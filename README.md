@@ -19,10 +19,10 @@ The provider-agnostic Stage 0 through Stage 6 pipeline and end-to-end
 currently reports 176 passed and 0 failed using deterministic fake providers.
 
 Real OpenAI, Supabase, Canvas, OCR, and mobile integration are intentionally
-deferred. The API-layer OpenAI provider adapter boundary is designed and
-contract-tested with fake clients, but real SDK wiring and network calls remain
-deferred. GUI/mobile work remains deferred until provider integration and
-engine validation are stable.
+deferred. The OpenAI SDK and server-only provider factory now live in
+`apps/api`; normal contract checks still use injected fake clients and make no
+network calls. Production route wiring remains deferred. GUI/mobile work
+remains deferred until provider integration and engine validation are stable.
 
 See [ADR-004](docs/architecture/ADR-004-engine-pipeline.md) and the
 [engine contract](docs/architecture/engine-contract.md) for the completed
@@ -43,6 +43,20 @@ Root and API env files may hold server credentials. Mobile must contain only
 `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, and Google Cloud credentials must
 never be placed in mobile env files or committed.
+
+Node.js 20 or newer and npm 10 or newer must be available before provider
+setup. The OpenAI SDK is installed only in `apps/api`, and
+`OPENAI_API_KEY` is read only by the server provider factory.
+
+The real provider smoke test is opt-in and makes one API request:
+
+```powershell
+$env:RUN_OPENAI_SMOKE="1"
+$env:OPENAI_API_KEY="<server-only-key>"
+npm run smoke:openai -w apps/api
+```
+
+Normal engine evals and provider contract checks do not run this smoke test.
 
 ## Getting started
 

@@ -52,7 +52,10 @@ V2 also separates AI provider integration from the core engine. The OpenAI
 adapter is defined in the server/API layer behind `GenerationProvider`, where
 it can be tested with fake clients without changing the pipeline or exposing
 credentials to mobile code. This separation improves maintainability and makes
-provider-specific failures testable before real network integration.
+provider-specific failures testable before real network integration. Real SDK
+construction is isolated in a server-only factory and evaluated separately
+from deterministic engine behavior; the normal engine suite still performs no
+network calls.
 
 ## Thesis Deliverables
 

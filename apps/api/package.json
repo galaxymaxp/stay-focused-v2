@@ -7,6 +7,7 @@
     "dev": "next dev",
     "lint": "next lint",
     "provider:contract": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.contract.test.js",
+    "smoke:openai": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.smoke.js",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next"
   },
@@ -14,6 +15,7 @@
     "@stay-focused/db": "*",
     "@stay-focused/engine": "*",
     "next": "^15.5.0",
+    "openai": "^6.42.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

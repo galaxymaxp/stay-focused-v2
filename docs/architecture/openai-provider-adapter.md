@@ -4,16 +4,15 @@
 
 The API-layer `OpenAIProvider` translates the engine's provider-agnostic
 generation request into a narrow OpenAI Responses API-style structured-output
-request. It is designed for dependency injection and contract testing before
-the real OpenAI SDK is installed or production routes are wired.
+request. It preserves dependency injection for fake-client contract testing
+while providing a separate server-only factory for real SDK construction.
 
 ## Non-goals
 
 The current adapter boundary does not:
 
-- instantiate an OpenAI SDK client;
-- read `OPENAI_API_KEY` directly;
 - make network calls in tests;
+- run the real smoke test by default;
 - change Stage 0 through Stage 6 or `runPipeline`;
 - validate generated section fields after JSON parsing; or
 - accept raw files, OCR objects, Canvas objects, Supabase objects, auth objects,
@@ -42,6 +41,19 @@ The adapter must:
 
 Request metadata remains available to surrounding API code for future tracing,
 but the current adapter neither logs it nor injects it into the prompt.
+
+## Real SDK Factory
+
+`createServerOpenAIProvider` lives beside the injected adapter in
+`apps/api/src/providers/openai-provider.ts`. It reads `OPENAI_API_KEY` from the
+server process, constructs the OpenAI SDK client, and wraps that client in the
+existing `OpenAIResponsesClient` boundary. It throws before client construction
+when the key is missing.
+
+The SDK is a dependency of `apps/api` only. Core engine stages and mobile code
+must not import the SDK, the factory, or server credentials. API route wiring is
+still intentionally deferred, so adding the factory does not change
+`runPipeline` or any Stage 0 through Stage 6 contract.
 
 ## Request Mapping
 
@@ -133,29 +145,49 @@ values only through approved variable-name matching.
 - empty, invalid, and non-object responses; and
 - client error wrapping with model context.
 
-The checks require no OpenAI SDK, API key, or network connection. They are kept
-separate from the 176 deterministic engine evals because they test an API-layer
-adapter rather than engine behavior.
+The checks require no API key or network connection. They are kept separate
+from the 176 deterministic engine evals because they test an API-layer adapter
+rather than engine behavior.
+
+The installed SDK module is present for compilation, but fake checks inject a
+client factory and do not construct the real SDK client. The checks also verify
+the missing-key guard, `json_schema` format, `strict: true`, and the `gpt-4o`
+default.
+
+## Opt-in Smoke Test
+
+`openai-provider.smoke.ts` makes exactly one small structured-output request.
+It is not part of normal builds, engine evals, or provider contract checks and
+requires both `RUN_OPENAI_SMOKE=1` and `OPENAI_API_KEY` when explicitly run:
+
+```powershell
+$env:RUN_OPENAI_SMOKE="1"
+$env:OPENAI_API_KEY="<server-only-key>"
+npm run smoke:openai -w apps/api
+```
+
+CI should leave `RUN_OPENAI_SMOKE` unset unless a dedicated, credentialed smoke
+job is intentionally configured.
 
 ## Real Integration Checklist
 
-1. Restore working Node.js/npm access.
-2. Install and pin the OpenAI SDK in `apps/api` only.
-3. Add server-only client construction that reads `OPENAI_API_KEY`.
-4. Adapt the real SDK response to the narrow injected-client interface if
-   required.
-5. Keep route handlers responsible for selecting the adapter and invoking
+1. Keep Node.js 20+ and npm 10+ available for API provider work.
+2. Keep route handlers responsible for selecting the adapter and invoking
    `runPipeline`.
-6. Add opt-in smoke tests with explicit cost and timeout limits.
-7. Add quality, latency, cost, and operational monitoring separately from
+3. Run the opt-in smoke test only in an explicitly credentialed environment.
+4. Add quality, latency, cost, and operational monitoring separately from
    deterministic engine evals.
-8. Confirm no server credential enters mobile or browser bundles.
+5. Confirm no server credential enters mobile or browser bundles.
 
 ## Current Limitations
 
-- The OpenAI SDK is not installed or instantiated.
 - No real OpenAI request has been made.
-- Response mapping is based on the narrow documented adapter shape and fake
-  clients; real SDK compatibility must be confirmed during wiring.
-- npm commands remain blocked locally because `npm` is unavailable on `PATH`.
+- Production API routes do not yet construct or invoke the real provider.
+- Real model quality, latency, cost, refusal, and operational behavior remain
+  unevaluated until the opt-in smoke and later provider evaluations are run.
 - Engine evals still use fake providers and remain unchanged.
+
+Node.js and npm are prerequisites for SDK installation and verification. V1
+environment values may be reused only in ignored local V2 env files after
+variable-name matching; they must never be copied into committed templates or
+mobile server-secret variables.

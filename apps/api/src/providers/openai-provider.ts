@@ -3,6 +3,8 @@ import type {
   GenerationRequest,
   StructuredOutputSchema,
 } from "@stay-focused/engine";
+import OpenAI from "openai";
+import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 
 export interface OpenAIJsonSchemaFormat {
   readonly type: "json_schema";
@@ -45,6 +47,20 @@ export interface OpenAIResponsesClient {
 export interface OpenAIProviderOptions {
   readonly client: OpenAIResponsesClient;
   readonly defaultModel?: string;
+}
+
+export interface OpenAIProviderEnvironment {
+  readonly OPENAI_API_KEY?: string;
+}
+
+export type OpenAIResponsesClientFactory = (
+  apiKey: string,
+) => OpenAIResponsesClient;
+
+export interface CreateServerOpenAIProviderOptions {
+  readonly defaultModel?: string;
+  readonly environment?: OpenAIProviderEnvironment;
+  readonly clientFactory?: OpenAIResponsesClientFactory;
 }
 
 export class OpenAIProvider implements GenerationProvider {
@@ -123,6 +139,55 @@ export class OpenAIProvider implements GenerationProvider {
 
     return parsed as TOutput;
   }
+}
+
+export function createServerOpenAIProvider(
+  options: CreateServerOpenAIProviderOptions = {},
+): OpenAIProvider {
+  const environment = options.environment ?? process.env;
+  const apiKey = readNonEmptyString(environment.OPENAI_API_KEY);
+  if (!apiKey) {
+    throw new Error(
+      "OPENAI_API_KEY is required to create the server OpenAI provider.",
+    );
+  }
+
+  const clientFactory = options.clientFactory ?? createOpenAIResponsesClient;
+  return new OpenAIProvider({
+    client: clientFactory(apiKey),
+    defaultModel: options.defaultModel,
+  });
+}
+
+function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
+  const client = new OpenAI({ apiKey });
+
+  return {
+    responses: {
+      create: async (
+        request: OpenAIResponsesCreateRequest,
+      ): Promise<OpenAIResponsesCreateResponse> => {
+        const sdkRequest: ResponseCreateParamsNonStreaming = {
+          model: request.model,
+          input: request.input,
+          text: {
+            format: {
+              type: request.text.format.type,
+              name: request.text.format.name,
+              description: request.text.format.description,
+              schema: request.text.format.schema,
+              strict: request.text.format.strict,
+            },
+          },
+          ...(request.temperature !== undefined
+            ? { temperature: request.temperature }
+            : {}),
+        };
+        const response = await client.responses.create(sdkRequest);
+        return { output_text: response.output_text };
+      },
+    },
+  };
 }
 
 function extractOutputText(

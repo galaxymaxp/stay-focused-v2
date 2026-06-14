@@ -4,6 +4,7 @@ import type {
 } from "@stay-focused/engine";
 
 import {
+  createServerOpenAIProvider,
   OpenAIProvider,
   type OpenAIResponsesClient,
   type OpenAIResponsesCreateRequest,
@@ -69,6 +70,47 @@ const checks: readonly ContractCheck[] = [
         model: undefined,
       } as unknown as GenerationRequest<unknown>;
       await new OpenAIProvider({ client }).generate(request);
+      assertEqual(client.lastRequest?.model, "gpt-4o");
+    },
+  },
+  {
+    name: "server factory requires OPENAI_API_KEY",
+    run: async () => {
+      let clientFactoryCalls = 0;
+      expectError(
+        () =>
+          createServerOpenAIProvider({
+            environment: {},
+            clientFactory: () => {
+              clientFactoryCalls += 1;
+              return new FakeClient({ output_text: '{"value":"ok"}' });
+            },
+          }),
+        "OPENAI_API_KEY is required to create the server OpenAI provider.",
+      );
+      assertEqual(clientFactoryCalls, 0);
+    },
+  },
+  {
+    name: "server factory supports fake clients without constructing SDK client",
+    run: async () => {
+      const client = new FakeClient({ output_text: '{"value":"ok"}' });
+      let clientFactoryCalls = 0;
+      const provider = createServerOpenAIProvider({
+        environment: { OPENAI_API_KEY: "contract-key" },
+        clientFactory: (apiKey) => {
+          clientFactoryCalls += 1;
+          assertEqual(apiKey, "contract-key");
+          return client;
+        },
+      });
+      const request = {
+        ...createRequest(),
+        model: undefined,
+      } as unknown as GenerationRequest<unknown>;
+
+      await provider.generate(request);
+      assertEqual(clientFactoryCalls, 1);
       assertEqual(client.lastRequest?.model, "gpt-4o");
     },
   },
