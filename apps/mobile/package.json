@@ -1,0 +1,29 @@
+{
+  "name": "@stay-focused/mobile",
+  "version": "2.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "build": "expo export",
+    "dev": "expo start",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf .expo dist"
+  },
+  "dependencies": {
+    "@stay-focused/engine": "*",
+    "@stay-focused/shared": "*",
+    "expo": "~53.0.0",
+    "expo-router": "~5.0.0",
+    "expo-secure-store": "~14.2.0",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3"
+  }
+}
