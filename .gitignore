@@ -8,3 +8,7 @@ dist/
 *.log
 coverage/
 .DS_Store
+
+# Local AI agent handoff logs
+docs/ai/handoff.md
+docs/ai/*.local.md
