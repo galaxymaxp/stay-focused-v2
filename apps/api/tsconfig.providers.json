@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "outDir": "dist/provider-contract",
+    "paths": {
+      "@stay-focused/engine": ["packages/engine/src/index.ts"]
+    },
+    "rootDir": "../.."
+  },
+  "include": [
+    "src/providers/**/*.ts",
+    "../../packages/engine/src/**/*.ts"
+  ]
+}

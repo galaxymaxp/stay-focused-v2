@@ -13,6 +13,10 @@ deterministic and dependency-free; provider-facing cases use fake providers
 only. LLM quality evals are intentionally deferred until a real provider
 adapter exists.
 
+API-layer provider adapter contract checks are maintained separately from these
+176 engine evals. They use injected fake clients and do not replace the engine's
+fake-provider suites or require a real API key.
+
 ## Why Evals Come Before Each Stage
 
 Stage 0 establishes the source representation used by every later stage.

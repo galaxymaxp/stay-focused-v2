@@ -48,6 +48,12 @@ helps prevent V1-style regressions such as silently weak reviewers or missing
 later source sections. Provider quality evaluation and application integration
 remain future work.
 
+V2 also separates AI provider integration from the core engine. The OpenAI
+adapter is defined in the server/API layer behind `GenerationProvider`, where
+it can be tested with fake clients without changing the pipeline or exposing
+credentials to mobile code. This separation improves maintainability and makes
+provider-specific failures testable before real network integration.
+
 ## Thesis Deliverables
 
 - A working mobile application integrated with Canvas LMS.

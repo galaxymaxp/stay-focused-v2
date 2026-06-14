@@ -6,6 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
+    "provider:contract": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.contract.test.js",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next"
   },

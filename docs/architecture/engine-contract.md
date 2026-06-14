@@ -154,7 +154,10 @@ The request contains:
 
 The engine calls this interface only. No direct OpenAI SDK import belongs in
 Stage 0 through Stage 6. A future provider adapter may translate this request
-into vendor-specific API calls without changing the stage contracts.
+into vendor-specific API calls without changing the stage contracts. The
+API-layer OpenAI adapter boundary is now defined by
+[ADR-005](ADR-005-openai-provider-adapter.md); real SDK client construction and
+network wiring remain deferred.
 
 ## Schema Family
 
@@ -208,7 +211,8 @@ case fails.
 
 ## Current Limitations
 
-- Only fake providers are evaluated; real OpenAI integration is not present.
+- Engine evals use fake providers. The API adapter has fake-client contract
+  checks, but real OpenAI integration is not present.
 - LLM response quality, latency, cost, and provider reliability are not yet
   measured.
 - File and OCR extraction remain external to the engine.
@@ -220,10 +224,9 @@ case fails.
 
 ## Next Engineering Steps
 
-1. Design a provider adapter boundary for OpenAI without changing the engine
-   contracts.
-2. Add adapter contract tests for request translation, errors, timeouts, and
-   provider metadata.
+1. Restore Node.js/npm access, then install and wire the OpenAI SDK in the API
+   layer without changing engine contracts.
+2. Add opt-in real-provider smoke tests with explicit timeout and cost limits.
 3. Add LLM quality, latency, and cost evaluation separately from deterministic
    engine evals.
 4. Integrate extraction, storage, Canvas, and mobile only after the provider

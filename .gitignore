@@ -4,7 +4,14 @@ node_modules/
 dist/
 .expo/
 .env
-.env.local
+.env.*
+!.env.example
+!**/.env.example
+apps/api/.env
+apps/api/.env.local
+apps/mobile/.env
+apps/mobile/.env.local
+*.credentials.json
 *.log
 coverage/
 .DS_Store
