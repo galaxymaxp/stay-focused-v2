@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "name": "plan and source mismatch is rejected",
+      "scenario": "source-mismatch",
+      "expectError": "Coverage verification source mismatch: plan source ID \"different-source\" does not match source ID \"stage4-source\"."
+    },
+    {
+      "name": "planned section missing source block is rejected",
+      "scenario": "missing-plan-source-block",
+      "expectError": "Planned section \"planned-concept-card-0\" references missing source block ID \"missing-block\"."
+    },
+    {
+      "name": "missing outputs are rejected",
+      "scenario": "missing-outputs",
+      "expectError": "Coverage verification requires generated outputs."
+    },
+    {
+      "name": "missing plan is rejected",
+      "scenario": "missing-plan",
+      "expectError": "Coverage verification requires a generation plan."
+    },
+    {
+      "name": "missing source is rejected",
+      "scenario": "missing-source",
+      "expectError": "Coverage verification requires a normalized source."
+    },
+    {
+      "name": "empty plan sections are rejected",
+      "scenario": "empty-plan",
+      "expectError": "Coverage verification requires at least one planned section."
+    }
+  ]
+}

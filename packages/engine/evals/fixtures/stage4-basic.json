@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "name": "valid concept output passes",
+      "schemaKind": "concept-card",
+      "expectStatus": "passed",
+      "expectScore": 1
+    },
+    {
+      "name": "valid process output passes",
+      "schemaKind": "process-step",
+      "expectStatus": "passed",
+      "expectScore": 1
+    },
+    {
+      "name": "valid example output passes",
+      "schemaKind": "example-card",
+      "expectStatus": "passed",
+      "expectScore": 1
+    },
+    {
+      "name": "valid claim output passes",
+      "schemaKind": "claim-card",
+      "expectStatus": "passed",
+      "expectScore": 1
+    }
+  ]
+}

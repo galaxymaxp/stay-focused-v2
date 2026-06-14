@@ -7,12 +7,14 @@ import { stage0NormalizationSuite } from "./stage0-normalization.eval.js";
 import { stage1OutlineSuite } from "./stage1-outline.eval.js";
 import { stage2PlanSuite } from "./stage2-plan.eval.js";
 import { stage3GenerateSuite } from "./stage3-generate.eval.js";
+import { stage4VerifySuite } from "./stage4-verify.eval.js";
 
 const suites = [
   stage0NormalizationSuite,
   stage1OutlineSuite,
   stage2PlanSuite,
   stage3GenerateSuite,
+  stage4VerifySuite,
 ];
 const results = [];
 

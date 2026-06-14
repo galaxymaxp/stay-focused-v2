@@ -1,0 +1,100 @@
+{
+  "cases": [
+    {
+      "name": "missing output fails",
+      "scenario": "missing-output",
+      "expectReportStatus": "failed",
+      "expectSectionStatuses": ["failed"],
+      "expectSectionScores": [0],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Missing output for planned section"]
+    },
+    {
+      "name": "wrong output kind fails",
+      "scenario": "wrong-kind",
+      "expectReportStatus": "failed",
+      "expectSectionStatuses": ["failed"],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Output kind does not match planned schema kind"]
+    },
+    {
+      "name": "missing required field fails",
+      "scenario": "missing-field",
+      "expectReportStatus": "failed",
+      "expectSectionStatuses": ["failed"],
+      "expectSectionScores": [0.59],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Missing required field: explanation"]
+    },
+    {
+      "name": "empty required field fails",
+      "scenario": "empty-field",
+      "expectReportStatus": "failed",
+      "expectSectionStatuses": ["failed"],
+      "expectSectionScores": [0.59],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Missing required field: explanation"]
+    },
+    {
+      "name": "short required content is weak",
+      "scenario": "weak-content",
+      "expectReportStatus": "weak",
+      "expectSectionStatuses": ["weak"],
+      "expectSectionScores": [0.84],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Weak content field: explanation"]
+    },
+    {
+      "name": "partial source block coverage is weak",
+      "scenario": "partial-coverage",
+      "expectReportStatus": "weak",
+      "expectSectionStatuses": ["weak"],
+      "expectSectionScores": [0.8],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Missing required source block: \"source-b\""]
+    },
+    {
+      "name": "unknown output source block fails",
+      "scenario": "unknown-source-block",
+      "expectReportStatus": "failed",
+      "expectSectionStatuses": ["failed"],
+      "expectSectionScores": [0.59],
+      "expectRetryable": [true],
+      "expectIssuesContain": ["Output references unknown source block: \"unknown-block\""]
+    },
+    {
+      "name": "output for unplanned section fails",
+      "scenario": "unplanned-output",
+      "expectReportStatus": "failed",
+      "expectSectionStatuses": ["passed", "failed"],
+      "expectRetryable": [false, false],
+      "expectSectionOrder": ["planned-concept-card-0", "unplanned-section"],
+      "expectIssuesContain": ["Output references unplanned section \"unplanned-section\""]
+    },
+    {
+      "name": "multiple sections preserve report order",
+      "scenario": "multiple-passed",
+      "expectReportStatus": "passed",
+      "expectReportScore": 1,
+      "expectSectionStatuses": ["passed", "passed"],
+      "expectRetryable": [false, false],
+      "expectSectionOrder": ["planned-concept-card-0", "planned-process-step-1"]
+    },
+    {
+      "name": "overall weak when one section is weak and none fail",
+      "scenario": "multiple-weak",
+      "expectReportStatus": "weak",
+      "expectReportScore": 0.9,
+      "expectSectionStatuses": ["passed", "weak"],
+      "expectRetryable": [false, true]
+    },
+    {
+      "name": "overall failed when any section fails",
+      "scenario": "multiple-failed",
+      "expectReportStatus": "failed",
+      "expectReportScore": 0.5,
+      "expectSectionStatuses": ["passed", "failed"],
+      "expectRetryable": [false, true]
+    }
+  ]
+}

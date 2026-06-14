@@ -183,6 +183,9 @@ export interface SectionCoverageResult {
 }
 
 export interface CoverageReport {
+  readonly id: string;
+  readonly planId: string;
+  readonly sourceId: string;
   readonly status: CoverageStatus;
   readonly score: number;
   readonly sections: readonly SectionCoverageResult[];

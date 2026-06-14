@@ -32,6 +32,11 @@ construction, source excerpt isolation, fake-provider failures, and runtime
 validation of all four section output shapes. Real OpenAI integration remains
 intentionally deferred so provider work cannot weaken the engine boundary.
 
+Stage 4 is deterministic coverage verification. Its evals compare generated
+outputs with planned schema kinds, required fields, and required source-block
+coverage before retry or reviewer assembly. This prevents weak, incomplete, or
+misrouted reviewer sections from silently passing into later pipeline stages.
+
 ## Running Evals
 
 Build the engine and run all suites:
@@ -65,10 +70,16 @@ Run only Stage 3 after building:
 npm run eval:stage3 --workspace @stay-focused/engine
 ```
 
+Run only Stage 4 after building:
+
+```text
+npm run eval:stage4 --workspace @stay-focused/engine
+```
+
 The process exits with code `0` when every case passes and code `1` when any
 case fails.
 
-## Adding Stage 4-6 Evals
+## Adding Stage 5-6 Evals
 
 1. Add readable JSON fixture files under `evals/fixtures`.
 2. Create a typed suite that converts each fixture into an `EvalCase`.
