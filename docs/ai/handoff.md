@@ -98,3 +98,22 @@ None.
 
 - Node.js and npm remain unavailable on the normal shell `PATH`; direct runtime
   and TypeScript verification remain necessary until the PATH is repaired.
+
+## Session 5
+
+### What Was Implemented
+
+- Implemented eval-first Stage 2 deterministic generation planning.
+- Added Stage 2 fixtures and an eval suite for schema selection, target
+  contracts, source references, ordering, deterministic IDs, and validation.
+- Updated the eval runner to cover Stage 0, Stage 1, and Stage 2.
+
+### Next Step
+
+1. Implement Stage 3 schema contracts and provider-request construction without
+   real OpenAI integration.
+
+### Blockers
+
+- Node.js and npm remain unavailable on the normal shell `PATH`; direct runtime
+  and TypeScript verification remain necessary until the PATH is repaired.

@@ -11,6 +11,7 @@
     "eval": "node dist/evals/run-evals.js",
     "eval:stage0": "node dist/evals/stage0-normalization.eval.js",
     "eval:stage1": "node dist/evals/stage1-outline.eval.js",
+    "eval:stage2": "node dist/evals/stage2-plan.eval.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json",
     "clean": "rimraf dist"

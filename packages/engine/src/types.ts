@@ -103,6 +103,10 @@ export type SectionSchemaKind =
 export interface PlannedSectionTarget {
   readonly objective: string;
   readonly itemCount: number;
+  readonly focus: string;
+  readonly requiredSourceBlockIds: readonly string[];
+  readonly expectedTags: readonly SectionContentTag[];
+  readonly coverageRules: readonly string[];
 }
 
 export interface PlannedSection {
@@ -116,8 +120,17 @@ export interface PlannedSection {
 }
 
 export interface GenerationPlan {
+  readonly id: string;
   readonly sourceId: string;
+  readonly outlineId: string;
+  readonly title: string;
   readonly sections: readonly PlannedSection[];
+  readonly metadata: GenerationPlanMetadata;
+}
+
+export interface GenerationPlanMetadata {
+  readonly sectionCount: number;
+  readonly sourceBlockCount: number;
 }
 
 interface BaseSectionOutput {

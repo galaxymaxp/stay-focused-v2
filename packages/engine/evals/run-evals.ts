@@ -5,8 +5,9 @@ import {
 } from "./assert.js";
 import { stage0NormalizationSuite } from "./stage0-normalization.eval.js";
 import { stage1OutlineSuite } from "./stage1-outline.eval.js";
+import { stage2PlanSuite } from "./stage2-plan.eval.js";
 
-const suites = [stage0NormalizationSuite, stage1OutlineSuite];
+const suites = [stage0NormalizationSuite, stage1OutlineSuite, stage2PlanSuite];
 const results = [];
 
 for (const [index, suite] of suites.entries()) {

@@ -1,0 +1,249 @@
+{
+  "cases": [
+    {
+      "name": "one outline section creates one planned section",
+      "sourceInput": {
+        "id": "single-plan-source",
+        "title": "Cell Notes",
+        "blocks": [
+          { "id": "cell-heading", "kind": "heading", "text": "Cells", "order": 0 },
+          { "id": "cell-body", "kind": "paragraph", "text": "Cells are units of life.", "order": 1 }
+        ]
+      },
+      "outline": {
+        "id": "single-plan-outline",
+        "sourceId": "single-plan-source",
+        "title": "Cell Notes",
+        "sections": [
+          {
+            "id": "cells-section",
+            "title": "Cells",
+            "order": 0,
+            "blockIds": ["cell-heading", "cell-body"],
+            "roughStartBlockId": "cell-heading",
+            "roughEndBlockId": "cell-body",
+            "tags": ["concept"],
+            "confidence": 0.9
+          }
+        ]
+      },
+      "expect": {
+        "planTitle": "Cell Notes",
+        "planSourceId": "single-plan-source",
+        "planOutlineId": "single-plan-outline",
+        "sectionCount": 1,
+        "sectionTitles": ["Cells"],
+        "sourceSectionIds": ["cells-section"],
+        "sectionOrders": [0],
+        "schemaKinds": ["concept-card"],
+        "metadata": { "sectionCount": 1, "sourceBlockCount": 2 }
+      }
+    },
+    {
+      "name": "multiple outline sections preserve order",
+      "sourceInput": {
+        "id": "ordered-plan-source",
+        "title": "Ordered Notes",
+        "blocks": [
+          { "id": "first-block", "kind": "paragraph", "text": "First content.", "order": 0 },
+          { "id": "second-block", "kind": "paragraph", "text": "Second content.", "order": 1 },
+          { "id": "third-block", "kind": "paragraph", "text": "Third content.", "order": 2 }
+        ]
+      },
+      "outline": {
+        "id": "ordered-plan-outline",
+        "sourceId": "ordered-plan-source",
+        "title": "Ordered Notes",
+        "sections": [
+          {
+            "id": "first-section",
+            "title": "First",
+            "order": 0,
+            "blockIds": ["first-block"],
+            "roughStartBlockId": "first-block",
+            "roughEndBlockId": "first-block",
+            "tags": ["concept"],
+            "confidence": 0.7
+          },
+          {
+            "id": "second-section",
+            "title": "Second",
+            "order": 1,
+            "blockIds": ["second-block"],
+            "roughStartBlockId": "second-block",
+            "roughEndBlockId": "second-block",
+            "tags": ["example"],
+            "confidence": 0.7
+          },
+          {
+            "id": "third-section",
+            "title": "Third",
+            "order": 2,
+            "blockIds": ["third-block"],
+            "roughStartBlockId": "third-block",
+            "roughEndBlockId": "third-block",
+            "tags": ["claim"],
+            "confidence": 0.7
+          }
+        ]
+      },
+      "expect": {
+        "sectionTitles": ["First", "Second", "Third"],
+        "sourceSectionIds": ["first-section", "second-section", "third-section"],
+        "sectionOrders": [0, 1, 2],
+        "schemaKinds": ["concept-card", "example-card", "claim-card"]
+      }
+    },
+    {
+      "name": "source block IDs are copied from outline sections",
+      "sourceInput": {
+        "id": "copied-block-source",
+        "title": "Copied Blocks",
+        "blocks": [
+          { "id": "copy-a", "kind": "heading", "text": "Copy", "order": 0 },
+          { "id": "copy-b", "kind": "paragraph", "text": "Copy this content.", "order": 1 }
+        ]
+      },
+      "outline": {
+        "id": "copied-block-outline",
+        "sourceId": "copied-block-source",
+        "title": "Copied Blocks",
+        "sections": [
+          {
+            "id": "copied-block-section",
+            "title": "Copy",
+            "order": 0,
+            "blockIds": ["copy-a", "copy-b"],
+            "roughStartBlockId": "copy-a",
+            "roughEndBlockId": "copy-b",
+            "tags": ["concept"],
+            "confidence": 0.9
+          }
+        ]
+      },
+      "expect": {
+        "sourceBlockIds": [["copy-a", "copy-b"]],
+        "targetRequiredSourceBlockIds": [["copy-a", "copy-b"]]
+      }
+    },
+    {
+      "name": "plan and planned section IDs are deterministic",
+      "sourceInput": {
+        "id": "stable-plan-source",
+        "title": "Stable Plan",
+        "blocks": [
+          { "id": "stable-block", "kind": "paragraph", "text": "Stable content.", "order": 0 }
+        ]
+      },
+      "outline": {
+        "id": "stable-plan-outline",
+        "sourceId": "stable-plan-source",
+        "title": "Stable Plan",
+        "sections": [
+          {
+            "id": "stable-section",
+            "title": "Stable",
+            "order": 0,
+            "blockIds": ["stable-block"],
+            "roughStartBlockId": "stable-block",
+            "roughEndBlockId": "stable-block",
+            "tags": ["concept"],
+            "confidence": 0.7
+          }
+        ]
+      },
+      "expect": { "deterministicIds": true }
+    },
+    {
+      "name": "empty outline sections are rejected",
+      "sourceInput": {
+        "id": "empty-outline-source",
+        "text": "Usable source content."
+      },
+      "outline": {
+        "id": "empty-outline",
+        "sourceId": "empty-outline-source",
+        "title": "Empty Outline",
+        "sections": []
+      },
+      "expectError": "Generation planning requires at least one outline section."
+    },
+    {
+      "name": "source and outline mismatch is rejected",
+      "sourceInput": {
+        "id": "actual-source",
+        "text": "Usable source content."
+      },
+      "outline": {
+        "id": "mismatched-outline",
+        "sourceId": "different-source",
+        "title": "Mismatch",
+        "sections": [
+          {
+            "id": "mismatch-section",
+            "title": "Mismatch",
+            "order": 0,
+            "blockIds": ["unused"],
+            "roughStartBlockId": "unused",
+            "roughEndBlockId": "unused",
+            "tags": ["concept"],
+            "confidence": 0.7
+          }
+        ]
+      },
+      "expectError": "Generation planning source mismatch: outline source ID \"different-source\" does not match source ID \"actual-source\"."
+    },
+    {
+      "name": "outline section without block IDs is rejected",
+      "sourceInput": {
+        "id": "no-block-ids-source",
+        "text": "Usable source content."
+      },
+      "outline": {
+        "id": "no-block-ids-outline",
+        "sourceId": "no-block-ids-source",
+        "title": "No Block IDs",
+        "sections": [
+          {
+            "id": "no-block-ids-section",
+            "title": "No Blocks",
+            "order": 0,
+            "blockIds": [],
+            "roughStartBlockId": "",
+            "roughEndBlockId": "",
+            "tags": ["unknown"],
+            "confidence": 0.5
+          }
+        ]
+      },
+      "expectError": "Outline section \"no-block-ids-section\" must reference at least one source block."
+    },
+    {
+      "name": "missing referenced source block is rejected",
+      "sourceInput": {
+        "id": "missing-block-source",
+        "blocks": [
+          { "id": "existing-block", "kind": "paragraph", "text": "Existing content.", "order": 0 }
+        ]
+      },
+      "outline": {
+        "id": "missing-block-outline",
+        "sourceId": "missing-block-source",
+        "title": "Missing Block",
+        "sections": [
+          {
+            "id": "missing-block-section",
+            "title": "Missing",
+            "order": 0,
+            "blockIds": ["missing-block"],
+            "roughStartBlockId": "missing-block",
+            "roughEndBlockId": "missing-block",
+            "tags": ["concept"],
+            "confidence": 0.7
+          }
+        ]
+      },
+      "expectError": "Outline section \"missing-block-section\" references missing source block ID \"missing-block\"."
+    }
+  ]
+}

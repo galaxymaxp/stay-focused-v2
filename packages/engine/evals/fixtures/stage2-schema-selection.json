@@ -1,0 +1,49 @@
+{
+  "cases": [
+    {
+      "name": "process tag selects process-step",
+      "tag": "process",
+      "expectSchemaKind": "process-step"
+    },
+    {
+      "name": "example tag selects example-card",
+      "tag": "example",
+      "expectSchemaKind": "example-card"
+    },
+    {
+      "name": "claim tag selects claim-card",
+      "tag": "claim",
+      "expectSchemaKind": "claim-card"
+    },
+    {
+      "name": "concept tag selects concept-card",
+      "tag": "concept",
+      "expectSchemaKind": "concept-card"
+    },
+    {
+      "name": "definition tag falls back to concept-card",
+      "tag": "definition",
+      "expectSchemaKind": "concept-card"
+    },
+    {
+      "name": "unknown tag falls back to concept-card",
+      "tag": "unknown",
+      "expectSchemaKind": "concept-card"
+    },
+    {
+      "name": "mixed tag falls back to concept-card",
+      "tag": "mixed",
+      "expectSchemaKind": "concept-card"
+    },
+    {
+      "name": "multiple tags follow process example claim priority",
+      "tags": ["claim", "example", "process", "concept"],
+      "expectSchemaKind": "process-step"
+    },
+    {
+      "name": "example wins over claim when process is absent",
+      "tags": ["claim", "example"],
+      "expectSchemaKind": "example-card"
+    }
+  ]
+}

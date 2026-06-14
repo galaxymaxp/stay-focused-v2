@@ -1,0 +1,38 @@
+{
+  "cases": [
+    {
+      "name": "concept target requests explanation and key points",
+      "schemaTag": "concept",
+      "expectSchemaKind": "concept-card",
+      "expectObjectiveContains": ["Explain", "key points"],
+      "expectCoverageContains": ["central concept", "key points"]
+    },
+    {
+      "name": "process target requests ordered steps",
+      "schemaTag": "process",
+      "expectSchemaKind": "process-step",
+      "expectObjectiveContains": ["ordered steps"],
+      "expectCoverageContains": ["logical order", "required step"]
+    },
+    {
+      "name": "example target requests scenario and explanation",
+      "schemaTag": "example",
+      "expectSchemaKind": "example-card",
+      "expectObjectiveContains": ["example or scenario", "explain"],
+      "expectCoverageContains": ["concrete example or scenario", "connects"]
+    },
+    {
+      "name": "claim target requests evidence or reasoning",
+      "schemaTag": "claim",
+      "expectSchemaKind": "claim-card",
+      "expectObjectiveContains": ["central claim", "evidence or reasoning"],
+      "expectCoverageContains": ["central claim", "evidence or reasoning"]
+    },
+    {
+      "name": "target item count is clamped to five source blocks",
+      "schemaTag": "concept",
+      "sourceBlockCount": 7,
+      "expectItemCount": 5
+    }
+  ]
+}

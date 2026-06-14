@@ -19,6 +19,13 @@ stable IDs, content tags, confidence scores, and invalid empty input. These
 contracts are tested before Stage 2 so generation planning can rely on a stable
 and measurable outline instead of compensating for ambiguous structure.
 
+Stage 2 is deterministic generation planning. Its evals verify one-to-one
+section planning, source ordering, reference validation, stable IDs, target
+coverage requirements, and schema selection. The schema family is intentionally
+limited to `ConceptCard`, `ProcessStep`, `ExampleCard`, and `ClaimCard` so Stage
+3 receives a small, predictable contract before any provider request is built.
+Stable planning prevents provider behavior from hiding structural mistakes.
+
 ## Running Evals
 
 Build the engine and run all suites:
@@ -40,10 +47,16 @@ Run only Stage 1 after building:
 npm run eval:stage1 --workspace @stay-focused/engine
 ```
 
+Run only Stage 2 after building:
+
+```text
+npm run eval:stage2 --workspace @stay-focused/engine
+```
+
 The process exits with code `0` when every case passes and code `1` when any
 case fails.
 
-## Adding Stage 2-6 Evals
+## Adding Stage 3-6 Evals
 
 1. Add readable JSON fixture files under `evals/fixtures`.
 2. Create a typed suite that converts each fixture into an `EvalCase`.
