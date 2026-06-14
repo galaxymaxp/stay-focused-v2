@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "name": "passed sections are preserved without provider calls",
+      "scenario": "passed-preserved"
+    },
+    {
+      "name": "weak retryable sections are regenerated",
+      "scenario": "weak-retried"
+    },
+    {
+      "name": "failed retryable sections are regenerated",
+      "scenario": "failed-retried"
+    },
+    {
+      "name": "non-retryable sections are preserved",
+      "scenario": "retryable-false"
+    },
+    {
+      "name": "successful retries replace weak outputs",
+      "scenario": "successful-replaces"
+    },
+    {
+      "name": "provider failures keep the previous output",
+      "scenario": "failed-retry-keeps"
+    },
+    {
+      "name": "missing outputs can be generated",
+      "scenario": "missing-generated"
+    },
+    {
+      "name": "provider failures do not crash when output is missing",
+      "scenario": "provider-failure-no-output"
+    },
+    {
+      "name": "final outputs follow generation plan order",
+      "scenario": "plan-order"
+    },
+    {
+      "name": "unplanned outputs are excluded deterministically",
+      "scenario": "unplanned-excluded"
+    }
+  ]
+}

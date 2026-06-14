@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "name": "negative maxRetries is rejected",
+      "scenario": "negative-retries",
+      "expectError": "Stage 5 retry policy maxRetries must be an integer between 0 and 5."
+    },
+    {
+      "name": "fractional maxRetries is rejected",
+      "scenario": "fractional-retries",
+      "expectError": "Stage 5 retry policy maxRetries must be an integer between 0 and 5."
+    },
+    {
+      "name": "maxRetries above the bound is rejected",
+      "scenario": "excessive-retries",
+      "expectError": "Stage 5 retry policy maxRetries must be an integer between 0 and 5."
+    },
+    {
+      "name": "coverage and plan IDs must match",
+      "scenario": "coverage-plan-mismatch",
+      "expectError": "Stage 5 coverage mismatch: coverage plan ID \"different-plan\" does not match plan ID \"stage5-plan\"."
+    },
+    {
+      "name": "plan and source IDs must match",
+      "scenario": "plan-source-mismatch",
+      "expectError": "Stage 5 source mismatch: plan source ID \"different-source\" does not match source ID \"stage5-source\"."
+    },
+    {
+      "name": "coverage cannot reference an unknown planned section",
+      "scenario": "unknown-coverage-section",
+      "expectError": "Stage 5 coverage references unknown planned section \"unknown-section\"."
+    },
+    {
+      "name": "planned source references must exist",
+      "scenario": "missing-source-block",
+      "expectError": "Stage 5 planned section \"planned-concept-card-0\" references missing source block ID \"missing-block\"."
+    },
+    {
+      "name": "outputs are required",
+      "scenario": "missing-outputs",
+      "expectError": "Stage 5 retry requires generated outputs."
+    },
+    {
+      "name": "coverage is required",
+      "scenario": "missing-coverage",
+      "expectError": "Stage 5 retry requires a coverage report."
+    },
+    {
+      "name": "plan is required",
+      "scenario": "missing-plan",
+      "expectError": "Stage 5 retry requires a generation plan."
+    },
+    {
+      "name": "source is required",
+      "scenario": "missing-source",
+      "expectError": "Stage 5 retry requires a normalized source."
+    },
+    {
+      "name": "provider is required",
+      "scenario": "missing-provider",
+      "expectError": "Stage 5 retry requires a generation provider."
+    }
+  ]
+}

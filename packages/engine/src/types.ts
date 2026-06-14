@@ -215,8 +215,9 @@ export interface ReviewerOutput {
 }
 
 export interface RetryPolicy {
-  readonly maxAttempts: number;
-  readonly retryWeakSections?: boolean;
+  readonly maxRetries: number;
+  readonly retryWeakSections: boolean;
+  readonly retryFailedSections: boolean;
 }
 
 export interface PipelineOptions {

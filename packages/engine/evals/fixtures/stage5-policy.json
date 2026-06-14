@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "name": "retryWeakSections false skips weak sections",
+      "scenario": "weak-disabled"
+    },
+    {
+      "name": "retryFailedSections false skips failed sections",
+      "scenario": "failed-disabled"
+    },
+    {
+      "name": "maxRetries zero performs no retries",
+      "scenario": "zero-retries"
+    },
+    {
+      "name": "maxRetries bounds provider call count",
+      "scenario": "bounded-calls"
+    },
+    {
+      "name": "default policy permits two retry attempts",
+      "scenario": "default-two-retries"
+    },
+    {
+      "name": "a later retry may pass after a provider failure",
+      "scenario": "failure-then-success"
+    }
+  ]
+}

@@ -37,6 +37,14 @@ outputs with planned schema kinds, required fields, and required source-block
 coverage before retry or reviewer assembly. This prevents weak, incomplete, or
 misrouted reviewer sections from silently passing into later pipeline stages.
 
+Stage 5 performs bounded retries only. Its evals verify that passed outputs are
+preserved, only retryable weak or failed sections are regenerated, policy
+switches and retry limits are honored, provider failures remain contained, and
+final outputs follow plan order. Fake providers keep these cases deterministic;
+real OpenAI integration is intentionally deferred. The bounded flow prevents
+weak sections from silently reaching reviewer assembly without introducing an
+unbounded provider loop.
+
 ## Running Evals
 
 Build the engine and run all suites:
@@ -76,10 +84,16 @@ Run only Stage 4 after building:
 npm run eval:stage4 --workspace @stay-focused/engine
 ```
 
+Run only Stage 5 after building:
+
+```text
+npm run eval:stage5 --workspace @stay-focused/engine
+```
+
 The process exits with code `0` when every case passes and code `1` when any
 case fails.
 
-## Adding Stage 5-6 Evals
+## Adding Stage 6 Evals
 
 1. Add readable JSON fixture files under `evals/fixtures`.
 2. Create a typed suite that converts each fixture into an `EvalCase`.

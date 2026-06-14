@@ -8,6 +8,7 @@ import { stage1OutlineSuite } from "./stage1-outline.eval.js";
 import { stage2PlanSuite } from "./stage2-plan.eval.js";
 import { stage3GenerateSuite } from "./stage3-generate.eval.js";
 import { stage4VerifySuite } from "./stage4-verify.eval.js";
+import { stage5RetrySuite } from "./stage5-retry.eval.js";
 
 const suites = [
   stage0NormalizationSuite,
@@ -15,6 +16,7 @@ const suites = [
   stage2PlanSuite,
   stage3GenerateSuite,
   stage4VerifySuite,
+  stage5RetrySuite,
 ];
 const results = [];
 

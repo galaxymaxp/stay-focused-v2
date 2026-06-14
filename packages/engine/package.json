@@ -14,6 +14,7 @@
     "eval:stage2": "node dist/evals/stage2-plan.eval.js",
     "eval:stage3": "node dist/evals/stage3-generate.eval.js",
     "eval:stage4": "node dist/evals/stage4-verify.eval.js",
+    "eval:stage5": "node dist/evals/stage5-retry.eval.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json",
     "clean": "rimraf dist"
