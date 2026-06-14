@@ -1,0 +1,32 @@
+{
+  "cases": [
+    {
+      "name": "valid concept section assembles",
+      "schemaKind": "concept-card"
+    },
+    {
+      "name": "valid process section assembles",
+      "schemaKind": "process-step"
+    },
+    {
+      "name": "valid example section assembles",
+      "schemaKind": "example-card"
+    },
+    {
+      "name": "valid claim section assembles",
+      "schemaKind": "claim-card"
+    },
+    {
+      "name": "reviewer metadata preserves source plan and coverage identity",
+      "scenario": "metadata"
+    },
+    {
+      "name": "reviewer sections preserve source block IDs",
+      "scenario": "source-blocks"
+    },
+    {
+      "name": "weak coverage assembles only with explicit opt in",
+      "scenario": "weak-allowed"
+    }
+  ]
+}

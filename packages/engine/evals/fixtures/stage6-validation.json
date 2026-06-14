@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "name": "missing output is rejected",
+      "scenario": "missing-output",
+      "expectError": "Stage 6 assembly is missing output for planned section \"planned-concept-card-0\"."
+    },
+    {
+      "name": "unplanned output is rejected",
+      "scenario": "unplanned-output",
+      "expectError": "Stage 6 output references unplanned section \"unplanned-section\"."
+    },
+    {
+      "name": "wrong output kind is rejected",
+      "scenario": "wrong-kind",
+      "expectError": "Stage 6 output kind mismatch for planned section \"planned-concept-card-0\": expected \"concept-card\" but received \"claim-card\"."
+    },
+    {
+      "name": "failed coverage is rejected",
+      "scenario": "failed-coverage",
+      "expectError": "Stage 6 cannot assemble planned section \"planned-concept-card-0\" because coverage status is failed."
+    },
+    {
+      "name": "weak coverage is rejected by default",
+      "scenario": "weak-coverage",
+      "expectError": "Stage 6 cannot assemble planned section \"planned-concept-card-0\" because coverage status is weak and allowWeakSections is false."
+    },
+    {
+      "name": "missing coverage result is rejected",
+      "scenario": "missing-coverage-result",
+      "expectError": "Stage 6 coverage is missing planned section \"planned-process-step-1\"."
+    },
+    {
+      "name": "plan and source IDs must match",
+      "scenario": "plan-source-mismatch",
+      "expectError": "Stage 6 source mismatch: plan source ID \"different-source\" does not match source ID \"stage6-source\"."
+    },
+    {
+      "name": "coverage and plan IDs must match",
+      "scenario": "coverage-plan-mismatch",
+      "expectError": "Stage 6 coverage mismatch: coverage plan ID \"different-plan\" does not match plan ID \"stage6-plan\"."
+    },
+    {
+      "name": "output source block references must exist",
+      "scenario": "missing-output-source-block",
+      "expectError": "Stage 6 output for planned section \"planned-concept-card-0\" references missing source block ID \"missing-block\"."
+    },
+    {
+      "name": "planned source block references must exist",
+      "scenario": "missing-plan-source-block",
+      "expectError": "Stage 6 planned section \"planned-concept-card-0\" references missing source block ID \"missing-block\"."
+    },
+    {
+      "name": "duplicate outputs are rejected",
+      "scenario": "duplicate-output",
+      "expectError": "Stage 6 assembly found multiple outputs for planned section \"planned-concept-card-0\"."
+    },
+    {
+      "name": "duplicate coverage results are rejected",
+      "scenario": "duplicate-coverage",
+      "expectError": "Stage 6 coverage contains multiple results for planned section \"planned-concept-card-0\"."
+    },
+    {
+      "name": "outputs are required",
+      "scenario": "missing-outputs",
+      "expectError": "Stage 6 assembly requires generated outputs."
+    },
+    {
+      "name": "coverage is required",
+      "scenario": "missing-coverage",
+      "expectError": "Stage 6 assembly requires a coverage report."
+    },
+    {
+      "name": "plan is required",
+      "scenario": "missing-plan",
+      "expectError": "Stage 6 assembly requires a generation plan."
+    },
+    {
+      "name": "source is required",
+      "scenario": "missing-source",
+      "expectError": "Stage 6 assembly requires a normalized source."
+    },
+    {
+      "name": "empty plan sections are rejected",
+      "scenario": "empty-plan",
+      "expectError": "Stage 6 assembly requires at least one planned section."
+    },
+    {
+      "name": "empty coverage results are rejected",
+      "scenario": "empty-coverage",
+      "expectError": "Stage 6 assembly requires at least one coverage result."
+    }
+  ]
+}

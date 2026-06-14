@@ -45,6 +45,13 @@ real OpenAI integration is intentionally deferred. The bounded flow prevents
 weak sections from silently reaching reviewer assembly without introducing an
 unbounded provider loop.
 
+Stage 6 performs deterministic reviewer assembly without a final model pass.
+Its evals cover all four typed section shapes, coverage acceptance, stable IDs,
+metadata, source references, input immutability, and strict source/plan order.
+Preserving the generation plan order ensures later sections cannot be silently
+dropped or reordered during final assembly, directly addressing a V1
+limitation while keeping final content unchanged by another model call.
+
 ## Running Evals
 
 Build the engine and run all suites:
@@ -90,16 +97,23 @@ Run only Stage 5 after building:
 npm run eval:stage5 --workspace @stay-focused/engine
 ```
 
+Run only Stage 6 after building:
+
+```text
+npm run eval:stage6 --workspace @stay-focused/engine
+```
+
 The process exits with code `0` when every case passes and code `1` when any
 case fails.
 
-## Adding Stage 6 Evals
+## Adding Integration Evals
 
 1. Add readable JSON fixture files under `evals/fixtures`.
 2. Create a typed suite that converts each fixture into an `EvalCase`.
 3. Use the assertion helpers to return clear `EvalIssue` values.
 4. Add the suite to `run-evals.ts`.
-5. Keep deterministic stage evals independent of UI, storage, and providers.
+5. Keep deterministic stage evals independent of UI and storage, and use fake
+   providers for end-to-end pipeline fixtures.
 
 The current harness evaluates deterministic contracts only. It does not yet
 measure LLM response quality because generation-provider integration is

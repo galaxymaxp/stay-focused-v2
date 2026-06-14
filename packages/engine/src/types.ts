@@ -194,16 +194,27 @@ export interface CoverageReport {
 export interface ReviewerSection {
   readonly id: string;
   readonly sourceSectionId: string;
+  readonly plannedSectionId: string;
   readonly title: string;
   readonly order: number;
+  readonly kind: SectionSchemaKind;
+  readonly sourceBlockIds: readonly string[];
+  readonly coverageStatus: CoverageStatus;
+  readonly coverageScore: number;
   readonly items: readonly SectionOutput[];
 }
 
 export interface ReviewerMetadata {
   readonly sourceId: string;
+  readonly planId: string;
+  readonly coverageReportId: string;
+  readonly sourceTitle: string;
   readonly sourceKind: NormalizedSourceKind;
   readonly language: string;
-  readonly generatedAt: string;
+  readonly sectionCount: number;
+  readonly generatedSectionCount: number;
+  readonly coverageStatus: CoverageStatus;
+  readonly coverageScore: number;
   readonly coverage: CoverageReport;
 }
 

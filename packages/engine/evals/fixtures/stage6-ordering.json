@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "name": "multiple sections preserve generation plan order",
+      "scenario": "plan-order"
+    },
+    {
+      "name": "reviewer output ID is deterministic",
+      "scenario": "reviewer-id"
+    },
+    {
+      "name": "reviewer section IDs are deterministic",
+      "scenario": "section-ids"
+    },
+    {
+      "name": "output title is used for the reviewer section",
+      "scenario": "output-title"
+    },
+    {
+      "name": "assembly does not mutate its inputs",
+      "scenario": "immutable-inputs"
+    }
+  ]
+}
