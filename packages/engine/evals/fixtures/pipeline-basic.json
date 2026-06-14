@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "name": "simple text source produces a reviewer output",
+      "scenario": "simple",
+      "input": {
+        "id": "pipeline-simple-source",
+        "title": "Simple Source",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "Photosynthesis converts light energy into chemical energy in plants.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "heading based source produces multiple reviewer sections",
+      "scenario": "multiple-headings",
+      "input": {
+        "id": "pipeline-heading-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# Cells\n\nCells are the basic units of life.\n\n# Tissues\n\nTissues are groups of related cells.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "reviewer sections preserve source order",
+      "scenario": "source-order",
+      "input": {
+        "id": "pipeline-order-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# First Topic\n\nThe first topic has explanatory content.\n\n# Second Topic\n\nThe second topic has explanatory content.\n\n# Third Topic\n\nThe third topic has explanatory content.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "concept section flows through all stages",
+      "scenario": "schema-kind",
+      "expectKind": "concept-card",
+      "input": {
+        "id": "pipeline-concept-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# Photosynthesis\n\nPhotosynthesis converts light energy into chemical energy in plants.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "process section flows through all stages",
+      "scenario": "schema-kind",
+      "expectKind": "process-step",
+      "input": {
+        "id": "pipeline-process-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# Lab Procedure\n\n1. First collect the material.\n2. Then measure the material.\n3. Finally record the result.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "example section flows through all stages",
+      "scenario": "schema-kind",
+      "expectKind": "example-card",
+      "input": {
+        "id": "pipeline-example-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# Adaptation Example\n\nFor example, a cactus stores water in its stem during a dry season.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "claim section flows through all stages",
+      "scenario": "schema-kind",
+      "expectKind": "claim-card",
+      "input": {
+        "id": "pipeline-claim-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# Plant Growth Claim\n\nEvidence suggests that adequate light improves plant growth.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "provider receives the default gpt-4o model",
+      "scenario": "default-model",
+      "input": {
+        "id": "pipeline-model-source",
+        "title": "Default Model",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A stable concept explanation for the provider request.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "provider receives one initial request per planned section",
+      "scenario": "initial-request-count",
+      "input": {
+        "id": "pipeline-request-count-source",
+        "kind": "document",
+        "language": "en",
+        "text": "# Alpha\n\nAlpha has explanatory content.\n\n# Beta\n\nBeta has explanatory content.\n\n# Gamma\n\nGamma has explanatory content.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "final reviewer output ID is deterministic",
+      "scenario": "deterministic-id",
+      "input": {
+        "id": "pipeline-deterministic-source",
+        "title": "Deterministic Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A deterministic concept explanation for repeated pipeline runs.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "reviewer metadata includes pipeline identities and coverage status",
+      "scenario": "metadata",
+      "input": {
+        "id": "pipeline-metadata-source",
+        "title": "Metadata Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A complete concept explanation for reviewer metadata.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "pipeline does not mutate normalization input",
+      "scenario": "immutable-input",
+      "input": {
+        "id": "pipeline-immutable-source",
+        "title": "Immutable Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A complete concept explanation for immutable input testing.",
+        "metadata": {
+          "author": "Capstone Team"
+        },
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    }
+  ]
+}

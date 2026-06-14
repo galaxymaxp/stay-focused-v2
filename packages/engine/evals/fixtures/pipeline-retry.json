@@ -1,0 +1,66 @@
+{
+  "cases": [
+    {
+      "name": "weak section is retried and then assembled",
+      "scenario": "weak-then-pass",
+      "input": {
+        "id": "pipeline-retry-source",
+        "title": "Retry Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A concept explanation that requires one deterministic retry.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "failed retry leaves final assembly rejected",
+      "scenario": "weak-then-error",
+      "input": {
+        "id": "pipeline-retry-failure-source",
+        "title": "Retry Failure Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A concept explanation whose retry provider calls fail.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      },
+      "expectErrorContains": "coverage status is weak"
+    },
+    {
+      "name": "allowWeakSections false rejects weak final coverage",
+      "scenario": "weak-rejected",
+      "input": {
+        "id": "pipeline-weak-rejected-source",
+        "title": "Weak Rejected Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A concept explanation retained as weak content.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      },
+      "expectErrorContains": "allowWeakSections is false"
+    },
+    {
+      "name": "allowWeakSections true assembles weak final coverage",
+      "scenario": "weak-allowed",
+      "input": {
+        "id": "pipeline-weak-allowed-source",
+        "title": "Weak Allowed Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A concept explanation explicitly allowed as weak content.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "retry policy bounds pipeline provider calls",
+      "scenario": "retry-bound",
+      "input": {
+        "id": "pipeline-retry-bound-source",
+        "title": "Retry Bound Pipeline",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A concept explanation that remains weak through bounded retries.",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    }
+  ]
+}

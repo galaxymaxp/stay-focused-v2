@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "name": "missing provider throws a clear error",
+      "scenario": "missing-provider",
+      "expectError": "Pipeline requires a generation provider."
+    },
+    {
+      "name": "missing input throws a clear error",
+      "scenario": "missing-input",
+      "expectError": "Pipeline requires source normalization input."
+    },
+    {
+      "name": "empty input preserves the Stage 0 error",
+      "scenario": "empty-input",
+      "expectError": "Source normalization requires non-empty text or at least one block."
+    },
+    {
+      "name": "initial provider failure preserves Stage 3 section context",
+      "scenario": "initial-provider-failure",
+      "expectErrorContains": "Stage 3 provider generation failed for section"
+    }
+  ]
+}

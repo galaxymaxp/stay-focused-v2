@@ -232,8 +232,9 @@ export interface RetryPolicy {
 }
 
 export interface PipelineOptions {
-  readonly model: string;
+  readonly model?: string;
   readonly temperature?: number;
-  readonly retryPolicy: RetryPolicy;
+  readonly retryPolicy?: RetryPolicy;
+  readonly allowWeakSections?: boolean;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }

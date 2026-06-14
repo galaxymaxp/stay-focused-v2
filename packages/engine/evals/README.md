@@ -52,6 +52,13 @@ Preserving the generation plan order ensures later sections cannot be silently
 dropped or reordered during final assembly, directly addressing a V1
 limitation while keeping final content unchanged by another model call.
 
+The pipeline integration suite exercises `runPipeline` across Stage 0 through
+Stage 6 using extracted text inputs and deterministic fake providers. It checks
+schema routing, request counts, bounded retry behavior, final coverage,
+ordering, metadata, and contextual errors without connecting a real provider.
+Real OpenAI integration remains deferred, and GUI/mobile work remains deferred
+until the completed engine contract is documented and stable.
+
 ## Running Evals
 
 Build the engine and run all suites:
@@ -101,6 +108,12 @@ Run only Stage 6 after building:
 
 ```text
 npm run eval:stage6 --workspace @stay-focused/engine
+```
+
+Run only the end-to-end pipeline suite after building:
+
+```text
+npm run eval:pipeline --workspace @stay-focused/engine
 ```
 
 The process exits with code `0` when every case passes and code `1` when any
