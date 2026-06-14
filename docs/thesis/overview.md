@@ -32,6 +32,22 @@ and authentication client mismatches caused silent Supabase RLS failures.
 - Integrate Canvas LMS as the source of academic context and scheduling data.
 - Keep generation provider concerns separate from pipeline behavior.
 
+## Engine Contribution
+
+V1 was the exploratory prototype that established feasibility and revealed
+where generation, application, and integration concerns were too closely
+coupled. V2 is the refined architecture: its completed Stage 0 through Stage 6
+engine turns extracted source content into a typed reviewer through explicit
+normalization, planning, generation, verification, bounded retry, and assembly
+contracts.
+
+This pipeline is a capstone-ready technical contribution because it is
+documented and independently testable, not because real-provider quality is
+already complete. The dependency-free harness currently passes 176 cases and
+helps prevent V1-style regressions such as silently weak reviewers or missing
+later source sections. Provider quality evaluation and application integration
+remain future work.
+
 ## Thesis Deliverables
 
 - A working mobile application integrated with Canvas LMS.

@@ -5,6 +5,14 @@ deterministic stages of the Stay Focused V2 generation engine. Each suite reads
 human-readable JSON fixtures, runs a stage, compares its output with explicit
 expectations, and reports passed and failed cases with useful issue messages.
 
+## Current Status
+
+Stage 0 through Stage 6 plus end-to-end pipeline integration are covered. The
+current aggregate result is **176 passed, 0 failed**. The harness is
+deterministic and dependency-free; provider-facing cases use fake providers
+only. LLM quality evals are intentionally deferred until a real provider
+adapter exists.
+
 ## Why Evals Come Before Each Stage
 
 Stage 0 establishes the source representation used by every later stage.
