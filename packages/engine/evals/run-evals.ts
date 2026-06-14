@@ -6,8 +6,14 @@ import {
 import { stage0NormalizationSuite } from "./stage0-normalization.eval.js";
 import { stage1OutlineSuite } from "./stage1-outline.eval.js";
 import { stage2PlanSuite } from "./stage2-plan.eval.js";
+import { stage3GenerateSuite } from "./stage3-generate.eval.js";
 
-const suites = [stage0NormalizationSuite, stage1OutlineSuite, stage2PlanSuite];
+const suites = [
+  stage0NormalizationSuite,
+  stage1OutlineSuite,
+  stage2PlanSuite,
+  stage3GenerateSuite,
+];
 const results = [];
 
 for (const [index, suite] of suites.entries()) {

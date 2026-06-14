@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "name": "wrong returned kind is rejected",
+      "scenario": "wrong-kind",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": expected kind \"concept-card\" but received \"claim-card\"."
+    },
+    {
+      "name": "missing required output field is rejected",
+      "scenario": "missing-field",
+      "schemaKind": "concept-card",
+      "field": "explanation",
+      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": missing required field \"explanation\"."
+    },
+    {
+      "name": "missing source block ID is rejected",
+      "scenario": "missing-source-block",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 source block ID \"missing-block\" was not found for section \"planned-concept-card\"."
+    },
+    {
+      "name": "provider failure is wrapped with section context",
+      "scenario": "provider-failure",
+      "schemaKind": "concept-card",
+      "providerError": "simulated provider outage",
+      "expectError": "Stage 3 provider generation failed for section \"planned-concept-card\": simulated provider outage"
+    },
+    {
+      "name": "section outside plan is rejected",
+      "scenario": "section-not-in-plan",
+      "schemaKind": "concept-card",
+      "expectError": "Planned section \"planned-concept-card\" is not part of generation plan \"stage3-plan\"."
+    },
+    {
+      "name": "wrong output source block IDs are rejected",
+      "scenario": "wrong-output-source-blocks",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": sourceBlockIds must match the planned section source block IDs."
+    },
+    {
+      "name": "wrong output planned section ID is rejected",
+      "scenario": "wrong-planned-section-id",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": plannedSectionId must be \"planned-concept-card\"."
+    },
+    {
+      "name": "missing section is rejected",
+      "scenario": "missing-section",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 generation requires a planned section."
+    },
+    {
+      "name": "missing plan is rejected",
+      "scenario": "missing-plan",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 generation requires a generation plan."
+    },
+    {
+      "name": "missing source is rejected",
+      "scenario": "missing-source",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 generation requires a normalized source."
+    },
+    {
+      "name": "missing provider is rejected",
+      "scenario": "missing-provider",
+      "schemaKind": "concept-card",
+      "expectError": "Stage 3 generation requires a generation provider."
+    }
+  ]
+}

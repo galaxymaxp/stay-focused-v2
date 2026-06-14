@@ -26,6 +26,12 @@ limited to `ConceptCard`, `ProcessStep`, `ExampleCard`, and `ClaimCard` so Stage
 3 receives a small, predictable contract before any provider request is built.
 Stable planning prevents provider behavior from hiding structural mistakes.
 
+Stage 3 evaluates the provider boundary without using a real model. Its suite
+checks provider-agnostic schema selection, deterministic prompt and request
+construction, source excerpt isolation, fake-provider failures, and runtime
+validation of all four section output shapes. Real OpenAI integration remains
+intentionally deferred so provider work cannot weaken the engine boundary.
+
 ## Running Evals
 
 Build the engine and run all suites:
@@ -53,10 +59,16 @@ Run only Stage 2 after building:
 npm run eval:stage2 --workspace @stay-focused/engine
 ```
 
+Run only Stage 3 after building:
+
+```text
+npm run eval:stage3 --workspace @stay-focused/engine
+```
+
 The process exits with code `0` when every case passes and code `1` when any
 case fails.
 
-## Adding Stage 3-6 Evals
+## Adding Stage 4-6 Evals
 
 1. Add readable JSON fixture files under `evals/fixtures`.
 2. Create a typed suite that converts each fixture into an `EvalCase`.

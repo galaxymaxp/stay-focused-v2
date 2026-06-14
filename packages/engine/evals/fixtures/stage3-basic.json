@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "name": "valid concept output passes",
+      "schemaKind": "concept-card",
+      "output": {
+        "kind": "concept-card",
+        "id": "output-concept",
+        "plannedSectionId": "planned-concept-card",
+        "title": "Study Section",
+        "explanation": "The concept is explained using the supplied source.",
+        "keyPoints": ["First grounded point", "Second grounded point"],
+        "sourceBlockIds": ["included-a", "included-b"]
+      }
+    },
+    {
+      "name": "valid process output passes",
+      "schemaKind": "process-step",
+      "output": {
+        "kind": "process-step",
+        "id": "output-process",
+        "plannedSectionId": "planned-process-step",
+        "title": "Study Section",
+        "steps": ["Complete the first step", "Complete the second step"],
+        "summary": "The steps preserve the source sequence.",
+        "sourceBlockIds": ["included-a", "included-b"]
+      }
+    },
+    {
+      "name": "valid example output passes",
+      "schemaKind": "example-card",
+      "output": {
+        "kind": "example-card",
+        "id": "output-example",
+        "plannedSectionId": "planned-example-card",
+        "title": "Study Section",
+        "scenario": "A learner applies the source concept in a concrete situation.",
+        "explanation": "The scenario demonstrates the supplied material.",
+        "takeaway": "Apply the concept only where the source supports it.",
+        "sourceBlockIds": ["included-a", "included-b"]
+      }
+    },
+    {
+      "name": "valid claim output passes",
+      "schemaKind": "claim-card",
+      "output": {
+        "kind": "claim-card",
+        "id": "output-claim",
+        "plannedSectionId": "planned-claim-card",
+        "title": "Study Section",
+        "claim": "The source supports the central claim.",
+        "support": "The included blocks provide supporting evidence.",
+        "reasoning": "The support connects directly to the claim.",
+        "sourceBlockIds": ["included-a", "included-b"]
+      }
+    }
+  ]
+}

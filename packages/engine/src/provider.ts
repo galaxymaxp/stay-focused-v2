@@ -1,6 +1,8 @@
+import type { StructuredOutputSchema } from "./schemas";
+
 export interface GenerationRequest<TOutput> {
   readonly prompt: string;
-  readonly schema: Readonly<Record<string, unknown>>;
+  readonly schema: StructuredOutputSchema;
   readonly model: string;
   readonly temperature?: number;
   readonly metadata?: Readonly<Record<string, unknown>>;

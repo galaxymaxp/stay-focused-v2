@@ -1,0 +1,71 @@
+{
+  "cases": [
+    {
+      "name": "concept request uses concept schema",
+      "schemaKind": "concept-card",
+      "expectSchemaName": "ConceptCard"
+    },
+    {
+      "name": "process request uses process schema",
+      "schemaKind": "process-step",
+      "expectSchemaName": "ProcessStep"
+    },
+    {
+      "name": "example request uses example schema",
+      "schemaKind": "example-card",
+      "expectSchemaName": "ExampleCard"
+    },
+    {
+      "name": "claim request uses claim schema",
+      "schemaKind": "claim-card",
+      "expectSchemaName": "ClaimCard"
+    },
+    {
+      "name": "provider receives default model",
+      "schemaKind": "concept-card",
+      "expectModel": "gpt-4o"
+    },
+    {
+      "name": "provider receives custom model and temperature",
+      "schemaKind": "concept-card",
+      "model": "test-model",
+      "temperature": 0.25,
+      "expectModel": "test-model",
+      "expectTemperature": 0.25
+    },
+    {
+      "name": "prompt contains only planned source excerpt",
+      "schemaKind": "concept-card",
+      "expectPromptContains": [
+        "Included source alpha.",
+        "Included source beta.",
+        "Use only the provided source content.",
+        "Do not invent missing information."
+      ],
+      "expectPromptExcludes": ["Excluded unrelated omega."],
+      "expectPromptOrder": ["Included source alpha.", "Included source beta."]
+    },
+    {
+      "name": "provider metadata includes plan and section context",
+      "schemaKind": "claim-card",
+      "metadata": { "evaluationCase": "metadata-check" },
+      "expectMetadata": {
+        "evaluationCase": "metadata-check",
+        "plannedSectionId": "planned-claim-card",
+        "planId": "stage3-plan",
+        "schemaKind": "claim-card",
+        "sourceId": "stage3-source"
+      }
+    },
+    {
+      "name": "prompt includes target and schema instructions",
+      "schemaKind": "process-step",
+      "expectPromptContains": [
+        "Section title: Study Section",
+        "Schema kind: process-step",
+        "Target:",
+        "Return structured output matching the provided schema exactly."
+      ]
+    }
+  ]
+}

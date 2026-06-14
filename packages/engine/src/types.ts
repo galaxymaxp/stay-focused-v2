@@ -142,28 +142,28 @@ interface BaseSectionOutput {
 
 export interface ConceptCard extends BaseSectionOutput {
   readonly kind: "concept-card";
-  readonly concept: string;
   readonly explanation: string;
+  readonly keyPoints: readonly string[];
 }
 
 export interface ProcessStep extends BaseSectionOutput {
   readonly kind: "process-step";
-  readonly stepNumber: number;
-  readonly instruction: string;
-  readonly explanation?: string;
+  readonly steps: readonly string[];
+  readonly summary: string;
 }
 
 export interface ExampleCard extends BaseSectionOutput {
   readonly kind: "example-card";
-  readonly example: string;
+  readonly scenario: string;
   readonly explanation: string;
+  readonly takeaway: string;
 }
 
 export interface ClaimCard extends BaseSectionOutput {
   readonly kind: "claim-card";
   readonly claim: string;
-  readonly evidence: string;
-  readonly qualification?: string;
+  readonly support: string;
+  readonly reasoning: string;
 }
 
 export type SectionOutput =
