@@ -7,9 +7,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.evals.json",
+    "eval": "node dist/evals/run-evals.js",
+    "eval:stage0": "node dist/evals/stage0-normalization.eval.js",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json",
     "clean": "rimraf dist"
   },
   "devDependencies": {

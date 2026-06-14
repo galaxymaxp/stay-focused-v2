@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "name": "missing text and blocks is rejected",
+      "input": {},
+      "expectError": "Source normalization input must include text or blocks."
+    },
+    {
+      "name": "empty text is rejected",
+      "input": { "text": "   \n\n   " },
+      "expectError": "Source normalization requires non-empty text or at least one block."
+    },
+    {
+      "name": "empty blocks are rejected",
+      "input": { "blocks": [] },
+      "expectError": "Source normalization requires non-empty text or at least one block."
+    },
+    {
+      "name": "block with empty text is rejected",
+      "input": {
+        "blocks": [{ "kind": "paragraph", "text": "   " }]
+      },
+      "expectError": "Source block at index 0 has empty text after trimming."
+    }
+  ]
+}

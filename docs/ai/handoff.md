@@ -61,3 +61,21 @@ None.
 - Node.js and npm remain unavailable on `PATH`. The engine package was checked
   with a temporary TypeScript 5.8.3 compiler, but the root npm workflows remain
   blocked until the local PATH is repaired.
+
+## Session 3
+
+### What Was Implemented
+
+- Built a dependency-free evaluation harness for deterministic engine stages.
+- Added a Stage 0 normalization suite with success and expected-error cases.
+- Added capstone-friendly JSON fixtures for basic behavior, document structure,
+  metadata sanitization, deterministic ordering, and validation errors.
+
+### Next Step
+
+1. Implement Stage 1 outline detection by writing its eval cases first.
+
+### Blockers
+
+- Node.js and npm remain unavailable on the normal shell `PATH`; direct runtime
+  and TypeScript verification are used until the local PATH is repaired.

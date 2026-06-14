@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "name": "bullet list",
+      "input": { "text": "- Nucleus\n- Cytoplasm\n- Cell membrane" },
+      "expect": {
+        "blockKinds": ["list"],
+        "blockCount": 1,
+        "containsText": ["- Nucleus", "- Cell membrane"]
+      }
+    },
+    {
+      "name": "numbered list",
+      "input": { "text": "1. Observe\n2. Record\n3. Compare" },
+      "expect": {
+        "blockKinds": ["list"],
+        "blockCount": 1,
+        "containsText": ["1. Observe", "3. Compare"]
+      }
+    },
+    {
+      "name": "quote block",
+      "input": { "text": "> Evidence should support the claim.\n> Sources should be cited." },
+      "expect": {
+        "blockKinds": ["quote"],
+        "blockCount": 1,
+        "containsText": ["> Evidence", "> Sources"]
+      }
+    },
+    {
+      "name": "fenced code block",
+      "input": { "text": "```ts\nconst focused = true;\n```" },
+      "expect": {
+        "blockKinds": ["code"],
+        "blockCount": 1,
+        "containsText": ["```ts", "const focused = true;"]
+      }
+    },
+    {
+      "name": "Markdown table",
+      "input": { "text": "| Term | Meaning |\n| --- | --- |\n| Cell | Basic unit of life |" },
+      "expect": {
+        "blockKinds": ["table"],
+        "blockCount": 1,
+        "containsText": ["| Term | Meaning |", "Basic unit of life"]
+      }
+    },
+    {
+      "name": "deterministic block order",
+      "input": {
+        "id": "ordered-source",
+        "blocks": [
+          { "kind": "paragraph", "text": "Third", "order": 30 },
+          { "kind": "heading", "text": "First", "order": 10 },
+          { "kind": "paragraph", "text": "Second", "order": 20 }
+        ]
+      },
+      "expect": {
+        "title": "First",
+        "blockKinds": ["heading", "paragraph", "paragraph"],
+        "blockTexts": ["First", "Second", "Third"],
+        "blockOrders": [0, 1, 2],
+        "deterministicIds": true
+      }
+    }
+  ]
+}

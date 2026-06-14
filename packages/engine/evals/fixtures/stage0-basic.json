@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "name": "simple paragraph text",
+      "input": {
+        "kind": "plain-text",
+        "language": "en",
+        "text": "A single extracted paragraph."
+      },
+      "expect": {
+        "title": "Untitled Source",
+        "kind": "plain-text",
+        "language": "en",
+        "blockKinds": ["paragraph"],
+        "blockCount": 1,
+        "containsText": ["A single extracted paragraph."]
+      }
+    },
+    {
+      "name": "heading plus paragraph",
+      "input": {
+        "kind": "document",
+        "language": "en",
+        "text": "# Photosynthesis\n\nPhotosynthesis converts light energy into chemical energy."
+      },
+      "expect": {
+        "title": "Photosynthesis",
+        "blockKinds": ["heading", "paragraph"],
+        "blockCount": 2,
+        "containsText": ["Photosynthesis", "chemical energy"]
+      }
+    },
+    {
+      "name": "title inference from first heading",
+      "input": {
+        "text": "INTRODUCTION\n\nThis section introduces the topic.\n\n# Later Heading"
+      },
+      "expect": {
+        "title": "INTRODUCTION",
+        "blockKinds": ["heading", "paragraph", "heading"]
+      }
+    },
+    {
+      "name": "metadata sanitization",
+      "input": {
+        "text": "Safe metadata remains scalar.",
+        "metadata": {
+          "author": "Student Researcher",
+          "createdAt": "2026-01-02T03:04:05.000Z",
+          "accessToken": "discard-me",
+          "providerResponse": { "raw": true },
+          "attributes": {
+            "course": "Biology 101",
+            "semester": 2,
+            "secret": "discard-me"
+          }
+        }
+      },
+      "expect": {
+        "createdAt": "2026-01-02T03:04:05.000Z",
+        "metadata": {
+          "author": "Student Researcher",
+          "attributes": {
+            "course": "Biology 101",
+            "semester": 2
+          },
+          "absentAttributeKeys": ["accessToken", "providerResponse", "secret"]
+        }
+      }
+    }
+  ]
+}
