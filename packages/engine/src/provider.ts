@@ -1,20 +1,22 @@
+export interface GenerationRequest<TOutput> {
+  readonly prompt: string;
+  readonly schema: Readonly<Record<string, unknown>>;
+  readonly model: string;
+  readonly temperature?: number;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export interface GenerationProvider {
-  generate(
-    prompt: string,
-    schema: Readonly<Record<string, unknown>>,
-    model: string,
-  ): Promise<unknown>;
+  generate<TOutput>(request: GenerationRequest<TOutput>): Promise<TOutput>;
 }
 
 export class OpenAIProvider implements GenerationProvider {
   public constructor(private readonly apiKey: string) {}
 
-  public async generate(
-    _prompt: string,
-    _schema: Readonly<Record<string, unknown>>,
-    _model: string,
-  ): Promise<unknown> {
+  public async generate<TOutput>(
+    _request: GenerationRequest<TOutput>,
+  ): Promise<TOutput> {
     void this.apiKey;
-    throw new Error("OpenAIProvider.generate is not implemented");
+    throw new Error("OpenAIProvider is not implemented yet.");
   }
 }

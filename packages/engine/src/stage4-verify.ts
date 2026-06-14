@@ -4,9 +4,11 @@ import type {
   SectionOutput,
 } from "./types";
 
-export function verifyCoverage(
-  _output: readonly SectionOutput[],
-  _plan: GenerationPlan,
-): CoverageReport {
+export interface VerifyCoverageArgs {
+  readonly plan: GenerationPlan;
+  readonly outputs: readonly SectionOutput[];
+}
+
+export function verifyCoverage(_args: VerifyCoverageArgs): CoverageReport {
   throw new Error("verifyCoverage is not implemented");
 }
