@@ -6,6 +6,15 @@ const nextConfig: NextConfig = {
     "@stay-focused/engine",
     "@stay-focused/shared",
   ],
+  webpack(config) {
+    config.resolve ??= {};
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      ".js": [".ts", ".tsx", ".js"],
+      ".jsx": [".tsx", ".jsx"],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;
