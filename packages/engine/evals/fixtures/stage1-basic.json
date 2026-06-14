@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "name": "single heading with paragraph",
+      "input": {
+        "id": "single-heading-source",
+        "text": "# Photosynthesis\n\nPlants convert light energy into chemical energy."
+      },
+      "expect": {
+        "outlineTitle": "Photosynthesis",
+        "sectionTitles": ["Photosynthesis"],
+        "sectionBlockKinds": [["heading", "paragraph"]],
+        "sectionBlockCounts": [2],
+        "sectionOrders": [0],
+        "confidences": [0.9],
+        "deterministicIds": true
+      }
+    },
+    {
+      "name": "multiple headings create multiple sections",
+      "input": {
+        "id": "multiple-heading-source",
+        "title": "Biology Notes",
+        "text": "# Cells\n\nCells are basic units of life.\n\n# Genetics\n\nGenes carry inherited information."
+      },
+      "expect": {
+        "outlineTitle": "Biology Notes",
+        "sectionTitles": ["Cells", "Genetics"],
+        "sectionBlockKinds": [
+          ["heading", "paragraph"],
+          ["heading", "paragraph"]
+        ],
+        "sectionBlockCounts": [2, 2],
+        "sectionOrders": [0, 1],
+        "confidences": [0.9, 0.9]
+      }
+    },
+    {
+      "name": "source with no headings creates one section",
+      "input": {
+        "id": "no-heading-source",
+        "title": "Cell Notes",
+        "text": "Cells contain structures that perform specialized functions."
+      },
+      "expect": {
+        "sectionTitles": ["Cell Notes"],
+        "sectionBlockKinds": [["paragraph"]],
+        "sectionBlockCounts": [1],
+        "tags": [["concept"]],
+        "confidences": [0.7]
+      }
+    },
+    {
+      "name": "preface content creates Introduction section",
+      "input": {
+        "id": "preface-source",
+        "title": "Research Notes",
+        "text": "These notes summarize the assigned reading.\n\n# Findings\n\nThe findings describe observed results."
+      },
+      "expect": {
+        "sectionTitles": ["Introduction", "Findings"],
+        "sectionBlockKinds": [
+          ["paragraph"],
+          ["heading", "paragraph"]
+        ],
+        "sectionBlockCounts": [1, 2],
+        "sectionOrders": [0, 1],
+        "confidences": [0.7, 0.9]
+      }
+    }
+  ]
+}

@@ -88,7 +88,9 @@ export interface OutlineSection {
 }
 
 export interface SourceOutline {
+  readonly id: string;
   readonly sourceId: string;
+  readonly title: string;
   readonly sections: readonly OutlineSection[];
 }
 

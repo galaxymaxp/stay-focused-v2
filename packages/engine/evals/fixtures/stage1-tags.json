@@ -1,0 +1,71 @@
+{
+  "cases": [
+    {
+      "name": "numbered list section gets process tag",
+      "input": {
+        "id": "process-tag-source",
+        "text": "# Procedure\n\n1. Gather materials\n2. Record observations\n3. Compare results"
+      },
+      "expect": {
+        "sectionTitles": ["Procedure"],
+        "tags": [["process"]],
+        "confidences": [0.9]
+      }
+    },
+    {
+      "name": "definition-like section gets definition tag",
+      "input": {
+        "id": "definition-tag-source",
+        "text": "# Mitosis\n\nMitosis is defined as the division of a cell nucleus."
+      },
+      "expect": {
+        "tags": [["definition"]]
+      }
+    },
+    {
+      "name": "example-like section gets example tag",
+      "input": {
+        "id": "example-tag-source",
+        "text": "# Applications\n\nFor example, solar panels convert sunlight into electricity."
+      },
+      "expect": {
+        "tags": [["example"]]
+      }
+    },
+    {
+      "name": "claim-like section gets claim tag",
+      "input": {
+        "id": "claim-tag-source",
+        "text": "# Interpretation\n\nThe evidence suggests that regular review improves recall."
+      },
+      "expect": {
+        "tags": [["claim"]]
+      }
+    },
+    {
+      "name": "multiple strong signals get mixed tag",
+      "input": {
+        "id": "mixed-tag-source",
+        "text": "# Analysis\n\nFor example, the evidence suggests that spaced review improves recall."
+      },
+      "expect": {
+        "tags": [["mixed"]]
+      }
+    },
+    {
+      "name": "weak content gets unknown tag and low confidence",
+      "input": {
+        "id": "weak-tag-source",
+        "title": "Sparse Notes",
+        "blocks": [
+          { "id": "weak-block", "kind": "unknown", "text": "...", "order": 0 }
+        ]
+      },
+      "expect": {
+        "sectionTitles": ["Sparse Notes"],
+        "tags": [["unknown"]],
+        "confidences": [0.5]
+      }
+    }
+  ]
+}

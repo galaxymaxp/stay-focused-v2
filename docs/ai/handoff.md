@@ -79,3 +79,22 @@ None.
 
 - Node.js and npm remain unavailable on the normal shell `PATH`; direct runtime
   and TypeScript verification are used until the local PATH is repaired.
+
+## Session 4
+
+### What Was Implemented
+
+- Implemented eval-first Stage 1 deterministic outline detection.
+- Added Stage 1 fixtures and an eval suite for grouping, ordering, tags,
+  confidence scores, deterministic IDs, and empty-source validation.
+- Updated the eval runner to cover both Stage 0 normalization and Stage 1
+  outline detection with aggregate totals.
+
+### Next Step
+
+1. Implement Stage 2 generation planning using the eval-first approach.
+
+### Blockers
+
+- Node.js and npm remain unavailable on the normal shell `PATH`; direct runtime
+  and TypeScript verification remain necessary until the PATH is repaired.

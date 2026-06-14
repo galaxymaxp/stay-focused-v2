@@ -1,0 +1,46 @@
+{
+  "cases": [
+    {
+      "name": "heading section preserves block ordering",
+      "input": {
+        "id": "ordered-outline-source",
+        "blocks": [
+          { "id": "third", "kind": "quote", "text": "> Third block", "order": 30 },
+          { "id": "first", "kind": "heading", "text": "Ordered Section", "order": 10 },
+          { "id": "second", "kind": "paragraph", "text": "Second block", "order": 20 }
+        ]
+      },
+      "expect": {
+        "sectionTitles": ["Ordered Section"],
+        "sectionBlockIds": [["first", "second", "third"]],
+        "sectionBlockTexts": [["Ordered Section", "Second block", "> Third block"]],
+        "roughStartBlockIds": ["first"],
+        "roughEndBlockIds": ["third"],
+        "sectionOrders": [0]
+      }
+    },
+    {
+      "name": "deterministic outline and section IDs",
+      "input": {
+        "id": "deterministic-outline-source",
+        "text": "# Stable Section\n\nStable content produces stable identifiers."
+      },
+      "expect": {
+        "sectionTitles": ["Stable Section"],
+        "deterministicIds": true
+      }
+    },
+    {
+      "name": "heading without content has low confidence",
+      "input": {
+        "id": "heading-only-source",
+        "text": "# Empty Topic"
+      },
+      "expect": {
+        "sectionTitles": ["Empty Topic"],
+        "tags": [["unknown"]],
+        "confidences": [0.5]
+      }
+    }
+  ]
+}
