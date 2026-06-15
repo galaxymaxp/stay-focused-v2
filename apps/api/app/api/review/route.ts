@@ -2,7 +2,7 @@ import { runPipeline } from "@stay-focused/engine";
 import type { SourceNormalizationInput } from "@stay-focused/engine";
 import { NextResponse } from "next/server";
 import { createServerOpenAIProvider } from "../../../src/providers/openai-provider";
-import { verifyBearerToken } from "../../../src/lib/auth";
+import { verifyBearerToken } from "@/lib/auth";
 
 export async function POST(request: Request): Promise<Response> {
   const user = await verifyBearerToken(request);
