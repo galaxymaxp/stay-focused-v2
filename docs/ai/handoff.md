@@ -490,3 +490,12 @@ Design reference:
 - Next recommended step: Apply the same auth helper to remaining protected API routes.
 - Risks/blockers: `apps/api/package.json` has a separate unstaged change adding `@supabase/supabase-js`; it is intentionally excluded from this commit.
 - Commit: not committed
+
+### Stage 6.2 — @/* path alias — 2026-06-15
+- Files created: none
+- Files changed: apps/api/tsconfig.json, apps/api/app/api/review/route.ts
+- What was implemented: @/* → ./src/* alias; auth import switched off relative path
+- Verified by: tsc --noEmit pass
+- Next recommended step: roll verifyBearerToken out to remaining generation routes
+- Risks/blockers: npx is unavailable on PATH in this shell; verification passed with the repository's local TypeScript compiler via the bundled Node runtime. tsconfig.providers.json remains unchanged.
+- Commit: 853b1901b93773b9af088c3add7d96c82fc42f2b
