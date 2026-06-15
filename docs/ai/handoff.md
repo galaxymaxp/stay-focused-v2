@@ -1,0 +1,492 @@
+# Stay Focused V2 - Local Agent Handoff
+
+This file is local-only and intentionally ignored by Git.
+
+## Current Status
+
+- Stay Focused V2 uses an engine-first, evaluation-first workflow.
+- Stages 0 through 6 and the end-to-end pipeline are implemented with typed
+  evaluation coverage.
+- The API-layer OpenAI provider now includes an injected-client adapter and a
+  server-only OpenAI SDK factory in commit `d8374e9`, present on `origin/main`.
+- The current branch is `main` at `d8374e9`, matching `origin/main`.
+- The latest full evaluation result is 176 passed and 0 failed.
+- OpenAI adapter contract checks pass 18 cases with fake clients and no network
+  access.
+- Node.js `v24.16.0` and npm `11.13.0` are installed. The Node directory was
+  added to the user PATH, and PowerShell CurrentUser execution policy is
+  `RemoteSigned` so the official npm shim can run.
+- API and engine typechecks/builds pass. Root workspace typecheck/build now run
+  but stop in untouched mobile configuration due duplicate React types and a
+  missing `react-native-web` dependency.
+- The real OpenAI smoke test is implemented but was not run because it remains
+  explicitly opt-in through `RUN_OPENAI_SMOKE=1`.
+- Supabase JWT Bearer authentication is now enforced on `/api/review`.
+- This handoff is local-only, ignored by Git, and was not committed.
+
+## Recent Completed Work
+
+### Stage 0 - Domain Contracts and Source Normalization
+
+- Added domain contracts and initial normalized source handling.
+- Added the evaluation framework foundation and Stage 0 cases.
+- Recorded verification: 14 passed, 0 failed.
+
+### Stage 1 - Outline Detection
+
+- Implemented deterministic outline detection.
+- Added typed eval coverage for outline behavior.
+- Recorded verification: Stage 0 14 passed; Stage 1 14 passed.
+
+### Stage 2 - Generation Planning
+
+- Implemented deterministic generation planning.
+- Added plan-oriented eval cases.
+- Recorded verification: Stage 0 14 passed; Stage 1 14 passed; Stage 2 24
+  passed.
+
+### Stage 3 - Provider Requests and Typed Outputs
+
+- Implemented deterministic, source-grounded prompts.
+- Added provider-agnostic schema selection with `gpt-4o` as the default model.
+- Added plan, section, schema, and source metadata to provider requests.
+- Added validation for returned output fields and identities.
+- Wrapped provider failures with section context.
+- Kept all provider access behind the `GenerationProvider` interface.
+- Added plain serializable TypeScript descriptors for `ConceptCard`,
+  `ProcessStep`, `ExampleCard`, and `ClaimCard`.
+- Added 24 eval cases covering schema selection, prompts, metadata, valid
+  outputs, invalid responses, missing inputs, source references, and provider
+  failures.
+
+### Stage 4 - Coverage Verification
+
+- Implemented deterministic coverage verification using eval-first
+  development.
+- Added checks for schema alignment, required content, source coverage,
+  scoring, statuses, ordering, and validation.
+- Added Stage 4 to the aggregate eval runner.
+
+### Stage 5 - Bounded Retry Handling
+
+- Implemented eval-first bounded retries through the existing Stage 3 provider
+  boundary.
+- Preserved passed outputs and retried only retryable weak or failed sections.
+- Re-ran Stage 4 coverage after generated retry candidates and stopped sections
+  once they passed or reached the configured retry bound.
+- Added fake-provider coverage for policy switches, provider failures, missing
+  outputs, ordering, replacement behavior, and structural validation.
+- Added Stage 5 to the aggregate eval runner.
+
+### Stage 6 - Deterministic Reviewer Assembly
+
+- Implemented deterministic reviewer assembly without a final provider or
+  model pass.
+- Preserved generation-plan order and all typed section output content.
+- Added stable reviewer and reviewer-section IDs, deterministic metadata, and
+  explicit weak-section opt-in.
+- Added validation for output, coverage, plan, source, schema, and source-block
+  relationships.
+- Added Stage 6 to the aggregate eval runner with 30 cases.
+
+### Pipeline Integration
+
+- Wired `runPipeline` through normalization, outline detection, generation
+  planning, initial generation, coverage verification, bounded retries, final
+  verification, and reviewer assembly.
+- Kept all provider calls behind `GenerationProvider` and used deterministic
+  fake providers in integration evals only.
+- Added integration coverage for schema routing, source order, request counts,
+  retries, weak-section policy, metadata, deterministic IDs, and contextual
+  failures.
+- Added the pipeline integration suite to the aggregate eval runner.
+
+### Engine Contract Documentation
+
+- Added ADR-004 for the accepted Stage 0 through Stage 6 engine pipeline.
+- Added an implementation-focused engine contract covering public types, stage
+  boundaries, provider requests, schema family, verification, retries, and
+  current limitations.
+- Updated the repository README, thesis overview, and eval README with the
+  completed pipeline status and capstone context.
+
+### OpenAI Provider Adapter Boundary
+
+- Added ADR-005 and implementation documentation for an API-layer OpenAI
+  adapter behind `GenerationProvider`.
+- Added an injected-client `OpenAIProvider` boundary without importing the
+  OpenAI SDK or changing Stage 0 through Stage 6.
+- Added 16 dependency-free fake-client contract checks for request mapping,
+  structured output parsing, validation, and error wrapping.
+- Added safe env templates and strengthened ignore rules for local env and
+  credential files.
+- Migrated matching V1 local values into ignored V2 root/API/mobile env files;
+  Google Cloud project and credential values remain missing.
+
+### Server OpenAI SDK Wiring
+
+- Installed the OpenAI SDK in `apps/api` only.
+- Added `createServerOpenAIProvider`, which reads the server-only
+  `OPENAI_API_KEY` and constructs the real SDK client behind the existing
+  `OpenAIResponsesClient` boundary.
+- Preserved strict JSON Schema Responses API mapping and Stage 3 validation.
+- Added an opt-in, one-call OpenAI smoke module guarded by
+  `RUN_OPENAI_SMOKE=1`.
+- Expanded fake-client provider contract coverage to 18 passing checks.
+- Restored local Node/npm access without changing system PATH.
+
+## Active Branch / Commits
+
+- Branch: `main`
+- `d8374e9` - `feat(api): wire server openai provider`
+- `a0233be` - `feat(api): design openai provider adapter boundary`
+- `e2a665f` - `docs(engine): document completed pipeline contract`
+- `cc5dac2` - `feat(engine): wire pipeline integration`
+- `d54b4cb` - `feat(engine): implement stage 6 reviewer assembly`
+- `25aabc4` - `feat(engine): implement stage 5 bounded retries`
+- `612bfe0` - `chore: add local-only agent handoff template`
+- `e0f79bf` - `feat(engine): implement eval-first stage 4 coverage verification`
+- `a108a26` - `feat(engine): implement eval-first stage 3 provider requests`
+- `5f50c89` - `feat(engine): implement eval-first stage 2 generation planning`
+- `1aad79c` - `feat(engine): implement eval-first stage 1 outline detection`
+- `4483503` - `test(engine): add dependency-free evaluation harness`
+- `dfd6ae8` - `feat(engine): add domain contracts and stage 0 normalization`
+
+`origin/main` currently points to `a0233be`, confirming that the OpenAI adapter
+boundary commit was pushed.
+
+## Test / Verification Status
+
+Latest full verification through pipeline integration on 2026-06-15:
+
+- Stage 0: 14 passed
+- Stage 1: 14 passed
+- Stage 2: 24 passed
+- Stage 3: 24 passed
+- Stage 4: 21 passed
+- Stage 5: 28 passed
+- Stage 6: 30 passed
+- Pipeline integration: 21 passed
+- Total: 176 passed, 0 failed
+- Direct TypeScript 5.8.3 source and eval typechecks passed.
+- Direct TypeScript 5.8.3 source and eval builds passed.
+- Each Stage 0 through Stage 6 suite and the pipeline suite passed
+  independently.
+- The aggregate eval runner passed.
+- The failure exit-code check correctly returned `1`.
+- `git diff --check` passed with exit code `0`.
+- `npm install` passes with npm `11.13.0`.
+- `npm run typecheck` starts successfully but fails in untouched mobile code
+  because React Native JSX types resolve against incompatible duplicate React
+  type definitions.
+- `npm run build` starts successfully but fails in untouched mobile setup
+  because Expo web export requires `react-native-web`.
+- Verification used the bundled Codex Node.js runtime and the local temporary
+  TypeScript 5.8.3 compiler package.
+- The documentation session reran direct source/eval typechecks, both builds,
+  and the full 176-case eval runner successfully.
+- The adapter session reran the full 176-case engine eval runner and direct
+  engine typechecks/builds successfully.
+- API provider-specific TypeScript typecheck/build passed, and all 18 provider
+  contract checks passed without a real API key or network call.
+- The API Next.js production build passes.
+- The OpenAI smoke test was not run because it is opt-in and
+  `RUN_OPENAI_SMOKE=1` was not explicitly enabled.
+
+## Important Architecture Decisions
+
+- Engine-first development continues.
+- Evaluation-first development is the standard workflow for each engine stage.
+- The provider boundary must remain isolated through `GenerationProvider`.
+- Stage outputs must remain typed, serializable, and source-grounded.
+- `packages/engine` must not contain UI coupling.
+- Provider schema descriptors remain plain serializable TypeScript data rather
+  than SDK-specific objects.
+- Real model quality evaluation remains separate from deterministic engine
+  contract evaluation.
+
+## Known Constraints
+
+- New shells inherit `C:\Program Files\nodejs` from the user PATH. Existing
+  long-lived parent processes may require a restart to observe the updated
+  environment automatically.
+- Google Cloud project ID and credentials are not available in the migrated
+  local environment files.
+- OpenAI token ceilings and serverless execution limits may affect future
+  generation latency and should be monitored when real provider integration is
+  added.
+- `npm install` currently reports 12 moderate dependency vulnerabilities; no
+  forced audit fix was applied because that could introduce unrelated breaking
+  changes.
+
+## Blockers
+
+- Root workspace typecheck is blocked by duplicate React type definitions in
+  the existing mobile workspace.
+- Root workspace build is blocked because the existing Expo web configuration
+  does not include `react-native-web`.
+- CRLF warnings appear during some Git checks but do not block verification.
+
+## Recommended Next Task
+
+- Run the opt-in OpenAI smoke test in a deliberate credentialed session, then
+  add a protected API route that constructs the server provider and invokes the
+  unchanged engine pipeline.
+- Resolve the separate mobile dependency/type mismatch before requiring clean
+  root monorepo typecheck and build results.
+
+## Session Log
+
+### 2026-06-15 - Session 14 Supabase JWT Auth on /api/review
+
+**Files created:**
+- `apps/api/src/lib/auth.ts` — `verifyBearerToken(request)` helper using
+  Supabase service-role client to validate `Authorization: Bearer <token>`
+  headers. Returns the `User` object on success, `null` on any failure.
+  Never exposes token contents, stack traces, or Supabase internals.
+
+**Files changed:**
+- `apps/api/app/api/review/route.ts` — Auth check now runs first, before
+  `RUN_OPENAI_SMOKE` and all other checks. Returns `{ error: "Unauthorized" }`
+  with HTTP 401 on any auth failure.
+- `apps/api/package.json` — Added `@supabase/supabase-js: ^2.49.4` to
+  `dependencies` (was already hoisted to root node_modules via `packages/db`;
+  now declared explicitly in the API package).
+
+**What was implemented:**
+- JWT Bearer-only authentication for `/api/review` (no cookies, mobile-safe).
+- Auth call order: auth → RUN_OPENAI_SMOKE guard → input validation → provider
+  → pipeline.
+- Status mapping: 401 (no/bad/expired token), 501 (smoke disabled), 400 (bad
+  input), 500 (provider/pipeline failure).
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are read from `process.env`
+  inside the helper; both are already configured in Vercel.
+
+**Risks / edge cases noticed:**
+- `@supabase/supabase-js` was not explicitly listed in `apps/api/package.json`
+  before this session. It was accessible via hoisting from `packages/db`, but
+  explicit declaration was added for correctness and deploy reliability.
+- The `tsconfig.providers.json` scope does not include `src/lib/`, so the new
+  auth helper is only compiled by the main `tsconfig.json`. This is intentional
+  and consistent with existing route files.
+- `persistSession: false` is passed to `createClient` to prevent any
+  cookie/storage side effects in the server environment.
+- If `SUPABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY` are missing at runtime, the
+  helper returns `null` (→ 401) rather than throwing, keeping error responses
+  generic.
+
+**Next recommended step:**
+- Run `npm run build` in `apps/api` and verify the Next.js production build
+  still passes with the new auth import.
+- Test the deployed `/api/review` endpoint: confirm 401 without a token, 401
+  with an invalid token, and 501 with a valid Supabase token (until
+  `RUN_OPENAI_SMOKE=1` is enabled).
+- Consider adding a mobile integration test that exercises the full auth +
+  pipeline path once `RUN_OPENAI_SMOKE=1` is enabled in a staging environment.
+
+### 2026-06-15 - Session 13 Server OpenAI SDK Wiring
+
+- Diagnosed Node/npm as absent rather than only missing from PATH.
+- Installed official Node.js LTS `v24.16.0` through `winget`; npm `11.13.0` is
+  available.
+- Added `C:\Program Files\nodejs` to the user PATH and set PowerShell
+  CurrentUser execution policy to `RemoteSigned`; system PATH and machine
+  policy were not changed.
+- Installed `openai@6.42.0` in `apps/api` only.
+- Added the server-only SDK factory while preserving the injected fake-client
+  adapter and all engine contracts.
+- Added an opt-in one-call smoke module; it was not run because
+  `RUN_OPENAI_SMOKE=1` was not explicitly enabled.
+- Provider contract checks pass 18 cases with no network access.
+- Engine evals remain 176 passed, 0 failed.
+- API and engine typechecks/builds pass; the API Next.js production build
+  passes.
+- Root workspace typecheck/build now execute but fail only in untouched mobile
+  setup due duplicate React types and missing `react-native-web`.
+- `npm install` passes. It reports 12 moderate dependency vulnerabilities; no
+  forced audit remediation was applied.
+- Committed and pushed the server SDK wiring as `d8374e9`.
+- Next step: run the opt-in real OpenAI smoke test intentionally, then add a
+  protected API route without changing engine contracts.
+- `docs/ai/handoff.md` is ignored and local-only, so it was updated locally but
+  not staged or committed.
+
+### 2026-06-15 - Session 12 OpenAI Adapter Boundary
+
+- Safely prepared V2 env files using matching V1 local env values.
+- Created the root env example and confirmed the existing API/mobile examples
+  contain empty values only.
+- Designed the OpenAI provider adapter boundary and added ADR-005.
+- Added provider adapter implementation documentation.
+- Added an API-layer `OpenAIProvider` boundary with 16 fake-client contract
+  checks and no network calls.
+- Current engine eval total remains 176 passed, 0 failed.
+- Direct TypeScript 5.8.3 engine and provider typechecks/builds passed.
+- npm remains unavailable on `PATH`; `npm install`, `npm run typecheck`, and
+  `npm run build` were blocked by the command-not-found error.
+- Committed and pushed the adapter boundary as `a0233be`.
+- Next step: fix Node.js/npm PATH before real SDK wiring, or add an opt-in real
+  OpenAI smoke test only after npm works.
+- `docs/ai/handoff.md` is ignored and local-only, so it was updated locally but
+  not staged or committed.
+
+### 2026-06-15 - Session 11 Engine Contract Documentation
+
+- Added engine contract documentation.
+- Added ADR-004 for the completed Stage 0 through Stage 6 pipeline.
+- Updated the repository README, thesis overview, and eval README.
+- Current eval total: 176 passed, 0 failed.
+- Direct TypeScript 5.8.3 source/eval typechecks and builds passed.
+- npm remains unavailable on `PATH`; `npm install`, `npm run typecheck`, and
+  `npm run build` were blocked by the command-not-found error.
+- Committed and pushed the documentation as `e2a665f`.
+- Next step: design the provider adapter boundary for OpenAI integration
+  without changing engine contracts.
+- `docs/ai/handoff.md` is ignored and local-only, so it was updated locally but
+  not staged or committed.
+
+### 2026-06-15 - Session 10 Pipeline Integration
+
+- Wired `runPipeline` end to end with fake-provider integration fixtures.
+- Added a 21-case pipeline eval suite.
+- The eval runner now covers Stage 0 through Stage 6 plus pipeline integration.
+- Current eval totals: 176 passed, 0 failed.
+- Direct TypeScript 5.8.3 source/eval typechecks and builds passed.
+- npm remains unavailable on `PATH`; `npm install`, `npm run typecheck`, and
+  `npm run build` were blocked by the command-not-found error.
+- Committed and pushed pipeline integration as `cc5dac2`.
+- Next step: add engine contract documentation and an ADR for the completed
+  pipeline before provider integration.
+- `docs/ai/handoff.md` is ignored and local-only, so it was updated locally but
+  not staged or committed.
+
+### 2026-06-15 - Session 9 Stage 6 Reviewer Assembly
+
+- Implemented eval-first Stage 6 deterministic reviewer assembly.
+- Added Stage 6 fixtures and a 30-case eval suite.
+- The eval runner now covers Stage 0 through Stage 6.
+- Current eval totals: 155 passed, 0 failed.
+- Direct TypeScript 5.8.3 source/eval typechecks and builds passed.
+- npm remains unavailable on `PATH`; `npm install`, `npm run typecheck`, and
+  `npm run build` were blocked by the command-not-found error.
+- Committed and pushed Stage 6 as `d54b4cb`.
+- Next step: wire `runPipeline` end to end using fake-provider fixtures, then
+  add integration evals.
+- `docs/ai/handoff.md` is ignored and local-only, so it was updated locally but
+  not staged or committed.
+
+### 2026-06-15 - Session 8 Stage 5 Bounded Retries
+
+- Implemented eval-first Stage 5 bounded retry handling.
+- Added Stage 5 fixtures and a 28-case fake-provider eval suite.
+- The eval runner now covers Stage 0, Stage 1, Stage 2, Stage 3, Stage 4, and
+  Stage 5.
+- Current eval totals: 125 passed, 0 failed.
+- Direct TypeScript 5.8.3 source/eval typechecks and builds passed.
+- npm remains unavailable on `PATH`; `npm install`, `npm run typecheck`, and
+  `npm run build` were blocked by the command-not-found error.
+- Committed and pushed Stage 5 as `25aabc4`.
+- Next step: implement Stage 6 deterministic reviewer assembly.
+- `docs/ai/handoff.md` is ignored and local-only, so it was updated locally but
+  not staged or committed.
+
+### 2026-06-15 - Current Progress Refresh
+
+- Refreshed the local-only handoff with detailed Stage 0 through Stage 3
+  progress and verification results.
+- Verified that the exact Stage 3 commit is `a108a26`.
+- Confirmed that `origin/main` includes Stage 4 at `e0f79bf`, which is newer
+  than the supplied Stage 3 project snapshot.
+- Confirmed the current branch is `main` and locally ahead by the handoff
+  template commit `612bfe0`.
+- Attempted the engine build and aggregate eval commands; both remain blocked
+  by npm being unavailable on `PATH`.
+- Confirmed `git diff --check` passes in the current workspace.
+
+### Session 7 - Stage 4 Coverage Verification
+
+- Implemented eval-first Stage 4 deterministic coverage verification.
+- Added fixtures and eval coverage for schema alignment, required content,
+  source coverage, scoring, statuses, ordering, and validation.
+- Updated the aggregate eval runner to include Stage 4.
+- Next task recorded at the time: Stage 5 bounded retry handling with fake
+  providers.
+
+### Session 6 - Stage 3 Provider Requests
+
+- Implemented eval-first Stage 3 schema contracts and provider-request
+  construction.
+- Added provider-agnostic schema descriptors for four section output kinds.
+- Added fake-provider evals for requests, valid outputs, validation, source
+  isolation, and contextual provider errors.
+- Updated the aggregate eval runner to include Stage 3.
+
+### Session 5 - Stage 2 Generation Planning
+
+- Implemented eval-first deterministic generation planning.
+- Added cases for schema selection, target contracts, source references,
+  ordering, deterministic IDs, and validation.
+
+### Session 4 - Stage 1 Outline Detection
+
+- Implemented eval-first deterministic outline detection.
+- Added coverage for grouping, ordering, tags, confidence scores,
+  deterministic IDs, and empty-source validation.
+
+### Session 3 - Evaluation Harness
+
+- Built a dependency-free evaluation harness for deterministic engine stages.
+- Added Stage 0 success and expected-error cases with readable JSON fixtures.
+
+### Session 2 - Stage 0 Normalization
+
+- Implemented normalization for extracted text and block-like input.
+- Added deterministic text-to-block normalization and stable source/block IDs.
+- Preserved the engine boundary from raw file, OCR, storage, LMS, UI, and
+  provider dependencies.
+
+### Session 1 - Domain Types
+
+- Implemented stable domain types for normalized sources, outlines, generation
+  plans, outputs, coverage, reviewer output, and retries.
+- Defined a provider-agnostic request boundary without importing an SDK.
+- Updated stage signatures to use typed argument objects.
+
+### Session 0 - Initial Architecture
+
+- Initialized V2 as a Turborepo monorepo with npm workspaces.
+- Chose an engine-first architecture with no UI dependency.
+- Chose token-based JWT authentication instead of cookies.
+- Separated mobile, API, engine, database, Canvas, and shared code into
+  workspaces.
+
+Vercel project created:
+- Project name: stay-focused-v2-api
+- Root directory: apps/api
+- Preset: Next.js
+- RUN_OPENAI_SMOKE=0
+- /api/health expected live
+- /api/review expected 501 until real provider is enabled
+
+Design reference:
+- Local folder: C:\Users\Fely Max Dilinila\OneDrive\Documents\Projects\stay-focused-v2\design
+
+### Session: Stage 6.1 - JWT auth on /api/review
+
+- Files created: `apps/api/src/lib/auth.ts`
+- Files changed: `apps/api/app/api/review/route.ts`
+- What was implemented: Bearer token verification via Supabase `getUser`, runs
+  before all other checks, with a generic 401 response on failure.
+- Next step: Apply the same auth helper to remaining generation routes.
+- Risks/blockers: The app has no `@/*` TypeScript path alias, so the route uses
+  the existing relative import style. Missing Supabase server environment
+  variables intentionally produce the same generic 401 response.
+
+### Stage 6.1 — Supabase JWT verification — 2026-06-15
+- Files created: `apps/api/src/lib/auth.ts`
+- Files changed: `apps/api/app/api/review/route.ts`, `docs/ai/handoff.md`
+- What was implemented: Added a Supabase-backed Bearer token verifier and enforced authentication before all other `/api/review` checks, returning a generic 401 on failure without cookies or exposed internals.
+- Verified by: API TypeScript check (`tsc --noEmit`).
+- Next recommended step: Apply the same auth helper to remaining protected API routes.
+- Risks/blockers: `apps/api/package.json` has a separate unstaged change adding `@supabase/supabase-js`; it is intentionally excluded from this commit.
+- Commit: not committed

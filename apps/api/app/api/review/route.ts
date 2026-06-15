@@ -2,9 +2,13 @@ import { runPipeline } from "@stay-focused/engine";
 import type { SourceNormalizationInput } from "@stay-focused/engine";
 import { NextResponse } from "next/server";
 import { createServerOpenAIProvider } from "../../../src/providers/openai-provider";
+import { verifyBearerToken } from "../../../src/lib/auth";
 
-export async function POST(request: Request): Promise<NextResponse> {
-  // TODO: verify JWT token
+export async function POST(request: Request): Promise<Response> {
+  const user = await verifyBearerToken(request);
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   if (process.env.RUN_OPENAI_SMOKE !== "1") {
     return NextResponse.json(
