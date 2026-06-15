@@ -1,0 +1,20 @@
+<!-- @dsCard group="Type" viewport="700x260" name="Body, meta & kicker" subtitle="Reading sizes and the uppercase eyebrow" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; background:var(--app-bg); font-family:var(--font-sans); color:var(--text-primary); padding:24px; }
+  .row { display:flex; align-items:baseline; gap:14px; padding:9px 0; border-bottom:1px solid var(--border-subtle); }
+  .row:last-child { border-bottom:0; }
+  .tag { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); min-width:138px; }
+  .body { font-size:var(--type-body); line-height:var(--leading-relaxed); color:var(--text-primary); }
+  .bodysm { font-size:var(--type-body-sm); color:var(--text-secondary); }
+  .cap { font-size:var(--type-caption); color:var(--text-muted); }
+  .kicker { font-size:var(--type-kicker); font-weight:800; letter-spacing:var(--tracking-kicker); text-transform:uppercase; color:var(--text-muted); }
+</style></head>
+<body>
+  <div class="row"><span class="tag">body · 15/400</span><span class="body">Due Friday, and this is your only free block today.</span></div>
+  <div class="row"><span class="tag">body-sm · 13/400</span><span class="bodysm">Grounded in 4 modules from Canvas.</span></div>
+  <div class="row"><span class="tag">caption · 12/400</span><span class="cap">Synced 6 minutes ago</span></div>
+  <div class="row"><span class="tag">kicker · 11/800</span><span class="kicker">Right now</span></div>
+</body></html>

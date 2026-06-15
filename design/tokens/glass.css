@@ -1,0 +1,87 @@
+/* Stay Focused V2 — Liquid Glass + flat-surface system
+ *
+ * THE V2 RULE:
+ *   • iOS 26 Liquid Glass  → chrome only: floating tab bar, nav bar, FAB.
+ *   • Stay Focused "flat"   → all content: schedule blocks, cards, sheets.
+ * Glass is gold-tinted (the accent doubles as the glass tint). Content never
+ * blurs; it sits flat on the parchment with the soft warm shadow system. */
+
+:root {
+  /* ---- Liquid Glass ---- */
+  /* Tint derives from --accent, so the glass chrome retints with the theme. */
+  --glass-tint: color-mix(in srgb, var(--accent) 12%, transparent);       /* accent, very faint */
+  --glass-tint-strong: color-mix(in srgb, var(--accent) 18%, transparent);
+  --glass-base: rgba(252, 250, 245, 0.62);          /* parchment-white veil */
+  --glass-blur: 22px;
+  --glass-saturate: 165%;
+  --glass-edge: rgba(255, 255, 255, 0.65);          /* top specular highlight */
+  --glass-edge-low: rgba(255, 255, 255, 0.18);      /* bottom edge */
+  --glass-hairline: rgba(120, 96, 40, 0.18);        /* warm rim */
+  --glass-shadow: 0 8px 30px rgba(40, 30, 12, 0.14), 0 2px 8px rgba(40, 30, 12, 0.08);
+  --glass-shadow-float: 0 14px 40px rgba(40, 30, 12, 0.20), 0 3px 10px rgba(40, 30, 12, 0.10);
+  --glass-inner: inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 var(--glass-edge-low);
+
+  /* ---- Flat content surfaces ---- */
+  --flat-card: var(--surface-base);
+  --flat-card-border: var(--border-subtle);
+  --flat-card-shadow: var(--shadow-low);
+}
+
+/* Dark mode — Apple-style dark glass: charcoal veil, faint light top edge.
+ * The accent tint still derives from --accent, so it carries through. */
+:root[data-theme='dark'] {
+  --glass-base: rgba(38, 33, 28, 0.58);
+  --glass-saturate: 175%;
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-edge-low: rgba(0, 0, 0, 0.28);
+  --glass-hairline: rgba(255, 243, 223, 0.16);
+  --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.22);
+  --glass-shadow-float: 0 14px 42px rgba(0, 0, 0, 0.42), 0 3px 12px rgba(0, 0, 0, 0.26);
+}
+
+/* ============ Liquid Glass utility ============ */
+.sf-glass {
+  position: relative;
+  background:
+    linear-gradient(180deg, var(--glass-tint) 0%, transparent 55%),
+    var(--glass-base);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-hairline);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+}
+.sf-glass--floating {
+  box-shadow: var(--glass-shadow-float), var(--glass-inner);
+}
+.sf-glass--accent {
+  background:
+    linear-gradient(180deg, var(--glass-tint-strong) 0%, var(--glass-tint) 60%),
+    var(--glass-base);
+}
+/* The thin specular sheen riding the top edge of a glass element */
+.sf-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.40) 0%, transparent 38%);
+  opacity: 0.9;
+  mix-blend-mode: screen;
+}
+
+/* ============ Flat content surface utility ============ */
+.sf-flat {
+  background: var(--flat-card);
+  border: 1px solid var(--flat-card-border);
+  box-shadow: var(--flat-card-shadow);
+  border-radius: var(--radius-panel);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sf-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface-elevated);
+  }
+}

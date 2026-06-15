@@ -1,0 +1,42 @@
+<!-- @dsCard group="Glass" viewport="700x300" name="Glass vs Flat — the V2 rule" subtitle="Liquid Glass = chrome only. Content stays flat." -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; background:var(--app-bg); font-family:var(--font-sans); color:var(--text-primary); }
+  .wrap { position:relative; height:300px; overflow:hidden; }
+  .bed { position:absolute; inset:0; padding:18px; display:grid; grid-template-columns:1fr 1fr; gap:12px; align-content:start; }
+  .stripe { height:60px; border-radius:14px; }
+  .s1 { background:color-mix(in srgb, var(--accent) 22%, var(--surface-base)); }
+  .s2 { background:color-mix(in srgb, var(--blue) 18%, var(--surface-base)); }
+  .s3 { background:color-mix(in srgb, var(--green) 18%, var(--surface-base)); }
+  .s4 { background:color-mix(in srgb, var(--red) 16%, var(--surface-base)); }
+  /* FLAT content card */
+  .flat { position:absolute; left:18px; top:150px; width:280px; padding:14px 16px; background:var(--surface-base); border:1px solid var(--border-subtle); box-shadow:var(--shadow-low); border-radius:var(--radius-panel); }
+  /* GLASS chrome capsule */
+  .glass { position:absolute; right:18px; bottom:24px; left:18px; height:58px; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:999px;
+    background:linear-gradient(180deg, var(--glass-tint) 0%, transparent 55%), var(--glass-base);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate)); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border:1px solid var(--glass-hairline); box-shadow:var(--glass-shadow-float), var(--glass-inner); }
+  .lbl { font-size:11px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; }
+  .title { font-size:14px; font-weight:700; margin:2px 0 0; }
+  .sub { font-size:12px; color:var(--text-secondary); }
+</style></head>
+<body>
+  <div class="wrap">
+    <div class="bed">
+      <div class="stripe s1"></div><div class="stripe s2"></div>
+      <div class="stripe s3"></div><div class="stripe s4"></div>
+      <div class="stripe s2"></div><div class="stripe s1"></div>
+    </div>
+    <div class="flat">
+      <div class="lbl" style="color:var(--text-muted)">Flat · content</div>
+      <div class="title">Schedule block</div>
+      <div class="sub">Warm surface, hairline border, no blur.</div>
+    </div>
+    <div class="glass">
+      <span class="lbl" style="color:var(--accent-foreground)">Glass · chrome</span>
+      <span class="sub" style="color:var(--text-secondary)">tab bar · nav · FAB</span>
+    </div>
+  </div>
+</body></html>

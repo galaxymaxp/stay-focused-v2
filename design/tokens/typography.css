@@ -1,0 +1,47 @@
+/* Stay Focused — Typography tokens
+ *
+ * BRAND FONT: "Aptos" (Microsoft's default; the app is built in a Windows +
+ * VS Code environment, fallbacks "Segoe UI", "SF Pro Text"). Aptos is NOT on
+ * Google Fonts, so this system substitutes **Hanken Grotesk** — a clean
+ * humanist grotesque with similar proportions and a neutral, legible voice.
+ * >>> SUBSTITUTION FLAGGED: swap in the real Aptos webfont files if you have
+ *     a license, or keep Hanken Grotesk for web/prototype work. <<<
+ * Mono is "Aptos Mono" → substituted with "JetBrains Mono". */
+
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* Families */
+  --font-sans: "Hanken Grotesk", "Aptos", "Segoe UI", "SF Pro Text", "Helvetica Neue", "Noto Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Aptos Mono", "Cascadia Code", "SFMono-Regular", Consolas, ui-monospace, monospace;
+  --font-display: var(--font-sans);
+
+  /* Type scale (px) — mobile-first; tight tracking on big text */
+  --type-display: 34px;   /* hero numerals / "what now" headline */
+  --type-h1: 24px;        /* screen title */
+  --type-h2: 19px;        /* card / section title */
+  --type-h3: 16px;        /* block title */
+  --type-body: 15px;      /* default reading size */
+  --type-body-sm: 13px;   /* secondary text, meta */
+  --type-caption: 12px;   /* timestamps, helper */
+  --type-kicker: 11px;    /* uppercase eyebrow labels */
+
+  /* Weights */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-heavy: 800;
+
+  /* Line heights */
+  --leading-tight: 1.05;
+  --leading-snug: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Tracking — negative on display, positive on kickers */
+  --tracking-display: -0.04em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-kicker: 0.08em;
+}

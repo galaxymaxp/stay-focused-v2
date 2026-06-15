@@ -1,0 +1,24 @@
+<!-- @dsCard group="Colors" viewport="700x200" name="Parchment & surfaces" subtitle="Warm canvas + translucent white surface stack" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; background:var(--app-bg); font-family:var(--font-sans); padding:22px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .sw { width:128px; border-radius:var(--radius-control); overflow:hidden; border:1px solid var(--border-subtle); box-shadow:var(--shadow-low); }
+  .chip { height:58px; }
+  .meta { padding:8px 10px; background:#fff; }
+  .name { font-size:12px; font-weight:700; color:var(--text-primary); }
+  .hex { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
+  /* checker so translucency reads */
+  .checker { background-image:linear-gradient(45deg,#e7e1d4 25%,transparent 25%),linear-gradient(-45deg,#e7e1d4 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e7e1d4 75%),linear-gradient(-45deg,transparent 75%,#e7e1d4 75%); background-size:14px 14px; background-position:0 0,0 7px,7px -7px,-7px 0; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="sw"><div class="chip" style="background:var(--app-bg)"></div><div class="meta"><div class="name">app-bg</div><div class="hex">#f6f4ef parchment</div></div></div>
+    <div class="sw"><div class="chip checker"><div style="height:100%;background:var(--surface-base)"></div></div><div class="meta"><div class="name">surface-base</div><div class="hex">white / .92</div></div></div>
+    <div class="sw"><div class="chip checker"><div style="height:100%;background:var(--surface-soft)"></div></div><div class="meta"><div class="name">surface-soft</div><div class="hex">.82</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-elevated)"></div><div class="meta"><div class="name">surface-elevated</div><div class="hex">white / .96</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-selected)"></div><div class="meta"><div class="name">surface-selected</div><div class="hex">gold tint</div></div></div>
+  </div>
+</body></html>

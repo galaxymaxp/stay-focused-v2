@@ -1,0 +1,118 @@
+/* Stay Focused — Color tokens
+ * Lifted verbatim from the V1 codebase (app/globals.css :root).
+ * Warm parchment surfaces, earthy semantic colors, single gold accent. */
+
+:root {
+  /* Brand accent — the one gold that carries the whole product */
+  --accent: #d7aa38;
+  --accent-hover: #c29524;
+  --accent-light: #f5ebc7;
+  --accent-foreground: #2c2107;
+  --accent-border: #bb912f;
+  --accent-shadow: rgba(215, 170, 56, 0.18);
+
+  /* Semantic — muted, earthy, never neon */
+  --red: #be5a46;
+  --red-light: #fbefeb;
+  --amber: #b9863c;
+  --amber-light: #faf1e5;
+  --green: #54795f;
+  --green-light: #eef5ef;
+  --blue: #5e7da5;
+  --blue-light: #edf2f8;
+
+  /* Canvas — warm parchment */
+  --app-bg: #f6f4ef;
+  --app-bg-rgb: 246 244 239;
+  --bg: var(--app-bg);
+
+  /* Surfaces — translucent warm whites, stacked by elevation */
+  --surface-base: rgba(255, 255, 253, 0.92);
+  --surface-soft: rgba(250, 248, 243, 0.82);
+  --surface-elevated: rgba(255, 255, 255, 0.96);
+  --surface-focus: rgba(249, 246, 238, 0.94);
+  --surface-hover: rgba(255, 255, 252, 0.99);
+  --surface-selected: rgba(248, 240, 220, 0.98);
+  --surface-accent: color-mix(in srgb, var(--surface-focus) 88%, var(--accent) 12%);
+  --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0.08) 24%, transparent 58%);
+
+  /* Aliases used by components */
+  --bg-card: var(--surface-base);
+  --bg-elevated: var(--surface-elevated);
+  --bg-hover: var(--surface-hover);
+
+  /* Text — warm near-black down through muted clay */
+  --text-primary: #1f1913;
+  --text-secondary: #61584f;
+  --text-muted: #74695d;
+
+  /* Borders — low-contrast warm hairlines */
+  --border-subtle: rgba(82, 67, 42, 0.1);
+  --border-strong: rgba(82, 67, 42, 0.16);
+  --border-hover: rgba(82, 67, 42, 0.22);
+  --border: var(--border-subtle);
+
+  /* Focus ring — accent halo */
+  --focus-ring: 0 0 0 1px color-mix(in srgb, var(--accent) 54%, #ffffff 46%),
+                0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+
+  color-scheme: light;
+}
+
+/* ============================================================
+ * DARK MODE — lifted from the V2 codebase (:root[data-theme='dark']).
+ * Warm charcoal canvas + cream text, in line with Apple's dark
+ * mode (dark grays not pure black, elevation by lightening, lifted
+ * semantic hues for contrast). The single gold accent is unchanged.
+ *
+ * Activation:
+ *   • Manual  →  <html data-theme="dark">   (the explicit option)
+ *   • Auto    →  system "Dark" when no data-theme is set
+ *   • Force light → <html data-theme="light"> wins over system
+ * ============================================================ */
+
+:root[data-theme='dark'] {
+  --app-bg: #1b1814;
+  --app-bg-rgb: 27 24 20;
+  --bg: var(--app-bg);
+
+  /* Surfaces — elevation by LIGHTENING (Apple-style), translucent warm grays */
+  --surface-base: rgba(40, 35, 30, 0.9);
+  --surface-soft: rgba(48, 41, 35, 0.86);
+  --surface-elevated: rgba(45, 39, 33, 0.94);
+  --surface-focus: rgba(52, 45, 38, 0.95);
+  --surface-hover: rgba(58, 49, 42, 0.98);
+  --surface-selected: rgba(74, 61, 45, 0.96);
+  --surface-accent: color-mix(in srgb, var(--surface-focus) 88%, var(--accent) 12%);
+  --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 24%, transparent 56%);
+
+  --bg-card: var(--surface-base);
+  --bg-elevated: var(--surface-elevated);
+  --bg-hover: var(--surface-hover);
+
+  /* Text — warm cream down through clay-gray */
+  --text-primary: #f4eee5;
+  --text-secondary: #cabeb1;
+  --text-muted: #a19485;
+
+  /* Borders — low-contrast warm-light hairlines */
+  --border-subtle: rgba(255, 243, 223, 0.1);
+  --border-strong: rgba(255, 243, 223, 0.16);
+  --border-hover: rgba(255, 243, 223, 0.22);
+  --border: var(--border-subtle);
+
+  /* Semantic — lifted, warmer, washed-dark tints for dark surfaces */
+  --red: #f29b86;
+  --red-light: rgba(96, 45, 36, 0.68);
+  --amber: #e0b468;
+  --amber-light: rgba(89, 60, 26, 0.68);
+  --green: #8bb49a;
+  --green-light: rgba(34, 57, 41, 0.72);
+  --blue: #9cb6d5;
+  --blue-light: rgba(34, 45, 60, 0.72);
+
+  --focus-ring: 0 0 0 1px color-mix(in srgb, var(--accent) 58%, #1b1814 42%),
+                0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+
+  color-scheme: dark;
+}

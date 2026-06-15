@@ -1,0 +1,32 @@
+/* Stay Focused — Radii & shadow tokens
+ * Soft, warm-tinted elevation. Content stays flat; only chrome lifts. */
+
+:root {
+  /* Corner radii */
+  --radius-page: 18px;
+  --radius-panel: 14px;
+  --radius-overlay: 18px;
+  --radius-control: 12px;
+  --radius-tight: 10px;
+  --radius-pill: 999px;
+
+  /* Aliases */
+  --radius-premium: var(--radius-page);
+  --radius-lg: var(--radius-panel);
+  --radius-md: var(--radius-control);
+  --radius-sm: var(--radius-tight);
+
+  /* Shadows — extremely soft, warm-brown tint, low opacity */
+  --shadow-low: 0 4px 12px rgba(36, 29, 18, 0.035);
+  --shadow-medium: 0 10px 24px rgba(36, 29, 18, 0.06);
+  --shadow-high: 0 18px 36px rgba(28, 22, 14, 0.1);
+  --highlight-sheen: 0 1px 0 rgba(255, 255, 255, 0.24) inset;
+}
+
+/* Dark mode — deeper, neutral-black elevation (Apple-style); near-invisible sheen */
+:root[data-theme='dark'] {
+  --shadow-low: 0 10px 24px rgba(0, 0, 0, 0.18);
+  --shadow-medium: 0 18px 38px rgba(0, 0, 0, 0.24);
+  --shadow-high: 0 28px 56px rgba(0, 0, 0, 0.3);
+  --highlight-sheen: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}

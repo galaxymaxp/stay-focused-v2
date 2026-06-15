@@ -1,0 +1,22 @@
+<!-- @dsCard group="Colors" viewport="700x180" name="Semantic — earthy, never neon" subtitle="Status colors paired with soft tint backgrounds" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; background:var(--app-bg); font-family:var(--font-sans); padding:22px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .pair { width:128px; border-radius:var(--radius-control); overflow:hidden; border:1px solid var(--border-subtle); }
+  .solid { height:42px; }
+  .light { height:26px; }
+  .meta { padding:7px 10px; background:#fff; }
+  .name { font-size:12px; font-weight:700; color:var(--text-primary); }
+  .hex { font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
+</style></head>
+<body>
+  <div class="row">
+    <div class="pair"><div class="solid" style="background:var(--red)"></div><div class="light" style="background:var(--red-light)"></div><div class="meta"><div class="name">red</div><div class="hex">#be5a46 overdue</div></div></div>
+    <div class="pair"><div class="solid" style="background:var(--amber)"></div><div class="light" style="background:var(--amber-light)"></div><div class="meta"><div class="name">amber</div><div class="hex">#b9863c due soon</div></div></div>
+    <div class="pair"><div class="solid" style="background:var(--green)"></div><div class="light" style="background:var(--green-light)"></div><div class="meta"><div class="name">green</div><div class="hex">#54795f done</div></div></div>
+    <div class="pair"><div class="solid" style="background:var(--blue)"></div><div class="light" style="background:var(--blue-light)"></div><div class="meta"><div class="name">blue</div><div class="hex">#5e7da5 lecture</div></div></div>
+  </div>
+</body></html>

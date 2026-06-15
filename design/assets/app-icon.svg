@@ -1,0 +1,21 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stay Focused">
+  <defs>
+    <radialGradient id="sfGlow" cx="50%" cy="42%" r="58%">
+      <stop offset="0%" stop-color="#d7aa38" stop-opacity="0.55"></stop>
+      <stop offset="55%" stop-color="#d7aa38" stop-opacity="0.12"></stop>
+      <stop offset="100%" stop-color="#d7aa38" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+  
+  <rect x="4" y="4" width="248" height="248" rx="58" fill="#221b11"></rect>
+  <rect x="4" y="4" width="248" height="248" rx="58" fill="url(#sfGlow)"></rect>
+  <rect x="4.75" y="4.75" width="246.5" height="246.5" rx="57.25" fill="none" stroke="#d7aa38" stroke-opacity="0.22" stroke-width="1.5"></rect>
+  
+  <g transform="translate(51.2 53) scale(6.4)" stroke="#e6bd4e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M12 7v14"></path>
+    <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path>
+    <path d="M5 11l1.8 1.8 3.2-3.6"></path>
+    <path d="M15.4 9h4"></path>
+    <path d="M15.4 11.6h3"></path>
+  </g>
+</svg>

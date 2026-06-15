@@ -1,0 +1,66 @@
+<!-- @dsCard group="Colors" viewport="700x320" name="Dark mode" subtitle="data-theme toggle — warm charcoal, cream text, Apple-style elevation" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; background:#cfc9bd; font-family:var(--font-sans); padding:22px; display:flex; gap:18px; flex-wrap:wrap; }
+  .pane { flex:1; min-width:280px; border-radius:var(--radius-page); padding:18px; background:var(--app-bg);
+    border:1px solid var(--border-subtle); box-shadow:var(--shadow-medium); }
+  .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .label { font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted); }
+  .toggle { display:inline-flex; border:1px solid var(--border-strong); border-radius:999px; overflow:hidden; }
+  .toggle button { border:none; background:transparent; color:var(--text-secondary); font:inherit; font-size:12px; font-weight:700;
+    padding:5px 12px; cursor:pointer; }
+  .toggle button[aria-pressed="true"] { background:var(--accent); color:var(--accent-foreground); }
+  .card { background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-panel);
+    box-shadow:var(--shadow-low); padding:13px 14px; margin-bottom:10px; }
+  .title { font-size:15px; font-weight:600; color:var(--text-primary); letter-spacing:-0.01em; }
+  .sub { font-size:13px; color:var(--text-secondary); margin-top:3px; }
+  .row { display:flex; gap:8px; margin-top:6px; }
+  .chip { font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; }
+  .c-blue { color:var(--blue); background:var(--blue-light); }
+  .c-green { color:var(--green); background:var(--green-light); }
+  .c-amber { color:var(--amber); background:var(--amber-light); }
+  .btn { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 16px; border-radius:var(--radius-control);
+    background:var(--accent); color:var(--accent-foreground); font-weight:600; font-size:14px; border:none; }
+  .swrow { display:flex; gap:7px; margin-top:12px; }
+  .sw { width:34px; height:34px; border-radius:9px; border:1px solid var(--border-subtle); }
+</style></head>
+<body>
+  <div class="pane" id="pane">
+    <div class="head">
+      <span class="label" id="mode">Light</span>
+      <span class="toggle" id="tog">
+        <button data-t="light" aria-pressed="true">Light</button>
+        <button data-t="dark" aria-pressed="false">Dark</button>
+      </span>
+    </div>
+    <div class="card">
+      <div class="title">Draft Chapter 3 — Methodology</div>
+      <div class="sub">CS 198 · Thesis · due Friday</div>
+      <div class="row">
+        <span class="chip c-blue">MATH 211</span>
+        <span class="chip c-green">on track</span>
+        <span class="chip c-amber">quiz Thu</span>
+      </div>
+    </div>
+    <button class="btn">Start now</button>
+    <div class="swrow">
+      <span class="sw" style="background:var(--app-bg)"></span>
+      <span class="sw" style="background:var(--surface-base)"></span>
+      <span class="sw" style="background:var(--surface-selected)"></span>
+      <span class="sw" style="background:var(--accent)"></span>
+      <span class="sw" style="background:var(--text-primary)"></span>
+    </div>
+  </div>
+<script>
+  const root = document.documentElement;
+  root.dataset.theme = "light";
+  document.getElementById("tog").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    root.dataset.theme = b.dataset.t;
+    document.getElementById("mode").textContent = b.dataset.t === "dark" ? "Dark" : "Light";
+    document.querySelectorAll("#tog button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  });
+</script>
+</body></html>

@@ -1,0 +1,9 @@
+/* Stay Focused Design System — global entry point.
+ * Consumers link THIS file. Keep it as @import lines only. */
+
+@import "./tokens/colors.css";
+@import "./tokens/accents.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radii-shadows.css";
+@import "./tokens/glass.css";

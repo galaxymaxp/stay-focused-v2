@@ -1,0 +1,49 @@
+/* Stay Focused — Accent themes
+ *
+ * Gold is the default/main accent. The product accent is swappable: set
+ * `data-accent` on <html> (or any scope) to retint everything driven by
+ * --accent — buttons, chips, the "now" block, AND the Liquid Glass tint
+ * (glass.css derives its tint from --accent via color-mix).
+ *
+ *   <html data-accent="green">   →  sage-leaf green
+ *   <html data-accent="blue">    →  slate blue
+ *   <html data-accent="orange">  →  terracotta orange
+ *   (unset, or data-accent="gold")  →  the default gold
+ *
+ * Each theme overrides the full accent ramp so contrast stays correct. */
+
+:root[data-accent="gold"] {
+  --accent: #d7aa38;
+  --accent-hover: #c29524;
+  --accent-light: #f5ebc7;
+  --accent-foreground: #2c2107;
+  --accent-border: #bb912f;
+  --accent-shadow: rgba(215, 170, 56, 0.18);
+}
+
+:root[data-accent="green"] {
+  --accent: #6f9b53;
+  --accent-hover: #5e8845;
+  --accent-light: #e8efdb;
+  --accent-foreground: #1d2b12;
+  --accent-border: #5d8541;
+  --accent-shadow: rgba(111, 155, 83, 0.20);
+}
+
+:root[data-accent="blue"] {
+  --accent: #5680b4;
+  --accent-hover: #4a6fa1;
+  --accent-light: #e3ebf6;
+  --accent-foreground: #122237;
+  --accent-border: #49709f;
+  --accent-shadow: rgba(86, 128, 180, 0.20);
+}
+
+:root[data-accent="orange"] {
+  --accent: #db7f3c;
+  --accent-hover: #c66c2c;
+  --accent-light: #f7e7d4;
+  --accent-foreground: #391f08;
+  --accent-border: #c06f2e;
+  --accent-shadow: rgba(219, 127, 60, 0.20);
+}

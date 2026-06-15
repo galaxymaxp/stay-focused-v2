@@ -1,0 +1,28 @@
+<!-- @dsCard group="Brand" viewport="700x250" name="Logo mark" subtitle="One unified glyph — open book + checkmark + page lines" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; background:var(--app-bg); font-family:var(--font-sans); color:var(--text-primary); padding:26px; display:flex; align-items:center; gap:34px; flex-wrap:wrap; }
+  .col { display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+  .lockup { display:flex; align-items:center; gap:12px; }
+  .name { font-size:22px; font-weight:800; letter-spacing:-0.03em; white-space:nowrap; }
+  .on-dark { background:#221b11; border-radius:var(--radius-panel); padding:16px 20px; }
+  .on-dark .name { color:#f6f4ef; }
+  .cap { font-size:12px; font-family:var(--font-mono); color:var(--text-muted); }
+  .icons { display:flex; align-items:center; gap:14px; }
+</style></head>
+<body>
+  <div class="col">
+    <div class="lockup"><img src="../assets/logo-mark.svg" width="44" height="44" alt="Stay Focused" /><span class="name">Stay Focused</span></div>
+    <span class="cap">wordmark · parchment</span>
+  </div>
+  <div class="col">
+    <div class="lockup on-dark"><img src="../assets/logo-mark.svg" width="40" height="40" alt="Stay Focused" /><span class="name">Stay Focused</span></div>
+    <span class="cap">wordmark · ink</span>
+  </div>
+  <div class="col">
+    <div class="icons"><img src="../assets/app-icon.svg" width="64" height="64" alt="App icon" /><img src="../assets/favicon.svg" width="32" height="32" alt="Favicon" /></div>
+    <span class="cap">app icon · favicon — same glyph</span>
+  </div>
+</body></html>
