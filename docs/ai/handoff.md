@@ -499,3 +499,24 @@ Design reference:
 - Next recommended step: roll verifyBearerToken out to remaining generation routes
 - Risks/blockers: npx is unavailable on PATH in this shell; verification passed with the repository's local TypeScript compiler via the bundled Node runtime. tsconfig.providers.json remains unchanged.
 - Commit: 853b1901b93773b9af088c3add7d96c82fc42f2b
+
+---
+
+## CONVENTION — API route auth (established Stage 6.2)
+
+Every new `/api/*` route that touches user data or runs generation MUST:
+- call `verifyBearerToken(request)` from `@/lib/auth` as the first statement in the handler
+- return `{ error: "Unauthorized" }` with status 401 when it returns null
+- run the auth check before input parsing and before any env/feature flag checks
+- never expose token contents, stack traces, or Supabase internals in responses
+- use JWT Bearer only — no cookies (mobile cannot use cookies)
+
+Public exceptions (MUST NOT receive the Bearer guard):
+- `/api/health` — health check, must return unauthenticated 200
+- any future webhook or cron route — these authenticate via their own secret/signature, not Bearer
+
+Current route status:
+- `/api/review` — guarded ✅
+- `/api/health` — intentionally public ✅
+
+---
