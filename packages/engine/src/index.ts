@@ -1,4 +1,5 @@
 export * from "./generate";
+export * from "./leakage-guard";
 export * from "./provider";
 export * from "./schemas";
 export * from "./stage0-normalize";
@@ -6,6 +7,7 @@ export * from "./stage1-outline";
 export * from "./stage2-plan";
 export * from "./stage3-generate";
 export * from "./stage4-verify";
+export * from "./stage5a-grounding";
 export * from "./stage5-retry";
 export * from "./stage6-assemble";
 export * from "./types";

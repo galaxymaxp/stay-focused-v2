@@ -5,6 +5,8 @@ import { buildGenerationPlan } from "./stage2-plan.js";
 import { generateSection } from "./stage3-generate.js";
 import { verifyCoverage } from "./stage4-verify.js";
 import { retryFailedSections } from "./stage5-retry.js";
+import { validateGrounding } from "./stage5a-grounding.js";
+import { validateLeakage } from "./leakage-guard.js";
 import { assembleReviewer } from "./stage6-assemble.js";
 import type {
   PipelineOptions,
@@ -48,9 +50,21 @@ export async function runPipeline(
     source,
     outline,
   });
+  const initialGrounding = validateGrounding({
+    outputs: initialOutputs,
+    plan,
+    source,
+    outline,
+  });
+  const initialLeakage = validateLeakage({
+    outputs: initialOutputs,
+    plan,
+  });
   const finalOutputs = await retryFailedSections({
     outputs: initialOutputs,
     coverage: initialCoverage,
+    grounding: initialGrounding,
+    leakage: initialLeakage,
     plan,
     source,
     outline,
@@ -66,10 +80,22 @@ export async function runPipeline(
     source,
     outline,
   });
+  const finalGrounding = validateGrounding({
+    outputs: finalOutputs,
+    plan,
+    source,
+    outline,
+  });
+  const finalLeakage = validateLeakage({
+    outputs: finalOutputs,
+    plan,
+  });
 
   return assembleReviewer({
     outputs: finalOutputs,
     coverage: finalCoverage,
+    grounding: finalGrounding,
+    leakage: finalLeakage,
     plan,
     source,
     allowWeakSections: args.allowWeakSections,

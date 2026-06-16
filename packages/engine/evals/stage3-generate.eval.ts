@@ -428,28 +428,34 @@ function createValidOutput(
     case "concept-card":
       return {
         ...base,
-        explanation: "A source-grounded concept explanation.",
-        keyPoints: ["First key point", "Second key point"],
+        sourceCore: {
+          explanation: "Included source alpha and included source beta.",
+          keyPoints: ["Included source alpha.", "Included source beta."],
+        },
       };
     case "process-step":
       return {
         ...base,
-        steps: ["First source-grounded step", "Second source-grounded step"],
-        summary: "A concise process summary.",
+        sourceCore: {
+          explanation: "Included source alpha and included source beta.",
+          keyPoints: ["Included source alpha.", "Included source beta."],
+        },
       };
     case "example-card":
       return {
         ...base,
-        scenario: "A source-grounded scenario.",
-        explanation: "The scenario explains the source content.",
-        takeaway: "Use the scenario as a concrete application.",
+        sourceCore: {
+          explanation: "Included source alpha and included source beta.",
+          keyPoints: ["Included source alpha.", "Included source beta."],
+        },
       };
     case "claim-card":
       return {
         ...base,
-        claim: "A source-grounded claim.",
-        support: "Support from the required source blocks.",
-        reasoning: "Reasoning that connects support to the claim.",
+        sourceCore: {
+          explanation: "Included source alpha and included source beta.",
+          keyPoints: ["Included source alpha.", "Included source beta."],
+        },
       };
   }
 }

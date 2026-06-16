@@ -8,6 +8,7 @@ import { stage1OutlineSuite } from "./stage1-outline.eval.js";
 import { stage2PlanSuite } from "./stage2-plan.eval.js";
 import { stage3GenerateSuite } from "./stage3-generate.eval.js";
 import { stage4VerifySuite } from "./stage4-verify.eval.js";
+import { stage5aGroundingSuite } from "./stage5a-grounding.eval.js";
 import { stage5RetrySuite } from "./stage5-retry.eval.js";
 import { stage6AssembleSuite } from "./stage6-assemble.eval.js";
 import { pipelineSuite } from "./pipeline.eval.js";
@@ -18,6 +19,7 @@ const suites = [
   stage2PlanSuite,
   stage3GenerateSuite,
   stage4VerifySuite,
+  stage5aGroundingSuite,
   stage5RetrySuite,
   stage6AssembleSuite,
   pipelineSuite,

@@ -8,8 +8,10 @@
         "id": "output-concept",
         "plannedSectionId": "planned-concept-card",
         "title": "Study Section",
-        "explanation": "The concept is explained using the supplied source.",
-        "keyPoints": ["First grounded point", "Second grounded point"],
+        "sourceCore": {
+          "explanation": "Included source alpha and included source beta.",
+          "keyPoints": ["Included source alpha.", "Included source beta."]
+        },
         "sourceBlockIds": ["included-a", "included-b"]
       }
     },
@@ -21,8 +23,10 @@
         "id": "output-process",
         "plannedSectionId": "planned-process-step",
         "title": "Study Section",
-        "steps": ["Complete the first step", "Complete the second step"],
-        "summary": "The steps preserve the source sequence.",
+        "sourceCore": {
+          "explanation": "Included source alpha and included source beta.",
+          "keyPoints": ["Included source alpha.", "Included source beta."]
+        },
         "sourceBlockIds": ["included-a", "included-b"]
       }
     },
@@ -34,9 +38,10 @@
         "id": "output-example",
         "plannedSectionId": "planned-example-card",
         "title": "Study Section",
-        "scenario": "A learner applies the source concept in a concrete situation.",
-        "explanation": "The scenario demonstrates the supplied material.",
-        "takeaway": "Apply the concept only where the source supports it.",
+        "sourceCore": {
+          "explanation": "Included source alpha and included source beta.",
+          "keyPoints": ["Included source alpha.", "Included source beta."]
+        },
         "sourceBlockIds": ["included-a", "included-b"]
       }
     },
@@ -48,9 +53,10 @@
         "id": "output-claim",
         "plannedSectionId": "planned-claim-card",
         "title": "Study Section",
-        "claim": "The source supports the central claim.",
-        "support": "The included blocks provide supporting evidence.",
-        "reasoning": "The support connects directly to the claim.",
+        "sourceCore": {
+          "explanation": "Included source alpha and included source beta.",
+          "keyPoints": ["Included source alpha.", "Included source beta."]
+        },
         "sourceBlockIds": ["included-a", "included-b"]
       }
     }

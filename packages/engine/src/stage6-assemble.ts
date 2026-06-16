@@ -1,10 +1,14 @@
 import type {
   CoverageReport,
   GenerationPlan,
+  GroundingReport,
+  LeakageReport,
   NormalizedSource,
   ReviewerOutput,
   ReviewerSection,
   SectionCoverageResult,
+  SectionGroundingResult,
+  SectionLeakageResult,
   SectionOutput,
 } from "./types";
 
@@ -13,20 +17,24 @@ export interface AssembleReviewerArgs {
   readonly plan: GenerationPlan;
   readonly outputs: readonly SectionOutput[];
   readonly coverage: CoverageReport;
+  readonly grounding: GroundingReport;
+  readonly leakage: LeakageReport;
   readonly allowWeakSections?: boolean;
 }
 
 export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
   validateArgs(args);
 
-  const { outputs, coverage, plan, source } = args;
+  const { outputs, coverage, grounding, leakage, plan, source } = args;
   const allowWeakSections = args.allowWeakSections ?? false;
-  validateRelationships(plan, coverage, source);
+  validateRelationships(plan, coverage, grounding, leakage, source);
 
   const sourceBlockIds = new Set(source.blocks.map((block) => block.id));
   const plannedSectionIds = new Set(plan.sections.map((section) => section.id));
   const outputsBySectionId = indexOutputs(outputs, plannedSectionIds);
   const coverageBySectionId = indexCoverage(coverage, plannedSectionIds);
+  const groundingBySectionId = indexGrounding(grounding, plannedSectionIds);
+  const leakageBySectionId = indexLeakage(leakage, plannedSectionIds);
 
   const sections = plan.sections.map((plannedSection) => {
     validatePlannedSourceReferences(plannedSection, sourceBlockIds);
@@ -55,17 +63,36 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       sectionCoverage,
       allowWeakSections,
     );
+    const sectionGrounding = groundingBySectionId.get(plannedSection.id);
+    if (!sectionGrounding) {
+      throw new Error(
+        `Stage 6 grounding is missing planned section "${plannedSection.id}".`,
+      );
+    }
+    validateGroundingAcceptance(plannedSection.id, sectionGrounding);
+
+    const sectionLeakage = leakageBySectionId.get(plannedSection.id);
+    if (!sectionLeakage) {
+      throw new Error(
+        `Stage 6 leakage is missing planned section "${plannedSection.id}".`,
+      );
+    }
+    validateLeakageAcceptance(plannedSection.id, sectionLeakage);
 
     return createReviewerSection(
       plannedSection,
       output,
       sectionCoverage,
+      sectionGrounding,
+      sectionLeakage,
       source.id,
       plan.id,
       coverage.id,
     );
   });
   validateReportAcceptance(coverage);
+  validateGroundingReportAcceptance(grounding);
+  validateLeakageReportAcceptance(leakage);
 
   return {
     id: stableId(
@@ -88,6 +115,11 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       coverageStatus: coverage.status,
       coverageScore: coverage.score,
       coverage,
+      groundingStatus: grounding.status,
+      groundingScore: grounding.score,
+      grounding,
+      leakageStatus: leakage.status,
+      leakage,
     },
   };
 }
@@ -98,6 +130,12 @@ function validateArgs(args: AssembleReviewerArgs): void {
   }
   if (!isRecord(args.coverage)) {
     throw new Error("Stage 6 assembly requires a coverage report.");
+  }
+  if (!isRecord(args.grounding)) {
+    throw new Error("Stage 6 assembly requires a grounding report.");
+  }
+  if (!isRecord(args.leakage)) {
+    throw new Error("Stage 6 assembly requires a leakage report.");
   }
   if (!isRecord(args.plan)) {
     throw new Error("Stage 6 assembly requires a generation plan.");
@@ -114,11 +152,25 @@ function validateArgs(args: AssembleReviewerArgs): void {
   ) {
     throw new Error("Stage 6 assembly requires at least one coverage result.");
   }
+  if (
+    !Array.isArray(args.grounding.sections) ||
+    args.grounding.sections.length === 0
+  ) {
+    throw new Error("Stage 6 assembly requires at least one grounding result.");
+  }
+  if (
+    !Array.isArray(args.leakage.sections) ||
+    args.leakage.sections.length === 0
+  ) {
+    throw new Error("Stage 6 assembly requires at least one leakage result.");
+  }
 }
 
 function validateRelationships(
   plan: GenerationPlan,
   coverage: CoverageReport,
+  grounding: GroundingReport,
+  leakage: LeakageReport,
   source: NormalizedSource,
 ): void {
   if (plan.sourceId !== source.id) {
@@ -134,6 +186,26 @@ function validateRelationships(
   if (coverage.sourceId !== source.id) {
     throw new Error(
       `Stage 6 coverage source mismatch: coverage source ID "${coverage.sourceId}" does not match source ID "${source.id}".`,
+    );
+  }
+  if (grounding.planId !== plan.id) {
+    throw new Error(
+      `Stage 6 grounding mismatch: grounding plan ID "${grounding.planId}" does not match plan ID "${plan.id}".`,
+    );
+  }
+  if (grounding.sourceId !== source.id) {
+    throw new Error(
+      `Stage 6 grounding source mismatch: grounding source ID "${grounding.sourceId}" does not match source ID "${source.id}".`,
+    );
+  }
+  if (leakage.planId !== plan.id) {
+    throw new Error(
+      `Stage 6 leakage mismatch: leakage plan ID "${leakage.planId}" does not match plan ID "${plan.id}".`,
+    );
+  }
+  if (leakage.sourceId !== source.id) {
+    throw new Error(
+      `Stage 6 leakage source mismatch: leakage source ID "${leakage.sourceId}" does not match source ID "${source.id}".`,
     );
   }
 }
@@ -173,6 +245,48 @@ function indexCoverage(
     if (indexed.has(result.plannedSectionId)) {
       throw new Error(
         `Stage 6 coverage contains multiple results for planned section "${result.plannedSectionId}".`,
+      );
+    }
+    indexed.set(result.plannedSectionId, result);
+  }
+  return indexed;
+}
+
+function indexGrounding(
+  grounding: GroundingReport,
+  plannedSectionIds: ReadonlySet<string>,
+): ReadonlyMap<string, SectionGroundingResult> {
+  const indexed = new Map<string, SectionGroundingResult>();
+  for (const result of grounding.sections) {
+    if (!plannedSectionIds.has(result.plannedSectionId)) {
+      throw new Error(
+        `Stage 6 grounding references unplanned section "${result.plannedSectionId}".`,
+      );
+    }
+    if (indexed.has(result.plannedSectionId)) {
+      throw new Error(
+        `Stage 6 grounding contains multiple results for planned section "${result.plannedSectionId}".`,
+      );
+    }
+    indexed.set(result.plannedSectionId, result);
+  }
+  return indexed;
+}
+
+function indexLeakage(
+  leakage: LeakageReport,
+  plannedSectionIds: ReadonlySet<string>,
+): ReadonlyMap<string, SectionLeakageResult> {
+  const indexed = new Map<string, SectionLeakageResult>();
+  for (const result of leakage.sections) {
+    if (!plannedSectionIds.has(result.plannedSectionId)) {
+      throw new Error(
+        `Stage 6 leakage references unplanned section "${result.plannedSectionId}".`,
+      );
+    }
+    if (indexed.has(result.plannedSectionId)) {
+      throw new Error(
+        `Stage 6 leakage contains multiple results for planned section "${result.plannedSectionId}".`,
       );
     }
     indexed.set(result.plannedSectionId, result);
@@ -227,6 +341,28 @@ function validateCoverageAcceptance(
   }
 }
 
+function validateGroundingAcceptance(
+  plannedSectionId: string,
+  grounding: SectionGroundingResult,
+): void {
+  if (grounding.status === "failed") {
+    throw new Error(
+      `Stage 6 cannot assemble planned section "${plannedSectionId}" because grounding status is failed.`,
+    );
+  }
+}
+
+function validateLeakageAcceptance(
+  plannedSectionId: string,
+  leakage: SectionLeakageResult,
+): void {
+  if (leakage.status === "failed") {
+    throw new Error(
+      `Stage 6 cannot assemble planned section "${plannedSectionId}" because leakage status is failed.`,
+    );
+  }
+}
+
 function validateReportAcceptance(
   coverage: CoverageReport,
 ): void {
@@ -237,10 +373,30 @@ function validateReportAcceptance(
   }
 }
 
+function validateGroundingReportAcceptance(
+  grounding: GroundingReport,
+): void {
+  if (grounding.status === "failed") {
+    throw new Error(
+      `Stage 6 cannot assemble grounding report "${grounding.id}" because status is failed.`,
+    );
+  }
+}
+
+function validateLeakageReportAcceptance(leakage: LeakageReport): void {
+  if (leakage.status === "failed") {
+    throw new Error(
+      `Stage 6 cannot assemble leakage report "${leakage.id}" because status is failed.`,
+    );
+  }
+}
+
 function createReviewerSection(
   plannedSection: GenerationPlan["sections"][number],
   output: SectionOutput,
   coverage: SectionCoverageResult,
+  grounding: SectionGroundingResult,
+  leakage: SectionLeakageResult,
   sourceId: string,
   planId: string,
   coverageId: string,
@@ -258,6 +414,11 @@ function createReviewerSection(
     sourceBlockIds: [...output.sourceBlockIds],
     coverageStatus: coverage.status,
     coverageScore: coverage.score,
+    groundingStatus: grounding.status,
+    groundingScore: grounding.score,
+    groundingIssues: [...grounding.issues],
+    leakageStatus: leakage.status,
+    leakageIssues: [...leakage.issues],
     items: [output],
   };
 }

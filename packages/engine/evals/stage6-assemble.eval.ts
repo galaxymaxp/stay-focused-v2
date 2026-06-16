@@ -11,6 +11,8 @@ import {
   type AssembleReviewerArgs,
 } from "../src/stage6-assemble.js";
 import { verifyCoverage } from "../src/stage4-verify.js";
+import { validateGrounding } from "../src/stage5a-grounding.js";
+import { validateLeakage } from "../src/leakage-guard.js";
 import type {
   CoverageReport,
   GenerationPlan,
@@ -163,9 +165,13 @@ function runSchemaCase(
   const section = requireSection(context.sections[0]);
   const output = createValidOutput(section);
   const coverage = createCoverage(context, [output]);
+  const grounding = createGrounding(context, [output]);
+  const leakage = createLeakage(context, [output]);
   const reviewer = assembleReviewer({
     outputs: [output],
     coverage,
+    grounding,
+    leakage,
     plan: context.plan,
     source: context.source,
   });
@@ -207,9 +213,13 @@ function runBasicScenario(scenario: BasicScenario): readonly EvalIssue[] {
   switch (scenario) {
     case "metadata": {
       const coverage = createCoverage(context, [output]);
+      const grounding = createGrounding(context, [output]);
+      const leakage = createLeakage(context, [output]);
       const reviewer = assembleReviewer({
         outputs: [output],
         coverage,
+        grounding,
+        leakage,
         plan: context.plan,
         source: context.source,
       });
@@ -243,9 +253,13 @@ function runBasicScenario(scenario: BasicScenario): readonly EvalIssue[] {
     }
     case "source-blocks": {
       const coverage = createCoverage(context, [output]);
+      const grounding = createGrounding(context, [output]);
+      const leakage = createLeakage(context, [output]);
       const reviewer = assembleReviewer({
         outputs: [output],
         coverage,
+        grounding,
+        leakage,
         plan: context.plan,
         source: context.source,
       });
@@ -258,9 +272,13 @@ function runBasicScenario(scenario: BasicScenario): readonly EvalIssue[] {
     case "weak-allowed": {
       const weakOutput = createWeakOutput(section);
       const coverage = createCoverage(context, [weakOutput]);
+      const grounding = createGrounding(context, [weakOutput]);
+      const leakage = createLeakage(context, [weakOutput]);
       const reviewer = assembleReviewer({
         outputs: [weakOutput],
         coverage,
+        grounding,
+        leakage,
         plan: context.plan,
         source: context.source,
         allowWeakSections: true,
@@ -300,9 +318,13 @@ function runOrderingScenario(
     requireOutput(outputs[2]),
   ];
   const coverage = createCoverage(context, shuffledOutputs);
+  const grounding = createGrounding(context, shuffledOutputs);
+  const leakage = createLeakage(context, shuffledOutputs);
   const args: AssembleReviewerArgs = {
     outputs: shuffledOutputs,
     coverage,
+    grounding,
+    leakage,
     plan: context.plan,
     source: context.source,
   };
@@ -348,9 +370,13 @@ function runOrderingScenario(
         sourceBlockIds: [...singleSection.sourceBlockIds],
       } as SectionOutput;
       const singleCoverage = createCoverage(singleContext, [matchingOutput]);
+      const singleGrounding = createGrounding(singleContext, [matchingOutput]);
+      const singleLeakage = createLeakage(singleContext, [matchingOutput]);
       const reviewer = assembleReviewer({
         outputs: [matchingOutput],
         coverage: singleCoverage,
+        grounding: singleGrounding,
+        leakage: singleLeakage,
         plan: singleContext.plan,
         source: singleContext.source,
       });
@@ -382,9 +408,13 @@ function runValidationScenario(scenario: ValidationScenario): void {
   const outputs = context.sections.map((section) => createValidOutput(section));
   const firstOutput = requireOutput(outputs[0]);
   let coverage = createCoverage(context, outputs);
+  let grounding = createGrounding(context, outputs);
+  let leakage = createLeakage(context, outputs);
   let args: AssembleReviewerArgs = {
     outputs,
     coverage,
+    grounding,
+    leakage,
     plan: context.plan,
     source: context.source,
   };
@@ -422,6 +452,8 @@ function runValidationScenario(scenario: ValidationScenario): void {
         ...args,
         outputs: [weakOutput],
         coverage: createCoverage(context, [weakOutput]),
+        grounding: createGrounding(context, [weakOutput]),
+        leakage: createLeakage(context, [weakOutput]),
       };
       break;
     }
@@ -518,6 +550,28 @@ function createCoverage(
     plan: context.plan,
     source: context.source,
     outline: context.outline,
+  });
+}
+
+function createGrounding(
+  context: Stage6Context,
+  outputs: readonly SectionOutput[],
+) {
+  return validateGrounding({
+    outputs,
+    plan: context.plan,
+    source: context.source,
+    outline: context.outline,
+  });
+}
+
+function createLeakage(
+  context: Stage6Context,
+  outputs: readonly SectionOutput[],
+) {
+  return validateLeakage({
+    outputs,
+    plan: context.plan,
   });
 }
 
@@ -644,31 +698,49 @@ function createValidOutput(
       return {
         ...base,
         kind: "concept-card",
-        explanation: "A complete explanation grounded in the required source.",
-        keyPoints: ["A complete key point grounded in the required source."],
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
     case "process-step":
       return {
         ...base,
         kind: "process-step",
-        steps: ["Complete the first source-grounded step."],
-        summary: "A complete summary of the ordered process.",
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
     case "example-card":
       return {
         ...base,
         kind: "example-card",
-        scenario: "A complete scenario grounded in the required source.",
-        explanation: "A complete explanation of the source-grounded scenario.",
-        takeaway: "A complete practical takeaway from the scenario.",
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
     case "claim-card":
       return {
         ...base,
         kind: "claim-card",
-        claim: "A complete claim grounded in the required source.",
-        support: "Complete supporting evidence from the required source.",
-        reasoning: "Complete reasoning connecting the support to the claim.",
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
   }
 }
@@ -678,7 +750,13 @@ function createWeakOutput(section: PlannedSection): SectionOutput {
   if (output.kind !== "concept-card") {
     throw new Error("Weak-output eval setup requires a concept-card section.");
   }
-  return { ...output, explanation: "Brief." };
+  return {
+    ...output,
+    sourceCore: {
+      ...output.sourceCore,
+      explanation: "Brief.",
+    },
+  };
 }
 
 function createWrongKindOutput(section: PlannedSection): SectionOutput {
@@ -687,9 +765,13 @@ function createWrongKindOutput(section: PlannedSection): SectionOutput {
     kind: "claim-card",
     plannedSectionId: section.id,
     title: section.title,
-    claim: "A complete but incorrectly routed claim.",
-    support: "Complete support for the incorrectly routed claim.",
-    reasoning: "Complete reasoning for the incorrectly routed claim.",
+    sourceCore: {
+      explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+      keyPoints: [
+        `Complete source content A for section ${section.order + 1}.`,
+        `Complete source content B for section ${section.order + 1}.`,
+      ],
+    },
     sourceBlockIds: [...section.sourceBlockIds],
   };
 }

@@ -10,8 +10,8 @@
       "name": "missing required output field is rejected",
       "scenario": "missing-field",
       "schemaKind": "concept-card",
-      "field": "explanation",
-      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": missing required field \"explanation\"."
+      "field": "sourceCore",
+      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": missing required field \"sourceCore\"."
     },
     {
       "name": "missing source block ID is rejected",

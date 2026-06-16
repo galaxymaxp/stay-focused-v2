@@ -150,32 +150,34 @@ interface BaseSectionOutput {
   readonly plannedSectionId: string;
   readonly title: string;
   readonly sourceBlockIds: readonly string[];
+  readonly sourceCore: SourceGroundedCore;
+  readonly enrichment?: EnrichmentLayer;
 }
 
-export interface ConceptCard extends BaseSectionOutput {
-  readonly kind: "concept-card";
+export interface SourceGroundedCore {
   readonly explanation: string;
   readonly keyPoints: readonly string[];
 }
 
+export interface EnrichmentLayer {
+  readonly note?: string;
+  readonly points?: readonly string[];
+}
+
+export interface ConceptCard extends BaseSectionOutput {
+  readonly kind: "concept-card";
+}
+
 export interface ProcessStep extends BaseSectionOutput {
   readonly kind: "process-step";
-  readonly steps: readonly string[];
-  readonly summary: string;
 }
 
 export interface ExampleCard extends BaseSectionOutput {
   readonly kind: "example-card";
-  readonly scenario: string;
-  readonly explanation: string;
-  readonly takeaway: string;
 }
 
 export interface ClaimCard extends BaseSectionOutput {
   readonly kind: "claim-card";
-  readonly claim: string;
-  readonly support: string;
-  readonly reasoning: string;
 }
 
 export type SectionOutput =
@@ -236,6 +238,82 @@ export interface CoverageReport {
   readonly sections: readonly SectionCoverageResult[];
 }
 
+export type GroundingReportStatus = "passed" | "failed";
+export type GroundingIssueType =
+  | "grounding-fabrication"
+  | "grounding-omission";
+
+export interface GroundingIssue {
+  readonly type: GroundingIssueType;
+  readonly severity: "error";
+  readonly message: string;
+  readonly plannedSectionId: string;
+  readonly sourceSectionId: string;
+  readonly field?: StudentFacingSectionField;
+  readonly fieldPath?: string;
+  readonly offendingText?: string;
+  readonly sourceItem?: string;
+  readonly excerpt?: string;
+}
+
+export interface SectionGroundingResult {
+  readonly plannedSectionId: string;
+  readonly sourceSectionId: string;
+  readonly status: GroundingReportStatus;
+  readonly score: number;
+  readonly sourceItemCount: number;
+  readonly representedSourceItemCount: number;
+  readonly issues: readonly GroundingIssue[];
+  readonly retryable: boolean;
+}
+
+export interface GroundingReport {
+  readonly id: string;
+  readonly planId: string;
+  readonly sourceId: string;
+  readonly status: GroundingReportStatus;
+  readonly score: number;
+  readonly threshold: number;
+  readonly issues: readonly GroundingIssue[];
+  readonly sections: readonly SectionGroundingResult[];
+}
+
+export type StudentFacingSectionField =
+  | "title"
+  | "sourceCore.explanation"
+  | "sourceCore.keyPoints"
+  | "enrichment.note"
+  | "enrichment.points";
+
+export interface LeakageIssue {
+  readonly type: "leakage";
+  readonly severity: "error";
+  readonly message: string;
+  readonly plannedSectionId: string;
+  readonly sourceSectionId: string;
+  readonly field: StudentFacingSectionField;
+  readonly fieldPath: string;
+  readonly offendingTerm: string;
+  readonly excerpt: string;
+}
+
+export interface SectionLeakageResult {
+  readonly plannedSectionId: string;
+  readonly sourceSectionId: string;
+  readonly status: "passed" | "failed";
+  readonly issues: readonly LeakageIssue[];
+  readonly retryable: boolean;
+}
+
+export interface LeakageReport {
+  readonly id: string;
+  readonly planId: string;
+  readonly sourceId: string;
+  readonly status: "passed" | "failed";
+  readonly issues: readonly LeakageIssue[];
+  readonly sections: readonly SectionLeakageResult[];
+}
+
 export interface ReviewerSection {
   readonly id: string;
   readonly sourceSectionId: string;
@@ -246,6 +324,11 @@ export interface ReviewerSection {
   readonly sourceBlockIds: readonly string[];
   readonly coverageStatus: CoverageStatus;
   readonly coverageScore: number;
+  readonly groundingStatus: GroundingReportStatus;
+  readonly groundingScore: number;
+  readonly groundingIssues: readonly GroundingIssue[];
+  readonly leakageStatus: "passed" | "failed";
+  readonly leakageIssues: readonly LeakageIssue[];
   readonly items: readonly SectionOutput[];
 }
 
@@ -261,6 +344,11 @@ export interface ReviewerMetadata {
   readonly coverageStatus: CoverageStatus;
   readonly coverageScore: number;
   readonly coverage: CoverageReport;
+  readonly groundingStatus: GroundingReportStatus;
+  readonly groundingScore: number;
+  readonly grounding: GroundingReport;
+  readonly leakageStatus: "passed" | "failed";
+  readonly leakage: LeakageReport;
 }
 
 export interface ReviewerOutput {

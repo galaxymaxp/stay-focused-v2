@@ -1,14 +1,20 @@
 import type { GenerationProvider } from "./provider";
+import { validateLeakage } from "./leakage-guard.js";
 import { generateSection } from "./stage3-generate.js";
 import { verifyCoverage } from "./stage4-verify.js";
+import { validateGrounding } from "./stage5a-grounding.js";
 import type {
   CoverageReport,
   CoverageStatus,
   GenerationPlan,
+  GroundingReport,
+  LeakageReport,
   NormalizedSource,
   PlannedSection,
   RetryPolicy,
   SectionCoverageResult,
+  SectionGroundingResult,
+  SectionLeakageResult,
   SectionOutput,
   SourceOutline,
 } from "./types";
@@ -16,6 +22,8 @@ import type {
 export interface RetryFailedSectionsArgs {
   readonly outputs: readonly SectionOutput[];
   readonly coverage: CoverageReport;
+  readonly grounding?: GroundingReport;
+  readonly leakage?: LeakageReport;
   readonly plan: GenerationPlan;
   readonly source: NormalizedSource;
   readonly outline: SourceOutline;
@@ -37,10 +45,10 @@ export async function retryFailedSections(
 ): Promise<readonly SectionOutput[]> {
   validateArgs(args);
 
-  const { plan, source, outline, provider, coverage } = args;
+  const { plan, source, outline, provider, coverage, grounding, leakage } = args;
   const retryPolicy = args.retryPolicy ?? defaultRetryPolicy;
   validateRetryPolicy(retryPolicy);
-  validatePlanAndCoverage(plan, source, outline, coverage);
+  validatePlanAndReports({ plan, source, outline, coverage, grounding, leakage });
 
   const plannedSectionIds = new Set(plan.sections.map((section) => section.id));
   const currentOutputs = new Map<string, SectionOutput>();
@@ -60,10 +68,22 @@ export async function retryFailedSections(
   const coverageBySectionId = new Map(
     coverage.sections.map((result) => [result.plannedSectionId, result] as const),
   );
+  const groundingBySectionId = new Map(
+    (grounding?.sections ?? []).map(
+      (result) => [result.plannedSectionId, result] as const,
+    ),
+  );
+  const leakageBySectionId = new Map(
+    (leakage?.sections ?? []).map(
+      (result) => [result.plannedSectionId, result] as const,
+    ),
+  );
 
   for (const section of plan.sections) {
     const result = requireCoverageResult(section, coverageBySectionId);
-    if (!shouldRetry(result, retryPolicy)) {
+    const groundingResult = groundingBySectionId.get(section.id);
+    const leakageResult = leakageBySectionId.get(section.id);
+    if (!shouldRetry(result, groundingResult, leakageResult, retryPolicy)) {
       continue;
     }
 
@@ -93,10 +113,38 @@ export async function retryFailedSections(
         source,
         outline,
       });
+      const refreshedGrounding =
+        grounding === undefined
+          ? undefined
+          : validateGrounding({
+              outputs: orderedOutputs(plan, currentOutputs),
+              plan,
+              source,
+              outline,
+            });
+      const refreshedLeakage =
+        leakage === undefined
+          ? undefined
+          : validateLeakage({
+              outputs: orderedOutputs(plan, currentOutputs),
+              plan,
+            });
       const refreshedResult = refreshedCoverage.sections.find(
         (candidate) => candidate.plannedSectionId === section.id,
       );
-      if (refreshedResult?.status === "passed") {
+      const refreshedGroundingResult = refreshedGrounding?.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      const refreshedLeakageResult = refreshedLeakage?.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      if (
+        isSectionAccepted(
+          refreshedResult,
+          refreshedGroundingResult,
+          refreshedLeakageResult,
+        )
+      ) {
         break;
       }
     }
@@ -138,12 +186,15 @@ function validateRetryPolicy(policy: RetryPolicy): void {
   }
 }
 
-function validatePlanAndCoverage(
-  plan: GenerationPlan,
-  source: NormalizedSource,
-  outline: SourceOutline,
-  coverage: CoverageReport,
-): void {
+function validatePlanAndReports(args: {
+  readonly plan: GenerationPlan;
+  readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
+  readonly coverage: CoverageReport;
+  readonly grounding?: GroundingReport;
+  readonly leakage?: LeakageReport;
+}): void {
+  const { plan, source, outline, coverage, grounding, leakage } = args;
   if (!Array.isArray(plan.sections) || plan.sections.length === 0) {
     throw new Error("Stage 5 retry requires at least one planned section.");
   }
@@ -209,6 +260,13 @@ function validatePlanAndCoverage(
       );
     }
   }
+
+  if (grounding !== undefined) {
+    validateGroundingReport(plan, source, grounding);
+  }
+  if (leakage !== undefined) {
+    validateLeakageReport(plan, source, leakage);
+  }
 }
 
 function requireCoverageResult(
@@ -224,12 +282,23 @@ function requireCoverageResult(
 
 function shouldRetry(
   result: SectionCoverageResult,
+  groundingResult: SectionGroundingResult | undefined,
+  leakageResult: SectionLeakageResult | undefined,
   policy: RetryPolicy,
 ): boolean {
-  if (!result.retryable || result.status === "passed") {
-    return false;
+  const shouldRetryCoverage =
+    result.retryable &&
+    result.status !== "passed" &&
+    isEnabledStatus(result.status, policy);
+  const shouldRetryGrounding =
+    groundingResult?.retryable === true && groundingResult.status === "failed";
+  const shouldRetryLeakage =
+    leakageResult?.retryable === true && leakageResult.status === "failed";
+
+  if (shouldRetryCoverage) {
+    return true;
   }
-  return isEnabledStatus(result.status, policy);
+  return shouldRetryGrounding || shouldRetryLeakage;
 }
 
 function isEnabledStatus(status: CoverageStatus, policy: RetryPolicy): boolean {
@@ -250,6 +319,92 @@ function orderedOutputs(
     const output = outputsBySectionId.get(section.id);
     return output ? [output] : [];
   });
+}
+
+function validateGroundingReport(
+  plan: GenerationPlan,
+  source: NormalizedSource,
+  grounding: GroundingReport,
+): void {
+  if (grounding.planId !== plan.id) {
+    throw new Error(
+      `Stage 5 grounding mismatch: grounding plan ID "${grounding.planId}" does not match plan ID "${plan.id}".`,
+    );
+  }
+  if (grounding.sourceId !== source.id) {
+    throw new Error(
+      `Stage 5 grounding source mismatch: grounding source ID "${grounding.sourceId}" does not match source ID "${source.id}".`,
+    );
+  }
+  validateReportSections(
+    plan,
+    grounding.sections.map((section) => section.plannedSectionId),
+    "grounding",
+  );
+}
+
+function validateLeakageReport(
+  plan: GenerationPlan,
+  source: NormalizedSource,
+  leakage: LeakageReport,
+): void {
+  if (leakage.planId !== plan.id) {
+    throw new Error(
+      `Stage 5 leakage mismatch: leakage plan ID "${leakage.planId}" does not match plan ID "${plan.id}".`,
+    );
+  }
+  if (leakage.sourceId !== source.id) {
+    throw new Error(
+      `Stage 5 leakage source mismatch: leakage source ID "${leakage.sourceId}" does not match source ID "${source.id}".`,
+    );
+  }
+  validateReportSections(
+    plan,
+    leakage.sections.map((section) => section.plannedSectionId),
+    "leakage",
+  );
+}
+
+function validateReportSections(
+  plan: GenerationPlan,
+  sectionIds: readonly string[],
+  reportName: string,
+): void {
+  const plannedSectionIds = new Set(plan.sections.map((section) => section.id));
+  const seenSectionIds = new Set<string>();
+  for (const sectionId of sectionIds) {
+    if (!plannedSectionIds.has(sectionId)) {
+      throw new Error(
+        `Stage 5 ${reportName} references unknown planned section "${sectionId}".`,
+      );
+    }
+    if (seenSectionIds.has(sectionId)) {
+      throw new Error(
+        `Stage 5 ${reportName} contains duplicate result for planned section "${sectionId}".`,
+      );
+    }
+    seenSectionIds.add(sectionId);
+  }
+
+  for (const section of plan.sections) {
+    if (!seenSectionIds.has(section.id)) {
+      throw new Error(
+        `Stage 5 ${reportName} is missing planned section "${section.id}".`,
+      );
+    }
+  }
+}
+
+function isSectionAccepted(
+  coverage: SectionCoverageResult | undefined,
+  grounding: SectionGroundingResult | undefined,
+  leakage: SectionLeakageResult | undefined,
+): boolean {
+  return (
+    coverage?.status === "passed" &&
+    (grounding === undefined || grounding.status === "passed") &&
+    (leakage === undefined || leakage.status === "passed")
+  );
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

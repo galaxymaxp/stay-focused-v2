@@ -39,10 +39,10 @@
       "expectPromptContains": [
         "Included source alpha.",
         "Included source beta.",
-        "Use only the provided source content.",
-        "Do not invent missing information."
+        "Populate sourceCore.explanation and sourceCore.keyPoints using ONLY the provided source excerpt for this section.",
+        "Put optional examples, outside knowledge, and clarifying context only in enrichment."
       ],
-      "expectPromptExcludes": ["Excluded unrelated omega."],
+      "expectPromptExcludes": ["Excluded unrelated omega.", "Stay Focused V2 engine"],
       "expectPromptOrder": ["Included source alpha.", "Included source beta."]
     },
     {
@@ -64,6 +64,7 @@
         "Section title: Study Section",
         "Schema kind: process-step",
         "Target:",
+        "Do not include project, repository, internal architecture, pipeline, engine, or Stay Focused references in any output field.",
         "Return structured output matching the provided schema exactly."
       ]
     }

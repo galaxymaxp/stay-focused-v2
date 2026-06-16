@@ -703,31 +703,49 @@ function createValidOutput(
       return {
         ...base,
         kind: "concept-card",
-        explanation: "A complete explanation grounded in the required source.",
-        keyPoints: ["A complete key point grounded in the required source."],
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
     case "process-step":
       return {
         ...base,
         kind: "process-step",
-        steps: ["Complete the first source-grounded step."],
-        summary: "A complete summary of the ordered process.",
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
     case "example-card":
       return {
         ...base,
         kind: "example-card",
-        scenario: "A complete scenario grounded in the required source.",
-        explanation: "A complete explanation of the source-grounded scenario.",
-        takeaway: "A complete practical takeaway from the scenario.",
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
     case "claim-card":
       return {
         ...base,
         kind: "claim-card",
-        claim: "A complete claim grounded in the required source.",
-        support: "Complete supporting evidence from the required source.",
-        reasoning: "Complete reasoning connecting the support to the claim.",
+        sourceCore: {
+          explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+          keyPoints: [
+            `Complete source content A for section ${section.order + 1}.`,
+            `Complete source content B for section ${section.order + 1}.`,
+          ],
+        },
       };
   }
 }
@@ -737,7 +755,13 @@ function createWeakOutput(section: PlannedSection, id: string): SectionOutput {
   if (output.kind !== "concept-card") {
     throw new Error("Weak-output eval setup requires a concept-card section.");
   }
-  return { ...output, explanation: "Brief." };
+  return {
+    ...output,
+    sourceCore: {
+      ...output.sourceCore,
+      explanation: "Brief.",
+    },
+  };
 }
 
 function createWrongKindOutput(
@@ -749,9 +773,13 @@ function createWrongKindOutput(
     kind: "claim-card",
     plannedSectionId: section.id,
     title: section.title,
-    claim: "A complete but incorrectly routed claim.",
-    support: "Complete support for the incorrectly routed claim.",
-    reasoning: "Complete reasoning for the incorrectly routed claim.",
+    sourceCore: {
+      explanation: `Complete source content A for section ${section.order + 1} and complete source content B for section ${section.order + 1}.`,
+      keyPoints: [
+        `Complete source content A for section ${section.order + 1}.`,
+        `Complete source content B for section ${section.order + 1}.`,
+      ],
+    },
     sourceBlockIds: [...section.sourceBlockIds],
   };
 }

@@ -435,17 +435,17 @@ function createStatusScenario(
     case "missing-field":
       return {
         context,
-        outputs: [omitField(firstOutput, "explanation")],
+        outputs: [omitSourceCoreExplanation(firstOutput)],
       };
     case "empty-field":
       return {
         context,
-        outputs: [{ ...firstOutput, explanation: "" } as SectionOutput],
+        outputs: [withSourceCoreExplanation(firstOutput, "")],
       };
     case "weak-content":
       return {
         context,
-        outputs: [{ ...firstOutput, explanation: "Brief." } as SectionOutput],
+        outputs: [withSourceCoreExplanation(firstOutput, "Brief.")],
       };
     case "partial-coverage":
       return {
@@ -640,31 +640,37 @@ function createValidOutput(
       return {
         ...base,
         kind: "concept-card",
-        explanation: "A complete explanation grounded in the required source.",
-        keyPoints: ["A complete key point grounded in the source."],
+        sourceCore: {
+          explanation: "Source alpha content and source beta content.",
+          keyPoints: ["Source alpha content.", "Source beta content."],
+        },
       };
     case "process-step":
       return {
         ...base,
         kind: "process-step",
-        steps: ["Complete the first source-grounded step."],
-        summary: "A complete summary of the ordered process.",
+        sourceCore: {
+          explanation: "Source gamma content and source delta content.",
+          keyPoints: ["Source gamma content.", "Source delta content."],
+        },
       };
     case "example-card":
       return {
         ...base,
         kind: "example-card",
-        scenario: "A complete scenario grounded in the required source.",
-        explanation: "A complete explanation of the source-grounded scenario.",
-        takeaway: "A complete practical takeaway from the scenario.",
+        sourceCore: {
+          explanation: "Source alpha content and source beta content.",
+          keyPoints: ["Source alpha content.", "Source beta content."],
+        },
       };
     case "claim-card":
       return {
         ...base,
         kind: "claim-card",
-        claim: "A complete claim grounded in the required source.",
-        support: "Complete supporting evidence from the required source.",
-        reasoning: "Complete reasoning connecting the support to the claim.",
+        sourceCore: {
+          explanation: "Source alpha content and source beta content.",
+          keyPoints: ["Source alpha content.", "Source beta content."],
+        },
       };
   }
 }
@@ -682,6 +688,28 @@ function omitField(output: SectionOutput, field: string): SectionOutput {
   return Object.fromEntries(
     Object.entries(output).filter(([key]) => key !== field),
   ) as unknown as SectionOutput;
+}
+
+function omitSourceCoreExplanation(output: SectionOutput): SectionOutput {
+  return ({
+    ...output,
+    sourceCore: {
+      keyPoints: [...output.sourceCore.keyPoints],
+    },
+  } as unknown) as SectionOutput;
+}
+
+function withSourceCoreExplanation(
+  output: SectionOutput,
+  explanation: string,
+): SectionOutput {
+  return {
+    ...output,
+    sourceCore: {
+      ...output.sourceCore,
+      explanation,
+    },
+  };
 }
 
 function requireSection(section: PlannedSection | undefined): PlannedSection {

@@ -14,15 +14,21 @@
     "eval:stage2": "node dist/evals/stage2-plan.eval.js",
     "eval:stage3": "node dist/evals/stage3-generate.eval.js",
     "eval:stage4": "node dist/evals/stage4-verify.eval.js",
+    "eval:stage5a": "node dist/evals/stage5a-grounding.eval.js",
     "eval:stage5": "node dist/evals/stage5-retry.eval.js",
     "eval:stage6": "node dist/evals/stage6-assemble.eval.js",
     "eval:pipeline": "node dist/evals/pipeline.eval.js",
+    "live-run": "tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js",
+    "diagnose:stage012": "tsc -p tsconfig.live-run.json && node dist-live/scripts/diagnose-stage012.js",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json",
-    "clean": "rimraf dist"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json && tsc --noEmit -p tsconfig.live-run.json",
+    "clean": "rimraf dist dist-live"
   },
   "devDependencies": {
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "openai": "^6.42.0"
   }
 }

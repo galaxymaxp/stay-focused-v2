@@ -287,7 +287,7 @@ function checkRequiredFields(
   let hasMissingRequiredField = false;
 
   for (const field of fields) {
-    const fieldValue = value[field];
+    const fieldValue = readNestedField(value, field);
     if (!hasRequiredContent(fieldValue)) {
       issues.push(`Missing required field: ${field}.`);
       hasMissingRequiredField = true;
@@ -480,13 +480,10 @@ function requiredFieldsFor(
 ): readonly string[] {
   switch (schemaKind) {
     case "concept-card":
-      return ["explanation", "keyPoints"];
     case "process-step":
-      return ["steps", "summary"];
     case "example-card":
-      return ["scenario", "explanation", "takeaway"];
     case "claim-card":
-      return ["claim", "support", "reasoning"];
+      return ["sourceCore.explanation", "sourceCore.keyPoints"];
   }
 }
 
@@ -511,6 +508,18 @@ function isWeakContent(value: unknown): boolean {
     return value.join(" ").trim().length < 12;
   }
   return true;
+}
+
+function readNestedField(
+  value: Readonly<Record<string, unknown>>,
+  field: string,
+): unknown {
+  return field.split(".").reduce<unknown>((current, key) => {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    return current[key];
+  }, value);
 }
 
 function statusForScore(score: number): CoverageStatus {
@@ -579,4 +588,8 @@ function stableId(prefix: string, value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return `${prefix}-${(hash >>> 0).toString(36)}`;
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

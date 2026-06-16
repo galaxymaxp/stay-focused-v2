@@ -24,7 +24,7 @@
       "expectSectionStatuses": ["failed"],
       "expectSectionScores": [0.59],
       "expectRetryable": [true],
-      "expectIssuesContain": ["Missing required field: explanation"]
+      "expectIssuesContain": ["Missing required field: sourceCore.explanation"]
     },
     {
       "name": "empty required field fails",
@@ -33,7 +33,7 @@
       "expectSectionStatuses": ["failed"],
       "expectSectionScores": [0.59],
       "expectRetryable": [true],
-      "expectIssuesContain": ["Missing required field: explanation"]
+      "expectIssuesContain": ["Missing required field: sourceCore.explanation"]
     },
     {
       "name": "short required content is weak",
@@ -42,7 +42,7 @@
       "expectSectionStatuses": ["weak"],
       "expectSectionScores": [0.84],
       "expectRetryable": [true],
-      "expectIssuesContain": ["Weak content field: explanation"]
+      "expectIssuesContain": ["Weak content field: sourceCore.explanation"]
     },
     {
       "name": "partial source block coverage is weak",

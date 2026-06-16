@@ -1,4 +1,5 @@
 import type { GenerationProvider } from "./provider";
+import { detectInstructionLeakage } from "./leakage-guard.js";
 import { getSchemaForSectionKind } from "./schemas.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import type {
@@ -7,7 +8,6 @@ import type {
   NormalizedSourceBlock,
   PlannedSection,
   SectionOutput,
-  SectionSchemaKind,
 } from "./types";
 
 export interface GenerateSectionArgs {
@@ -66,7 +66,7 @@ export function buildSectionPrompt(
     .join("\n\n");
 
   return [
-    "You are generating one structured study-review section for the Stay Focused V2 engine.",
+    "You are generating one structured study-review section.",
     `Section title: ${section.title}`,
     `Schema kind: ${section.schemaKind}`,
     "Target:",
@@ -79,8 +79,13 @@ export function buildSectionPrompt(
     "Source excerpt:",
     sourceExcerpt,
     "Instructions:",
-    "- Use only the provided source content.",
-    "- Do not invent missing information.",
+    "- Populate sourceCore.explanation and sourceCore.keyPoints using ONLY the provided source excerpt for this section.",
+    "- Never invent examples, scenarios, entities, technologies, impacts, or methods inside sourceCore.",
+    "- Never introduce concepts in sourceCore that are absent from this source excerpt.",
+    "- Never borrow content from other source sections.",
+    "- Put optional examples, outside knowledge, and clarifying context only in enrichment.",
+    "- Keep enrichment structurally separate from sourceCore; never blend enrichment into sourceCore.",
+    "- Do not include project, repository, internal architecture, pipeline, engine, or Stay Focused references in any output field.",
     "- Return structured output matching the provided schema exactly.",
     `- Set plannedSectionId to "${section.id}".`,
     `- Set sourceBlockIds to: ${section.sourceBlockIds.join(", ")}.`,
@@ -206,8 +211,17 @@ export function validateSectionOutput(
     );
   }
 
-  validateKindSpecificFields(output, section.schemaKind, section.id);
-  return output as unknown as SectionOutput;
+  validateKindSpecificFields(output, section.id);
+  const sectionOutput = output as unknown as SectionOutput;
+  const leakageResult = detectInstructionLeakage(sectionOutput);
+  if (!leakageResult.ok) {
+    throw outputValidationError(
+      section.id,
+      `user-facing fields contain leaked instruction wording: ${leakageResult.fields.join(", ")}`,
+    );
+  }
+
+  return sectionOutput;
 }
 
 function validateArgs(args: GenerateSectionArgs): void {
@@ -232,29 +246,52 @@ function validateArgs(args: GenerateSectionArgs): void {
 
 function validateKindSpecificFields(
   output: Readonly<Record<string, unknown>>,
-  schemaKind: SectionSchemaKind,
   sectionId: string,
 ): void {
-  switch (schemaKind) {
-    case "concept-card":
-      readRequiredString(output, "explanation", sectionId);
-      readRequiredStringArray(output, "keyPoints", sectionId);
-      return;
-    case "process-step":
-      readRequiredStringArray(output, "steps", sectionId);
-      readRequiredString(output, "summary", sectionId);
-      return;
-    case "example-card":
-      readRequiredString(output, "scenario", sectionId);
-      readRequiredString(output, "explanation", sectionId);
-      readRequiredString(output, "takeaway", sectionId);
-      return;
-    case "claim-card":
-      readRequiredString(output, "claim", sectionId);
-      readRequiredString(output, "support", sectionId);
-      readRequiredString(output, "reasoning", sectionId);
-      return;
+  const sourceCore = readRequiredObject(output, "sourceCore", sectionId);
+  readRequiredString(sourceCore, "explanation", sectionId);
+  readRequiredStringArray(sourceCore, "keyPoints", sectionId);
+
+  if (Object.prototype.hasOwnProperty.call(output, "enrichment")) {
+    const enrichment = readRequiredObject(output, "enrichment", sectionId);
+    const note = enrichment["note"];
+    if (note !== undefined && (typeof note !== "string" || note.trim().length === 0)) {
+      throw outputValidationError(
+        sectionId,
+        'missing required field "enrichment.note"',
+      );
+    }
+
+    const points = enrichment["points"];
+    if (
+      points !== undefined &&
+      (!Array.isArray(points) ||
+        points.length === 0 ||
+        !points.every(
+          (entry) => typeof entry === "string" && entry.trim().length > 0,
+        ))
+    ) {
+      throw outputValidationError(
+        sectionId,
+        'missing required field "enrichment.points"',
+      );
+    }
   }
+}
+
+function readRequiredObject(
+  value: Readonly<Record<string, unknown>>,
+  field: string,
+  sectionId: string,
+): Readonly<Record<string, unknown>> {
+  const fieldValue = value[field];
+  if (!isRecord(fieldValue)) {
+    throw outputValidationError(
+      sectionId,
+      `missing required field "${field}"`,
+    );
+  }
+  return fieldValue;
 }
 
 function readRequiredString(

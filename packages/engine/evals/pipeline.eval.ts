@@ -453,6 +453,7 @@ function createProviderOutput(
   const schemaKind = readSchemaKind(request.metadata?.schemaKind);
   const title = readPromptValue(request.prompt, "Section title: ");
   const sourceBlockIds = readSourceBlockIds(request.prompt);
+  const sourceCoreText = readSourceCoreText(request.prompt);
   const base = {
     id: `fake-output-${plannedSectionId}-${weak ? "weak" : "passed"}`,
     plannedSectionId,
@@ -465,39 +466,37 @@ function createProviderOutput(
       return {
         ...base,
         kind: "concept-card",
-        explanation: weak
-          ? "Brief."
-          : "A complete explanation grounded only in the provided source.",
-        keyPoints: ["A complete source-grounded key point for review."],
+        sourceCore: {
+          explanation: weak ? "Brief." : sourceCoreText,
+          keyPoints: [sourceCoreText],
+        },
       };
     case "process-step":
       return {
         ...base,
         kind: "process-step",
-        steps: ["Complete the first ordered source-grounded step."],
-        summary: weak
-          ? "Brief."
-          : "A complete source-grounded summary of the ordered process.",
+        sourceCore: {
+          explanation: weak ? "Brief." : sourceCoreText,
+          keyPoints: [sourceCoreText],
+        },
       };
     case "example-card":
       return {
         ...base,
         kind: "example-card",
-        scenario: "A complete scenario grounded in the provided source.",
-        explanation: "A complete explanation of the source-grounded scenario.",
-        takeaway: weak
-          ? "Brief."
-          : "A complete source-grounded takeaway from the scenario.",
+        sourceCore: {
+          explanation: weak ? "Brief." : sourceCoreText,
+          keyPoints: [sourceCoreText],
+        },
       };
     case "claim-card":
       return {
         ...base,
         kind: "claim-card",
-        claim: "A complete claim grounded in the provided source.",
-        support: "Complete supporting evidence from the provided source.",
-        reasoning: weak
-          ? "Brief."
-          : "Complete reasoning connecting the evidence to the claim.",
+        sourceCore: {
+          explanation: weak ? "Brief." : sourceCoreText,
+          keyPoints: [sourceCoreText],
+        },
       };
   }
 }
@@ -551,6 +550,23 @@ function readSourceBlockIds(prompt: string): readonly string[] {
     throw new Error("Fake provider prompt is missing source block IDs.");
   }
   return ids;
+}
+
+function readSourceCoreText(prompt: string): string {
+  const [, afterSourceExcerpt] = prompt.split("Source excerpt:\n");
+  const [sourceExcerpt] = (afterSourceExcerpt ?? "").split("\nInstructions:");
+  const text = sourceExcerpt
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("[Source block "))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (text.length === 0) {
+    throw new Error("Fake provider prompt is missing source excerpt text.");
+  }
+
+  return text;
 }
 
 if (isDirectExecution(import.meta.url)) {

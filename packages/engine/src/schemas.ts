@@ -20,6 +20,32 @@ const baseProperties = {
     minItems: 1,
     items: { type: "string", minLength: 1 },
   },
+  sourceCore: {
+    type: "object",
+    additionalProperties: false,
+    required: ["explanation", "keyPoints"],
+    properties: {
+      explanation: { type: "string", minLength: 1 },
+      keyPoints: {
+        type: "array",
+        minItems: 1,
+        items: { type: "string", minLength: 1 },
+      },
+    },
+  },
+  enrichment: {
+    type: "object",
+    additionalProperties: false,
+    required: [],
+    properties: {
+      note: { type: "string", minLength: 1 },
+      points: {
+        type: "array",
+        minItems: 1,
+        items: { type: "string", minLength: 1 },
+      },
+    },
+  },
 } as const;
 
 export const conceptCardSchema: StructuredOutputSchema = {
@@ -33,19 +59,12 @@ export const conceptCardSchema: StructuredOutputSchema = {
       "id",
       "plannedSectionId",
       "title",
-      "explanation",
-      "keyPoints",
+      "sourceCore",
       "sourceBlockIds",
     ],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "concept-card" },
-      explanation: { type: "string", minLength: 1 },
-      keyPoints: {
-        type: "array",
-        minItems: 1,
-        items: { type: "string", minLength: 1 },
-      },
     },
   },
 };
@@ -61,19 +80,12 @@ export const processStepSchema: StructuredOutputSchema = {
       "id",
       "plannedSectionId",
       "title",
-      "steps",
-      "summary",
+      "sourceCore",
       "sourceBlockIds",
     ],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "process-step" },
-      steps: {
-        type: "array",
-        minItems: 1,
-        items: { type: "string", minLength: 1 },
-      },
-      summary: { type: "string", minLength: 1 },
     },
   },
 };
@@ -89,17 +101,12 @@ export const exampleCardSchema: StructuredOutputSchema = {
       "id",
       "plannedSectionId",
       "title",
-      "scenario",
-      "explanation",
-      "takeaway",
+      "sourceCore",
       "sourceBlockIds",
     ],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "example-card" },
-      scenario: { type: "string", minLength: 1 },
-      explanation: { type: "string", minLength: 1 },
-      takeaway: { type: "string", minLength: 1 },
     },
   },
 };
@@ -115,17 +122,12 @@ export const claimCardSchema: StructuredOutputSchema = {
       "id",
       "plannedSectionId",
       "title",
-      "claim",
-      "support",
-      "reasoning",
+      "sourceCore",
       "sourceBlockIds",
     ],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "claim-card" },
-      claim: { type: "string", minLength: 1 },
-      support: { type: "string", minLength: 1 },
-      reasoning: { type: "string", minLength: 1 },
     },
   },
 };
