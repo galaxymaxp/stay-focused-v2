@@ -1,5 +1,6 @@
 import type { GenerationProvider } from "./provider";
 import { getSchemaForSectionKind } from "./schemas.js";
+import { flattenSourceBlocks } from "./stage1-outline.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -94,6 +95,9 @@ export function collectSectionSourceBlocks(
   const sourceBlocksById = new Map(
     source.blocks.map((block) => [block.id, block] as const),
   );
+  const flattenedBlocksById = new Map(
+    flattenSourceBlocks(source.blocks).map((entry) => [entry.block.id, entry] as const),
+  );
 
   for (const blockId of section.sourceBlockIds) {
     if (!sourceBlocksById.has(blockId)) {
@@ -106,12 +110,59 @@ export function collectSectionSourceBlocks(
   return source.blocks
     .map((block, inputIndex) => ({ block, inputIndex }))
     .filter(({ block }) => requiredIds.has(block.id))
+    .map(({ block, inputIndex }) => ({
+      block: sliceBlockForSection(block, section, flattenedBlocksById),
+      inputIndex,
+    }))
+    .filter((entry): entry is { readonly block: NormalizedSourceBlock; readonly inputIndex: number } =>
+      entry.block !== undefined,
+    )
     .sort(
       (left, right) =>
         left.block.order - right.block.order ||
         left.inputIndex - right.inputIndex,
     )
     .map(({ block }) => block);
+}
+
+function sliceBlockForSection(
+  block: NormalizedSourceBlock,
+  section: PlannedSection,
+  flattenedBlocksById: ReadonlyMap<
+    string,
+    { readonly startOffset: number; readonly endOffset: number }
+  >,
+): NormalizedSourceBlock | undefined {
+  if (section.sourceEndOffset <= section.sourceStartOffset) {
+    return block;
+  }
+
+  const flattenedBlock = flattenedBlocksById.get(block.id);
+  if (!flattenedBlock) {
+    return block;
+  }
+
+  const startOffset = Math.max(
+    flattenedBlock.startOffset,
+    section.sourceStartOffset,
+  );
+  const endOffset = Math.min(flattenedBlock.endOffset, section.sourceEndOffset);
+  if (startOffset >= endOffset) {
+    return undefined;
+  }
+
+  const localStartOffset = startOffset - flattenedBlock.startOffset;
+  const localEndOffset = endOffset - flattenedBlock.startOffset;
+  const text = block.text.slice(localStartOffset, localEndOffset).trim();
+
+  if (!text) {
+    return undefined;
+  }
+
+  return {
+    ...block,
+    text,
+  };
 }
 
 export function validateSectionOutput(

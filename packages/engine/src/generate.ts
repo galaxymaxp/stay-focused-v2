@@ -46,12 +46,14 @@ export async function runPipeline(
     outputs: initialOutputs,
     plan,
     source,
+    outline,
   });
   const finalOutputs = await retryFailedSections({
     outputs: initialOutputs,
     coverage: initialCoverage,
     plan,
     source,
+    outline,
     provider: args.provider,
     retryPolicy: args.retryPolicy,
     model: args.model,
@@ -62,6 +64,7 @@ export async function runPipeline(
     outputs: finalOutputs,
     plan,
     source,
+    outline,
   });
 
   return assembleReviewer({

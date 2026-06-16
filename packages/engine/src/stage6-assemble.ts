@@ -65,7 +65,7 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       coverage.id,
     );
   });
-  validateReportAcceptance(coverage, allowWeakSections);
+  validateReportAcceptance(coverage);
 
   return {
     id: stableId(
@@ -229,16 +229,10 @@ function validateCoverageAcceptance(
 
 function validateReportAcceptance(
   coverage: CoverageReport,
-  allowWeakSections: boolean,
 ): void {
   if (coverage.status === "failed") {
     throw new Error(
       `Stage 6 cannot assemble coverage report "${coverage.id}" because status is failed.`,
-    );
-  }
-  if (coverage.status === "weak" && !allowWeakSections) {
-    throw new Error(
-      `Stage 6 cannot assemble coverage report "${coverage.id}" because status is weak and allowWeakSections is false.`,
     );
   }
 }

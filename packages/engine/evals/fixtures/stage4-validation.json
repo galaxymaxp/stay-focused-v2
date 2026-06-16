@@ -26,9 +26,9 @@
       "expectError": "Coverage verification requires a normalized source."
     },
     {
-      "name": "empty plan sections are rejected",
-      "scenario": "empty-plan",
-      "expectError": "Coverage verification requires at least one planned section."
+      "name": "missing source outline is rejected",
+      "scenario": "missing-outline",
+      "expectError": "Coverage verification requires a source outline."
     }
   ]
 }

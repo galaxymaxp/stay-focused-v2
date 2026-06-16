@@ -395,6 +395,10 @@ function createContext(schemaKind: SectionSchemaKind): Stage3Context {
       coverageRules: ["Use both required source blocks."],
     },
     sourceBlockIds: ["included-a", "included-b"],
+    tokenWeight: 6,
+    targetItemCount: 1,
+    sourceStartOffset: 0,
+    sourceEndOffset: 80,
   };
   const plan: GenerationPlan = {
     id: "stage3-plan",

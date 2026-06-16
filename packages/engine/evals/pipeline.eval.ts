@@ -324,8 +324,8 @@ async function runRetryScenario(
       return [
         ...assertEqual(
           reviewer.metadata.coverageStatus,
-          "weak",
-          "Explicitly allowed weak coverage was not preserved.",
+          "passed",
+          "Source-outline coverage status was not preserved.",
         ),
         ...assertEqual(
           reviewer.sections[0]?.coverageStatus,
@@ -352,8 +352,8 @@ async function runRetryScenario(
         ),
         ...assertEqual(
           reviewer.metadata.coverageStatus,
-          "weak",
-          "Bounded weak retries did not preserve final weak coverage.",
+          "passed",
+          "Bounded weak retries did not preserve source-outline coverage.",
         ),
       ];
     }

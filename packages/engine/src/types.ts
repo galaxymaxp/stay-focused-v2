@@ -76,22 +76,29 @@ export type SectionContentTag =
   | "mixed"
   | "unknown";
 
-export interface OutlineSection {
+export interface SourceOutlineSection {
   readonly id: string;
   readonly title: string;
   readonly order: number;
+  readonly startOffset: number;
+  readonly endOffset: number;
+  readonly tokenWeight: number;
+  readonly sourceBlockIds: readonly string[];
   readonly blockIds: readonly string[];
   readonly roughStartBlockId: string;
   readonly roughEndBlockId: string;
   readonly tags: readonly SectionContentTag[];
   readonly confidence: number;
+  readonly inferred?: boolean;
 }
+
+export type OutlineSection = SourceOutlineSection;
 
 export interface SourceOutline {
   readonly id: string;
   readonly sourceId: string;
   readonly title: string;
-  readonly sections: readonly OutlineSection[];
+  readonly sections: readonly SourceOutlineSection[];
 }
 
 export type SectionSchemaKind =
@@ -117,6 +124,10 @@ export interface PlannedSection {
   readonly schemaKind: SectionSchemaKind;
   readonly target: PlannedSectionTarget;
   readonly sourceBlockIds: readonly string[];
+  readonly tokenWeight: number;
+  readonly targetItemCount: number;
+  readonly sourceStartOffset: number;
+  readonly sourceEndOffset: number;
 }
 
 export interface GenerationPlan {
@@ -126,6 +137,7 @@ export interface GenerationPlan {
   readonly title: string;
   readonly sections: readonly PlannedSection[];
   readonly metadata: GenerationPlanMetadata;
+  readonly sourceOutline?: SourceOutline;
 }
 
 export interface GenerationPlanMetadata {
@@ -173,6 +185,26 @@ export type SectionOutput =
   | ClaimCard;
 
 export type CoverageStatus = "passed" | "weak" | "failed";
+export type CoverageReportStatus = "passed" | "failed";
+export type CoverageBasis = "source-outline";
+
+export type CoverageIssueSeverity = "warning" | "error";
+export type CoverageIssueType =
+  | "missing-source-section"
+  | "duplicate-section"
+  | "unplanned-output"
+  | "section-quality"
+  | "empty-source";
+
+export interface CoverageIssue {
+  readonly type: CoverageIssueType;
+  readonly severity: CoverageIssueSeverity;
+  readonly message: string;
+  readonly sourceSectionId?: string;
+  readonly title?: string;
+  readonly plannedSectionId?: string;
+  readonly plannedSectionIds?: readonly string[];
+}
 
 export interface SectionCoverageResult {
   readonly plannedSectionId: string;
@@ -182,12 +214,25 @@ export interface SectionCoverageResult {
   readonly retryable: boolean;
 }
 
+export interface SourceSectionCoverage {
+  readonly sourceSectionId: string;
+  readonly title: string;
+  readonly status: "covered" | "missing";
+  readonly plannedSectionIds: readonly string[];
+}
+
 export interface CoverageReport {
   readonly id: string;
   readonly planId: string;
   readonly sourceId: string;
-  readonly status: CoverageStatus;
+  readonly status: CoverageReportStatus;
   readonly score: number;
+  readonly coverageScore: number;
+  readonly coverageBasis: CoverageBasis;
+  readonly sourceSectionsTotal: number;
+  readonly sourceSectionsCovered: number;
+  readonly sourceSections: readonly SourceSectionCoverage[];
+  readonly issues: readonly CoverageIssue[];
   readonly sections: readonly SectionCoverageResult[];
 }
 

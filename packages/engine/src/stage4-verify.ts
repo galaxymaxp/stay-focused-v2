@@ -1,5 +1,9 @@
+import { COVERAGE_THRESHOLD } from "@stay-focused/shared";
+
 import type {
+  CoverageIssue,
   CoverageReport,
+  CoverageReportStatus,
   CoverageStatus,
   GenerationPlan,
   NormalizedSource,
@@ -7,12 +11,16 @@ import type {
   SectionCoverageResult,
   SectionOutput,
   SectionSchemaKind,
+  SourceOutline,
+  SourceOutlineSection,
+  SourceSectionCoverage,
 } from "./types";
 
 export interface VerifyCoverageArgs {
   readonly plan: GenerationPlan;
   readonly outputs: readonly SectionOutput[];
   readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
 }
 
 interface FieldCheckResult {
@@ -28,6 +36,12 @@ interface SourceCheckResult {
   readonly hasUnknownReference: boolean;
 }
 
+interface DuplicateSectionGroup {
+  readonly sourceSectionId: string;
+  readonly title: string;
+  readonly plannedSectionIds: readonly string[];
+}
+
 const PASSED_THRESHOLD = 0.85;
 const WEAK_THRESHOLD = 0.6;
 const REQUIRED_FIELD_FAILURE_CAP = 0.59;
@@ -35,7 +49,7 @@ const REQUIRED_FIELD_FAILURE_CAP = 0.59;
 export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
   validateArgs(args);
 
-  const { plan, outputs, source } = args;
+  const { plan, outputs, source, outline } = args;
   const sourceBlockIds = new Set(source.blocks.map((block) => block.id));
   validatePlanReferences(plan, sourceBlockIds);
 
@@ -52,10 +66,47 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     .filter((output) => !plannedSectionIds.has(output.plannedSectionId))
     .map(createUnplannedOutputResult);
   const sections = [...sectionResults, ...unplannedResults];
-  const score = roundScore(
-    sections.reduce((total, section) => total + section.score, 0) /
-      sections.length,
+  const sectionResultsByPlannedId = new Map(
+    sectionResults.map((result) => [result.plannedSectionId, result] as const),
   );
+  const sourceSections = createSourceSectionCoverage(
+    outline.sections,
+    plan.sections,
+    sectionResultsByPlannedId,
+  );
+  const sourceSectionsTotal = outline.sections.length;
+  const sourceSectionsCovered = sourceSections.filter(
+    (section) => section.status === "covered",
+  ).length;
+  const coverageScore = roundScore(
+    sourceSectionsTotal === 0
+      ? 0
+      : sourceSectionsCovered / sourceSectionsTotal,
+  );
+  const duplicateGroups = findDuplicateSectionGroups(plan.sections);
+  const issues = createCoverageIssues({
+    sourceSections,
+    duplicateGroups,
+    unplannedResults,
+    sourceSectionsTotal,
+  });
+  const status = reportStatus({
+    coverageScore,
+    sectionResults,
+    unplannedResults,
+  });
+
+  emitCoverageLog({
+    sourceId: source.id,
+    detectedSectionCount: sourceSectionsTotal,
+    coveredCount: sourceSectionsCovered,
+    missingSectionTitles: sourceSections
+      .filter((section) => section.status === "missing")
+      .map((section) => section.title),
+    duplicateGroups,
+    coverageScore,
+    status,
+  });
 
   return {
     id: stableId(
@@ -63,6 +114,13 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
       [
         plan.id,
         source.id,
+        outline.id,
+        coverageScore,
+        status,
+        ...sourceSections.map(
+          (section) =>
+            `${section.sourceSectionId}:${section.status}:${section.plannedSectionIds.join(",")}`,
+        ),
         ...sections.map(
           (section) =>
             `${section.plannedSectionId}:${section.status}:${section.score}`,
@@ -71,8 +129,14 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     ),
     planId: plan.id,
     sourceId: source.id,
-    status: overallStatus(sections),
-    score,
+    status,
+    score: coverageScore,
+    coverageScore,
+    coverageBasis: "source-outline",
+    sourceSectionsTotal,
+    sourceSectionsCovered,
+    sourceSections,
+    issues,
     sections,
   };
 }
@@ -95,14 +159,27 @@ function validateArgs(args: VerifyCoverageArgs): void {
   ) {
     throw new Error("Coverage verification requires a normalized source.");
   }
-  if (!Array.isArray(args.plan.sections) || args.plan.sections.length === 0) {
-    throw new Error(
-      "Coverage verification requires at least one planned section.",
-    );
+  if (
+    !args.outline ||
+    typeof args.outline !== "object" ||
+    Array.isArray(args.outline)
+  ) {
+    throw new Error("Coverage verification requires a source outline.");
+  }
+  if (!Array.isArray(args.plan.sections)) {
+    throw new Error("Coverage verification requires planned sections.");
+  }
+  if (!Array.isArray(args.outline.sections)) {
+    throw new Error("Coverage verification requires source outline sections.");
   }
   if (args.plan.sourceId !== args.source.id) {
     throw new Error(
       `Coverage verification source mismatch: plan source ID "${args.plan.sourceId}" does not match source ID "${args.source.id}".`,
+    );
+  }
+  if (args.outline.sourceId !== args.source.id) {
+    throw new Error(
+      `Coverage verification source mismatch: outline source ID "${args.outline.sourceId}" does not match source ID "${args.source.id}".`,
     );
   }
 }
@@ -224,7 +301,8 @@ function checkRequiredFields(
   }
 
   const completeness = fields.length === 0 ? 0 : validFields / fields.length;
-  const weaknessPenalty = fields.length === 0 ? 0 : (weakFields / fields.length) * 0.4;
+  const weaknessPenalty =
+    fields.length === 0 ? 0 : (weakFields / fields.length) * 0.4;
 
   return {
     score: Math.max(0, completeness - weaknessPenalty),
@@ -268,6 +346,119 @@ function checkSourceCoverage(
     issues,
     hasUnknownReference,
   };
+}
+
+function createSourceSectionCoverage(
+  sourceSections: readonly SourceOutlineSection[],
+  plannedSections: readonly PlannedSection[],
+  sectionResultsByPlannedId: ReadonlyMap<string, SectionCoverageResult>,
+): readonly SourceSectionCoverage[] {
+  const plannedIdsBySourceSectionId = new Map<string, string[]>();
+  for (const plannedSection of plannedSections) {
+    const existing =
+      plannedIdsBySourceSectionId.get(plannedSection.sourceSectionId) ?? [];
+    existing.push(plannedSection.id);
+    plannedIdsBySourceSectionId.set(plannedSection.sourceSectionId, existing);
+  }
+
+  return sourceSections.map((sourceSection) => {
+    const plannedSectionIds =
+      plannedIdsBySourceSectionId.get(sourceSection.id) ?? [];
+    const hasCoveredResult = plannedSectionIds.some((plannedSectionId) => {
+      const result = sectionResultsByPlannedId.get(plannedSectionId);
+      return result?.status === "passed" || result?.status === "weak";
+    });
+
+    return {
+      sourceSectionId: sourceSection.id,
+      title: sourceSection.title,
+      status: hasCoveredResult ? "covered" : "missing",
+      plannedSectionIds,
+    };
+  });
+}
+
+function findDuplicateSectionGroups(
+  plannedSections: readonly PlannedSection[],
+): readonly DuplicateSectionGroup[] {
+  const grouped = new Map<string, PlannedSection[]>();
+
+  for (const section of plannedSections) {
+    const key = `${section.sourceSectionId}\u001f${normalizeCoverageTitleKey(section.title)}`;
+    const existing = grouped.get(key) ?? [];
+    existing.push(section);
+    grouped.set(key, existing);
+  }
+
+  return [...grouped.values()]
+    .filter((sections) => sections.length > 1)
+    .map((sections) => {
+      const first = sections[0];
+      if (!first) {
+        throw new Error("Duplicate section group requires at least one section.");
+      }
+      return {
+        sourceSectionId: first.sourceSectionId,
+        title: first.title,
+        plannedSectionIds: sections.map((section) => section.id),
+      };
+    });
+}
+
+function createCoverageIssues(args: {
+  readonly sourceSections: readonly SourceSectionCoverage[];
+  readonly duplicateGroups: readonly DuplicateSectionGroup[];
+  readonly unplannedResults: readonly SectionCoverageResult[];
+  readonly sourceSectionsTotal: number;
+}): readonly CoverageIssue[] {
+  const issues: CoverageIssue[] = [];
+
+  if (args.sourceSectionsTotal === 0) {
+    issues.push({
+      type: "empty-source",
+      severity: "error",
+      message: "No source outline sections were detected for coverage verification.",
+    });
+  }
+
+  for (const sourceSection of args.sourceSections) {
+    if (sourceSection.status === "covered") {
+      continue;
+    }
+
+    issues.push({
+      type: "missing-source-section",
+      severity: "error",
+      sourceSectionId: sourceSection.sourceSectionId,
+      title: sourceSection.title,
+      plannedSectionIds: sourceSection.plannedSectionIds,
+      message:
+        "Detected source section was not represented in the generated reviewer.",
+    });
+  }
+
+  for (const duplicateGroup of args.duplicateGroups) {
+    issues.push({
+      type: "duplicate-section",
+      severity: "warning",
+      sourceSectionId: duplicateGroup.sourceSectionId,
+      title: duplicateGroup.title,
+      plannedSectionIds: duplicateGroup.plannedSectionIds,
+      message:
+        "Multiple planned sections normalize to the same title for the same source section.",
+    });
+  }
+
+  for (const result of args.unplannedResults) {
+    issues.push({
+      type: "unplanned-output",
+      severity: "error",
+      plannedSectionId: result.plannedSectionId,
+      message: `Output references unplanned section "${result.plannedSectionId}".`,
+    });
+  }
+
+  return issues;
 }
 
 function createUnplannedOutputResult(
@@ -332,16 +523,49 @@ function statusForScore(score: number): CoverageStatus {
   return "failed";
 }
 
-function overallStatus(
-  sections: readonly SectionCoverageResult[],
-): CoverageStatus {
-  if (sections.some((section) => section.status === "failed")) {
-    return "failed";
-  }
-  if (sections.some((section) => section.status === "weak")) {
-    return "weak";
-  }
-  return "passed";
+function reportStatus(args: {
+  readonly coverageScore: number;
+  readonly sectionResults: readonly SectionCoverageResult[];
+  readonly unplannedResults: readonly SectionCoverageResult[];
+}): CoverageReportStatus {
+  const hasFailedGeneratedSection =
+    args.sectionResults.some((section) => section.status === "failed") ||
+    args.unplannedResults.length > 0;
+
+  return args.coverageScore >= COVERAGE_THRESHOLD && !hasFailedGeneratedSection
+    ? "passed"
+    : "failed";
+}
+
+function emitCoverageLog(args: {
+  readonly sourceId: string;
+  readonly detectedSectionCount: number;
+  readonly coveredCount: number;
+  readonly missingSectionTitles: readonly string[];
+  readonly duplicateGroups: readonly DuplicateSectionGroup[];
+  readonly coverageScore: number;
+  readonly status: CoverageReportStatus;
+}): void {
+  console.info(
+    JSON.stringify({
+      event: "reviewer.coverage.completed",
+      sourceId: args.sourceId,
+      detectedSectionCount: args.detectedSectionCount,
+      coveredCount: args.coveredCount,
+      missingSectionTitles: args.missingSectionTitles,
+      duplicateGroups: args.duplicateGroups,
+      coverageScore: args.coverageScore,
+      coverageBasis: "source-outline",
+      status: args.status,
+    }),
+  );
+}
+
+function normalizeCoverageTitleKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
 }
 
 function roundScore(score: number): number {

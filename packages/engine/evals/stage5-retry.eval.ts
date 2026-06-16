@@ -21,6 +21,7 @@ import type {
   RetryPolicy,
   SectionOutput,
   SectionSchemaKind,
+  SourceOutline,
 } from "../src/types.js";
 import {
   assertDeepEqual,
@@ -82,6 +83,7 @@ interface FixtureFile<TFixture> {
 
 interface Stage5Context {
   readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
   readonly plan: GenerationPlan;
   readonly sections: readonly PlannedSection[];
 }
@@ -557,6 +559,7 @@ function baseArgs(
     outputs,
     plan: context.plan,
     source: context.source,
+    outline: context.outline,
     provider,
   };
 }
@@ -569,6 +572,7 @@ function createCoverage(
     outputs,
     plan: context.plan,
     source: context.source,
+    outline: context.outline,
   });
 }
 
@@ -633,8 +637,27 @@ function createContext(schemaKinds: readonly SectionSchemaKind[]): Stage5Context
       sourceBlockCount: source.blocks.length,
     },
   };
+  const outline: SourceOutline = {
+    id: "stage5-outline",
+    sourceId: source.id,
+    title: source.title,
+    sections: sections.map((section) => ({
+      id: section.sourceSectionId,
+      title: section.title,
+      order: section.order,
+      startOffset: section.sourceStartOffset,
+      endOffset: section.sourceEndOffset,
+      tokenWeight: section.tokenWeight,
+      sourceBlockIds: [...section.sourceBlockIds],
+      blockIds: [...section.sourceBlockIds],
+      roughStartBlockId: section.sourceBlockIds[0] ?? "",
+      roughEndBlockId: section.sourceBlockIds.at(-1) ?? "",
+      tags: [tagForSchemaKind(section.schemaKind)],
+      confidence: 0.9,
+    })),
+  };
 
-  return { source, plan, sections };
+  return { source, outline, plan, sections };
 }
 
 function createPlannedSection(
@@ -657,6 +680,10 @@ function createPlannedSection(
       coverageRules: ["Cover every required source block."],
     },
     sourceBlockIds: [...sourceBlockIds],
+    tokenWeight: sourceBlockIds.length * 8,
+    targetItemCount: 1,
+    sourceStartOffset: order * 100,
+    sourceEndOffset: order * 100 + 80,
   };
 }
 

@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import basicFixtures from "./fixtures/stage2-basic.json" with { type: "json" };
 import schemaFixtures from "./fixtures/stage2-schema-selection.json" with {
   type: "json",
@@ -7,6 +10,7 @@ import targetFixtures from "./fixtures/stage2-targets.json" with {
 };
 
 import { normalizeSource } from "../src/stage0-normalize.js";
+import { detectOutline } from "../src/stage1-outline.js";
 import { buildGenerationPlan } from "../src/stage2-plan.js";
 import type {
   GenerationPlanMetadata,
@@ -61,6 +65,7 @@ interface Stage2TargetFixture {
   readonly name: string;
   readonly schemaTag: SectionContentTag;
   readonly sourceBlockCount?: number;
+  readonly tokenWeight?: number;
   readonly expectSchemaKind?: SectionSchemaKind;
   readonly expectObjectiveContains?: readonly string[];
   readonly expectCoverageContains?: readonly string[];
@@ -71,7 +76,8 @@ interface FixtureFile<TFixture> {
   readonly cases: readonly TFixture[];
 }
 
-const basicCases = (basicFixtures as FixtureFile<Stage2BasicFixture>).cases;
+const basicCases = (basicFixtures as unknown as FixtureFile<Stage2BasicFixture>)
+  .cases;
 const schemaCases = (schemaFixtures as FixtureFile<Stage2SchemaFixture>).cases;
 const targetCases = (targetFixtures as FixtureFile<Stage2TargetFixture>).cases;
 
@@ -81,6 +87,7 @@ export const stage2PlanSuite: EvalSuite = {
     ...basicCases.map(createBasicCase),
     ...schemaCases.map(createSchemaCase),
     ...targetCases.map(createTargetCase),
+    createItSecurityPlanCase(),
     ...createMissingInputCases(),
   ],
 };
@@ -266,6 +273,7 @@ function createTargetCase(fixture: Stage2TargetFixture): EvalCase {
       const { outline, source } = await createSingleSectionInput(
         [fixture.schemaTag],
         fixture.sourceBlockCount ?? 2,
+        fixture.tokenWeight,
       );
       const plan = buildGenerationPlan(outline, source);
       const section = plan.sections[0];
@@ -309,6 +317,11 @@ function createTargetCase(fixture: Stage2TargetFixture): EvalCase {
             fixture.expectItemCount,
             "Target item count did not match.",
           ),
+          ...assertEqual(
+            section.targetItemCount,
+            fixture.expectItemCount,
+            "Planned section target item count did not match.",
+          ),
         );
       }
       issues.push(
@@ -337,6 +350,7 @@ function createTargetCase(fixture: Stage2TargetFixture): EvalCase {
 async function createSingleSectionInput(
   tags: readonly SectionContentTag[],
   blockCount: number,
+  tokenWeight?: number,
 ): Promise<{ readonly source: Awaited<ReturnType<typeof normalizeSource>>; readonly outline: SourceOutline }> {
   const blocks = Array.from({ length: blockCount }, (_value, index) => ({
     id: `target-block-${index}`,
@@ -352,6 +366,12 @@ async function createSingleSectionInput(
   const blockIds = source.blocks.map((block) => block.id);
   const firstBlockId = blockIds[0] ?? "";
   const lastBlockId = blockIds.at(-1) ?? "";
+  const effectiveTokenWeight =
+    tokenWeight ??
+    source.blocks.reduce(
+      (total, block) => total + countTokens(block.text),
+      0,
+    );
 
   return {
     source,
@@ -364,6 +384,13 @@ async function createSingleSectionInput(
           id: "target-section",
           title: "Target Section",
           order: 0,
+          startOffset: 0,
+          endOffset: source.blocks.reduce(
+            (total, block) => total + block.text.length,
+            0,
+          ),
+          tokenWeight: effectiveTokenWeight,
+          sourceBlockIds: blockIds,
           blockIds,
           roughStartBlockId: firstBlockId,
           roughEndBlockId: lastBlockId,
@@ -426,4 +453,94 @@ function createMissingInputCases(): readonly EvalCase[] {
       },
     },
   ];
+}
+
+function createItSecurityPlanCase(): EvalCase {
+  return {
+    name: "IT Security plan mirrors grouped source outline",
+    run: async () => {
+      const text = await readItSecurityFixture();
+      const source = await normalizeSource({
+        id: "it-security-plan-source",
+        title: "Intro to IT Security Module 1",
+        kind: "plain-text",
+        language: "en",
+        text,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const outline = await detectOutline(source);
+      const plan = buildGenerationPlan(outline, source);
+      const issues: EvalIssue[] = [];
+
+      issues.push(
+        ...assertEqual(
+          plan.sections.length,
+          outline.sections.length,
+          "Generation plan did not create one planned section per source outline section.",
+        ),
+        ...assertEqual(
+          plan.sections.length > 6,
+          true,
+          "IT Security plan collapsed to six or fewer planned sections.",
+        ),
+        ...assertEqual(
+          countTitle(plan.sections, "Types of Cybersecurity Threats"),
+          1,
+          "Plan duplicated Types of Cybersecurity Threats.",
+        ),
+        ...assertEqual(
+          countTitle(plan.sections, "Methods to Deny Service"),
+          1,
+          "Plan duplicated Methods to Deny Service.",
+        ),
+      );
+
+      return issues;
+    },
+  };
+}
+
+async function readItSecurityFixture(): Promise<string> {
+  const candidates = [
+    join(process.cwd(), "scripts", "fixtures", "it-security.txt"),
+    join(
+      process.cwd(),
+      "packages",
+      "engine",
+      "scripts",
+      "fixtures",
+      "it-security.txt",
+    ),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, "utf8");
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error("Unable to read IT Security fixture.");
+}
+
+function countTitle(
+  sections: readonly { readonly title: string }[],
+  title: string,
+): number {
+  const key = normalizeTopicKey(title);
+  return sections.filter((section) => normalizeTopicKey(section.title) === key)
+    .length;
+}
+
+function normalizeTopicKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\b(?:a|an|the)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+function countTokens(text: string): number {
+  return (text.match(/[\p{L}\p{N}]+/gu) ?? []).length;
 }

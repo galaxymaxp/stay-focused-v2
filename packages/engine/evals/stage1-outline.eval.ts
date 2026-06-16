@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import basicFixtures from "./fixtures/stage1-basic.json" with { type: "json" };
 import structureFixtures from "./fixtures/stage1-structure.json" with {
   type: "json",
@@ -15,7 +18,6 @@ import type {
 import {
   assertDeepEqual,
   assertEqual,
-  errorMessage,
   isDirectExecution,
   printEvalSuiteResult,
   runEvalSuite,
@@ -54,9 +56,32 @@ const fixtures = [
   ...(tagFixtures as Stage1FixtureFile).cases,
 ];
 
+const IT_SECURITY_REQUIRED_SECTIONS = [
+  "What is IT Security",
+  "Goal of IT Security",
+  "Domains of IT Security",
+  "What is Cybersecurity",
+  "Importance of Cybersecurity",
+  "Challenges of Cybersecurity",
+  "Impact of Security Breach",
+  "Types of Attackers",
+  "Definition of Terms",
+  "Types of Cybersecurity Threats",
+  "Types of Malware",
+  "Symptoms of Malware",
+  "Methods of Infiltration",
+  "Methods to Deny Service",
+  "Blended Attacks",
+  "Impact Reduction",
+] as const;
+
 export const stage1OutlineSuite: EvalSuite = {
   name: "Stage 1 outline detection",
-  cases: [...fixtures.map(createFixtureCase), createEmptySourceCase()],
+  cases: [
+    ...fixtures.map(createFixtureCase),
+    createItSecurityOutlineCase(),
+    createEmptySourceCase(),
+  ],
 };
 
 export async function runStage1OutlineEvals(): Promise<boolean> {
@@ -215,7 +240,7 @@ function createFixtureCase(fixture: Stage1Fixture): EvalCase {
 
 function createEmptySourceCase(): EvalCase {
   return {
-    name: "empty normalized source is rejected",
+    name: "empty normalized source returns an empty outline",
     run: async () => {
       const emptySource: NormalizedSource = {
         id: "empty-source",
@@ -226,23 +251,106 @@ function createEmptySourceCase(): EvalCase {
         blocks: [],
         createdAt: "2026-01-01T00:00:00.000Z",
       };
+      const outline = await detectOutline(emptySource);
 
-      try {
-        await detectOutline(emptySource);
-        return [
-          {
-            message: "Expected outline detection to reject an empty source.",
-            expected: "Outline detection requires at least one source block.",
-            actual: "No error was thrown",
-          },
-        ];
-      } catch (error) {
-        return assertEqual(
-          errorMessage(error),
-          "Outline detection requires at least one source block.",
-          "Outline detection error message did not match.",
-        );
-      }
+      return assertDeepEqual(
+        outline.sections,
+        [],
+        "Empty source should produce an empty outline safely.",
+      );
     },
   };
+}
+
+function createItSecurityOutlineCase(): EvalCase {
+  return {
+    name: "IT Security source detects major sections and groups repeats",
+    run: async () => {
+      const text = await readItSecurityFixture();
+      const source = await normalizeSource({
+        id: "it-security-outline-source",
+        title: "Intro to IT Security Module 1",
+        kind: "plain-text",
+        language: "en",
+        text,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const outline = await detectOutline(source);
+      const titleKeys = outline.sections.map((section) =>
+        normalizeTopicKey(section.title),
+      );
+      const issues: EvalIssue[] = [];
+
+      for (const requiredSection of IT_SECURITY_REQUIRED_SECTIONS) {
+        issues.push(
+          ...assertEqual(
+            titleKeys.includes(normalizeTopicKey(requiredSection)),
+            true,
+            `IT Security outline did not include required section "${requiredSection}".`,
+          ),
+        );
+      }
+
+      issues.push(
+        ...assertEqual(
+          countTitle(outline.sections, "Types of Cybersecurity Threats"),
+          1,
+          "Repeated Types of Cybersecurity Threats headings were not grouped.",
+        ),
+        ...assertEqual(
+          countTitle(outline.sections, "Methods to Deny Service"),
+          1,
+          "Repeated Methods to Deny Service headings were not grouped.",
+        ),
+        ...assertEqual(
+          outline.sections.length > 6,
+          true,
+          "IT Security source collapsed to six or fewer detected sections.",
+        ),
+      );
+
+      return issues;
+    },
+  };
+}
+
+async function readItSecurityFixture(): Promise<string> {
+  const candidates = [
+    join(process.cwd(), "scripts", "fixtures", "it-security.txt"),
+    join(
+      process.cwd(),
+      "packages",
+      "engine",
+      "scripts",
+      "fixtures",
+      "it-security.txt",
+    ),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, "utf8");
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error("Unable to read IT Security fixture.");
+}
+
+function countTitle(
+  sections: readonly { readonly title: string }[],
+  title: string,
+): number {
+  const key = normalizeTopicKey(title);
+  return sections.filter((section) => normalizeTopicKey(section.title) === key)
+    .length;
+}
+
+function normalizeTopicKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\b(?:a|an|the)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
 }

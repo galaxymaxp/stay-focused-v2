@@ -1,11 +1,11 @@
 import type {
   GenerationPlan,
   NormalizedSource,
-  OutlineSection,
   PlannedSection,
   PlannedSectionTarget,
   SectionSchemaKind,
   SourceOutline,
+  SourceOutlineSection,
 } from "./types";
 
 const COVERAGE_RULES: Readonly<
@@ -36,9 +36,12 @@ export function buildGenerationPlan(
   validateInputs(outline, source);
 
   const sourceBlockIds = new Set(source.blocks.map((block) => block.id));
+  const sourceBlockById = new Map(
+    source.blocks.map((block) => [block.id, block] as const),
+  );
   const sections = outline.sections.map((section) => {
     validateSectionBlockIds(section, sourceBlockIds);
-    return createPlannedSection(section);
+    return createPlannedSection(section, sourceBlockById);
   });
 
   return {
@@ -56,6 +59,7 @@ export function buildGenerationPlan(
       sectionCount: sections.length,
       sourceBlockCount: source.blocks.length,
     },
+    sourceOutline: outline,
   };
 }
 
@@ -69,7 +73,10 @@ function validateInputs(
   if (!source || typeof source !== "object" || Array.isArray(source)) {
     throw new Error("Generation planning requires a normalized source.");
   }
-  if (!Array.isArray(outline.sections) || outline.sections.length === 0) {
+  if (!Array.isArray(outline.sections)) {
+    throw new Error("Generation planning requires outline sections.");
+  }
+  if (source.blocks.length > 0 && outline.sections.length === 0) {
     throw new Error(
       "Generation planning requires at least one outline section.",
     );
@@ -82,16 +89,17 @@ function validateInputs(
 }
 
 function validateSectionBlockIds(
-  section: OutlineSection,
+  section: SourceOutlineSection,
   sourceBlockIds: ReadonlySet<string>,
 ): void {
-  if (!Array.isArray(section.blockIds) || section.blockIds.length === 0) {
+  const sectionBlockIds = blockIdsForSection(section);
+  if (sectionBlockIds.length === 0) {
     throw new Error(
       `Outline section "${section.id}" must reference at least one source block.`,
     );
   }
 
-  for (const blockId of section.blockIds) {
+  for (const blockId of sectionBlockIds) {
     if (!sourceBlockIds.has(blockId)) {
       throw new Error(
         `Outline section "${section.id}" references missing source block ID "${blockId}".`,
@@ -100,9 +108,14 @@ function validateSectionBlockIds(
   }
 }
 
-function createPlannedSection(section: OutlineSection): PlannedSection {
+function createPlannedSection(
+  section: SourceOutlineSection,
+  sourceBlockById: ReadonlyMap<string, NormalizedSource["blocks"][number]>,
+): PlannedSection {
   const schemaKind = selectSchemaKind(section);
-  const sourceBlockIds = [...section.blockIds];
+  const sourceBlockIds = blockIdsForSection(section);
+  const tokenWeight = tokenWeightForSection(section, sourceBlockIds, sourceBlockById);
+  const targetItemCount = targetItemCountFor(tokenWeight);
 
   return {
     id: stableId(
@@ -113,12 +126,16 @@ function createPlannedSection(section: OutlineSection): PlannedSection {
     title: section.title,
     order: section.order,
     schemaKind,
-    target: createTarget(section, schemaKind, sourceBlockIds),
+    target: createTarget(section, schemaKind, sourceBlockIds, targetItemCount),
     sourceBlockIds,
+    tokenWeight,
+    targetItemCount,
+    sourceStartOffset: finiteNumberOr(section.startOffset, 0),
+    sourceEndOffset: finiteNumberOr(section.endOffset, 0),
   };
 }
 
-function selectSchemaKind(section: OutlineSection): SectionSchemaKind {
+function selectSchemaKind(section: SourceOutlineSection): SectionSchemaKind {
   if (section.tags.includes("process")) {
     return "process-step";
   }
@@ -132,13 +149,14 @@ function selectSchemaKind(section: OutlineSection): SectionSchemaKind {
 }
 
 function createTarget(
-  section: OutlineSection,
+  section: SourceOutlineSection,
   schemaKind: SectionSchemaKind,
   sourceBlockIds: readonly string[],
+  targetItemCount: number,
 ): PlannedSectionTarget {
   return {
     objective: objectiveFor(schemaKind, section.title),
-    itemCount: Math.min(5, Math.max(1, sourceBlockIds.length)),
+    itemCount: targetItemCount,
     focus: section.title,
     requiredSourceBlockIds: [...sourceBlockIds],
     expectedTags: [...section.tags],
@@ -157,6 +175,53 @@ function objectiveFor(schemaKind: SectionSchemaKind, title: string): string {
     case "concept-card":
       return `Explain "${title}" concisely with its key points.`;
   }
+}
+
+function blockIdsForSection(section: SourceOutlineSection): readonly string[] {
+  const sourceBlockIds = Array.isArray(section.sourceBlockIds)
+    ? section.sourceBlockIds
+    : [];
+  const blockIds = Array.isArray(section.blockIds) ? section.blockIds : [];
+  return [...(sourceBlockIds.length > 0 ? sourceBlockIds : blockIds)];
+}
+
+function tokenWeightForSection(
+  section: SourceOutlineSection,
+  sourceBlockIds: readonly string[],
+  sourceBlockById: ReadonlyMap<string, NormalizedSource["blocks"][number]>,
+): number {
+  if (Number.isFinite(section.tokenWeight) && section.tokenWeight > 0) {
+    return section.tokenWeight;
+  }
+
+  const text = sourceBlockIds
+    .map((blockId) => sourceBlockById.get(blockId)?.text ?? "")
+    .join("\n");
+  return countTokens(text);
+}
+
+function targetItemCountFor(tokenWeight: number): number {
+  if (tokenWeight <= 80) {
+    return 1;
+  }
+  if (tokenWeight <= 180) {
+    return 2;
+  }
+  if (tokenWeight <= 320) {
+    return 3;
+  }
+  if (tokenWeight <= 520) {
+    return 4;
+  }
+  return 5;
+}
+
+function finiteNumberOr(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function countTokens(text: string): number {
+  return (text.match(/[\p{L}\p{N}]+/gu) ?? []).length;
 }
 
 function stableId(prefix: string, value: string): string {

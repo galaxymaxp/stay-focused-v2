@@ -10,6 +10,7 @@ import type {
   RetryPolicy,
   SectionCoverageResult,
   SectionOutput,
+  SourceOutline,
 } from "./types";
 
 export interface RetryFailedSectionsArgs {
@@ -17,6 +18,7 @@ export interface RetryFailedSectionsArgs {
   readonly coverage: CoverageReport;
   readonly plan: GenerationPlan;
   readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
   readonly provider: GenerationProvider;
   readonly retryPolicy?: RetryPolicy;
   readonly model?: string;
@@ -35,10 +37,10 @@ export async function retryFailedSections(
 ): Promise<readonly SectionOutput[]> {
   validateArgs(args);
 
-  const { plan, source, provider, coverage } = args;
+  const { plan, source, outline, provider, coverage } = args;
   const retryPolicy = args.retryPolicy ?? defaultRetryPolicy;
   validateRetryPolicy(retryPolicy);
-  validatePlanAndCoverage(plan, source, coverage);
+  validatePlanAndCoverage(plan, source, outline, coverage);
 
   const plannedSectionIds = new Set(plan.sections.map((section) => section.id));
   const currentOutputs = new Map<string, SectionOutput>();
@@ -89,6 +91,7 @@ export async function retryFailedSections(
         outputs: orderedOutputs(plan, currentOutputs),
         plan,
         source,
+        outline,
       });
       const refreshedResult = refreshedCoverage.sections.find(
         (candidate) => candidate.plannedSectionId === section.id,
@@ -115,6 +118,9 @@ function validateArgs(args: RetryFailedSectionsArgs): void {
   if (!isRecord(args.source)) {
     throw new Error("Stage 5 retry requires a normalized source.");
   }
+  if (!isRecord(args.outline)) {
+    throw new Error("Stage 5 retry requires a source outline.");
+  }
   if (!args.provider || typeof args.provider.generate !== "function") {
     throw new Error("Stage 5 retry requires a generation provider.");
   }
@@ -135,6 +141,7 @@ function validateRetryPolicy(policy: RetryPolicy): void {
 function validatePlanAndCoverage(
   plan: GenerationPlan,
   source: NormalizedSource,
+  outline: SourceOutline,
   coverage: CoverageReport,
 ): void {
   if (!Array.isArray(plan.sections) || plan.sections.length === 0) {
@@ -154,6 +161,14 @@ function validatePlanAndCoverage(
     throw new Error(
       `Stage 5 coverage source mismatch: coverage source ID "${coverage.sourceId}" does not match source ID "${source.id}".`,
     );
+  }
+  if (outline.sourceId !== source.id) {
+    throw new Error(
+      `Stage 5 outline source mismatch: outline source ID "${outline.sourceId}" does not match source ID "${source.id}".`,
+    );
+  }
+  if (coverage.coverageBasis !== "source-outline") {
+    throw new Error("Stage 5 coverage must use source-outline coverage basis.");
   }
 
   const sourceBlockIds = new Set(source.blocks.map((block) => block.id));

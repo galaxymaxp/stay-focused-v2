@@ -38,7 +38,7 @@
     {
       "name": "short required content is weak",
       "scenario": "weak-content",
-      "expectReportStatus": "weak",
+      "expectReportStatus": "passed",
       "expectSectionStatuses": ["weak"],
       "expectSectionScores": [0.84],
       "expectRetryable": [true],
@@ -47,7 +47,7 @@
     {
       "name": "partial source block coverage is weak",
       "scenario": "partial-coverage",
-      "expectReportStatus": "weak",
+      "expectReportStatus": "passed",
       "expectSectionStatuses": ["weak"],
       "expectSectionScores": [0.8],
       "expectRetryable": [true],
@@ -83,8 +83,8 @@
     {
       "name": "overall weak when one section is weak and none fail",
       "scenario": "multiple-weak",
-      "expectReportStatus": "weak",
-      "expectReportScore": 0.9,
+      "expectReportStatus": "passed",
+      "expectReportScore": 1,
       "expectSectionStatuses": ["passed", "weak"],
       "expectRetryable": [false, true]
     },

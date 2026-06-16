@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import basicFixtures from "./fixtures/stage4-basic.json" with { type: "json" };
 import statusFixtures from "./fixtures/stage4-status.json" with { type: "json" };
 import validationFixtures from "./fixtures/stage4-validation.json" with {
@@ -8,6 +11,8 @@ import {
   verifyCoverage,
   type VerifyCoverageArgs,
 } from "../src/stage4-verify.js";
+import { normalizeSource } from "../src/stage0-normalize.js";
+import { detectOutline } from "../src/stage1-outline.js";
 import type {
   CoverageStatus,
   GenerationPlan,
@@ -15,6 +20,8 @@ import type {
   PlannedSection,
   SectionOutput,
   SectionSchemaKind,
+  SourceOutline,
+  SourceOutlineSection,
 } from "../src/types.js";
 import {
   assertDeepEqual,
@@ -66,7 +73,7 @@ type ValidationScenario =
   | "missing-outputs"
   | "missing-plan"
   | "missing-source"
-  | "empty-plan";
+  | "missing-outline";
 
 interface Stage4ValidationFixture {
   readonly name: string;
@@ -80,6 +87,7 @@ interface FixtureFile<TFixture> {
 
 interface Stage4Context {
   readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
   readonly plan: GenerationPlan;
   readonly sections: readonly PlannedSection[];
 }
@@ -95,6 +103,7 @@ export const stage4VerifySuite: EvalSuite = {
   cases: [
     ...basicCases.map(createBasicCase),
     ...statusCases.map(createStatusCase),
+    createItSecurityFalsePositiveRegressionCase(),
     ...validationCases.map(createValidationCase),
   ],
 };
@@ -120,11 +129,13 @@ function createBasicCase(fixture: Stage4BasicFixture): EvalCase {
         plan: context.plan,
         outputs: [output],
         source: context.source,
+        outline: context.outline,
       });
       const repeatedReport = verifyCoverage({
         plan: context.plan,
         outputs: [output],
         source: context.source,
+        outline: context.outline,
       });
       const result = report.sections[0];
       const issues: EvalIssue[] = [];
@@ -152,6 +163,16 @@ function createBasicCase(fixture: Stage4BasicFixture): EvalCase {
           report.status,
           "passed",
           "Valid output should produce a passing report.",
+        ),
+        ...assertEqual(
+          report.coverageBasis,
+          "source-outline",
+          "Coverage report did not use source-outline basis.",
+        ),
+        ...assertEqual(
+          report.coverageScore,
+          1,
+          "Valid output did not cover the detected source section.",
         ),
         ...assertEqual(
           report.planId,
@@ -184,6 +205,7 @@ function createStatusCase(fixture: Stage4StatusFixture): EvalCase {
         plan: context.plan,
         outputs,
         source: context.source,
+        outline: context.outline,
       });
       const issues: EvalIssue[] = [];
 
@@ -273,6 +295,112 @@ function createValidationCase(fixture: Stage4ValidationFixture): EvalCase {
           "Coverage validation error message did not match.",
         );
       }
+    },
+  };
+}
+
+function createItSecurityFalsePositiveRegressionCase(): EvalCase {
+  return {
+    name: "IT Security legacy six-section output fails source-outline coverage",
+    run: async () => {
+      const text = await readItSecurityFixture();
+      const source = await normalizeSource({
+        id: "it-security-coverage-source",
+        title: "Intro to IT Security Module 1",
+        kind: "plain-text",
+        language: "en",
+        text,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+      const outline = await detectOutline(source);
+      const introduction = requireSourceSection(outline, "Introduction");
+      const threats = requireSourceSection(
+        outline,
+        "Types of Cybersecurity Threats",
+      );
+      const denyService = requireSourceSection(
+        outline,
+        "Methods to Deny Service",
+      );
+      const legacySections = [
+        createLegacyPlannedSection(introduction, 0, "Introduction"),
+        createLegacyPlannedSection(threats, 1, "Types of Cybersecurity Threats"),
+        createLegacyPlannedSection(threats, 2, "Types of Cybersecurity Threats"),
+        createLegacyPlannedSection(threats, 3, "Types of Cybersecurity Threats"),
+        createLegacyPlannedSection(denyService, 4, "Methods to Deny Service"),
+        createLegacyPlannedSection(denyService, 5, "Methods to Deny Service"),
+      ];
+      const plan: GenerationPlan = {
+        id: "it-security-legacy-bad-plan",
+        sourceId: source.id,
+        outlineId: outline.id,
+        title: source.title,
+        sections: legacySections,
+        metadata: {
+          sectionCount: legacySections.length,
+          sourceBlockCount: source.blocks.length,
+        },
+      };
+      const outputs = legacySections.map((section) =>
+        createValidOutput(section.schemaKind, section),
+      );
+      const report = verifyCoverage({ plan, outputs, source, outline });
+      const missingIssueTitles = report.issues
+        .filter((issue) => issue.type === "missing-source-section")
+        .map((issue) => normalizeTopicKey(issue.title ?? ""));
+      const requiredMissingTitles = [
+        "Types of Attackers",
+        "Types of Malware",
+        "Symptoms of Malware",
+        "Methods of Infiltration",
+        "Challenges of Cybersecurity",
+        "Impact of Security Breach",
+        "Impact Reduction",
+        "Definition of Terms",
+      ];
+      const issues: EvalIssue[] = [];
+
+      issues.push(
+        ...assertEqual(
+          report.status,
+          "failed",
+          "Legacy bad output should fail source-outline coverage.",
+        ),
+        ...assertEqual(
+          report.coverageBasis,
+          "source-outline",
+          "Coverage report did not identify source-outline basis.",
+        ),
+        ...assertEqual(
+          report.coverageScore === 1,
+          false,
+          "Legacy bad output reproduced the old false-positive score of 1.",
+        ),
+        ...assertEqual(
+          report.coverageScore >= 0.15 && report.coverageScore <= 0.25,
+          true,
+          "Legacy bad output did not produce the expected low source-outline score.",
+        ),
+        ...assertEqual(
+          report.issues.some(
+            (issue) => issue.type === "duplicate-section",
+          ),
+          true,
+          "Legacy duplicate planned sections did not emit a duplicate-section issue.",
+        ),
+      );
+
+      for (const title of requiredMissingTitles) {
+        issues.push(
+          ...assertEqual(
+            missingIssueTitles.includes(normalizeTopicKey(title)),
+            true,
+            `Missing source-section issue was not emitted for "${title}".`,
+          ),
+        );
+      }
+
+      return issues;
     },
   };
 }
@@ -374,6 +502,7 @@ function runValidationScenario(scenario: ValidationScenario): void {
     plan: context.plan,
     outputs: [output],
     source: context.source,
+    outline: context.outline,
   };
 
   switch (scenario) {
@@ -407,8 +536,8 @@ function runValidationScenario(scenario: ValidationScenario): void {
     case "missing-source":
       args = { ...args, source: undefined as unknown as NormalizedSource };
       break;
-    case "empty-plan":
-      args = { ...args, plan: { ...context.plan, sections: [] } };
+    case "missing-outline":
+      args = { ...args, outline: undefined as unknown as SourceOutline };
       break;
   }
 
@@ -444,8 +573,27 @@ function createContext(schemaKinds: readonly SectionSchemaKind[]): Stage4Context
     sections,
     metadata: { sectionCount: sections.length, sourceBlockCount: source.blocks.length },
   };
+  const outline: SourceOutline = {
+    id: "stage4-outline",
+    sourceId: source.id,
+    title: source.title,
+    sections: sections.map((section) => ({
+      id: section.sourceSectionId,
+      title: section.title,
+      order: section.order,
+      startOffset: section.sourceStartOffset,
+      endOffset: section.sourceEndOffset,
+      tokenWeight: section.tokenWeight,
+      sourceBlockIds: [...section.sourceBlockIds],
+      blockIds: [...section.sourceBlockIds],
+      roughStartBlockId: section.sourceBlockIds[0] ?? "",
+      roughEndBlockId: section.sourceBlockIds.at(-1) ?? "",
+      tags: [tagForSchemaKind(section.schemaKind)],
+      confidence: 0.9,
+    })),
+  };
 
-  return { source, plan, sections };
+  return { source, outline, plan, sections };
 }
 
 function createPlannedSection(
@@ -468,6 +616,10 @@ function createPlannedSection(
       coverageRules: ["Cover every required source block."],
     },
     sourceBlockIds: [...sourceBlockIds],
+    tokenWeight: sourceBlockIds.length * 8,
+    targetItemCount: 1,
+    sourceStartOffset: order * 100,
+    sourceEndOffset: order * 100 + 80,
   };
 }
 
@@ -544,4 +696,77 @@ function requireOutput(output: SectionOutput | undefined): SectionOutput {
     throw new Error("Eval setup requires a section output.");
   }
   return output;
+}
+
+async function readItSecurityFixture(): Promise<string> {
+  const candidates = [
+    join(process.cwd(), "scripts", "fixtures", "it-security.txt"),
+    join(
+      process.cwd(),
+      "packages",
+      "engine",
+      "scripts",
+      "fixtures",
+      "it-security.txt",
+    ),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, "utf8");
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error("Unable to read IT Security fixture.");
+}
+
+function requireSourceSection(
+  outline: SourceOutline,
+  title: string,
+): SourceOutlineSection {
+  const key = normalizeTopicKey(title);
+  const section = outline.sections.find(
+    (candidate) => normalizeTopicKey(candidate.title) === key,
+  );
+  if (!section) {
+    throw new Error(`Eval setup could not find source section "${title}".`);
+  }
+  return section;
+}
+
+function createLegacyPlannedSection(
+  section: SourceOutlineSection,
+  order: number,
+  title: string,
+): PlannedSection {
+  return {
+    id: `legacy-planned-${order}`,
+    sourceSectionId: section.id,
+    title,
+    order,
+    schemaKind: "concept-card",
+    target: {
+      objective: `Explain ${title}.`,
+      itemCount: 1,
+      focus: title,
+      requiredSourceBlockIds: [...section.sourceBlockIds],
+      expectedTags: ["concept"],
+      coverageRules: ["Represent the source section."],
+    },
+    sourceBlockIds: [...section.sourceBlockIds],
+    tokenWeight: section.tokenWeight,
+    targetItemCount: 1,
+    sourceStartOffset: section.startOffset,
+    sourceEndOffset: section.endOffset,
+  };
+}
+
+function normalizeTopicKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\b(?:a|an|the)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
 }

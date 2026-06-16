@@ -29,9 +29,15 @@
       "expectCoverageContains": ["central claim", "evidence or reasoning"]
     },
     {
-      "name": "target item count is clamped to five source blocks",
+      "name": "thin section gets one target item",
       "schemaTag": "concept",
-      "sourceBlockCount": 7,
+      "tokenWeight": 20,
+      "expectItemCount": 1
+    },
+    {
+      "name": "long section target is derived from token weight",
+      "schemaTag": "concept",
+      "tokenWeight": 620,
       "expectItemCount": 5
     }
   ]
