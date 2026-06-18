@@ -10,6 +10,7 @@ import {
   assembleReviewer,
   type AssembleReviewerArgs,
 } from "../src/stage6-assemble.js";
+import { flattenSourceBlocks } from "../src/stage1-outline.js";
 import { verifyCoverage } from "../src/stage4-verify.js";
 import { validateGrounding } from "../src/stage5a-grounding.js";
 import { validateLeakage } from "../src/leakage-guard.js";
@@ -617,9 +618,23 @@ function createContext(schemaKinds: readonly SectionSchemaKind[]): Stage6Context
     blocks,
     createdAt: "2026-01-01T00:00:00.000Z",
   };
+  const flattenedBlocksById = new Map(
+    flattenSourceBlocks(source.blocks).map((entry) => [entry.block.id, entry]),
+  );
   const sections = schemaKinds.map((schemaKind, index) => {
     const sourceBlockIds = [`source-${index}-a`, `source-${index}-b`];
-    return createPlannedSection(schemaKind, index, sourceBlockIds);
+    const firstBlock = flattenedBlocksById.get(sourceBlockIds[0] ?? "");
+    const lastBlock = flattenedBlocksById.get(sourceBlockIds.at(-1) ?? "");
+    if (!firstBlock || !lastBlock) {
+      throw new Error("Stage 6 eval setup could not resolve source offsets.");
+    }
+    return createPlannedSection(
+      schemaKind,
+      index,
+      sourceBlockIds,
+      firstBlock.startOffset,
+      lastBlock.endOffset,
+    );
   });
   const plan: GenerationPlan = {
     id: "stage6-plan",
@@ -659,6 +674,8 @@ function createPlannedSection(
   schemaKind: SectionSchemaKind,
   order: number,
   sourceBlockIds: readonly string[],
+  sourceStartOffset: number,
+  sourceEndOffset: number,
 ): PlannedSection {
   return {
     id: `planned-${schemaKind}-${order}`,
@@ -677,8 +694,8 @@ function createPlannedSection(
     sourceBlockIds: [...sourceBlockIds],
     tokenWeight: sourceBlockIds.length * 8,
     targetItemCount: 1,
-    sourceStartOffset: order * 100,
-    sourceEndOffset: order * 100 + 80,
+    sourceStartOffset,
+    sourceEndOffset,
   };
 }
 
@@ -754,7 +771,7 @@ function createWeakOutput(section: PlannedSection): SectionOutput {
     ...output,
     sourceCore: {
       ...output.sourceCore,
-      explanation: "Brief.",
+      explanation: "The.",
     },
   };
 }

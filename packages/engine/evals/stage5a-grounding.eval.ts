@@ -8,11 +8,13 @@ import type {
   GenerationPlan,
   NormalizedSource,
   PlannedSection,
+  SectionGroundingResult,
   SectionOutput,
   SourceOutline,
   SourceOutlineSection,
 } from "../src/types.js";
 import {
+  assertDeepEqual,
   assertEqual,
   isDirectExecution,
   printEvalSuiteResult,
@@ -24,7 +26,15 @@ import type { EvalCase, EvalIssue, EvalSuite } from "./types.js";
 export const stage5aGroundingSuite: EvalSuite = {
   name: "Stage 5a grounding validation",
   cases: [
+    createLooseConnectivePhase1Case(),
+    createInventedEndpointDescriptionCase(),
+    createCompleteDomainsListCase(),
+    createMalwareOmissionThresholdCase(),
+    createImpactReductionDriftCase(),
+    createDomainDescriptionInCoreCase(),
+    createPureStopwordParaphraseCase(),
     createSymptomsRegressionCase(),
+    createSparseIntroductionRegressionCase(),
     createBlendedAttackRegressionCase(),
     createDenyServiceRegressionCase(),
     createFaithfulSectionsCase(),
@@ -40,6 +50,275 @@ export async function runStage5aGroundingEvals(): Promise<boolean> {
 
 if (isDirectExecution(import.meta.url)) {
   await runStage5aGroundingEvals();
+}
+
+function createLooseConnectivePhase1Case(): EvalCase {
+  return {
+    name: "Phase 1 rejects a faithful loose-connective paraphrase",
+    run: async () => {
+      const sourceText =
+        "A set of cyber security strategies that prevent unauthorized access";
+      const context = createSyntheticContext("IT Security", sourceText);
+      const claim =
+        "IT Security involves cyber security strategies that prevent unauthorized access";
+      const output = createOutput(context.section, sourceText, [claim]);
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+      const result = report.sections[0];
+      const issue = result?.issues.find(
+        (candidate) => candidate.type === "grounding-fabrication",
+      );
+
+      // This flips to PASS in Phase 2 with the entailment judge. Phase 1 fixes
+      // it by making the generator emit source wording, not by loosening validation.
+      return [
+        ...assertEqual(
+          result?.status,
+          "failed",
+          "Loose-connective Phase 1 paraphrase did not fail.",
+        ),
+        ...assertDeepEqual(
+          issue?.offendingText,
+          ["involves"],
+          "Loose-connective Phase 1 failure did not isolate the unsupported content token.",
+        ),
+        ...assertEqual(
+          report.phase1FabricationFails,
+          1,
+          "Phase 1 fabrication instrumentation did not collect the failed claim.",
+        ),
+      ];
+    },
+  };
+}
+
+function createInventedEndpointDescriptionCase(): EvalCase {
+  return {
+    name: "Endpoint Security rejects an invented device description",
+    run: async () => {
+      const sourceText = "Endpoint Security";
+      const context = createSyntheticContext("Endpoint Security", sourceText);
+      const output = createOutput(context.section, sourceText, [
+        "Endpoint Security secures end-user devices like computers and mobile phones",
+      ]);
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+
+      return assertEqual(
+        hasUnsupportedToken(report.sections[0], /end-user/i),
+        true,
+        "Invented Endpoint Security description did not flag end-user.",
+      );
+    },
+  };
+}
+
+function createCompleteDomainsListCase(): EvalCase {
+  return {
+    name: "Complete Domains of IT Security list passes omission coverage",
+    run: async () => {
+      const items = [
+        "Network Security",
+        "Internet Security",
+        "Endpoint Security",
+        "Cloud Security",
+        "Application Security",
+        "Information Security",
+        "Operational Security",
+        "Mobile Security",
+        "IoT Security",
+        "User Education",
+        "Cyber Security",
+      ];
+      const sourceText = numberedListSource("Domains of IT Security", items);
+      const context = createSyntheticContext(
+        "Domains of IT Security",
+        sourceText,
+      );
+      const output = createOutput(
+        context.section,
+        "Domains of IT Security",
+        items,
+      );
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+      const result = report.sections[0];
+
+      return [
+        ...assertEqual(
+          result?.status,
+          "passed",
+          "Complete domains list did not pass grounding.",
+        ),
+        ...assertEqual(
+          result?.issues.some(
+            (issue) => issue.type === "grounding-omission",
+          ),
+          false,
+          "Complete domains list raised an omission.",
+        ),
+      ];
+    },
+  };
+}
+
+function createMalwareOmissionThresholdCase(): EvalCase {
+  return {
+    name: "One of ten malware types fails the list coverage threshold",
+    run: async () => {
+      const items = [
+        "Virus",
+        "Worm",
+        "Trojan Horse",
+        "Ransomware",
+        "Spyware",
+        "Adware",
+        "Rootkit",
+        "Keylogger",
+        "Bot",
+        "Logic Bomb",
+      ];
+      const sourceText = numberedListSource("Types of Malware", items);
+      const context = createSyntheticContext("Types of Malware", sourceText);
+      const output = createOutput(context.section, "Types of Malware", [
+        items[0] ?? "Virus",
+      ]);
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+
+      return assertEqual(
+        report.sections[0]?.issues.some(
+          (issue) => issue.type === "grounding-omission",
+        ),
+        true,
+        "One of ten malware types did not raise grounding-omission.",
+      );
+    },
+  };
+}
+
+function createImpactReductionDriftCase(): EvalCase {
+  return {
+    name: "Impact Reduction generic drift fails fabrication and omission",
+    run: async () => {
+      const actions = [
+        "Communicate the Issue",
+        "Be sincere and accountable",
+        "Provide details",
+        "Understand the cause of the breach",
+        "Take steps to avoid another similar breach in the future",
+        "Ensure all systems are clean",
+        "Educate employees, partners, and customers",
+      ];
+      const sourceText = bulletListSource("Impact Reduction", actions);
+      const context = createSyntheticContext("Impact Reduction", sourceText);
+      const output = createOutput(
+        context.section,
+        "Impact Reduction focuses on decreasing the extent of adverse effects",
+        ["Impact Reduction"],
+      );
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+      const issueTypes =
+        report.sections[0]?.issues.map((issue) => issue.type) ?? [];
+
+      return [
+        ...assertEqual(
+          issueTypes.includes("grounding-fabrication"),
+          true,
+          "Impact Reduction generic drift did not raise fabrication.",
+        ),
+        ...assertEqual(
+          issueTypes.includes("grounding-omission"),
+          true,
+          "Impact Reduction generic drift did not raise omission.",
+        ),
+      ];
+    },
+  };
+}
+
+function createDomainDescriptionInCoreCase(): EvalCase {
+  return {
+    name: "Domain-name-only source rejects descriptions in sourceCore",
+    run: async () => {
+      const items = [
+        "Network Security",
+        "Internet Security",
+        "Endpoint Security",
+      ];
+      const sourceText = numberedListSource("Domains of IT Security", items);
+      const context = createSyntheticContext(
+        "Domains of IT Security",
+        sourceText,
+      );
+      const output = createOutput(
+        context.section,
+        "Domains of IT Security",
+        [
+          "Endpoint Security: enhances security by securing end-user devices like computers and mobile phones",
+        ],
+      );
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+
+      return assertEqual(
+        hasUnsupportedToken(report.sections[0], /end-user/i),
+        true,
+        "Description added to a domain name did not raise fabrication.",
+      );
+    },
+  };
+}
+
+function createPureStopwordParaphraseCase(): EvalCase {
+  return {
+    name: "Pure stopword additions remain grounded",
+    run: async () => {
+      const sourceText =
+        "Network Security Internet Security Endpoint Security";
+      const context = createSyntheticContext("Security Domains", sourceText);
+      const claim =
+        "Network Security and Internet Security and Endpoint Security";
+      const output = createOutput(context.section, sourceText, [claim]);
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+
+      return assertEqual(
+        report.sections[0]?.status,
+        "passed",
+        "Pure stopword additions did not pass grounding.",
+      );
+    },
+  };
 }
 
 function createSymptomsRegressionCase(): EvalCase {
@@ -102,11 +381,75 @@ function createBlendedAttackRegressionCase(): EvalCase {
         result?.issues.some(
           (issue) =>
             issue.type === "grounding-fabrication" &&
-            /sql|retail|injection/i.test(issue.offendingText ?? ""),
+            issue.offendingText?.some((token) =>
+              /sql|retail|injection/i.test(token),
+            ),
         ),
         true,
         "Blended Attacks retail SQL scenario did not raise fabrication.",
       );
+    },
+  };
+}
+
+function createSparseIntroductionRegressionCase(): EvalCase {
+  return {
+    name: "IT Security sparse Introduction rejects generic expansion",
+    run: async () => {
+      const context = await createItSecurityContext("Introduction");
+      const sourceText = extractSourceSectionText(
+        context.source,
+        context.sourceSection,
+      );
+      const expandedOutput = createOutput(
+        context.section,
+        "The Introduction to IT Security serves as the foundational entry point into information technology security and explains how organizations protect data and systems from threats.",
+        [
+          "IT Security Overview: safeguards information technology systems from unauthorized access and threats.",
+          "Risk Assessment: identifies and evaluates potential risks to IT systems.",
+          "Security Layers: uses multi-layered strategies to protect systems.",
+        ],
+      );
+      const expandedReport = validateGrounding({
+        plan: context.plan,
+        outputs: [expandedOutput],
+        source: context.source,
+        outline: context.outline,
+      });
+      const expandedResult = expandedReport.sections[0];
+      const minimalOutput = createOutput(context.section, sourceText, [sourceText]);
+      const minimalReport = validateGrounding({
+        plan: context.plan,
+        outputs: [minimalOutput],
+        source: context.source,
+        outline: context.outline,
+      });
+      const minimalResult = minimalReport.sections[0];
+
+      return [
+        ...assertEqual(
+          sourceText,
+          "Intro to IT Security Module 1",
+          "Introduction source span did not match the exact sparse live span.",
+        ),
+        ...assertEqual(
+          expandedResult?.status,
+          "failed",
+          "Sparse Introduction generic expansion did not fail grounding.",
+        ),
+        ...assertEqual(
+          expandedResult?.issues.some(
+            (issue) => issue.type === "grounding-fabrication",
+          ),
+          true,
+          "Sparse Introduction expansion did not raise fabrication.",
+        ),
+        ...assertEqual(
+          minimalResult?.status,
+          "passed",
+          "Minimal sparse Introduction sourceCore did not pass grounding.",
+        ),
+      ];
     },
   };
 }
@@ -133,7 +476,9 @@ function createDenyServiceRegressionCase(): EvalCase {
         result?.issues.some(
           (issue) =>
             issue.type === "grounding-fabrication" &&
-            /icmp|syn|udp|slowloris|http/i.test(issue.offendingText ?? ""),
+            issue.offendingText?.some((token) =>
+              /icmp|syn|udp|slowloris|http/i.test(token),
+            ),
         ),
         true,
         "Methods to Deny Service unsupported flood specifics did not raise fabrication.",
@@ -144,34 +489,21 @@ function createDenyServiceRegressionCase(): EvalCase {
 
 function createFaithfulSectionsCase(): EvalCase {
   return {
-    name: "IT Security faithful sections pass grounding cleanly",
+    name: "Faithful extraction passes grounding cleanly",
     run: async () => {
-      const definition = await createItSecurityContext("Definition of Terms");
-      const impact = await createItSecurityContext("Impact of a Security Breach");
-      const definitionText = extractSourceSectionText(
-        definition.source,
-        definition.sourceSection,
+      const sourceText =
+        "Cybersecurity protects networked systems and data from unauthorized use or harm";
+      const context = createSyntheticContext("Cybersecurity", sourceText);
+      const output = createOutput(
+        context.section,
+        sourceText,
+        [sourceText],
       );
-      const impactText = extractSourceSectionText(impact.source, impact.sourceSection);
-      const definitionOutput = createOutput(
-        definition.section,
-        definitionText,
-        [definitionText],
-      );
-      const impactOutput = createOutput(impact.section, impactText, [impactText]);
-      const plan: GenerationPlan = {
-        ...definition.plan,
-        sections: [definition.section, { ...impact.section, order: 1 }],
-        metadata: {
-          ...definition.plan.metadata,
-          sectionCount: 2,
-        },
-      };
       const report = validateGrounding({
-        plan,
-        outputs: [definitionOutput, impactOutput],
-        source: definition.source,
-        outline: definition.outline,
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
       });
       const issues: EvalIssue[] = [];
 
@@ -193,6 +525,96 @@ function createFaithfulSectionsCase(): EvalCase {
       return issues;
     },
   };
+}
+
+function createSyntheticContext(
+  title: string,
+  sourceText: string,
+): {
+  readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
+  readonly sourceSection: SourceOutlineSection;
+  readonly section: PlannedSection;
+  readonly plan: GenerationPlan;
+} {
+  const key = normalizeTopicKey(title) || "section";
+  const blockId = `block-${key}`;
+  const source: NormalizedSource = {
+    id: `source-${key}`,
+    title,
+    kind: "plain-text",
+    language: "en",
+    metadata: {},
+    blocks: [
+      {
+        id: blockId,
+        kind: "paragraph",
+        text: sourceText,
+        order: 0,
+      },
+    ],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const sourceSection: SourceOutlineSection = {
+    id: `source-section-${key}`,
+    title,
+    order: 0,
+    startOffset: 0,
+    endOffset: sourceText.length,
+    tokenWeight: Math.max(1, sourceText.split(/\s+/).length),
+    sourceBlockIds: [blockId],
+    blockIds: [blockId],
+    roughStartBlockId: blockId,
+    roughEndBlockId: blockId,
+    tags: ["concept"],
+    confidence: 1,
+  };
+  const outline: SourceOutline = {
+    id: `outline-${key}`,
+    sourceId: source.id,
+    title,
+    sections: [sourceSection],
+  };
+  const section = createPlannedSection(sourceSection, 0);
+  const plan: GenerationPlan = {
+    id: `plan-${key}`,
+    sourceId: source.id,
+    outlineId: outline.id,
+    title,
+    sections: [section],
+    metadata: {
+      sectionCount: 1,
+      sourceBlockCount: 1,
+    },
+  };
+
+  return { source, outline, sourceSection, section, plan };
+}
+
+function numberedListSource(
+  title: string,
+  items: readonly string[],
+): string {
+  return `${title}: ${items
+    .map((item, index) => `${index + 1}. ${item}`)
+    .join(" ")}`;
+}
+
+function bulletListSource(title: string, items: readonly string[]): string {
+  return `${title} ${items.map((item) => `\u2022 ${item}`).join(" ")}`;
+}
+
+function hasUnsupportedToken(
+  result: SectionGroundingResult | undefined,
+  pattern: RegExp,
+): boolean {
+  return (
+    result?.issues.some(
+      (issue) =>
+        issue.type === "grounding-fabrication" &&
+        issue.offendingText?.some((token) => pattern.test(token)),
+    ) ?? false
+  );
 }
 
 async function createItSecurityContext(title: string): Promise<{

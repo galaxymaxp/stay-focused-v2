@@ -520,3 +520,11 @@ Current route status:
 - `/api/health` — intentionally public ✅
 
 ---
+
+### 2026-06-19 Stage 5a grounding fix — Phase 1 (deterministic floor)
+- Changed: `packages/engine/src/stage3-generate.ts`, `packages/engine/src/stage4-verify.ts`, `packages/engine/src/stage5-retry.ts`, `packages/engine/src/stage5a-grounding.ts`, `packages/engine/src/types.ts`, `packages/engine/evals/stage5a-grounding.eval.ts`, `packages/engine/evals/pipeline.eval.ts`, `packages/engine/evals/stage6-assemble.eval.ts`, `packages/engine/scripts/live-run.ts`, `docs/ai/handoff.md`
+- Root cause: token-presence fabrication check flagged glue words (false-positive storm); real omissions/drift were buried. The comparison span is clean UTF-8; corruption was limited to PowerShell live-log capture.
+- Phase 1 fix: extraction-first sourceCore; stopword-aware content-token check; LIST_COVERAGE_THRESHOLD omission gate; no encoding normalization needed. NO LLM judge.
+- Verification: typecheck PASS; build PASS; eval PASS (202/202); eval:stage5a PASS (12/12); phase1FabricationFails=unavailable (OPENAI_API_KEY unset)
+- Next: Phase 2 — entailment judge for the N flagged claims (sized from a future live run); Phase 3 — specific-reason retry + judge cap.
+- Risks: Phase 1 flags faithful synonym paraphrase as fabrication by design; mitigated by extraction-first generator until Phase 2.

@@ -454,6 +454,7 @@ function createProviderOutput(
   const title = readPromptValue(request.prompt, "Section title: ");
   const sourceBlockIds = readSourceBlockIds(request.prompt);
   const sourceCoreText = readSourceCoreText(request.prompt);
+  const sourceCoreKeyPoints = extractSourceCoreKeyPoints(sourceCoreText);
   const base = {
     id: `fake-output-${plannedSectionId}-${weak ? "weak" : "passed"}`,
     plannedSectionId,
@@ -467,8 +468,8 @@ function createProviderOutput(
         ...base,
         kind: "concept-card",
         sourceCore: {
-          explanation: weak ? "Brief." : sourceCoreText,
-          keyPoints: [sourceCoreText],
+          explanation: weak ? "The." : sourceCoreText,
+          keyPoints: sourceCoreKeyPoints,
         },
       };
     case "process-step":
@@ -476,8 +477,8 @@ function createProviderOutput(
         ...base,
         kind: "process-step",
         sourceCore: {
-          explanation: weak ? "Brief." : sourceCoreText,
-          keyPoints: [sourceCoreText],
+          explanation: weak ? "The." : sourceCoreText,
+          keyPoints: sourceCoreKeyPoints,
         },
       };
     case "example-card":
@@ -485,8 +486,8 @@ function createProviderOutput(
         ...base,
         kind: "example-card",
         sourceCore: {
-          explanation: weak ? "Brief." : sourceCoreText,
-          keyPoints: [sourceCoreText],
+          explanation: weak ? "The." : sourceCoreText,
+          keyPoints: sourceCoreKeyPoints,
         },
       };
     case "claim-card":
@@ -494,8 +495,8 @@ function createProviderOutput(
         ...base,
         kind: "claim-card",
         sourceCore: {
-          explanation: weak ? "Brief." : sourceCoreText,
-          keyPoints: [sourceCoreText],
+          explanation: weak ? "The." : sourceCoreText,
+          keyPoints: sourceCoreKeyPoints,
         },
       };
   }
@@ -567,6 +568,30 @@ function readSourceCoreText(prompt: string): string {
   }
 
   return text;
+}
+
+function extractSourceCoreKeyPoints(sourceText: string): readonly string[] {
+  const markerPattern =
+    /(?:^|\s)(?:[-*]\s+|\u2022\s+|\d{1,2}[.)]\s*|[a-z]\)\s*)/gi;
+  const markerMatches = [...sourceText.matchAll(markerPattern)];
+  if (markerMatches.length < 2) {
+    return [sourceText];
+  }
+
+  return markerMatches.flatMap((match, index) => {
+    if (match.index === undefined) {
+      return [];
+    }
+    const nextMatch = markerMatches[index + 1];
+    const start = match.index + match[0].length;
+    const end = nextMatch?.index ?? sourceText.length;
+    const item = sourceText
+      .slice(start, end)
+      .replace(/\s+/g, " ")
+      .replace(/^[.:;,\s]+/, "")
+      .trim();
+    return item.length > 0 ? [item] : [];
+  });
 }
 
 if (isDirectExecution(import.meta.url)) {
