@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { normalizeSource } from "../src/stage0-normalize.js";
 import { detectOutline, flattenSourceBlocks } from "../src/stage1-outline.js";
+import { extractCleanSourceItems } from "../src/source-items.js";
 import { validateGrounding } from "../src/stage5a-grounding.js";
 import type {
   GenerationPlan,
@@ -26,6 +27,8 @@ import type { EvalCase, EvalIssue, EvalSuite } from "./types.js";
 export const stage5aGroundingSuite: EvalSuite = {
   name: "Stage 5a grounding validation",
   cases: [
+    createRepeatedHeadingSuffixCleanupCase(),
+    createCleanedFusedItemGroundingCase(),
     createLooseConnectivePhase1Case(),
     createInventedEndpointDescriptionCase(),
     createVerbatimListAdherenceCase(),
@@ -42,6 +45,101 @@ export const stage5aGroundingSuite: EvalSuite = {
     createFaithfulSectionsCase(),
   ],
 };
+
+function createRepeatedHeadingSuffixCleanupCase(): EvalCase {
+  return {
+    name: "source item cleanup removes repeated heading suffixes",
+    run: async () => [
+      ...assertDeepEqual(
+        extractCleanSourceItems({
+          sourceSpanText:
+            "Types of Malware • Spyware • Scareware Types of Malware",
+          sectionTitle: "Types of Malware",
+        }).map((item) => item.text),
+        ["Spyware", "Scareware"],
+        "Malware heading suffix was not removed from the final item.",
+      ),
+      ...assertDeepEqual(
+        extractCleanSourceItems({
+          sourceSpanText:
+            "Symptoms of Malware • Browser redirection • Files are deleted Symptoms of Malware",
+          sectionTitle: "Symptoms of Malware",
+        }).map((item) => item.text),
+        ["Browser redirection", "Files are deleted"],
+        "Symptoms heading suffix was not removed from the final item.",
+      ),
+      ...assertDeepEqual(
+        extractCleanSourceItems({
+          sourceSpanText:
+            "Methods to Deny Service • Zombie – Infected Host • Botnet – Network of Infected Hosts Methods to Deny Service",
+          sectionTitle: "Methods to Deny Service",
+        }).map((item) => item.text),
+        [
+          "Zombie – Infected Host",
+          "Botnet – Network of Infected Hosts",
+        ],
+        "Service-denial heading suffix was not removed from the final item.",
+      ),
+      ...assertDeepEqual(
+        extractCleanSourceItems({
+          sourceSpanText:
+            "Importance of cybersecurity • Critical services can be disrupted Importance of cybersecurity Importance of cybersecurity • Rising costs",
+          sectionTitle: "Importance of cybersecurity",
+        }).map((item) => item.text),
+        ["Critical services can be disrupted", "Rising costs"],
+        "Multiple repeated heading suffixes were not removed.",
+      ),
+    ],
+  };
+}
+
+function createCleanedFusedItemGroundingCase(): EvalCase {
+  return {
+    name: "cleaned fused list item passes grounding with empty explanation",
+    run: async () => {
+      const sourceText =
+        "Types of Malware • Spyware • Scareware Types of Malware";
+      const context = createSyntheticContext("Types of Malware", sourceText);
+      const output = createOutput(
+        context.section,
+        "",
+        ["Spyware", "Scareware"],
+      );
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+      const result = report.sections[0];
+
+      return [
+        ...assertEqual(
+          result?.status,
+          "passed",
+          "Cleaned fused list item did not pass grounding.",
+        ),
+        ...assertEqual(
+          result?.sourceItemCount,
+          2,
+          "Cleaned fused list item count was incorrect.",
+        ),
+        ...assertEqual(
+          result?.representedSourceItemCount,
+          2,
+          "Cleaned fused list item was not represented.",
+        ),
+        ...assertEqual(
+          result?.issues.some(
+            (issue) => issue.type === "grounding-fabrication",
+          ),
+          false,
+          "Empty explanation was incorrectly treated as fabrication.",
+        ),
+      ];
+    },
+  };
+}
 
 function createVerbatimListAdherenceCase(): EvalCase {
   return {
@@ -791,6 +889,7 @@ function createOutput(
       explanation,
       keyPoints,
     },
+    enrichment: null,
   };
 }
 

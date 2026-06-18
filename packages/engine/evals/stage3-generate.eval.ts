@@ -10,10 +10,21 @@ import type {
   GenerationProvider,
   GenerationRequest,
 } from "../src/provider.js";
-import { detectInstructionLeakage } from "../src/leakage-guard.js";
+import {
+  DEFAULT_FORBIDDEN_INSTRUCTION_PATTERNS,
+  detectInstructionLeakage,
+} from "../src/leakage-guard.js";
+import {
+  claimCardSchema,
+  conceptCardSchema,
+  exampleCardSchema,
+  processStepSchema,
+  type StructuredOutputSchema,
+} from "../src/schemas.js";
 import {
   generateSection,
   type GenerateSectionArgs,
+  validateSectionOutput,
 } from "../src/stage3-generate.js";
 import type {
   GenerationPlan,
@@ -113,12 +124,23 @@ const requestCases = (requestFixtures as FixtureFile<Stage3RequestFixture>)
 const validationCases = (
   validationFixtures as FixtureFile<Stage3ValidationFixture>
 ).cases;
+const structuredOutputSchemas = [
+  conceptCardSchema,
+  processStepSchema,
+  exampleCardSchema,
+  claimCardSchema,
+] as const;
 
 export const stage3GenerateSuite: EvalSuite = {
   name: "Stage 3 generation request",
   cases: [
+    ...structuredOutputSchemas.map(createSchemaCompatibilityCase),
     ...basicCases.map(createBasicCase),
     ...requestCases.map(createRequestCase),
+    createSparseSourceGuardCase(),
+    createDeterministicListCoreCase(),
+    createPromptDenylistCase(),
+    createPromptFixtureNeutralityCase(),
     createMetaExplanationLeakageCase(),
     createEmptyListExplanationCase(),
     ...validationCases.map(createValidationCase),
@@ -175,11 +197,18 @@ function createEmptyListExplanationCase(): EvalCase {
         },
       } satisfies SectionOutput;
 
-      return assertDeepEqual(
-        detectInstructionLeakage(output),
-        { ok: true },
-        "Empty list-only explanation was incorrectly flagged as leakage.",
-      );
+      return [
+        ...assertDeepEqual(
+          detectInstructionLeakage(output),
+          { ok: true },
+          "Empty list-only explanation was incorrectly flagged as leakage.",
+        ),
+        ...assertDeepEqual(
+          validateSectionOutput(output, context.section),
+          output,
+          "Stage 3 output validation rejected an empty required explanation.",
+        ),
+      ];
     },
   };
 }
@@ -193,6 +222,113 @@ export async function runStage3GenerateEvals(): Promise<boolean> {
 
 if (isDirectExecution(import.meta.url)) {
   await runStage3GenerateEvals();
+}
+
+function createSchemaCompatibilityCase(
+  schema: StructuredOutputSchema,
+): EvalCase {
+  return {
+    name: `${schema.name} schema is OpenAI strict-compatible`,
+    run: async () => assertOpenAISchemaCompatibility(schema),
+  };
+}
+
+function assertOpenAISchemaCompatibility(
+  schema: StructuredOutputSchema,
+): readonly EvalIssue[] {
+  const issues: EvalIssue[] = [];
+
+  for (const property of ["sourceCore", "enrichment"]) {
+    issues.push(
+      ...assertEqual(
+        Object.prototype.hasOwnProperty.call(schema.schema.properties, property),
+        true,
+        `${schema.name} schema must include ${property}.`,
+      ),
+    );
+  }
+
+  walkStrictSchemaObjects(schema.schema, schema.name, issues);
+  const sourceCore = schema.schema.properties["sourceCore"];
+  const explanation =
+    isRecord(sourceCore) && isRecord(sourceCore["properties"])
+      ? sourceCore["properties"]["explanation"]
+      : undefined;
+  issues.push(
+    ...assertEqual(
+      isRecord(explanation) &&
+        Object.prototype.hasOwnProperty.call(explanation, "minLength"),
+      false,
+      `${schema.name} explanation must remain required while permitting an empty string.`,
+    ),
+  );
+  return issues;
+}
+
+function walkStrictSchemaObjects(
+  node: unknown,
+  path: string,
+  issues: EvalIssue[],
+): void {
+  if (!isRecord(node)) {
+    return;
+  }
+
+  const properties = node["properties"];
+  if (properties !== undefined) {
+    if (!isRecord(properties)) {
+      issues.push({
+        message: `${path} properties must be an object.`,
+        actual: properties,
+      });
+    } else {
+      issues.push(
+        ...assertEqual(
+          node["additionalProperties"],
+          false,
+          `${path} must reject additional properties.`,
+        ),
+      );
+
+      const propertyKeys = Object.keys(properties);
+      const required = node["required"];
+      if (!Array.isArray(required)) {
+        issues.push({
+          message: `${path} required must be an array including every property.`,
+          actual: required,
+        });
+      } else {
+        const requiredKeys = required.filter(
+          (entry): entry is string => typeof entry === "string",
+        );
+        issues.push(
+          ...assertDeepEqual(
+            [...requiredKeys].sort(),
+            [...propertyKeys].sort(),
+            `${path} required fields must exactly match properties.`,
+          ),
+        );
+      }
+
+      for (const [key, value] of Object.entries(properties)) {
+        walkStrictSchemaObjects(value, `${path}.properties.${key}`, issues);
+      }
+    }
+  }
+
+  const items = node["items"];
+  if (items !== undefined) {
+    walkStrictSchemaObjects(items, `${path}.items`, issues);
+  }
+
+  for (const unionKey of ["anyOf", "oneOf", "allOf"]) {
+    const unionValue = node[unionKey];
+    if (Array.isArray(unionValue)) {
+      unionValue.forEach((entry, index) =>
+        walkStrictSchemaObjects(entry, `${path}.${unionKey}[${index}]`, issues),
+      );
+    }
+  }
 }
 
 function createBasicCase(fixture: Stage3BasicFixture): EvalCase {
@@ -313,6 +449,307 @@ function createRequestCase(fixture: Stage3RequestFixture): EvalCase {
       return issues;
     },
   };
+}
+
+function createDeterministicListCoreCase(): EvalCase {
+  return {
+    name: "detected passage items deterministically replace list-heavy sourceCore",
+    run: async () => {
+      const blockId = "fruit-list-block";
+      const preamble = "Repeated preamble";
+      const sourceText = "Example Fruit List • Apple • Banana • Cherry";
+      const sourceStartOffset = preamble.length + 2;
+      const source: NormalizedSource = {
+        id: "fruit-list-source",
+        title: "Example Fruit List",
+        kind: "plain-text",
+        language: "en",
+        metadata: {},
+        blocks: [
+          {
+            id: "fruit-preamble-a",
+            kind: "paragraph",
+            text: preamble,
+            order: 0,
+          },
+          {
+            id: "fruit-preamble-b",
+            kind: "paragraph",
+            text: preamble,
+            order: 1,
+          },
+          {
+            id: blockId,
+            kind: "paragraph",
+            text: sourceText,
+            order: 2,
+          },
+        ],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      };
+      const section: PlannedSection = {
+        id: "fruit-list-section",
+        sourceSectionId: "fruit-list-outline-section",
+        title: "Example Fruit List",
+        order: 0,
+        schemaKind: "concept-card",
+        target: {
+          objective: "Retain the listed fruit names.",
+          itemCount: 3,
+          focus: "Fruit names",
+          requiredSourceBlockIds: [blockId],
+          expectedTags: ["concept"],
+          coverageRules: ["Preserve every listed entry."],
+        },
+        sourceBlockIds: [blockId],
+        tokenWeight: 8,
+        targetItemCount: 3,
+        sourceStartOffset,
+        sourceEndOffset: sourceStartOffset + sourceText.length,
+      };
+      const plan: GenerationPlan = {
+        id: "fruit-list-plan",
+        sourceId: source.id,
+        outlineId: "fruit-list-outline",
+        title: source.title,
+        sections: [section],
+        metadata: { sectionCount: 1, sourceBlockCount: 3 },
+      };
+      const provider = new FakeGenerationProvider({
+        kind: "concept-card",
+        id: "fruit-list-output",
+        plannedSectionId: section.id,
+        title: section.title,
+        sourceBlockIds: [blockId],
+        sourceCore: {
+          explanation: "This card summarizes several kinds of fruit.",
+          keyPoints: ["Several fruits are listed."],
+        },
+        enrichment: {
+          note: "Optional note",
+          points: ["Target: Additional context"],
+        },
+      });
+
+      const output = await generateSection({ section, plan, source, provider });
+      const request = provider.requests[0];
+      const issues: EvalIssue[] = [
+        ...assertDeepEqual(
+          output.sourceCore,
+          {
+            explanation: "",
+            keyPoints: ["Apple", "Banana", "Cherry"],
+          },
+          "Detected list items did not replace provider-authored sourceCore.",
+        ),
+        ...assertDeepEqual(
+          output.enrichment,
+          {
+            note: "Optional note",
+            points: ["Target — Additional context"],
+          },
+          "Deterministic list enforcement did not safely preserve enrichment.",
+        ),
+      ];
+
+      if (!request) {
+        return [{ message: "Fake provider did not receive a list request." }];
+      }
+
+      issues.push(
+        ...assertIncludes(
+          request.prompt,
+          "DETECTED PASSAGE ITEMS:",
+          "List request omitted the detected-items block.",
+        ),
+        ...assertIncludes(
+          request.prompt,
+          "1. Apple\n2. Banana\n3. Cherry",
+          "List request did not preserve detected item order.",
+        ),
+      );
+      return issues;
+    },
+  };
+}
+
+function createPromptDenylistCase(): EvalCase {
+  return {
+    name: "Stage 3 prompt avoids instruction-leakage denylist phrases",
+    run: async () => {
+      const context = createContext("concept-card");
+      const provider = new FakeGenerationProvider(
+        createValidOutput("concept-card", context.section),
+      );
+      await generateSection({
+        ...context,
+        provider,
+        retryGuidance: DEFAULT_FORBIDDEN_INSTRUCTION_PATTERNS,
+      });
+      const prompt = provider.requests[0]?.prompt;
+      if (!prompt) {
+        return [{ message: "Fake provider did not receive a prompt." }];
+      }
+
+      const normalizedPrompt = normalizePromptText(prompt);
+      return DEFAULT_FORBIDDEN_INSTRUCTION_PATTERNS.flatMap((pattern) =>
+        assertEqual(
+          normalizedPrompt.includes(normalizePromptText(pattern)),
+          false,
+          `Stage 3 prompt contains denylisted phrase "${pattern}".`,
+        ),
+      );
+    },
+  };
+}
+
+function createPromptFixtureNeutralityCase(): EvalCase {
+  return {
+    name: "Stage 3 static prompt contains no real IT fixture terms",
+    run: async () => {
+      const context = createContext("concept-card");
+      const provider = new FakeGenerationProvider(
+        createValidOutput("concept-card", context.section),
+      );
+      await generateSection({ ...context, provider });
+      const prompt = provider.requests[0]?.prompt;
+      if (!prompt) {
+        return [{ message: "Fake provider did not receive a prompt." }];
+      }
+
+      const fixtureTerms = [
+        "Methods to Deny Service",
+        "Blended Attacks",
+        "Impact Reduction",
+        "Types of Malware",
+        "Domains of IT Security",
+        "Endpoint Security",
+        "DDoS",
+        "Malware",
+      ];
+      return fixtureTerms.flatMap((term) =>
+        assertEqual(
+          prompt.toLowerCase().includes(term.toLowerCase()),
+          false,
+          `Stage 3 static prompt contains real fixture term "${term}".`,
+        ),
+      );
+    },
+  };
+}
+
+function createSparseSourceGuardCase(): EvalCase {
+  return {
+    name: "sparse IT Security Introduction sourceCore stays literal",
+    run: async () => {
+      const sourceText = "Intro to IT Security Module 1";
+      const blockId = "live-it-security-block-16nqjjw";
+      const sectionId = "live-it-security-section-hicgc7-planned-1jv6nax";
+      const source: NormalizedSource = {
+        id: "live-it-security",
+        title: "IT Security",
+        kind: "plain-text",
+        language: "en",
+        metadata: {},
+        blocks: [
+          {
+            id: blockId,
+            kind: "paragraph",
+            text: `${sourceText} What is IT Security`,
+            order: 0,
+          },
+        ],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      };
+      const section: PlannedSection = {
+        id: sectionId,
+        sourceSectionId: "live-it-security-section-hicgc7",
+        title: "Introduction",
+        order: 0,
+        schemaKind: "concept-card",
+        target: {
+          objective: 'Explain "Introduction" concisely with its key points.',
+          itemCount: 1,
+          focus: "Introduction",
+          requiredSourceBlockIds: [blockId],
+          expectedTags: ["concept"],
+          coverageRules: ["Represent only the source section."],
+        },
+        sourceBlockIds: [blockId],
+        tokenWeight: 6,
+        targetItemCount: 1,
+        sourceStartOffset: 0,
+        sourceEndOffset: sourceText.length,
+      };
+      const plan: GenerationPlan = {
+        id: "plan-it-security-sparse-introduction",
+        sourceId: source.id,
+        outlineId: "outline-it-security",
+        title: source.title,
+        sections: [section],
+        metadata: { sectionCount: 1, sourceBlockCount: 1 },
+      };
+      const provider = new FakeGenerationProvider({
+        kind: "concept-card",
+        id: "generic-introduction",
+        plannedSectionId: section.id,
+        title: section.title,
+        sourceBlockIds: [blockId],
+        sourceCore: {
+          explanation:
+            "The Introduction to IT Security explains how organizations protect data and systems from threats.",
+          keyPoints: [
+            "IT Security Overview: safeguards systems from unauthorized access.",
+            "Risk Assessment: identifies potential risks to IT systems.",
+          ],
+        },
+        enrichment: {
+          note: "Extra context",
+          points: ["Generic IT security context."],
+        },
+      });
+      const output = await generateSection({ section, plan, source, provider });
+      const request = provider.requests[0];
+      const issues: EvalIssue[] = [
+        ...assertDeepEqual(
+          output.sourceCore,
+          {
+            explanation: sourceText,
+            keyPoints: [sourceText],
+          },
+          "Sparse sourceCore was not clamped to the exact source span.",
+        ),
+        ...assertEqual(
+          output.enrichment,
+          null,
+          "Sparse source output should not retain generic enrichment.",
+        ),
+      ];
+
+      if (!request) {
+        return [{ message: "Fake provider did not receive a sparse request." }];
+      }
+
+      issues.push(
+        ...assertIncludes(
+          request.prompt,
+          "Sparse passage:",
+          "Sparse request did not include sparse-source prompt guidance.",
+        ),
+        ...assertIncludes(
+          request.prompt,
+          `- Exact text: ${sourceText}`,
+          "Sparse request did not include the exact source text.",
+        ),
+      );
+
+      return issues;
+    },
+  };
+}
+
+function normalizePromptText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function createValidationCase(fixture: Stage3ValidationFixture): EvalCase {
@@ -485,6 +922,7 @@ function createValidOutput(
     plannedSectionId: section.id,
     title: section.title,
     sourceBlockIds: [...section.sourceBlockIds],
+    enrichment: null,
   };
 
   switch (schemaKind) {
@@ -543,4 +981,8 @@ function omitField(
   return Object.fromEntries(
     Object.entries(value).filter(([key]) => key !== field),
   );
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

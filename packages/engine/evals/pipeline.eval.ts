@@ -601,7 +601,7 @@ function createProviderOutput(
     "plannedSectionId",
   );
   const schemaKind = readSchemaKind(request.metadata?.schemaKind);
-  const title = readPromptValue(request.prompt, "Section title: ");
+  const title = readPromptValue(request.prompt, "Topic heading — ");
   const sourceBlockIds = readSourceBlockIds(request.prompt);
   const sourceCoreText = readSourceCoreText(request.prompt);
   const sourceCoreKeyPoints = extractSourceCoreKeyPoints(sourceCoreText);
@@ -610,6 +610,7 @@ function createProviderOutput(
     plannedSectionId,
     title,
     sourceBlockIds,
+    enrichment: null,
   };
 
   switch (schemaKind) {
@@ -694,7 +695,7 @@ function readPromptValue(prompt: string, prefix: string): string {
 }
 
 function readSourceBlockIds(prompt: string): readonly string[] {
-  const value = readPromptValue(prompt, "- Set sourceBlockIds to: ");
+  const value = readPromptValue(prompt, "- sourceBlockIds value — ");
   const withoutPeriod = value.endsWith(".") ? value.slice(0, -1) : value;
   const ids = withoutPeriod.split(", ").filter((entry) => entry.length > 0);
   if (ids.length === 0) {
@@ -704,17 +705,18 @@ function readSourceBlockIds(prompt: string): readonly string[] {
 }
 
 function readSourceCoreText(prompt: string): string {
-  const [, afterSourceExcerpt] = prompt.split("Source excerpt:\n");
-  const [sourceExcerpt] = (afterSourceExcerpt ?? "").split("\nInstructions:");
-  const text = sourceExcerpt
+  const [, afterPassage] = prompt.split("PASSAGE:\n");
+  const [beforeRequirements] = (afterPassage ?? "").split("\nRequirements:");
+  const [passage] = beforeRequirements.split("\nDETECTED PASSAGE ITEMS:");
+  const text = passage
     .split("\n")
-    .filter((line) => !line.trim().startsWith("[Source block "))
+    .filter((line) => !line.trim().startsWith("[Passage block "))
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
 
   if (text.length === 0) {
-    throw new Error("Fake provider prompt is missing source excerpt text.");
+    throw new Error("Fake provider prompt is missing passage text.");
   }
 
   return text;

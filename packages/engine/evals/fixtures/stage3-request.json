@@ -34,12 +34,12 @@
       "expectTemperature": 0.25
     },
     {
-      "name": "prompt contains only planned source excerpt",
+      "name": "prompt contains only planned passage",
       "schemaKind": "concept-card",
       "expectPromptContains": [
         "Included source alpha.",
         "Included source beta.",
-        "Populate sourceCore.explanation and sourceCore.keyPoints using ONLY the provided source excerpt for this section.",
+        "Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
         "Put optional examples, outside knowledge, and clarifying context only in enrichment."
       ],
       "expectPromptExcludes": ["Excluded unrelated omega.", "Stay Focused V2 engine"],
@@ -58,14 +58,14 @@
       }
     },
     {
-      "name": "prompt includes target and schema instructions",
+      "name": "prompt includes learning goal and output requirements",
       "schemaKind": "process-step",
       "expectPromptContains": [
-        "Section title: Study Section",
-        "Schema kind: process-step",
-        "Target:",
+        "Topic heading — Study Section",
+        "Card shape — process-step",
+        "Learning goal:",
         "Do not include project, repository, internal architecture, pipeline, engine, or Stay Focused references in any output field.",
-        "Return structured output matching the provided schema exactly."
+        "Return JSON conforming to the supplied object format."
       ]
     }
   ]
