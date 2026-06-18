@@ -1,6 +1,9 @@
 import type { GenerationProvider } from "./provider";
 import { validateLeakage } from "./leakage-guard.js";
-import { generateSection } from "./stage3-generate.js";
+import {
+  generateSection,
+  SectionValidationError,
+} from "./stage3-generate.js";
 import { verifyCoverage } from "./stage4-verify.js";
 import { validateGrounding } from "./stage5a-grounding.js";
 import type {
@@ -32,6 +35,10 @@ export interface RetryFailedSectionsArgs {
   readonly model?: string;
   readonly temperature?: number;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly onValidationFailure?: (
+    section: PlannedSection,
+    error: SectionValidationError,
+  ) => void;
 }
 
 export const defaultRetryPolicy: RetryPolicy = {
@@ -102,8 +109,12 @@ export async function retryFailedSections(
             retryAttempt: attempt,
           },
         });
-      } catch {
-        continue;
+      } catch (error) {
+        if (error instanceof SectionValidationError) {
+          args.onValidationFailure?.(section, error);
+          continue;
+        }
+        throw error;
       }
 
       currentOutputs.set(section.id, generated);

@@ -20,6 +20,32 @@ export interface GenerateSectionArgs {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+export type SectionValidationFailureReason =
+  | "output-validation"
+  | "instruction-leakage";
+
+export class SectionValidationError extends Error {
+  public readonly sectionId: string;
+  public readonly stage = "stage3" as const;
+  public readonly reason: SectionValidationFailureReason;
+  public readonly issues: readonly string[];
+
+  public constructor(args: {
+    readonly sectionId: string;
+    readonly detail: string;
+    readonly reason?: SectionValidationFailureReason;
+    readonly issues?: readonly string[];
+  }) {
+    super(
+      `Stage 3 output validation failed for section "${args.sectionId}": ${args.detail}.`,
+    );
+    this.name = "SectionValidationError";
+    this.sectionId = args.sectionId;
+    this.reason = args.reason ?? "output-validation";
+    this.issues = args.issues ?? [args.detail];
+  }
+}
+
 export async function generateSection(
   args: GenerateSectionArgs,
 ): Promise<SectionOutput> {
@@ -235,6 +261,11 @@ export function validateSectionOutput(
     throw outputValidationError(
       section.id,
       `user-facing fields contain leaked instruction wording: ${leakageResult.fields.join(", ")}`,
+      "instruction-leakage",
+      leakageResult.findings.map(
+        (finding) =>
+          `${finding.fieldPath} matched forbidden pattern "${finding.forbiddenPattern}"`,
+      ),
     );
   }
 
@@ -347,10 +378,18 @@ function readRequiredStringArray(
   return fieldValue;
 }
 
-function outputValidationError(sectionId: string, detail: string): Error {
-  return new Error(
-    `Stage 3 output validation failed for section "${sectionId}": ${detail}.`,
-  );
+function outputValidationError(
+  sectionId: string,
+  detail: string,
+  reason: SectionValidationFailureReason = "output-validation",
+  issues: readonly string[] = [detail],
+): SectionValidationError {
+  return new SectionValidationError({
+    sectionId,
+    detail,
+    reason,
+    issues,
+  });
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
