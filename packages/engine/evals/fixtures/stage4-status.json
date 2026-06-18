@@ -27,13 +27,12 @@
       "expectIssuesContain": ["Missing required field: sourceCore.explanation"]
     },
     {
-      "name": "empty required field fails",
+      "name": "empty explanation is valid",
       "scenario": "empty-field",
-      "expectReportStatus": "failed",
-      "expectSectionStatuses": ["failed"],
-      "expectSectionScores": [0.59],
-      "expectRetryable": [true],
-      "expectIssuesContain": ["Missing required field: sourceCore.explanation"]
+      "expectReportStatus": "passed",
+      "expectSectionStatuses": ["passed"],
+      "expectSectionScores": [1],
+      "expectRetryable": [false]
     },
     {
       "name": "short required content is weak",

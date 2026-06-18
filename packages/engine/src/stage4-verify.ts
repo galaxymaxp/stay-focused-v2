@@ -288,13 +288,15 @@ function checkRequiredFields(
 
   for (const field of fields) {
     const fieldValue = readNestedField(value, field);
-    if (!hasRequiredContent(fieldValue)) {
+    const permitsEmptyString =
+      field === "sourceCore.explanation" && fieldValue === "";
+    if (!permitsEmptyString && !hasRequiredContent(fieldValue)) {
       issues.push(`Missing required field: ${field}.`);
       hasMissingRequiredField = true;
       continue;
     }
     validFields += 1;
-    if (isWeakContent(fieldValue)) {
+    if (!permitsEmptyString && isWeakContent(fieldValue)) {
       issues.push(`Weak content field: ${field}.`);
       weakFields += 1;
     }

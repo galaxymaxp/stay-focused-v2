@@ -11,6 +11,15 @@ export interface StructuredOutputSchema {
   };
 }
 
+const baseRequired = [
+  "id",
+  "plannedSectionId",
+  "title",
+  "sourceBlockIds",
+  "sourceCore",
+  "enrichment",
+] as const;
+
 const baseProperties = {
   id: { type: "string", minLength: 1 },
   plannedSectionId: { type: "string", minLength: 1 },
@@ -25,7 +34,7 @@ const baseProperties = {
     additionalProperties: false,
     required: ["explanation", "keyPoints"],
     properties: {
-      explanation: { type: "string", minLength: 1 },
+      explanation: { type: "string" },
       keyPoints: {
         type: "array",
         minItems: 1,
@@ -34,9 +43,9 @@ const baseProperties = {
     },
   },
   enrichment: {
-    type: "object",
+    type: ["object", "null"],
     additionalProperties: false,
-    required: [],
+    required: ["note", "points"],
     properties: {
       note: { type: "string", minLength: 1 },
       points: {
@@ -54,14 +63,7 @@ export const conceptCardSchema: StructuredOutputSchema = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: [
-      "kind",
-      "id",
-      "plannedSectionId",
-      "title",
-      "sourceCore",
-      "sourceBlockIds",
-    ],
+    required: ["kind", ...baseRequired],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "concept-card" },
@@ -75,14 +77,7 @@ export const processStepSchema: StructuredOutputSchema = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: [
-      "kind",
-      "id",
-      "plannedSectionId",
-      "title",
-      "sourceCore",
-      "sourceBlockIds",
-    ],
+    required: ["kind", ...baseRequired],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "process-step" },
@@ -96,14 +91,7 @@ export const exampleCardSchema: StructuredOutputSchema = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: [
-      "kind",
-      "id",
-      "plannedSectionId",
-      "title",
-      "sourceCore",
-      "sourceBlockIds",
-    ],
+    required: ["kind", ...baseRequired],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "example-card" },
@@ -117,14 +105,7 @@ export const claimCardSchema: StructuredOutputSchema = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: [
-      "kind",
-      "id",
-      "plannedSectionId",
-      "title",
-      "sourceCore",
-      "sourceBlockIds",
-    ],
+    required: ["kind", ...baseRequired],
     properties: {
       ...baseProperties,
       kind: { type: "string", const: "claim-card" },
