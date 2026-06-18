@@ -1,5 +1,10 @@
 import { GROUNDING_THRESHOLD } from "@stay-focused/shared";
 
+import {
+  extractCleanSourceItems,
+  type SourceItem,
+} from "./source-items.js";
+import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import { normalizeCoverageTitleKey } from "./stage4-verify.js";
 import type {
@@ -39,10 +44,6 @@ interface TermOccurrence {
   readonly text: string;
   readonly canonical: string;
   readonly index: number;
-}
-
-interface SourceItem {
-  readonly text: string;
 }
 
 interface ClaimFabricationFailure extends Phase1FabricationFailure {
@@ -105,8 +106,6 @@ const STOPWORDS = new Set([
 
 const LIST_COVERAGE_THRESHOLD = 0.8; // mirrors GROUNDING_THRESHOLD convention
 const TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+)*/g;
-const LIST_MARKER_PATTERN =
-  /(?:^|\s)(?:[-*]\s+|[•]\s+|â€¢\s+|\d{1,2}[.)]\s*|[a-z]\)\s*)/gi;
 
 export function validateGrounding(
   args: ValidateGroundingArgs,
@@ -129,7 +128,7 @@ export function validateGrounding(
       outputs: outputsBySectionId.get(section.id) ?? [],
       sourceSpan: {
         sourceSection,
-        text: extractSourceSectionText(args.source, sourceSection),
+        text: extractGroundingSourceSectionText(args.source, sourceSection),
       },
     });
   });
@@ -199,7 +198,10 @@ function validateSectionGrounding(args: {
 
   const coreEntries = collectSourceCoreText(output);
   const sourceTerms = extractTermSet(args.sourceSpan.text);
-  const sourceItems = extractSourceItems(args.sourceSpan.text);
+  const sourceItems = extractCleanSourceItems({
+    sourceSpanText: args.sourceSpan.text,
+    sectionTitle: args.sourceSpan.sourceSection.title,
+  });
   const fabricationCheck = checkFabrication({
     section: args.section,
     sourceTerms,
@@ -385,7 +387,7 @@ function collectSourceCoreText(output: SectionOutput): readonly CoreTextEntry[] 
   ];
 }
 
-function extractSourceSectionText(
+export function extractGroundingSourceSectionText(
   source: NormalizedSource,
   sourceSection: SourceOutlineSection,
 ): string {
@@ -402,7 +404,7 @@ function extractSourceSectionText(
     )
     .map(({ block }) => block);
   const flattened = flattenSourceBlocks(
-    removeConsecutiveDuplicateBlocks(orderedBlocks),
+    removeConsecutiveDuplicateSourceBlocks(orderedBlocks),
   );
   const fragments = flattened
     .filter(({ block }) => sourceBlockIds.has(block.id))
@@ -417,23 +419,6 @@ function extractSourceSectionText(
     .filter((text): text is string => text !== undefined && text.length > 0);
 
   return fragments.join("\n").trim();
-}
-
-function removeConsecutiveDuplicateBlocks(
-  blocks: readonly NormalizedSourceBlock[],
-): readonly NormalizedSourceBlock[] {
-  const uniqueBlocks: NormalizedSourceBlock[] = [];
-  let previousText: string | undefined;
-
-  for (const block of blocks) {
-    if (block.text === previousText) {
-      continue;
-    }
-    uniqueBlocks.push(block);
-    previousText = block.text;
-  }
-
-  return uniqueBlocks;
 }
 
 function sliceBlockForSourceSection(args: {
@@ -455,50 +440,6 @@ function sliceBlockForSourceSection(args: {
   const localEndOffset = endOffset - args.blockStartOffset;
   const text = args.block.text.slice(localStartOffset, localEndOffset).trim();
   return text.length > 0 ? text : undefined;
-}
-
-function extractSourceItems(sourceText: string): readonly SourceItem[] {
-  const normalized = normalizeListMarkers(sourceText);
-  const markerMatches = [...normalized.matchAll(LIST_MARKER_PATTERN)];
-  if (markerMatches.length < 2) {
-    return [];
-  }
-
-  const items: SourceItem[] = [];
-  for (let index = 0; index < markerMatches.length; index += 1) {
-    const match = markerMatches[index];
-    const nextMatch = markerMatches[index + 1];
-    if (!match || match.index === undefined) {
-      continue;
-    }
-
-    const itemStart = match.index + match[0].length;
-    const itemEnd = nextMatch?.index ?? normalized.length;
-    const itemText = cleanSourceItemText(normalized.slice(itemStart, itemEnd));
-    if (
-      itemText.length > 0 &&
-      normalizeCoverageTitleKey(itemText).length > 0
-    ) {
-      items.push({ text: itemText });
-    }
-  }
-
-  return items;
-}
-
-function normalizeListMarkers(value: string): string {
-  return value
-    .replace(/â€¢/g, " • ")
-    .replace(/•/g, " • ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function cleanSourceItemText(value: string): string {
-  return value
-    .replace(/\s+/g, " ")
-    .replace(/^[.:;,\s]+/, "")
-    .trim();
 }
 
 function extractTermSet(value: string): ReadonlySet<string> {

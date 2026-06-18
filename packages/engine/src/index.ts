@@ -2,6 +2,8 @@ export * from "./generate";
 export * from "./leakage-guard";
 export * from "./provider";
 export * from "./schemas";
+export * from "./source-items";
+export * from "./source-blocks";
 export * from "./stage0-normalize";
 export * from "./stage1-outline";
 export * from "./stage2-plan";
