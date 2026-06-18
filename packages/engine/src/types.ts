@@ -251,9 +251,16 @@ export interface GroundingIssue {
   readonly sourceSectionId: string;
   readonly field?: StudentFacingSectionField;
   readonly fieldPath?: string;
-  readonly offendingText?: string;
+  readonly offendingText?: readonly string[];
   readonly sourceItem?: string;
   readonly excerpt?: string;
+}
+
+export interface Phase1FabricationFailure {
+  readonly claimText: string;
+  readonly unsupportedTokens: readonly string[];
+  readonly sourceSectionId: string;
+  readonly fieldPath: string;
 }
 
 export interface SectionGroundingResult {
@@ -276,6 +283,8 @@ export interface GroundingReport {
   readonly threshold: number;
   readonly issues: readonly GroundingIssue[];
   readonly sections: readonly SectionGroundingResult[];
+  readonly phase1FabricationFails: number;
+  readonly phase1FabricationFailures: readonly Phase1FabricationFailure[];
 }
 
 export type StudentFacingSectionField =

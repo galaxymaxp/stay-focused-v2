@@ -570,7 +570,7 @@ function emitCoverageLog(args: {
   );
 }
 
-function normalizeCoverageTitleKey(title: string): string {
+export function normalizeCoverageTitleKey(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "")

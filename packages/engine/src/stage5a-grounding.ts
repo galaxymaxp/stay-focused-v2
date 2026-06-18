@@ -1,12 +1,14 @@
 import { GROUNDING_THRESHOLD } from "@stay-focused/shared";
 
 import { flattenSourceBlocks } from "./stage1-outline.js";
+import { normalizeCoverageTitleKey } from "./stage4-verify.js";
 import type {
   GenerationPlan,
   GroundingIssue,
   GroundingReport,
   NormalizedSource,
   NormalizedSourceBlock,
+  Phase1FabricationFailure,
   PlannedSection,
   SectionGroundingResult,
   SectionOutput,
@@ -36,20 +38,22 @@ interface CoreTextEntry {
 interface TermOccurrence {
   readonly text: string;
   readonly canonical: string;
-  readonly field: StudentFacingSectionField;
-  readonly fieldPath: string;
   readonly index: number;
-  readonly sourceText: string;
 }
 
 interface SourceItem {
   readonly text: string;
-  readonly terms: readonly string[];
+}
+
+interface ClaimFabricationFailure extends Phase1FabricationFailure {
+  readonly field: StudentFacingSectionField;
+  readonly unsupportedOccurrences: readonly TermOccurrence[];
 }
 
 interface FabricationCheck {
   readonly score: number;
   readonly issues: readonly GroundingIssue[];
+  readonly failures: readonly ClaimFabricationFailure[];
 }
 
 interface OmissionCheck {
@@ -59,125 +63,47 @@ interface OmissionCheck {
   readonly issues: readonly GroundingIssue[];
 }
 
-const HIGH_RISK_UNSUPPORTED_TERMS = new Set([
-  "api",
-  "apis",
-  "browser",
-  "covid",
-  "covid-19",
-  "disaster",
-  "encryption",
-  "firewall",
-  "firewalls",
-  "flood",
-  "hijacker",
-  "hijackers",
-  "http",
-  "icmp",
-  "injection",
-  "logging",
-  "pandemic",
-  "redundancy",
-  "recovery",
-  "retail",
-  "slowloris",
-  "sql",
-  "ssl",
-  "ssl/tls",
-  "syn",
-  "telemetry",
-  "testing",
-  "tls",
-  "udp",
-  "vpn",
-  "vpns",
-]);
+interface InstrumentedSectionGroundingResult extends SectionGroundingResult {
+  readonly phase1FabricationFailures: readonly Phase1FabricationFailure[];
+}
 
-const COMMON_UNSUPPORTED_WORDS = new Set([
-  "about",
-  "above",
-  "across",
-  "action",
-  "actions",
-  "additional",
-  "also",
-  "another",
-  "because",
-  "being",
-  "below",
-  "brief",
-  "business",
-  "cause",
-  "caused",
-  "causes",
-  "clear",
-  "clearly",
-  "complete",
-  "concept",
-  "connect",
-  "connected",
-  "content",
-  "context",
-  "could",
-  "describes",
-  "detail",
-  "details",
-  "during",
-  "example",
-  "explain",
-  "explained",
-  "explains",
-  "explanation",
-  "focus",
-  "focused",
-  "following",
-  "from",
-  "given",
-  "grounded",
-  "helps",
-  "include",
-  "includes",
-  "including",
-  "information",
-  "into",
-  "itself",
-  "key",
-  "learner",
-  "learners",
-  "material",
-  "meaning",
-  "method",
-  "methods",
-  "must",
-  "only",
-  "part",
-  "point",
-  "points",
-  "practical",
-  "provided",
-  "required",
-  "review",
-  "section",
-  "shows",
-  "source",
-  "study",
-  "summary",
-  "takeaway",
-  "that",
-  "their",
-  "there",
-  "these",
-  "this",
-  "through",
-  "topic",
-  "using",
-  "where",
-  "which",
-  "while",
+const STOPWORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "as",
+  "it",
+  "is",
+  "are",
+  "was",
+  "were",
+  "for",
+  "to",
+  "of",
+  "in",
+  "on",
+  "by",
   "with",
-  "within",
+  "that",
+  "this",
+  "these",
+  "those",
+  "can",
+  "be",
+  "its",
+  "also",
+  "such",
+  "which",
+  "from",
+  "into",
+  "their",
+  "they",
+  "them",
 ]);
 
+const LIST_COVERAGE_THRESHOLD = 0.8; // mirrors GROUNDING_THRESHOLD convention
 const TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+)*/g;
 const LIST_MARKER_PATTERN =
   /(?:^|\s)(?:[-*]\s+|[•]\s+|â€¢\s+|\d{1,2}[.)]\s*|[a-z]\)\s*)/gi;
@@ -208,6 +134,9 @@ export function validateGrounding(
     });
   });
   const issues = sections.flatMap((section) => section.issues);
+  const phase1FabricationFailures = sections.flatMap(
+    (section) => section.phase1FabricationFailures,
+  );
   const score = roundScore(
     sections.length === 0
       ? 0
@@ -229,6 +158,7 @@ export function validateGrounding(
         args.outline.id,
         score,
         status,
+        phase1FabricationFailures.length,
         ...sections.map(
           (section) =>
             `${section.plannedSectionId}:${section.score}:${section.status}:${section.issues.length}`,
@@ -242,6 +172,8 @@ export function validateGrounding(
     threshold: GROUNDING_THRESHOLD,
     issues,
     sections,
+    phase1FabricationFails: phase1FabricationFailures.length,
+    phase1FabricationFailures,
   };
 }
 
@@ -249,7 +181,7 @@ function validateSectionGrounding(args: {
   readonly section: PlannedSection;
   readonly outputs: readonly SectionOutput[];
   readonly sourceSpan: SourceSpan;
-}): SectionGroundingResult {
+}): InstrumentedSectionGroundingResult {
   const output = args.outputs[0];
   if (!output) {
     return {
@@ -261,23 +193,22 @@ function validateSectionGrounding(args: {
       representedSourceItemCount: 0,
       issues: [],
       retryable: true,
+      phase1FabricationFailures: [],
     };
   }
 
   const coreEntries = collectSourceCoreText(output);
-  const coreText = coreEntries.map((entry) => entry.text).join("\n");
   const sourceTerms = extractTermSet(args.sourceSpan.text);
   const sourceItems = extractSourceItems(args.sourceSpan.text);
   const fabricationCheck = checkFabrication({
     section: args.section,
     sourceTerms,
-    sourceText: args.sourceSpan.text,
     coreEntries,
   });
   const omissionCheck = checkOmissions({
     section: args.section,
     sourceItems,
-    coreText,
+    keyPoints: output.sourceCore.keyPoints,
   });
   const score = roundScore(
     Math.min(fabricationCheck.score, omissionCheck.score),
@@ -294,56 +225,68 @@ function validateSectionGrounding(args: {
     representedSourceItemCount: omissionCheck.representedSourceItemCount,
     issues,
     retryable: issues.length > 0,
+    phase1FabricationFailures: fabricationCheck.failures,
   };
 }
 
 function checkFabrication(args: {
   readonly section: PlannedSection;
   readonly sourceTerms: ReadonlySet<string>;
-  readonly sourceText: string;
   readonly coreEntries: readonly CoreTextEntry[];
 }): FabricationCheck {
-  const sourceTermCount = args.sourceTerms.size;
-  if (sourceTermCount < 3) {
-    return { score: 1, issues: [] };
+  // PHASE 1: lexical content-token check. Flags faithful synonym paraphrase
+  // (e.g. "blocks" for "prevents") as fabrication. Phase 2 adds an entailment
+  // judge for exactly these cases. Generator is kept extraction-first meanwhile.
+  const failures = args.coreEntries.flatMap((entry) => {
+    const unsupportedOccurrences = findUnsupportedContentTerms(
+      entry.text,
+      args.sourceTerms,
+    );
+    if (unsupportedOccurrences.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        claimText: entry.text,
+        unsupportedTokens: unsupportedOccurrences.map(
+          (occurrence) => occurrence.text,
+        ),
+        sourceSectionId: args.section.sourceSectionId,
+        field: entry.field,
+        fieldPath: entry.fieldPath,
+        unsupportedOccurrences,
+      } satisfies ClaimFabricationFailure,
+    ];
+  });
+
+  if (failures.length === 0) {
+    return { score: 1, issues: [], failures: [] };
   }
 
-  const unsupported = uniqueUnsupportedTerms(
-    args.coreEntries.flatMap((entry) => extractTermOccurrences(entry)),
-    args.sourceTerms,
+  const unsupportedTokenCount = failures.reduce(
+    (total, failure) => total + failure.unsupportedTokens.length,
+    0,
   );
-  const highConfidence = unsupported.filter((occurrence) =>
-    isHighConfidenceFabrication(occurrence),
-  );
-  const issueOccurrences =
-    highConfidence.length > 0
-      ? highConfidence
-      : unsupported.length >= 3
-        ? unsupported
-        : [];
-
-  if (issueOccurrences.length === 0) {
-    return { score: 1, issues: [] };
-  }
-
-  const issues = issueOccurrences.slice(0, 8).map((occurrence) =>
+  const issues = failures.map((failure) =>
     createFabricationIssue({
       section: args.section,
-      occurrence,
+      failure,
     }),
   );
-  const rawScore = Math.max(0, 1 - issueOccurrences.length * 0.15);
+  const rawScore = Math.max(0, 1 - unsupportedTokenCount * 0.15);
 
   return {
     score: Math.min(0.79, roundScore(rawScore)),
     issues,
+    failures,
   };
 }
 
 function checkOmissions(args: {
   readonly section: PlannedSection;
   readonly sourceItems: readonly SourceItem[];
-  readonly coreText: string;
+  readonly keyPoints: readonly string[];
 }): OmissionCheck {
   if (args.sourceItems.length < 2) {
     return {
@@ -354,11 +297,15 @@ function checkOmissions(args: {
     };
   }
 
-  const coreTerms = extractTermSet(args.coreText);
+  const representedItemKeys = new Set(
+    args.keyPoints
+      .map(normalizeCoverageTitleKey)
+      .filter((key) => key.length > 0),
+  );
   const missingItems: SourceItem[] = [];
 
   for (const item of args.sourceItems) {
-    if (!isSourceItemRepresented(item, coreTerms)) {
+    if (!representedItemKeys.has(normalizeCoverageTitleKey(item.text))) {
       missingItems.push(item);
     }
   }
@@ -366,7 +313,7 @@ function checkOmissions(args: {
   const representedCount = args.sourceItems.length - missingItems.length;
   const score = roundScore(representedCount / args.sourceItems.length);
 
-  if (score >= GROUNDING_THRESHOLD) {
+  if (score >= LIST_COVERAGE_THRESHOLD) {
     return {
       score,
       sourceItemCount: args.sourceItems.length,
@@ -397,22 +344,27 @@ function checkOmissions(args: {
 
 function createFabricationIssue(args: {
   readonly section: PlannedSection;
-  readonly occurrence: TermOccurrence;
+  readonly failure: ClaimFabricationFailure;
 }): GroundingIssue {
+  const firstOccurrence = args.failure.unsupportedOccurrences[0];
+  if (!firstOccurrence) {
+    throw new Error("Fabrication issue requires an unsupported content token.");
+  }
+
   return {
     type: "grounding-fabrication",
     severity: "error",
     plannedSectionId: args.section.id,
     sourceSectionId: args.section.sourceSectionId,
-    field: args.occurrence.field,
-    fieldPath: args.occurrence.fieldPath,
-    offendingText: args.occurrence.text,
+    field: args.failure.field,
+    fieldPath: args.failure.fieldPath,
+    offendingText: args.failure.unsupportedTokens,
     excerpt: excerptAround(
-      args.occurrence.sourceText,
-      args.occurrence.index,
-      args.occurrence.text.length,
+      args.failure.claimText,
+      firstOccurrence.index,
+      firstOccurrence.text.length,
     ),
-    message: `SourceCore introduces unsupported term "${args.occurrence.text}" in ${args.occurrence.fieldPath}.`,
+    message: `SourceCore introduces unsupported content tokens "${args.failure.unsupportedTokens.join(", ")}" in ${args.failure.fieldPath}.`,
   };
 }
 
@@ -523,9 +475,11 @@ function extractSourceItems(sourceText: string): readonly SourceItem[] {
     const itemStart = match.index + match[0].length;
     const itemEnd = nextMatch?.index ?? normalized.length;
     const itemText = cleanSourceItemText(normalized.slice(itemStart, itemEnd));
-    const terms = Array.from(extractTermSet(itemText));
-    if (itemText.length > 0 && terms.length > 0) {
-      items.push({ text: itemText, terms });
+    if (
+      itemText.length > 0 &&
+      normalizeCoverageTitleKey(itemText).length > 0
+    ) {
+      items.push({ text: itemText });
     }
   }
 
@@ -555,17 +509,6 @@ function extractTermSet(value: string): ReadonlySet<string> {
   );
 }
 
-function extractTermOccurrences(
-  entry: CoreTextEntry,
-): readonly TermOccurrence[] {
-  return extractTerms(entry.text).map((term) => ({
-    ...term,
-    field: entry.field,
-    fieldPath: entry.fieldPath,
-    sourceText: entry.text,
-  }));
-}
-
 function extractTerms(
   value: string,
 ): readonly { readonly text: string; readonly canonical: string; readonly index: number }[] {
@@ -573,8 +516,11 @@ function extractTerms(
 
   for (const match of value.matchAll(TOKEN_PATTERN)) {
     const text = match[0];
+    if (STOPWORDS.has(text.toLowerCase())) {
+      continue;
+    }
     const canonical = canonicalTerm(text);
-    if (canonical.length === 0 || COMMON_UNSUPPORTED_WORDS.has(canonical)) {
+    if (canonical.length === 0) {
       continue;
     }
     terms.push({
@@ -587,14 +533,14 @@ function extractTerms(
   return terms;
 }
 
-function uniqueUnsupportedTerms(
-  occurrences: readonly TermOccurrence[],
+function findUnsupportedContentTerms(
+  claimText: string,
   sourceTerms: ReadonlySet<string>,
 ): readonly TermOccurrence[] {
   const seen = new Set<string>();
-  const unique: TermOccurrence[] = [];
+  const unsupported: TermOccurrence[] = [];
 
-  for (const occurrence of occurrences) {
+  for (const occurrence of extractTerms(claimText)) {
     if (
       sourceTerms.has(occurrence.canonical) ||
       seen.has(occurrence.canonical)
@@ -602,29 +548,10 @@ function uniqueUnsupportedTerms(
       continue;
     }
     seen.add(occurrence.canonical);
-    unique.push(occurrence);
+    unsupported.push(occurrence);
   }
 
-  return unique;
-}
-
-function isHighConfidenceFabrication(occurrence: TermOccurrence): boolean {
-  return (
-    HIGH_RISK_UNSUPPORTED_TERMS.has(occurrence.canonical) ||
-    /[0-9/-]/.test(occurrence.text) ||
-    /^[A-Z0-9]{2,}$/.test(occurrence.text)
-  );
-}
-
-function isSourceItemRepresented(
-  item: SourceItem,
-  coreTerms: ReadonlySet<string>,
-): boolean {
-  const matchedTerms = item.terms.filter((term) => coreTerms.has(term));
-  if (item.terms.length <= 2) {
-    return matchedTerms.length === item.terms.length;
-  }
-  return matchedTerms.length >= Math.ceil(item.terms.length * 0.5);
+  return unsupported;
 }
 
 function canonicalTerm(value: string): string {
