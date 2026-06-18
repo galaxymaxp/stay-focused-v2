@@ -28,6 +28,8 @@ export const stage5aGroundingSuite: EvalSuite = {
   cases: [
     createLooseConnectivePhase1Case(),
     createInventedEndpointDescriptionCase(),
+    createVerbatimListAdherenceCase(),
+    createReplacementProseOmissionCase(),
     createCompleteDomainsListCase(),
     createMalwareOmissionThresholdCase(),
     createImpactReductionDriftCase(),
@@ -40,6 +42,103 @@ export const stage5aGroundingSuite: EvalSuite = {
     createFaithfulSectionsCase(),
   ],
 };
+
+function createVerbatimListAdherenceCase(): EvalCase {
+  return {
+    name: "Verbatim list keyPoints are grounded with no omission",
+    run: async () => {
+      const items = [
+        "Communicate the Issue",
+        "Be sincere and accountable",
+        "Provide details",
+        "Understand the cause",
+        "Take steps to avoid another breach",
+        "Ensure all systems are clean",
+        "Educate employees, partners, and customers",
+      ];
+      const sourceText = bulletListSource("Impact Reduction", items);
+      const context = createSyntheticContext("Impact Reduction", sourceText);
+      const output = createOutput(
+        context.section,
+        "Impact Reduction",
+        items,
+      );
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+      const result = report.sections[0];
+
+      return [
+        ...assertEqual(
+          result?.status,
+          "passed",
+          "Verbatim source list did not pass grounding.",
+        ),
+        ...assertEqual(
+          result?.issues.some(
+            (issue) => issue.type === "grounding-omission",
+          ),
+          false,
+          "Verbatim source list raised a grounding omission.",
+        ),
+      ];
+    },
+  };
+}
+
+function createReplacementProseOmissionCase(): EvalCase {
+  return {
+    name: "Replacement prose falls below the list coverage threshold",
+    run: async () => {
+      const items = [
+        "Overwhelm quantity of traffic",
+        "Maliciously formatted packets",
+        "Zombie - Infected Host",
+        "Botnet",
+        "Distributed attack",
+      ];
+      const sourceText = bulletListSource("Methods to Deny Service", items);
+      const context = createSyntheticContext(
+        "Methods to Deny Service",
+        sourceText,
+      );
+      const output = createOutput(
+        context.section,
+        "Methods to Deny Service",
+        ["DDoS attacks flood targets with traffic"],
+      );
+      const report = validateGrounding({
+        plan: context.plan,
+        outputs: [output],
+        source: context.source,
+        outline: context.outline,
+      });
+      const result = report.sections[0];
+      const listCoverage =
+        result === undefined || result.sourceItemCount === 0
+          ? 0
+          : result.representedSourceItemCount / result.sourceItemCount;
+
+      return [
+        ...assertEqual(
+          listCoverage < 0.8,
+          true,
+          "Replacement prose did not fall below LIST_COVERAGE_THRESHOLD.",
+        ),
+        ...assertEqual(
+          result?.issues.some(
+            (issue) => issue.type === "grounding-omission",
+          ),
+          true,
+          "Replacement prose did not raise grounding-omission.",
+        ),
+      ];
+    },
+  };
+}
 
 export async function runStage5aGroundingEvals(): Promise<boolean> {
   const result = await runEvalSuite(stage5aGroundingSuite);

@@ -4,7 +4,11 @@ import validationFixtures from "./fixtures/pipeline-validation.json" with {
   type: "json",
 };
 
-import { runPipeline, type RunPipelineArgs } from "../src/generate.js";
+import {
+  PipelineAssemblyError,
+  runPipeline,
+  type RunPipelineArgs,
+} from "../src/generate.js";
 import type {
   GenerationProvider,
   GenerationRequest,
@@ -56,7 +60,9 @@ type ProviderBehavior =
   | "weak-then-pass"
   | "weak-then-error"
   | "always-weak"
-  | "initial-error";
+  | "initial-error"
+  | "first-validation-error"
+  | "validation-then-infra-error";
 
 interface BasicFixture {
   readonly name: string;
@@ -95,8 +101,120 @@ export const pipelineSuite: EvalSuite = {
     ...basicCases.map(createBasicCase),
     ...retryCases.map(createRetryCase),
     ...validationCases.map(createValidationCase),
+    createCollectAndContinueCase(),
+    createInfraErrorBoundaryCase(),
   ],
 };
+
+function createCollectAndContinueCase(): EvalCase {
+  return {
+    name: "Stage 3 validation failure is recorded and the next section is processed",
+    run: async () => {
+      const provider = new FakeProvider("first-validation-error");
+      try {
+        await runPipeline({
+          input: multiSectionValidationInput(),
+          provider,
+          retryPolicy: noRetriesPolicy(),
+        });
+        return [
+          {
+            message:
+              "Expected collected Stage 3 validation failure to reject after the full pass.",
+          },
+        ];
+      } catch (error) {
+        if (!(error instanceof PipelineAssemblyError)) {
+          return [
+            {
+              message:
+                "Collected validation failure did not produce pipeline diagnostics.",
+              actual: errorMessage(error),
+            },
+          ];
+        }
+
+        const firstSectionId = readMetadataString(
+          provider.requests[0]?.metadata,
+          "plannedSectionId",
+        );
+        const secondSectionId = readMetadataString(
+          provider.requests[1]?.metadata,
+          "plannedSectionId",
+        );
+        return [
+          ...assertEqual(
+            provider.requests.length,
+            2,
+            "Pipeline did not attempt the section after a validation failure.",
+          ),
+          ...assertDeepEqual(
+            error.state.sectionValidationFailures,
+            [
+              {
+                sectionTitle: "First Topic",
+                sectionId: firstSectionId,
+                stage: "stage3",
+                reason: "output-validation",
+                issues: [
+                  `plannedSectionId must be "${firstSectionId}"`,
+                ],
+              },
+            ],
+            "Pipeline did not retain the structured Stage 3 failure.",
+          ),
+          ...assertEqual(
+            error.state.outputs.some(
+              (output) => output.plannedSectionId === secondSectionId,
+            ),
+            true,
+            "Later section output was not evaluated after the earlier validation failure.",
+          ),
+        ];
+      }
+    },
+  };
+}
+
+function createInfraErrorBoundaryCase(): EvalCase {
+  return {
+    name: "provider infrastructure error propagates outside collected validation failures",
+    run: async () => {
+      const provider = new FakeProvider("validation-then-infra-error");
+      try {
+        await runPipeline({
+          input: multiSectionValidationInput(),
+          provider,
+          retryPolicy: noRetriesPolicy(),
+        });
+        return [{ message: "Expected provider infrastructure error to propagate." }];
+      } catch (error) {
+        return [
+          ...assertEqual(
+            error instanceof PipelineAssemblyError,
+            false,
+            "Infrastructure error was incorrectly bucketed as a collected pipeline validation failure.",
+          ),
+          ...assertIncludes(
+            errorMessage(error),
+            "Stage 3 provider generation failed for section",
+            "Infrastructure error lost its Stage 3 provider context.",
+          ),
+          ...assertIncludes(
+            errorMessage(error),
+            "second section infrastructure failure",
+            "Infrastructure error lost the provider failure detail.",
+          ),
+          ...assertEqual(
+            provider.requests.length,
+            2,
+            "Infrastructure boundary fixture did not reach the second section.",
+          ),
+        ];
+      }
+    },
+  };
+}
 
 export async function runPipelineEvals(): Promise<boolean> {
   const result = await runEvalSuite(pipelineSuite);
@@ -284,18 +402,18 @@ async function runRetryScenario(
       const provider = new FakeProvider("weak-then-error");
       try {
         await runWithProvider(fixture.input, provider);
-        return [{ message: "Expected failed retry pipeline to reject assembly." }];
+        return [{ message: "Expected retry provider fault to propagate." }];
       } catch (error) {
         return [
           ...assertIncludes(
             errorMessage(error),
             fixture.expectErrorContains ?? "",
-            "Failed retry did not leave a rejected final assembly.",
+            "Retry provider fault did not propagate with Stage 3 context.",
           ),
           ...assertEqual(
             provider.requests.length,
-            3,
-            "Failed retry provider calls did not honor the default bound.",
+            2,
+            "Retry provider fault was swallowed instead of failing immediately.",
           ),
         ];
       }
@@ -425,9 +543,19 @@ class FakeProvider implements GenerationProvider {
   ): Promise<TOutput> {
     this.requests.push(request);
     const retryAttempt = readRetryAttempt(request);
+    const initialRequestCount = this.requests.filter(
+      (candidate) => readRetryAttempt(candidate) === undefined,
+    ).length;
 
     if (this.behavior === "initial-error" && retryAttempt === undefined) {
       throw new Error("initial provider failure");
+    }
+    if (
+      this.behavior === "validation-then-infra-error" &&
+      retryAttempt === undefined &&
+      initialRequestCount === 2
+    ) {
+      throw new Error("second section infrastructure failure");
     }
     if (this.behavior === "weak-then-error" && retryAttempt !== undefined) {
       throw new Error("retry provider failure");
@@ -438,8 +566,30 @@ class FakeProvider implements GenerationProvider {
       ((this.behavior === "weak-then-pass" ||
         this.behavior === "weak-then-error") &&
         retryAttempt === undefined);
-    return createProviderOutput(request, weak) as unknown as TOutput;
+    const output = createProviderOutput(request, weak);
+    if (
+      (this.behavior === "first-validation-error" ||
+        this.behavior === "validation-then-infra-error") &&
+      retryAttempt === undefined &&
+      initialRequestCount === 1
+    ) {
+      return {
+        ...output,
+        plannedSectionId: "wrong-planned-section-id",
+      } as unknown as TOutput;
+    }
+    return output as unknown as TOutput;
   }
+}
+
+function multiSectionValidationInput(): SourceNormalizationInput {
+  return {
+    id: "pipeline-collect-and-continue-source",
+    kind: "document",
+    language: "en",
+    text: "# First Topic\n\nThe first topic has factual content.\n\n# Second Topic\n\nThe second topic has factual content.",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
 }
 
 function createProviderOutput(

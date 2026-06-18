@@ -10,6 +10,7 @@ import type {
   GenerationProvider,
   GenerationRequest,
 } from "../src/provider.js";
+import { detectInstructionLeakage } from "../src/leakage-guard.js";
 import {
   generateSection,
   type GenerateSectionArgs,
@@ -19,6 +20,7 @@ import type {
   NormalizedSource,
   PlannedSection,
   SectionContentTag,
+  SectionOutput,
   SectionSchemaKind,
 } from "../src/types.js";
 import {
@@ -117,9 +119,70 @@ export const stage3GenerateSuite: EvalSuite = {
   cases: [
     ...basicCases.map(createBasicCase),
     ...requestCases.map(createRequestCase),
+    createMetaExplanationLeakageCase(),
+    createEmptyListExplanationCase(),
     ...validationCases.map(createValidationCase),
   ],
 };
+
+function createMetaExplanationLeakageCase(): EvalCase {
+  return {
+    name: "meta explanation echoing source-excerpt instructions is rejected",
+    run: async () => {
+      const context = createContext("concept-card");
+      const output = {
+        ...(createValidOutput(
+          "concept-card",
+          context.section,
+        ) as unknown as SectionOutput),
+        sourceCore: {
+          explanation:
+            "This section lists the steps from the source excerpt.",
+          keyPoints: ["Included source alpha.", "Included source beta."],
+        },
+      } satisfies SectionOutput;
+      const result = detectInstructionLeakage(output);
+
+      return [
+        ...assertEqual(
+          result.ok,
+          false,
+          "Meta explanation echoing instruction wording was not detected.",
+        ),
+        ...assertDeepEqual(
+          result.ok ? [] : result.fields,
+          ["sourceCore.explanation"],
+          "Meta explanation leakage was reported against the wrong field.",
+        ),
+      ];
+    },
+  };
+}
+
+function createEmptyListExplanationCase(): EvalCase {
+  return {
+    name: "empty list-only explanation is not instruction leakage",
+    run: async () => {
+      const context = createContext("concept-card");
+      const output = {
+        ...(createValidOutput(
+          "concept-card",
+          context.section,
+        ) as unknown as SectionOutput),
+        sourceCore: {
+          explanation: "",
+          keyPoints: ["Included source alpha.", "Included source beta."],
+        },
+      } satisfies SectionOutput;
+
+      return assertDeepEqual(
+        detectInstructionLeakage(output),
+        { ok: true },
+        "Empty list-only explanation was incorrectly flagged as leakage.",
+      );
+    },
+  };
+}
 
 export async function runStage3GenerateEvals(): Promise<boolean> {
   const result = await runEvalSuite(stage3GenerateSuite);

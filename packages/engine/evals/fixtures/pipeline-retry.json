@@ -23,7 +23,7 @@
         "text": "A concept explanation whose retry provider calls fail.",
         "createdAt": "2026-01-01T00:00:00.000Z"
       },
-      "expectErrorContains": "coverage status is weak"
+      "expectErrorContains": "Stage 3 provider generation failed for section"
     },
     {
       "name": "allowWeakSections false rejects weak final coverage",

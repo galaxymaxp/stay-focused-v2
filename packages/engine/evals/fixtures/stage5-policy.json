@@ -21,7 +21,7 @@
       "scenario": "default-two-retries"
     },
     {
-      "name": "a later retry may pass after a provider failure",
+      "name": "provider failure propagates before any later scripted retry",
       "scenario": "failure-then-success"
     }
   ]

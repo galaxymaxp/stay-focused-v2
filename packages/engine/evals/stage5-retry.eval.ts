@@ -26,6 +26,7 @@ import type {
 import {
   assertDeepEqual,
   assertEqual,
+  assertIncludes,
   errorMessage,
   isDirectExecution,
   printEvalSuiteResult,
@@ -274,22 +275,26 @@ async function runBasicScenario(
     }
     case "failed-retry-keeps": {
       const provider = new FakeProvider([errorResponse("provider unavailable")]);
-      const outputs = await retryFailedSections({
-        ...baseArgs(context, [weakOutput], provider),
-        coverage: createCoverage(context, [weakOutput]),
-      });
-      return [
-        ...assertEqual(
-          provider.requests.length,
-          2,
-          "Provider failures did not use the default retry bound.",
-        ),
-        ...assertEqual(
-          outputs[0],
-          weakOutput,
-          "Provider failure should keep the previous output.",
-        ),
-      ];
+      try {
+        await retryFailedSections({
+          ...baseArgs(context, [weakOutput], provider),
+          coverage: createCoverage(context, [weakOutput]),
+        });
+        return [{ message: "Expected retry provider fault to propagate." }];
+      } catch (error) {
+        return [
+          ...assertEqual(
+            provider.requests.length,
+            1,
+            "Retry provider fault was swallowed instead of failing immediately.",
+          ),
+          ...assertIncludes(
+            errorMessage(error),
+            "provider unavailable",
+            "Retry provider fault lost its original detail.",
+          ),
+        ];
+      }
     }
     case "missing-generated": {
       const provider = new FakeProvider([outputResponse(retryOutput)]);
@@ -312,22 +317,28 @@ async function runBasicScenario(
     }
     case "provider-failure-no-output": {
       const provider = new FakeProvider([errorResponse("provider unavailable")]);
-      const outputs = await retryFailedSections({
-        ...baseArgs(context, [], provider),
-        coverage: createCoverage(context, []),
-      });
-      return [
-        ...assertEqual(
-          provider.requests.length,
-          2,
-          "Missing output did not honor the default retry bound.",
-        ),
-        ...assertEqual(
-          outputs.length,
-          0,
-          "All failed retries should leave a missing output omitted.",
-        ),
-      ];
+      try {
+        await retryFailedSections({
+          ...baseArgs(context, [], provider),
+          coverage: createCoverage(context, []),
+        });
+        return [
+          { message: "Expected missing-output provider fault to propagate." },
+        ];
+      } catch (error) {
+        return [
+          ...assertEqual(
+            provider.requests.length,
+            1,
+            "Missing-output provider fault was swallowed.",
+          ),
+          ...assertIncludes(
+            errorMessage(error),
+            "provider unavailable",
+            "Missing-output provider fault lost its original detail.",
+          ),
+        ];
+      }
     }
     case "unplanned-excluded": {
       const unplannedOutput: SectionOutput = {
@@ -461,15 +472,27 @@ async function runPolicyScenario(
         errorResponse("temporary failure"),
         outputResponse(passedRetry),
       ]);
-      const outputs = await retryFailedSections({
-        ...baseArgs(context, [weakOutput], provider),
-        coverage: createCoverage(context, [weakOutput]),
-        retryPolicy: policy({ maxRetries: 3 }),
-      });
-      return [
-        ...assertEqual(provider.requests.length, 2, "Retry did not stop after a passing output."),
-        ...assertEqual(outputs[0]?.id, passedRetry.id, "Later successful retry was not retained."),
-      ];
+      try {
+        await retryFailedSections({
+          ...baseArgs(context, [weakOutput], provider),
+          coverage: createCoverage(context, [weakOutput]),
+          retryPolicy: policy({ maxRetries: 3 }),
+        });
+        return [{ message: "Expected temporary provider fault to propagate." }];
+      } catch (error) {
+        return [
+          ...assertEqual(
+            provider.requests.length,
+            1,
+            "Provider fault was swallowed before a later scripted success.",
+          ),
+          ...assertIncludes(
+            errorMessage(error),
+            "temporary failure",
+            "Temporary provider fault lost its original detail.",
+          ),
+        ];
+      }
     }
   }
 }

@@ -21,7 +21,7 @@
       "scenario": "successful-replaces"
     },
     {
-      "name": "provider failures keep the previous output",
+      "name": "provider failures propagate instead of keeping the previous output",
       "scenario": "failed-retry-keeps"
     },
     {
@@ -29,7 +29,7 @@
       "scenario": "missing-generated"
     },
     {
-      "name": "provider failures do not crash when output is missing",
+      "name": "provider failures propagate when output is missing",
       "scenario": "provider-failure-no-output"
     },
     {
