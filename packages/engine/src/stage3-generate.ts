@@ -1,6 +1,14 @@
 import type { GenerationProvider } from "./provider";
-import { detectInstructionLeakage } from "./leakage-guard.js";
+import {
+  DEFAULT_FORBIDDEN_INSTRUCTION_PATTERNS,
+  detectInstructionLeakage,
+} from "./leakage-guard.js";
 import { getSchemaForSectionKind } from "./schemas.js";
+import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
+import {
+  extractCleanSourceItems,
+  type SourceItem,
+} from "./source-items.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import type {
   GenerationPlan,
@@ -18,6 +26,7 @@ export interface GenerateSectionArgs {
   readonly model?: string;
   readonly temperature?: number;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly retryGuidance?: readonly string[];
 }
 
 export type SectionValidationFailureReason =
@@ -46,6 +55,13 @@ export class SectionValidationError extends Error {
   }
 }
 
+const SPARSE_SOURCE_WORD_LIMIT = 8;
+const TERM_PATTERN = /[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g;
+const LIST_MARKER_PATTERN =
+  /(?:^|\s)(?:[-*]\s+|(?:â€¢|Ã¢â‚¬Â¢)\s+|\d{1,2}[.)]\s+|[a-z]\)\s+)/i;
+const ENRICHMENT_LABEL_PATTERN =
+  /\b(section title|target|instructions|schema kind|requested item count|coverage rules)\s*:/gi;
+
 export async function generateSection(
   args: GenerateSectionArgs,
 ): Promise<SectionOutput> {
@@ -53,9 +69,18 @@ export async function generateSection(
 
   const { section, plan, source, provider } = args;
   const sourceBlocks = collectSectionSourceBlocks(section, source);
+  const detectedItems = extractCleanSourceItems({
+    sourceSpanText: sourceBlocksToText(sourceBlocks),
+    sectionTitle: section.title,
+  });
   const schema = getSchemaForSectionKind(section.schemaKind);
   const request = {
-    prompt: buildSectionPrompt(section, sourceBlocks),
+    prompt: buildSectionPrompt(
+      section,
+      sourceBlocks,
+      detectedItems,
+      args.retryGuidance,
+    ),
     schema,
     model: args.model ?? "gpt-4o",
     temperature: args.temperature,
@@ -77,61 +102,76 @@ export async function generateSection(
     );
   }
 
-  return validateSectionOutput(providerOutput, section);
+  const structurallyValidOutput = validateSectionOutputShape(
+    providerOutput,
+    section,
+  );
+  const guardedOutput =
+    detectedItems.length >= 2
+      ? applyDetectedListCoreGuard(structurallyValidOutput, detectedItems)
+      : applySparseSourceCoreGuard(structurallyValidOutput, sourceBlocks);
+  const normalizedOutput = normalizeEnrichmentLabelPunctuation(guardedOutput);
+  validateSectionInstructionLeakage(normalizedOutput, section);
+  return normalizedOutput;
 }
 
 export function buildSectionPrompt(
   section: PlannedSection,
   sourceBlocks: readonly NormalizedSourceBlock[],
+  detectedItems: readonly SourceItem[] = [],
+  retryGuidance: readonly string[] = [],
 ): string {
-  const sourceExcerpt = sourceBlocks
+  const sourceText = sourceBlocksToText(sourceBlocks);
+  const passage = sourceBlocks
     .map(
       (block) =>
-        `[Source block ${block.id} | ${block.kind}]\n${block.text}`,
+        `[Passage block ${block.id} | ${block.kind}]\n${block.text}`,
     )
     .join("\n\n");
 
   return [
-    "You are generating one structured study-review section.",
-    `Section title: ${section.title}`,
-    `Schema kind: ${section.schemaKind}`,
-    "Target:",
-    `- Objective: ${section.target.objective}`,
-    `- Focus: ${section.target.focus}`,
-    `- Expected tags: ${section.target.expectedTags.join(", ")}`,
-    `- Requested item count: ${section.target.itemCount}`,
-    "- Coverage rules:",
+    "Create one structured study-review card.",
+    `Topic heading — ${section.title}`,
+    `Card shape — ${section.schemaKind}`,
+    "Learning goal:",
+    `- Objective — ${section.target.objective}`,
+    `- Focus — ${section.target.focus}`,
+    `- Expected tags — ${section.target.expectedTags.join(", ")}`,
+    `- Desired point total — ${section.target.itemCount}`,
+    "- Content checks:",
     ...section.target.coverageRules.map((rule) => `  - ${rule}`),
-    "Source excerpt:",
-    sourceExcerpt,
-    "Instructions:",
-    "- Populate sourceCore.explanation and sourceCore.keyPoints using ONLY the provided source excerpt for this section.",
-    "- HARD LIST RULE: when the source section is primarily an enumerated list of items or names, sourceCore.keyPoints MUST be exactly the source list items: one keyPoint per source item, in source order, using the source's own wording verbatim.",
+    "PASSAGE:",
+    passage,
+    ...detectedItemsPromptLines(detectedItems),
+    "Requirements:",
+    "- Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
+    "- HARD LIST RULE: when the passage is primarily an enumerated list of items or names, sourceCore.keyPoints MUST be exactly the detected passage items: one keyPoint per item, in passage order, using the passage wording verbatim.",
     "- For a list section, DO NOT summarize the list, replace it with prose, merge items, omit items, or add items.",
     "- DO NOT elaborate on any list item inside sourceCore. Copy a short or sparse list AS-IS; thinness is never a reason to elaborate.",
     "- If per-item explanation is genuinely useful, put it in enrichment ONLY, with one enrichment point per item that begins with the exact item wording so it is keyed to that item. Enrichment is separate from sourceCore.",
-    "- ANTI-META EXPLANATION RULE: sourceCore.explanation must contain factual content drawn from the source span, be a single minimal source-derived factual sentence, or be empty when the output schema permits it for a sparse/list-only section.",
-    "- sourceCore.explanation MUST NEVER describe the section itself, describe its purpose, or restate the task or instructions.",
+    "- ANTI-META EXPLANATION RULE: sourceCore.explanation must contain passage-derived factual content, be one minimal passage-derived factual sentence, or be empty for a sparse/list-only card.",
+    "- sourceCore.explanation MUST NEVER describe the card itself, describe its purpose, or restate the task.",
     "- Forbidden meta-commentary includes: \"This section lists...\", \"The following are...\", \"These are the steps to...\", \"This section explains...\", and similar framing. Such text is not study content and can trigger instruction-leakage rejection.",
-    "- For a list-only section, the items carry the content through sourceCore.keyPoints. Use an empty explanation when permitted; otherwise use only one minimal factual sentence copied or directly drawn from the source.",
-    "- For a heading-only or very short source, keep sourceCore minimal and use the text as-is with no filler.",
-    "- SOURCE: \"Impact Reduction: Communicate the Issue; Be sincere and accountable; Provide details; Understand the cause; Take steps to avoid another breach; Ensure all systems are clean; Educate employees, partners, and customers\"",
-    "- CORRECT sourceCore.explanation: \"\" // or one factual source sentence; NOT a description",
-    "- CORRECT sourceCore.keyPoints: [\"Communicate the Issue\",\"Be sincere and accountable\",\"Provide details\",\"Understand the cause\",\"Take steps to avoid another breach\",\"Ensure all systems are clean\",\"Educate employees, partners, and customers\"]",
-    "- WRONG explanation: \"Impact Reduction focuses on decreasing the extent of adverse effects.\" // invented framing + meta",
-    "- WRONG keyPoints: [\"Mitigation involves several steps\"] // replacement prose, list abandoned",
-    "- SOURCE: \"Methods to Deny Service: Overwhelm quantity of traffic; Maliciously formatted packets; Zombie - Infected Host; Botnet ...(12 items)\"",
-    "- CORRECT keyPoints: [all 12 source items verbatim]",
-    "- WRONG keyPoints: [\"DDoS attacks flood targets with traffic\"] // invented, drops 12 items",
+    "- For a list-only card, the items carry the content through sourceCore.keyPoints. Use an empty explanation.",
+    "- For a heading-only or very short passage, keep sourceCore minimal and use the wording as-is with no filler.",
+    "- FAKE FORMAT EXAMPLE: \"Fruit List • Apple • Banana • Cherry\" maps to explanation \"\" and keyPoints [\"Apple\",\"Banana\",\"Cherry\"].",
+    "- FAKE FORMAT EXAMPLE: \"Desk Supplies • Pen • Notebook\" maps to explanation \"\" and keyPoints [\"Pen\",\"Notebook\"].",
     "- Never invent examples, scenarios, entities, technologies, impacts, or methods inside sourceCore.",
-    "- Never introduce concepts in sourceCore that are absent from this source excerpt.",
-    "- Never borrow content from other source sections.",
+    "- Never introduce concepts in sourceCore that are absent from this passage.",
+    "- If the passage is only a heading, title, module label, or very short phrase, do not expand it into a general lesson.",
+    "- For a heading-only or very short passage, sourceCore must be a minimal restatement of the exact passage with one key point and enrichment must be null.",
+    "- For list-only passages, include only the listed items and explanations explicitly present there.",
+    "- Never borrow content from other passages.",
     "- Put optional examples, outside knowledge, and clarifying context only in enrichment.",
+    "- Write enrichment points as ordinary sentences, never as label-and-colon fragments.",
+    "- Set enrichment to null when no optional enrichment is needed.",
     "- Keep enrichment structurally separate from sourceCore; never blend enrichment into sourceCore.",
     "- Do not include project, repository, internal architecture, pipeline, engine, or Stay Focused references in any output field.",
-    "- Return structured output matching the provided schema exactly.",
-    `- Set plannedSectionId to "${section.id}".`,
-    `- Set sourceBlockIds to: ${section.sourceBlockIds.join(", ")}.`,
+    "- Return JSON conforming to the supplied object format.",
+    `- plannedSectionId value — "${section.id}".`,
+    `- sourceBlockIds value — ${section.sourceBlockIds.join(", ")}.`,
+    ...sparseSourcePromptLines(sourceText),
+    ...retryGuidancePromptLines(retryGuidance),
   ].join("\n");
 }
 
@@ -140,11 +180,16 @@ export function collectSectionSourceBlocks(
   source: NormalizedSource,
 ): readonly NormalizedSourceBlock[] {
   const requiredIds = new Set(section.sourceBlockIds);
+  const uniqueSourceBlocks = removeConsecutiveDuplicateSourceBlocks(
+    source.blocks,
+  );
   const sourceBlocksById = new Map(
-    source.blocks.map((block) => [block.id, block] as const),
+    uniqueSourceBlocks.map((block) => [block.id, block] as const),
   );
   const flattenedBlocksById = new Map(
-    flattenSourceBlocks(source.blocks).map((entry) => [entry.block.id, entry] as const),
+    flattenSourceBlocks(uniqueSourceBlocks).map(
+      (entry) => [entry.block.id, entry] as const,
+    ),
   );
 
   for (const blockId of section.sourceBlockIds) {
@@ -155,7 +200,7 @@ export function collectSectionSourceBlocks(
     }
   }
 
-  return source.blocks
+  return uniqueSourceBlocks
     .map((block, inputIndex) => ({ block, inputIndex }))
     .filter(({ block }) => requiredIds.has(block.id))
     .map(({ block, inputIndex }) => ({
@@ -213,7 +258,168 @@ function sliceBlockForSection(
   };
 }
 
+function applySparseSourceCoreGuard(
+  output: SectionOutput,
+  sourceBlocks: readonly NormalizedSourceBlock[],
+): SectionOutput {
+  const sourceText = sourceBlocksToText(sourceBlocks);
+  if (!isSparseSourceText(sourceText)) {
+    return output;
+  }
+
+  return {
+    ...output,
+    sourceCore: {
+      explanation: sourceText,
+      keyPoints: [sourceText],
+    },
+    enrichment: null,
+  } as SectionOutput;
+}
+
+function applyDetectedListCoreGuard(
+  output: SectionOutput,
+  detectedItems: readonly SourceItem[],
+): SectionOutput {
+  if (detectedItems.length < 2) {
+    return output;
+  }
+
+  return {
+    ...output,
+    sourceCore: {
+      explanation: "",
+      keyPoints: detectedItems.map((item) => item.text),
+    },
+  } as SectionOutput;
+}
+
+function normalizeEnrichmentLabelPunctuation(
+  output: SectionOutput,
+): SectionOutput {
+  if (!output.enrichment) {
+    return output;
+  }
+
+  const replaceLabelColon = (value: string): string =>
+    value.replace(
+      ENRICHMENT_LABEL_PATTERN,
+      (_match, label: string) => `${label} —`,
+    );
+
+  return {
+    ...output,
+    enrichment: {
+      note: replaceLabelColon(output.enrichment.note),
+      points: output.enrichment.points.map(replaceLabelColon),
+    },
+  } as SectionOutput;
+}
+
+function detectedItemsPromptLines(
+  detectedItems: readonly SourceItem[],
+): readonly string[] {
+  if (detectedItems.length < 2) {
+    return [];
+  }
+
+  return [
+    "DETECTED PASSAGE ITEMS:",
+    "These entries were mechanically extracted from this card's passage. Preserve this order and wording in sourceCore.keyPoints.",
+    ...detectedItems.map((item, index) => `${index + 1}. ${item.text}`),
+  ];
+}
+
+function sparseSourcePromptLines(sourceText: string): readonly string[] {
+  if (!isSparseSourceText(sourceText)) {
+    return [];
+  }
+
+  return [
+    "Sparse passage:",
+    `- Exact text: ${sourceText}`,
+    "- Use that exact text as the complete factual basis for sourceCore.",
+    "- Do not add definitions, goals, domains, benefits, examples, risks, technologies, or methods that are not written in that exact text.",
+  ];
+}
+
+function retryGuidancePromptLines(
+  retryGuidance: readonly string[],
+): readonly string[] {
+  if (retryGuidance.length === 0) {
+    return [];
+  }
+
+  return [
+    "Retry guidance:",
+    ...retryGuidance.map(
+      (guidance) => `- ${sanitizeRetryGuidance(guidance)}`,
+    ),
+  ];
+}
+
+function sanitizeRetryGuidance(guidance: string): string {
+  return DEFAULT_FORBIDDEN_INSTRUCTION_PATTERNS.reduce(
+    (sanitized, pattern) =>
+      sanitized.replace(
+        new RegExp(
+          pattern
+            .trim()
+            .split(/\s+/)
+            .map(escapeRegExp)
+            .join("\\s+"),
+          "gi",
+        ),
+        "[removed forbidden wording]",
+      ),
+    guidance,
+  );
+}
+
+function sourceBlocksToText(
+  sourceBlocks: readonly NormalizedSourceBlock[],
+): string {
+  return sourceBlocks
+    .map((block) => block.text)
+    .join("\n")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSparseSourceText(sourceText: string): boolean {
+  if (
+    sourceText.length === 0 ||
+    hasListMarkers(sourceText) ||
+    hasSentencePunctuation(sourceText)
+  ) {
+    return false;
+  }
+
+  return countTerms(sourceText) <= SPARSE_SOURCE_WORD_LIMIT;
+}
+
+function hasListMarkers(sourceText: string): boolean {
+  return LIST_MARKER_PATTERN.test(sourceText);
+}
+
+function hasSentencePunctuation(sourceText: string): boolean {
+  return /[.!?]/.test(sourceText);
+}
+
+function countTerms(sourceText: string): number {
+  return [...sourceText.matchAll(TERM_PATTERN)].length;
+}
+
 export function validateSectionOutput(
+  output: unknown,
+  section: PlannedSection,
+): SectionOutput {
+  const sectionOutput = validateSectionOutputShape(output, section);
+  validateSectionInstructionLeakage(sectionOutput, section);
+  return sectionOutput;
+}
+
+function validateSectionOutputShape(
   output: unknown,
   section: PlannedSection,
 ): SectionOutput {
@@ -255,7 +461,13 @@ export function validateSectionOutput(
   }
 
   validateKindSpecificFields(output, section.id);
-  const sectionOutput = output as unknown as SectionOutput;
+  return output as unknown as SectionOutput;
+}
+
+function validateSectionInstructionLeakage(
+  sectionOutput: SectionOutput,
+  section: PlannedSection,
+): void {
   const leakageResult = detectInstructionLeakage(sectionOutput);
   if (!leakageResult.ok) {
     throw outputValidationError(
@@ -268,8 +480,6 @@ export function validateSectionOutput(
       ),
     );
   }
-
-  return sectionOutput;
 }
 
 function validateArgs(args: GenerateSectionArgs): void {
@@ -297,33 +507,26 @@ function validateKindSpecificFields(
   sectionId: string,
 ): void {
   const sourceCore = readRequiredObject(output, "sourceCore", sectionId);
-  readRequiredString(sourceCore, "explanation", sectionId);
+  readRequiredStringAllowEmpty(sourceCore, "explanation", sectionId);
   readRequiredStringArray(sourceCore, "keyPoints", sectionId);
 
-  if (Object.prototype.hasOwnProperty.call(output, "enrichment")) {
-    const enrichment = readRequiredObject(output, "enrichment", sectionId);
-    const note = enrichment["note"];
-    if (note !== undefined && (typeof note !== "string" || note.trim().length === 0)) {
-      throw outputValidationError(
-        sectionId,
-        'missing required field "enrichment.note"',
-      );
-    }
+  if (!Object.prototype.hasOwnProperty.call(output, "enrichment")) {
+    throw outputValidationError(
+      sectionId,
+      'missing required field "enrichment"',
+    );
+  }
 
-    const points = enrichment["points"];
-    if (
-      points !== undefined &&
-      (!Array.isArray(points) ||
-        points.length === 0 ||
-        !points.every(
-          (entry) => typeof entry === "string" && entry.trim().length > 0,
-        ))
-    ) {
+  const enrichmentValue = output["enrichment"];
+  if (enrichmentValue !== null) {
+    if (!isRecord(enrichmentValue)) {
       throw outputValidationError(
         sectionId,
-        'missing required field "enrichment.points"',
+        'missing required field "enrichment"',
       );
     }
+    readRequiredString(enrichmentValue, "note", sectionId);
+    readRequiredStringArray(enrichmentValue, "points", sectionId);
   }
 }
 
@@ -349,6 +552,21 @@ function readRequiredString(
 ): string {
   const fieldValue = value[field];
   if (typeof fieldValue !== "string" || fieldValue.trim().length === 0) {
+    throw outputValidationError(
+      sectionId,
+      `missing required field "${field}"`,
+    );
+  }
+  return fieldValue;
+}
+
+function readRequiredStringAllowEmpty(
+  value: Readonly<Record<string, unknown>>,
+  field: string,
+  sectionId: string,
+): string {
+  const fieldValue = value[field];
+  if (typeof fieldValue !== "string") {
     throw outputValidationError(
       sectionId,
       `missing required field "${field}"`,
@@ -408,4 +626,8 @@ function arraysEqual(
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

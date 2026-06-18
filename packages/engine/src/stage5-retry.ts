@@ -104,6 +104,11 @@ export async function retryFailedSections(
           provider,
           model: args.model,
           temperature: args.temperature,
+          retryGuidance: buildRetryGuidance(
+            result,
+            groundingResult,
+            leakageResult,
+          ),
           metadata: {
             ...args.metadata,
             retryAttempt: attempt,
@@ -310,6 +315,61 @@ function shouldRetry(
     return true;
   }
   return shouldRetryGrounding || shouldRetryLeakage;
+}
+
+function buildRetryGuidance(
+  coverageResult: SectionCoverageResult,
+  groundingResult: SectionGroundingResult | undefined,
+  leakageResult: SectionLeakageResult | undefined,
+): readonly string[] {
+  const guidance: string[] = [];
+
+  if (coverageResult.status !== "passed" && coverageResult.issues.length > 0) {
+    guidance.push(
+      `Previous coverage status was ${coverageResult.status}. Fix these coverage issues: ${coverageResult.issues.join("; ")}`,
+    );
+  }
+
+  if (groundingResult?.status === "failed") {
+    guidance.push(
+      "Previous sourceCore failed grounding. Rewrite sourceCore using only facts and terms present in the section passage. If the passage is only a heading or very short phrase, use a minimal restatement of that exact text and set enrichment to null.",
+    );
+    guidance.push(
+      ...groundingResult.issues.slice(0, 5).map(formatGroundingIssueGuidance),
+    );
+  }
+
+  if (leakageResult?.status === "failed") {
+    guidance.push(
+      "Previous output contained internal or forbidden wording. Remove every leaked term from title, sourceCore, and enrichment.",
+    );
+    guidance.push(
+      ...leakageResult.issues.slice(0, 5).map(formatLeakageIssueGuidance),
+    );
+  }
+
+  return guidance;
+}
+
+function formatGroundingIssueGuidance(
+  issue: SectionGroundingResult["issues"][number],
+): string {
+  const details = [
+    issue.message,
+    issue.fieldPath ? `field=${issue.fieldPath}` : "",
+    issue.offendingText
+      ? `unsupported=${issue.offendingText.join(", ")}`
+      : "",
+    issue.sourceItem ? `missingSourceItem=${issue.sourceItem}` : "",
+  ].filter((value) => value.length > 0);
+
+  return `Grounding issue: ${details.join(" | ")}`;
+}
+
+function formatLeakageIssueGuidance(
+  issue: SectionLeakageResult["issues"][number],
+): string {
+  return `Leakage issue in ${issue.fieldPath}: rewrite it as plain student-facing prose without label-and-colon formatting or internal wording.`;
 }
 
 function isEnabledStatus(status: CoverageStatus, policy: RetryPolicy): boolean {
