@@ -11,6 +11,7 @@ import { stage4VerifySuite } from "./stage4-verify.eval.js";
 import { stage5aGroundingSuite } from "./stage5a-grounding.eval.js";
 import { stage5RetrySuite } from "./stage5-retry.eval.js";
 import { stage6AssembleSuite } from "./stage6-assemble.eval.js";
+import { studentVisibleFaithfulnessSuite } from "./student-visible-faithfulness.eval.js";
 import { pipelineSuite } from "./pipeline.eval.js";
 
 const suites = [
@@ -22,6 +23,7 @@ const suites = [
   stage5aGroundingSuite,
   stage5RetrySuite,
   stage6AssembleSuite,
+  studentVisibleFaithfulnessSuite,
   pipelineSuite,
 ];
 const results = [];

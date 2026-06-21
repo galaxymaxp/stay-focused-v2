@@ -13,7 +13,7 @@
       "scenario": "section-ids"
     },
     {
-      "name": "output title is used for the reviewer section",
+      "name": "source-backed output title is used for the reviewer section",
       "scenario": "output-title"
     },
     {

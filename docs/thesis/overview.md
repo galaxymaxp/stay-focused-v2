@@ -43,7 +43,7 @@ contracts.
 
 This pipeline is a capstone-ready technical contribution because it is
 documented and independently testable, not because real-provider quality is
-already complete. The dependency-free harness currently passes 176 cases and
+already complete. The dependency-free harness currently passes 219 cases and
 helps prevent V1-style regressions such as silently weak reviewers or missing
 later source sections. Provider quality evaluation and application integration
 remain future work.

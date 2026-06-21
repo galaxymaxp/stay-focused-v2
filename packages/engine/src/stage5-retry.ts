@@ -332,7 +332,7 @@ function buildRetryGuidance(
 
   if (groundingResult?.status === "failed") {
     guidance.push(
-      "Previous sourceCore failed grounding. Rewrite sourceCore using only facts and terms present in the section passage. If the passage is only a heading or very short phrase, use a minimal restatement of that exact text and set enrichment to null.",
+      "Previous default student-visible content failed grounding. Use the exact topic heading as title, rewrite sourceCore using only facts and terms present in the section passage, and set enrichment to null. If the passage is only a heading or very short phrase, use a minimal restatement of that exact text.",
     );
     guidance.push(
       ...groundingResult.issues.slice(0, 5).map(formatGroundingIssueGuidance),

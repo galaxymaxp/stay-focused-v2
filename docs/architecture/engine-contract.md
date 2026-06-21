@@ -205,7 +205,7 @@ small TypeScript assertions. It covers:
 - Stage 6 reviewer assembly: 30 cases; and
 - end-to-end pipeline integration: 21 cases.
 
-Current result: **176 passed, 0 failed**. Provider-facing and integration cases
+Current result: **219 passed, 0 failed**. Provider-facing and integration cases
 use deterministic fake providers only. The runner exits with code 1 when any
 case fails.
 

@@ -10,7 +10,7 @@ This file is local-only and intentionally ignored by Git.
 - The API-layer OpenAI provider now includes an injected-client adapter and a
   server-only OpenAI SDK factory in commit `d8374e9`, present on `origin/main`.
 - The current branch is `main` at `d8374e9`, matching `origin/main`.
-- The latest full evaluation result is 176 passed and 0 failed.
+- The latest full evaluation result is 219 passed and 0 failed.
 - OpenAI adapter contract checks pass 18 cases with fake clients and no network
   access.
 - Node.js `v24.16.0` and npm `11.13.0` are installed. The Node directory was
@@ -529,6 +529,14 @@ Current route status:
 - Next: Phase 2 — entailment judge for the N flagged claims (sized from a future live run); Phase 3 — specific-reason retry + judge cap.
 - Risks: Phase 1 flags faithful synonym paraphrase as fabrication by design; mitigated by extraction-first generator until Phase 2.
 
+### 2026-06-19 Stage 5a grounding fix — Phase 1.1 (list adherence + collect-and-continue)
+- Changed: `packages/engine/src/stage3-generate.ts`, `packages/engine/src/generate.ts`, `packages/engine/src/stage5-retry.ts`, `packages/engine/scripts/live-run.ts`, `packages/engine/evals/stage3-generate.eval.ts`, `packages/engine/evals/stage5a-grounding.eval.ts`, `packages/engine/evals/pipeline.eval.ts`, `packages/engine/evals/stage5-retry.eval.ts`, `packages/engine/evals/fixtures/pipeline-retry.json`, `packages/engine/evals/fixtures/stage5-basic.json`, `packages/engine/evals/fixtures/stage5-policy.json`, `docs/ai/live-output-it-security-after-grounding.txt`, `docs/ai/handoff.md`
+- Root cause: extraction-first prompt failed on list-only sections - model elaborated instead of extracting, causing fabrication + 0/N omission, and a meta-commentary explanation tripped the instruction-leakage guard and aborted the run.
+- Fix: hard list-adherence rule (keyPoints = source items verbatim; descriptions to enrichment); anti-meta explanation rule; collect-and-continue on validation failures with infra-error boundary preserved.
+- Verification: typecheck PASS; build PASS; eval PASS (208/208); eval:stage5a PASS (14/14). LIVE: complete run = yes; phase1FabricationFails=45; per-section grounding = Introduction 1, What is IT Security 1, Goal of IT Security 1, Domains of IT Security 0.4, What is Cybersecurity? 1, What is Cybersecurity all about? 0.25, Importance of cybersecurity 0.88, Challenges of Cybersecurity 0.7, Impact of a Security Breach 0.4, Types of Attackers 0.79, Definition of Terms 0.25, Types of Cybersecurity Threats 0, Types of Malware 0, Symptoms of Malware 0, Methods of Infiltration 0, Methods to Deny Service 0, Blended Attacks 0, Impact Reduction 0.25.
+- Next: Phase 2 (entailment judge) - NOW UNBLOCKED because N=45 is known; size judge cost against N. Re-confirm list omissions resolved before adding judge (judge can't fix non-extraction).
+- Risks: PS5 stderr trap on live runs - always use `$ErrorActionPreference='Continue'`. Consider a committed run script so the working invocation isn't re-derived.
+
 ### 2026-06-19 Stage 5a grounding fix — Phase 1.2
 - Changed: `packages/engine/src/source-blocks.ts`, `packages/engine/src/source-items.ts`, `packages/engine/src/index.ts`, `packages/engine/src/schemas.ts`, `packages/engine/src/stage3-generate.ts`, `packages/engine/src/stage4-verify.ts`, `packages/engine/src/stage5-retry.ts`, `packages/engine/src/stage5a-grounding.ts`, `packages/engine/evals/fixtures/stage3-request.json`, `packages/engine/evals/fixtures/stage4-status.json`, `packages/engine/evals/pipeline.eval.ts`, `packages/engine/evals/stage3-generate.eval.ts`, `packages/engine/evals/stage5a-grounding.eval.ts`, `docs/ai/live-output-it-security-after-grounding.txt`, `docs/ai/handoff.md`
 - Root cause: Stage 1 preserved source items, but Stage 3 still summarized/replaced list-heavy sections. Non-empty explanation schema forced filler into grounded core. Real-topic examples and denylisted prompt vocabulary contaminated output.
@@ -537,3 +545,10 @@ Current route status:
 - Live result: complete run=yes; phase1FabricationFails=0; formerly zero-list sections=Types of Cybersecurity Threats 7/7, Types of Malware 10/10, Symptoms of Malware 11/11, Methods of Infiltration 19/19, Methods to Deny Service 12/12, Blended Attacks 5/5, Impact Reduction 7/7; Domains of IT Security remained 11/11.
 - Next: Phase 2 only after this N is known and list extraction is clean. Phase 2 should add entailment judging only for remaining lexical false positives, not for omissions or prompt contamination. This IT Security fixture now has N=0, so validate broader fixtures before adding judge cost.
 - Risks: OpenAI strict schema compatibility for empty explanation is live-verified; UI/assembly has no direct explanation renderer and treats the required empty string safely while keyPoints/enrichment remain available.
+
+### 2026-06-21 Stage 5a grounding fix — Phase 1.3
+- Changed: added a shared default-visible text extractor; Stage 5 now validates title, sourceCore.explanation, and every sourceCore.keyPoint; Stage 3 normalizes title to the planned heading and enrichment to null; Stage 6 strips enrichment again during assembly.
+- Policy: IT Security sourceCore grounding remains closed. Default reviewer output is source-faithful, and outside knowledge is not part of the default assembled reviewer output.
+- Regression coverage: unsupported malware definitions, attack consequences, and invented example scenarios in enrichment are excluded; unsupported visible titles fail with field-specific diagnostics; existing list-adherence regressions remain passing.
+- Verification: engine typecheck PASS; build PASS; eval PASS (219/219); Stage 5a PASS (16/16); student-visible faithfulness PASS (6/6).
+- Live validation: not rerun in this phase; no live OpenAI calls were made.

@@ -146,7 +146,7 @@ values only through approved variable-name matching.
 - client error wrapping with model context.
 
 The checks require no API key or network connection. They are kept separate
-from the 176 deterministic engine evals because they test an API-layer adapter
+from the 219 deterministic engine evals because they test an API-layer adapter
 rather than engine behavior.
 
 The installed SDK module is present for compilation, but fake checks inject a

@@ -544,11 +544,8 @@ function createDeterministicListCoreCase(): EvalCase {
         ),
         ...assertDeepEqual(
           output.enrichment,
-          {
-            note: "Optional note",
-            points: ["Target — Additional context"],
-          },
-          "Deterministic list enforcement did not safely preserve enrichment.",
+          null,
+          "Default Stage 3 output retained source-external enrichment.",
         ),
       ];
 

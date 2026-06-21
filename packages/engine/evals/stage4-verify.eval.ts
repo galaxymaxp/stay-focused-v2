@@ -633,6 +633,7 @@ function createValidOutput(
     plannedSectionId: plannedSection.id,
     title: plannedSection.title,
     sourceBlockIds: [...plannedSection.sourceBlockIds],
+    enrichment: null,
   };
 
   switch (schemaKind) {

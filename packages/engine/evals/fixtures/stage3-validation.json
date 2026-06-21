@@ -14,6 +14,13 @@
       "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": missing required field \"sourceCore\"."
     },
     {
+      "name": "missing required enrichment field is rejected",
+      "scenario": "missing-field",
+      "schemaKind": "concept-card",
+      "field": "enrichment",
+      "expectError": "Stage 3 output validation failed for section \"planned-concept-card\": missing required field \"enrichment\"."
+    },
+    {
       "name": "missing source block ID is rejected",
       "scenario": "missing-source-block",
       "schemaKind": "concept-card",

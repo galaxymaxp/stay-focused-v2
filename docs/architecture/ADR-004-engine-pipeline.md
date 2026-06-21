@@ -77,7 +77,7 @@ core engine.
 
 Each stage was developed eval-first using dependency-free TypeScript suites and
 readable JSON fixtures. Provider-facing cases use deterministic fake providers.
-The aggregate harness currently reports 176 passing cases and 0 failures,
+The aggregate harness currently reports 219 passing cases and 0 failures,
 covering Stage 0 through Stage 6 and end-to-end pipeline integration.
 
 These evals test contracts, ordering, validation, retry bounds, failure

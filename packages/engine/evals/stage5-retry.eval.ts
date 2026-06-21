@@ -719,6 +719,7 @@ function createValidOutput(
     plannedSectionId: section.id,
     title: section.title,
     sourceBlockIds: [...section.sourceBlockIds],
+    enrichment: null,
   };
 
   switch (section.schemaKind) {
@@ -803,6 +804,7 @@ function createWrongKindOutput(
         `Complete source content B for section ${section.order + 1}.`,
       ],
     },
+    enrichment: null,
     sourceBlockIds: [...section.sourceBlockIds],
   };
 }

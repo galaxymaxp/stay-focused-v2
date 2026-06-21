@@ -13,6 +13,7 @@ const cleanOutput: SectionOutput = {
     explanation: "Focused review keeps attention on one source-backed idea.",
     keyPoints: ["Use short review intervals", "Keep examples concrete"],
   },
+  enrichment: null,
   sourceBlockIds: ["source-block-1"],
 };
 

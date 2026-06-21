@@ -151,7 +151,7 @@ interface BaseSectionOutput {
   readonly title: string;
   readonly sourceBlockIds: readonly string[];
   readonly sourceCore: SourceGroundedCore;
-  readonly enrichment?: EnrichmentLayer;
+  readonly enrichment: EnrichmentLayer | null;
 }
 
 export interface SourceGroundedCore {
@@ -160,8 +160,8 @@ export interface SourceGroundedCore {
 }
 
 export interface EnrichmentLayer {
-  readonly note?: string;
-  readonly points?: readonly string[];
+  readonly note: string;
+  readonly points: readonly string[];
 }
 
 export interface ConceptCard extends BaseSectionOutput {

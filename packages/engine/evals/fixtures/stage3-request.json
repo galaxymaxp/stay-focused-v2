@@ -40,7 +40,7 @@
         "Included source alpha.",
         "Included source beta.",
         "Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
-        "Put optional examples, outside knowledge, and clarifying context only in enrichment."
+        "Set enrichment to null. Outside knowledge and source-external clarifications are not part of the default reviewer."
       ],
       "expectPromptExcludes": ["Excluded unrelated omega.", "Stay Focused V2 engine"],
       "expectPromptOrder": ["Included source alpha.", "Included source beta."]

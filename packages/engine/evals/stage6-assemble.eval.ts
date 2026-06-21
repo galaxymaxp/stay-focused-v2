@@ -361,7 +361,7 @@ function runOrderingScenario(
       const firstSection = requireSection(context.sections[0]);
       const titledOutput = {
         ...createValidOutput(firstSection),
-        title: "Generated Reviewer Title",
+        title: firstSection.title,
       } as SectionOutput;
       const singleContext = createContext(["concept-card"]);
       const singleSection = requireSection(singleContext.sections[0]);
@@ -383,8 +383,8 @@ function runOrderingScenario(
       });
       return assertEqual(
         reviewer.sections[0]?.title,
-        "Generated Reviewer Title",
-        "Reviewer section did not use the generated output title.",
+        singleSection.title,
+        "Reviewer section did not use the source-backed output title.",
       );
     }
     case "immutable-inputs": {
@@ -706,8 +706,9 @@ function createValidOutput(
   const base = {
     id,
     plannedSectionId: section.id,
-    title: `Generated ${section.title}`,
+    title: section.title,
     sourceBlockIds: [...section.sourceBlockIds],
+    enrichment: null,
   };
 
   switch (section.schemaKind) {
@@ -789,6 +790,7 @@ function createWrongKindOutput(section: PlannedSection): SectionOutput {
         `Complete source content B for section ${section.order + 1}.`,
       ],
     },
+    enrichment: null,
     sourceBlockIds: [...section.sourceBlockIds],
   };
 }

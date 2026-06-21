@@ -12,6 +12,7 @@
           "explanation": "Included source alpha and included source beta.",
           "keyPoints": ["Included source alpha.", "Included source beta."]
         },
+        "enrichment": null,
         "sourceBlockIds": ["included-a", "included-b"]
       }
     },
@@ -27,6 +28,7 @@
           "explanation": "Included source alpha and included source beta.",
           "keyPoints": ["Included source alpha.", "Included source beta."]
         },
+        "enrichment": null,
         "sourceBlockIds": ["included-a", "included-b"]
       }
     },
@@ -42,6 +44,7 @@
           "explanation": "Included source alpha and included source beta.",
           "keyPoints": ["Included source alpha.", "Included source beta."]
         },
+        "enrichment": null,
         "sourceBlockIds": ["included-a", "included-b"]
       }
     },
@@ -57,6 +60,7 @@
           "explanation": "Included source alpha and included source beta.",
           "keyPoints": ["Included source alpha.", "Included source beta."]
         },
+        "enrichment": null,
         "sourceBlockIds": ["included-a", "included-b"]
       }
     }

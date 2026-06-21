@@ -11,6 +11,7 @@ import type {
   SectionLeakageResult,
   SectionOutput,
 } from "./types";
+import { toDefaultStudentVisibleSectionOutput } from "./student-visible-text.js";
 
 export interface AssembleReviewerArgs {
   readonly source: NormalizedSource;
@@ -401,6 +402,8 @@ function createReviewerSection(
   planId: string,
   coverageId: string,
 ): ReviewerSection {
+  const visibleOutput = toDefaultStudentVisibleSectionOutput(output);
+
   return {
     id: stableId(
       "reviewer-section",
@@ -408,7 +411,7 @@ function createReviewerSection(
     ),
     sourceSectionId: plannedSection.sourceSectionId,
     plannedSectionId: plannedSection.id,
-    title: output.title.trim() || plannedSection.title,
+    title: visibleOutput.title.trim() || plannedSection.title,
     order: plannedSection.order,
     kind: plannedSection.schemaKind,
     sourceBlockIds: [...output.sourceBlockIds],
@@ -419,7 +422,7 @@ function createReviewerSection(
     groundingIssues: [...grounding.issues],
     leakageStatus: leakage.status,
     leakageIssues: [...leakage.issues],
-    items: [output],
+    items: [visibleOutput],
   };
 }
 

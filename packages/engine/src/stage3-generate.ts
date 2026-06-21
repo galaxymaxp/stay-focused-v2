@@ -9,6 +9,7 @@ import {
   extractCleanSourceItems,
   type SourceItem,
 } from "./source-items.js";
+import { toDefaultStudentVisibleSectionOutput } from "./student-visible-text.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import type {
   GenerationPlan,
@@ -59,9 +60,6 @@ const SPARSE_SOURCE_WORD_LIMIT = 8;
 const TERM_PATTERN = /[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g;
 const LIST_MARKER_PATTERN =
   /(?:^|\s)(?:[-*]\s+|(?:â€¢|Ã¢â‚¬Â¢)\s+|\d{1,2}[.)]\s+|[a-z]\)\s+)/i;
-const ENRICHMENT_LABEL_PATTERN =
-  /\b(section title|target|instructions|schema kind|requested item count|coverage rules)\s*:/gi;
-
 export async function generateSection(
   args: GenerateSectionArgs,
 ): Promise<SectionOutput> {
@@ -110,7 +108,10 @@ export async function generateSection(
     detectedItems.length >= 2
       ? applyDetectedListCoreGuard(structurallyValidOutput, detectedItems)
       : applySparseSourceCoreGuard(structurallyValidOutput, sourceBlocks);
-  const normalizedOutput = normalizeEnrichmentLabelPunctuation(guardedOutput);
+  const normalizedOutput = toDefaultStudentVisibleSectionOutput({
+    ...guardedOutput,
+    title: section.title,
+  } as SectionOutput);
   validateSectionInstructionLeakage(normalizedOutput, section);
   return normalizedOutput;
 }
@@ -148,7 +149,6 @@ export function buildSectionPrompt(
     "- HARD LIST RULE: when the passage is primarily an enumerated list of items or names, sourceCore.keyPoints MUST be exactly the detected passage items: one keyPoint per item, in passage order, using the passage wording verbatim.",
     "- For a list section, DO NOT summarize the list, replace it with prose, merge items, omit items, or add items.",
     "- DO NOT elaborate on any list item inside sourceCore. Copy a short or sparse list AS-IS; thinness is never a reason to elaborate.",
-    "- If per-item explanation is genuinely useful, put it in enrichment ONLY, with one enrichment point per item that begins with the exact item wording so it is keyed to that item. Enrichment is separate from sourceCore.",
     "- ANTI-META EXPLANATION RULE: sourceCore.explanation must contain passage-derived factual content, be one minimal passage-derived factual sentence, or be empty for a sparse/list-only card.",
     "- sourceCore.explanation MUST NEVER describe the card itself, describe its purpose, or restate the task.",
     "- Forbidden meta-commentary includes: \"This section lists...\", \"The following are...\", \"These are the steps to...\", \"This section explains...\", and similar framing. Such text is not study content and can trigger instruction-leakage rejection.",
@@ -156,16 +156,14 @@ export function buildSectionPrompt(
     "- For a heading-only or very short passage, keep sourceCore minimal and use the wording as-is with no filler.",
     "- FAKE FORMAT EXAMPLE: \"Fruit List • Apple • Banana • Cherry\" maps to explanation \"\" and keyPoints [\"Apple\",\"Banana\",\"Cherry\"].",
     "- FAKE FORMAT EXAMPLE: \"Desk Supplies • Pen • Notebook\" maps to explanation \"\" and keyPoints [\"Pen\",\"Notebook\"].",
-    "- Never invent examples, scenarios, entities, technologies, impacts, or methods inside sourceCore.",
-    "- Never introduce concepts in sourceCore that are absent from this passage.",
+    "- Never invent examples, scenarios, entities, technologies, impacts, consequences, definitions, or methods in any student-visible field.",
+    "- Never introduce concepts in the title or sourceCore that are absent from this passage.",
     "- If the passage is only a heading, title, module label, or very short phrase, do not expand it into a general lesson.",
     "- For a heading-only or very short passage, sourceCore must be a minimal restatement of the exact passage with one key point and enrichment must be null.",
     "- For list-only passages, include only the listed items and explanations explicitly present there.",
     "- Never borrow content from other passages.",
-    "- Put optional examples, outside knowledge, and clarifying context only in enrichment.",
-    "- Write enrichment points as ordinary sentences, never as label-and-colon fragments.",
-    "- Set enrichment to null when no optional enrichment is needed.",
-    "- Keep enrichment structurally separate from sourceCore; never blend enrichment into sourceCore.",
+    "- Use the exact topic heading as title.",
+    "- Set enrichment to null. Outside knowledge and source-external clarifications are not part of the default reviewer.",
     "- Do not include project, repository, internal architecture, pipeline, engine, or Stay Focused references in any output field.",
     "- Return JSON conforming to the supplied object format.",
     `- plannedSectionId value — "${section.id}".`,
@@ -290,28 +288,6 @@ function applyDetectedListCoreGuard(
     sourceCore: {
       explanation: "",
       keyPoints: detectedItems.map((item) => item.text),
-    },
-  } as SectionOutput;
-}
-
-function normalizeEnrichmentLabelPunctuation(
-  output: SectionOutput,
-): SectionOutput {
-  if (!output.enrichment) {
-    return output;
-  }
-
-  const replaceLabelColon = (value: string): string =>
-    value.replace(
-      ENRICHMENT_LABEL_PATTERN,
-      (_match, label: string) => `${label} —`,
-    );
-
-  return {
-    ...output,
-    enrichment: {
-      note: replaceLabelColon(output.enrichment.note),
-      points: output.enrichment.points.map(replaceLabelColon),
     },
   } as SectionOutput;
 }

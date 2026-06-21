@@ -5,6 +5,10 @@ import {
   type SourceItem,
 } from "./source-items.js";
 import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
+import {
+  extractStudentVisibleText,
+  type StudentVisibleTextEntry,
+} from "./student-visible-text.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import { normalizeCoverageTitleKey } from "./stage4-verify.js";
 import type {
@@ -19,7 +23,6 @@ import type {
   SectionOutput,
   SourceOutline,
   SourceOutlineSection,
-  StudentFacingSectionField,
 } from "./types.js";
 
 export interface ValidateGroundingArgs {
@@ -34,12 +37,6 @@ interface SourceSpan {
   readonly text: string;
 }
 
-interface CoreTextEntry {
-  readonly field: StudentFacingSectionField;
-  readonly fieldPath: string;
-  readonly text: string;
-}
-
 interface TermOccurrence {
   readonly text: string;
   readonly canonical: string;
@@ -47,7 +44,7 @@ interface TermOccurrence {
 }
 
 interface ClaimFabricationFailure extends Phase1FabricationFailure {
-  readonly field: StudentFacingSectionField;
+  readonly field: StudentVisibleTextEntry["field"];
   readonly unsupportedOccurrences: readonly TermOccurrence[];
 }
 
@@ -196,8 +193,13 @@ function validateSectionGrounding(args: {
     };
   }
 
-  const coreEntries = collectSourceCoreText(output);
+  const visibleEntries = extractStudentVisibleText(output);
   const sourceTerms = extractTermSet(args.sourceSpan.text);
+  const titleTerms = new Set([
+    ...sourceTerms,
+    ...extractTermSet(args.sourceSpan.sourceSection.title),
+    ...extractTermSet(args.section.title),
+  ]);
   const sourceItems = extractCleanSourceItems({
     sourceSpanText: args.sourceSpan.text,
     sectionTitle: args.sourceSpan.sourceSection.title,
@@ -205,7 +207,8 @@ function validateSectionGrounding(args: {
   const fabricationCheck = checkFabrication({
     section: args.section,
     sourceTerms,
-    coreEntries,
+    titleTerms,
+    visibleEntries,
   });
   const omissionCheck = checkOmissions({
     section: args.section,
@@ -234,15 +237,16 @@ function validateSectionGrounding(args: {
 function checkFabrication(args: {
   readonly section: PlannedSection;
   readonly sourceTerms: ReadonlySet<string>;
-  readonly coreEntries: readonly CoreTextEntry[];
+  readonly titleTerms: ReadonlySet<string>;
+  readonly visibleEntries: readonly StudentVisibleTextEntry[];
 }): FabricationCheck {
   // PHASE 1: lexical content-token check. Flags faithful synonym paraphrase
   // (e.g. "blocks" for "prevents") as fabrication. Phase 2 adds an entailment
   // judge for exactly these cases. Generator is kept extraction-first meanwhile.
-  const failures = args.coreEntries.flatMap((entry) => {
+  const failures = args.visibleEntries.flatMap((entry) => {
     const unsupportedOccurrences = findUnsupportedContentTerms(
       entry.text,
-      args.sourceTerms,
+      entry.field === "title" ? args.titleTerms : args.sourceTerms,
     );
     if (unsupportedOccurrences.length === 0) {
       return [];
@@ -366,25 +370,8 @@ function createFabricationIssue(args: {
       firstOccurrence.index,
       firstOccurrence.text.length,
     ),
-    message: `SourceCore introduces unsupported content tokens "${args.failure.unsupportedTokens.join(", ")}" in ${args.failure.fieldPath}.`,
+    message: `Default student-visible content introduces unsupported content tokens "${args.failure.unsupportedTokens.join(", ")}" in ${args.failure.fieldPath}.`,
   };
-}
-
-function collectSourceCoreText(output: SectionOutput): readonly CoreTextEntry[] {
-  return [
-    {
-      field: "sourceCore.explanation",
-      fieldPath: "sourceCore.explanation",
-      text: output.sourceCore.explanation,
-    },
-    ...output.sourceCore.keyPoints.map(
-      (text, index): CoreTextEntry => ({
-        field: "sourceCore.keyPoints",
-        fieldPath: `sourceCore.keyPoints[${index}]`,
-        text,
-      }),
-    ),
-  ];
 }
 
 export function extractGroundingSourceSectionText(
