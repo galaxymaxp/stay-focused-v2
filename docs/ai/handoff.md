@@ -552,3 +552,11 @@ Current route status:
 - Regression coverage: unsupported malware definitions, attack consequences, and invented example scenarios in enrichment are excluded; unsupported visible titles fail with field-specific diagnostics; existing list-adherence regressions remain passing.
 - Verification: engine typecheck PASS; build PASS; eval PASS (219/219); Stage 5a PASS (16/16); student-visible faithfulness PASS (6/6).
 - Live validation: not rerun in this phase; no live OpenAI calls were made.
+
+### 2026-06-21 Phase 1.4 live visible-grounding validation
+- Live output: `docs/ai/live-output-it-security-after-visible-grounding.txt`
+- Audit: `docs/ai/live-output-it-security-after-visible-grounding-audit.md`
+- Result: coverage 18/18; grounding 1.00; grounding issues 0; phase-1 fabrication failures 0; leakage issues 0.
+- Default-visible verdict: all 18 assembled cards have `enrichment: null`; no unsupported visible outside knowledge was found.
+- Readability: 17 list-heavy sections use empty explanations with complete source key points; no section is empty.
+- Verification: engine typecheck PASS; build PASS; eval PASS (219/219).
