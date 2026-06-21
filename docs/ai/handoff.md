@@ -560,3 +560,10 @@ Current route status:
 - Default-visible verdict: all 18 assembled cards have `enrichment: null`; no unsupported visible outside knowledge was found.
 - Readability: 17 list-heavy sections use empty explanations with complete source key points; no section is empty.
 - Verification: engine typecheck PASS; build PASS; eval PASS (219/219).
+
+### 2026-06-22 Phase 1.4 live visible-grounding revalidation
+- Live output: `docs/ai/live-output-it-security-after-visible-grounding-20260622-053615.txt`
+- Result: coverage 18/18; grounding 1.00; grounding issues 0; phase-1 fabrication failures 0; leakage issues 0.
+- Default-visible verdict: all 18 assembled cards have `enrichment: null`; no unsupported visible outside knowledge was found.
+- Readability: the source-backed `Blended Attacks` title remains restored; 17 list-heavy sections use empty explanations with 3-19 source key points, and no section is empty.
+- Verification: engine typecheck PASS; build PASS; eval PASS (219/219).
