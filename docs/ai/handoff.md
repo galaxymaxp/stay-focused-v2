@@ -586,3 +586,13 @@ Current route status:
 - The fix is deterministic extraction and grounding logic across subject domains. Stage 3 prompts, OpenAI schemas, provider behavior, mobile, auth, API, database, and shared packages were unchanged.
 - Added 23 cross-domain fidelity evals, including the Digital Components live fixture regression.
 - Verification: engine typecheck PASS; build PASS; targeted Stage 0/1/3/5a/pipeline/fidelity suites PASS; aggregate eval PASS (242/242). No live OpenAI calls were made.
+
+### 2026-06-23 06:55 +08:00 Phase 1.7 Digital Components live token-fidelity validation
+- Fixture: Digital Components (`digital-components`; source ID `live-digital-components`).
+- Live output: `docs/ai/live-output-digital-components-after-token-fidelity-20260623-065246.txt`.
+- Result: coverage 18/18, score 1.00; grounding 1.00; grounding issues 0; phase-1 fabrication failures 0; leakage issues 0.
+- Token-fidelity verdict: PASS. The default-visible key point preserves `3.3V on 3.3 board` intact; no standalone `3V on`, `3 board`, or `3 board)` key point is present.
+- Default-visible verdict: all 18 enrichment values are null; no unsupported visible text was found.
+- Readability: all 18 sections are non-empty and the 76 source-backed key points remain useful as a compact outline. Explanations remain limited: 9 are empty and 9 are heading-like placeholders.
+- Verification: engine typecheck PASS; build PASS; aggregate eval PASS (242/242); source-token fidelity eval PASS (23/23).
+- Remaining issue: explanation quality and repeated generic `Digital Software Coding` sections remain weak, but no Phase 1.7 coverage, grounding, leakage, enrichment, or token-fidelity failure remains.
