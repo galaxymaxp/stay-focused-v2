@@ -11,6 +11,7 @@ import {
 } from "./student-visible-text.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import { normalizeCoverageTitleKey } from "./stage4-verify.js";
+import { findSourceTokenFidelityViolations } from "./source-token-fidelity.js";
 import type {
   GenerationPlan,
   GroundingIssue,
@@ -206,6 +207,12 @@ function validateSectionGrounding(args: {
   });
   const fabricationCheck = checkFabrication({
     section: args.section,
+    sourceText: args.sourceSpan.text,
+    titleSourceText: [
+      args.sourceSpan.text,
+      args.sourceSpan.sourceSection.title,
+      args.section.title,
+    ].join("\n"),
     sourceTerms,
     titleTerms,
     visibleEntries,
@@ -236,6 +243,8 @@ function validateSectionGrounding(args: {
 
 function checkFabrication(args: {
   readonly section: PlannedSection;
+  readonly sourceText: string;
+  readonly titleSourceText: string;
   readonly sourceTerms: ReadonlySet<string>;
   readonly titleTerms: ReadonlySet<string>;
   readonly visibleEntries: readonly StudentVisibleTextEntry[];
@@ -248,20 +257,34 @@ function checkFabrication(args: {
       entry.text,
       entry.field === "title" ? args.titleTerms : args.sourceTerms,
     );
-    if (unsupportedOccurrences.length === 0) {
+    const fidelityOccurrences = findSourceTokenFidelityViolations(
+      entry.field === "title" ? args.titleSourceText : args.sourceText,
+      entry.text,
+    ).map(
+      (violation): TermOccurrence => ({
+        text: violation.text,
+        canonical: `source-token:${violation.text}`,
+        index: violation.index,
+      }),
+    );
+    const combinedOccurrences = dedupeTermOccurrences([
+      ...unsupportedOccurrences,
+      ...fidelityOccurrences,
+    ]);
+    if (combinedOccurrences.length === 0) {
       return [];
     }
 
     return [
       {
         claimText: entry.text,
-        unsupportedTokens: unsupportedOccurrences.map(
+        unsupportedTokens: combinedOccurrences.map(
           (occurrence) => occurrence.text,
         ),
         sourceSectionId: args.section.sourceSectionId,
         field: entry.field,
         fieldPath: entry.fieldPath,
-        unsupportedOccurrences,
+        unsupportedOccurrences: combinedOccurrences,
       } satisfies ClaimFabricationFailure,
     ];
   });
@@ -287,6 +310,20 @@ function checkFabrication(args: {
     issues,
     failures,
   };
+}
+
+function dedupeTermOccurrences(
+  occurrences: readonly TermOccurrence[],
+): readonly TermOccurrence[] {
+  const seen = new Set<string>();
+  return occurrences.filter((occurrence) => {
+    const key = `${occurrence.index}\u001f${occurrence.text}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function checkOmissions(args: {

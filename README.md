@@ -16,7 +16,7 @@ with Canvas LMS integration and AI-generated study materials.
 
 The provider-agnostic Stage 0 through Stage 6 pipeline and end-to-end
 `runPipeline` integration are complete. The dependency-free eval harness
-currently reports 219 passed and 0 failed using deterministic fake providers.
+currently reports 242 passed and 0 failed using deterministic fake providers.
 Default assembled reviewer cards are source-faithful: Stage 5 validates every
 default-visible title, explanation, and key point, while source-external
 enrichment is excluded from the default reviewer output.

@@ -9,14 +9,19 @@ export interface ExtractCleanSourceItemsArgs {
   readonly sectionTitle: string;
 }
 
-const LIST_MARKER_PATTERN =
-  /(?:^|\s)(?:[-*]\s+|\u2022\s+|\d{1,2}[.)]\s*|[a-z]\)\s*)/gi;
+const BULLET_MARKER_PATTERN = /(?:^|\s)(?:[-*]\s+|\u2022\s+)/gi;
+const ORDERED_MARKER_PATTERN =
+  /(?:^|\s)(?:\d{1,3}[.)]\s+|[a-z]\)\s+)/gi;
 
 export function extractCleanSourceItems(
   args: ExtractCleanSourceItemsArgs,
 ): readonly SourceItem[] {
   const normalized = normalizeListMarkers(args.sourceSpanText);
-  const markerMatches = [...normalized.matchAll(LIST_MARKER_PATTERN)];
+  const bulletMatches = [...normalized.matchAll(BULLET_MARKER_PATTERN)];
+  const markerMatches =
+    bulletMatches.length >= 2
+      ? bulletMatches
+      : [...normalized.matchAll(ORDERED_MARKER_PATTERN)];
   if (markerMatches.length < 2) {
     return [];
   }
@@ -58,10 +63,7 @@ function normalizeListMarkers(value: string): string {
 }
 
 function cleanSourceItemText(value: string): string {
-  return value
-    .replace(/\s+/g, " ")
-    .replace(/^[.:;,\s]+/, "")
-    .trim();
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function stripTrailingRepeatedSectionTitle(

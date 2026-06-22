@@ -17,6 +17,7 @@
     "eval:stage5a": "node dist/evals/stage5a-grounding.eval.js",
     "eval:stage5": "node dist/evals/stage5-retry.eval.js",
     "eval:stage6": "node dist/evals/stage6-assemble.eval.js",
+    "eval:fidelity": "node dist/evals/source-token-fidelity.eval.js",
     "eval:pipeline": "node dist/evals/pipeline.eval.js",
     "live-run": "tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js",
     "diagnose:stage012": "tsc -p tsconfig.live-run.json && node dist-live/scripts/diagnose-stage012.js",

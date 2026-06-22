@@ -3,6 +3,7 @@ export * from "./leakage-guard";
 export * from "./provider";
 export * from "./schemas";
 export * from "./source-items";
+export * from "./source-token-fidelity";
 export * from "./source-blocks";
 export * from "./student-visible-text";
 export * from "./stage0-normalize";

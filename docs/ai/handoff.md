@@ -577,3 +577,12 @@ Current route status:
 - Arnis M1 readability: no section is empty; seven explanations are empty and the heading card is title-only, while source key points preserve the history, techniques, equipment, rules, and Filipino martial-arts context. The evolvement section is dense but source-faithful.
 - Verification: engine typecheck PASS; build PASS; eval PASS (219/219).
 - Remaining issue: add a regression for decimal-bearing source text so sentence/item extraction does not split `3.3V` into misleading standalone visible fragments. No engine, prompt, schema, mobile, auth, or provider changes were made in this validation task.
+
+### 2026-06-23 Phase 1.6 generalized source-token fidelity
+- Digital Components live validation exposed a deterministic list-marker bug: decimal fragments inside `3.3V on 3.3 board` were interpreted as numbered-item boundaries and then copied into visible key points by the Stage 3 source-item guard.
+- Fixed source-item extraction so explicit bullet lists do not reinterpret numeric punctuation inside their items, ordered markers require following whitespace, and leading token punctuation such as `.env.local` is preserved.
+- Added shared source-token fidelity validation for numeric identity, measurements, math, chemistry, laws/dates, networking/software tokens, code, ranges/ratios/dimensions, abbreviations, table rows, numbered headings, and OCR-looking source text.
+- Stage 5 now rejects punctuation-stripped, symbol-stripped, or number-mutated visible variants with field-specific grounding failures instead of accepting content-word substring matches.
+- The fix is deterministic extraction and grounding logic across subject domains. Stage 3 prompts, OpenAI schemas, provider behavior, mobile, auth, API, database, and shared packages were unchanged.
+- Added 23 cross-domain fidelity evals, including the Digital Components live fixture regression.
+- Verification: engine typecheck PASS; build PASS; targeted Stage 0/1/3/5a/pipeline/fidelity suites PASS; aggregate eval PASS (242/242). No live OpenAI calls were made.
