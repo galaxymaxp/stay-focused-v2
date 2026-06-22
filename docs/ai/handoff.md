@@ -567,3 +567,13 @@ Current route status:
 - Default-visible verdict: all 18 assembled cards have `enrichment: null`; no unsupported visible outside knowledge was found.
 - Readability: the source-backed `Blended Attacks` title remains restored; 17 list-heavy sections use empty explanations with 3-19 source key points, and no section is empty.
 - Verification: engine typecheck PASS; build PASS; eval PASS (219/219).
+
+### 2026-06-23 05:25 +08:00 Phase 1.5 cross-fixture live visible-grounding validation
+- Fixtures: Digital Components (`live-digital-components`) and Arnis M1 (`live-arnis-m1`).
+- Live outputs: `docs/ai/live-output-digital-components-after-visible-grounding-20260623-052054.txt` and `docs/ai/live-output-arnis-after-visible-grounding-20260623-052149.txt`.
+- Digital Components automated result: coverage 18/18, score 1.00; grounding 1.00; grounding issues 0; phase-1 fabrication failures 0; leakage issues 0; all 18 enrichment values null.
+- Digital Components manual verdict: FAIL. The source phrase `3.3V on 3.3 board` became separate default-visible key points `3V on` and `3 board)`, changing the technical meaning despite the passing grounding report. Repeated duplicate-heading sections are also weak as a study outline.
+- Arnis M1 result: coverage 8/8, score 1.00; grounding 1.00; grounding issues 0; phase-1 fabrication failures 0; leakage issues 0; all 8 enrichment values null; no unsupported default-visible outside knowledge found.
+- Arnis M1 readability: no section is empty; seven explanations are empty and the heading card is title-only, while source key points preserve the history, techniques, equipment, rules, and Filipino martial-arts context. The evolvement section is dense but source-faithful.
+- Verification: engine typecheck PASS; build PASS; eval PASS (219/219).
+- Remaining issue: add a regression for decimal-bearing source text so sentence/item extraction does not split `3.3V` into misleading standalone visible fragments. No engine, prompt, schema, mobile, auth, or provider changes were made in this validation task.

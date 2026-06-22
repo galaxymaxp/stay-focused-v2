@@ -1,0 +1,779 @@
+
+> @stay-focused/engine@0.0.0 live-run
+> tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js arnis-m1
+
+
+=== Arnis M1 (arnis-m1.txt) ===
+{"event":"reviewer.coverage.completed","sourceId":"live-arnis-m1","detectedSectionCount":8,"coveredCount":8,"missingSectionTitles":[],"duplicateGroups":[],"coverageScore":1,"coverageBasis":"source-outline","status":"passed","validationRuns":2}
+Planned sections: 8
+Sections passed coverage: 8
+Failed sections: none
+Coverage summary: status=passed score=1 sourceSections=8/8 passedSections=8 weakSections=0 failedSections=0
+Grounding summary: status=passed score=1 threshold=0.8 failedSections=0 issues=0 phase1FabricationFails=0
+Leakage summary: status=passed failedSections=0 issues=0
+Per-section pass/fail table:
+PASS | ARNIS/ STICK FIGHTING | live-arnis-m1-section-pcomtj-planned-1h16qqb | stage=stage3 | reason=- | grounding=1(passed)
+PASS | ARNIS | live-arnis-m1-section-vz0m93-planned-1ihlo8u | stage=stage3 | reason=- | grounding=1(passed)
+PASS | A. HISTORICAL CONCEPT: | live-arnis-m1-section-1fv2x80-planned-19w4is3 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | B. EVOLVEMENT OF THE ART: | live-arnis-m1-section-1g1ylkn-planned-1yg9nre | stage=stage3 | reason=- | grounding=1(passed)
+PASS | 3 MAIN GROUPS: | live-arnis-m1-section-1eqzd03-planned-178qcwx | stage=stage3 | reason=- | grounding=1(passed)
+PASS | COURTESY / SALUTATION: | live-arnis-m1-section-edwwdh-planned-19p900r | stage=stage3 | reason=- | grounding=1(passed)
+PASS | TYPES OF STRIKES: | live-arnis-m1-section-brj7a0-planned-1aleafi | stage=stage3 | reason=- | grounding=1(passed)
+PASS | ARNIS AS A SPORT | live-arnis-m1-section-1dc0x8n-planned-1ropyab | stage=stage3 | reason=- | grounding=1(passed)
+Section validation failures: []
+Leakage rejections: none
+Final assembled reviewer:
+{
+  "id": "reviewer-162ilj2",
+  "title": "Arnis M1",
+  "sections": [
+    {
+      "id": "reviewer-section-1mouemo",
+      "sourceSectionId": "live-arnis-m1-section-pcomtj",
+      "plannedSectionId": "live-arnis-m1-section-pcomtj-planned-1h16qqb",
+      "title": "ARNIS/ STICK FIGHTING",
+      "order": 0,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-1rbs65"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "1",
+          "plannedSectionId": "live-arnis-m1-section-pcomtj-planned-1h16qqb",
+          "title": "ARNIS/ STICK FIGHTING",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-1rbs65"
+          ],
+          "sourceCore": {
+            "explanation": "ARNIS/ STICK FIGHTING",
+            "keyPoints": [
+              "ARNIS/ STICK FIGHTING"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-tf4dyu",
+      "sourceSectionId": "live-arnis-m1-section-vz0m93",
+      "plannedSectionId": "live-arnis-m1-section-vz0m93-planned-1ihlo8u",
+      "title": "ARNIS",
+      "order": 1,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-1opkj0z",
+        "live-arnis-m1-block-s1goq0",
+        "live-arnis-m1-block-jnh8ov",
+        "live-arnis-m1-block-gokzva",
+        "live-arnis-m1-block-11fl66y",
+        "live-arnis-m1-block-1m94vti"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-1",
+          "plannedSectionId": "live-arnis-m1-section-vz0m93-planned-1ihlo8u",
+          "title": "ARNIS",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-1opkj0z",
+            "live-arnis-m1-block-s1goq0",
+            "live-arnis-m1-block-jnh8ov",
+            "live-arnis-m1-block-gokzva",
+            "live-arnis-m1-block-11fl66y",
+            "live-arnis-m1-block-1m94vti"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Also known as Eskrima, Kali, Garrote and other names in various regional languages.",
+              "An indigenous Filipino Martial Art and Sport characterized by the use of swinging and twirling movements, accompanied by striking, thrusting and parrying techniques for defense and offense.",
+              "This is usually done with the use of one or two sticks.",
+              "R.A. 9850 Arnis was declared as the National Martial Art and Sport of the Philippines on the December 11, 2009 signed by President Gloria Macapagal-Arroyo."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1opt5eg",
+      "sourceSectionId": "live-arnis-m1-section-1fv2x80",
+      "plannedSectionId": "live-arnis-m1-section-1fv2x80-planned-19w4is3",
+      "title": "A. HISTORICAL CONCEPT:",
+      "order": 2,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-1ejbqpv",
+        "live-arnis-m1-block-1ppuhna"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "live-arnis-m1-section-1fv2x80-planned-19w4is3",
+          "plannedSectionId": "live-arnis-m1-section-1fv2x80-planned-19w4is3",
+          "title": "A. HISTORICAL CONCEPT:",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-1ejbqpv",
+            "live-arnis-m1-block-1ppuhna"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "No document and written histories."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1bmcekd",
+      "sourceSectionId": "live-arnis-m1-section-1g1ylkn",
+      "plannedSectionId": "live-arnis-m1-section-1g1ylkn-planned-1yg9nre",
+      "title": "B. EVOLVEMENT OF THE ART:",
+      "order": 3,
+      "kind": "example-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-1g9bjbq",
+        "live-arnis-m1-block-obhlrv",
+        "live-arnis-m1-block-1k4lm9s",
+        "live-arnis-m1-block-1dheu9q",
+        "live-arnis-m1-block-1s4jux2",
+        "live-arnis-m1-block-1dcvw93",
+        "live-arnis-m1-block-1qwf636",
+        "live-arnis-m1-block-1to5fd8",
+        "live-arnis-m1-block-counpq",
+        "live-arnis-m1-block-1j9yzna",
+        "live-arnis-m1-block-1yq2of5",
+        "live-arnis-m1-block-f5pnvo",
+        "live-arnis-m1-block-14pgx6n",
+        "live-arnis-m1-block-1a9dtiq",
+        "live-arnis-m1-block-ctsen8",
+        "live-arnis-m1-block-y1jbhe",
+        "live-arnis-m1-block-1j6jbv3",
+        "live-arnis-m1-block-1dv1x1a",
+        "live-arnis-m1-block-i0hzip",
+        "live-arnis-m1-block-rn6wyh",
+        "live-arnis-m1-block-1qqxhdm",
+        "live-arnis-m1-block-9zwg0v",
+        "live-arnis-m1-block-7xedvc",
+        "live-arnis-m1-block-cry2qz",
+        "live-arnis-m1-block-1dqw66l",
+        "live-arnis-m1-block-b0og1w",
+        "live-arnis-m1-block-186ufl7"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "b-evovement-of-the-art-example-card",
+          "plannedSectionId": "live-arnis-m1-section-1g1ylkn-planned-1yg9nre",
+          "title": "B. EVOLVEMENT OF THE ART:",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-1g9bjbq",
+            "live-arnis-m1-block-obhlrv",
+            "live-arnis-m1-block-1k4lm9s",
+            "live-arnis-m1-block-1dheu9q",
+            "live-arnis-m1-block-1s4jux2",
+            "live-arnis-m1-block-1dcvw93",
+            "live-arnis-m1-block-1qwf636",
+            "live-arnis-m1-block-1to5fd8",
+            "live-arnis-m1-block-counpq",
+            "live-arnis-m1-block-1j9yzna",
+            "live-arnis-m1-block-1yq2of5",
+            "live-arnis-m1-block-f5pnvo",
+            "live-arnis-m1-block-14pgx6n",
+            "live-arnis-m1-block-1a9dtiq",
+            "live-arnis-m1-block-ctsen8",
+            "live-arnis-m1-block-y1jbhe",
+            "live-arnis-m1-block-1j6jbv3",
+            "live-arnis-m1-block-1dv1x1a",
+            "live-arnis-m1-block-i0hzip",
+            "live-arnis-m1-block-rn6wyh",
+            "live-arnis-m1-block-1qqxhdm",
+            "live-arnis-m1-block-9zwg0v",
+            "live-arnis-m1-block-7xedvc",
+            "live-arnis-m1-block-cry2qz",
+            "live-arnis-m1-block-1dqw66l",
+            "live-arnis-m1-block-b0og1w",
+            "live-arnis-m1-block-186ufl7"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "The system was named after the province in which they are named:",
+              "Pangasinan – KALIRONGAN",
+              "Tagalogs – PANANANDATA",
+              "Ilocanos – DIDYA/KABAROAN",
+              "Ibanags – PAGKALIKALI",
+              "Pampanguenos – SINAWALI",
+              "Visayans – KINAADMAN, PAGARADMAN, ESGRIMA/ESCRIMA",
+              "The system was named after their founder: Example: Arnis Philippines Kali Ilustrisimo",
+              "The system as named after their most distinguishing technical characteristics: Example: Arnis de Abaniko",
+              "The system was named after a Filipino National Heroes: Example: Rizal Arnis",
+              "The system was named after a historical place: Example: Balintawak Arnis",
+              "The system was named after the weapons of former enemies: Example: Estocada Espada y Daga 1920 – 1 st Arnis Club was organized in CEBU CITY, where Escrima was used in the practice of art. 1932 – DOCE PARES ASSOCIATION with all the well-known grandmasters bases in Cebu as nucleus came into existence. They made arnis as a competitive sport now called ARNIS SPORT. They too created the rules on sparring matches. 1970 – Arnis clubs, schools, and organizations accepted the rules created by Doce Pares association. 1989 – WEKAF (World Escrima Kali Arnis Federation) 1975 – NARAPHIL (National Arnis Association of the Philippines) PURPOSE: To promote and propagate the Filipino art by organizing arnis congress. This led to the creation of WEKAF of which ten countries became members including the Philippines."
+            ]
+          },
+          "enrichment": null,
+          "kind": "example-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-5tg4iy",
+      "sourceSectionId": "live-arnis-m1-section-1eqzd03",
+      "plannedSectionId": "live-arnis-m1-section-1eqzd03-planned-178qcwx",
+      "title": "3 MAIN GROUPS:",
+      "order": 4,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-1u2xh74",
+        "live-arnis-m1-block-1oremdn",
+        "live-arnis-m1-block-lze033",
+        "live-arnis-m1-block-1bw3f5n"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-card-3-main-groups",
+          "plannedSectionId": "live-arnis-m1-section-1eqzd03-planned-178qcwx",
+          "title": "3 MAIN GROUPS:",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-1u2xh74",
+            "live-arnis-m1-block-1oremdn",
+            "live-arnis-m1-block-lze033",
+            "live-arnis-m1-block-1bw3f5n"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Northern Style – Arnis",
+              "Central Style – Arnis de Mano",
+              "Southern Style – Kali"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-any197",
+      "sourceSectionId": "live-arnis-m1-section-edwwdh",
+      "plannedSectionId": "live-arnis-m1-section-edwwdh-planned-19p900r",
+      "title": "COURTESY / SALUTATION:",
+      "order": 5,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-9ki7v0",
+        "live-arnis-m1-block-1k7ngrb",
+        "live-arnis-m1-block-9z7xxw",
+        "live-arnis-m1-block-1erjpxz",
+        "live-arnis-m1-block-19iqn7u",
+        "live-arnis-m1-block-2ne8iz"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "1234567890",
+          "plannedSectionId": "live-arnis-m1-section-edwwdh-planned-19p900r",
+          "title": "COURTESY / SALUTATION:",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-9ki7v0",
+            "live-arnis-m1-block-1k7ngrb",
+            "live-arnis-m1-block-9z7xxw",
+            "live-arnis-m1-block-1erjpxz",
+            "live-arnis-m1-block-19iqn7u",
+            "live-arnis-m1-block-2ne8iz"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Done before and after class.",
+              "Canes should be held by right hand and the left hand slightly pushes the cane with the blade of the hand in front of waist level.",
+              "Stand shoulder width stance.",
+              "Commands: a. Handa(Ready) b. Pugay(Bow) Bring left foot to right, at the same time place right fist over heart and nod.",
+              "Return to ready stance."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-6dw5ke",
+      "sourceSectionId": "live-arnis-m1-section-brj7a0",
+      "plannedSectionId": "live-arnis-m1-section-brj7a0-planned-1aleafi",
+      "title": "TYPES OF STRIKES:",
+      "order": 6,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-hhg2lm",
+        "live-arnis-m1-block-12gxjrm",
+        "live-arnis-m1-block-1bfb7bt",
+        "live-arnis-m1-block-1yvfdq0",
+        "live-arnis-m1-block-1xxy8wa"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "typedone4",
+          "plannedSectionId": "live-arnis-m1-section-brj7a0-planned-1aleafi",
+          "title": "TYPES OF STRIKES:",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-hhg2lm",
+            "live-arnis-m1-block-12gxjrm",
+            "live-arnis-m1-block-1bfb7bt",
+            "live-arnis-m1-block-1yvfdq0",
+            "live-arnis-m1-block-1xxy8wa"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Babad Hangin",
+              "Buong Palo",
+              "Pitik",
+              "BABAD ARAW – Cane guard position."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1eh8n2r",
+      "sourceSectionId": "live-arnis-m1-section-1dc0x8n",
+      "plannedSectionId": "live-arnis-m1-section-1dc0x8n-planned-1ropyab",
+      "title": "ARNIS AS A SPORT",
+      "order": 7,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-arnis-m1-block-fuo8ah",
+        "live-arnis-m1-block-bzr8xz",
+        "live-arnis-m1-block-76d638",
+        "live-arnis-m1-block-1ml2ht9",
+        "live-arnis-m1-block-1r54fdt",
+        "live-arnis-m1-block-1fburxp",
+        "live-arnis-m1-block-1lf3y7j",
+        "live-arnis-m1-block-1we5m19",
+        "live-arnis-m1-block-1wpm0ff",
+        "live-arnis-m1-block-1n22uk",
+        "live-arnis-m1-block-1n4bd31",
+        "live-arnis-m1-block-1akwubz"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "arnis-concept-card-001",
+          "plannedSectionId": "live-arnis-m1-section-1dc0x8n-planned-1ropyab",
+          "title": "ARNIS AS A SPORT",
+          "sourceBlockIds": [
+            "live-arnis-m1-block-fuo8ah",
+            "live-arnis-m1-block-bzr8xz",
+            "live-arnis-m1-block-76d638",
+            "live-arnis-m1-block-1ml2ht9",
+            "live-arnis-m1-block-1r54fdt",
+            "live-arnis-m1-block-1fburxp",
+            "live-arnis-m1-block-1lf3y7j",
+            "live-arnis-m1-block-1we5m19",
+            "live-arnis-m1-block-1wpm0ff",
+            "live-arnis-m1-block-1n22uk",
+            "live-arnis-m1-block-1n4bd31",
+            "live-arnis-m1-block-1akwubz"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "The game is played by using prescribed padded stick in delivering artistic and legal blows, strikes, thrusts, and disarming the opponent to gain scores.",
+              "Facilities and Equipment Weapons: The most basic and common weapon in Arnis is the baston or yantok. They are typically constructed from rattan, an inexpensive stem from a type of Southeast Asian vine. The stick is ranging from twenty-four to twenty-eight inches long. Types of Arnis sticks",
+              "Baston, olisi, yantok -stick ranging from twenty-four to twenty-eight inches long.",
+              "Largo mano yantok",
+              "longer stick ranging from twenty-eight to thirty-six inches",
+              "Dulo y dulo",
+              "short stick about four to seven inches in length, held in the palm of the hand",
+              "Bankaw",
+              "six-foot pole. Staves can be used to practice sword techniques",
+              "Panangga",
+              "shield"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "sourceId": "live-arnis-m1",
+    "planId": "plan-1gxi9t1",
+    "coverageReportId": "coverage-o3z6mw",
+    "sourceTitle": "Arnis M1",
+    "sourceKind": "plain-text",
+    "language": "en",
+    "sectionCount": 8,
+    "generatedSectionCount": 8,
+    "coverageStatus": "passed",
+    "coverageScore": 1,
+    "coverage": {
+      "id": "coverage-o3z6mw",
+      "planId": "plan-1gxi9t1",
+      "sourceId": "live-arnis-m1",
+      "status": "passed",
+      "score": 1,
+      "coverageScore": 1,
+      "coverageBasis": "source-outline",
+      "sourceSectionsTotal": 8,
+      "sourceSectionsCovered": 8,
+      "sourceSections": [
+        {
+          "sourceSectionId": "live-arnis-m1-section-pcomtj",
+          "title": "ARNIS/ STICK FIGHTING",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-pcomtj-planned-1h16qqb"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-vz0m93",
+          "title": "ARNIS",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-vz0m93-planned-1ihlo8u"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-1fv2x80",
+          "title": "A. HISTORICAL CONCEPT:",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-1fv2x80-planned-19w4is3"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-1g1ylkn",
+          "title": "B. EVOLVEMENT OF THE ART:",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-1g1ylkn-planned-1yg9nre"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-1eqzd03",
+          "title": "3 MAIN GROUPS:",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-1eqzd03-planned-178qcwx"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-edwwdh",
+          "title": "COURTESY / SALUTATION:",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-edwwdh-planned-19p900r"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-brj7a0",
+          "title": "TYPES OF STRIKES:",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-brj7a0-planned-1aleafi"
+          ]
+        },
+        {
+          "sourceSectionId": "live-arnis-m1-section-1dc0x8n",
+          "title": "ARNIS AS A SPORT",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-arnis-m1-section-1dc0x8n-planned-1ropyab"
+          ]
+        }
+      ],
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-arnis-m1-section-pcomtj-planned-1h16qqb",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-vz0m93-planned-1ihlo8u",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1fv2x80-planned-19w4is3",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1g1ylkn-planned-1yg9nre",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1eqzd03-planned-178qcwx",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-edwwdh-planned-19p900r",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-brj7a0-planned-1aleafi",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1dc0x8n-planned-1ropyab",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    },
+    "groundingStatus": "passed",
+    "groundingScore": 1,
+    "grounding": {
+      "id": "grounding-eqpw3v",
+      "planId": "plan-1gxi9t1",
+      "sourceId": "live-arnis-m1",
+      "status": "passed",
+      "score": 1,
+      "threshold": 0.8,
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-arnis-m1-section-pcomtj-planned-1h16qqb",
+          "sourceSectionId": "live-arnis-m1-section-pcomtj",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-vz0m93-planned-1ihlo8u",
+          "sourceSectionId": "live-arnis-m1-section-vz0m93",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1fv2x80-planned-19w4is3",
+          "sourceSectionId": "live-arnis-m1-section-1fv2x80",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1g1ylkn-planned-1yg9nre",
+          "sourceSectionId": "live-arnis-m1-section-1g1ylkn",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 12,
+          "representedSourceItemCount": 12,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1eqzd03-planned-178qcwx",
+          "sourceSectionId": "live-arnis-m1-section-1eqzd03",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-edwwdh-planned-19p900r",
+          "sourceSectionId": "live-arnis-m1-section-edwwdh",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-brj7a0-planned-1aleafi",
+          "sourceSectionId": "live-arnis-m1-section-brj7a0",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1dc0x8n-planned-1ropyab",
+          "sourceSectionId": "live-arnis-m1-section-1dc0x8n",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 11,
+          "representedSourceItemCount": 11,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        }
+      ],
+      "phase1FabricationFails": 0,
+      "phase1FabricationFailures": []
+    },
+    "leakageStatus": "passed",
+    "leakage": {
+      "id": "leakage-87od6u",
+      "planId": "plan-1gxi9t1",
+      "sourceId": "live-arnis-m1",
+      "status": "passed",
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-arnis-m1-section-pcomtj-planned-1h16qqb",
+          "sourceSectionId": "live-arnis-m1-section-pcomtj",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-vz0m93-planned-1ihlo8u",
+          "sourceSectionId": "live-arnis-m1-section-vz0m93",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1fv2x80-planned-19w4is3",
+          "sourceSectionId": "live-arnis-m1-section-1fv2x80",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1g1ylkn-planned-1yg9nre",
+          "sourceSectionId": "live-arnis-m1-section-1g1ylkn",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1eqzd03-planned-178qcwx",
+          "sourceSectionId": "live-arnis-m1-section-1eqzd03",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-edwwdh-planned-19p900r",
+          "sourceSectionId": "live-arnis-m1-section-edwwdh",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-brj7a0-planned-1aleafi",
+          "sourceSectionId": "live-arnis-m1-section-brj7a0",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-arnis-m1-section-1dc0x8n-planned-1ropyab",
+          "sourceSectionId": "live-arnis-m1-section-1dc0x8n",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    }
+  }
+}
