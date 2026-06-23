@@ -607,3 +607,13 @@ Current route status:
 - Readability: the reviewers remain usable as compact source-faithful outlines. IT Security has 17 empty explanations; Digital Components has 9 empty and 9 heading-like explanations; Arnis has 7 empty explanations and one heading-like explanation. Digital Components retains generic repeated coding sections, and the source-derived Arnis evolvement item remains dense.
 - Verification: engine typecheck PASS; build PASS; aggregate eval PASS (242/242); source-token fidelity eval PASS (23/23).
 - Remaining issues: presentation quality only; no Phase 1.8 coverage, grounding, leakage, enrichment, unsupported-text, or token-fidelity failure remains.
+
+### 2026-06-24 01:57 +08:00 Phase 1.4 live OpenAI validation
+- Fixture: IT Security (`it-security`; source ID `live-it-security`).
+- Live output: `docs/ai/live-output-phase14.txt`; JSON artifact: `docs/ai/live-output-phase14.json`.
+- Coverage result: PASS, 18/18 sections covered, score 1.00, 0 weak sections, 0 failed sections.
+- Grounding result: PASS, score 1.00, grounding issues 0, phase-1 fabrication failures 0.
+- Leakage result: PASS, leakage issues 0, failed leakage sections 0.
+- Enrichment verdict: PASS. All 18 assembled section items have `enrichment: null`; `enrichment` appears only as an internal JSON field key, not as visible content.
+- Visible-content verdict: PASS. No unsupported visible outside knowledge found; `Blended Attacks` is unchanged from the previous IT Security final sweep and remains source-faithful. Explanations remain presentation-weak after enrichment removal: 17 of 18 are empty, but source-backed key points are present.
+- Verification: engine typecheck PASS; build PASS; aggregate eval PASS (242/242). Mobile typecheck was intentionally not run.
