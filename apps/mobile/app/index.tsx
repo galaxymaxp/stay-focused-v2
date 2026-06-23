@@ -14,6 +14,7 @@ import { Card } from "../src/components/Card";
 import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { colors, spacing, typography } from "../src/design/tokens";
+import { ReviewerGenerateScreen } from "../src/features/reviewer/ReviewerGenerateScreen";
 
 export default function IndexScreen() {
   const auth = useAuth();
@@ -23,7 +24,7 @@ export default function IndexScreen() {
   }
 
   if (auth.session) {
-    return <SignedInHome />;
+    return <ReviewerGenerateScreen />;
   }
 
   return <LoginScreen />;
@@ -128,39 +129,6 @@ function LoginScreen() {
   );
 }
 
-function SignedInHome() {
-  const { isSigningOut, session, signOut } = useAuth();
-  const email = session?.user.email ?? "No email on this account";
-
-  return (
-    <Screen centered contentContainerStyle={styles.authContent}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Stay Focused V2</Text>
-        <Text style={styles.title}>Study workspace</Text>
-        <Text style={styles.subtitle}>
-          Reviewer UI is not enabled in this phase.
-        </Text>
-      </View>
-
-      <Card accent elevated style={styles.homeCard}>
-        <View style={styles.statusPill}>
-          <Text style={styles.statusPillText}>Signed in</Text>
-        </View>
-        <Text style={styles.homeTitle}>You are ready to continue.</Text>
-        <Text style={styles.emailText}>{email}</Text>
-        <Button
-          fullWidth
-          loading={isSigningOut}
-          onPress={signOut}
-          variant="secondary"
-        >
-          Log out
-        </Button>
-      </Card>
-    </Screen>
-  );
-}
-
 const styles = StyleSheet.create({
   authContent: {
     gap: spacing[6],
@@ -238,36 +206,5 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.h3,
     fontWeight: "800",
-  },
-  homeCard: {
-    gap: spacing[5],
-  },
-  statusPill: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.successSurface,
-    borderColor: colors.success,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-  },
-  statusPillText: {
-    color: colors.success,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.caption,
-    fontWeight: "800",
-  },
-  homeTitle: {
-    color: colors.textPrimary,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.h2,
-    fontWeight: "800",
-    lineHeight: 24,
-  },
-  emailText: {
-    color: colors.textSecondary,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.body,
-    lineHeight: 23,
   },
 });
