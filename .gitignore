@@ -16,6 +16,11 @@ apps/mobile/.env.local
 coverage/
 .DS_Store
 
+# Generated live-run output
+packages/engine/dist-live/
+
 # Local AI agent handoff logs
 docs/ai/handoff.md
 docs/ai/*.local.md
+.phase-1.2-handoff.patch
+docs/ai/live-outputs/

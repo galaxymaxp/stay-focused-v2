@@ -1,0 +1,947 @@
+IT Security live reviewer output after source-outline coverage fix
+
+Status: passed
+Fixture: C:\Users\Fely Max Dilinila\OneDrive\Documents\Projects\stay-focused-v2\packages\engine\scripts\fixtures\it-security.txt
+.env.local exists: true
+Existing live-run loads .env.local itself: false
+
+Stage 1 Detected Source Outline
+Detected section count: 18
+1. Introduction (live-it-security-section-hicgc7) blocks=live-it-security-block-16nqjjw offsets=0-30 tokens=6
+2. What is IT Security (live-it-security-section-e2woy0) blocks=live-it-security-block-16nqjjw offsets=30-355 tokens=43
+3. Goal of IT Security (live-it-security-section-18cc8cr) blocks=live-it-security-block-16nqjjw offsets=355-423 tokens=10
+4. Domains of IT Security (live-it-security-section-8zh0y2) blocks=live-it-security-block-16nqjjw offsets=423-669 tokens=37
+5. What is Cybersecurity? (live-it-security-section-1k2bk2y) blocks=live-it-security-block-16nqjjw offsets=669-1107 tokens=62
+6. What is Cybersecurity all about? (live-it-security-section-jtk97v) blocks=live-it-security-block-16nqjjw offsets=1107-1673 tokens=78
+7. Importance of cybersecurity (live-it-security-section-uqy7h4) blocks=live-it-security-block-16nqjjw offsets=1673-2179 tokens=64
+8. Challenges of Cybersecurity (live-it-security-section-byxpo4) blocks=live-it-security-block-16nqjjw offsets=2179-2369 tokens=23
+9. Impact of a Security Breach (live-it-security-section-1dwzz1h) blocks=live-it-security-block-16nqjjw offsets=2369-2484 tokens=14
+10. Types of Attackers (live-it-security-section-96wj2i) blocks=live-it-security-block-16nqjjw offsets=2484-2771 tokens=34
+11. Definition of Terms (live-it-security-section-1xss1an) blocks=live-it-security-block-16nqjjw offsets=2771-3014 tokens=32
+12. Types of Cybersecurity Threats (live-it-security-section-zdu3cm) blocks=live-it-security-block-xln3zf,live-it-security-block-q9w7cg,live-it-security-block-5z9uoh,live-it-security-block-1n7ypwm,live-it-security-block-1bfeban,live-it-security-block-1wiaycf offsets=3014-3642 tokens=88
+13. Types of Malware (live-it-security-section-swi63a) blocks=live-it-security-block-1wiaycf offsets=3642-3773 tokens=17
+14. Symptoms of Malware (live-it-security-section-p1ibz4) blocks=live-it-security-block-1wiaycf offsets=3773-4296 tokens=81
+15. Methods of Infiltration (live-it-security-section-1vrs2ts) blocks=live-it-security-block-1wiaycf offsets=4296-4869 tokens=79
+16. Methods to Deny Service (live-it-security-section-5rukc8) blocks=live-it-security-block-ktb03f,live-it-security-block-1qjd7ce,live-it-security-block-a7ovsw,live-it-security-block-wlan4f offsets=4869-5376 tokens=76
+17. Blended Attacks (live-it-security-section-u6hfcr) blocks=live-it-security-block-wlan4f offsets=5376-5659 tokens=39
+18. Impact Reduction (live-it-security-section-wnau0i) blocks=live-it-security-block-wlan4f offsets=5659-5918 tokens=37
+
+Stage 2 Plan
+Planned section count: 18
+Mirrors source outline: true
+1. Introduction planned=live-it-security-section-hicgc7-planned-1jv6nax sourceSection=live-it-security-section-hicgc7 blocks=live-it-security-block-16nqjjw tokenWeight=6 targetItemCount=1 offsets=0-30
+2. What is IT Security planned=live-it-security-section-e2woy0-planned-1k2x9tq sourceSection=live-it-security-section-e2woy0 blocks=live-it-security-block-16nqjjw tokenWeight=43 targetItemCount=1 offsets=30-355
+3. Goal of IT Security planned=live-it-security-section-18cc8cr-planned-1b15qhu sourceSection=live-it-security-section-18cc8cr blocks=live-it-security-block-16nqjjw tokenWeight=10 targetItemCount=1 offsets=355-423
+4. Domains of IT Security planned=live-it-security-section-8zh0y2-planned-8da7xp sourceSection=live-it-security-section-8zh0y2 blocks=live-it-security-block-16nqjjw tokenWeight=37 targetItemCount=1 offsets=423-669
+5. What is Cybersecurity? planned=live-it-security-section-1k2bk2y-planned-1f63i8d sourceSection=live-it-security-section-1k2bk2y blocks=live-it-security-block-16nqjjw tokenWeight=62 targetItemCount=1 offsets=669-1107
+6. What is Cybersecurity all about? planned=live-it-security-section-jtk97v-planned-1xb21fm sourceSection=live-it-security-section-jtk97v blocks=live-it-security-block-16nqjjw tokenWeight=78 targetItemCount=1 offsets=1107-1673
+7. Importance of cybersecurity planned=live-it-security-section-uqy7h4-planned-161dv8n sourceSection=live-it-security-section-uqy7h4 blocks=live-it-security-block-16nqjjw tokenWeight=64 targetItemCount=1 offsets=1673-2179
+8. Challenges of Cybersecurity planned=live-it-security-section-byxpo4-planned-12gt49o sourceSection=live-it-security-section-byxpo4 blocks=live-it-security-block-16nqjjw tokenWeight=23 targetItemCount=1 offsets=2179-2369
+9. Impact of a Security Breach planned=live-it-security-section-1dwzz1h-planned-1ru6jyp sourceSection=live-it-security-section-1dwzz1h blocks=live-it-security-block-16nqjjw tokenWeight=14 targetItemCount=1 offsets=2369-2484
+10. Types of Attackers planned=live-it-security-section-96wj2i-planned-aufta2 sourceSection=live-it-security-section-96wj2i blocks=live-it-security-block-16nqjjw tokenWeight=34 targetItemCount=1 offsets=2484-2771
+11. Definition of Terms planned=live-it-security-section-1xss1an-planned-1g3ct7q sourceSection=live-it-security-section-1xss1an blocks=live-it-security-block-16nqjjw tokenWeight=32 targetItemCount=1 offsets=2771-3014
+12. Types of Cybersecurity Threats planned=live-it-security-section-zdu3cm-planned-9czcks sourceSection=live-it-security-section-zdu3cm blocks=live-it-security-block-xln3zf,live-it-security-block-q9w7cg,live-it-security-block-5z9uoh,live-it-security-block-1n7ypwm,live-it-security-block-1bfeban,live-it-security-block-1wiaycf tokenWeight=88 targetItemCount=2 offsets=3014-3642
+13. Types of Malware planned=live-it-security-section-swi63a-planned-367ftb sourceSection=live-it-security-section-swi63a blocks=live-it-security-block-1wiaycf tokenWeight=17 targetItemCount=1 offsets=3642-3773
+14. Symptoms of Malware planned=live-it-security-section-p1ibz4-planned-1yo8nc4 sourceSection=live-it-security-section-p1ibz4 blocks=live-it-security-block-1wiaycf tokenWeight=81 targetItemCount=2 offsets=3773-4296
+15. Methods of Infiltration planned=live-it-security-section-1vrs2ts-planned-1lrisu1 sourceSection=live-it-security-section-1vrs2ts blocks=live-it-security-block-1wiaycf tokenWeight=79 targetItemCount=1 offsets=4296-4869
+16. Methods to Deny Service planned=live-it-security-section-5rukc8-planned-64br63 sourceSection=live-it-security-section-5rukc8 blocks=live-it-security-block-ktb03f,live-it-security-block-1qjd7ce,live-it-security-block-a7ovsw,live-it-security-block-wlan4f tokenWeight=76 targetItemCount=1 offsets=4869-5376
+17. Blended Attacks planned=live-it-security-section-u6hfcr-planned-151ua51 sourceSection=live-it-security-section-u6hfcr blocks=live-it-security-block-wlan4f tokenWeight=39 targetItemCount=1 offsets=5376-5659
+18. Impact Reduction planned=live-it-security-section-wnau0i-planned-1v3fx6e sourceSection=live-it-security-section-wnau0i blocks=live-it-security-block-wlan4f tokenWeight=37 targetItemCount=1 offsets=5659-5918
+
+Stage 4 Coverage
+coverageBasis: source-outline
+coverageScore: 1
+coverage formula: 18 / 18 = 1
+status: passed
+missing source sections: none
+issues: none
+
+Duplicate Section Check
+Types of Cybersecurity Threats outline/plan counts: 1/1
+Methods to Deny Service outline/plan counts: 1/1
+
+Reviewer Topic Presence
+present: Importance of Cybersecurity
+present: Challenges of Cybersecurity
+present: Impact of a Security Breach
+present: Types of Attackers
+present: Definition of Terms
+present: Types of Malware
+present: Symptoms of Malware
+present: Methods of Infiltration
+present: Impact Reduction
+
+Final Assembled Reviewer JSON
+{
+  "id": "reviewer-1vgilgt",
+  "title": "IT Security",
+  "sections": [
+    {
+      "id": "reviewer-section-tm4oni",
+      "sourceSectionId": "live-it-security-section-hicgc7",
+      "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+      "title": "Introduction",
+      "order": 0,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "concept-card-1",
+          "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+          "title": "Introduction",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "The Introduction to IT Security serves as the foundational entry point into the field of information technology security. It sets the stage for understanding how organizations protect their data and systems from a wide range of threats.",
+          "keyPoints": [
+            "IT Security Overview: Learn about the importance and fundamentals of safeguarding information technology systems from unauthorized access and threats.",
+            "Risk Assessment: Recognize the methods used to identify and evaluate potential risks to IT systems.",
+            "Security Layers: Understand the concept of multi-layered security strategies that encompass various levels of safeguards to protect systems."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-jcnf4p",
+      "sourceSectionId": "live-it-security-section-e2woy0",
+      "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+      "title": "What is IT Security",
+      "order": 1,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "it-security-concept-987",
+          "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+          "title": "What is IT Security",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "## IT Security is a comprehensive approach aimed at protecting digital assets by employing various cyber security strategies. This includes safeguarding organizational assets against unauthorized access while focusing on defending against cyber attacks and other potential threats.",
+          "keyPoints": [
+            "IT Security involves strategies to prevent unauthorized access to digital resources.",
+            "It plays a crucial role in protecting organizational assets from cyber attacks and additional security threats.",
+            "Also referred to as InfoSec (Information Security), it prioritizes protecting sensitive business information.",
+            "Efforts in IT Security primarily revolve around securing digital data through robust computer network security measures."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-rg0w1i",
+      "sourceSectionId": "live-it-security-section-18cc8cr",
+      "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+      "title": "Goal of IT Security",
+      "order": 2,
+      "kind": "process-step",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "db7h3kg9s-zikv-28po-81gt-zldx7t0cde",
+          "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+          "title": "Goal of IT Security",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "process-step",
+          "steps": [
+            "Ensure Confidentiality: Protect sensitive data and information from unauthorized access by implementing robust encryption and ensuring that only authorized users have access to certain data.",
+            "Maintain Integrity: Guarantee the accuracy and completeness of data by preventing unauthorized alterations and ensuring that any changes are tracked and logged.",
+            "Ensure Availability: Keep systems and data accessible to authorized users when needed by implementing redundancy, disaster recovery plans, and timely maintenance procedures."
+          ],
+          "summary": "In IT Security, the primary goal is to protect information assets through three fundamental components. First, confidentiality must be ensured by restricting data access to authorized users only. Next, data integrity must be maintained to ensure that information remains complete, consistent, and unaltered. Lastly, availability must be guaranteed so that authorized individuals can access necessary resources without interruption."
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-uspddm",
+      "sourceSectionId": "live-it-security-section-8zh0y2",
+      "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+      "title": "Domains of IT Security",
+      "order": 3,
+      "kind": "process-step",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "it-security-process-step-001",
+          "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+          "title": "Domains of IT Security",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "process-step",
+          "steps": [
+            "## Step 1: Network Security \nNetwork security involves policies and practices designed to secure a network and protect data from being accessed without authorization. This includes implementing firewalls, VPNs, and various forms of network encryption to safeguard the local and external networks.",
+            "## Step2: Internet Security \nInternet security encompasses safeguarding web browsers and the internet as a whole to protect against threats like viruses, phishing attacks, and other malicious activities. It involves the use of security protocols such as SSL/TLS and appropriate browser settings.",
+            "## Step 3: Endpoint Security \nEndpoint security refers to securing individual devices that connect to a network, such as laptops and mobile phones, through methods like antivirus software and intrusion detection systems. ",
+            "## Step 4: Cloud Security \nWith the rise of cloud computing, cloud security focuses on the protection of data stored online from theft, leakage, or damage. It involves encryption, access control, and secure APIs to ensure the integrity of data off-premises.",
+            "## Step 5: Application Security \nThis domain involves measures taken throughout the application's lifecycle to improve security, including authentication, authorization, logging, and auditing practices, as well as vulnerability testing before deploying software.",
+            "## Step 6: Information Security \nInformation security protects sensitive company or personal data from unauthorized access, misuse, or disruption. Implementing data encryption and strict access policies are critical components.",
+            "## Step 7: Operational Security \nOperational security is the process of protecting its crucial operational details and assets from external threats. It involves processes for managing and protecting physical and digital data.",
+            "## Step 8: Mobile Security \nGiven the ubiquity of mobile devices, mobile security focuses on protecting these devices from threats like malware, unauthorized access, and data theft through proper device management and application control.",
+            "## Step 9: IoT Security \nProtecting the rapidly growing Internet of Things (IoT) devices is crucial. It includes measures like setting strong credentials, minimizing data transfer, and constant monitoring for vulnerabilities.",
+            "## Step 10: User Education \nPerhaps the most pivotal step is ensuring users are educated on security best practices, making them the first line of defense against potential threats through awareness training and regular updates.",
+            "## Step 11: Cyber Security \nCyber security is a broad field that integrates all domains to create a robust and comprehensive approach to protecting computing environments against cyberattacks."
+          ],
+          "summary": "The process of IT security is comprehensive and must cover various domains, from protecting individual networks and endpoints to educating users. Each domain contributes essential components that ensure an organization effectively mitigates cyber threats."
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-199cxgu",
+      "sourceSectionId": "live-it-security-section-1k2bk2y",
+      "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+      "title": "What is Cybersecurity?",
+      "order": 4,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "concept-1",
+          "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+          "title": "What is Cybersecurity?",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "Cybersecurity is the practice of safeguarding networks, devices, and data from unauthorized access or damage and ensuring the integrity of information systems. It encompasses various strategies and techniques to protect against attacks originating from malicious entities.",
+          "keyPoints": [
+            "Cybersecurity involves the protection of networked systems from unauthorized use or harm, as highlighted by Cisco.",
+            "Palo Alto Networks defines it as employing techniques to preserve the security architecture of an organization and to defend its data from attacks or unauthorized access.",
+            "Kaspersky emphasizes that cybersecurity is the practice of shielding electronic systems and data from malicious activities."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-9hck0l",
+      "sourceSectionId": "live-it-security-section-jtk97v",
+      "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+      "title": "What is Cybersecurity all about?",
+      "order": 5,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "cybersecurity-concept-card-001",
+          "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+          "title": "What is Cybersecurity all about?",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "Cybersecurity involves implementing multiple layers of protection across devices, networks, programs, and data to safeguard them from unauthorized access and attacks. It requires an integrated approach where people, processes, and technology work harmoniously to establish a comprehensive defense mechanism.",
+          "keyPoints": [
+            "Cybersecurity includes multiple protection layers to secure computers, networks, programs, or data, ensuring confidentiality, integrity, and availability.",
+            "An organization's cybersecurity framework depends on the synergy between people, processes, and technology to fend off cyber threats effectively.",
+            "Unified threat management systems foster automation in security operations, streamlining processes such as threat detection, investigation, and remediation."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-u8tg3b",
+      "sourceSectionId": "live-it-security-section-uqy7h4",
+      "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+      "title": "Importance of Cybersecurity",
+      "order": 6,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "importance-of-cybersecurity-concept-card",
+          "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+          "title": "Importance of Cybersecurity",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "Cybersecurity is vital for protecting individuals, businesses, and critical infrastructure from an ever-escalating array of cyber threats. With the rise of sophisticated hacking tools and techniques, coupled with the increased cost and complexity of addressing breaches, organizations must prioritize cybersecurity at a strategic, board-level to safeguard against potential losses and regulatory repercussions.",
+          "keyPoints": [
+            "Cybersecurity breaches can lead to significant damages, including identity theft, extortion, and loss of important data.",
+            "Attacks on critical infrastructures—such as power stations, hospitals, and financial services—can have far-reaching and severe consequences.",
+            "There is a proliferation of sophisticated cyberattacking tools, making threats more pervasive and challenging to counter.",
+            "The financial repercussions of cyber breaches are growing, making the cost of inaction exceedingly high.",
+            "Cybersecurity is not merely an IT issue but a strategic concern that requires attention at the board level.",
+            "Cybercrime has evolved into a lucrative industry, underscoring the importance of robust cybersecurity measures."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-19m44il",
+      "sourceSectionId": "live-it-security-section-byxpo4",
+      "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+      "title": "Challenges of Cybersecurity",
+      "order": 7,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "cybersecurity-challenges-001",
+          "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+          "title": "Challenges of Cybersecurity",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "claim-card",
+          "claim": "The complexity and dynamic nature of cybersecurity challenges are escalating due to multiple interconnected factors.",
+          "support": "1. The Internet of Things (IoT) exponentially increases potential entry points for cyber attackers as more devices are interconnected. \n2. Rapidly evolving risks demand constant adaptation and preparedness, which can strain existing cybersecurity infrastructures.\n3. The protection of large volumes of big and confidential data necessitates advanced security measures, which can be both costly and technically complex.\n4. Organized and state-sponsored hacker groups have sophisticated capabilities, making them formidable adversaries that can target sensitive information.\n5. Remote working environments, amplified by COVID-19, have blurred traditional security perimeters, increasing vulnerability to cyber threats. \n6. Advances in high-speed internet facilitate faster attacks and data breaches.\n7. The Bring Your Own Device (BYOD) approach in workplaces complicates security protocols due to the diversity and breadth of personal devices accessing corporate networks.",
+          "reasoning": "The more diverse and widespread the digital landscape becomes, the more complex cybersecurity challenges become. Each listed factor—ranging from IoT advancements to remote working—contributes layers of complexity that increase vulnerability. Cybersecurity professionals must thus navigate a rapidly changing environment where threats adapt faster than traditional security measures. Additionally, the proliferation of high-speed internet and a growing number of personal devices in workplaces adds pressure on cybersecurity frameworks to keep pace with technological advancements. The complexity of dealing with organized cyber crime operations only compounds these challenges."
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-n1cvrp",
+      "sourceSectionId": "live-it-security-section-1dwzz1h",
+      "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+      "title": "Impact of a Security Breach",
+      "order": 8,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "concept-card-impact-security-breach",
+          "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+          "title": "Impact of a Security Breach",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "A security breach refers to an incident where unauthorized individuals gain access to confidential information or systems. The impact of a security breach can be extensive and multifaceted, affecting various aspects of an organization’s operations and integrity.",
+          "keyPoints": [
+            "Ruined Reputation: Breaches can lead to a loss of trust and credibility among clients and partners.",
+            "Vandalism: Hackers may alter or destroy digital assets, disrupting business operations.",
+            "Theft: Sensitive data, including personal and financial information, can be stolen and used maliciously.",
+            "Revenue Lost: The financial repercussions can include both immediate losses and long-term financial damage.",
+            "Damaged Intellectual Property: Breaches may result in the unauthorized access and misuse of proprietary information, undermining competitive advantage."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-nvx0wb",
+      "sourceSectionId": "live-it-security-section-96wj2i",
+      "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+      "title": "Types of Attackers",
+      "order": 9,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "unique-claim-card-01",
+          "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+          "title": "Types of Attackers",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "claim-card",
+          "claim": "Cyber attackers are diverse, comprising both insiders and outsiders driven by varied motivations and capabilities.",
+          "support": "The provided source material identifies multiple distinct types of cyber attackers. Insiders include employees, ex-employees, contract staff, and trusted partners. Outsiders encompass organized attackers like cyber criminals, hacktivists, terrorists, state-sponsored hackers, as well as individuals classified as black hats, grey hats, or white hats. Additionally, there are amateurs who may engage in attacks for experimentation or sport.",
+          "reasoning": "Understanding the diversity among cyber attackers is crucial for developing comprehensive security strategies. Insiders, with their access privileges and knowledge of internal systems, pose significant threats from within an organization. Conversely, outsiders operate beyond the organization's immediate control and may be motivated by financial gain, political statements, or strategic advantage in international conflicts. Recognizing the wide spectrum of attackers helps in tailoring defensive measures and allocating resources effectively."
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-hmyzfa",
+      "sourceSectionId": "live-it-security-section-1xss1an",
+      "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+      "title": "Definition of Terms",
+      "order": 10,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "def-term-cc-01",
+          "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+          "title": "Definition of Terms",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "kind": "concept-card",
+          "explanation": "The 'Definition of Terms' is a section dedicated to outlining and explaining key concepts and terminologies that are essential for understanding the broader context of a subject. This section serves as a foundational component of a text, ensuring that readers grasp the basic meanings and implications of terms that will be used throughout the document.",
+          "keyPoints": [
+            "**Vulnerability**: Refers to weaknesses or flaws in the hardware or software that can be exploited.",
+            "**Exploit**: As a verb, it is the method used to take advantage of a vulnerability; as a noun, it refers to the tools used for this purpose.",
+            "**Breach**: Denotes a successful exploit of a vulnerability, resulting in unauthorized access or damage."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1lgt0ii",
+      "sourceSectionId": "live-it-security-section-zdu3cm",
+      "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+      "title": "Types of Cybersecurity Threats",
+      "order": 11,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-it-security-block-xln3zf",
+        "live-it-security-block-q9w7cg",
+        "live-it-security-block-5z9uoh",
+        "live-it-security-block-1n7ypwm",
+        "live-it-security-block-1bfeban",
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "2d1c3f4a-431a-4c0a-b6dd-dabcf63ca737",
+          "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+          "title": "Types of Cybersecurity Threats",
+          "sourceBlockIds": [
+            "live-it-security-block-xln3zf",
+            "live-it-security-block-q9w7cg",
+            "live-it-security-block-5z9uoh",
+            "live-it-security-block-1n7ypwm",
+            "live-it-security-block-1bfeban",
+            "live-it-security-block-1wiaycf"
+          ],
+          "kind": "claim-card",
+          "claim": "There are several types of cybersecurity threats each with distinct characteristics and impacts, ranging from malware and phishing to insider threats.",
+          "support": "Cybersecurity threats are diverse in their nature and execution. Malware, such as viruses and ransomware, aims to disrupt, damage, or gain unauthorized access to systems. Phishing attacks attempt to deceive individuals into providing sensitive information by masquerading as trustworthy entities. Insider threats involve individuals within an organization misusing their access intentionally or unintentionally, leading to security breaches. These varied threat types highlight the need for a multi-faceted defense strategy in cybersecurity.",
+          "reasoning": "The range of cybersecurity threats presented illustrates how attackers exploit different vulnerabilities in human behavior and system weaknesses. Malware like ransomware directly impacts system functionality and access, while phishing exploits human error in digital communications. Insider threats represent a unique challenge as they leverage existing permissions and trust within an organization. Addressing these varied threats requires tailored security practices, emphasizing the importance of both technology and user education in cybersecurity defenses."
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-t88rfc",
+      "sourceSectionId": "live-it-security-section-swi63a",
+      "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+      "title": "Types of Malware",
+      "order": 12,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "malware-types-concept-card-001",
+          "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+          "title": "Types of Malware",
+          "sourceBlockIds": [
+            "live-it-security-block-1wiaycf"
+          ],
+          "kind": "concept-card",
+          "explanation": "Malware, short for malicious software, refers to any software deliberately designed to harm, exploit, or otherwise compromise a computer, server, or network. Understanding the types of malware is crucial for developing effective cybersecurity strategies.",
+          "keyPoints": [
+            "**Viruses**: These are malicious programs that can replicate themselves and spread to other files or systems. They often attach themselves to legitimate software and require user interaction to activate. ",
+            "**Worms**: Unlike viruses, worms can propagate autonomously across networks. They exploit vulnerabilities to gain access and spread rapidly without needing user action.",
+            "**Trojan Horses**: Named after the deceptive wooden horse from Greek mythology, these are seemingly benign programs that host malicious payload. They often trick users by appearing helpful or harmless.",
+            "**Ransomware**: A type of malware that encrypts a user's data and demands payment for the decryption key. It has become increasingly common due to its lucrative nature for attackers.",
+            "**Spyware**: This software covertly monitors user activity and gathers personal information without consent. Spyware often comes bundled with free software downloads or appears as a misleading pop-up window.",
+            "**Adware**: Primarily designed to display unwanted advertisements, adware can also track user browsing habits. While not always harmful, it can degrade system performance and user experience.",
+            "**Rootkits**: These allow attackers to gain root-level access and hide malicious activities from users and security software. They target critical OS processes to avoid detection."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-jbftar",
+      "sourceSectionId": "live-it-security-section-p1ibz4",
+      "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+      "title": "Symptoms of Malware",
+      "order": 13,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "live-it-security-section-p1ibz4-card-a2zqp",
+          "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+          "title": "Symptoms of Malware",
+          "sourceBlockIds": [
+            "live-it-security-block-1wiaycf"
+          ],
+          "kind": "concept-card",
+          "explanation": "Malware symptoms vary but often include unusual behavior, performance issues, or system anomalies. Recognizing these symptoms can prompt users to take action to secure their devices and data.",
+          "keyPoints": [
+            "System slows down without obvious cause, indicating a potential drain on resources by malware processes.",
+            "Unexpected pop-up ads may appear even when the browser isn't open, suggesting adware presence.",
+            "Antivirus software becomes disabled or unstable, reflecting possible interference by malware.",
+            "New toolbars or icons appear unexpectedly in web browsers, often due to browser hijackers.",
+            "Unusual network activity, such as increased data usage, can indicate malware communication with external servers."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1juqbpp",
+      "sourceSectionId": "live-it-security-section-1vrs2ts",
+      "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+      "title": "Methods of Infiltration",
+      "order": 14,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "cc-infiltration-methods",
+          "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+          "title": "Methods of Infiltration",
+          "sourceBlockIds": [
+            "live-it-security-block-1wiaycf"
+          ],
+          "kind": "concept-card",
+          "explanation": "Methods of Infiltration involve various tactics and strategies used by attackers to gain unauthorized access to networks, systems, or data. These methods can range from technical exploits to psychological manipulation, often fitting the context of the target environment to optimize success rates.",
+          "keyPoints": [
+            "Phishing is a common method where attackers manipulate individuals into revealing confidential information by posing as trustworthy entities.",
+            "Social Engineering leverages the manipulation of human psychology to trick individuals into giving away confidential access or data.",
+            "Malware Deployment involves introducing malicious software into the system to disrupt, damage, or gain unauthorized control.",
+            "Exploiting Software Vulnerabilities takes advantage of known software bugs or security holes to gain entry into systems.",
+            "Physical Intrusion includes physically accessing secured locations to bypass digital security measures, often using stolen or forged identification."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1jy9keo",
+      "sourceSectionId": "live-it-security-section-5rukc8",
+      "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+      "title": "Methods to Deny Service",
+      "order": 15,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-ktb03f",
+        "live-it-security-block-1qjd7ce",
+        "live-it-security-block-a7ovsw",
+        "live-it-security-block-wlan4f"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "concept-54",
+          "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+          "title": "Methods to Deny Service",
+          "sourceBlockIds": [
+            "live-it-security-block-ktb03f",
+            "live-it-security-block-1qjd7ce",
+            "live-it-security-block-a7ovsw",
+            "live-it-security-block-wlan4f"
+          ],
+          "kind": "concept-card",
+          "explanation": "Methods to deny service, commonly associated with Denial of Service (DoS) attacks, are strategies designed to render a network, system, or application unavailable to its intended users, often by overwhelming the target with an excessive amount of traffic or data. These methods exploit limitations in system resources, network bandwidth, and application architecture.",
+          "keyPoints": [
+            "\\- **Flooding Attacks**: Inundates a target with excessive amounts of data or requests. This includes ICMP flood, SYN flood, and UDP flood attacks, which overwhelm resources, rendering them non-functional. (Source: live-it-security-block-ktb03f)",
+            "\\- **Application Layer Attacks**: Exploits vulnerabilities within application-layer processes to consume system resources unnecessarily, leading to service disruption. Examples include HTTP flood and Slowloris. (Source: live-it-security-block-1qjd7ce)",
+            "\\- **Resource Exhaustion**: Consumes all available resources systematically, such as CPU or memory, leading to a halt in legitimate service requests. Often achieved through sophisticated botnet operations. (Source: live-it-security-block-a7ovsw)",
+            "\\- **Distributed Denial of Service (DDoS)**: Involves multiple compromised systems to increase the potency and scale of the attack. Typically more challenging to mitigate than a traditional DoS due to its distributed nature. (Source: live-it-security-block-wlan4f)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1jj442e",
+      "sourceSectionId": "live-it-security-section-u6hfcr",
+      "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+      "title": "Blended Attacks",
+      "order": 16,
+      "kind": "example-card",
+      "sourceBlockIds": [
+        "live-it-security-block-wlan4f"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "blended-attack-example-001",
+          "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+          "title": "Blended Attacks",
+          "sourceBlockIds": [
+            "live-it-security-block-wlan4f"
+          ],
+          "kind": "example-card",
+          "scenario": "A cybercriminal initiates a sophisticated attack on a retail company's server. First, they launch a phishing campaign targeting employees of the company. An unsuspecting employee clicks on a malicious link, compromising their account credentials. Using this account, the attacker then executes a SQL injection attack on the company's database. This allows the attacker access to sensitive financial data which is subsequently used for fraudulent activities, damaging the company's reputation and causing financial loss.",
+          "explanation": "The scenario illustrates a practical case of a blended attack in cybersecurity. A blended attack combines multiple attack methods to exploit different vulnerabilities within a targeted system. In this example, phishing (a form of social engineering) is coupled with a SQL injection (an application vulnerability exploit) to achieve a successful breach. This multi-layered approach enhances the chances of circumventing security measures since it exploits both human and technical vulnerabilities within the organization.",
+          "takeaway": "Blended attacks exemplify the importance of having a comprehensive security framework that encompasses both technology-based and human-focused defenses. Organizations should educate employees on recognizing phishing attempts while also reinforcing their systems against technical vulnerabilities like SQL injections to safeguard against blended threats."
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1sxvhq0",
+      "sourceSectionId": "live-it-security-section-wnau0i",
+      "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+      "title": "Impact Reduction in Stay Focused V2",
+      "order": 17,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-wlan4f"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "items": [
+        {
+          "id": "impact-reduction-card-wt8393",
+          "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+          "title": "Impact Reduction in Stay Focused V2",
+          "sourceBlockIds": [
+            "live-it-security-block-wlan4f"
+          ],
+          "kind": "concept-card",
+          "explanation": "Impact reduction is a strategic objective within the Stay Focused V2 engine that involves minimizing the adverse effects of potential disruptions or threats on core operations. This approach ensures the resilience and continuous functioning of essential processes, even in the presence of challenges.",
+          "keyPoints": [
+            "Impact reduction aims to maintain operational resilience in the face of disruptions.",
+            "It involves identifying potential threats to critical functions and implementing measures to mitigate these risks.",
+            "Critical functions are protected to ensure continuous availability and reliability of services.",
+            "Preventive strategies include diversifying resources, strengthening infrastructures, and developing responsive contingency plans.",
+            "Impact reduction supports a proactive, rather than reactive, approach to managing risks."
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "sourceId": "live-it-security",
+    "planId": "plan-1v687pr",
+    "coverageReportId": "coverage-713qx7",
+    "sourceTitle": "IT Security",
+    "sourceKind": "plain-text",
+    "language": "en",
+    "sectionCount": 18,
+    "generatedSectionCount": 18,
+    "coverageStatus": "passed",
+    "coverageScore": 1,
+    "coverage": {
+      "id": "coverage-713qx7",
+      "planId": "plan-1v687pr",
+      "sourceId": "live-it-security",
+      "status": "passed",
+      "score": 1,
+      "coverageScore": 1,
+      "coverageBasis": "source-outline",
+      "sourceSectionsTotal": 18,
+      "sourceSectionsCovered": 18,
+      "sourceSections": [
+        {
+          "sourceSectionId": "live-it-security-section-hicgc7",
+          "title": "Introduction",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-hicgc7-planned-1jv6nax"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-e2woy0",
+          "title": "What is IT Security",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-e2woy0-planned-1k2x9tq"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-18cc8cr",
+          "title": "Goal of IT Security",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-18cc8cr-planned-1b15qhu"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-8zh0y2",
+          "title": "Domains of IT Security",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-8zh0y2-planned-8da7xp"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1k2bk2y",
+          "title": "What is Cybersecurity?",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1k2bk2y-planned-1f63i8d"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-jtk97v",
+          "title": "What is Cybersecurity all about?",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-jtk97v-planned-1xb21fm"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-uqy7h4",
+          "title": "Importance of cybersecurity",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-uqy7h4-planned-161dv8n"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-byxpo4",
+          "title": "Challenges of Cybersecurity",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-byxpo4-planned-12gt49o"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1dwzz1h",
+          "title": "Impact of a Security Breach",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1dwzz1h-planned-1ru6jyp"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-96wj2i",
+          "title": "Types of Attackers",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-96wj2i-planned-aufta2"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1xss1an",
+          "title": "Definition of Terms",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1xss1an-planned-1g3ct7q"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-zdu3cm",
+          "title": "Types of Cybersecurity Threats",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-zdu3cm-planned-9czcks"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-swi63a",
+          "title": "Types of Malware",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-swi63a-planned-367ftb"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-p1ibz4",
+          "title": "Symptoms of Malware",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-p1ibz4-planned-1yo8nc4"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1vrs2ts",
+          "title": "Methods of Infiltration",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1vrs2ts-planned-1lrisu1"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-5rukc8",
+          "title": "Methods to Deny Service",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-5rukc8-planned-64br63"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-u6hfcr",
+          "title": "Blended Attacks",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-u6hfcr-planned-151ua51"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-wnau0i",
+          "title": "Impact Reduction",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-wnau0i-planned-1v3fx6e"
+          ]
+        }
+      ],
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    }
+  }
+}
