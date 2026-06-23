@@ -13,6 +13,7 @@ apps/mobile/.env
 apps/mobile/.env.local
 *.credentials.json
 *.log
+*.tsbuildinfo
 coverage/
 .DS_Store
 
