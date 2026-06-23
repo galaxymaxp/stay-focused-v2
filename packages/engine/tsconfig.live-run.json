@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": false,
+    "noEmit": false,
+    "outDir": "dist-live",
+    "rootDir": "."
+  },
+  "files": ["scripts/live-run.ts", "scripts/diagnose-stage012.ts"]
+}
