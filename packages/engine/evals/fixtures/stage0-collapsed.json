@@ -1,0 +1,84 @@
+{
+  "cases": [
+    {
+      "name": "collapsed table of contents source recovers sections",
+      "input": {
+        "id": "collapsed-toc-source",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "Course Overview Table of Contents • Cell Structure • Energy Flow • References Cell Structure Cell Structure describes membranes, cytoplasm, organelles, and how each component contributes to the work of a living cell in a lesson summary for students. Energy Flow Energy Flow explains how sunlight moves through producers and consumers, why stored chemical energy matters, and how diagrams should be interpreted during review. References https://example.edu/biology"
+      },
+      "expect": {
+        "title": "Cell Structure",
+        "kind": "plain-text",
+        "language": "en",
+        "blockKinds": [
+          "paragraph",
+          "list",
+          "heading",
+          "paragraph",
+          "heading",
+          "paragraph",
+          "heading",
+          "paragraph"
+        ],
+        "blockCount": 8,
+        "containsText": [
+          "Course Overview",
+          "Cell Structure",
+          "Energy Flow",
+          "References",
+          "https://example.edu/biology"
+        ],
+        "deterministicIds": true
+      }
+    },
+    {
+      "name": "collapsed references marker becomes final heading",
+      "input": {
+        "id": "collapsed-reference-source",
+        "kind": "plain-text",
+        "text": "Module Notes Table of Contents • Main Concept • Practice Pattern • References Main Concept Main Concept explains the central idea with enough detail to make the surrounding sentence look like normal prose rather than a list of headings. Practice Pattern Practice Pattern gives learners a repeatable way to inspect examples, compare outputs, and explain why the result follows from the earlier concept. References https://example.edu/module"
+      },
+      "expect": {
+        "blockKinds": [
+          "paragraph",
+          "list",
+          "heading",
+          "paragraph",
+          "heading",
+          "paragraph",
+          "heading",
+          "paragraph"
+        ],
+        "blockTexts": [
+          "Module Notes",
+          "- Main Concept\n- Practice Pattern\n- References",
+          "Main Concept",
+          "Main Concept explains the central idea with enough detail to make the surrounding sentence look like normal prose rather than a list of headings.",
+          "Practice Pattern",
+          "Practice Pattern gives learners a repeatable way to inspect examples, compare outputs, and explain why the result follows from the earlier concept.",
+          "References",
+          "https://example.edu/module"
+        ],
+        "deterministicIds": true
+      }
+    },
+    {
+      "name": "long normal paragraph with title case phrases is not split",
+      "input": {
+        "kind": "plain-text",
+        "text": "During Biology Today, students compare the Cell Theory with classroom observations, but the sentence remains ordinary prose instead of a collapsed academic export. The paragraph mentions Digital Citizenship, Energy Flow, and Research Methods as normal title-cased phrases inside a continuous explanation, and it keeps going long enough to exceed the collapsed-text length threshold without containing a table of contents, repeated body headings, standalone function labels, or a references section marker."
+      },
+      "expect": {
+        "blockKinds": ["paragraph"],
+        "blockCount": 1,
+        "containsText": [
+          "Biology Today",
+          "Digital Citizenship",
+          "Research Methods"
+        ]
+      }
+    }
+  ]
+}

@@ -1,4 +1,10 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import basicFixtures from "./fixtures/stage0-basic.json" with { type: "json" };
+import collapsedFixtures from "./fixtures/stage0-collapsed.json" with {
+  type: "json",
+};
 import errorFixtures from "./fixtures/stage0-errors.json" with { type: "json" };
 import structureFixtures from "./fixtures/stage0-structure.json" with {
   type: "json",
@@ -66,13 +72,26 @@ interface ErrorFixtureFile {
 const successFixtures = [
   ...(basicFixtures as SuccessFixtureFile).cases,
   ...(structureFixtures as SuccessFixtureFile).cases,
+  ...(collapsedFixtures as SuccessFixtureFile).cases,
 ];
 const expectedErrorFixtures = (errorFixtures as ErrorFixtureFile).cases;
+const DIGITAL_COMPONENTS_FIXTURE_CANDIDATES = [
+  join(process.cwd(), "scripts", "fixtures", "digital-components.txt"),
+  join(
+    process.cwd(),
+    "packages",
+    "engine",
+    "scripts",
+    "fixtures",
+    "digital-components.txt",
+  ),
+];
 
 export const stage0NormalizationSuite: EvalSuite = {
   name: "Stage 0 normalization",
   cases: [
     ...successFixtures.map(createSuccessCase),
+    createDigitalComponentsCollapsedCase(),
     ...expectedErrorFixtures.map(createErrorCase),
   ],
 };
@@ -250,4 +269,111 @@ function createErrorCase(fixture: Stage0ErrorFixture): EvalCase {
       }
     },
   };
+}
+
+function createDigitalComponentsCollapsedCase(): EvalCase {
+  return {
+    name: "digital-components collapsed fixture recovers multiple blocks",
+    run: async () => {
+      const text = await readDigitalComponentsFixture();
+      const output = await normalizeSource({
+        id: "stage0-digital-components",
+        title: "Digital Components",
+        kind: "plain-text",
+        language: "en",
+        text,
+        metadata: {
+          sourceName: "digital-components.txt",
+        },
+      });
+      const repeatedOutput = await normalizeSource({
+        id: "stage0-digital-components",
+        title: "Digital Components",
+        kind: "plain-text",
+        language: "en",
+        text,
+        metadata: {
+          sourceName: "digital-components.txt",
+        },
+      });
+      const blockText = output.blocks.map((block) => block.text).join("\n");
+      const headingText = output.blocks
+        .filter((block) => block.kind === "heading")
+        .map((block) => block.text)
+        .join("\n");
+      const issues: EvalIssue[] = [];
+
+      if (output.blocks.length <= 1) {
+        issues.push({
+          message: "Digital Components should not collapse to one block.",
+          expected: "more than 1 block",
+          actual: `${output.blocks.length} block(s)`,
+        });
+      }
+
+      issues.push(
+        ...assertIncludes(
+          blockText,
+          "Digital Input Hardware Connections",
+          "Recovered blocks should retain the table-of-contents input hardware boundary.",
+        ),
+        ...assertIncludes(
+          blockText,
+          "Digital Output Hardware Components",
+          "Recovered blocks should retain the table-of-contents output hardware boundary.",
+        ),
+        ...assertIncludes(
+          headingText,
+          "Digital vs. Analog",
+          "Recovered headings should include Digital vs. Analog.",
+        ),
+        ...assertIncludes(
+          headingText,
+          "Digital Software Coding",
+          "Recovered headings should include Digital Software Coding.",
+        ),
+        ...assertIncludes(
+          headingText,
+          "pinMode ()",
+          "Recovered headings should include pinMode().",
+        ),
+        ...assertIncludes(
+          headingText,
+          "digitalWrite ()",
+          "Recovered headings should include digitalWrite().",
+        ),
+        ...assertIncludes(
+          headingText,
+          "digitalRead ()",
+          "Recovered headings should include digitalRead().",
+        ),
+        ...assertIncludes(
+          headingText,
+          "References",
+          "Recovered headings should include References.",
+        ),
+        ...assertDeepEqual(
+          repeatedOutput.blocks.map((block) => block.id),
+          output.blocks.map((block) => block.id),
+          "Repeated collapsed-text normalization changed block IDs.",
+        ),
+      );
+
+      return issues;
+    },
+  };
+}
+
+async function readDigitalComponentsFixture(): Promise<string> {
+  for (const fixturePath of DIGITAL_COMPONENTS_FIXTURE_CANDIDATES) {
+    try {
+      return (await readFile(fixturePath, "utf8")).trim();
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error(
+    `Unable to find digital-components.txt in: ${DIGITAL_COMPONENTS_FIXTURE_CANDIDATES.join(", ")}`,
+  );
 }

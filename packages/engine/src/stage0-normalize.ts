@@ -18,6 +18,23 @@ interface DraftBlock {
   readonly metadata?: Readonly<Record<string, MetadataValue>>;
 }
 
+interface TableOfContentsSignal {
+  readonly startIndex: number;
+  readonly bodyStartIndex: number;
+  readonly items: readonly string[];
+}
+
+interface InlineSectionMarker {
+  readonly index: number;
+  readonly text: string;
+  readonly priority: number;
+}
+
+interface WordToken {
+  readonly text: string;
+  readonly index: number;
+}
+
 const SOURCE_KINDS: readonly NormalizedSourceKind[] = [
   "document",
   "presentation",
@@ -199,6 +216,12 @@ function normalizeExtractedText(text: string): string {
 }
 
 function detectTextBlocks(text: string): DraftBlock[] {
+  const collapsedBlocks = splitCollapsedPlainTextIntoBlocks(text);
+
+  if (collapsedBlocks.length > 0) {
+    return collapsedBlocks;
+  }
+
   const blocks: DraftBlock[] = [];
   const activeLines: string[] = [];
   let activeKind: SourceBlockKind | undefined;
@@ -288,6 +311,499 @@ function detectTextBlocks(text: string): DraftBlock[] {
   }
 
   return blocks;
+}
+
+function splitCollapsedPlainTextIntoBlocks(text: string): DraftBlock[] {
+  const line = readSingleCollapsedLine(text);
+
+  if (!line) {
+    return [];
+  }
+
+  const tableOfContents = detectTableOfContentsSignal(line);
+  const markers = detectInlineSectionMarkers(line, tableOfContents);
+
+  if (!shouldSplitCollapsedText(line, tableOfContents, markers)) {
+    return [];
+  }
+
+  const bodyStartIndex = tableOfContents?.bodyStartIndex ?? 0;
+  const blocks: DraftBlock[] = [];
+  const prefaceEndIndex = tableOfContents?.startIndex ?? markers[0]?.index ?? 0;
+  const prefaceText = line.slice(0, prefaceEndIndex);
+
+  appendCollapsedContentBlock(blocks, prefaceText);
+
+  if (tableOfContents && tableOfContents.items.length > 0) {
+    blocks.push({
+      kind: "list",
+      text: tableOfContents.items.map((item) => `- ${item}`).join("\n"),
+      sectionHint: "Table of Contents",
+    });
+  }
+
+  let cursor = bodyStartIndex;
+
+  for (const marker of markers) {
+    if (marker.index < cursor) {
+      continue;
+    }
+
+    appendCollapsedContentBlock(blocks, line.slice(cursor, marker.index));
+    blocks.push({
+      kind: "heading",
+      text: marker.text,
+    });
+    cursor = marker.index + marker.text.length;
+  }
+
+  appendCollapsedContentBlock(blocks, line.slice(cursor));
+
+  return blocks.length > 1 ? blocks : [];
+}
+
+function readSingleCollapsedLine(text: string): string | undefined {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const line = lines[0];
+
+  if (lines.length !== 1 || !line || line.length < 300) {
+    return undefined;
+  }
+  if (/^\s*```/.test(line)) {
+    return undefined;
+  }
+
+  return line;
+}
+
+function detectTableOfContentsSignal(
+  line: string,
+): TableOfContentsSignal | undefined {
+  const tocMatch = /table\s+of\s+contents/i.exec(line);
+
+  if (!tocMatch) {
+    return undefined;
+  }
+
+  const bulletMatches = findBulletMatches(
+    line,
+    tocMatch.index + tocMatch[0].length,
+  );
+  const items: string[] = [];
+  let firstItem: string | undefined;
+  let bodyStartIndex = line.length;
+
+  for (const [index, bullet] of bulletMatches.entries()) {
+    const segmentStart = bullet.index + bullet.text.length;
+    const segmentEnd = bulletMatches[index + 1]?.index ?? line.length;
+    const rawSegment = line.slice(segmentStart, segmentEnd);
+    const bodyOffset =
+      firstItem !== undefined
+        ? rawSegment.search(new RegExp(`\\s+${escapeRegExp(firstItem)}\\b`))
+        : -1;
+    const itemText = normalizeInlineWhitespace(
+      rawSegment.slice(0, bodyOffset >= 0 ? bodyOffset : undefined),
+    );
+
+    if (!isLikelyTableOfContentsItem(itemText)) {
+      continue;
+    }
+
+    items.push(itemText);
+    firstItem = firstItem ?? itemText;
+
+    if (bodyOffset >= 0) {
+      bodyStartIndex = segmentStart + bodyOffset;
+      break;
+    }
+  }
+
+  if (items.length < 2 || bodyStartIndex >= line.length) {
+    return undefined;
+  }
+
+  return {
+    startIndex: tocMatch.index,
+    bodyStartIndex,
+    items,
+  };
+}
+
+function findBulletMatches(
+  line: string,
+  startIndex: number,
+): readonly { readonly index: number; readonly text: string }[] {
+  const bulletPattern = /(?:\u2022|â€¢)/g;
+  const matches: { index: number; text: string }[] = [];
+  bulletPattern.lastIndex = startIndex;
+
+  let match = bulletPattern.exec(line);
+  while (match) {
+    matches.push({
+      index: match.index,
+      text: match[0],
+    });
+    match = bulletPattern.exec(line);
+  }
+
+  return matches;
+}
+
+function isLikelyTableOfContentsItem(text: string): boolean {
+  const words = text.split(/\s+/).filter((word) => word.length > 0);
+
+  return (
+    text.length >= 3 &&
+    text.length <= 90 &&
+    words.length <= 8 &&
+    /[A-Za-z]/.test(text) &&
+    !/[.!?]$/.test(text)
+  );
+}
+
+function detectInlineSectionMarkers(
+  line: string,
+  tableOfContents: TableOfContentsSignal | undefined,
+): readonly InlineSectionMarker[] {
+  const searchStart = tableOfContents?.bodyStartIndex ?? 0;
+  const markers = [
+    ...detectTableOfContentsBodyMarkers(line, tableOfContents),
+    ...detectRepeatedTitleMarkers(line, searchStart),
+    ...detectFunctionLabelMarkers(line, searchStart),
+    ...detectReferenceMarkers(line, searchStart),
+  ];
+
+  return cleanInlineSectionMarkers(line, markers, searchStart);
+}
+
+function detectTableOfContentsBodyMarkers(
+  line: string,
+  tableOfContents: TableOfContentsSignal | undefined,
+): readonly InlineSectionMarker[] {
+  if (!tableOfContents) {
+    return [];
+  }
+
+  return tableOfContents.items
+    .map((item) => ({
+      item,
+      index: line.indexOf(item, tableOfContents.bodyStartIndex),
+    }))
+    .filter((entry) => entry.index >= tableOfContents.bodyStartIndex)
+    .map((entry) => ({
+      index: entry.index,
+      text: entry.item,
+      priority: 4,
+    }));
+}
+
+function detectRepeatedTitleMarkers(
+  line: string,
+  searchStart: number,
+): readonly InlineSectionMarker[] {
+  const body = line.slice(searchStart);
+  const tokens = tokenizeWords(body, searchStart);
+  const candidates = new Map<string, number>();
+
+  for (let start = 0; start < tokens.length; start += 1) {
+    for (let length = 2; length <= 5; length += 1) {
+      const phraseTokens = tokens.slice(start, start + length);
+
+      if (phraseTokens.length !== length) {
+        continue;
+      }
+
+      const phrase = phraseTokens.map((token) => token.text).join(" ");
+      if (
+        isPotentialInlineHeadingPhrase(phraseTokens) &&
+        isStrongRepeatedTitleCandidate(body, phraseTokens, phrase)
+      ) {
+        candidates.set(phrase, countOccurrences(body, phrase));
+      }
+    }
+  }
+
+  const markers: InlineSectionMarker[] = [];
+  for (const [phrase, count] of candidates.entries()) {
+    if (count < 2) {
+      continue;
+    }
+
+    let index = line.indexOf(phrase, searchStart);
+    while (index >= searchStart) {
+      if (isRepeatedTitleMarkerOccurrence(line, index, searchStart)) {
+        markers.push({
+          index,
+          text: phrase,
+          priority: 2,
+        });
+      }
+      index = line.indexOf(phrase, index + phrase.length);
+    }
+  }
+
+  return markers;
+}
+
+function tokenizeWords(text: string, offset: number): readonly WordToken[] {
+  const wordPattern = /[A-Za-z][A-Za-z0-9']*\.?/g;
+  const tokens: WordToken[] = [];
+  let match = wordPattern.exec(text);
+
+  while (match) {
+    tokens.push({
+      text: match[0],
+      index: offset + match.index,
+    });
+    match = wordPattern.exec(text);
+  }
+
+  return tokens;
+}
+
+function isPotentialInlineHeadingPhrase(
+  tokens: readonly WordToken[],
+): boolean {
+  const firstToken = tokens[0]?.text ?? "";
+  const lastToken = tokens.at(-1)?.text ?? "";
+  const capitalizedCount = tokens.filter((token) =>
+    /^[A-Z][A-Za-z0-9']*\.?$/.test(token.text),
+  ).length;
+  const connectorCount = tokens.filter((token) =>
+    isHeadingConnector(token.text),
+  ).length;
+
+  return (
+    tokens.length >= 2 &&
+    tokens.length <= 5 &&
+    /^[A-Z]/.test(firstToken) &&
+    !isHeadingConnector(lastToken) &&
+    capitalizedCount >= 2 &&
+    capitalizedCount + connectorCount === tokens.length &&
+    tokens.map((token) => token.text).join(" ").length <= 70
+  );
+}
+
+function isStrongRepeatedTitleCandidate(
+  body: string,
+  tokens: readonly WordToken[],
+  phrase: string,
+): boolean {
+  const significantTokens = tokens.filter(
+    (token) => !isHeadingConnector(token.text),
+  );
+  const allSignificantTokensAreAcronyms = significantTokens.every(
+    (token) => token.text === token.text.toUpperCase(),
+  );
+  const hasImmediateRepeat = body.includes(`${phrase} ${phrase}`);
+  const hasSpecificMultiwordShape = significantTokens.length >= 3;
+
+  return (
+    !allSignificantTokensAreAcronyms &&
+    (hasImmediateRepeat || hasSpecificMultiwordShape)
+  );
+}
+
+function isRepeatedTitleMarkerOccurrence(
+  line: string,
+  index: number,
+  searchStart: number,
+): boolean {
+  if (index <= searchStart) {
+    return true;
+  }
+
+  const previousCharacter = previousNonWhitespaceCharacter(line, index);
+  return previousCharacter !== "\u2022" && previousCharacter !== "•";
+}
+
+function previousNonWhitespaceCharacter(
+  text: string,
+  index: number,
+): string | undefined {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const character = text[cursor];
+
+    if (character && !/\s/.test(character)) {
+      return character;
+    }
+  }
+
+  return undefined;
+}
+
+function isHeadingConnector(token: string): boolean {
+  return /^(?:a|an|and|for|in|of|or|the|to|vs\.?|with)$/i.test(token);
+}
+
+function detectFunctionLabelMarkers(
+  line: string,
+  searchStart: number,
+): readonly InlineSectionMarker[] {
+  const markers: InlineSectionMarker[] = [];
+  const functionPattern = /\b[a-z][A-Za-z0-9_]*\s*\(\s*\)/g;
+  functionPattern.lastIndex = searchStart;
+
+  let match = functionPattern.exec(line);
+  while (match) {
+    const markerText = normalizeInlineWhitespace(match[0]);
+    const followingText = line.slice(
+      match.index + match[0].length,
+      match.index + match[0].length + 28,
+    );
+
+    if (/^\s*(?:Example\s+Code:|(?:\u2022|â€¢))/.test(followingText)) {
+      markers.push({
+        index: match.index,
+        text: markerText,
+        priority: 5,
+      });
+    }
+
+    match = functionPattern.exec(line);
+  }
+
+  return markers;
+}
+
+function detectReferenceMarkers(
+  line: string,
+  searchStart: number,
+): readonly InlineSectionMarker[] {
+  const markers: InlineSectionMarker[] = [];
+  const referencePattern = /\bReferences\b/g;
+  referencePattern.lastIndex = searchStart;
+
+  let match = referencePattern.exec(line);
+  while (match) {
+    markers.push({
+      index: match.index,
+      text: match[0],
+      priority: 6,
+    });
+    match = referencePattern.exec(line);
+  }
+
+  return markers;
+}
+
+function cleanInlineSectionMarkers(
+  line: string,
+  markers: readonly InlineSectionMarker[],
+  searchStart: number,
+): readonly InlineSectionMarker[] {
+  const sorted = [...markers]
+    .filter((marker) => marker.index >= searchStart)
+    .sort(
+      (left, right) =>
+        left.index - right.index ||
+        right.priority - left.priority ||
+        right.text.length - left.text.length,
+    );
+  const deduped: InlineSectionMarker[] = [];
+
+  for (const marker of sorted) {
+    const previous = deduped.at(-1);
+
+    if (
+      previous &&
+      marker.index < previous.index + previous.text.length
+    ) {
+      continue;
+    }
+
+    deduped.push(marker);
+  }
+
+  const cleaned: InlineSectionMarker[] = [];
+
+  for (const marker of deduped) {
+    const previous = cleaned.at(-1);
+
+    if (previous) {
+      const betweenMarkers = line
+        .slice(previous.index + previous.text.length, marker.index)
+        .trim();
+      const markersAreDuplicateOrNested =
+        previous.text === marker.text ||
+        marker.text.startsWith(`${previous.text} `);
+
+      if (
+        markersAreDuplicateOrNested &&
+        /^(?:[-:–—]|\s)*$/.test(betweenMarkers)
+      ) {
+        continue;
+      }
+    }
+
+    cleaned.push(marker);
+  }
+
+  return cleaned;
+}
+
+function shouldSplitCollapsedText(
+  line: string,
+  tableOfContents: TableOfContentsSignal | undefined,
+  markers: readonly InlineSectionMarker[],
+): boolean {
+  const hasTableOfContentsStructure =
+    tableOfContents !== undefined &&
+    tableOfContents.items.length >= 2 &&
+    markers.length >= 2;
+  const hasRepeatedAcademicStructure =
+    line.length >= 600 && markers.length >= 4;
+
+  return hasTableOfContentsStructure || hasRepeatedAcademicStructure;
+}
+
+function appendCollapsedContentBlock(
+  blocks: DraftBlock[],
+  text: string,
+): void {
+  const normalizedText = normalizeInlineWhitespace(
+    text.replace(/^table\s+of\s+contents\b/i, ""),
+  );
+
+  if (!hasMeaningfulInlineContent(normalizedText)) {
+    return;
+  }
+
+  blocks.push({
+    kind: "paragraph",
+    text: normalizedText,
+  });
+}
+
+function hasMeaningfulInlineContent(text: string): boolean {
+  return (text.match(/[A-Za-z0-9]/g) ?? []).length >= 3;
+}
+
+function normalizeInlineWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function countOccurrences(text: string, needle: string): number {
+  if (needle.length === 0) {
+    return 0;
+  }
+
+  let count = 0;
+  let offset = text.indexOf(needle);
+
+  while (offset >= 0) {
+    count += 1;
+    offset = text.indexOf(needle, offset + needle.length);
+  }
+
+  return count;
 }
 
 function normalizeSuppliedBlocks(
