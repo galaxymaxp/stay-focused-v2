@@ -6,6 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
+    "test": "vitest run",
     "provider:contract": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.contract.test.js",
     "smoke:openai": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.smoke.js",
     "typecheck": "tsc --noEmit",
@@ -25,6 +26,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "rimraf": "^6.0.1",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.9"
   }
 }
