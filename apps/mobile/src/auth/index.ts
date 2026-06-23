@@ -7,15 +7,18 @@ export {
   signInWithMicrosoft,
   signOut,
 } from "./authService";
+export { AuthProvider } from "./AuthProvider";
 export {
   getSupabaseClient,
   getSupabaseClientResult,
   getSupabaseMobileConfig,
 } from "./supabaseClient";
+export { useAuth } from "./useAuth";
+export type { AuthContextValue, AuthStatus } from "./AuthProvider";
 export type {
   AuthErrorCode,
   AuthErrorInfo,
-  AuthProvider,
+  AuthProvider as AuthLoginProvider,
   AuthResult,
   AuthRole,
   AuthRoleClaims,
