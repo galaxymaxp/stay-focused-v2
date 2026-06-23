@@ -1,0 +1,1440 @@
+
+> @stay-focused/engine@0.0.0 live-run
+> tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js digital-components
+
+
+=== Digital Components (digital-components.txt) ===
+{"event":"reviewer.coverage.completed","sourceId":"live-digital-components","detectedSectionCount":18,"coveredCount":18,"missingSectionTitles":[],"duplicateGroups":[],"coverageScore":1,"coverageBasis":"source-outline","status":"passed","validationRuns":2}
+Planned sections: 18
+Sections passed coverage: 18
+Failed sections: none
+Coverage summary: status=passed score=1 sourceSections=18/18 passedSections=18 weakSections=0 failedSections=0
+Grounding summary: status=passed score=1 threshold=0.8 failedSections=0 issues=0 phase1FabricationFails=0
+Leakage summary: status=passed failedSections=0 issues=0
+Per-section pass/fail table:
+PASS | Introduction | live-digital-components-section-28awso-planned-174jo9h | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital vs. Analog | live-digital-components-section-f53f2t-planned-18uhbmf | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Pins | live-digital-components-section-1kyit3m-planned-1keoyy5 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Pins INPUT | live-digital-components-section-1l9lwvw-planned-1yw9tj | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Software Coding 1 | live-digital-components-section-caj4ug-planned-1xx6n73 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | pinMode () 1 | live-digital-components-section-1eoewqo-planned-nmp3vk | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Software Coding 2 | live-digital-components-section-145pd0v-planned-30iqy8 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | pinMode () 2 | live-digital-components-section-1m3s9su-planned-xh01to | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Software Coding 3 | live-digital-components-section-d3psqs-planned-ic6aom | stage=stage3 | reason=- | grounding=1(passed)
+PASS | digitalWrite () 1 | live-digital-components-section-bllgrz-planned-1vvrqyi | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Software Coding 4 | live-digital-components-section-a9qwyb-planned-14xcb3d | stage=stage3 | reason=- | grounding=1(passed)
+PASS | digitalWrite () 2 | live-digital-components-section-1ha2czq-planned-17gb58a | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Software Coding 5 | live-digital-components-section-11w30xd-planned-1bmdva0 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | digitalRead () 1 | live-digital-components-section-k49n4l-planned-1onzppa | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Software Coding 6 | live-digital-components-section-rtq6fy-planned-1wjwpbl | stage=stage3 | reason=- | grounding=1(passed)
+PASS | digitalRead () 2 | live-digital-components-section-14u4000-planned-18amk1g | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Digital Hardware Components | live-digital-components-section-1cmvkxa-planned-l00vi3 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | References | live-digital-components-section-yqq92a-planned-1ma5kv4 | stage=stage3 | reason=- | grounding=1(passed)
+Section validation failures: []
+Leakage rejections: none
+Final assembled reviewer:
+{
+  "id": "reviewer-1pdtzkc",
+  "title": "Digital Components",
+  "sections": [
+    {
+      "id": "reviewer-section-1he1sig",
+      "sourceSectionId": "live-digital-components-section-28awso",
+      "plannedSectionId": "live-digital-components-section-28awso-planned-174jo9h",
+      "title": "Introduction",
+      "order": 0,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-19u1ng",
+        "live-digital-components-block-fch1a4"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "introduction-concept-card",
+          "plannedSectionId": "live-digital-components-section-28awso-planned-174jo9h",
+          "title": "Introduction",
+          "sourceBlockIds": [
+            "live-digital-components-block-19u1ng",
+            "live-digital-components-block-fch1a4"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Digital vs. Analog",
+              "Digital Input Hardware Connections",
+              "Digital Input Software Coding",
+              "Digital Output Hardware Components",
+              "Digital Output Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-mw66eh",
+      "sourceSectionId": "live-digital-components-section-f53f2t",
+      "plannedSectionId": "live-digital-components-section-f53f2t-planned-18uhbmf",
+      "title": "Digital vs. Analog",
+      "order": 1,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-10ivq1e",
+        "live-digital-components-block-1ozzvjf",
+        "live-digital-components-block-39oyu0",
+        "live-digital-components-block-3klg8z",
+        "live-digital-components-block-1l9okim",
+        "live-digital-components-block-9adxql",
+        "live-digital-components-block-1tuypf8",
+        "live-digital-components-block-1thfwcw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "digital-vs-analog-claim-card",
+          "plannedSectionId": "live-digital-components-section-f53f2t-planned-18uhbmf",
+          "title": "Digital vs. Analog",
+          "sourceBlockIds": [
+            "live-digital-components-block-10ivq1e",
+            "live-digital-components-block-1ozzvjf",
+            "live-digital-components-block-39oyu0",
+            "live-digital-components-block-3klg8z",
+            "live-digital-components-block-1l9okim",
+            "live-digital-components-block-9adxql",
+            "live-digital-components-block-1tuypf8",
+            "live-digital-components-block-1thfwcw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Digital Digital",
+              "Digital Signals are binary",
+              "HIGH(1), LOW (0)",
+              "Digital Pins",
+              "Digital Input: Reads the state of a digital sensor or switch (HIGH or LOW).",
+              "Digital Output: Sends a HIGH or LOW signal to control devices like LEDs, relays, or digital displays.",
+              "Digital",
+              "Examples",
+              "Digital Input: Push button (Pressed or not) Digital Output: LED (ON or OFF)",
+              "Analog Analog",
+              "Analog Signals can have a range.",
+              "Between 0V – 5V",
+              "Continuous measurement is needed",
+              "Analog Pins",
+              "Analog Input: any value between 0 – 1023 using ADC (Analog- to-Digital Converter)",
+              "0=0V and 1023 = 5V",
+              "Analog Output:",
+              "Using PWM (Pulse Width Modulation)",
+              "Rapid switches between HIGH and LOW to create an average voltage",
+              "Analog",
+              "Examples",
+              "Analog Input: Variable resistors AKA potentiometers/pots Analog Output: LED (brightness)"
+            ]
+          },
+          "enrichment": null,
+          "kind": "claim-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1b1p3v9",
+      "sourceSectionId": "live-digital-components-section-1kyit3m",
+      "plannedSectionId": "live-digital-components-section-1kyit3m-planned-1keoyy5",
+      "title": "Digital Pins",
+      "order": 2,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-uwjrrk",
+        "live-digital-components-block-6p9qro"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "digital-pin-study-card-943",
+          "plannedSectionId": "live-digital-components-section-1kyit3m-planned-1keoyy5",
+          "title": "Digital Pins",
+          "sourceBlockIds": [
+            "live-digital-components-block-uwjrrk",
+            "live-digital-components-block-6p9qro"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Don’t need to be explicitly declared as inputs with pinMode().",
+              "Make small demands on circuit to change from 1 state to another",
+              "Equivalent to 100megohm",
+              "However, this will report random changes in pin state. Can be from:",
+              "Noise from environment",
+              "Capacity coupling the state of nearby pin"
+            ]
+          },
+          "enrichment": null,
+          "kind": "claim-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-zgujh0",
+      "sourceSectionId": "live-digital-components-section-1l9lwvw",
+      "plannedSectionId": "live-digital-components-section-1l9lwvw-planned-1yw9tj",
+      "title": "Digital Pins INPUT",
+      "order": 3,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-153ag6a",
+        "live-digital-components-block-1bj2s30"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "1",
+          "plannedSectionId": "live-digital-components-section-1l9lwvw-planned-1yw9tj",
+          "title": "Digital Pins INPUT",
+          "sourceBlockIds": [
+            "live-digital-components-block-153ag6a",
+            "live-digital-components-block-1bj2s30"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Will use Pullup Resistors with pins configured as INPUT"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1v4n4ut",
+      "sourceSectionId": "live-digital-components-section-caj4ug",
+      "plannedSectionId": "live-digital-components-section-caj4ug-planned-1xx6n73",
+      "title": "Digital Software Coding 1",
+      "order": 4,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1qlcht",
+        "live-digital-components-block-1goexpi"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-001",
+          "plannedSectionId": "live-digital-components-section-caj4ug-planned-1xx6n73",
+          "title": "Digital Software Coding 1",
+          "sourceBlockIds": [
+            "live-digital-components-block-1qlcht",
+            "live-digital-components-block-1goexpi"
+          ],
+          "sourceCore": {
+            "explanation": "Digital Software Coding Digital Software Coding",
+            "keyPoints": [
+              "Digital Software Coding Digital Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-2jvs0s",
+      "sourceSectionId": "live-digital-components-section-1eoewqo",
+      "plannedSectionId": "live-digital-components-section-1eoewqo-planned-nmp3vk",
+      "title": "pinMode () 1",
+      "order": 5,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-v5fjxd",
+        "live-digital-components-block-v2jsht"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "card1",
+          "plannedSectionId": "live-digital-components-section-1eoewqo-planned-nmp3vk",
+          "title": "pinMode () 1",
+          "sourceBlockIds": [
+            "live-digital-components-block-v5fjxd",
+            "live-digital-components-block-v2jsht"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Configures the specified pin to behave either as an input or an output.",
+              "Syntax",
+              "pinMode(pin, mode)",
+              "Parameters",
+              "pin: the Arduino pin number to set the mode of.",
+              "mode: INPUT, OUTPUT, OR INPUT_PULLUP",
+              "Returns",
+              "Nothing",
+              "Note",
+              "The analog input pins can be used as digital pins, referred to as A0, A1, etc."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-ufym2o",
+      "sourceSectionId": "live-digital-components-section-145pd0v",
+      "plannedSectionId": "live-digital-components-section-145pd0v-planned-30iqy8",
+      "title": "Digital Software Coding 2",
+      "order": 6,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1hb13bh"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "dc3b3f94-3445-4488-9f81-f2d42300cf9f",
+          "plannedSectionId": "live-digital-components-section-145pd0v-planned-30iqy8",
+          "title": "Digital Software Coding 2",
+          "sourceBlockIds": [
+            "live-digital-components-block-1hb13bh"
+          ],
+          "sourceCore": {
+            "explanation": "Digital Software Coding",
+            "keyPoints": [
+              "Digital Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1epou8l",
+      "sourceSectionId": "live-digital-components-section-1m3s9su",
+      "plannedSectionId": "live-digital-components-section-1m3s9su-planned-xh01to",
+      "title": "pinMode () 2",
+      "order": 7,
+      "kind": "example-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-18v4p72",
+        "live-digital-components-block-ujwbb8"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "example-card-001",
+          "plannedSectionId": "live-digital-components-section-1m3s9su-planned-xh01to",
+          "title": "pinMode () 2",
+          "sourceBlockIds": [
+            "live-digital-components-block-18v4p72",
+            "live-digital-components-block-ujwbb8"
+          ],
+          "sourceCore": {
+            "explanation": "pinMode () Example Code:",
+            "keyPoints": [
+              "pinMode () Example Code:"
+            ]
+          },
+          "enrichment": null,
+          "kind": "example-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1byiu07",
+      "sourceSectionId": "live-digital-components-section-d3psqs",
+      "plannedSectionId": "live-digital-components-section-d3psqs-planned-ic6aom",
+      "title": "Digital Software Coding 3",
+      "order": 8,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-98t7il"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "dsc3-concept-card",
+          "plannedSectionId": "live-digital-components-section-d3psqs-planned-ic6aom",
+          "title": "Digital Software Coding 3",
+          "sourceBlockIds": [
+            "live-digital-components-block-98t7il"
+          ],
+          "sourceCore": {
+            "explanation": "Digital Software Coding",
+            "keyPoints": [
+              "Digital Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1gzzpal",
+      "sourceSectionId": "live-digital-components-section-bllgrz",
+      "plannedSectionId": "live-digital-components-section-bllgrz-planned-1vvrqyi",
+      "title": "digitalWrite () 1",
+      "order": 9,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-ovwymr",
+        "live-digital-components-block-blzls1"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "digitalWrite1-concept-card",
+          "plannedSectionId": "live-digital-components-section-bllgrz-planned-1vvrqyi",
+          "title": "digitalWrite () 1",
+          "sourceBlockIds": [
+            "live-digital-components-block-ovwymr",
+            "live-digital-components-block-blzls1"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Write a HIGH(5V or 3.3V on 3.3 board) or a LOW(0V) value to a digital pin.",
+              "Syntax",
+              "pinMode(pin, mode)",
+              "Parameters",
+              "pin: the Arduino pin number.",
+              "mode: HIGH, LOW",
+              "Returns",
+              "Nothing",
+              "Note",
+              "The analog input pins can be used as digital pins, referred to as A0, A1, etc. The exception is the Arduino Nano, Pro Mini, and Mini’s A6 and A7 pins, which can only be used as analog inputs."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-sj1r3u",
+      "sourceSectionId": "live-digital-components-section-a9qwyb",
+      "plannedSectionId": "live-digital-components-section-a9qwyb-planned-14xcb3d",
+      "title": "Digital Software Coding 4",
+      "order": 10,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-jznh0m"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-card-1",
+          "plannedSectionId": "live-digital-components-section-a9qwyb-planned-14xcb3d",
+          "title": "Digital Software Coding 4",
+          "sourceBlockIds": [
+            "live-digital-components-block-jznh0m"
+          ],
+          "sourceCore": {
+            "explanation": "Digital Software Coding",
+            "keyPoints": [
+              "Digital Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1j6n7q7",
+      "sourceSectionId": "live-digital-components-section-1ha2czq",
+      "plannedSectionId": "live-digital-components-section-1ha2czq-planned-17gb58a",
+      "title": "digitalWrite () 2",
+      "order": 11,
+      "kind": "example-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1610kt2",
+        "live-digital-components-block-v1z8xq"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "example-digitalWrite2-159",
+          "plannedSectionId": "live-digital-components-section-1ha2czq-planned-17gb58a",
+          "title": "digitalWrite () 2",
+          "sourceBlockIds": [
+            "live-digital-components-block-1610kt2",
+            "live-digital-components-block-v1z8xq"
+          ],
+          "sourceCore": {
+            "explanation": "digitalWrite () Example Code:",
+            "keyPoints": [
+              "digitalWrite () Example Code:"
+            ]
+          },
+          "enrichment": null,
+          "kind": "example-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1540j7r",
+      "sourceSectionId": "live-digital-components-section-11w30xd",
+      "plannedSectionId": "live-digital-components-section-11w30xd-planned-1bmdva0",
+      "title": "Digital Software Coding 5",
+      "order": 12,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1a2qfgn"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "df9086f6-3647-4c7d-a478-2a9eabce57a1",
+          "plannedSectionId": "live-digital-components-section-11w30xd-planned-1bmdva0",
+          "title": "Digital Software Coding 5",
+          "sourceBlockIds": [
+            "live-digital-components-block-1a2qfgn"
+          ],
+          "sourceCore": {
+            "explanation": "Digital Software Coding",
+            "keyPoints": [
+              "Digital Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-nrgn7p",
+      "sourceSectionId": "live-digital-components-section-k49n4l",
+      "plannedSectionId": "live-digital-components-section-k49n4l-planned-1onzppa",
+      "title": "digitalRead () 1",
+      "order": 13,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-z7imhy",
+        "live-digital-components-block-kqzr3d"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-card-1",
+          "plannedSectionId": "live-digital-components-section-k49n4l-planned-1onzppa",
+          "title": "digitalRead () 1",
+          "sourceBlockIds": [
+            "live-digital-components-block-z7imhy",
+            "live-digital-components-block-kqzr3d"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Reads the value from a specified digital pin, either HIGH or LOW.",
+              "Syntax",
+              "digitalRead(pin)",
+              "Parameters",
+              "pin: the Arduino pin number you want to read",
+              "Returns",
+              "HIGH or LOW",
+              "Note",
+              "If the pin isn’t connected to anything, digitalRead() can return either HIGH or LOW (and this can change randomly)."
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-nikcd1",
+      "sourceSectionId": "live-digital-components-section-rtq6fy",
+      "plannedSectionId": "live-digital-components-section-rtq6fy-planned-1wjwpbl",
+      "title": "Digital Software Coding 6",
+      "order": 14,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1qmrf13"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "digital-software-coding-concept-card",
+          "plannedSectionId": "live-digital-components-section-rtq6fy-planned-1wjwpbl",
+          "title": "Digital Software Coding 6",
+          "sourceBlockIds": [
+            "live-digital-components-block-1qmrf13"
+          ],
+          "sourceCore": {
+            "explanation": "Digital Software Coding",
+            "keyPoints": [
+              "Digital Software Coding"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-19pe2eq",
+      "sourceSectionId": "live-digital-components-section-14u4000",
+      "plannedSectionId": "live-digital-components-section-14u4000-planned-18amk1g",
+      "title": "digitalRead () 2",
+      "order": 15,
+      "kind": "example-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1df4mjw",
+        "live-digital-components-block-2l2t8n"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "28b64f9c-e44a-4b2b-8f32-afde5f274a76",
+          "plannedSectionId": "live-digital-components-section-14u4000-planned-18amk1g",
+          "title": "digitalRead () 2",
+          "sourceBlockIds": [
+            "live-digital-components-block-1df4mjw",
+            "live-digital-components-block-2l2t8n"
+          ],
+          "sourceCore": {
+            "explanation": "digitalRead () Example Code:",
+            "keyPoints": [
+              "digitalRead () Example Code:"
+            ]
+          },
+          "enrichment": null,
+          "kind": "example-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-y3huy1",
+      "sourceSectionId": "live-digital-components-section-1cmvkxa",
+      "plannedSectionId": "live-digital-components-section-1cmvkxa-planned-l00vi3",
+      "title": "Digital Hardware Components",
+      "order": 16,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-1rgt89b",
+        "live-digital-components-block-15wq18m",
+        "live-digital-components-block-pfbq4p",
+        "live-digital-components-block-6o557s",
+        "live-digital-components-block-js2wln",
+        "live-digital-components-block-1eqrr78"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "4e5f9340-0f3c-11ee-be56-0242ac120002",
+          "plannedSectionId": "live-digital-components-section-1cmvkxa-planned-l00vi3",
+          "title": "Digital Hardware Components",
+          "sourceBlockIds": [
+            "live-digital-components-block-1rgt89b",
+            "live-digital-components-block-15wq18m",
+            "live-digital-components-block-pfbq4p",
+            "live-digital-components-block-6o557s",
+            "live-digital-components-block-js2wln",
+            "live-digital-components-block-1eqrr78"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Resistors Guide",
+              "Push Button",
+              "RGB LED"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-7wdnx0",
+      "sourceSectionId": "live-digital-components-section-yqq92a",
+      "plannedSectionId": "live-digital-components-section-yqq92a-planned-1ma5kv4",
+      "title": "References",
+      "order": 17,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-digital-components-block-15d184l",
+        "live-digital-components-block-vh73j2"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "references-study-card",
+          "plannedSectionId": "live-digital-components-section-yqq92a-planned-1ma5kv4",
+          "title": "References",
+          "sourceBlockIds": [
+            "live-digital-components-block-15d184l",
+            "live-digital-components-block-vh73j2"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "https://www.arduino.cc/reference/en/"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "sourceId": "live-digital-components",
+    "planId": "plan-1yhk0bw",
+    "coverageReportId": "coverage-bweof9",
+    "sourceTitle": "Digital Components",
+    "sourceKind": "plain-text",
+    "language": "en",
+    "sectionCount": 18,
+    "generatedSectionCount": 18,
+    "coverageStatus": "passed",
+    "coverageScore": 1,
+    "coverage": {
+      "id": "coverage-bweof9",
+      "planId": "plan-1yhk0bw",
+      "sourceId": "live-digital-components",
+      "status": "passed",
+      "score": 1,
+      "coverageScore": 1,
+      "coverageBasis": "source-outline",
+      "sourceSectionsTotal": 18,
+      "sourceSectionsCovered": 18,
+      "sourceSections": [
+        {
+          "sourceSectionId": "live-digital-components-section-28awso",
+          "title": "Introduction",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-28awso-planned-174jo9h"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-f53f2t",
+          "title": "Digital vs. Analog",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-f53f2t-planned-18uhbmf"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-1kyit3m",
+          "title": "Digital Pins",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-1kyit3m-planned-1keoyy5"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-1l9lwvw",
+          "title": "Digital Pins INPUT",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-1l9lwvw-planned-1yw9tj"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-caj4ug",
+          "title": "Digital Software Coding 1",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-caj4ug-planned-1xx6n73"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-1eoewqo",
+          "title": "pinMode () 1",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-1eoewqo-planned-nmp3vk"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-145pd0v",
+          "title": "Digital Software Coding 2",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-145pd0v-planned-30iqy8"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-1m3s9su",
+          "title": "pinMode () 2",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-1m3s9su-planned-xh01to"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-d3psqs",
+          "title": "Digital Software Coding 3",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-d3psqs-planned-ic6aom"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-bllgrz",
+          "title": "digitalWrite () 1",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-bllgrz-planned-1vvrqyi"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-a9qwyb",
+          "title": "Digital Software Coding 4",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-a9qwyb-planned-14xcb3d"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-1ha2czq",
+          "title": "digitalWrite () 2",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-1ha2czq-planned-17gb58a"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-11w30xd",
+          "title": "Digital Software Coding 5",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-11w30xd-planned-1bmdva0"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-k49n4l",
+          "title": "digitalRead () 1",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-k49n4l-planned-1onzppa"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-rtq6fy",
+          "title": "Digital Software Coding 6",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-rtq6fy-planned-1wjwpbl"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-14u4000",
+          "title": "digitalRead () 2",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-14u4000-planned-18amk1g"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-1cmvkxa",
+          "title": "Digital Hardware Components",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-1cmvkxa-planned-l00vi3"
+          ]
+        },
+        {
+          "sourceSectionId": "live-digital-components-section-yqq92a",
+          "title": "References",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-digital-components-section-yqq92a-planned-1ma5kv4"
+          ]
+        }
+      ],
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-digital-components-section-28awso-planned-174jo9h",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-f53f2t-planned-18uhbmf",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1kyit3m-planned-1keoyy5",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1l9lwvw-planned-1yw9tj",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-caj4ug-planned-1xx6n73",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1eoewqo-planned-nmp3vk",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-145pd0v-planned-30iqy8",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1m3s9su-planned-xh01to",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-d3psqs-planned-ic6aom",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-bllgrz-planned-1vvrqyi",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-a9qwyb-planned-14xcb3d",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1ha2czq-planned-17gb58a",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-11w30xd-planned-1bmdva0",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-k49n4l-planned-1onzppa",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-rtq6fy-planned-1wjwpbl",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-14u4000-planned-18amk1g",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1cmvkxa-planned-l00vi3",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-yqq92a-planned-1ma5kv4",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    },
+    "groundingStatus": "passed",
+    "groundingScore": 1,
+    "grounding": {
+      "id": "grounding-1qa2ha3",
+      "planId": "plan-1yhk0bw",
+      "sourceId": "live-digital-components",
+      "status": "passed",
+      "score": 1,
+      "threshold": 0.8,
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-digital-components-section-28awso-planned-174jo9h",
+          "sourceSectionId": "live-digital-components-section-28awso",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-f53f2t-planned-18uhbmf",
+          "sourceSectionId": "live-digital-components-section-f53f2t",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 22,
+          "representedSourceItemCount": 22,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1kyit3m-planned-1keoyy5",
+          "sourceSectionId": "live-digital-components-section-1kyit3m",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 6,
+          "representedSourceItemCount": 6,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1l9lwvw-planned-1yw9tj",
+          "sourceSectionId": "live-digital-components-section-1l9lwvw",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-caj4ug-planned-1xx6n73",
+          "sourceSectionId": "live-digital-components-section-caj4ug",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1eoewqo-planned-nmp3vk",
+          "sourceSectionId": "live-digital-components-section-1eoewqo",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 10,
+          "representedSourceItemCount": 10,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-145pd0v-planned-30iqy8",
+          "sourceSectionId": "live-digital-components-section-145pd0v",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1m3s9su-planned-xh01to",
+          "sourceSectionId": "live-digital-components-section-1m3s9su",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-d3psqs-planned-ic6aom",
+          "sourceSectionId": "live-digital-components-section-d3psqs",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-bllgrz-planned-1vvrqyi",
+          "sourceSectionId": "live-digital-components-section-bllgrz",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 10,
+          "representedSourceItemCount": 10,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-a9qwyb-planned-14xcb3d",
+          "sourceSectionId": "live-digital-components-section-a9qwyb",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1ha2czq-planned-17gb58a",
+          "sourceSectionId": "live-digital-components-section-1ha2czq",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-11w30xd-planned-1bmdva0",
+          "sourceSectionId": "live-digital-components-section-11w30xd",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-k49n4l-planned-1onzppa",
+          "sourceSectionId": "live-digital-components-section-k49n4l",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 9,
+          "representedSourceItemCount": 9,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-rtq6fy-planned-1wjwpbl",
+          "sourceSectionId": "live-digital-components-section-rtq6fy",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-14u4000-planned-18amk1g",
+          "sourceSectionId": "live-digital-components-section-14u4000",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1cmvkxa-planned-l00vi3",
+          "sourceSectionId": "live-digital-components-section-1cmvkxa",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-yqq92a-planned-1ma5kv4",
+          "sourceSectionId": "live-digital-components-section-yqq92a",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        }
+      ],
+      "phase1FabricationFails": 0,
+      "phase1FabricationFailures": []
+    },
+    "leakageStatus": "passed",
+    "leakage": {
+      "id": "leakage-1wkrvyi",
+      "planId": "plan-1yhk0bw",
+      "sourceId": "live-digital-components",
+      "status": "passed",
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-digital-components-section-28awso-planned-174jo9h",
+          "sourceSectionId": "live-digital-components-section-28awso",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-f53f2t-planned-18uhbmf",
+          "sourceSectionId": "live-digital-components-section-f53f2t",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1kyit3m-planned-1keoyy5",
+          "sourceSectionId": "live-digital-components-section-1kyit3m",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1l9lwvw-planned-1yw9tj",
+          "sourceSectionId": "live-digital-components-section-1l9lwvw",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-caj4ug-planned-1xx6n73",
+          "sourceSectionId": "live-digital-components-section-caj4ug",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1eoewqo-planned-nmp3vk",
+          "sourceSectionId": "live-digital-components-section-1eoewqo",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-145pd0v-planned-30iqy8",
+          "sourceSectionId": "live-digital-components-section-145pd0v",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1m3s9su-planned-xh01to",
+          "sourceSectionId": "live-digital-components-section-1m3s9su",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-d3psqs-planned-ic6aom",
+          "sourceSectionId": "live-digital-components-section-d3psqs",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-bllgrz-planned-1vvrqyi",
+          "sourceSectionId": "live-digital-components-section-bllgrz",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-a9qwyb-planned-14xcb3d",
+          "sourceSectionId": "live-digital-components-section-a9qwyb",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1ha2czq-planned-17gb58a",
+          "sourceSectionId": "live-digital-components-section-1ha2czq",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-11w30xd-planned-1bmdva0",
+          "sourceSectionId": "live-digital-components-section-11w30xd",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-k49n4l-planned-1onzppa",
+          "sourceSectionId": "live-digital-components-section-k49n4l",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-rtq6fy-planned-1wjwpbl",
+          "sourceSectionId": "live-digital-components-section-rtq6fy",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-14u4000-planned-18amk1g",
+          "sourceSectionId": "live-digital-components-section-14u4000",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-1cmvkxa-planned-l00vi3",
+          "sourceSectionId": "live-digital-components-section-1cmvkxa",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-digital-components-section-yqq92a-planned-1ma5kv4",
+          "sourceSectionId": "live-digital-components-section-yqq92a",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    }
+  }
+}
