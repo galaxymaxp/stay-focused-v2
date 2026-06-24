@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0",
     "lint": "next lint",
     "test": "vitest run",
     "provider:contract": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.contract.test.js",
