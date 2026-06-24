@@ -540,7 +540,7 @@ function validateReviewerResponse(
       message: "Reviewer sections are missing or empty.",
     });
   } else {
-    validateSectionExplanations(sections, failures);
+    validateSectionStudentVisibleContent(sections, failures);
   }
 
   const metadata = isRecord(reviewer["metadata"]) ? reviewer["metadata"] : {};
@@ -570,7 +570,7 @@ function validateReviewerResponse(
   };
 }
 
-function validateSectionExplanations(
+function validateSectionStudentVisibleContent(
   sections: readonly unknown[],
   failures: ValidationFailure[],
 ): void {
@@ -586,22 +586,28 @@ function validateSectionExplanations(
     const items = section["items"];
     if (!Array.isArray(items) || items.length === 0) {
       failures.push({
-        code: "missing_section_explanation",
-        message: `Reviewer section ${formatSectionLabel(section, sectionIndex)} has no generated items with explanations.`,
+        code: "missing_section_student_visible_content",
+        message: `Reviewer section ${formatSectionLabel(section, sectionIndex)} has no generated items with student-visible content.`,
       });
       return;
     }
 
     items.forEach((item, itemIndex) => {
-      const explanation =
+      const sourceCore =
         isRecord(item) && isRecord(item["sourceCore"])
-          ? readNonEmptyString(item["sourceCore"]["explanation"])
+          ? item["sourceCore"]
           : undefined;
+      const explanation = sourceCore
+        ? readNonEmptyString(sourceCore["explanation"])
+        : undefined;
+      const keyPoints = sourceCore
+        ? readNonEmptyStringArray(sourceCore["keyPoints"])
+        : [];
 
-      if (!explanation) {
+      if (!explanation && keyPoints.length === 0) {
         failures.push({
-          code: "empty_section_explanation",
-          message: `Reviewer section ${formatSectionLabel(section, sectionIndex)} item ${itemIndex + 1} has an empty explanation.`,
+          code: "empty_section_student_visible_content",
+          message: `Reviewer section ${formatSectionLabel(section, sectionIndex)} item ${itemIndex + 1} has neither a sourceCore explanation nor sourceCore keyPoints.`,
         });
       }
     });
@@ -899,6 +905,16 @@ function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : undefined;
+}
+
+function readNonEmptyStringArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => readNonEmptyString(entry))
+    .filter((entry): entry is string => entry !== undefined);
 }
 
 function isValidEmail(email: string): boolean {

@@ -5,14 +5,31 @@ OCR fixture text -> mobile-shaped authenticated POST -> `/api/reviewer/generate`
 
 ## Result
 
-- Pass/fail result: FAIL
-- Generated at: 2026-06-24T14:50:32.100Z
-- Completed at: 2026-06-24T14:50:32.104Z
+- Pass/fail result: PASS
+- Generated at: 2026-06-24T16:10:06.779Z
+- Completed at: 2026-06-24T16:10:25.262Z
 - Client timeout: 120000 ms
-- Token source: missing
-- API base URL present: no
-- Request duration: not started
-- HTTP status: No response
+- Token source: minted via email/password
+- API base URL present: yes
+- Request duration: 17955 ms
+- HTTP status: 200 OK
+
+## Env diagnostics
+
+- Env file path: `C:\Users\Fely Max Dilinila\OneDrive\Documents\Projects\stay-focused-v2\.env.local`
+- Env file exists: yes
+- Dotenv load succeeded: yes
+- Dotenv loaded keys: API_BASE_URL, email, EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_URL, GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_CLOUD_PROJECT, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SUPABASE_URL, OCR_PROVIDER, OPENAI_API_KEY, password, RUN_OPENAI_SMOKE, SUPABASE_SERVICE_ROLE_KEY
+- Process env overrides preserved: yes
+
+## Logical env groups
+
+- API base URL: present (API_BASE_URL)
+- Supabase URL: present (EXPO_PUBLIC_SUPABASE_URL)
+- Supabase anon key: present (EXPO_PUBLIC_SUPABASE_ANON_KEY)
+- test user email: present (email)
+- test user password: present (password)
+- manual access token: missing
 
 ## Request
 
@@ -23,16 +40,15 @@ OCR fixture text -> mobile-shaped authenticated POST -> `/api/reviewer/generate`
 
 ## Reviewer summary
 
-- Title: unavailable
-- Sections: unavailable
-- Coverage status: unavailable
-- Grounding status: unavailable
-- Leakage status: unavailable
+- Title: OCR Functional Timeout Test
+- Sections: 5
+- Coverage status: passed
+- Grounding status: passed
+- Leakage status: passed
 
 ## Validation failures
 
-- missing_api_base_url: Set API_BASE_URL or EXPO_PUBLIC_API_BASE_URL.
-- missing_supabase_sign_in_env: Missing required Supabase sign-in env vars: EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, TEST_SUPABASE_EMAIL, TEST_SUPABASE_PASSWORD.
+- None
 
 ## Output files
 

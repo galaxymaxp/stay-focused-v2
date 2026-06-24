@@ -1,15 +1,68 @@
 {
-  "ok": false,
-  "generatedAt": "2026-06-24T14:50:32.100Z",
-  "completedAt": "2026-06-24T14:50:32.104Z",
+  "ok": true,
+  "generatedAt": "2026-06-24T16:10:06.779Z",
+  "completedAt": "2026-06-24T16:10:25.262Z",
   "pathRecreated": "OCR fixture text -> mobile-shaped authenticated POST -> /api/reviewer/generate -> engine pipeline -> API reviewer response",
   "route": "/api/reviewer/generate",
   "timeoutMs": 120000,
-  "requestDurationMs": null,
+  "requestDurationMs": 17955,
   "env": {
-    "apiBaseUrlSource": null,
-    "apiBaseUrl": null,
-    "supabaseAccessTokenPresent": false
+    "apiBaseUrlSource": "API_BASE_URL",
+    "apiBaseUrlPresent": true,
+    "supabaseTokenSource": "minted_email_password",
+    "diagnostics": {
+      "envFilePath": "C:\\Users\\Fely Max Dilinila\\OneDrive\\Documents\\Projects\\stay-focused-v2\\.env.local",
+      "envFileExists": true,
+      "dotenvLoaded": true,
+      "dotenvLoadedKeys": [
+        "API_BASE_URL",
+        "email",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GOOGLE_CLOUD_PROJECT",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "OCR_PROVIDER",
+        "OPENAI_API_KEY",
+        "password",
+        "RUN_OPENAI_SMOKE",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
+      "processEnvOverridesPreserved": true,
+      "logicalGroups": [
+        {
+          "label": "API base URL",
+          "present": true,
+          "source": "API_BASE_URL"
+        },
+        {
+          "label": "Supabase URL",
+          "present": true,
+          "source": "EXPO_PUBLIC_SUPABASE_URL"
+        },
+        {
+          "label": "Supabase anon key",
+          "present": true,
+          "source": "EXPO_PUBLIC_SUPABASE_ANON_KEY"
+        },
+        {
+          "label": "test user email",
+          "present": true,
+          "source": "email"
+        },
+        {
+          "label": "test user password",
+          "present": true,
+          "source": "password"
+        },
+        {
+          "label": "manual access token",
+          "present": false,
+          "source": null
+        }
+      ]
+    }
   },
   "fixture": {
     "path": "C:\\Users\\Fely Max Dilinila\\OneDrive\\Documents\\Projects\\stay-focused-v2\\packages\\engine\\scripts\\fixtures\\ocr-extracted-general-lecture.txt",
@@ -19,19 +72,474 @@
     "sourceTitle": "OCR Functional Timeout Test",
     "sourceTextCharacters": 1567
   },
-  "response": null,
-  "reviewerSummary": null,
-  "validation": {
-    "passed": false,
-    "failures": [
-      {
-        "code": "missing_api_base_url",
-        "message": "Set API_BASE_URL or EXPO_PUBLIC_API_BASE_URL."
-      },
-      {
-        "code": "missing_supabase_access_token",
-        "message": "Set SUPABASE_ACCESS_TOKEN to a valid Supabase user access token."
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "validJson": true,
+    "json": {
+      "ok": true,
+      "reviewer": {
+        "id": "reviewer-17eeocm",
+        "title": "OCR Functional Timeout Test",
+        "sections": [
+          {
+            "id": "reviewer-section-1wjaf2g",
+            "sourceSectionId": "source-1gdwttx-section-1i12z2h",
+            "plannedSectionId": "source-1gdwttx-section-1i12z2h-planned-sh3754",
+            "title": "GENERAL LECTURE NOTES - OCR EXPORT 1",
+            "order": 0,
+            "kind": "example-card",
+            "sourceBlockIds": [
+              "source-1gdwttx-block-35u0kn",
+              "source-1gdwttx-block-dxe2n2"
+            ],
+            "coverageStatus": "passed",
+            "coverageScore": 1,
+            "groundingStatus": "passed",
+            "groundingScore": 1,
+            "groundingIssues": [],
+            "leakageStatus": "passed",
+            "leakageIssues": [],
+            "items": [
+              {
+                "id": "example-1",
+                "plannedSectionId": "source-1gdwttx-section-1i12z2h-planned-sh3754",
+                "title": "GENERAL LECTURE NOTES - OCR EXPORT 1",
+                "sourceBlockIds": [
+                  "source-1gdwttx-block-35u0kn",
+                  "source-1gdwttx-block-dxe2n2"
+                ],
+                "sourceCore": {
+                  "explanation": "",
+                  "keyPoints": [
+                    "page 1 / sample footer",
+                    "page 1 / sample footer"
+                  ]
+                },
+                "enrichment": null,
+                "kind": "example-card"
+              }
+            ]
+          },
+          {
+            "id": "reviewer-section-nb1t5j",
+            "sourceSectionId": "source-1gdwttx-section-g6acsf",
+            "plannedSectionId": "source-1gdwttx-section-g6acsf-planned-1jc76pm",
+            "title": "SESSION AIM",
+            "order": 1,
+            "kind": "concept-card",
+            "sourceBlockIds": [
+              "source-1gdwttx-block-wu6vl0",
+              "source-1gdwttx-block-1sb5c6u",
+              "source-1gdwttx-block-v0sc8"
+            ],
+            "coverageStatus": "passed",
+            "coverageScore": 1,
+            "groundingStatus": "passed",
+            "groundingScore": 1,
+            "groundingIssues": [],
+            "leakageStatus": "passed",
+            "leakageIssues": [],
+            "items": [
+              {
+                "id": "session-aim-card",
+                "plannedSectionId": "source-1gdwttx-section-g6acsf-planned-1jc76pm",
+                "title": "SESSION AIM",
+                "sourceBlockIds": [
+                  "source-1gdwttx-block-wu6vl0",
+                  "source-1gdwttx-block-1sb5c6u",
+                  "source-1gdwttx-block-v0sc8"
+                ],
+                "sourceCore": {
+                  "explanation": "",
+                  "keyPoints": [
+                    "observation means a noticed detail from the source activity",
+                    "record means the written trace kept for later checking",
+                    "conclusion means a statement drawn from the available record"
+                  ]
+                },
+                "enrichment": null,
+                "kind": "concept-card"
+              }
+            ]
+          },
+          {
+            "id": "reviewer-section-16vaa4v",
+            "sourceSectionId": "source-1gdwttx-section-1i6bewa",
+            "plannedSectionId": "source-1gdwttx-section-1i6bewa-planned-12nzzg7",
+            "title": "GENERAL LECTURE NOTES - OCR EXPORT 2",
+            "order": 2,
+            "kind": "concept-card",
+            "sourceBlockIds": [
+              "source-1gdwttx-block-t06d76",
+              "source-1gdwttx-block-11sfmmi",
+              "source-1gdwttx-block-1bzmfj2",
+              "source-1gdwttx-block-2w22k7",
+              "source-1gdwttx-block-rqomxp"
+            ],
+            "coverageStatus": "passed",
+            "coverageScore": 1,
+            "groundingStatus": "passed",
+            "groundingScore": 1,
+            "groundingIssues": [],
+            "leakageStatus": "passed",
+            "leakageIssues": [],
+            "items": [
+              {
+                "id": "concept-1",
+                "plannedSectionId": "source-1gdwttx-section-1i6bewa-planned-12nzzg7",
+                "title": "GENERAL LECTURE NOTES - OCR EXPORT 2",
+                "sourceBlockIds": [
+                  "source-1gdwttx-block-t06d76",
+                  "source-1gdwttx-block-11sfmmi",
+                  "source-1gdwttx-block-1bzmfj2",
+                  "source-1gdwttx-block-2w22k7",
+                  "source-1gdwttx-block-rqomxp"
+                ],
+                "sourceCore": {
+                  "explanation": "",
+                  "keyPoints": [
+                    "Input item - material or detail received before work begins",
+                    "Check point - place where the item is compared with a rule",
+                    "Output note - result written after the check point",
+                    "Review mark - sign that the output note was inspected G e n e r a l L e c t u r e N o t e s page 3 / sample footer"
+                  ]
+                },
+                "enrichment": null,
+                "kind": "concept-card"
+              }
+            ]
+          },
+          {
+            "id": "reviewer-section-xkfs8n",
+            "sourceSectionId": "source-1gdwttx-section-18csmae",
+            "plannedSectionId": "source-1gdwttx-section-18csmae-planned-1r9v3id",
+            "title": "FLATTENED TABLE",
+            "order": 3,
+            "kind": "concept-card",
+            "sourceBlockIds": [
+              "source-1gdwttx-block-35x35b",
+              "source-1gdwttx-block-zj0s1e",
+              "source-1gdwttx-block-33mt0h"
+            ],
+            "coverageStatus": "passed",
+            "coverageScore": 1,
+            "groundingStatus": "passed",
+            "groundingScore": 1,
+            "groundingIssues": [],
+            "leakageStatus": "passed",
+            "leakageIssues": [],
+            "items": [
+              {
+                "id": "concept-01",
+                "plannedSectionId": "source-1gdwttx-section-18csmae-planned-1r9v3id",
+                "title": "FLATTENED TABLE",
+                "sourceBlockIds": [
+                  "source-1gdwttx-block-35x35b",
+                  "source-1gdwttx-block-zj0s1e",
+                  "source-1gdwttx-block-33mt0h"
+                ],
+                "sourceCore": {
+                  "explanation": "",
+                  "keyPoints": [
+                    "Column | Meaning | Example value",
+                    "Label | short name for an item | alpha-01",
+                    "Status | current condition of an item | ready",
+                    "Count | number of units present | 4"
+                  ]
+                },
+                "enrichment": null,
+                "kind": "concept-card"
+              }
+            ]
+          },
+          {
+            "id": "reviewer-section-1c69pmd",
+            "sourceSectionId": "source-1gdwttx-section-15b9bw",
+            "plannedSectionId": "source-1gdwttx-section-15b9bw-planned-odjsee",
+            "title": "GENERAL LECTURE NOTES - OCR EXPORT 3",
+            "order": 4,
+            "kind": "concept-card",
+            "sourceBlockIds": [
+              "source-1gdwttx-block-95km11",
+              "source-1gdwttx-block-15rwpev",
+              "source-1gdwttx-block-1yxgdna",
+              "source-1gdwttx-block-ix3m03",
+              "source-1gdwttx-block-1owvhcp",
+              "source-1gdwttx-block-1u3c84e",
+              "source-1gdwttx-block-r3a3pt",
+              "source-1gdwttx-block-1o68bpq",
+              "source-1gdwttx-block-unyovo",
+              "source-1gdwttx-block-1ycbgme"
+            ],
+            "coverageStatus": "passed",
+            "coverageScore": 1,
+            "groundingStatus": "passed",
+            "groundingScore": 1,
+            "groundingIssues": [],
+            "leakageStatus": "passed",
+            "leakageIssues": [],
+            "items": [
+              {
+                "id": "concept-card-1",
+                "plannedSectionId": "source-1gdwttx-section-15b9bw-planned-odjsee",
+                "title": "GENERAL LECTURE NOTES - OCR EXPORT 3",
+                "sourceBlockIds": [
+                  "source-1gdwttx-block-95km11",
+                  "source-1gdwttx-block-15rwpev",
+                  "source-1gdwttx-block-1yxgdna",
+                  "source-1gdwttx-block-ix3m03",
+                  "source-1gdwttx-block-1owvhcp",
+                  "source-1gdwttx-block-1u3c84e",
+                  "source-1gdwttx-block-r3a3pt",
+                  "source-1gdwttx-block-1o68bpq",
+                  "source-1gdwttx-block-unyovo",
+                  "source-1gdwttx-block-1ycbgme"
+                ],
+                "sourceCore": {
+                  "explanation": "",
+                  "keyPoints": [
+                    "a missing label stops the check",
+                    "a ready status allows the count",
+                    "a count of 0 requires a note End of extracted notes."
+                  ]
+                },
+                "enrichment": null,
+                "kind": "concept-card"
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "sourceId": "source-1gdwttx",
+          "planId": "plan-noze3v",
+          "coverageReportId": "coverage-qzk7mr",
+          "sourceTitle": "OCR Functional Timeout Test",
+          "sourceKind": "plain-text",
+          "language": "und",
+          "sectionCount": 5,
+          "generatedSectionCount": 5,
+          "coverageStatus": "passed",
+          "coverageScore": 1,
+          "coverage": {
+            "id": "coverage-qzk7mr",
+            "planId": "plan-noze3v",
+            "sourceId": "source-1gdwttx",
+            "status": "passed",
+            "score": 1,
+            "coverageScore": 1,
+            "coverageBasis": "source-outline",
+            "sourceSectionsTotal": 5,
+            "sourceSectionsCovered": 5,
+            "sourceSections": [
+              {
+                "sourceSectionId": "source-1gdwttx-section-1i12z2h",
+                "title": "GENERAL LECTURE NOTES - OCR EXPORT 1",
+                "status": "covered",
+                "plannedSectionIds": [
+                  "source-1gdwttx-section-1i12z2h-planned-sh3754"
+                ]
+              },
+              {
+                "sourceSectionId": "source-1gdwttx-section-g6acsf",
+                "title": "SESSION AIM",
+                "status": "covered",
+                "plannedSectionIds": [
+                  "source-1gdwttx-section-g6acsf-planned-1jc76pm"
+                ]
+              },
+              {
+                "sourceSectionId": "source-1gdwttx-section-1i6bewa",
+                "title": "GENERAL LECTURE NOTES - OCR EXPORT 2",
+                "status": "covered",
+                "plannedSectionIds": [
+                  "source-1gdwttx-section-1i6bewa-planned-12nzzg7"
+                ]
+              },
+              {
+                "sourceSectionId": "source-1gdwttx-section-18csmae",
+                "title": "FLATTENED TABLE",
+                "status": "covered",
+                "plannedSectionIds": [
+                  "source-1gdwttx-section-18csmae-planned-1r9v3id"
+                ]
+              },
+              {
+                "sourceSectionId": "source-1gdwttx-section-15b9bw",
+                "title": "GENERAL LECTURE NOTES - OCR EXPORT 3",
+                "status": "covered",
+                "plannedSectionIds": [
+                  "source-1gdwttx-section-15b9bw-planned-odjsee"
+                ]
+              }
+            ],
+            "issues": [],
+            "sections": [
+              {
+                "plannedSectionId": "source-1gdwttx-section-1i12z2h-planned-sh3754",
+                "status": "passed",
+                "score": 1,
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-g6acsf-planned-1jc76pm",
+                "status": "passed",
+                "score": 1,
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-1i6bewa-planned-12nzzg7",
+                "status": "passed",
+                "score": 1,
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-18csmae-planned-1r9v3id",
+                "status": "passed",
+                "score": 1,
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-15b9bw-planned-odjsee",
+                "status": "passed",
+                "score": 1,
+                "issues": [],
+                "retryable": false
+              }
+            ]
+          },
+          "groundingStatus": "passed",
+          "groundingScore": 1,
+          "grounding": {
+            "id": "grounding-z1rt8c",
+            "planId": "plan-noze3v",
+            "sourceId": "source-1gdwttx",
+            "status": "passed",
+            "score": 1,
+            "threshold": 0.8,
+            "issues": [],
+            "sections": [
+              {
+                "plannedSectionId": "source-1gdwttx-section-1i12z2h-planned-sh3754",
+                "sourceSectionId": "source-1gdwttx-section-1i12z2h",
+                "status": "passed",
+                "score": 1,
+                "sourceItemCount": 0,
+                "representedSourceItemCount": 0,
+                "issues": [],
+                "retryable": false,
+                "phase1FabricationFailures": []
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-g6acsf-planned-1jc76pm",
+                "sourceSectionId": "source-1gdwttx-section-g6acsf",
+                "status": "passed",
+                "score": 1,
+                "sourceItemCount": 3,
+                "representedSourceItemCount": 3,
+                "issues": [],
+                "retryable": false,
+                "phase1FabricationFailures": []
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-1i6bewa-planned-12nzzg7",
+                "sourceSectionId": "source-1gdwttx-section-1i6bewa",
+                "status": "passed",
+                "score": 1,
+                "sourceItemCount": 4,
+                "representedSourceItemCount": 4,
+                "issues": [],
+                "retryable": false,
+                "phase1FabricationFailures": []
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-18csmae-planned-1r9v3id",
+                "sourceSectionId": "source-1gdwttx-section-18csmae",
+                "status": "passed",
+                "score": 1,
+                "sourceItemCount": 4,
+                "representedSourceItemCount": 4,
+                "issues": [],
+                "retryable": false,
+                "phase1FabricationFailures": []
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-15b9bw-planned-odjsee",
+                "sourceSectionId": "source-1gdwttx-section-15b9bw",
+                "status": "passed",
+                "score": 1,
+                "sourceItemCount": 3,
+                "representedSourceItemCount": 3,
+                "issues": [],
+                "retryable": false,
+                "phase1FabricationFailures": []
+              }
+            ],
+            "phase1FabricationFails": 0,
+            "phase1FabricationFailures": []
+          },
+          "leakageStatus": "passed",
+          "leakage": {
+            "id": "leakage-shn2hv",
+            "planId": "plan-noze3v",
+            "sourceId": "source-1gdwttx",
+            "status": "passed",
+            "issues": [],
+            "sections": [
+              {
+                "plannedSectionId": "source-1gdwttx-section-1i12z2h-planned-sh3754",
+                "sourceSectionId": "source-1gdwttx-section-1i12z2h",
+                "status": "passed",
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-g6acsf-planned-1jc76pm",
+                "sourceSectionId": "source-1gdwttx-section-g6acsf",
+                "status": "passed",
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-1i6bewa-planned-12nzzg7",
+                "sourceSectionId": "source-1gdwttx-section-1i6bewa",
+                "status": "passed",
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-18csmae-planned-1r9v3id",
+                "sourceSectionId": "source-1gdwttx-section-18csmae",
+                "status": "passed",
+                "issues": [],
+                "retryable": false
+              },
+              {
+                "plannedSectionId": "source-1gdwttx-section-15b9bw-planned-odjsee",
+                "sourceSectionId": "source-1gdwttx-section-15b9bw",
+                "status": "passed",
+                "issues": [],
+                "retryable": false
+              }
+            ]
+          }
+        }
       }
-    ]
+    }
+  },
+  "reviewerSummary": {
+    "title": "OCR Functional Timeout Test",
+    "sectionCount": 5,
+    "coverageStatus": "passed",
+    "groundingStatus": "passed",
+    "leakageStatus": "passed"
+  },
+  "validation": {
+    "passed": true,
+    "failures": []
   }
 }
