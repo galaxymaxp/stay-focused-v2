@@ -3,13 +3,42 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createClient } from "@supabase/supabase-js";
+import { config as loadDotenv } from "dotenv";
 
 const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
 const SOURCE_TITLE = "OCR Functional Timeout Test";
 const FIXTURE_FILE_NAME = "ocr-extracted-general-lecture.txt";
 const TIMEOUT_MS = 120_000;
 
+const API_BASE_URL_ALIASES = [
+  "API_BASE_URL",
+  "EXPO_PUBLIC_API_BASE_URL",
+  "NEXT_PUBLIC_API_BASE_URL",
+] as const;
+const SUPABASE_URL_ALIASES = [
+  "EXPO_PUBLIC_SUPABASE_URL",
+  "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+] as const;
+const SUPABASE_ANON_KEY_ALIASES = [
+  "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+  "SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+] as const;
+const TEST_EMAIL_ALIASES = [
+  "TEST_SUPABASE_EMAIL",
+  "TEST_USER_EMAIL",
+  "email",
+] as const;
+const TEST_PASSWORD_ALIASES = [
+  "TEST_SUPABASE_PASSWORD",
+  "TEST_USER_PASSWORD",
+  "pass",
+] as const;
+
 const FIXTURE_PATH = resolvePackagePath("scripts", "fixtures", FIXTURE_FILE_NAME);
+const REPO_ROOT_PATH = resolveRepoPath();
+const REPO_ENV_LOCAL_PATH = join(REPO_ROOT_PATH, ".env.local");
 const OUTPUT_JSON_PATH = resolveRepoPath(
   "docs",
   "ai",
@@ -20,6 +49,9 @@ const OUTPUT_AUDIT_PATH = resolveRepoPath(
   "ai",
   "api-reviewer-functional-audit.md",
 );
+const PROCESS_ENV_OVERRIDES = snapshotProcessEnv();
+
+loadRepoRootEnvLocal();
 
 interface ValidationFailure {
   readonly code: string;
@@ -29,8 +61,13 @@ interface ValidationFailure {
 
 interface ApiBaseUrlResult {
   readonly value: string | null;
-  readonly source: "API_BASE_URL" | "EXPO_PUBLIC_API_BASE_URL" | null;
+  readonly source: string | null;
   readonly present: boolean;
+}
+
+interface EnvSelection {
+  readonly name: string;
+  readonly value: string;
 }
 
 type SupabaseTokenSource = "manual_fallback" | "minted_email_password";
@@ -158,27 +195,11 @@ async function main(): Promise<void> {
 }
 
 function readApiBaseUrl(failures: ValidationFailure[]): ApiBaseUrlResult {
-  const candidates: readonly ApiBaseUrlResult[] = [
-    {
-      source: "API_BASE_URL",
-      value: process.env.API_BASE_URL?.trim() ?? "",
-      present: Boolean(process.env.API_BASE_URL?.trim()),
-    },
-    {
-      source: "EXPO_PUBLIC_API_BASE_URL",
-      value: process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? "",
-      present: Boolean(process.env.EXPO_PUBLIC_API_BASE_URL?.trim()),
-    },
-  ];
-
-  const selected = candidates.find(
-    (candidate): candidate is ApiBaseUrlResult & { readonly value: string } =>
-      Boolean(candidate.value),
-  );
+  const selected = readEnvSelection(API_BASE_URL_ALIASES);
   if (!selected) {
     failures.push({
       code: "missing_api_base_url",
-      message: "Set API_BASE_URL or EXPO_PUBLIC_API_BASE_URL.",
+      message: "Missing: API base URL",
     });
     return { source: null, value: null, present: false };
   }
@@ -187,12 +208,13 @@ function readApiBaseUrl(failures: ValidationFailure[]): ApiBaseUrlResult {
   if (!isHttpUrl(normalized)) {
     failures.push({
       code: "invalid_api_base_url",
-      message: `${selected.source} must be a valid HTTP(S) origin or base URL without query or hash.`,
+      message:
+        "API base URL must be a valid HTTP(S) origin or base URL without query or hash.",
     });
-    return { source: selected.source, value: null, present: true };
+    return { source: selected.name, value: null, present: true };
   }
 
-  return { source: selected.source, value: normalized, present: true };
+  return { source: selected.name, value: normalized, present: true };
 }
 
 async function readSupabaseAccessToken(
@@ -214,50 +236,79 @@ async function readSupabaseAccessToken(
 function readSupabaseSignInConfig(
   failures: ValidationFailure[],
 ): SupabaseSignInConfig | null {
-  const required = {
-    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "",
-    EXPO_PUBLIC_SUPABASE_ANON_KEY:
-      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "",
-    TEST_SUPABASE_EMAIL: process.env.TEST_SUPABASE_EMAIL?.trim() ?? "",
-    TEST_SUPABASE_PASSWORD: process.env.TEST_SUPABASE_PASSWORD ?? "",
-  } as const;
+  const supabaseUrlSelection = readEnvSelection(SUPABASE_URL_ALIASES);
+  const supabaseAnonKeySelection = readEnvSelection(SUPABASE_ANON_KEY_ALIASES);
+  const emailSelection = readEnvSelection(TEST_EMAIL_ALIASES);
+  const passwordSelection = readEnvSelection(TEST_PASSWORD_ALIASES, {
+    preserveWhitespace: true,
+  });
 
-  const missing = Object.entries(required)
-    .filter(([, value]) => value.length === 0)
-    .map(([name]) => name);
+  pushMissingEnvFailure(failures, supabaseUrlSelection, {
+    code: "missing_supabase_url",
+    label: "Supabase URL",
+  });
+  pushMissingEnvFailure(failures, supabaseAnonKeySelection, {
+    code: "missing_supabase_anon_key",
+    label: "Supabase anon key",
+  });
+  pushMissingEnvFailure(failures, emailSelection, {
+    code: "missing_test_user_email",
+    label: "test user email",
+  });
+  pushMissingEnvFailure(failures, passwordSelection, {
+    code: "missing_test_user_password",
+    label: "test user password",
+  });
 
-  if (missing.length > 0) {
-    failures.push({
-      code: "missing_supabase_sign_in_env",
-      message: `Missing required Supabase sign-in env vars: ${missing.join(", ")}.`,
-    });
+  if (
+    !supabaseUrlSelection ||
+    !supabaseAnonKeySelection ||
+    !emailSelection ||
+    !passwordSelection
+  ) {
     return null;
   }
 
-  const supabaseUrl = required.EXPO_PUBLIC_SUPABASE_URL.replace(/\/+$/, "");
+  const supabaseUrl = supabaseUrlSelection.value.replace(/\/+$/, "");
   if (!isHttpUrl(supabaseUrl)) {
     failures.push({
       code: "invalid_supabase_url",
-      message: "EXPO_PUBLIC_SUPABASE_URL must be a valid HTTP(S) URL without query or hash.",
+      message:
+        "Supabase URL must be a valid HTTP(S) URL without query or hash.",
     });
     return null;
   }
 
-  const email = required.TEST_SUPABASE_EMAIL.toLowerCase();
+  const email = emailSelection.value.toLowerCase();
   if (!isValidEmail(email)) {
     failures.push({
       code: "invalid_test_supabase_email",
-      message: "TEST_SUPABASE_EMAIL must be a valid email address.",
+      message: "Test user email must be a valid email address.",
     });
     return null;
   }
 
   return {
     supabaseUrl,
-    supabaseAnonKey: required.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseAnonKey: supabaseAnonKeySelection.value,
     email,
-    password: required.TEST_SUPABASE_PASSWORD,
+    password: passwordSelection.value,
   };
+}
+
+function pushMissingEnvFailure(
+  failures: ValidationFailure[],
+  selection: EnvSelection | null,
+  missing: { readonly code: string; readonly label: string },
+): void {
+  if (selection) {
+    return;
+  }
+
+  failures.push({
+    code: missing.code,
+    message: `Missing: ${missing.label}`,
+  });
 }
 
 async function mintSupabaseAccessToken(
@@ -671,6 +722,51 @@ function formatTokenSource(source: SupabaseTokenSource | null): string {
 
 function yesNo(value: boolean): "yes" | "no" {
   return value ? "yes" : "no";
+}
+
+function loadRepoRootEnvLocal(): void {
+  loadDotenv({
+    path: REPO_ENV_LOCAL_PATH,
+    override: false,
+  });
+}
+
+function snapshotProcessEnv(): Readonly<Record<string, string | undefined>> {
+  return { ...process.env };
+}
+
+function readEnvSelection(
+  aliases: readonly string[],
+  options?: { readonly preserveWhitespace?: boolean },
+): EnvSelection | null {
+  for (const name of aliases) {
+    const value = readEnvValue(PROCESS_ENV_OVERRIDES, name, options);
+    if (value !== null) {
+      return { name, value };
+    }
+  }
+
+  for (const name of aliases) {
+    const value = readEnvValue(process.env, name, options);
+    if (value !== null) {
+      return { name, value };
+    }
+  }
+
+  return null;
+}
+
+function readEnvValue(
+  env: NodeJS.ProcessEnv | Readonly<Record<string, string | undefined>>,
+  name: string,
+  options?: { readonly preserveWhitespace?: boolean },
+): string | null {
+  const rawValue = env[name];
+  if (rawValue === undefined || rawValue.trim().length === 0) {
+    return null;
+  }
+
+  return options?.preserveWhitespace ? rawValue : rawValue.trim();
 }
 
 function isHttpUrl(value: string): boolean {
