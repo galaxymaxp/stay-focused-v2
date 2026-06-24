@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +35,7 @@ const TEST_PASSWORD_ALIASES = [
   "TEST_SUPABASE_PASSWORD",
   "TEST_USER_PASSWORD",
   "pass",
+  "password",
 ] as const;
 
 const FIXTURE_PATH = resolvePackagePath("scripts", "fixtures", FIXTURE_FILE_NAME);
@@ -50,8 +52,9 @@ const OUTPUT_AUDIT_PATH = resolveRepoPath(
   "api-reviewer-functional-audit.md",
 );
 const PROCESS_ENV_OVERRIDES = snapshotProcessEnv();
+const ENV_LOAD_DIAGNOSTICS = loadRepoRootEnvLocal();
 
-loadRepoRootEnvLocal();
+const MANUAL_ACCESS_TOKEN_ALIASES = ["SUPABASE_ACCESS_TOKEN"] as const;
 
 interface ValidationFailure {
   readonly code: string;
@@ -68,6 +71,20 @@ interface ApiBaseUrlResult {
 interface EnvSelection {
   readonly name: string;
   readonly value: string;
+}
+
+interface EnvLoadDiagnostics {
+  readonly envFilePath: string;
+  readonly envFileExists: boolean;
+  readonly dotenvLoaded: boolean;
+  readonly dotenvLoadedKeys: readonly string[];
+  readonly processEnvOverridesPreserved: boolean;
+}
+
+interface LogicalEnvGroupStatus {
+  readonly label: string;
+  readonly present: boolean;
+  readonly source: string | null;
 }
 
 type SupabaseTokenSource = "manual_fallback" | "minted_email_password";
@@ -112,6 +129,9 @@ interface FunctionalTestOutput {
     readonly apiBaseUrlSource: string | null;
     readonly apiBaseUrlPresent: boolean;
     readonly supabaseTokenSource: SupabaseTokenSource | null;
+    readonly diagnostics: EnvLoadDiagnostics & {
+      readonly logicalGroups: readonly LogicalEnvGroupStatus[];
+    };
   };
   readonly fixture: {
     readonly path: string;
@@ -169,6 +189,10 @@ async function main(): Promise<void> {
       apiBaseUrlSource: apiBaseUrl.source,
       apiBaseUrlPresent: apiBaseUrl.present,
       supabaseTokenSource: supabaseAccessToken?.source ?? null,
+      diagnostics: {
+        ...ENV_LOAD_DIAGNOSTICS,
+        logicalGroups: readLogicalEnvGroupStatuses(),
+      },
     },
     fixture: {
       path: FIXTURE_PATH,
@@ -631,6 +655,7 @@ function printDiagnostics(output: FunctionalTestOutput): void {
   console.log(`Path: ${output.pathRecreated}`);
   console.log(`Route: ${output.route}`);
   console.log(`Timeout: ${output.timeoutMs} ms`);
+  printEnvDiagnostics(output.env.diagnostics);
   console.log(`API base URL present: ${yesNo(output.env.apiBaseUrlPresent)}`);
   console.log(`Token source: ${formatTokenSource(output.env.supabaseTokenSource)}`);
   console.log(
@@ -662,6 +687,15 @@ function renderAuditMarkdown(output: FunctionalTestOutput): string {
   const responseStatus = output.response
     ? `${output.response.status} ${output.response.statusText}`.trim()
     : "No response";
+  const loadedKeys = formatKeyNames(output.env.diagnostics.dotenvLoadedKeys);
+  const logicalGroups = output.env.diagnostics.logicalGroups
+    .map(
+      (group) =>
+        `- ${group.label}: ${group.present ? "present" : "missing"}${
+          group.source ? ` (${group.source})` : ""
+        }`,
+    )
+    .join("\n");
 
   return `# API reviewer functional timeout validation
 
@@ -682,6 +716,20 @@ OCR fixture text -> mobile-shaped authenticated POST -> \`${REVIEWER_GENERATE_RO
       : `${output.requestDurationMs} ms`
   }
 - HTTP status: ${responseStatus}
+
+## Env diagnostics
+
+- Env file path: \`${output.env.diagnostics.envFilePath}\`
+- Env file exists: ${yesNo(output.env.diagnostics.envFileExists)}
+- Dotenv load succeeded: ${yesNo(output.env.diagnostics.dotenvLoaded)}
+- Dotenv loaded keys: ${loadedKeys}
+- Process env overrides preserved: ${
+    yesNo(output.env.diagnostics.processEnvOverridesPreserved)
+  }
+
+## Logical env groups
+
+${logicalGroups}
 
 ## Request
 
@@ -724,11 +772,46 @@ function yesNo(value: boolean): "yes" | "no" {
   return value ? "yes" : "no";
 }
 
-function loadRepoRootEnvLocal(): void {
-  loadDotenv({
+function printEnvDiagnostics(
+  diagnostics: EnvLoadDiagnostics & {
+    readonly logicalGroups: readonly LogicalEnvGroupStatus[];
+  },
+): void {
+  console.log(`Env file path: ${diagnostics.envFilePath}`);
+  console.log(`Env file exists: ${yesNo(diagnostics.envFileExists)}`);
+  console.log(`Dotenv load succeeded: ${yesNo(diagnostics.dotenvLoaded)}`);
+  console.log(`Dotenv loaded keys: ${formatKeyNames(diagnostics.dotenvLoadedKeys)}`);
+  console.log(
+    `Process env overrides preserved: ${
+      yesNo(diagnostics.processEnvOverridesPreserved)
+    }`,
+  );
+  console.log("Logical env groups:");
+  for (const group of diagnostics.logicalGroups) {
+    console.log(
+      `- ${group.label}: ${group.present ? "present" : "missing"}${
+        group.source ? ` (${group.source})` : ""
+      }`,
+    );
+  }
+}
+
+function loadRepoRootEnvLocal(): EnvLoadDiagnostics {
+  const envFileExists = existsSync(REPO_ENV_LOCAL_PATH);
+  const result = loadDotenv({
     path: REPO_ENV_LOCAL_PATH,
     override: false,
   });
+
+  return {
+    envFilePath: REPO_ENV_LOCAL_PATH,
+    envFileExists,
+    dotenvLoaded: envFileExists && !result.error,
+    dotenvLoadedKeys: Object.keys(result.parsed ?? {}).sort((a, b) =>
+      a.localeCompare(b),
+    ),
+    processEnvOverridesPreserved: true,
+  };
 }
 
 function snapshotProcessEnv(): Readonly<Record<string, string | undefined>> {
@@ -754,6 +837,36 @@ function readEnvSelection(
   }
 
   return null;
+}
+
+function readLogicalEnvGroupStatuses(): readonly LogicalEnvGroupStatus[] {
+  return [
+    readLogicalEnvGroupStatus("API base URL", API_BASE_URL_ALIASES),
+    readLogicalEnvGroupStatus("Supabase URL", SUPABASE_URL_ALIASES),
+    readLogicalEnvGroupStatus("Supabase anon key", SUPABASE_ANON_KEY_ALIASES),
+    readLogicalEnvGroupStatus("test user email", TEST_EMAIL_ALIASES),
+    readLogicalEnvGroupStatus("test user password", TEST_PASSWORD_ALIASES, {
+      preserveWhitespace: true,
+    }),
+    readLogicalEnvGroupStatus("manual access token", MANUAL_ACCESS_TOKEN_ALIASES),
+  ];
+}
+
+function readLogicalEnvGroupStatus(
+  label: string,
+  aliases: readonly string[],
+  options?: { readonly preserveWhitespace?: boolean },
+): LogicalEnvGroupStatus {
+  const selection = readEnvSelection(aliases, options);
+  return {
+    label,
+    present: selection !== null,
+    source: selection?.name ?? null,
+  };
+}
+
+function formatKeyNames(keys: readonly string[]): string {
+  return keys.length > 0 ? keys.join(", ") : "none";
 }
 
 function readEnvValue(

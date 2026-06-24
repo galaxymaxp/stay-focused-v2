@@ -18,7 +18,7 @@ Authentication can use either:
   - Supabase URL: `EXPO_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, or `NEXT_PUBLIC_SUPABASE_URL`
   - Supabase anon key: `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_ANON_KEY`, or `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - Test user email: `TEST_SUPABASE_EMAIL`, `TEST_USER_EMAIL`, or `email`
-  - Test user password: `TEST_SUPABASE_PASSWORD`, `TEST_USER_PASSWORD`, or `pass`
+  - Test user password: `TEST_SUPABASE_PASSWORD`, `TEST_USER_PASSWORD`, `pass`, or `password`
 
 Repo-root `.env.local` example:
 
@@ -29,6 +29,14 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 email=...
 pass=...
 ```
+
+Troubleshooting:
+
+- Check `.env.local` is in the repo root, next to `package.json`.
+- Check the file is named `.env.local`, not `.env.local.txt`.
+- Supported aliases are listed above; the script prints loaded key names only.
+- Prefer no spaces around key names, for example `API_BASE_URL=http://localhost:3000`.
+- PowerShell and process environment variables override `.env.local`.
 
 PowerShell example:
 
