@@ -6,7 +6,7 @@
   "scripts": {
     "build": "expo export",
     "dev": "expo start",
-    "lint": "expo lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .expo dist"
   },
