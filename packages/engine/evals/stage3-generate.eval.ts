@@ -99,6 +99,19 @@ interface Stage3Context {
   readonly source: NormalizedSource;
 }
 
+interface SingleBlockContextArgs {
+  readonly blockId: string;
+  readonly blockKind: NormalizedSource["blocks"][number]["kind"];
+  readonly sourceId: string;
+  readonly sourceTitle: string;
+  readonly sectionId: string;
+  readonly sectionTitle: string;
+  readonly sourceText: string;
+  readonly targetObjective: string;
+  readonly targetFocus: string;
+  readonly targetItemCount: number;
+}
+
 class FakeGenerationProvider implements GenerationProvider {
   public readonly requests: GenerationRequest<unknown>[] = [];
 
@@ -139,6 +152,8 @@ export const stage3GenerateSuite: EvalSuite = {
     ...requestCases.map(createRequestCase),
     createSparseSourceGuardCase(),
     createDeterministicListCoreCase(),
+    createLinePreservedBulletCoreCase(),
+    createLinePreservedTableCoreCase(),
     createPromptDenylistCase(),
     createPromptFixtureNeutralityCase(),
     createMetaExplanationLeakageCase(),
@@ -570,6 +585,180 @@ function createDeterministicListCoreCase(): EvalCase {
   };
 }
 
+function createLinePreservedBulletCoreCase(): EvalCase {
+  return {
+    name: "line-start bullets survive Stage 3 detected-item extraction",
+    run: async () => {
+      const blockId = "protection-methods-block";
+      const bulletItems = [
+        "Strong passwords help prevent unauthorized access.",
+        "Updates fix known software weaknesses.",
+        "Backups help recover data after loss or damage.",
+      ];
+      const sourceText = [
+        "Basic Protection Methods",
+        ...bulletItems.map((item) => `- ${item}`),
+      ].join("\n");
+      const context = createSingleBlockContext({
+        blockId,
+        blockKind: "list",
+        sourceId: "protection-methods-source",
+        sourceTitle: "Protection Methods",
+        sectionId: "protection-methods-section",
+        sectionTitle: "Basic Protection Methods",
+        sourceText,
+        targetObjective: "Retain the protection methods.",
+        targetFocus: "Basic Protection Methods",
+        targetItemCount: bulletItems.length,
+      });
+      const provider = new FakeGenerationProvider({
+        kind: "concept-card",
+        id: "protection-methods-output",
+        plannedSectionId: context.section.id,
+        title: context.section.title,
+        sourceBlockIds: [blockId],
+        sourceCore: {
+          explanation: "This card summarizes protection methods.",
+          keyPoints: ["Several protection methods are listed."],
+        },
+        enrichment: {
+          note: "Optional note",
+          points: ["Extra protection context."],
+        },
+      });
+
+      const output = await generateSection({ ...context, provider });
+      const request = provider.requests[0];
+      const issues: EvalIssue[] = [
+        ...assertDeepEqual(
+          output.sourceCore,
+          {
+            explanation: "",
+            keyPoints: bulletItems,
+          },
+          "Line-start bullet items did not replace provider-authored sourceCore.",
+        ),
+        ...assertDeepEqual(
+          output.enrichment,
+          null,
+          "Default Stage 3 bullet output retained source-external enrichment.",
+        ),
+      ];
+
+      if (!request) {
+        return [{ message: "Fake provider did not receive a bullet request." }];
+      }
+
+      issues.push(
+        ...assertIncludes(
+          request.prompt,
+          `[Passage block ${blockId} | list]\n${sourceText}`,
+          "Bullet request changed the existing passage block format.",
+        ),
+        ...assertIncludes(
+          request.prompt,
+          "1. Strong passwords help prevent unauthorized access.\n2. Updates fix known software weaknesses.\n3. Backups help recover data after loss or damage.",
+          "Bullet request did not preserve detected item order.",
+        ),
+        ...assertEqual(
+          request.prompt.includes("For flattened table rows"),
+          false,
+          "Stage 3 prompt unexpectedly included flattened-table instruction text.",
+        ),
+      );
+      return issues;
+    },
+  };
+}
+
+function createLinePreservedTableCoreCase(): EvalCase {
+  return {
+    name: "table rows survive Stage 3 detected-item extraction without prompt changes",
+    run: async () => {
+      const blockId = "security-goals-table-block";
+      const tableItems = [
+        "Confidentiality | Only authorized users can access information",
+        "Integrity | Information stays accurate and unchanged",
+        "Availability | Systems and data are accessible when needed",
+      ];
+      const sourceText = [
+        "| Term | Meaning |",
+        "| Confidentiality | Only authorized users can access information |",
+        "| Integrity | Information stays accurate and unchanged |",
+        "| Availability | Systems and data are accessible when needed |",
+      ].join("\n");
+      const context = createSingleBlockContext({
+        blockId,
+        blockKind: "table",
+        sourceId: "security-goals-table-source",
+        sourceTitle: "Security Goals Table",
+        sectionId: "security-goals-table-section",
+        sectionTitle: "Security Goals",
+        sourceText,
+        targetObjective: "Retain the security goal definitions.",
+        targetFocus: "Security Goals",
+        targetItemCount: tableItems.length,
+      });
+      const provider = new FakeGenerationProvider({
+        kind: "concept-card",
+        id: "security-goals-table-output",
+        plannedSectionId: context.section.id,
+        title: context.section.title,
+        sourceBlockIds: [blockId],
+        sourceCore: {
+          explanation: "This card summarizes the table.",
+          keyPoints: ["Security goals are defined in the table."],
+        },
+        enrichment: {
+          note: "Optional note",
+          points: ["Extra table context."],
+        },
+      });
+
+      const output = await generateSection({ ...context, provider });
+      const request = provider.requests[0];
+      const issues: EvalIssue[] = [
+        ...assertDeepEqual(
+          output.sourceCore,
+          {
+            explanation: "",
+            keyPoints: tableItems,
+          },
+          "Line-preserved table rows did not replace provider-authored sourceCore.",
+        ),
+        ...assertDeepEqual(
+          output.enrichment,
+          null,
+          "Default Stage 3 table output retained source-external enrichment.",
+        ),
+      ];
+
+      if (!request) {
+        return [{ message: "Fake provider did not receive a table request." }];
+      }
+
+      issues.push(
+        ...assertIncludes(
+          request.prompt,
+          `[Passage block ${blockId} | table]\n${sourceText}`,
+          "Table request changed the existing passage block format.",
+        ),
+        ...assertIncludes(
+          request.prompt,
+          "1. Confidentiality | Only authorized users can access information\n2. Integrity | Information stays accurate and unchanged\n3. Availability | Systems and data are accessible when needed",
+          "Table request did not preserve detected row order.",
+        ),
+        ...assertEqual(
+          request.prompt.includes("For flattened table rows"),
+          false,
+          "Stage 3 prompt unexpectedly included flattened-table instruction text.",
+        ),
+      );
+      return issues;
+    },
+  };
+}
+
 function createPromptDenylistCase(): EvalCase {
   return {
     name: "Stage 3 prompt avoids instruction-leakage denylist phrases",
@@ -904,6 +1093,55 @@ function createContext(schemaKind: SectionSchemaKind): Stage3Context {
     title: source.title,
     sections: [section],
     metadata: { sectionCount: 1, sourceBlockCount: source.blocks.length },
+  };
+
+  return { section, plan, source };
+}
+
+function createSingleBlockContext(args: SingleBlockContextArgs): Stage3Context {
+  const source: NormalizedSource = {
+    id: args.sourceId,
+    title: args.sourceTitle,
+    kind: "plain-text",
+    language: "en",
+    metadata: {},
+    blocks: [
+      {
+        id: args.blockId,
+        kind: args.blockKind,
+        text: args.sourceText,
+        order: 0,
+      },
+    ],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const section: PlannedSection = {
+    id: args.sectionId,
+    sourceSectionId: `${args.sectionId}-outline`,
+    title: args.sectionTitle,
+    order: 0,
+    schemaKind: "concept-card",
+    target: {
+      objective: args.targetObjective,
+      itemCount: args.targetItemCount,
+      focus: args.targetFocus,
+      requiredSourceBlockIds: [args.blockId],
+      expectedTags: ["concept"],
+      coverageRules: ["Preserve every detected source item."],
+    },
+    sourceBlockIds: [args.blockId],
+    tokenWeight: 12,
+    targetItemCount: args.targetItemCount,
+    sourceStartOffset: 0,
+    sourceEndOffset: args.sourceText.length,
+  };
+  const plan: GenerationPlan = {
+    id: `${args.sectionId}-plan`,
+    sourceId: source.id,
+    outlineId: `${args.sectionId}-outline`,
+    title: source.title,
+    sections: [section],
+    metadata: { sectionCount: 1, sourceBlockCount: 1 },
   };
 
   return { section, plan, source };

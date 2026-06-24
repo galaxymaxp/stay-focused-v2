@@ -68,7 +68,7 @@ export async function generateSection(
   const { section, plan, source, provider } = args;
   const sourceBlocks = collectSectionSourceBlocks(section, source);
   const detectedItems = extractCleanSourceItems({
-    sourceSpanText: sourceBlocksToText(sourceBlocks),
+    sourceSpanText: sourceBlocksToLineText(sourceBlocks),
     sectionTitle: section.title,
   });
   const schema = getSchemaForSectionKind(section.schemaKind);
@@ -359,6 +359,15 @@ function sourceBlocksToText(
     .map((block) => block.text)
     .join("\n")
     .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sourceBlocksToLineText(
+  sourceBlocks: readonly NormalizedSourceBlock[],
+): string {
+  return sourceBlocks
+    .map((block) => block.text)
+    .join("\n")
     .trim();
 }
 
