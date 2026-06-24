@@ -39,6 +39,10 @@ export interface RetryFailedSectionsArgs {
     section: PlannedSection,
     error: SectionValidationError,
   ) => void;
+  readonly onRetryAttempt?: (
+    section: PlannedSection,
+    attempt: number,
+  ) => void;
 }
 
 export const defaultRetryPolicy: RetryPolicy = {
@@ -95,6 +99,7 @@ export async function retryFailedSections(
     }
 
     for (let attempt = 1; attempt <= retryPolicy.maxRetries; attempt += 1) {
+      args.onRetryAttempt?.(section, attempt);
       let generated: SectionOutput;
       try {
         generated = await generateSection({

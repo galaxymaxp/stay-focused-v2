@@ -1,12 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  createServerOpenAIProvider: vi.fn(),
-  runPipeline: vi.fn(),
-  verifyBearerToken: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  class PipelineAssemblyError extends Error {
+    public readonly diagnostics = {
+      causeMessage:
+        'Stage 6 cannot assemble planned section "planned-1" because coverage status is weak and allowWeakSections is false.',
+      failingSections: [
+        {
+          plannedSectionId: "planned-1",
+          sourceSectionId: "source-section-1",
+          title: "Weak Section",
+          status: "weak",
+          failureReasons: ["coverage-weak"],
+          issues: ["Weak content field: sourceCore.explanation."],
+          retryCount: 2,
+          coverageScore: 0.84,
+          groundingScore: 1,
+          leakageIssueCount: 0,
+        },
+      ],
+      sectionValidationFailures: [],
+    };
+
+    public constructor(message = "Pipeline assembly failed.") {
+      super(message);
+      this.name = "PipelineAssemblyError";
+    }
+  }
+
+  return {
+    createServerOpenAIProvider: vi.fn(),
+    PipelineAssemblyError,
+    runPipeline: vi.fn(),
+    verifyBearerToken: vi.fn(),
+  };
+});
 
 vi.mock("@stay-focused/engine", () => ({
+  PipelineAssemblyError: mocks.PipelineAssemblyError,
   runPipeline: mocks.runPipeline,
 }));
 
@@ -206,6 +237,21 @@ describe("POST /api/reviewer/generate", () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(body)).not.toContain("engine stack trace");
+  });
+
+  it("returns 422 when reviewer validation fails after retries", async () => {
+    mocks.runPipeline.mockRejectedValue(
+      new mocks.PipelineAssemblyError(
+        'Stage 6 cannot assemble planned section "planned-1" because coverage status is weak and allowWeakSections is false.',
+      ),
+    );
+
+    const response = await POST(createRequest());
+    const body = await expectError(response, "reviewer_validation_failed");
+
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(body)).not.toContain("planned-1");
+    expect(JSON.stringify(body)).not.toContain("Weak content field");
   });
 
   it("returns 200 with a reviewer for a valid mocked request", async () => {

@@ -1,4 +1,4 @@
-import { runPipeline } from "@stay-focused/engine";
+import { PipelineAssemblyError, runPipeline } from "@stay-focused/engine";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
@@ -17,7 +17,11 @@ export const maxDuration = 120;
 // long notes or pasted reading material.
 const MAX_SOURCE_TEXT_CHARS = 100_000;
 const MAX_JSON_BODY_BYTES = 512 * 1024;
+const MAX_DIAGNOSTIC_TEXT_CHARS = 4_000;
 const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
+const REVIEWER_VALIDATION_FAILED_CODE = "reviewer_validation_failed";
+const REVIEWER_VALIDATION_FAILED_MESSAGE =
+  "Reviewer generation failed because one section could not pass validation after retries.";
 
 type ValidationResult =
   | { readonly ok: true; readonly value: ReviewerGenerateRequest }
@@ -29,18 +33,25 @@ type ValidationResult =
     };
 
 export async function POST(request: Request): Promise<Response> {
+  const requestId = createRequestId();
+
   try {
-    return await handlePost(request);
-  } catch {
+    return await handlePost(request, requestId);
+  } catch (error) {
+    logReviewerGenerationError(requestId, error);
+    const mappedError = mapReviewerGenerationError(error);
     return errorResponse(
-      500,
-      "reviewer_generation_failed",
-      "Reviewer generation failed before the API could complete a response.",
+      mappedError.status,
+      mappedError.code,
+      mappedError.message,
     );
   }
 }
 
-async function handlePost(request: Request): Promise<Response> {
+async function handlePost(
+  request: Request,
+  requestId: string,
+): Promise<Response> {
   if (!hasBearerToken(request.headers.get("authorization"))) {
     return errorResponse(
       401,
@@ -89,7 +100,6 @@ async function handlePost(request: Request): Promise<Response> {
     );
   }
 
-  const requestId = createRequestId();
   const startedAt = Date.now();
   let outcome: "success" | "error" = "error";
   logReviewerGenerationStart(requestId);
@@ -105,11 +115,13 @@ async function handlePost(request: Request): Promise<Response> {
 
     outcome = "success";
     return jsonResponse({ ok: true, reviewer }, 200);
-  } catch {
+  } catch (error) {
+    logReviewerGenerationError(requestId, error);
+    const mappedError = mapReviewerGenerationError(error);
     return errorResponse(
-      500,
-      "reviewer_generation_failed",
-      "Reviewer generation failed.",
+      mappedError.status,
+      mappedError.code,
+      mappedError.message,
     );
   } finally {
     logReviewerGenerationEnd(requestId, startedAt, outcome);
@@ -218,7 +230,7 @@ function createProvider():
 }
 
 function errorResponse(
-  status: 400 | 401 | 413 | 500,
+  status: 400 | 401 | 413 | 422 | 500,
   code: string,
   message: string,
 ): Response {
@@ -233,12 +245,58 @@ function errorResponse(
 
 function jsonResponse(
   body: ReviewerGenerateResponse | ReviewerGenerateErrorResponse,
-  status: 200 | 400 | 401 | 413 | 500,
+  status: 200 | 400 | 401 | 413 | 422 | 500,
 ): Response {
   return NextResponse.json(body, {
     status,
     headers: { "Cache-Control": "no-store" },
   });
+}
+
+function mapReviewerGenerationError(error: unknown): {
+  readonly status: 422 | 500;
+  readonly code: string;
+  readonly message: string;
+} {
+  if (isReviewerValidationFailure(error)) {
+    return {
+      status: 422,
+      code: REVIEWER_VALIDATION_FAILED_CODE,
+      message: REVIEWER_VALIDATION_FAILED_MESSAGE,
+    };
+  }
+
+  return {
+    status: 500,
+    code: "reviewer_generation_failed",
+    message: "Reviewer generation failed.",
+  };
+}
+
+function isReviewerValidationFailure(error: unknown): boolean {
+  if (!(error instanceof PipelineAssemblyError)) {
+    return false;
+  }
+
+  if (error.diagnostics.sectionValidationFailures.length > 0) {
+    return true;
+  }
+
+  return error.diagnostics.failingSections.some((section) =>
+    section.failureReasons.some(isExpectedValidationFailureReason),
+  );
+}
+
+function isExpectedValidationFailureReason(reason: string): boolean {
+  return (
+    reason === "coverage-weak" ||
+    reason === "coverage-failed" ||
+    reason === "grounding-failed" ||
+    reason === "leakage-failed" ||
+    reason === "missing-output" ||
+    reason === "stage3-output-validation" ||
+    reason === "stage3-instruction-leakage"
+  );
 }
 
 function createRequestId(): string {
@@ -263,6 +321,95 @@ function logReviewerGenerationEnd(
     outcome,
     durationMs: Date.now() - startedAt,
   });
+}
+
+function logReviewerGenerationError(requestId: string, error: unknown): void {
+  console.error("reviewer_generation.error", {
+    requestId,
+    route: REVIEWER_GENERATE_ROUTE,
+    ...getSafeErrorDetails(error),
+  });
+}
+
+function getSafeErrorDetails(error: unknown): {
+  readonly errorName: string;
+  readonly errorMessage: string;
+  readonly stack?: string;
+  readonly diagnostics?: unknown;
+} {
+  if (error instanceof Error) {
+    return {
+      errorName: sanitizeDiagnosticText(error.name || "Error"),
+      errorMessage: sanitizeDiagnosticText(error.message || "(missing)"),
+      ...(error.stack ? { stack: sanitizeDiagnosticText(error.stack) } : {}),
+      ...(error instanceof PipelineAssemblyError
+        ? { diagnostics: sanitizeDiagnosticValue(error.diagnostics) }
+        : {}),
+    };
+  }
+
+  return {
+    errorName: "UnknownError",
+    errorMessage: sanitizeDiagnosticText(getDiagnosticString(error)),
+  };
+}
+
+function sanitizeDiagnosticValue(value: unknown, depth = 0): unknown {
+  if (depth > 6) {
+    return "[truncated]";
+  }
+  if (typeof value === "string") {
+    return sanitizeDiagnosticText(value);
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null ||
+    value === undefined
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 25)
+      .map((entry) => sanitizeDiagnosticValue(entry, depth + 1));
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, 50)
+        .map(([key, entry]) => [
+          sanitizeDiagnosticText(key),
+          sanitizeDiagnosticValue(entry, depth + 1),
+        ]),
+    );
+  }
+
+  return sanitizeDiagnosticText(getDiagnosticString(value));
+}
+
+function sanitizeDiagnosticText(value: string): string {
+  const redacted = value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\bsk-[A-Za-z0-9_-]{10,}\b/g, "[REDACTED]")
+    .replace(
+      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+      "[REDACTED]",
+    );
+
+  if (redacted.length <= MAX_DIAGNOSTIC_TEXT_CHARS) {
+    return redacted;
+  }
+
+  return `${redacted.slice(0, MAX_DIAGNOSTIC_TEXT_CHARS)}...[truncated]`;
+}
+
+function getDiagnosticString(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return "Unknown error";
+  }
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

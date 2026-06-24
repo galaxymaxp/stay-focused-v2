@@ -617,3 +617,11 @@ Current route status:
 - Enrichment verdict: PASS. All 18 assembled section items have `enrichment: null`; `enrichment` appears only as an internal JSON field key, not as visible content.
 - Visible-content verdict: PASS. No unsupported visible outside knowledge found; `Blended Attacks` is unchanged from the previous IT Security final sweep and remains source-faithful. Explanations remain presentation-weak after enrichment removal: 17 of 18 are empty, but source-backed key points are present.
 - Verification: engine typecheck PASS; build PASS; aggregate eval PASS (242/242). Mobile typecheck was intentionally not run.
+
+### 2026-06-25 Expo Go reviewer generation stabilization
+- Expo Go end-to-end reviewer generation passed against API URL `http://192.168.68.102:3000`.
+- Organized reviewer fixture returned HTTP 200 through the Expo/API manual flow.
+- Flattened Arduino OCR-style fixture returned HTTP 200 after around 32 seconds (`POST /api/reviewer/generate 200 in 32255ms`).
+- Coverage, grounding, and leakage checks passed; assembled reviewer output kept `enrichment: null`.
+- Remaining issue: OCR-style input quality and layout reconstruction are still rough and deferred to the OCR layout phase.
+- Next recommended task: add OCR layout reconstruction before Stage 1 outline detection so flattened slide streams recover headings, bullets, and section boundaries before generation.

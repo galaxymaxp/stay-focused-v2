@@ -38,6 +38,7 @@ export type GenerateReviewerErrorCode =
   | "payload_too_large"
   | "source_text_too_large"
   | "provider_configuration_error"
+  | "reviewer_validation_failed"
   | "reviewer_generation_failed"
   | "unknown_api_error";
 
@@ -113,7 +114,7 @@ export async function generateReviewer(
 
     logReviewerApiResponse(response, startedAt);
 
-    return await parseReviewerResponse(response);
+    return await parseReviewerResponse(response, startedAt);
   } catch (error) {
     logReviewerApiThrownError(error, startedAt);
 
@@ -178,15 +179,22 @@ function createReviewerEndpoint(
 
 async function parseReviewerResponse(
   response: Response,
+  startedAt: number,
 ): Promise<GenerateReviewerResult> {
   const parsed = await readJson(response);
   logReviewerApiParsedResponse(parsed);
 
   if (!response.ok) {
+    logReviewerApiErrorBody(parsed);
     return apiError(response.status, parsed);
   }
 
+  if (isReviewerGenerateErrorResponse(parsed)) {
+    logReviewerApiErrorBody(parsed);
+  }
+
   if (isReviewerGenerateSuccessResponse(parsed)) {
+    logReviewerApiSuccessSummary(response, startedAt, parsed);
     return { ok: true, reviewer: parsed.reviewer };
   }
 
@@ -254,6 +262,7 @@ function mapApiErrorCode(code: string): GenerateReviewerErrorCode {
     case "payload_too_large":
     case "source_text_too_large":
     case "provider_configuration_error":
+    case "reviewer_validation_failed":
     case "reviewer_generation_failed":
       return code;
     default:
@@ -271,6 +280,9 @@ function statusToClientErrorCode(status: number): GenerateReviewerErrorCode {
   if (status === 413) {
     return "payload_too_large";
   }
+  if (status === 422) {
+    return "reviewer_validation_failed";
+  }
   if (status >= 500) {
     return "reviewer_generation_failed";
   }
@@ -286,6 +298,9 @@ function statusToClientErrorMessage(status: number): string {
   }
   if (status === 413) {
     return "Reviewer generation request was too large.";
+  }
+  if (status === 422) {
+    return "Reviewer generation failed validation after retries.";
   }
   if (status >= 500) {
     return "Reviewer generation failed.";
@@ -353,6 +368,24 @@ function logReviewerApiParsedResponse(parsed: unknown): void {
   console.info("reviewer_api.response_parsed", describeParsedResponse(parsed));
 }
 
+function logReviewerApiSuccessSummary(
+  response: Response,
+  startedAt: number,
+  parsed: ReviewerGenerateSuccessResponse,
+): void {
+  console.info("reviewer_api.success_summary", {
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+    reviewerTitle: parsed.reviewer.title,
+    sectionCount: parsed.reviewer.sections.length,
+    topLevelKeys: getTopLevelKeys(parsed),
+  });
+}
+
+function logReviewerApiErrorBody(parsed: unknown): void {
+  console.info("reviewer_api.error_body", stringifyForDiagnosticLog(parsed));
+}
+
 function logReviewerApiThrownError(error: unknown, startedAt: number): void {
   console.error("reviewer_api.request_error", {
     durationMs: Date.now() - startedAt,
@@ -385,6 +418,10 @@ function describeParsedResponse(parsed: unknown): {
   };
 }
 
+function getTopLevelKeys(value: unknown): readonly string[] {
+  return isRecord(value) ? Object.keys(value).sort() : [];
+}
+
 function getThrownErrorDetails(error: unknown): {
   readonly errorName: string;
   readonly errorMessage: string;
@@ -408,6 +445,23 @@ function getThrownErrorDetails(error: unknown): {
     errorName: typeof error,
     errorMessage: String(error),
   };
+}
+
+function stringifyForDiagnosticLog(value: unknown): string {
+  try {
+    const serialized = JSON.stringify(value, null, 2);
+    return serialized ?? String(value);
+  } catch (error) {
+    return `[unserializable response body: ${getDiagnosticString(error)}]`;
+  }
+}
+
+function getDiagnosticString(value: unknown): string {
+  try {
+    return value instanceof Error ? value.message : String(value);
+  } catch {
+    return "unknown serialization error";
+  }
 }
 
 function redactUrlCredentials(url: string): string {
