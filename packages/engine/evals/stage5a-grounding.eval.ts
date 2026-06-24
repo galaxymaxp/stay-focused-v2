@@ -28,6 +28,11 @@ export const stage5aGroundingSuite: EvalSuite = {
   name: "Stage 5a grounding validation",
   cases: [
     createRepeatedHeadingSuffixCleanupCase(),
+    createInlineBulletGlyphExtractionCase(),
+    createLineAndNumberedBulletExtractionCase(),
+    createFixtureDStyleNestedBulletExtractionCase(),
+    createFlattenedOcrHyphenStreamExtractionCase(),
+    createTableRowExtractionCase(),
     createCleanedFusedItemGroundingCase(),
     createLooseConnectivePhase1Case(),
     createInventedEndpointDescriptionCase(),
@@ -45,6 +50,204 @@ export const stage5aGroundingSuite: EvalSuite = {
     createFaithfulSectionsCase(),
   ],
 };
+
+function createInlineBulletGlyphExtractionCase(): EvalCase {
+  return {
+    name: "inline bullet glyphs extract source items",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          "Table of Contents \u2022 Arduino Simulator \u2022 Programming in Arduino \u2013 Basics \u2022 Arduino Parts",
+          "Table of Contents",
+        ),
+        [
+          "Arduino Simulator",
+          "Programming in Arduino \u2013 Basics",
+          "Arduino Parts",
+        ],
+        "Inline bullet glyph source items were not extracted in order.",
+      ),
+  };
+}
+
+function createLineAndNumberedBulletExtractionCase(): EvalCase {
+  return {
+    name: "line-start bullets and numbered bullets extract together",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          [
+            "Basic Protection Methods",
+            "- Strong passwords help prevent unauthorized access.",
+            "- Updates fix known software weaknesses.",
+            "1. Backups help recover data after loss or damage.",
+          ].join("\n"),
+          "Basic Protection Methods",
+        ),
+        [
+          "Strong passwords help prevent unauthorized access.",
+          "Updates fix known software weaknesses.",
+          "Backups help recover data after loss or damage.",
+        ],
+        "Mixed bullet and numbered source items were not extracted.",
+      ),
+  };
+}
+
+function createFixtureDStyleNestedBulletExtractionCase(): EvalCase {
+  return {
+    name: "Fixture D-style nested lecture bullets are represented",
+    run: async () => {
+      const items = sourceItemTexts(
+        [
+          "Module 3: Basic Cybersecurity Concepts",
+          "",
+          "1. Security Goals",
+          "Cybersecurity protects systems, networks, and data from unauthorized access and damage.",
+          "- Confidentiality means only authorized users can access information.",
+          "- Integrity means information stays accurate and unchanged unless properly modified.",
+          "- Availability means systems and data are accessible when needed.",
+          "",
+          "2. Common Threats",
+          "Threats are possible causes of harm to systems or data.",
+          "- Malware is harmful software.",
+          "- Phishing tricks users into giving sensitive information.",
+          "- Denial of service attacks try to make a service unavailable.",
+        ].join("\n"),
+        "Basic Cybersecurity Concepts",
+      );
+
+      return [
+        ...assertEqual(
+          items.some((item) => item.includes("Confidentiality means")),
+          true,
+          "Fixture D confidentiality bullet was not represented.",
+        ),
+        ...assertEqual(
+          items.some((item) => item.includes("Integrity means")),
+          true,
+          "Fixture D integrity bullet was not represented.",
+        ),
+        ...assertEqual(
+          items.some((item) => item.includes("Availability means")),
+          true,
+          "Fixture D availability bullet was not represented.",
+        ),
+        ...assertEqual(
+          items.some((item) => item.includes("Malware is harmful software")),
+          true,
+          "Fixture D malware bullet was not represented.",
+        ),
+        ...assertEqual(
+          items.some((item) => item.includes("Phishing tricks users")),
+          true,
+          "Fixture D phishing bullet was not represented.",
+        ),
+        ...assertEqual(
+          items.some((item) =>
+            item.includes("Denial of service attacks try"),
+          ),
+          true,
+          "Fixture D denial-of-service bullet was not represented.",
+        ),
+      ];
+    },
+  };
+}
+
+function createFlattenedOcrHyphenStreamExtractionCase(): EvalCase {
+  return {
+    name: "Fixture B-style flattened OCR hyphen stream extracts clear list items",
+    run: async () => {
+      const items = sourceItemTexts(
+        [
+          "Arduino Basics Unit 2 CIT4 Introduction to Integrative Programming",
+          "Table of Contents - Arduino Simulator - Programming in Arduino - Basics",
+          "- Arduino Parts - Digital inputs and outputs - LED - Resistors",
+          "- Breadboard - Series Circuits - Parallel Circuits",
+          "Arduino Simulator TinkerCad Arduino Simulator - TinkerCad",
+          "- Go to https://www.tinkercad.com/dashboard",
+          "- It is a web-based open-source simulator",
+          "- Contains Arduino modelling with code",
+          "- Create a personal account (not student account)",
+          "- In the dashboard, select circuits.",
+        ].join(" "),
+        "Arduino Basics",
+      );
+      const isolatedHyphenPhrase = sourceItemTexts(
+        "TinkerCad Arduino Simulator - TinkerCad",
+        "Arduino Simulator",
+      );
+
+      return [
+        ...assertEqual(
+          items.includes("Arduino Simulator"),
+          true,
+          "Fixture B TOC item Arduino Simulator was not detected.",
+        ),
+        ...assertEqual(
+          items.includes("Programming in Arduino - Basics"),
+          true,
+          "Fixture B TOC item Programming in Arduino - Basics was not preserved.",
+        ),
+        ...assertEqual(
+          items.includes("Arduino Parts"),
+          true,
+          "Fixture B TOC item Arduino Parts was not detected.",
+        ),
+        ...assertEqual(
+          items.includes("Go to https://www.tinkercad.com/dashboard"),
+          true,
+          "Fixture B TinkerCad URL fact was not detected.",
+        ),
+        ...assertEqual(
+          items.includes("It is a web-based open-source simulator"),
+          true,
+          "Fixture B TinkerCad simulator fact was not detected.",
+        ),
+        ...assertEqual(
+          items.includes("Basics"),
+          false,
+          "Fixture B split a subtitle into a standalone meaningless fragment.",
+        ),
+        ...assertEqual(
+          isolatedHyphenPhrase.length,
+          0,
+          "A single inline hyphen phrase was incorrectly treated as a list.",
+        ),
+        ...assertEqual(
+          items.length > 1,
+          true,
+          "Fixture B flattened OCR extraction returned only one giant item.",
+        ),
+      ];
+    },
+  };
+}
+
+function createTableRowExtractionCase(): EvalCase {
+  return {
+    name: "table-like rows extract term and meaning source items",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          [
+            "| Term | Meaning |",
+            "| Confidentiality | Only authorized users can access information |",
+            "| Integrity | Information stays accurate and unchanged |",
+            "| Availability | Systems and data are accessible when needed |",
+          ].join("\n"),
+          "Security Goals",
+        ),
+        [
+          "Confidentiality | Only authorized users can access information",
+          "Integrity | Information stays accurate and unchanged",
+          "Availability | Systems and data are accessible when needed",
+        ],
+        "Table rows did not preserve term/meaning source items.",
+      ),
+  };
+}
 
 function createRepeatedHeadingSuffixCleanupCase(): EvalCase {
   return {
@@ -799,6 +1002,16 @@ function numberedListSource(
 
 function bulletListSource(title: string, items: readonly string[]): string {
   return `${title} ${items.map((item) => `\u2022 ${item}`).join(" ")}`;
+}
+
+function sourceItemTexts(
+  sourceSpanText: string,
+  sectionTitle: string,
+): readonly string[] {
+  return extractCleanSourceItems({
+    sourceSpanText,
+    sectionTitle,
+  }).map((item) => item.text);
 }
 
 function hasUnsupportedToken(
