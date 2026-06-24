@@ -7,12 +7,16 @@
     "noEmit": false,
     "outDir": "dist/provider-contract",
     "paths": {
-      "@stay-focused/engine": ["packages/engine/src/index.ts"]
+      "@stay-focused/engine": ["packages/engine/src/index.ts"],
+      "@stay-focused/shared": ["packages/shared/src/index.ts"]
     },
     "rootDir": "../.."
   },
   "include": [
     "src/providers/**/*.ts",
     "../../packages/engine/src/**/*.ts"
+  ],
+  "exclude": [
+    "../../packages/engine/src/**/*.test.ts"
   ]
 }
