@@ -21,12 +21,14 @@
     "eval:pipeline": "node dist/evals/pipeline.eval.js",
     "live-run": "tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js",
     "diagnose:stage012": "tsc -p tsconfig.live-run.json && node dist-live/scripts/diagnose-stage012.js",
+    "validate:api-reviewer": "tsx scripts/api-reviewer-functional-test.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json && tsc --noEmit -p tsconfig.live-run.json",
     "clean": "rimraf dist dist-live"
   },
   "devDependencies": {
     "rimraf": "^6.0.1",
+    "tsx": "^4.22.4",
     "typescript": "^5.8.3"
   },
   "dependencies": {

@@ -1,0 +1,57 @@
+GENERAL LECTURE NOTES - OCR EXPORT
+page 1 / sample footer
+page 1 / sample footer
+
+SESSION AIM
+
+The session aim is to compare observations, records, and conclusions without adding facts.
+Short note: keep each record tied to the evidence that produced it.
+
+- observation means a noticed detail from the source activity
+- record means the written trace kept for later checking
+- conclusion means a statement drawn from the available record
+
+GENERAL LECTURE NOTES - OCR EXPORT
+page 2 / sample footer
+
+  working terms
+
+1. Input item - material or detail received before work begins
+2. Check point - place where the item is compared with a rule
+3. Output note - result written after the check point
+4. Review mark - sign that the output note was inspected
+
+G e n e r a l   L e c t u r e   N o t e s
+page 3 / sample footer
+
+FLATTENED TABLE
+
+Column | Meaning | Example value
+Label | short name for an item | alpha-01
+Status | current condition of an item | ready
+Count | number of units present | 4
+
+The table is read across each line: label then meaning then example value.
+
+GENERAL LECTURE NOTES - OCR EXPORT
+page 4 / sample footer
+
+Process sketch
+
+1. First read the item label.
+2. Then compare the status with the expected condition.
+3. Next count the units that remain.
+4. Finally write one output note.
+
+OCR noise: rn may look like m; 0 may look like O; l may look like 1.
+
+GENERAL LECTURE NOTES - OCR EXPORT
+page 5 / sample footer
+
+Short checks
+
+- a missing label stops the check
+- a ready status allows the count
+- a count of 0 requires a note
+
+End of extracted notes.

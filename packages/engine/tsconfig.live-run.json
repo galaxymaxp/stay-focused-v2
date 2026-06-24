@@ -6,5 +6,9 @@
     "outDir": "dist-live",
     "rootDir": "."
   },
-  "files": ["scripts/live-run.ts", "scripts/diagnose-stage012.ts"]
+  "files": [
+    "scripts/live-run.ts",
+    "scripts/diagnose-stage012.ts",
+    "scripts/api-reviewer-functional-test.ts"
+  ]
 }
