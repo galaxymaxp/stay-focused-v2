@@ -5,14 +5,14 @@ OCR fixture text -> mobile-shaped authenticated POST -> `/api/reviewer/generate`
 
 ## Result
 
-- Status: FAIL
+- Pass/fail result: FAIL
 - Generated at: 2026-06-24T14:50:32.100Z
 - Completed at: 2026-06-24T14:50:32.104Z
 - Client timeout: 120000 ms
+- Token source: missing
+- API base URL present: no
 - Request duration: not started
-- API base URL source: missing
-- Supabase token present: no
-- Response status: No response
+- HTTP status: No response
 
 ## Request
 
@@ -32,7 +32,7 @@ OCR fixture text -> mobile-shaped authenticated POST -> `/api/reviewer/generate`
 ## Validation failures
 
 - missing_api_base_url: Set API_BASE_URL or EXPO_PUBLIC_API_BASE_URL.
-- missing_supabase_access_token: Set SUPABASE_ACCESS_TOKEN to a valid Supabase user access token.
+- missing_supabase_sign_in_env: Missing required Supabase sign-in env vars: EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, TEST_SUPABASE_EMAIL, TEST_SUPABASE_PASSWORD.
 
 ## Output files
 

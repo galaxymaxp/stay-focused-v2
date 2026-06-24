@@ -7,4 +7,23 @@ The script sends OCR-style fixture text through the same API route and mobile re
 Required environment variables:
 
 - `API_BASE_URL` or `EXPO_PUBLIC_API_BASE_URL`
-- `SUPABASE_ACCESS_TOKEN`
+
+Authentication can use either:
+
+- `SUPABASE_ACCESS_TOKEN` as an optional manual fallback, or
+- Supabase email/password sign-in using:
+  - `EXPO_PUBLIC_SUPABASE_URL`
+  - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+  - `TEST_SUPABASE_EMAIL`
+  - `TEST_SUPABASE_PASSWORD`
+
+PowerShell example:
+
+```powershell
+$env:API_BASE_URL="http://localhost:3000"
+$env:EXPO_PUBLIC_SUPABASE_URL="<your project url>"
+$env:EXPO_PUBLIC_SUPABASE_ANON_KEY="<your anon key>"
+$env:TEST_SUPABASE_EMAIL="<test user email>"
+$env:TEST_SUPABASE_PASSWORD="<test user password>"
+npm run validate:api-reviewer --workspace @stay-focused/engine
+```

@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createClient } from "@supabase/supabase-js";
+
 const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
 const SOURCE_TITLE = "OCR Functional Timeout Test";
 const FIXTURE_FILE_NAME = "ocr-extracted-general-lecture.txt";
@@ -26,8 +28,23 @@ interface ValidationFailure {
 }
 
 interface ApiBaseUrlResult {
+  readonly value: string | null;
+  readonly source: "API_BASE_URL" | "EXPO_PUBLIC_API_BASE_URL" | null;
+  readonly present: boolean;
+}
+
+type SupabaseTokenSource = "manual_fallback" | "minted_email_password";
+
+interface SupabaseAccessTokenResult {
   readonly value: string;
-  readonly source: "API_BASE_URL" | "EXPO_PUBLIC_API_BASE_URL";
+  readonly source: SupabaseTokenSource;
+}
+
+interface SupabaseSignInConfig {
+  readonly supabaseUrl: string;
+  readonly supabaseAnonKey: string;
+  readonly email: string;
+  readonly password: string;
 }
 
 interface ResponseCapture {
@@ -56,8 +73,8 @@ interface FunctionalTestOutput {
   readonly requestDurationMs: number | null;
   readonly env: {
     readonly apiBaseUrlSource: string | null;
-    readonly apiBaseUrl: string | null;
-    readonly supabaseAccessTokenPresent: boolean;
+    readonly apiBaseUrlPresent: boolean;
+    readonly supabaseTokenSource: SupabaseTokenSource | null;
   };
   readonly fixture: {
     readonly path: string;
@@ -83,13 +100,13 @@ async function main(): Promise<void> {
   let reviewerSummary: ReviewerSummary | null = null;
 
   const apiBaseUrl = readApiBaseUrl(failures);
-  const supabaseAccessToken = readSupabaseAccessToken(failures);
+  const supabaseAccessToken = await readSupabaseAccessToken(failures);
   const fixtureText = await readFixtureText(failures);
 
-  if (apiBaseUrl && supabaseAccessToken && fixtureText !== null) {
+  if (apiBaseUrl.value && supabaseAccessToken && fixtureText !== null) {
     const result = await sendReviewerRequest({
       apiBaseUrl: apiBaseUrl.value,
-      accessToken: supabaseAccessToken,
+      accessToken: supabaseAccessToken.value,
       sourceText: fixtureText,
       failures,
     });
@@ -112,9 +129,9 @@ async function main(): Promise<void> {
     timeoutMs: TIMEOUT_MS,
     requestDurationMs,
     env: {
-      apiBaseUrlSource: apiBaseUrl?.source ?? null,
-      apiBaseUrl: apiBaseUrl?.value ?? null,
-      supabaseAccessTokenPresent: supabaseAccessToken !== null,
+      apiBaseUrlSource: apiBaseUrl.source,
+      apiBaseUrlPresent: apiBaseUrl.present,
+      supabaseTokenSource: supabaseAccessToken?.source ?? null,
     },
     fixture: {
       path: FIXTURE_PATH,
@@ -140,25 +157,30 @@ async function main(): Promise<void> {
   }
 }
 
-function readApiBaseUrl(failures: ValidationFailure[]): ApiBaseUrlResult | null {
+function readApiBaseUrl(failures: ValidationFailure[]): ApiBaseUrlResult {
   const candidates: readonly ApiBaseUrlResult[] = [
     {
       source: "API_BASE_URL",
       value: process.env.API_BASE_URL?.trim() ?? "",
+      present: Boolean(process.env.API_BASE_URL?.trim()),
     },
     {
       source: "EXPO_PUBLIC_API_BASE_URL",
       value: process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? "",
+      present: Boolean(process.env.EXPO_PUBLIC_API_BASE_URL?.trim()),
     },
   ];
 
-  const selected = candidates.find((candidate) => candidate.value.length > 0);
+  const selected = candidates.find(
+    (candidate): candidate is ApiBaseUrlResult & { readonly value: string } =>
+      Boolean(candidate.value),
+  );
   if (!selected) {
     failures.push({
       code: "missing_api_base_url",
       message: "Set API_BASE_URL or EXPO_PUBLIC_API_BASE_URL.",
     });
-    return null;
+    return { source: null, value: null, present: false };
   }
 
   const normalized = selected.value.replace(/\/+$/, "");
@@ -166,27 +188,124 @@ function readApiBaseUrl(failures: ValidationFailure[]): ApiBaseUrlResult | null 
     failures.push({
       code: "invalid_api_base_url",
       message: `${selected.source} must be a valid HTTP(S) origin or base URL without query or hash.`,
-      details: { value: selected.value },
     });
-    return null;
+    return { source: selected.source, value: null, present: true };
   }
 
-  return { source: selected.source, value: normalized };
+  return { source: selected.source, value: normalized, present: true };
 }
 
-function readSupabaseAccessToken(
+async function readSupabaseAccessToken(
   failures: ValidationFailure[],
-): string | null {
+): Promise<SupabaseAccessTokenResult | null> {
   const token = process.env.SUPABASE_ACCESS_TOKEN?.trim() ?? "";
-  if (!token) {
+  if (token) {
+    return { value: token, source: "manual_fallback" };
+  }
+
+  const config = readSupabaseSignInConfig(failures);
+  if (!config) {
+    return null;
+  }
+
+  return mintSupabaseAccessToken(config, failures);
+}
+
+function readSupabaseSignInConfig(
+  failures: ValidationFailure[],
+): SupabaseSignInConfig | null {
+  const required = {
+    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "",
+    EXPO_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "",
+    TEST_SUPABASE_EMAIL: process.env.TEST_SUPABASE_EMAIL?.trim() ?? "",
+    TEST_SUPABASE_PASSWORD: process.env.TEST_SUPABASE_PASSWORD ?? "",
+  } as const;
+
+  const missing = Object.entries(required)
+    .filter(([, value]) => value.length === 0)
+    .map(([name]) => name);
+
+  if (missing.length > 0) {
     failures.push({
-      code: "missing_supabase_access_token",
-      message: "Set SUPABASE_ACCESS_TOKEN to a valid Supabase user access token.",
+      code: "missing_supabase_sign_in_env",
+      message: `Missing required Supabase sign-in env vars: ${missing.join(", ")}.`,
     });
     return null;
   }
 
-  return token;
+  const supabaseUrl = required.EXPO_PUBLIC_SUPABASE_URL.replace(/\/+$/, "");
+  if (!isHttpUrl(supabaseUrl)) {
+    failures.push({
+      code: "invalid_supabase_url",
+      message: "EXPO_PUBLIC_SUPABASE_URL must be a valid HTTP(S) URL without query or hash.",
+    });
+    return null;
+  }
+
+  const email = required.TEST_SUPABASE_EMAIL.toLowerCase();
+  if (!isValidEmail(email)) {
+    failures.push({
+      code: "invalid_test_supabase_email",
+      message: "TEST_SUPABASE_EMAIL must be a valid email address.",
+    });
+    return null;
+  }
+
+  return {
+    supabaseUrl,
+    supabaseAnonKey: required.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    email,
+    password: required.TEST_SUPABASE_PASSWORD,
+  };
+}
+
+async function mintSupabaseAccessToken(
+  config: SupabaseSignInConfig,
+  failures: ValidationFailure[],
+): Promise<SupabaseAccessTokenResult | null> {
+  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      flowType: "pkce",
+      persistSession: false,
+    },
+  });
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: config.email,
+      password: config.password,
+    });
+
+    if (error) {
+      failures.push({
+        code: "supabase_sign_in_failed",
+        message: "Supabase email/password sign-in failed.",
+        ...(error.status ? { details: { status: error.status } } : {}),
+      });
+      return null;
+    }
+
+    const accessToken = data.session?.access_token?.trim() ?? "";
+    if (!accessToken) {
+      failures.push({
+        code: "supabase_session_token_missing",
+        message: "Supabase email/password sign-in did not return a session access token.",
+      });
+      return null;
+    }
+
+    return { value: accessToken, source: "minted_email_password" };
+  } catch {
+    failures.push({
+      code: "supabase_sign_in_request_failed",
+      message:
+        "Supabase email/password sign-in request failed before a session was returned.",
+    });
+    return null;
+  }
 }
 
 async function readFixtureText(
@@ -461,6 +580,8 @@ function printDiagnostics(output: FunctionalTestOutput): void {
   console.log(`Path: ${output.pathRecreated}`);
   console.log(`Route: ${output.route}`);
   console.log(`Timeout: ${output.timeoutMs} ms`);
+  console.log(`API base URL present: ${yesNo(output.env.apiBaseUrlPresent)}`);
+  console.log(`Token source: ${formatTokenSource(output.env.supabaseTokenSource)}`);
   console.log(
     `Request duration: ${
       output.requestDurationMs === null
@@ -498,18 +619,18 @@ OCR fixture text -> mobile-shaped authenticated POST -> \`${REVIEWER_GENERATE_RO
 
 ## Result
 
-- Status: ${output.ok ? "PASS" : "FAIL"}
+- Pass/fail result: ${output.ok ? "PASS" : "FAIL"}
 - Generated at: ${output.generatedAt}
 - Completed at: ${output.completedAt}
 - Client timeout: ${output.timeoutMs} ms
+- Token source: ${formatTokenSource(output.env.supabaseTokenSource)}
+- API base URL present: ${yesNo(output.env.apiBaseUrlPresent)}
 - Request duration: ${
     output.requestDurationMs === null
       ? "not started"
       : `${output.requestDurationMs} ms`
   }
-- API base URL source: ${output.env.apiBaseUrlSource ?? "missing"}
-- Supabase token present: ${output.env.supabaseAccessTokenPresent ? "yes" : "no"}
-- Response status: ${responseStatus}
+- HTTP status: ${responseStatus}
 
 ## Request
 
@@ -537,6 +658,21 @@ ${failures}
 `;
 }
 
+function formatTokenSource(source: SupabaseTokenSource | null): string {
+  if (source === "manual_fallback") {
+    return "manual fallback";
+  }
+  if (source === "minted_email_password") {
+    return "minted via email/password";
+  }
+
+  return "missing";
+}
+
+function yesNo(value: boolean): "yes" | "no" {
+  return value ? "yes" : "no";
+}
+
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -554,6 +690,10 @@ function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : undefined;
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
