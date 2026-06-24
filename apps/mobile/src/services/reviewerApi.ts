@@ -96,8 +96,11 @@ export async function generateReviewer(
     ...(sourceTitle ? { sourceTitle } : {}),
   });
   const abortContext = createAbortContext(input.signal, timeoutMs);
+  const startedAt = Date.now();
 
   try {
+    logReviewerApiRequestStart(endpoint.url);
+
     const response = await fetch(endpoint.url, {
       method: "POST",
       headers: {
@@ -108,8 +111,12 @@ export async function generateReviewer(
       signal: abortContext.signal,
     });
 
+    logReviewerApiResponse(response, startedAt);
+
     return await parseReviewerResponse(response);
   } catch (error) {
+    logReviewerApiThrownError(error, startedAt);
+
     if (abortContext.didTimeout()) {
       return clientError(
         "request_timeout",
@@ -173,6 +180,7 @@ async function parseReviewerResponse(
   response: Response,
 ): Promise<GenerateReviewerResult> {
   const parsed = await readJson(response);
+  logReviewerApiParsedResponse(parsed);
 
   if (!response.ok) {
     return apiError(response.status, parsed);
@@ -325,6 +333,92 @@ function isReviewerGenerateErrorResponse(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function logReviewerApiRequestStart(url: string): void {
+  console.info("reviewer_api.request_start", {
+    url: redactUrlCredentials(url),
+  });
+}
+
+function logReviewerApiResponse(response: Response, startedAt: number): void {
+  console.info("reviewer_api.response", {
+    status: response.status,
+    contentType: response.headers.get("content-type") ?? "(missing)",
+    durationMs: Date.now() - startedAt,
+  });
+}
+
+function logReviewerApiParsedResponse(parsed: unknown): void {
+  console.info("reviewer_api.response_parsed", describeParsedResponse(parsed));
+}
+
+function logReviewerApiThrownError(error: unknown, startedAt: number): void {
+  console.error("reviewer_api.request_error", {
+    durationMs: Date.now() - startedAt,
+    ...getThrownErrorDetails(error),
+  });
+}
+
+function describeParsedResponse(parsed: unknown): {
+  readonly type: string;
+  readonly topLevelKeys: readonly string[];
+  readonly errorKeys?: readonly string[];
+  readonly reviewerKeys?: readonly string[];
+} {
+  if (!isRecord(parsed)) {
+    return {
+      type: Array.isArray(parsed) ? "array" : typeof parsed,
+      topLevelKeys: [],
+    };
+  }
+
+  return {
+    type: "object",
+    topLevelKeys: Object.keys(parsed).sort(),
+    ...(isRecord(parsed.error)
+      ? { errorKeys: Object.keys(parsed.error).sort() }
+      : {}),
+    ...(isRecord(parsed.reviewer)
+      ? { reviewerKeys: Object.keys(parsed.reviewer).sort() }
+      : {}),
+  };
+}
+
+function getThrownErrorDetails(error: unknown): {
+  readonly errorName: string;
+  readonly errorMessage: string;
+} {
+  if (error instanceof Error) {
+    return {
+      errorName: error.name,
+      errorMessage: error.message,
+    };
+  }
+
+  if (isRecord(error)) {
+    return {
+      errorName: typeof error.name === "string" ? error.name : "(missing)",
+      errorMessage:
+        typeof error.message === "string" ? error.message : String(error),
+    };
+  }
+
+  return {
+    errorName: typeof error,
+    errorMessage: String(error),
+  };
+}
+
+function redactUrlCredentials(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 function createAbortContext(

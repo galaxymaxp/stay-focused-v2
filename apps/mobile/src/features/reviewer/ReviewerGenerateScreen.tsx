@@ -8,7 +8,10 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { colors, spacing, typography } from "../../design/tokens";
-import { generateReviewer } from "../../services/reviewerApi";
+import {
+  generateReviewer,
+  type GenerateReviewerError,
+} from "../../services/reviewerApi";
 import { ReviewerPreview } from "./ReviewerPreview";
 
 const DEFAULT_SOURCE_TEXT_HEIGHT = 180;
@@ -84,7 +87,7 @@ export function ReviewerGenerateScreen() {
       if (result.ok) {
         setReviewer(result.reviewer);
       } else {
-        setErrorMessage(result.error.message);
+        setErrorMessage(formatGenerateReviewerError(result.error));
       }
     } finally {
       if (abortControllerRef.current === abortController) {
@@ -169,6 +172,23 @@ export function ReviewerGenerateScreen() {
       </KeyboardAvoidingView>
     </Screen>
   );
+}
+
+function formatGenerateReviewerError(error: GenerateReviewerError): string {
+  const details = [
+    error.status !== undefined ? `HTTP ${error.status}` : null,
+    `code ${error.apiCode ?? error.code}`,
+  ].filter(isString);
+
+  if (details.length === 0) {
+    return error.message;
+  }
+
+  return `${error.message} (${details.join(", ")})`;
+}
+
+function isString(value: string | null): value is string {
+  return value !== null;
 }
 
 const styles = StyleSheet.create({
