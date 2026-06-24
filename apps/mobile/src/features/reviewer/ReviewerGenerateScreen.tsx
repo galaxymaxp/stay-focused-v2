@@ -16,12 +16,19 @@ import { ReviewerPreview } from "./ReviewerPreview";
 
 const DEFAULT_SOURCE_TEXT_HEIGHT = 180;
 
+interface GenerationDisplayError {
+  readonly title: string;
+  readonly message: string;
+  readonly detail?: string;
+}
+
 export function ReviewerGenerateScreen() {
   const { isSigningOut, session, signOut } = useAuth();
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [generationError, setGenerationError] =
+    useState<GenerationDisplayError | null>(null);
   const [reviewer, setReviewer] = useState<ReviewerOutput | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -41,7 +48,7 @@ export function ReviewerGenerateScreen() {
     const trimmedSourceTitle = sourceTitle.trim();
 
     setValidationMessage(null);
-    setErrorMessage(null);
+    setGenerationError(null);
 
     if (!trimmedSourceText) {
       setValidationMessage("Paste source text before generating a reviewer.");
@@ -50,21 +57,28 @@ export function ReviewerGenerateScreen() {
 
     const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
     if (!apiBaseUrl) {
-      setErrorMessage(
-        "EXPO_PUBLIC_API_BASE_URL is required before reviewer generation can run.",
-      );
+      setGenerationError({
+        title: "API setup needed",
+        message:
+          "EXPO_PUBLIC_API_BASE_URL is required before reviewer generation can run.",
+      });
       return;
     }
 
     const token = await getAccessToken();
     if (!token.ok) {
-      setErrorMessage(token.error.message);
+      setGenerationError({
+        title: "Session check failed",
+        message: token.error.message,
+      });
       return;
     }
     if (!token.data) {
-      setErrorMessage(
-        "Your session is missing an access token. Sign out and sign in again.",
-      );
+      setGenerationError({
+        title: "Session check failed",
+        message:
+          "Your session is missing an access token. Sign out and sign in again.",
+      });
       return;
     }
 
@@ -87,7 +101,7 @@ export function ReviewerGenerateScreen() {
       if (result.ok) {
         setReviewer(result.reviewer);
       } else {
-        setErrorMessage(formatGenerateReviewerError(result.error));
+        setGenerationError(formatGenerateReviewerError(result.error));
       }
     } finally {
       if (abortControllerRef.current === abortController) {
@@ -125,6 +139,9 @@ export function ReviewerGenerateScreen() {
             multiline
             onChangeText={(value) => {
               setSourceText(value);
+              if (generationError) {
+                setGenerationError(null);
+              }
               if (validationMessage) {
                 setValidationMessage(null);
               }
@@ -134,9 +151,13 @@ export function ReviewerGenerateScreen() {
             value={sourceText}
           />
 
-          {errorMessage ? (
+          {generationError ? (
             <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
+              <Text style={styles.errorTitle}>{generationError.title}</Text>
+              <Text style={styles.errorText}>{generationError.message}</Text>
+              {generationError.detail ? (
+                <Text style={styles.errorDetail}>{generationError.detail}</Text>
+              ) : null}
             </View>
           ) : null}
 
@@ -161,9 +182,10 @@ export function ReviewerGenerateScreen() {
 
         {isGenerating ? (
           <Card style={styles.statusCard}>
-            <Text style={styles.statusTitle}>Generating reviewer</Text>
+            <Text style={styles.statusTitle}>Generating reviewer...</Text>
             <Text style={styles.statusText}>
-              Stay Focused is sending your source text to the authenticated API.
+              This may take 10-45 seconds. Stay Focused is turning your source
+              into readable study cards.
             </Text>
           </Card>
         ) : null}
@@ -174,17 +196,65 @@ export function ReviewerGenerateScreen() {
   );
 }
 
-function formatGenerateReviewerError(error: GenerateReviewerError): string {
+function formatGenerateReviewerError(
+  error: GenerateReviewerError,
+): GenerationDisplayError {
+  const detail = formatTechnicalDetail(error);
+
+  if (error.code === "reviewer_validation_failed" || error.status === 422) {
+    return {
+      title: "Reviewer needs a clearer source",
+      message:
+        "The reviewer could not pass validation from this source. Try a clearer or longer source.",
+      detail,
+    };
+  }
+
+  if (error.code === "network_error") {
+    return {
+      title: "Could not reach the API",
+      message:
+        "Could not reach the API. Check that the API server is running and the phone is on the same Wi-Fi.",
+      detail,
+    };
+  }
+
+  if (error.code === "request_timeout") {
+    return {
+      title: "Reviewer took too long",
+      message:
+        "The API took too long to finish. Try again, or use a shorter source for now.",
+      detail,
+    };
+  }
+
+  if (error.code === "unauthorized") {
+    return {
+      title: "Session expired",
+      message: "Sign out and sign in again before generating another reviewer.",
+      detail,
+    };
+  }
+
+  return {
+    title: "Reviewer generation failed",
+    message:
+      "Something went wrong while generating the reviewer. Try again in a moment.",
+    detail,
+  };
+}
+
+function formatTechnicalDetail(error: GenerateReviewerError): string {
   const details = [
     error.status !== undefined ? `HTTP ${error.status}` : null,
     `code ${error.apiCode ?? error.code}`,
   ].filter(isString);
 
   if (details.length === 0) {
-    return error.message;
+    return `Details: ${error.message}`;
   }
 
-  return `${error.message} (${details.join(", ")})`;
+  return `Details: ${details.join(", ")}. ${error.message}`;
 }
 
 function isString(value: string | null): value is string {
@@ -233,13 +303,27 @@ const styles = StyleSheet.create({
     borderColor: colors.error,
     borderRadius: 12,
     borderWidth: 1,
+    gap: spacing[2],
     padding: spacing[3],
+  },
+  errorTitle: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    fontWeight: "800",
+    lineHeight: 21,
   },
   errorText: {
     color: colors.error,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
+  },
+  errorDetail: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 17,
   },
   statusCard: {
     gap: spacing[2],
