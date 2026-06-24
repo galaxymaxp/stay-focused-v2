@@ -1,7 +1,7 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
 
 const REVIEWER_GENERATE_PATH = "/api/reviewer/generate";
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_ERROR_MESSAGE_CHARS = 300;
 
 export interface GenerateReviewerInput {
@@ -113,7 +113,7 @@ export async function generateReviewer(
     if (abortContext.didTimeout()) {
       return clientError(
         "request_timeout",
-        "Reviewer generation request timed out.",
+        `Reviewer generation timed out after ${formatTimeoutMs(timeoutMs)} while waiting for the API response.`,
       );
     }
 
@@ -291,6 +291,13 @@ function safeApiErrorMessage(message: string, status: number): string {
     return statusToClientErrorMessage(status);
   }
   return normalized;
+}
+
+function formatTimeoutMs(timeoutMs: number): string {
+  if (timeoutMs % 1_000 === 0) {
+    return `${timeoutMs / 1_000} seconds`;
+  }
+  return `${timeoutMs} ms`;
 }
 
 function looksLikeStackTrace(value: string): boolean {

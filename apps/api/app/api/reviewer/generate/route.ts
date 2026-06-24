@@ -10,12 +10,14 @@ import type {
 } from "@/types/reviewer";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 // Temporary Phase 2 cap for plain text input before upload, OCR, and chunking
 // are introduced. 100k characters bounds request cost while still allowing
 // long notes or pasted reading material.
 const MAX_SOURCE_TEXT_CHARS = 100_000;
 const MAX_JSON_BODY_BYTES = 512 * 1024;
+const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
 
 type ValidationResult =
   | { readonly ok: true; readonly value: ReviewerGenerateRequest }
@@ -27,6 +29,18 @@ type ValidationResult =
     };
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    return await handlePost(request);
+  } catch {
+    return errorResponse(
+      500,
+      "reviewer_generation_failed",
+      "Reviewer generation failed before the API could complete a response.",
+    );
+  }
+}
+
+async function handlePost(request: Request): Promise<Response> {
   if (!hasBearerToken(request.headers.get("authorization"))) {
     return errorResponse(
       401,
@@ -75,6 +89,11 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  const requestId = createRequestId();
+  const startedAt = Date.now();
+  let outcome: "success" | "error" = "error";
+  logReviewerGenerationStart(requestId);
+
   try {
     const reviewer = await runPipeline({
       input: {
@@ -84,6 +103,7 @@ export async function POST(request: Request): Promise<Response> {
       provider: provider.value,
     });
 
+    outcome = "success";
     return jsonResponse({ ok: true, reviewer }, 200);
   } catch {
     return errorResponse(
@@ -91,6 +111,8 @@ export async function POST(request: Request): Promise<Response> {
       "reviewer_generation_failed",
       "Reviewer generation failed.",
     );
+  } finally {
+    logReviewerGenerationEnd(requestId, startedAt, outcome);
   }
 }
 
@@ -216,6 +238,30 @@ function jsonResponse(
   return NextResponse.json(body, {
     status,
     headers: { "Cache-Control": "no-store" },
+  });
+}
+
+function createRequestId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+}
+
+function logReviewerGenerationStart(requestId: string): void {
+  console.info("reviewer_generation.start", {
+    requestId,
+    route: REVIEWER_GENERATE_ROUTE,
+  });
+}
+
+function logReviewerGenerationEnd(
+  requestId: string,
+  startedAt: number,
+  outcome: "success" | "error",
+): void {
+  console.info("reviewer_generation.end", {
+    requestId,
+    route: REVIEWER_GENERATE_ROUTE,
+    outcome,
+    durationMs: Date.now() - startedAt,
   });
 }
 
