@@ -34,6 +34,7 @@ export const stage5aGroundingSuite: EvalSuite = {
     createFlattenedOcrHyphenStreamExtractionCase(),
     createFlattenedBoundaryNormalProseGuardCase(),
     createFlattenedNestedMethodDedupeCase(),
+    createRepeatedBareMethodLabelDedupeCase(),
     createTableRowExtractionCase(),
     createCleanedFusedItemGroundingCase(),
     createLooseConnectivePhase1Case(),
@@ -257,6 +258,43 @@ function createFlattenedNestedMethodDedupeCase(): EvalCase {
           "Password Cracking attempts to guess or recover passwords",
         ],
         "Nested repeated method label was not deduped while preserving distinct facts.",
+      ),
+  };
+}
+
+function createRepeatedBareMethodLabelDedupeCase(): EvalCase {
+  return {
+    name: "marked flattened methods dedupe repeated bare parent labels",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          [
+            "Methods of Entry",
+            "1. Social Engineering",
+            "- Pretexting uses a fabricated scenario to obtain access.",
+            "- Tailgating follows an authorized person into a restricted area.",
+            "2. Social Engineering",
+            "- Phishing uses deceptive messages to obtain information.",
+            "- Smishing uses text messages.",
+            "- Vishing uses voice calls.",
+            "3. Password Cracking",
+            "- Brute-force tries many password combinations.",
+            "- Network Sniffing captures traffic.",
+          ].join("\n"),
+          "Methods of Entry",
+        ),
+        [
+          "Social Engineering",
+          "Pretexting uses a fabricated scenario to obtain access.",
+          "Tailgating follows an authorized person into a restricted area.",
+          "Phishing uses deceptive messages to obtain information.",
+          "Smishing uses text messages.",
+          "Vishing uses voice calls.",
+          "Password Cracking",
+          "Brute-force tries many password combinations.",
+          "Network Sniffing captures traffic.",
+        ],
+        "Repeated bare method labels were not deduped while preserving child facts.",
       ),
   };
 }

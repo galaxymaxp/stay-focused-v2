@@ -119,6 +119,35 @@
         "Phishing uses deceptive messages",
         "Password Cracking attempts to guess or recover passwords"
       ]
+    },
+    {
+      "name": "flattened marked method labels dedupe repeated bare parent",
+      "blockKind": "list",
+      "sectionTitle": "Methods of Entry",
+      "sourceLines": [
+        "Methods of Entry",
+        "1. Social Engineering",
+        "- Pretexting uses a fabricated scenario to obtain access.",
+        "- Tailgating follows an authorized person into a restricted area.",
+        "2. Social Engineering",
+        "- Phishing uses deceptive messages to obtain information.",
+        "- Smishing uses text messages.",
+        "- Vishing uses voice calls.",
+        "3. Password Cracking",
+        "- Brute-force tries many password combinations.",
+        "- Network Sniffing captures traffic."
+      ],
+      "expectedKeyPoints": [
+        "Social Engineering",
+        "Pretexting uses a fabricated scenario to obtain access.",
+        "Tailgating follows an authorized person into a restricted area.",
+        "Phishing uses deceptive messages to obtain information.",
+        "Smishing uses text messages.",
+        "Vishing uses voice calls.",
+        "Password Cracking",
+        "Brute-force tries many password combinations.",
+        "Network Sniffing captures traffic."
+      ]
     }
   ]
 }

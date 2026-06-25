@@ -605,20 +605,24 @@ function suppressBareDuplicateBoundaryLabelsForGroup(
       return [normalizeCoverageTitleKey(match.label)];
     }),
   );
-  if (informativeLabelKeys.size === 0) {
-    return itemTexts;
-  }
-
+  const seenBareLabelKeys = new Set<string>();
   return itemTexts.filter((itemText) => {
     const match = readLeadingBoundaryLabel(itemText, boundaryGroup.labels);
     if (!match || match.index !== 0) {
       return true;
     }
 
-    return (
-      !isBareBoundaryLabel(itemText, match.label) ||
-      !informativeLabelKeys.has(normalizeCoverageTitleKey(match.label))
-    );
+    if (!isBareBoundaryLabel(itemText, match.label)) {
+      return true;
+    }
+
+    const labelKey = normalizeCoverageTitleKey(match.label);
+    if (informativeLabelKeys.has(labelKey) || seenBareLabelKeys.has(labelKey)) {
+      return false;
+    }
+
+    seenBareLabelKeys.add(labelKey);
+    return true;
   });
 }
 
@@ -632,7 +636,9 @@ function readLeadingBoundaryLabel(
 }
 
 function isBareBoundaryLabel(itemText: string, label: string): boolean {
-  return normalizeCoverageTitleKey(itemText) === normalizeCoverageTitleKey(label);
+  return (
+    normalizeCoverageTitleKey(itemText) === normalizeCoverageTitleKey(label)
+  );
 }
 
 function stripBoundaryLabel(itemText: string, label: string): string {
