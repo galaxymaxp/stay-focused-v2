@@ -78,6 +78,34 @@
         "Page 2 of 3",
         "Header: page 3 of 3"
       ]
+    },
+    {
+      "name": "flattened attacker types split into readable source items",
+      "blockKind": "paragraph",
+      "sectionTitle": "Attacker Types",
+      "sourceLines": [
+        "Attacker Types Internal Users can misuse approved access Contract Partners support systems with trusted access External Groups coordinate attempts from outside the organization Untrained Users make mistakes that expose accounts"
+      ],
+      "expectedKeyPoints": [
+        "Internal Users can misuse approved access",
+        "Contract Partners support systems with trusted access",
+        "External Groups coordinate attempts from outside the organization",
+        "Untrained Users make mistakes that expose accounts"
+      ]
+    },
+    {
+      "name": "flattened infiltration methods split into readable source items",
+      "blockKind": "paragraph",
+      "sectionTitle": "Entry Methods",
+      "sourceLines": [
+        "Entry Methods Social Engineering uses trust cues to request access Password Cracking tries likely passwords against accounts Vulnerability Exploitation uses known software weaknesses Advanced Persistent Threats stay active over time"
+      ],
+      "expectedKeyPoints": [
+        "Social Engineering uses trust cues to request access",
+        "Password Cracking tries likely passwords against accounts",
+        "Vulnerability Exploitation uses known software weaknesses",
+        "Advanced Persistent Threats stay active over time"
+      ]
     }
   ]
 }

@@ -37,17 +37,73 @@ const TABLE_HEADER_LABELS = new Set([
   "term",
   "value",
 ]);
+const FLATTENED_LABEL_MIN_MATCHES = 3;
+const FLATTENED_BOUNDARY_GROUPS = [
+  {
+    sectionTitleKeys: ["attacker", "actor"],
+    labels: [
+      "Insiders",
+      "Internal Users",
+      "Employees",
+      "Former Employees",
+      "Contract Staff",
+      "Contract Partners",
+      "Trusted Partners",
+      "Outsiders",
+      "External Groups",
+      "Organized Attackers",
+      "Cyber Criminals",
+      "Hacktivists",
+      "Terrorists",
+      "State-Sponsored Groups",
+      "State-sponsored Hackers",
+      "Black Hats",
+      "Grey Hats",
+      "White Hats",
+      "Amateurs",
+      "Hobbyists",
+      "Untrained Users",
+      "Attack Concepts & Techniques",
+      "Attacks Concepts & Techniques",
+    ],
+  },
+  {
+    sectionTitleKeys: ["infiltration", "entry method"],
+    labels: [
+      "Social Engineering",
+      "Pretexting",
+      "Tailgating",
+      "Something for Something",
+      "Phishing",
+      "Smishing",
+      "Vishing",
+      "Password Cracking",
+      "Brute-force",
+      "Network Sniffing",
+      "Vulnerability Exploitation",
+      "Advanced Persistent Threats",
+    ],
+  },
+] as const;
 
 interface ParsedTableRow {
   readonly cells: readonly string[];
   readonly separator: "pipe" | "spacing";
 }
 
+interface BoundaryLabelMatch {
+  readonly index: number;
+  readonly label: string;
+}
+
 export function extractCleanSourceItems(
   args: ExtractCleanSourceItemsArgs,
 ): readonly SourceItem[] {
   const normalized = normalizeListMarkers(args.sourceSpanText);
-  const markerMatches = findExplicitMarkerMatches(normalized);
+  const markerMatches = findExplicitMarkerMatches(
+    normalized,
+    args.sectionTitle,
+  );
   if (markerMatches.length < 2) {
     const tableItems = extractTableRowItems(
       args.sourceSpanText,
@@ -55,6 +111,14 @@ export function extractCleanSourceItems(
     );
     if (tableItems.length >= 2) {
       return tableItems;
+    }
+
+    const flattenedLabelItems = extractFlattenedLabelItems(
+      args.sourceSpanText,
+      args.sectionTitle,
+    );
+    if (flattenedLabelItems.length >= 2) {
+      return flattenedLabelItems;
     }
 
     const inlineHyphenItems = extractInlineHyphenItems(
@@ -90,7 +154,10 @@ function normalizeListMarkers(value: string): string {
     .trim();
 }
 
-function findExplicitMarkerMatches(value: string): readonly RegExpMatchArray[] {
+function findExplicitMarkerMatches(
+  value: string,
+  sectionTitle: string,
+): readonly RegExpMatchArray[] {
   const sortedMatches = [
     ...value.matchAll(LINE_BULLET_MARKER_PATTERN),
     ...value.matchAll(INLINE_BULLET_GLYPH_MARKER_PATTERN),
@@ -118,6 +185,7 @@ function findExplicitMarkerMatches(value: string): readonly RegExpMatchArray[] {
     if (
       orderedRank !== undefined &&
       isInlineOrderedMarker(value, match) &&
+      !isInlineOrderedMarkerAfterSectionTitle(value, start, sectionTitle) &&
       !isOrderedSequenceContinuation(
         value,
         start,
@@ -130,7 +198,9 @@ function findExplicitMarkerMatches(value: string): readonly RegExpMatchArray[] {
 
     markerMatches.push(match);
     previousMarkerEnd = end;
-    previousOrderedRank = orderedRank;
+    if (orderedRank !== undefined) {
+      previousOrderedRank = orderedRank;
+    }
   }
 
   return markerMatches;
@@ -156,6 +226,20 @@ function isInlineOrderedMarker(
 ): boolean {
   const start = match.index ?? 0;
   return start > 0 && !match[0].startsWith("\n") && value[start - 1] !== "\n";
+}
+
+function isInlineOrderedMarkerAfterSectionTitle(
+  value: string,
+  markerStart: number,
+  sectionTitle: string,
+): boolean {
+  const normalizedTitleKey = normalizeCoverageTitleKey(sectionTitle);
+  if (normalizedTitleKey.length === 0) {
+    return false;
+  }
+
+  const prefix = cleanSourceItemText(value.slice(0, markerStart));
+  return normalizeCoverageTitleKey(prefix).endsWith(normalizedTitleKey);
 }
 
 function isOrderedSequenceContinuation(
@@ -295,6 +379,133 @@ function extractInlineHyphenItems(
   return finalizeSourceItems(itemTexts, sectionTitle);
 }
 
+function extractFlattenedLabelItems(
+  sourceSpanText: string,
+  sectionTitle: string,
+): readonly SourceItem[] {
+  const itemTexts = splitFlattenedBoundaryItems(
+    cleanSourceItemText(sourceSpanText),
+    sectionTitle,
+    { requireDescriptions: true },
+  );
+
+  return itemTexts.length >= 2
+    ? finalizeSourceItems(itemTexts, sectionTitle)
+    : [];
+}
+
+function splitFlattenedBoundaryItems(
+  value: string,
+  sectionTitle: string,
+  options: { readonly requireDescriptions: boolean },
+): readonly string[] {
+  const boundaryGroup = findFlattenedBoundaryGroup(sectionTitle);
+  if (!boundaryGroup) {
+    return [value];
+  }
+
+  const matches = findBoundaryLabelMatches(value, boundaryGroup.labels);
+  if (matches.length < FLATTENED_LABEL_MIN_MATCHES) {
+    return [value];
+  }
+
+  const itemTexts = matches
+    .map((match, index) =>
+      cleanSourceItemText(
+        value.slice(match.index, matches[index + 1]?.index ?? value.length),
+      ),
+    )
+    .filter((itemText) => itemText.length > 0);
+  if (
+    options.requireDescriptions &&
+    itemTexts.some((itemText) => !hasDescriptionAfterBoundaryLabel(itemText))
+  ) {
+    return [value];
+  }
+
+  return itemTexts;
+}
+
+function findFlattenedBoundaryGroup(
+  sectionTitle: string,
+): (typeof FLATTENED_BOUNDARY_GROUPS)[number] | undefined {
+  const normalizedTitleKey = normalizeCoverageTitleKey(sectionTitle);
+  return FLATTENED_BOUNDARY_GROUPS.find((group) =>
+    group.sectionTitleKeys.some((key) =>
+      normalizedTitleKey.includes(normalizeCoverageTitleKey(key)),
+    ),
+  );
+}
+
+function findBoundaryLabelMatches(
+  value: string,
+  labels: readonly string[],
+): readonly BoundaryLabelMatch[] {
+  const lowerValue = value.toLocaleLowerCase();
+  const sortedLabels = [...labels].sort(
+    (left, right) => right.length - left.length,
+  );
+  const matches: BoundaryLabelMatch[] = [];
+
+  for (const label of sortedLabels) {
+    const lowerLabel = label.toLocaleLowerCase();
+    let searchStart = 0;
+    while (searchStart < lowerValue.length) {
+      const index = lowerValue.indexOf(lowerLabel, searchStart);
+      if (index < 0) {
+        break;
+      }
+      const end = index + label.length;
+      if (
+        isWordBoundary(value[index - 1]) &&
+        isWordBoundary(value[end]) &&
+        !matches.some((match) =>
+          rangesOverlap(
+            index,
+            end,
+            match.index,
+            match.index + match.label.length,
+          ),
+        )
+      ) {
+        matches.push({ index, label: value.slice(index, end) });
+      }
+      searchStart = end;
+    }
+  }
+
+  return matches.sort((left, right) => left.index - right.index);
+}
+
+function hasDescriptionAfterBoundaryLabel(itemText: string): boolean {
+  const boundaryGroupLabels = FLATTENED_BOUNDARY_GROUPS.flatMap(
+    (group) => group.labels,
+  );
+  const [firstMatch] = findBoundaryLabelMatches(itemText, boundaryGroupLabels);
+  if (!firstMatch || firstMatch.index !== 0) {
+    return false;
+  }
+
+  return (
+    countTerms(
+      itemText.slice(firstMatch.label.length).replace(/^[\s:;,.!?-]+/, ""),
+    ) >= 2
+  );
+}
+
+function isWordBoundary(value: string | undefined): boolean {
+  return value === undefined || !/[A-Za-z0-9]/.test(value);
+}
+
+function rangesOverlap(
+  leftStart: number,
+  leftEnd: number,
+  rightStart: number,
+  rightEnd: number,
+): boolean {
+  return leftStart < rightEnd && rightStart < leftEnd;
+}
+
 function shouldJoinHyphenContinuation(
   previousItem: string,
   segment: string,
@@ -332,6 +543,11 @@ function finalizeSourceItems(
     .map((itemText) =>
       stripTrailingRepeatedSectionTitle(itemText, sectionTitle),
     )
+    .flatMap((itemText) =>
+      splitFlattenedBoundaryItems(itemText, sectionTitle, {
+        requireDescriptions: false,
+      }),
+    )
     .map(cleanSourceItemText)
     .filter((itemText) => normalizeCoverageTitleKey(itemText).length > 0);
   const filteredItems =
@@ -343,6 +559,10 @@ function finalizeSourceItems(
       : cleanedItems;
 
   return filteredItems.map((text) => ({ text }));
+}
+
+function countTerms(value: string): number {
+  return [...value.matchAll(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g)].length;
 }
 
 function stripTrailingRepeatedSectionTitle(

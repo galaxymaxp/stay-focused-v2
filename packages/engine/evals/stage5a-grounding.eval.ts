@@ -32,6 +32,7 @@ export const stage5aGroundingSuite: EvalSuite = {
     createLineAndNumberedBulletExtractionCase(),
     createFixtureDStyleNestedBulletExtractionCase(),
     createFlattenedOcrHyphenStreamExtractionCase(),
+    createFlattenedBoundaryNormalProseGuardCase(),
     createTableRowExtractionCase(),
     createCleanedFusedItemGroundingCase(),
     createLooseConnectivePhase1Case(),
@@ -222,6 +223,21 @@ function createFlattenedOcrHyphenStreamExtractionCase(): EvalCase {
         ),
       ];
     },
+  };
+}
+
+function createFlattenedBoundaryNormalProseGuardCase(): EvalCase {
+  return {
+    name: "flattened boundary labels do not split normal prose",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          "Entry Methods compares Social Engineering, Password Cracking, and Vulnerability Exploitation as examples inside one ordinary sentence.",
+          "Entry Methods",
+        ),
+        [],
+        "Normal prose mentioning method labels was incorrectly split into source items.",
+      ),
   };
 }
 
