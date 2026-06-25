@@ -2,6 +2,9 @@ import basicFixtures from "./fixtures/stage3-basic.json" with { type: "json" };
 import requestFixtures from "./fixtures/stage3-request.json" with {
   type: "json",
 };
+import ocrLayoutFixtures from "./fixtures/stage3-ocr-layout.json" with {
+  type: "json",
+};
 import validationFixtures from "./fixtures/stage3-validation.json" with {
   type: "json",
 };
@@ -65,6 +68,15 @@ interface Stage3RequestFixture {
   readonly expectPromptContains?: readonly string[];
   readonly expectPromptExcludes?: readonly string[];
   readonly expectPromptOrder?: readonly string[];
+}
+
+interface Stage3OcrLayoutFixture {
+  readonly name: string;
+  readonly blockKind: NormalizedSource["blocks"][number]["kind"];
+  readonly sectionTitle: string;
+  readonly sourceLines: readonly string[];
+  readonly expectedKeyPoints: readonly string[];
+  readonly detectedBlockExcludes?: readonly string[];
 }
 
 type ValidationScenario =
@@ -134,6 +146,9 @@ class FakeGenerationProvider implements GenerationProvider {
 const basicCases = (basicFixtures as FixtureFile<Stage3BasicFixture>).cases;
 const requestCases = (requestFixtures as FixtureFile<Stage3RequestFixture>)
   .cases;
+const ocrLayoutCases = (
+  ocrLayoutFixtures as FixtureFile<Stage3OcrLayoutFixture>
+).cases;
 const validationCases = (
   validationFixtures as FixtureFile<Stage3ValidationFixture>
 ).cases;
@@ -154,6 +169,8 @@ export const stage3GenerateSuite: EvalSuite = {
     createDeterministicListCoreCase(),
     createLinePreservedBulletCoreCase(),
     createLinePreservedTableCoreCase(),
+    ...ocrLayoutCases.map(createOcrLayoutCase),
+    createPromptRequirementsStabilityCase(),
     createPromptDenylistCase(),
     createPromptFixtureNeutralityCase(),
     createMetaExplanationLeakageCase(),
@@ -759,6 +776,150 @@ function createLinePreservedTableCoreCase(): EvalCase {
   };
 }
 
+function createOcrLayoutCase(fixture: Stage3OcrLayoutFixture): EvalCase {
+  return {
+    name: fixture.name,
+    run: async () => {
+      const fixtureKey = slug(fixture.name);
+      const blockId = `${fixtureKey}-block`;
+      const sourceText = fixture.sourceLines.join("\n");
+      const context = createSingleBlockContext({
+        blockId,
+        blockKind: fixture.blockKind,
+        sourceId: `${fixtureKey}-source`,
+        sourceTitle: fixture.sectionTitle,
+        sectionId: `${fixtureKey}-section`,
+        sectionTitle: fixture.sectionTitle,
+        sourceText,
+        targetObjective: `Retain ${fixture.sectionTitle}.`,
+        targetFocus: fixture.sectionTitle,
+        targetItemCount: fixture.expectedKeyPoints.length,
+      });
+      const provider = new FakeGenerationProvider({
+        kind: "concept-card",
+        id: `${fixtureKey}-output`,
+        plannedSectionId: context.section.id,
+        title: context.section.title,
+        sourceBlockIds: [blockId],
+        sourceCore: {
+          explanation: "Provider-authored OCR summary should be replaced.",
+          keyPoints: ["Provider-authored OCR summary."],
+        },
+        enrichment: {
+          note: "Outside OCR context",
+          points: ["Unsupported provider enrichment."],
+        },
+      });
+
+      const output = await generateSection({ ...context, provider });
+      const request = provider.requests[0];
+      const issues: EvalIssue[] = [
+        ...assertDeepEqual(
+          output.sourceCore,
+          {
+            explanation: "",
+            keyPoints: fixture.expectedKeyPoints,
+          },
+          "OCR fixture source items did not replace provider-authored sourceCore.",
+        ),
+        ...assertDeepEqual(
+          output.enrichment,
+          null,
+          "Default Stage 3 OCR output retained source-external enrichment.",
+        ),
+      ];
+
+      if (!request) {
+        return [
+          ...issues,
+          { message: "Fake provider did not receive an OCR request." },
+        ];
+      }
+
+      const detectedBlock = extractDetectedItemsPromptBlock(request.prompt);
+      issues.push(
+        ...assertIncludes(
+          request.prompt,
+          `[Passage block ${blockId} | ${fixture.blockKind}]\n${sourceText}`,
+          "OCR fixture request changed the existing passage block format.",
+        ),
+        ...assertIncludes(
+          detectedBlock,
+          "DETECTED PASSAGE ITEMS:",
+          "OCR fixture request omitted the detected-items block.",
+        ),
+      );
+
+      for (const [index, keyPoint] of fixture.expectedKeyPoints.entries()) {
+        issues.push(
+          ...assertIncludes(
+            detectedBlock,
+            `${index + 1}. ${keyPoint}`,
+            "OCR fixture detected-items block did not preserve expected order.",
+          ),
+        );
+      }
+
+      for (const excludedText of fixture.detectedBlockExcludes ?? []) {
+        issues.push(
+          ...assertEqual(
+            detectedBlock.includes(excludedText),
+            false,
+            `OCR fixture detected-items block included page noise "${excludedText}".`,
+          ),
+        );
+      }
+
+      return issues;
+    },
+  };
+}
+
+function createPromptRequirementsStabilityCase(): EvalCase {
+  return {
+    name: "Stage 3 prompt requirements remain stable for default grounding",
+    run: async () => {
+      const context = createContext("concept-card");
+      const provider = new FakeGenerationProvider(
+        createValidOutput("concept-card", context.section),
+      );
+      await generateSection({ ...context, provider });
+      const prompt = provider.requests[0]?.prompt;
+      if (!prompt) {
+        return [{ message: "Fake provider did not receive a prompt." }];
+      }
+
+      return [
+        ...assertIncludes(
+          prompt,
+          "Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
+          "Stage 3 sourceCore prompt requirement drifted.",
+        ),
+        ...assertIncludes(
+          prompt,
+          "HARD LIST RULE: when the passage is primarily an enumerated list of items or names, sourceCore.keyPoints MUST be exactly the detected passage items: one keyPoint per item, in passage order, using the passage wording verbatim.",
+          "Stage 3 detected-item prompt requirement drifted.",
+        ),
+        ...assertIncludes(
+          prompt,
+          "Never invent examples, scenarios, entities, technologies, impacts, consequences, definitions, or methods in any student-visible field.",
+          "Stage 3 student-visible grounding rule drifted.",
+        ),
+        ...assertIncludes(
+          prompt,
+          "Set enrichment to null. Outside knowledge and source-external clarifications are not part of the default reviewer.",
+          "Stage 3 default enrichment rule drifted.",
+        ),
+        ...assertEqual(
+          prompt.includes("For flattened table rows"),
+          false,
+          "Stage 3 prompt unexpectedly included flattened-table instruction text.",
+        ),
+      ];
+    },
+  };
+}
+
 function createPromptDenylistCase(): EvalCase {
   return {
     name: "Stage 3 prompt avoids instruction-leakage denylist phrases",
@@ -936,6 +1097,16 @@ function createSparseSourceGuardCase(): EvalCase {
 
 function normalizePromptText(value: string): string {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function extractDetectedItemsPromptBlock(prompt: string): string {
+  const start = prompt.indexOf("DETECTED PASSAGE ITEMS:");
+  if (start < 0) {
+    return "";
+  }
+
+  const end = prompt.indexOf("\nRequirements:", start);
+  return end < 0 ? prompt.slice(start) : prompt.slice(start, end);
 }
 
 function createValidationCase(fixture: Stage3ValidationFixture): EvalCase {
@@ -1216,6 +1387,10 @@ function omitField(
   return Object.fromEntries(
     Object.entries(value).filter(([key]) => key !== field),
   );
+}
+
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

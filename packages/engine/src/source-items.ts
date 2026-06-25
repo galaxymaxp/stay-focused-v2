@@ -17,6 +17,12 @@ const LINE_BULLET_MARKER_PATTERN = /(?:^|\n)[ \t]*[-*+]\s+/g;
 const INLINE_BULLET_GLYPH_MARKER_PATTERN = /(?:^|\s)\u2022\s*/g;
 const INLINE_HYPHEN_SEPARATOR_PATTERN = /\s+-\s+/g;
 const MIN_INLINE_HYPHEN_SEGMENTS = 4;
+const SPACED_TABLE_COLUMN_SEPARATOR_PATTERN = /[ \t]{2,}/;
+const OCR_NOISE_LINE_PATTERNS = [
+  /^\s*(?:page|p\.?)\s*\d+(?:\s*(?:of|\/)\s*\d+)?\s*$/i,
+  /^\s*[-\u2013\u2014]*\s*(?:page|p\.?)\s*\d+\s*[-\u2013\u2014]*\s*$/i,
+  /^\s*(?:header|footer)\s*[:\-\u2013\u2014]\s*(?:page\s*)?\d+(?:\s*(?:of|\/)\s*\d+)?\s*$/i,
+];
 const TABLE_HEADER_LABELS = new Set([
   "column",
   "count",
@@ -31,6 +37,11 @@ const TABLE_HEADER_LABELS = new Set([
   "term",
   "value",
 ]);
+
+interface ParsedTableRow {
+  readonly cells: readonly string[];
+  readonly separator: "pipe" | "spacing";
+}
 
 export function extractCleanSourceItems(
   args: ExtractCleanSourceItemsArgs,
@@ -172,19 +183,35 @@ function extractTableRowItems(
   const rows = sourceSpanText
     .split(/\r?\n/)
     .map(parseTableRow)
-    .filter((row): row is readonly string[] => row !== undefined);
+    .filter((row): row is ParsedTableRow => row !== undefined);
   if (rows.length < 2) {
     return [];
   }
 
-  const dataRows = isHeaderRow(rows[0], rows.slice(1)) ? rows.slice(1) : rows;
+  const dataRows = isHeaderRow(
+    rows[0]?.cells,
+    rows.slice(1).map((row) => row.cells),
+  )
+    ? rows.slice(1)
+    : rows;
+  if (
+    dataRows.some((row) => row.separator === "spacing") &&
+    dataRows.length === rows.length
+  ) {
+    return [];
+  }
+
   return finalizeSourceItems(
-    dataRows.map((cells) => cells.join(" | ")),
+    dataRows.map((row) => row.cells.join(" | ")),
     sectionTitle,
   );
 }
 
-function parseTableRow(line: string): readonly string[] | undefined {
+function parseTableRow(line: string): ParsedTableRow | undefined {
+  return parsePipeTableRow(line) ?? parseSpacedTableRow(line);
+}
+
+function parsePipeTableRow(line: string): ParsedTableRow | undefined {
   const trimmed = line.trim();
   if ((trimmed.match(/\|/g)?.length ?? 0) < 2) {
     return undefined;
@@ -203,7 +230,28 @@ function parseTableRow(line: string): readonly string[] | undefined {
     return undefined;
   }
 
-  return cells;
+  return { cells, separator: "pipe" };
+}
+
+function parseSpacedTableRow(line: string): ParsedTableRow | undefined {
+  const trimmed = line.trim();
+  if (
+    trimmed.length === 0 ||
+    isOcrNoiseLine(trimmed) ||
+    !SPACED_TABLE_COLUMN_SEPARATOR_PATTERN.test(trimmed)
+  ) {
+    return undefined;
+  }
+
+  const cells = trimmed
+    .split(SPACED_TABLE_COLUMN_SEPARATOR_PATTERN)
+    .map((cell) => cell.trim())
+    .filter((cell) => cell.length > 0);
+  if (cells.length < 2) {
+    return undefined;
+  }
+
+  return { cells, separator: "spacing" };
 }
 
 function isHeaderRow(
@@ -259,7 +307,20 @@ function shouldJoinHyphenContinuation(
 }
 
 function cleanSourceItemText(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+  return value
+    .split(/\r?\n/)
+    .filter((line) => !isOcrNoiseLine(line))
+    .join("\n")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isOcrNoiseLine(line: string): boolean {
+  const trimmed = line.trim();
+  return (
+    trimmed.length > 0 &&
+    OCR_NOISE_LINE_PATTERNS.some((pattern) => pattern.test(trimmed))
+  );
 }
 
 function finalizeSourceItems(

@@ -1,0 +1,83 @@
+{
+  "cases": [
+    {
+      "name": "OCR broken line wraps stay with their own facts",
+      "blockKind": "list",
+      "sectionTitle": "Memory OCR Notes",
+      "sourceLines": [
+        "OCR export page 1",
+        "\u2022 Buffer memory stores data that is being",
+        "  processed temporarily during a task.",
+        "\u2022 Cache memory keeps frequently used data",
+        "  close to the processor.",
+        "\u2022 Virtual memory uses storage as",
+        "  additional working memory."
+      ],
+      "expectedKeyPoints": [
+        "Buffer memory stores data that is being processed temporarily during a task.",
+        "Cache memory keeps frequently used data close to the processor.",
+        "Virtual memory uses storage as additional working memory."
+      ],
+      "detectedBlockExcludes": ["OCR export page 1"]
+    },
+    {
+      "name": "OCR bullet-like symbols and spacing stay separate",
+      "blockKind": "list",
+      "sectionTitle": "Access Controls OCR",
+      "sourceLines": [
+        "Access Controls",
+        "    \u2022 Passwords verify a user's identity.",
+        "      + Tokens add a second login check.",
+        "  * Roles limit which actions are allowed."
+      ],
+      "expectedKeyPoints": [
+        "Passwords verify a user's identity.",
+        "Tokens add a second login check.",
+        "Roles limit which actions are allowed."
+      ]
+    },
+    {
+      "name": "OCR table rows with spacing loss preserve term meanings",
+      "blockKind": "table",
+      "sectionTitle": "Security Goals OCR Table",
+      "sourceLines": [
+        "Security goals copied from OCR",
+        "Term          Meaning",
+        "Confidentiality  Only authorized users can access information",
+        "Integrity        Information stays accurate and unchanged",
+        "Availability     Systems and data are accessible when needed"
+      ],
+      "expectedKeyPoints": [
+        "Confidentiality | Only authorized users can access information",
+        "Integrity | Information stays accurate and unchanged",
+        "Availability | Systems and data are accessible when needed"
+      ]
+    },
+    {
+      "name": "OCR page markers do not become detected facts",
+      "blockKind": "list",
+      "sectionTitle": "Risk Review OCR",
+      "sourceLines": [
+        "Risk Review Notes",
+        "Page 1 of 3",
+        "- Identify assets before risk analysis.",
+        "Footer: page 1 of 3",
+        "Page 2 of 3",
+        "- Rank risks by likelihood and impact.",
+        "Header: page 3 of 3",
+        "- Record mitigation owners."
+      ],
+      "expectedKeyPoints": [
+        "Identify assets before risk analysis.",
+        "Rank risks by likelihood and impact.",
+        "Record mitigation owners."
+      ],
+      "detectedBlockExcludes": [
+        "Page 1 of 3",
+        "Footer: page 1 of 3",
+        "Page 2 of 3",
+        "Header: page 3 of 3"
+      ]
+    }
+  ]
+}
