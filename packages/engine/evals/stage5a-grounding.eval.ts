@@ -33,6 +33,7 @@ export const stage5aGroundingSuite: EvalSuite = {
     createFixtureDStyleNestedBulletExtractionCase(),
     createFlattenedOcrHyphenStreamExtractionCase(),
     createFlattenedBoundaryNormalProseGuardCase(),
+    createFlattenedNestedMethodDedupeCase(),
     createTableRowExtractionCase(),
     createCleanedFusedItemGroundingCase(),
     createLooseConnectivePhase1Case(),
@@ -237,6 +238,25 @@ function createFlattenedBoundaryNormalProseGuardCase(): EvalCase {
         ),
         [],
         "Normal prose mentioning method labels was incorrectly split into source items.",
+      ),
+  };
+}
+
+function createFlattenedNestedMethodDedupeCase(): EvalCase {
+  return {
+    name: "flattened nested method labels dedupe repeated parent labels",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          "Methods of Entry Social Engineering uses human interaction to obtain access Social Engineering Phishing uses deceptive messages Password Cracking attempts to guess or recover passwords",
+          "Methods of Entry",
+        ),
+        [
+          "Social Engineering uses human interaction to obtain access",
+          "Phishing uses deceptive messages",
+          "Password Cracking attempts to guess or recover passwords",
+        ],
+        "Nested repeated method label was not deduped while preserving distinct facts.",
       ),
   };
 }

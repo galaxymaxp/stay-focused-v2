@@ -106,6 +106,19 @@
         "Vulnerability Exploitation uses known software weaknesses",
         "Advanced Persistent Threats stay active over time"
       ]
+    },
+    {
+      "name": "flattened nested method label dedupes repeated parent",
+      "blockKind": "paragraph",
+      "sectionTitle": "Methods of Entry",
+      "sourceLines": [
+        "Methods of Entry Social Engineering uses human interaction to obtain access Social Engineering Phishing uses deceptive messages Password Cracking attempts to guess or recover passwords"
+      ],
+      "expectedKeyPoints": [
+        "Social Engineering uses human interaction to obtain access",
+        "Phishing uses deceptive messages",
+        "Password Cracking attempts to guess or recover passwords"
+      ]
     }
   ]
 }

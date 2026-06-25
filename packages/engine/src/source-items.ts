@@ -68,7 +68,7 @@ const FLATTENED_BOUNDARY_GROUPS = [
     ],
   },
   {
-    sectionTitleKeys: ["infiltration", "entry method"],
+    sectionTitleKeys: ["infiltration", "entry method", "methods of entry"],
     labels: [
       "Social Engineering",
       "Pretexting",
@@ -416,14 +416,20 @@ function splitFlattenedBoundaryItems(
       ),
     )
     .filter((itemText) => itemText.length > 0);
+  const dedupedItemTexts = suppressBareDuplicateBoundaryLabelsForGroup(
+    itemTexts,
+    boundaryGroup,
+  );
   if (
     options.requireDescriptions &&
-    itemTexts.some((itemText) => !hasDescriptionAfterBoundaryLabel(itemText))
+    dedupedItemTexts.some(
+      (itemText) => !hasDescriptionAfterBoundaryLabel(itemText),
+    )
   ) {
     return [value];
   }
 
-  return itemTexts;
+  return dedupedItemTexts;
 }
 
 function findFlattenedBoundaryGroup(
@@ -550,15 +556,87 @@ function finalizeSourceItems(
     )
     .map(cleanSourceItemText)
     .filter((itemText) => normalizeCoverageTitleKey(itemText).length > 0);
+  const dedupedItems = suppressBareDuplicateBoundaryLabels(
+    cleanedItems,
+    sectionTitle,
+  );
   const filteredItems =
-    cleanedItems.length > 1 && normalizedTitleKey.length > 0
-      ? cleanedItems.filter(
+    dedupedItems.length > 1 && normalizedTitleKey.length > 0
+      ? dedupedItems.filter(
           (itemText) =>
             normalizeCoverageTitleKey(itemText) !== normalizedTitleKey,
         )
-      : cleanedItems;
+      : dedupedItems;
 
   return filteredItems.map((text) => ({ text }));
+}
+
+function suppressBareDuplicateBoundaryLabels(
+  itemTexts: readonly string[],
+  sectionTitle: string,
+): readonly string[] {
+  const boundaryGroup = findFlattenedBoundaryGroup(sectionTitle);
+  if (!boundaryGroup || itemTexts.length < 2) {
+    return itemTexts;
+  }
+
+  return suppressBareDuplicateBoundaryLabelsForGroup(itemTexts, boundaryGroup);
+}
+
+function suppressBareDuplicateBoundaryLabelsForGroup(
+  itemTexts: readonly string[],
+  boundaryGroup: (typeof FLATTENED_BOUNDARY_GROUPS)[number],
+): readonly string[] {
+  if (itemTexts.length < 2) {
+    return itemTexts;
+  }
+
+  const informativeLabelKeys = new Set(
+    itemTexts.flatMap((itemText) => {
+      const match = readLeadingBoundaryLabel(itemText, boundaryGroup.labels);
+      if (
+        !match ||
+        match.index !== 0 ||
+        countTerms(stripBoundaryLabel(itemText, match.label)) < 2
+      ) {
+        return [];
+      }
+
+      return [normalizeCoverageTitleKey(match.label)];
+    }),
+  );
+  if (informativeLabelKeys.size === 0) {
+    return itemTexts;
+  }
+
+  return itemTexts.filter((itemText) => {
+    const match = readLeadingBoundaryLabel(itemText, boundaryGroup.labels);
+    if (!match || match.index !== 0) {
+      return true;
+    }
+
+    return (
+      !isBareBoundaryLabel(itemText, match.label) ||
+      !informativeLabelKeys.has(normalizeCoverageTitleKey(match.label))
+    );
+  });
+}
+
+function readLeadingBoundaryLabel(
+  itemText: string,
+  labels: readonly string[],
+): BoundaryLabelMatch | undefined {
+  return findBoundaryLabelMatches(itemText, labels).find(
+    (match) => match.index === 0,
+  );
+}
+
+function isBareBoundaryLabel(itemText: string, label: string): boolean {
+  return normalizeCoverageTitleKey(itemText) === normalizeCoverageTitleKey(label);
+}
+
+function stripBoundaryLabel(itemText: string, label: string): string {
+  return itemText.slice(label.length).replace(/^[\s:;,.!?-]+/, "");
 }
 
 function countTerms(value: string): number {
