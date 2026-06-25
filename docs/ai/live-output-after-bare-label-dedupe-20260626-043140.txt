@@ -1,0 +1,1465 @@
+
+> @stay-focused/engine@0.0.0 live-run
+> tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js it-security
+
+
+=== IT Security (it-security.txt) ===
+{"event":"reviewer.coverage.completed","sourceId":"live-it-security","detectedSectionCount":18,"coveredCount":18,"missingSectionTitles":[],"duplicateGroups":[],"coverageScore":1,"coverageBasis":"source-outline","status":"passed","validationRuns":2}
+Planned sections: 18
+Sections passed coverage: 18
+Failed sections: none
+Coverage summary: status=passed score=1 sourceSections=18/18 passedSections=18 weakSections=0 failedSections=0
+Grounding summary: status=passed score=1 threshold=0.8 failedSections=0 issues=0 phase1FabricationFails=0
+Leakage summary: status=passed failedSections=0 issues=0
+Per-section pass/fail table:
+PASS | Introduction | live-it-security-section-hicgc7-planned-1jv6nax | stage=stage3 | reason=- | grounding=1(passed)
+PASS | What is IT Security | live-it-security-section-e2woy0-planned-1k2x9tq | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Goal of IT Security | live-it-security-section-18cc8cr-planned-1b15qhu | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Domains of IT Security | live-it-security-section-8zh0y2-planned-8da7xp | stage=stage3 | reason=- | grounding=1(passed)
+PASS | What is Cybersecurity? | live-it-security-section-1k2bk2y-planned-1f63i8d | stage=stage3 | reason=- | grounding=1(passed)
+PASS | What is Cybersecurity all about? | live-it-security-section-jtk97v-planned-1xb21fm | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Importance of cybersecurity | live-it-security-section-uqy7h4-planned-161dv8n | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Challenges of Cybersecurity | live-it-security-section-byxpo4-planned-12gt49o | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Impact of a Security Breach | live-it-security-section-1dwzz1h-planned-1ru6jyp | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Types of Attackers | live-it-security-section-96wj2i-planned-aufta2 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Definition of Terms | live-it-security-section-1xss1an-planned-1g3ct7q | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Types of Cybersecurity Threats | live-it-security-section-zdu3cm-planned-9czcks | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Types of Malware | live-it-security-section-swi63a-planned-367ftb | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Symptoms of Malware | live-it-security-section-p1ibz4-planned-1yo8nc4 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Methods of Infiltration | live-it-security-section-1vrs2ts-planned-1lrisu1 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Methods to Deny Service | live-it-security-section-5rukc8-planned-64br63 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Blended Attacks | live-it-security-section-u6hfcr-planned-151ua51 | stage=stage3 | reason=- | grounding=1(passed)
+PASS | Impact Reduction | live-it-security-section-wnau0i-planned-1v3fx6e | stage=stage3 | reason=- | grounding=1(passed)
+Section validation failures: []
+Leakage rejections: none
+Final assembled reviewer:
+{
+  "id": "reviewer-1vgilgt",
+  "title": "IT Security",
+  "sections": [
+    {
+      "id": "reviewer-section-tm4oni",
+      "sourceSectionId": "live-it-security-section-hicgc7",
+      "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+      "title": "Introduction",
+      "order": 0,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "introduction-card-001",
+          "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+          "title": "Introduction",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "Intro to IT Security Module 1",
+            "keyPoints": [
+              "Intro to IT Security Module 1"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-jcnf4p",
+      "sourceSectionId": "live-it-security-section-e2woy0",
+      "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+      "title": "What is IT Security",
+      "order": 1,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-card-it-security",
+          "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+          "title": "What is IT Security",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "A set of cyber security strategies that prevent unauthorized access",
+              "Focuses on protecting organizational assets against cyberattacks and other threats",
+              "InfoSec – processes and tools designed to protect sensitive business information",
+              "IT Sec – securing digital data through computer network security"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-rg0w1i",
+      "sourceSectionId": "live-it-security-section-18cc8cr",
+      "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+      "title": "Goal of IT Security",
+      "order": 2,
+      "kind": "process-step",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "it-security-step-01",
+          "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+          "title": "Goal of IT Security",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Confidentiality",
+              "Integrity",
+              "Availability"
+            ]
+          },
+          "enrichment": null,
+          "kind": "process-step"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-uspddm",
+      "sourceSectionId": "live-it-security-section-8zh0y2",
+      "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+      "title": "Domains of IT Security",
+      "order": 3,
+      "kind": "process-step",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "process-step-1",
+          "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+          "title": "Domains of IT Security",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Network Security",
+              "Internet Security",
+              "Endpoint Security",
+              "Cloud Security",
+              "Application Security",
+              "Information Security",
+              "Operational Security",
+              "Mobile Security",
+              "IoT Security 10.User Education 11.Cyber Security"
+            ]
+          },
+          "enrichment": null,
+          "kind": "process-step"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-199cxgu",
+      "sourceSectionId": "live-it-security-section-1k2bk2y",
+      "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+      "title": "What is Cybersecurity?",
+      "order": 4,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "1",
+          "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+          "title": "What is Cybersecurity?",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Protection of networked systems and data from unauthorized use or harm (Cisco)",
+              "Refers to a set of techniques used to protect the integrity of an organization’s security architecture and safeguard its data against attack, damage, or unauthorized access (Palo Alto Networks)",
+              "The practice of defending computers, servers, mobile devices, electronic systems, networks, and data from malicious attacks (Kaspersky)"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-9hck0l",
+      "sourceSectionId": "live-it-security-section-jtk97v",
+      "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+      "title": "What is Cybersecurity all about?",
+      "order": 5,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept_card_001",
+          "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+          "title": "What is Cybersecurity all about?",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "A successful cybersecurity approach has multiple layers of protection spread across computers, networks, programs or data that one intends to keep safe",
+              "In an organization, the people, processes and technology must all complement one another to create and effective defense from cyber attacks",
+              "A unified threat management system can automate integrations across products and accelerate key security operations functions: detection, investigation, and remediation"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-u8tg3b",
+      "sourceSectionId": "live-it-security-section-uqy7h4",
+      "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+      "title": "Importance of cybersecurity",
+      "order": 6,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "cybersecurity-importance-card",
+          "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+          "title": "Importance of cybersecurity",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "A single cybersecurity attack can result in everything from identity theft, extortion attempts, to the loss of important data",
+              "Cyberattacks may also occur in critical infrastructures like power stations, hospitals, and financial service companies",
+              "Increasingly sophisticated attacks",
+              "Widely available hacking tools",
+              "Compliance",
+              "Rising cost of breaches",
+              "Strategic, board-level concern",
+              "Cyber crime is big business"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-19m44il",
+      "sourceSectionId": "live-it-security-section-byxpo4",
+      "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+      "title": "Challenges of Cybersecurity",
+      "order": 7,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "challenge-cybersecurity-card-001",
+          "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+          "title": "Challenges of Cybersecurity",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Internet of Things",
+              "Rapidly Evolving Risks",
+              "Big & Confidential Data",
+              "Organized & State-sponsored Hacker Groups",
+              "Remote Working",
+              "High-speed Internet",
+              "BYOD"
+            ]
+          },
+          "enrichment": null,
+          "kind": "claim-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-n1cvrp",
+      "sourceSectionId": "live-it-security-section-1dwzz1h",
+      "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+      "title": "Impact of a Security Breach",
+      "order": 8,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "impact-of-a-security-breach",
+          "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+          "title": "Impact of a Security Breach",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Ruined Reputation",
+              "Vandalism",
+              "Theft",
+              "Revenue Lost",
+              "Damaged Intellectual Property"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-nvx0wb",
+      "sourceSectionId": "live-it-security-section-96wj2i",
+      "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+      "title": "Types of Attackers",
+      "order": 9,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "claim-card-1",
+          "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+          "title": "Types of Attackers",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Employees and ex-employees",
+              "Contract Staff",
+              "Trusted Partners",
+              "Outsiders",
+              "Organized Attackers",
+              "Cyber Criminals",
+              "Hacktivists",
+              "Terrorists",
+              "State-sponsored Hackers",
+              "Black hats",
+              "Grey hats",
+              "White hats",
+              "Amateurs",
+              "Attacks Concepts & Techniques"
+            ]
+          },
+          "enrichment": null,
+          "kind": "claim-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-hmyzfa",
+      "sourceSectionId": "live-it-security-section-1xss1an",
+      "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+      "title": "Definition of Terms",
+      "order": 10,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-16nqjjw"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-card-1234",
+          "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+          "title": "Definition of Terms",
+          "sourceBlockIds": [
+            "live-it-security-block-16nqjjw"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Vulnerability",
+              "Weaknesses or flaws in the hardware or software",
+              "Exploit",
+              "(v) Method used to take advantage vulnerability",
+              "(n) Tools used to take advantage vulnerability",
+              "Breach",
+              "Successful exploit if vulnerability"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1lgt0ii",
+      "sourceSectionId": "live-it-security-section-zdu3cm",
+      "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+      "title": "Types of Cybersecurity Threats",
+      "order": 11,
+      "kind": "claim-card",
+      "sourceBlockIds": [
+        "live-it-security-block-xln3zf",
+        "live-it-security-block-q9w7cg",
+        "live-it-security-block-5z9uoh",
+        "live-it-security-block-1n7ypwm",
+        "live-it-security-block-1bfeban",
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "cybersecurity-threats-card",
+          "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+          "title": "Types of Cybersecurity Threats",
+          "sourceBlockIds": [
+            "live-it-security-block-xln3zf",
+            "live-it-security-block-q9w7cg",
+            "live-it-security-block-5z9uoh",
+            "live-it-security-block-1n7ypwm",
+            "live-it-security-block-1bfeban",
+            "live-it-security-block-1wiaycf"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Cybercrime",
+              "Efforts by bad actors to profit from their malicious attacks",
+              "May be direct financial theft, identity theft, selling info from data break, hijacking computing resources for crypto-jacking to mine cryptocurrencies",
+              "Disruption",
+              "Attempts to disrupt operations of organizations by attacking their IT and operational technology (OT) infrastructure to damage it, temporarily shut it down, or hold it for ransom",
+              "Espionage",
+              "Attacks backed by state agencies that are part of a boarder espionage and military activity."
+            ]
+          },
+          "enrichment": null,
+          "kind": "claim-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-t88rfc",
+      "sourceSectionId": "live-it-security-section-swi63a",
+      "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+      "title": "Types of Malware",
+      "order": 12,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "0a4de1ae-2ae2-4e5b-8856-09808ae045d8",
+          "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+          "title": "Types of Malware",
+          "sourceBlockIds": [
+            "live-it-security-block-1wiaycf"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Spyware",
+              "Adware",
+              "Bot",
+              "Rootkit",
+              "Scareware",
+              "Ransomware",
+              "Virus",
+              "Trojan Horse",
+              "Worm",
+              "MiTM"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-jbftar",
+      "sourceSectionId": "live-it-security-section-p1ibz4",
+      "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+      "title": "Symptoms of Malware",
+      "order": 13,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "14",
+          "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+          "title": "Symptoms of Malware",
+          "sourceBlockIds": [
+            "live-it-security-block-1wiaycf"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "There is an increase in CPU usage",
+              "There is a decrease in computer speed",
+              "The computer freezes or crashes often",
+              "There is a decrease in Web browsing speed",
+              "There are unexplainable problems with network connections",
+              "Files are modified",
+              "Files are deleted",
+              "There is a presence of unknown files, programs, or desktop icons",
+              "There are unknown processes running",
+              "Programs are turning off or reconfiguring themselves",
+              "Email is being sent without the user’s knowledge or consent"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1juqbpp",
+      "sourceSectionId": "live-it-security-section-1vrs2ts",
+      "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+      "title": "Methods of Infiltration",
+      "order": 14,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-1wiaycf"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "concept-card-1",
+          "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+          "title": "Methods of Infiltration",
+          "sourceBlockIds": [
+            "live-it-security-block-1wiaycf"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Social Engineering",
+              "Pretexting",
+              "Tailgating",
+              "Something for something",
+              "Phishing",
+              "Smishing",
+              "Vishing",
+              "Password Cracking",
+              "Brute-force",
+              "Network Sniffing",
+              "Vulnerability Exploitation a) Gather info about the target using a port scanner or social engineering b) Determine learned info from (a) c) Look for vulnerability",
+              "Use a known exploit or a write a new exploit",
+              "Advanced Persistent Threats",
+              "Usually well-funded",
+              "Deploy customized malware"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1jy9keo",
+      "sourceSectionId": "live-it-security-section-5rukc8",
+      "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+      "title": "Methods to Deny Service",
+      "order": 15,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-ktb03f",
+        "live-it-security-block-1qjd7ce",
+        "live-it-security-block-a7ovsw",
+        "live-it-security-block-wlan4f"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "methods-deny-service-cc",
+          "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+          "title": "Methods to Deny Service",
+          "sourceBlockIds": [
+            "live-it-security-block-ktb03f",
+            "live-it-security-block-1qjd7ce",
+            "live-it-security-block-a7ovsw",
+            "live-it-security-block-wlan4f"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Overwhelm quantity of traffic",
+              "Send enormous quantity of data at a rate that cannot be handled",
+              "Maliciously formatted packets",
+              "Sent to a host or application and the receiver is unable to handle it",
+              "Zombie – Infected Host",
+              "Botnet – Network of Infected Hosts",
+              "SEO",
+              "Search Engine Optimization",
+              "Techniques to improve a website’s ranking by search engine",
+              "SEO Poisoning",
+              "Increase traffic to malicious websites",
+              "Force malicious sites to rank higher"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1jj442e",
+      "sourceSectionId": "live-it-security-section-u6hfcr",
+      "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+      "title": "Blended Attacks",
+      "order": 16,
+      "kind": "example-card",
+      "sourceBlockIds": [
+        "live-it-security-block-wlan4f"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "example-card-blended-attacks-001",
+          "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+          "title": "Blended Attacks",
+          "sourceBlockIds": [
+            "live-it-security-block-wlan4f"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Uses multiple techniques to compromise a target",
+              "Uses a hybrid of worms, Trojan horses, spyware, keyloggers, spam, and phishing schemes",
+              "Common example",
+              "Spam email, instant messages or legitimate websites to distribute links",
+              "DDoS combined with phishing emails"
+            ]
+          },
+          "enrichment": null,
+          "kind": "example-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1sxvhq0",
+      "sourceSectionId": "live-it-security-section-wnau0i",
+      "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+      "title": "Impact Reduction",
+      "order": 17,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "live-it-security-block-wlan4f"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "items": [
+        {
+          "id": "impact-reduction-card-0001",
+          "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+          "title": "Impact Reduction",
+          "sourceBlockIds": [
+            "live-it-security-block-wlan4f"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Communicate the Issue",
+              "Be sincere and accountable",
+              "Provide details",
+              "Understand the cause of the breach",
+              "Take steps to avoid another similar breach in the future",
+              "Ensure all systems are clean",
+              "Educate employees, partners, and customers"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "sourceId": "live-it-security",
+    "planId": "plan-1v687pr",
+    "coverageReportId": "coverage-713qx7",
+    "sourceTitle": "IT Security",
+    "sourceKind": "plain-text",
+    "language": "en",
+    "sectionCount": 18,
+    "generatedSectionCount": 18,
+    "coverageStatus": "passed",
+    "coverageScore": 1,
+    "coverage": {
+      "id": "coverage-713qx7",
+      "planId": "plan-1v687pr",
+      "sourceId": "live-it-security",
+      "status": "passed",
+      "score": 1,
+      "coverageScore": 1,
+      "coverageBasis": "source-outline",
+      "sourceSectionsTotal": 18,
+      "sourceSectionsCovered": 18,
+      "sourceSections": [
+        {
+          "sourceSectionId": "live-it-security-section-hicgc7",
+          "title": "Introduction",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-hicgc7-planned-1jv6nax"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-e2woy0",
+          "title": "What is IT Security",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-e2woy0-planned-1k2x9tq"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-18cc8cr",
+          "title": "Goal of IT Security",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-18cc8cr-planned-1b15qhu"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-8zh0y2",
+          "title": "Domains of IT Security",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-8zh0y2-planned-8da7xp"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1k2bk2y",
+          "title": "What is Cybersecurity?",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1k2bk2y-planned-1f63i8d"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-jtk97v",
+          "title": "What is Cybersecurity all about?",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-jtk97v-planned-1xb21fm"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-uqy7h4",
+          "title": "Importance of cybersecurity",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-uqy7h4-planned-161dv8n"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-byxpo4",
+          "title": "Challenges of Cybersecurity",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-byxpo4-planned-12gt49o"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1dwzz1h",
+          "title": "Impact of a Security Breach",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1dwzz1h-planned-1ru6jyp"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-96wj2i",
+          "title": "Types of Attackers",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-96wj2i-planned-aufta2"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1xss1an",
+          "title": "Definition of Terms",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1xss1an-planned-1g3ct7q"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-zdu3cm",
+          "title": "Types of Cybersecurity Threats",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-zdu3cm-planned-9czcks"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-swi63a",
+          "title": "Types of Malware",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-swi63a-planned-367ftb"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-p1ibz4",
+          "title": "Symptoms of Malware",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-p1ibz4-planned-1yo8nc4"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-1vrs2ts",
+          "title": "Methods of Infiltration",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-1vrs2ts-planned-1lrisu1"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-5rukc8",
+          "title": "Methods to Deny Service",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-5rukc8-planned-64br63"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-u6hfcr",
+          "title": "Blended Attacks",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-u6hfcr-planned-151ua51"
+          ]
+        },
+        {
+          "sourceSectionId": "live-it-security-section-wnau0i",
+          "title": "Impact Reduction",
+          "status": "covered",
+          "plannedSectionIds": [
+            "live-it-security-section-wnau0i-planned-1v3fx6e"
+          ]
+        }
+      ],
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    },
+    "groundingStatus": "passed",
+    "groundingScore": 1,
+    "grounding": {
+      "id": "grounding-1712v6c",
+      "planId": "plan-1v687pr",
+      "sourceId": "live-it-security",
+      "status": "passed",
+      "score": 1,
+      "threshold": 0.8,
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+          "sourceSectionId": "live-it-security-section-hicgc7",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+          "sourceSectionId": "live-it-security-section-e2woy0",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+          "sourceSectionId": "live-it-security-section-18cc8cr",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+          "sourceSectionId": "live-it-security-section-8zh0y2",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 9,
+          "representedSourceItemCount": 9,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+          "sourceSectionId": "live-it-security-section-1k2bk2y",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+          "sourceSectionId": "live-it-security-section-jtk97v",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+          "sourceSectionId": "live-it-security-section-uqy7h4",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 8,
+          "representedSourceItemCount": 8,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+          "sourceSectionId": "live-it-security-section-byxpo4",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 7,
+          "representedSourceItemCount": 7,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+          "sourceSectionId": "live-it-security-section-1dwzz1h",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+          "sourceSectionId": "live-it-security-section-96wj2i",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 14,
+          "representedSourceItemCount": 14,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+          "sourceSectionId": "live-it-security-section-1xss1an",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 7,
+          "representedSourceItemCount": 7,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+          "sourceSectionId": "live-it-security-section-zdu3cm",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 7,
+          "representedSourceItemCount": 7,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+          "sourceSectionId": "live-it-security-section-swi63a",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 10,
+          "representedSourceItemCount": 10,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+          "sourceSectionId": "live-it-security-section-p1ibz4",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 11,
+          "representedSourceItemCount": 11,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+          "sourceSectionId": "live-it-security-section-1vrs2ts",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 15,
+          "representedSourceItemCount": 15,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+          "sourceSectionId": "live-it-security-section-5rukc8",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 12,
+          "representedSourceItemCount": 12,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+          "sourceSectionId": "live-it-security-section-u6hfcr",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        },
+        {
+          "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+          "sourceSectionId": "live-it-security-section-wnau0i",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 7,
+          "representedSourceItemCount": 7,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": []
+        }
+      ],
+      "phase1FabricationFails": 0,
+      "phase1FabricationFailures": []
+    },
+    "leakageStatus": "passed",
+    "leakage": {
+      "id": "leakage-1eru5ey",
+      "planId": "plan-1v687pr",
+      "sourceId": "live-it-security",
+      "status": "passed",
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "live-it-security-section-hicgc7-planned-1jv6nax",
+          "sourceSectionId": "live-it-security-section-hicgc7",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-e2woy0-planned-1k2x9tq",
+          "sourceSectionId": "live-it-security-section-e2woy0",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-18cc8cr-planned-1b15qhu",
+          "sourceSectionId": "live-it-security-section-18cc8cr",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-8zh0y2-planned-8da7xp",
+          "sourceSectionId": "live-it-security-section-8zh0y2",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1k2bk2y-planned-1f63i8d",
+          "sourceSectionId": "live-it-security-section-1k2bk2y",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-jtk97v-planned-1xb21fm",
+          "sourceSectionId": "live-it-security-section-jtk97v",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-uqy7h4-planned-161dv8n",
+          "sourceSectionId": "live-it-security-section-uqy7h4",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-byxpo4-planned-12gt49o",
+          "sourceSectionId": "live-it-security-section-byxpo4",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1dwzz1h-planned-1ru6jyp",
+          "sourceSectionId": "live-it-security-section-1dwzz1h",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-96wj2i-planned-aufta2",
+          "sourceSectionId": "live-it-security-section-96wj2i",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1xss1an-planned-1g3ct7q",
+          "sourceSectionId": "live-it-security-section-1xss1an",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-zdu3cm-planned-9czcks",
+          "sourceSectionId": "live-it-security-section-zdu3cm",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-swi63a-planned-367ftb",
+          "sourceSectionId": "live-it-security-section-swi63a",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-p1ibz4-planned-1yo8nc4",
+          "sourceSectionId": "live-it-security-section-p1ibz4",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-1vrs2ts-planned-1lrisu1",
+          "sourceSectionId": "live-it-security-section-1vrs2ts",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-5rukc8-planned-64br63",
+          "sourceSectionId": "live-it-security-section-5rukc8",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-u6hfcr-planned-151ua51",
+          "sourceSectionId": "live-it-security-section-u6hfcr",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "live-it-security-section-wnau0i-planned-1v3fx6e",
+          "sourceSectionId": "live-it-security-section-wnau0i",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    }
+  }
+}
