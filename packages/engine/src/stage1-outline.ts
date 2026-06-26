@@ -187,6 +187,7 @@ function detectLineBoundaries(
 
   const lines = splitLines(entry.block.text, entry.startOffset);
   const boundaries: BoundaryCandidate[] = [];
+  const plainTextOcrBoundaryLines = findPlainTextOcrBoundaryLineIndexes(lines);
 
   for (const [index, line] of lines.entries()) {
     const trimmed = line.text.trim();
@@ -213,8 +214,17 @@ function detectLineBoundaries(
     if (
       isShortHeadingLine(trimmed) &&
       nextLine &&
-      startsBodyAfterHeading(nextLine.text.trim())
+      startsExplicitBodyAfterHeading(nextLine.text.trim())
     ) {
+      boundaries.push({
+        title: trimmed,
+        offset: line.startOffset + line.text.indexOf(trimmed),
+        priority: 7,
+      });
+      continue;
+    }
+
+    if (plainTextOcrBoundaryLines.has(index)) {
       boundaries.push({
         title: trimmed,
         offset: line.startOffset + line.text.indexOf(trimmed),
@@ -224,6 +234,30 @@ function detectLineBoundaries(
   }
 
   return boundaries;
+}
+
+function findPlainTextOcrBoundaryLineIndexes(
+  lines: readonly LineSlice[],
+): ReadonlySet<number> {
+  const candidates = new Set<number>();
+
+  for (const [index, line] of lines.entries()) {
+    const trimmed = line.text.trim();
+    const nextLine = lines
+      .slice(index + 1)
+      .find((candidate) => candidate.text.trim().length > 0);
+
+    if (
+      trimmed &&
+      nextLine &&
+      isPlainTextOcrHeadingLine(trimmed) &&
+      startsPlainTextOcrBodyLine(nextLine.text.trim())
+    ) {
+      candidates.add(index);
+    }
+  }
+
+  return candidates.size >= 2 ? candidates : new Set<number>();
 }
 
 function detectInlineBoundaries(
@@ -727,7 +761,7 @@ function splitLines(text: string, baseOffset: number): readonly LineSlice[] {
   return lines;
 }
 
-function startsBodyAfterHeading(line: string): boolean {
+function startsExplicitBodyAfterHeading(line: string): boolean {
   return /^(?:[-*+]\s+|\d+[.)]\s+|(?:\u2022|â€¢|Ã¢â‚¬Â¢)\s*)\S/.test(line);
 }
 
@@ -752,6 +786,57 @@ function isShortHeadingLine(line: string): boolean {
   );
 }
 
+function isPlainTextOcrHeadingLine(line: string): boolean {
+  if (
+    isMarkdownHeading(line) ||
+    startsExplicitBodyAfterHeading(line) ||
+    isTableLine(line)
+  ) {
+    return false;
+  }
+
+  const words = line.split(/\s+/).filter((word) => word.length > 0);
+  const letters = line.match(/[A-Za-z]/g) ?? [];
+  const headingWords = words.filter((word) =>
+    /^(?:[A-Z][A-Za-z0-9()'.?&-]*|IT|IoT|BYOD|SEO|DDoS)$/.test(word),
+  );
+  const connectorWords = words.filter((word) =>
+    /^(?:a|an|and|for|in|is|of|or|the|to|vs\.?|with)$/i.test(word),
+  );
+
+  return (
+    line.length >= 3 &&
+    line.length <= 80 &&
+    words.length >= 2 &&
+    words.length <= 8 &&
+    letters.length >= 2 &&
+    !/[.!?:;]$/.test(line) &&
+    headingWords.length + connectorWords.length === words.length &&
+    headingWords.length >= 2
+  );
+}
+
+function startsPlainTextOcrBodyLine(line: string): boolean {
+  const trimmedLine = line.trim();
+  if (!trimmedLine) {
+    return false;
+  }
+  if (startsExplicitBodyAfterHeading(trimmedLine)) {
+    return true;
+  }
+  if (
+    isMarkdownHeading(trimmedLine) ||
+    isTableLine(trimmedLine) ||
+    isPlainTextOcrHeadingLine(trimmedLine)
+  ) {
+    return false;
+  }
+
+  const words =
+    trimmedLine.match(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g) ?? [];
+  return /[.!?:;]/.test(trimmedLine) || words.length >= 4;
+}
+
 function isMarkdownHeading(line: string): boolean {
   return /^#{1,6}\s+\S/.test(line);
 }
@@ -769,6 +854,10 @@ function normalizeTitleKey(title: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "")
     .trim();
+}
+
+function isTableLine(line: string): boolean {
+  return (line.match(/\|/g)?.length ?? 0) >= 2;
 }
 
 function normalizeSpaces(value: string): string {

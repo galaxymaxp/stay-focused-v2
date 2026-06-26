@@ -222,6 +222,9 @@ function detectTextBlocks(text: string): DraftBlock[] {
     return collapsedBlocks;
   }
 
+  const sourceLines = text.split("\n");
+  const plainTextOcrHeadingLineIndexes =
+    findPlainTextOcrHeadingLineIndexes(sourceLines);
   const blocks: DraftBlock[] = [];
   const activeLines: string[] = [];
   let activeKind: SourceBlockKind | undefined;
@@ -249,7 +252,7 @@ function detectTextBlocks(text: string): DraftBlock[] {
     activeLines.push(line);
   };
 
-  for (const line of text.split("\n")) {
+  for (const [lineIndex, line] of sourceLines.entries()) {
     const trimmedLine = line.trim();
 
     if (insideCodeFence) {
@@ -301,6 +304,12 @@ function detectTextBlocks(text: string): DraftBlock[] {
       continue;
     }
 
+    if (plainTextOcrHeadingLineIndexes.has(lineIndex)) {
+      flushActiveBlock();
+      blocks.push({ kind: "heading", text: trimmedLine });
+      continue;
+    }
+
     appendLine("paragraph", trimmedLine);
   }
 
@@ -311,6 +320,50 @@ function detectTextBlocks(text: string): DraftBlock[] {
   }
 
   return blocks;
+}
+
+function findPlainTextOcrHeadingLineIndexes(
+  lines: readonly string[],
+): ReadonlySet<number> {
+  const candidates = new Set<number>();
+  let insideCodeFence = false;
+
+  for (const [index, line] of lines.entries()) {
+    const trimmedLine = line.trim();
+
+    if (/^\s*```/.test(line)) {
+      insideCodeFence = !insideCodeFence;
+      continue;
+    }
+    if (insideCodeFence || !trimmedLine) {
+      continue;
+    }
+
+    const nextLine = findNextNonBlankLine(lines, index + 1);
+    if (
+      nextLine &&
+      isPlainTextOcrHeadingLine(trimmedLine) &&
+      startsPlainTextOcrBodyLine(nextLine)
+    ) {
+      candidates.add(index);
+    }
+  }
+
+  return candidates.size >= 2 ? candidates : new Set<number>();
+}
+
+function findNextNonBlankLine(
+  lines: readonly string[],
+  startIndex: number,
+): string | undefined {
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const trimmedLine = lines[index]?.trim() ?? "";
+    if (trimmedLine) {
+      return trimmedLine;
+    }
+  }
+
+  return undefined;
 }
 
 function splitCollapsedPlainTextIntoBlocks(text: string): DraftBlock[] {
@@ -930,6 +983,60 @@ function isReasonableAllCapsHeading(line: string): boolean {
     line === line.toUpperCase() &&
     !/[.!?]$/.test(line)
   );
+}
+
+function isPlainTextOcrHeadingLine(line: string): boolean {
+  if (
+    isMarkdownHeading(line) ||
+    isListLine(line) ||
+    isQuoteLine(line) ||
+    isTableLine(line)
+  ) {
+    return false;
+  }
+
+  const words = line.split(/\s+/).filter((word) => word.length > 0);
+  const letters = line.match(/[A-Za-z]/g) ?? [];
+  const headingWords = words.filter((word) =>
+    /^(?:[A-Z][A-Za-z0-9()'.?&-]*|IT|IoT|BYOD|SEO|DDoS)$/.test(word),
+  );
+  const connectorWords = words.filter((word) =>
+    /^(?:a|an|and|for|in|is|of|or|the|to|vs\.?|with)$/i.test(word),
+  );
+
+  return (
+    line.length >= 3 &&
+    line.length <= 80 &&
+    words.length >= 2 &&
+    words.length <= 8 &&
+    letters.length >= 2 &&
+    !/[.!?:;]$/.test(line) &&
+    headingWords.length + connectorWords.length === words.length &&
+    headingWords.length >= 2
+  );
+}
+
+function startsPlainTextOcrBodyLine(line: string): boolean {
+  const trimmedLine = line.trim();
+  if (!trimmedLine) {
+    return false;
+  }
+  if (isListLine(trimmedLine)) {
+    return true;
+  }
+  if (
+    isMarkdownHeading(trimmedLine) ||
+    isQuoteLine(trimmedLine) ||
+    isTableLine(trimmedLine) ||
+    isReasonableAllCapsHeading(trimmedLine) ||
+    isPlainTextOcrHeadingLine(trimmedLine)
+  ) {
+    return false;
+  }
+
+  const words =
+    trimmedLine.match(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g) ?? [];
+  return /[.!?:;]/.test(trimmedLine) || words.length >= 4;
 }
 
 function isListLine(line: string): boolean {

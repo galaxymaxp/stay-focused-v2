@@ -46,6 +46,37 @@
       }
     },
     {
+      "name": "flat OCR heading lines recover section blocks",
+      "input": {
+        "text": "Social Engineering\nPretexting uses a false story to gain trust.\nTailgating follows an authorized person into a restricted area.\nPhishing sends deceptive messages to collect private details.\nSmishing uses text messages for phishing.\nVishing uses phone calls for phishing.\nPassword Cracking\nBrute-force tries many possible passwords until one works.\nNetwork Sniffing captures traffic to inspect exposed data.\nImpact Reduction\nStrong password policies reduce easy guessing.\nTraining helps people recognize suspicious requests."
+      },
+      "expect": {
+        "title": "Social Engineering",
+        "blockKinds": [
+          "heading",
+          "paragraph",
+          "heading",
+          "paragraph",
+          "heading",
+          "paragraph"
+        ],
+        "blockCount": 6,
+        "containsText": [
+          "Social Engineering",
+          "Pretexting",
+          "Tailgating",
+          "Phishing",
+          "Smishing",
+          "Vishing",
+          "Password Cracking",
+          "Brute-force",
+          "Network Sniffing",
+          "Impact Reduction"
+        ],
+        "deterministicIds": true
+      }
+    },
+    {
       "name": "deterministic block order",
       "input": {
         "id": "ordered-source",

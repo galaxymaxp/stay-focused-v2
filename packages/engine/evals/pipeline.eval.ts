@@ -101,10 +101,83 @@ export const pipelineSuite: EvalSuite = {
     ...basicCases.map(createBasicCase),
     ...retryCases.map(createRetryCase),
     ...validationCases.map(createValidationCase),
+    createFlatOcrPlainTextBoundaryCase(),
     createCollectAndContinueCase(),
     createInfraErrorBoundaryCase(),
   ],
 };
+
+function createFlatOcrPlainTextBoundaryCase(): EvalCase {
+  return {
+    name: "flat OCR plain text boundaries flow into reviewer content",
+    run: async () => {
+      const reviewer = await runWithProvider(
+        flatOcrPlainTextInput(),
+        new FakeProvider("pass"),
+      );
+      const sectionsByTitle = new Map(
+        reviewer.sections.map((section) => [section.title, section] as const),
+      );
+      const socialText = reviewerSectionVisibleText(
+        sectionsByTitle.get("Social Engineering"),
+      );
+      const passwordText = reviewerSectionVisibleText(
+        sectionsByTitle.get("Password Cracking"),
+      );
+      const impactText = reviewerSectionVisibleText(
+        sectionsByTitle.get("Impact Reduction"),
+      );
+
+      return [
+        ...assertDeepEqual(
+          reviewer.sections.map((section) => section.title),
+          ["Social Engineering", "Password Cracking", "Impact Reduction"],
+          "Flat OCR text did not produce the expected reviewer sections.",
+        ),
+        ...assertIncludes(
+          socialText,
+          "Pretexting",
+          "Social Engineering section lost its Pretexting child fact.",
+        ),
+        ...assertIncludes(
+          socialText,
+          "Tailgating",
+          "Social Engineering section lost its Tailgating child fact.",
+        ),
+        ...assertIncludes(
+          socialText,
+          "Phishing",
+          "Social Engineering section lost its Phishing child fact.",
+        ),
+        ...assertIncludes(
+          socialText,
+          "Smishing",
+          "Social Engineering section lost its Smishing child fact.",
+        ),
+        ...assertIncludes(
+          socialText,
+          "Vishing",
+          "Social Engineering section lost its Vishing child fact.",
+        ),
+        ...assertIncludes(
+          passwordText,
+          "Brute-force",
+          "Password Cracking section lost its Brute-force child fact.",
+        ),
+        ...assertIncludes(
+          passwordText,
+          "Network Sniffing",
+          "Password Cracking section lost its Network Sniffing child fact.",
+        ),
+        ...assertIncludes(
+          impactText,
+          "Strong password policies",
+          "Impact Reduction section lost its explanatory content.",
+        ),
+      ];
+    },
+  };
+}
 
 function createCollectAndContinueCase(): EvalCase {
   return {
@@ -214,6 +287,48 @@ function createInfraErrorBoundaryCase(): EvalCase {
       }
     },
   };
+}
+
+function flatOcrPlainTextInput(): SourceNormalizationInput {
+  return {
+    id: "pipeline-flat-ocr-source",
+    title: "Pretend OCR Notes",
+    kind: "plain-text",
+    language: "en",
+    text: [
+      "Social Engineering",
+      "Pretexting uses a false story to gain trust.",
+      "Tailgating follows an authorized person into a restricted area.",
+      "Phishing sends deceptive messages to collect private details.",
+      "Smishing uses text messages for phishing.",
+      "Vishing uses phone calls for phishing.",
+      "Password Cracking",
+      "Brute-force tries many possible passwords until one works.",
+      "Network Sniffing captures traffic to inspect exposed data.",
+      "Impact Reduction",
+      "Strong password policies reduce easy guessing.",
+      "Training helps people recognize suspicious requests.",
+    ].join("\n"),
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function reviewerSectionVisibleText(
+  section: ReviewerOutput["sections"][number] | undefined,
+): string {
+  return (
+    section?.items
+      .map((item) =>
+        [
+          item.title,
+          item.sourceCore.explanation,
+          ...item.sourceCore.keyPoints,
+          item.enrichment?.note ?? "",
+          ...(item.enrichment?.points ?? []),
+        ].join("\n"),
+      )
+      .join("\n") ?? ""
+  );
 }
 
 export async function runPipelineEvals(): Promise<boolean> {

@@ -41,6 +41,48 @@
         "tags": [["unknown"]],
         "confidences": [0.5]
       }
+    },
+    {
+      "name": "flat OCR heading lines create multiple outline sections",
+      "input": {
+        "id": "flat-ocr-outline-source",
+        "title": "Pretend OCR Notes",
+        "kind": "plain-text",
+        "language": "en",
+        "text": "Social Engineering\nPretexting uses a false story to gain trust.\nTailgating follows an authorized person into a restricted area.\nPhishing sends deceptive messages to collect private details.\nSmishing uses text messages for phishing.\nVishing uses phone calls for phishing.\nPassword Cracking\nBrute-force tries many possible passwords until one works.\nNetwork Sniffing captures traffic to inspect exposed data.\nImpact Reduction\nStrong password policies reduce easy guessing.\nTraining helps people recognize suspicious requests."
+      },
+      "expect": {
+        "outlineTitle": "Pretend OCR Notes",
+        "sectionTitles": [
+          "Social Engineering",
+          "Password Cracking",
+          "Impact Reduction"
+        ],
+        "sectionBlockKinds": [
+          ["heading", "paragraph"],
+          ["heading", "paragraph"],
+          ["heading", "paragraph"]
+        ],
+        "sectionBlockCounts": [2, 2, 2],
+        "sectionBlockTexts": [
+          [
+            "Social Engineering",
+            "Pretexting uses a false story to gain trust.\nTailgating follows an authorized person into a restricted area.\nPhishing sends deceptive messages to collect private details.\nSmishing uses text messages for phishing.\nVishing uses phone calls for phishing."
+          ],
+          [
+            "Password Cracking",
+            "Brute-force tries many possible passwords until one works.\nNetwork Sniffing captures traffic to inspect exposed data."
+          ],
+          [
+            "Impact Reduction",
+            "Strong password policies reduce easy guessing.\nTraining helps people recognize suspicious requests."
+          ]
+        ],
+        "sectionOrders": [0, 1, 2],
+        "tags": [["concept"], ["concept"], ["concept"]],
+        "confidences": [0.9, 0.9, 0.9],
+        "deterministicIds": true
+      }
     }
   ]
 }
