@@ -58,9 +58,11 @@ export function ReviewerGenerateScreen() {
     const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
     if (!apiBaseUrl) {
       setGenerationError({
-        title: "API setup needed",
+        title: "API base URL missing",
         message:
-          "EXPO_PUBLIC_API_BASE_URL is required before reviewer generation can run.",
+          "Set EXPO_PUBLIC_API_BASE_URL to the reviewer API server before generating a reviewer.",
+        detail:
+          "For local device testing, use a URL the phone can reach, such as http://<laptop-ip>:3000, not laptop localhost.",
       });
       return;
     }
@@ -210,11 +212,19 @@ function formatGenerateReviewerError(
     };
   }
 
+  if (error.code === "invalid_api_base_url") {
+    return {
+      title: "API address needs setup",
+      message: error.message,
+      detail,
+    };
+  }
+
   if (error.code === "network_error") {
     return {
       title: "Could not reach the API",
       message:
-        "Could not reach the API. Check that the API server is running and the phone is on the same Wi-Fi.",
+        "Check EXPO_PUBLIC_API_BASE_URL, the host, and the port. The API must be reachable from the phone, not only from laptop localhost.",
       detail,
     };
   }
@@ -230,8 +240,34 @@ function formatGenerateReviewerError(
 
   if (error.code === "unauthorized") {
     return {
-      title: "Session expired",
-      message: "Sign out and sign in again before generating another reviewer.",
+      title: "Login session expired",
+      message:
+        "Your login session was rejected by the API. Sign out and sign in again before generating another reviewer.",
+      detail,
+    };
+  }
+
+  if (isValidationRequestError(error)) {
+    return {
+      title: "Reviewer request needs a change",
+      message: error.message,
+      detail,
+    };
+  }
+
+  if (isPayloadTooLargeError(error)) {
+    return {
+      title: "Source is too large",
+      message: error.message,
+      detail,
+    };
+  }
+
+  if (isServerGenerationError(error)) {
+    return {
+      title: "Reviewer generation failed",
+      message:
+        "The API could not generate the reviewer. Try again, or check the API server if this is local testing.",
       detail,
     };
   }
@@ -242,6 +278,30 @@ function formatGenerateReviewerError(
       "Something went wrong while generating the reviewer. Try again in a moment.",
     detail,
   };
+}
+
+function isValidationRequestError(error: GenerateReviewerError): boolean {
+  return (
+    error.status === 400 ||
+    error.code === "invalid_json" ||
+    error.code === "invalid_request"
+  );
+}
+
+function isPayloadTooLargeError(error: GenerateReviewerError): boolean {
+  return (
+    error.status === 413 ||
+    error.code === "payload_too_large" ||
+    error.code === "source_text_too_large"
+  );
+}
+
+function isServerGenerationError(error: GenerateReviewerError): boolean {
+  return (
+    (error.status !== undefined && error.status >= 500) ||
+    error.code === "provider_configuration_error" ||
+    error.code === "reviewer_generation_failed"
+  );
 }
 
 function formatTechnicalDetail(error: GenerateReviewerError): string {

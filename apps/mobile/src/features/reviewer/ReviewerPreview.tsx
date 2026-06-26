@@ -94,6 +94,7 @@ function SectionPreview({
   readonly sectionNumber: number;
 }) {
   const itemCount = section.items.length;
+  const keyPointCount = countSectionKeyPoints(section);
 
   return (
     <Card style={styles.sectionCard}>
@@ -106,7 +107,9 @@ function SectionPreview({
           <Text style={styles.sectionTitle}>
             {formatTitle(section.title, "Untitled section")}
           </Text>
-          <Text style={styles.sectionMeta}>{formatItemCount(itemCount)}</Text>
+          <Text style={styles.sectionMeta}>
+            {formatSectionSummary(itemCount, keyPointCount)}
+          </Text>
         </View>
       </View>
 
@@ -115,6 +118,14 @@ function SectionPreview({
         <CompactStatus label="Source" status={section.groundingStatus} />
         <CompactStatus label="Clean" status={section.leakageStatus} />
       </View>
+
+      {itemCount > 0 && keyPointCount === 0 ? (
+        <View style={styles.emptyStateBox}>
+          <Text style={styles.mutedText}>
+            No key points were returned for this section.
+          </Text>
+        </View>
+      ) : null}
 
       {itemCount > 0 ? (
         <View style={styles.itemList}>
@@ -127,9 +138,11 @@ function SectionPreview({
           ))}
         </View>
       ) : (
-        <Text style={styles.mutedText}>
-          No study cards were generated for this section.
-        </Text>
+        <View style={styles.emptyStateBox}>
+          <Text style={styles.mutedText}>
+            No key points were returned for this section.
+          </Text>
+        </View>
       )}
     </Card>
   );
@@ -172,10 +185,14 @@ function StudyCard({
       </View>
 
       {showExplanation ? (
-        <Text style={styles.explanationText}>{explanation}</Text>
+        <View style={styles.copyBlock}>
+          <Text style={styles.copyLabel}>Explanation</Text>
+          <Text style={styles.explanationText}>{explanation}</Text>
+        </View>
       ) : null}
 
       <View style={styles.keyPointGroup}>
+        <Text style={styles.copyLabel}>Key points</Text>
         {keyPoints.length > 0 ? (
           <View style={styles.bulletList}>
             {keyPoints.map((point, index) => (
@@ -186,9 +203,11 @@ function StudyCard({
             ))}
           </View>
         ) : (
-          <Text style={styles.mutedText}>
-            No key points generated for this card.
-          </Text>
+          <View style={styles.emptyStateBox}>
+            <Text style={styles.mutedText}>
+              No key points generated for this card.
+            </Text>
+          </View>
         )}
       </View>
     </View>
@@ -206,6 +225,14 @@ function formatSectionCount(sectionCount: number): string {
 
 function formatItemCount(itemCount: number): string {
   return `${itemCount} ${itemCount === 1 ? "card" : "cards"}`;
+}
+
+function formatKeyPointCount(keyPointCount: number): string {
+  return `${keyPointCount} ${keyPointCount === 1 ? "key point" : "key points"}`;
+}
+
+function formatSectionSummary(itemCount: number, keyPointCount: number): string {
+  return `${formatItemCount(itemCount)} - ${formatKeyPointCount(keyPointCount)}`;
 }
 
 function formatStatus(status: ReviewStatus): string {
@@ -250,6 +277,16 @@ function shouldShowExplanation(
 
 function normalizeForComparison(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function countSectionKeyPoints(section: ReviewerSection): number {
+  return section.items.reduce(
+    (count, item) =>
+      count +
+      item.sourceCore.keyPoints.filter((point) => point.trim().length > 0)
+        .length,
+    0,
+  );
 }
 
 const styles = StyleSheet.create({
@@ -404,6 +441,16 @@ const styles = StyleSheet.create({
   studyCardHeader: {
     gap: spacing[1],
   },
+  copyBlock: {
+    gap: spacing[1],
+  },
+  copyLabel: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.kicker,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
   itemTitle: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
@@ -419,6 +466,14 @@ const styles = StyleSheet.create({
   },
   keyPointGroup: {
     gap: spacing[2],
+  },
+  emptyStateBox: {
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.border,
+    borderRadius: radius.tight,
+    borderWidth: 1,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[3],
   },
   bulletList: {
     gap: spacing[2],
