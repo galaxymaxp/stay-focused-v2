@@ -6,11 +6,15 @@
   "scripts": {
     "build": "expo export",
     "dev": "expo start",
+    "web": "expo start --web",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .expo dist"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
     "@stay-focused/engine": "*",
     "@stay-focused/shared": "*",
     "@supabase/supabase-js": "^2.49.4",

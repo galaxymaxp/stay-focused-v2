@@ -625,3 +625,13 @@ Current route status:
 - Coverage, grounding, and leakage checks passed; assembled reviewer output kept `enrichment: null`.
 - Remaining issue: OCR-style input quality and layout reconstruction are still rough and deferred to the OCR layout phase.
 - Next recommended task: add OCR layout reconstruction before Stage 1 outline detection so flattened slide streams recover headings, bullets, and section boundaries before generation.
+
+### 2026-07-01 Expo Web fast-testing workflow
+- Added Expo Web as the fast laptop-browser testing surface for the existing mobile reviewer UI.
+- Keep the testing surfaces ordered this way:
+  1. Engine/API testing: use engine evals, live scripts, and API route checks.
+  2. Fast UI testing: use Expo Web in the laptop browser.
+  3. Final mobile validation: use Expo Go on iPhone only for smoke testing.
+  4. Future V1 replacement: build a real browser app later using Next.js, after mobile/reviewer flow is stable.
+- Local commands: `npm run dev --workspace apps/api` and `npm run web --workspace apps/mobile`.
+- Use `EXPO_PUBLIC_API_BASE_URL=http://localhost:3000` for Expo Web and `EXPO_PUBLIC_API_BASE_URL=http://<LAN_IP>:3000` for iPhone Expo Go.

@@ -3,8 +3,8 @@ import type { ReviewerOutput } from "@stay-focused/engine";
 const REVIEWER_GENERATE_PATH = "/api/reviewer/generate";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_ERROR_MESSAGE_CHARS = 300;
-const LOCAL_DEVICE_API_HINT =
-  "For local device testing, use an API URL your phone can reach, such as http://<laptop-ip>:3000, not laptop localhost.";
+export const API_BASE_URL_SETUP_HINT =
+  "Set EXPO_PUBLIC_API_BASE_URL. For Expo Web, use http://localhost:3000. For phone testing, use http://<LAN_IP>:3000.";
 
 export interface GenerateReviewerInput {
   readonly apiBaseUrl: string;
@@ -133,7 +133,7 @@ export async function generateReviewer(
 
     return clientError(
       "network_error",
-      `Reviewer generation request failed before receiving a response. Check that the API host and port are reachable from this device. ${LOCAL_DEVICE_API_HINT}`,
+      `Reviewer generation request failed before receiving a response. Check that the API host and port are reachable from this device. ${API_BASE_URL_SETUP_HINT}`,
     );
   } finally {
     abortContext.cleanup();
@@ -150,7 +150,7 @@ function createReviewerEndpoint(
   if (!normalizedBaseUrl) {
     return clientError(
       "invalid_api_base_url",
-      `EXPO_PUBLIC_API_BASE_URL is missing. ${LOCAL_DEVICE_API_HINT}`,
+      API_BASE_URL_SETUP_HINT,
     );
   }
 
@@ -163,13 +163,13 @@ function createReviewerEndpoint(
     ) {
       return clientError(
         "invalid_api_base_url",
-        `EXPO_PUBLIC_API_BASE_URL must be a plain HTTP(S) base URL. ${LOCAL_DEVICE_API_HINT}`,
+        `EXPO_PUBLIC_API_BASE_URL must be a plain HTTP(S) base URL. ${API_BASE_URL_SETUP_HINT}`,
       );
     }
   } catch {
     return clientError(
       "invalid_api_base_url",
-      `EXPO_PUBLIC_API_BASE_URL must be a valid API base URL. ${LOCAL_DEVICE_API_HINT}`,
+      `EXPO_PUBLIC_API_BASE_URL must be a valid API base URL. ${API_BASE_URL_SETUP_HINT}`,
     );
   }
 

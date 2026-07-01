@@ -9,6 +9,7 @@ import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { colors, spacing, typography } from "../../design/tokens";
 import {
+  API_BASE_URL_SETUP_HINT,
   generateReviewer,
   type GenerateReviewerError,
 } from "../../services/reviewerApi";
@@ -59,10 +60,7 @@ export function ReviewerGenerateScreen() {
     if (!apiBaseUrl) {
       setGenerationError({
         title: "API base URL missing",
-        message:
-          "Set EXPO_PUBLIC_API_BASE_URL to the reviewer API server before generating a reviewer.",
-        detail:
-          "For local device testing, use a URL the phone can reach, such as http://<laptop-ip>:3000, not laptop localhost.",
+        message: API_BASE_URL_SETUP_HINT,
       });
       return;
     }
@@ -224,7 +222,7 @@ function formatGenerateReviewerError(
     return {
       title: "Could not reach the API",
       message:
-        "Check EXPO_PUBLIC_API_BASE_URL, the host, and the port. The API must be reachable from the phone, not only from laptop localhost.",
+        "Check EXPO_PUBLIC_API_BASE_URL, the host, and the port. The API must be reachable from the current test surface.",
       detail,
     };
   }

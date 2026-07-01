@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 import type { SupportedStorage } from "@supabase/supabase-js";
 
@@ -10,6 +11,7 @@ const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
 const CHUNK_PREFIX = "chunked-v1:";
 const CHUNK_SIZE = 1_800;
 const MAX_CHUNKS = 64;
+const WEB_STORAGE_TEST_KEY = "stay-focused-v2.storage-test";
 
 export const sessionStore: SupportedStorage = {
   getItem,
@@ -18,6 +20,10 @@ export const sessionStore: SupportedStorage = {
 };
 
 async function getItem(key: string): Promise<string | null> {
+  if (Platform.OS === "web") {
+    return getWebStorage()?.getItem(key) ?? null;
+  }
+
   const stored = await SecureStore.getItemAsync(key, SECURE_STORE_OPTIONS);
   if (!stored) {
     return null;
@@ -46,6 +52,16 @@ async function getItem(key: string): Promise<string | null> {
 }
 
 async function setItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === "web") {
+    const storage = getWebStorage();
+    if (!storage) {
+      return;
+    }
+
+    storage.setItem(key, value);
+    return;
+  }
+
   await removeItem(key);
 
   if (value.length <= CHUNK_SIZE) {
@@ -74,6 +90,11 @@ async function setItem(key: string, value: string): Promise<void> {
 }
 
 async function removeItem(key: string): Promise<void> {
+  if (Platform.OS === "web") {
+    getWebStorage()?.removeItem(key);
+    return;
+  }
+
   const stored = await SecureStore.getItemAsync(key, SECURE_STORE_OPTIONS);
   const chunkCount = stored ? decodeChunkCount(stored) : null;
 
@@ -107,4 +128,18 @@ function decodeChunkCount(value: string): number | null {
 
 function chunkKey(key: string, index: number): string {
   return `${key}.${index}`;
+}
+
+function getWebStorage(): Storage | null {
+  try {
+    if (typeof globalThis.localStorage === "undefined") {
+      return null;
+    }
+
+    globalThis.localStorage.setItem(WEB_STORAGE_TEST_KEY, "1");
+    globalThis.localStorage.removeItem(WEB_STORAGE_TEST_KEY);
+    return globalThis.localStorage;
+  } catch {
+    return null;
+  }
 }
