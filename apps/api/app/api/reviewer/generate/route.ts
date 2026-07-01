@@ -22,6 +22,9 @@ const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
 const REVIEWER_VALIDATION_FAILED_CODE = "reviewer_validation_failed";
 const REVIEWER_VALIDATION_FAILED_MESSAGE =
   "Reviewer generation failed because one section could not pass validation after retries.";
+const CORS_ALLOWED_METHODS = "POST, OPTIONS";
+const CORS_ALLOWED_HEADERS = "authorization, content-type";
+const CORS_MAX_AGE_SECONDS = "600";
 
 type ValidationResult =
   | { readonly ok: true; readonly value: ReviewerGenerateRequest }
@@ -44,8 +47,16 @@ export async function POST(request: Request): Promise<Response> {
       mappedError.status,
       mappedError.code,
       mappedError.message,
+      request,
     );
   }
+}
+
+export function OPTIONS(request: Request): Response {
+  return new Response(null, {
+    status: 204,
+    headers: createCorsHeaders(request.headers.get("origin")),
+  });
 }
 
 async function handlePost(
@@ -57,6 +68,7 @@ async function handlePost(
       401,
       "unauthorized",
       "Authorization header must be Bearer token.",
+      request,
     );
   }
 
@@ -65,12 +77,18 @@ async function handlePost(
       413,
       "payload_too_large",
       `Request body must be at most ${MAX_JSON_BODY_BYTES} bytes.`,
+      request,
     );
   }
 
   const body = await readJson(request);
   if (!body.ok) {
-    return errorResponse(400, "invalid_json", "Request body must be valid JSON.");
+    return errorResponse(
+      400,
+      "invalid_json",
+      "Request body must be valid JSON.",
+      request,
+    );
   }
 
   const validation = validateRequestBody(body.value);
@@ -79,6 +97,7 @@ async function handlePost(
       validation.status,
       validation.code,
       validation.message,
+      request,
     );
   }
 
@@ -88,6 +107,7 @@ async function handlePost(
       401,
       "unauthorized",
       "Bearer token is invalid or expired.",
+      request,
     );
   }
 
@@ -97,6 +117,7 @@ async function handlePost(
       500,
       "provider_configuration_error",
       "Reviewer provider is not configured.",
+      request,
     );
   }
 
@@ -114,7 +135,7 @@ async function handlePost(
     });
 
     outcome = "success";
-    return jsonResponse({ ok: true, reviewer }, 200);
+    return jsonResponse({ ok: true, reviewer }, 200, request);
   } catch (error) {
     logReviewerGenerationError(requestId, error);
     const mappedError = mapReviewerGenerationError(error);
@@ -122,6 +143,7 @@ async function handlePost(
       mappedError.status,
       mappedError.code,
       mappedError.message,
+      request,
     );
   } finally {
     logReviewerGenerationEnd(requestId, startedAt, outcome);
@@ -233,6 +255,7 @@ function errorResponse(
   status: 400 | 401 | 413 | 422 | 500,
   code: string,
   message: string,
+  request?: Request,
 ): Response {
   return jsonResponse(
     {
@@ -240,17 +263,63 @@ function errorResponse(
       error: { code, message },
     },
     status,
+    request,
   );
 }
 
 function jsonResponse(
   body: ReviewerGenerateResponse | ReviewerGenerateErrorResponse,
   status: 200 | 400 | 401 | 413 | 422 | 500,
+  request?: Request,
 ): Response {
   return NextResponse.json(body, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: {
+      "Cache-Control": "no-store",
+      ...createCorsHeaders(request?.headers.get("origin") ?? null),
+    },
   });
+}
+
+function createCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = getAllowedCorsOrigin(origin);
+  if (!allowedOrigin) {
+    return { Vary: "Origin" };
+  }
+
+  return {
+    "Access-Control-Allow-Headers": CORS_ALLOWED_HEADERS,
+    "Access-Control-Allow-Methods": CORS_ALLOWED_METHODS,
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Max-Age": CORS_MAX_AGE_SECONDS,
+    Vary: "Origin",
+  };
+}
+
+function getAllowedCorsOrigin(origin: string | null): string | null {
+  if (!origin) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    const hostname = parsed.hostname.toLowerCase();
+    const isLocalhost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1";
+
+    if (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      isLocalhost
+    ) {
+      return origin;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function mapReviewerGenerationError(error: unknown): {

@@ -31,6 +31,20 @@ For laptop browser / Expo Web:
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
 ```
 
+Expo Web runs on a different origin from the API. For reviewer generation,
+verify the browser-shaped preflight if the UI shows `network_error`:
+
+```powershell
+curl.exe -i -X OPTIONS http://localhost:3000/api/reviewer/generate `
+  -H "Origin: http://localhost:8081" `
+  -H "Access-Control-Request-Method: POST" `
+  -H "Access-Control-Request-Headers: authorization, content-type"
+```
+
+Expected: HTTP `204` with `Access-Control-Allow-Origin:
+http://localhost:8081`, `Access-Control-Allow-Methods: POST, OPTIONS`, and
+`Access-Control-Allow-Headers: authorization, content-type`.
+
 For iPhone Expo Go:
 
 ```txt

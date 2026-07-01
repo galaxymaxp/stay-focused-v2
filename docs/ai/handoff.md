@@ -635,3 +635,15 @@ Current route status:
   4. Future V1 replacement: build a real browser app later using Next.js, after mobile/reviewer flow is stable.
 - Local commands: `npm run dev --workspace apps/api` and `npm run web --workspace apps/mobile`.
 - Use `EXPO_PUBLIC_API_BASE_URL=http://localhost:3000` for Expo Web and `EXPO_PUBLIC_API_BASE_URL=http://<LAN_IP>:3000` for iPhone Expo Go.
+
+### 2026-07-01 Expo Web reviewer network_error troubleshooting
+- Root cause found: Expo Web sends a browser preflight for `POST /api/reviewer/generate` because the request includes `Authorization` and JSON. The API route previously returned `204` for OPTIONS without local-web CORS headers, so browser fetch could fail before the request reached the POST handler and surface as `network_error`.
+- Fix: `apps/api/app/api/reviewer/generate/route.ts` now exports an explicit OPTIONS handler and adds CORS headers to reviewer POST JSON responses for local browser origins (`localhost`, `127.0.0.1`, and `::1`). Non-local origins do not receive `Access-Control-Allow-Origin`.
+- API port used: `http://localhost:3000`.
+- Expo Web URL used: `http://localhost:8081`.
+- CLI `/api/health` result: PASS, returned `{ "status": "ok", "version": "2.0.0" }`.
+- Browser-shaped OPTIONS preflight result: PASS, returned `204` with `Access-Control-Allow-Origin: http://localhost:8081`, `Access-Control-Allow-Methods: POST, OPTIONS`, and `Access-Control-Allow-Headers: authorization, content-type`.
+- Same-browser `/api/health`: opened in the user's normal browser for manual confirmation; Codex Chrome control was unavailable and only the in-app browser backend was exposed, so this was not observed by the agent.
+- Signed-in reviewer generation: pending manual confirmation because credentials must be entered by the human and were not requested, logged, stored, or hardcoded.
+- Reviewer preview/logout: pending manual confirmation with the same constraint.
+- Verification: reviewer route test PASS (17/17); mobile typecheck PASS; API typecheck PASS; engine build PASS; engine eval PASS (264/264); `git diff --check` PASS with line-ending warnings only.

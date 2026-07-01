@@ -49,7 +49,7 @@ vi.mock("@/providers", () => ({
   createServerOpenAIProvider: mocks.createServerOpenAIProvider,
 }));
 
-const { POST } = await import("./route");
+const { OPTIONS, POST } = await import("./route");
 
 const fakeProvider = { name: "fake-provider" };
 const fakeReviewer = {
@@ -82,6 +82,45 @@ describe("POST /api/reviewer/generate", () => {
     mocks.verifyBearerToken.mockResolvedValue({ id: "user-1" });
     mocks.createServerOpenAIProvider.mockReturnValue(fakeProvider);
     mocks.runPipeline.mockResolvedValue(fakeReviewer);
+  });
+
+  it("returns local web CORS headers for reviewer preflight", () => {
+    const response = OPTIONS(
+      new Request("http://localhost/api/reviewer/generate", {
+        method: "OPTIONS",
+        headers: {
+          "access-control-request-headers": "authorization, content-type",
+          "access-control-request-method": "POST",
+          origin: "http://localhost:8081",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:8081",
+    );
+    expect(response.headers.get("access-control-allow-methods")).toBe(
+      "POST, OPTIONS",
+    );
+    expect(response.headers.get("access-control-allow-headers")).toBe(
+      "authorization, content-type",
+    );
+  });
+
+  it("omits CORS allow-origin for non-local preflight origins", () => {
+    const response = OPTIONS(
+      new Request("http://localhost/api/reviewer/generate", {
+        method: "OPTIONS",
+        headers: {
+          "access-control-request-method": "POST",
+          origin: "https://example.com",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
   });
 
   it("returns 401 when the Authorization header is missing", async () => {
@@ -257,6 +296,7 @@ describe("POST /api/reviewer/generate", () => {
   it("returns 200 with a reviewer for a valid mocked request", async () => {
     const response = await POST(
       createRequest({
+        headers: { origin: "http://localhost:8081" },
         body: {
           sourceText: "  Photosynthesis converts light into chemical energy.  ",
           sourceTitle: "  Biology Notes  ",
@@ -266,6 +306,9 @@ describe("POST /api/reviewer/generate", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:8081",
+    );
     expect(body).toEqual({ ok: true, reviewer: fakeReviewer });
     expect(mocks.runPipeline).toHaveBeenCalledWith({
       input: {
