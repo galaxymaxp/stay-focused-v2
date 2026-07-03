@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
+import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { chromium } from "playwright";
@@ -13,6 +15,7 @@ const ROOT_DIR = path.resolve(SCRIPT_DIR, "..");
 export const API_BASE_URL = "http://localhost:3000";
 export const API_HEALTH_URL = `${API_BASE_URL}/api/health`;
 export const EXPO_WEB_URL = "http://localhost:8081";
+export const REVIEWER_GENERATE_URL = `${API_BASE_URL}/api/reviewer/generate`;
 export const SESSION_DIR = path.join(
   ROOT_DIR,
   ".local",
@@ -41,6 +44,9 @@ const EXPO_PORT = 8081;
 const SERVICE_READY_TIMEOUT_MS = 90_000;
 const PAGE_READY_TIMEOUT_MS = 60_000;
 const REVIEWER_RESULT_TIMEOUT_MS = 180_000;
+const EXPECTED_HEALTH_STATUS = "ok";
+const EXPECTED_HEALTH_VERSION = "2.0.0";
+const execFileAsync = promisify(execFile);
 
 const AUTH_ERROR_TEXTS = [
   "Sign in to continue",
@@ -103,6 +109,7 @@ class SmokeFailure extends Error {
     this.status = details.status;
     this.apiOwnership = details.apiOwnership;
     this.expoOwnership = details.expoOwnership;
+    this.details = details;
     this.cause = details.cause;
   }
 }
@@ -152,6 +159,18 @@ export function decideServiceStartup({ healthOk, portOpen }) {
   return "start";
 }
 
+export function isCompatibleApiHealthPayload(payload) {
+  return (
+    isRecord(payload) &&
+    payload.status === EXPECTED_HEALTH_STATUS &&
+    payload.version === EXPECTED_HEALTH_VERSION
+  );
+}
+
+export function isStayFocusedExpoPage(content) {
+  return /<title>\s*Stay Focused V2\s*<\/title>/i.test(content);
+}
+
 export function shouldStopService({ started, keepServices }) {
   return Boolean(started && !keepServices);
 }
@@ -178,6 +197,29 @@ export function selectAuthenticationMode({ hasValidSession, hasCredentials }) {
   };
 }
 
+export function readSmokeCredentialState(env) {
+  const email = env.SMOKE_TEST_EMAIL?.trim();
+  const password = env.SMOKE_TEST_PASSWORD;
+  const hasEmail = Boolean(email);
+  const hasPassword = Boolean(password);
+
+  if (hasEmail && hasPassword) {
+    return {
+      credentials: { email, password },
+      status: "complete",
+    };
+  }
+
+  if (hasEmail || hasPassword) {
+    return {
+      code: "SMOKE_CREDENTIALS_INCOMPLETE",
+      status: "incomplete",
+    };
+  }
+
+  return { status: "missing" };
+}
+
 export function redactSensitive(value) {
   return String(value)
     .replace(
@@ -193,6 +235,98 @@ export function redactSensitive(value) {
       "$1[REDACTED]",
     )
     .replace(/(password["']?\s*[:=]\s*["']?)([^"',}\s]+)/gi, "$1[REDACTED]");
+}
+
+export function parseHeaderList(value) {
+  return String(value ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function getHeaderValue(headers, name) {
+  if (typeof headers?.get === "function") {
+    return headers.get(name);
+  }
+
+  const requestedName = name.toLowerCase();
+  const match = Object.entries(headers ?? {}).find(
+    ([headerName]) => headerName.toLowerCase() === requestedName,
+  );
+
+  return match ? String(match[1]) : null;
+}
+
+export function validateCorsPreflightResponse({
+  expectedOrigin,
+  headers,
+  status,
+}) {
+  const missingHeaders = [];
+  const invalidHeaders = [];
+
+  if (status !== 204) {
+    invalidHeaders.push("status");
+  }
+
+  const allowOrigin = getHeaderValue(headers, "access-control-allow-origin");
+  const allowMethods = getHeaderValue(headers, "access-control-allow-methods");
+  const allowHeaders = getHeaderValue(headers, "access-control-allow-headers");
+
+  if (!allowOrigin) {
+    missingHeaders.push("access-control-allow-origin");
+  } else if (allowOrigin !== expectedOrigin || allowOrigin === "*") {
+    invalidHeaders.push("access-control-allow-origin");
+  }
+
+  const methods = parseHeaderList(allowMethods);
+  if (!allowMethods) {
+    missingHeaders.push("access-control-allow-methods");
+  } else {
+    if (!methods.includes("post")) {
+      invalidHeaders.push("access-control-allow-methods:post");
+    }
+    if (!methods.includes("options")) {
+      invalidHeaders.push("access-control-allow-methods:options");
+    }
+  }
+
+  const requestHeaders = parseHeaderList(allowHeaders);
+  if (!allowHeaders) {
+    missingHeaders.push("access-control-allow-headers");
+  } else {
+    if (!requestHeaders.includes("authorization")) {
+      invalidHeaders.push("access-control-allow-headers:authorization");
+    }
+    if (!requestHeaders.includes("content-type")) {
+      invalidHeaders.push("access-control-allow-headers:content-type");
+    }
+  }
+
+  return {
+    invalidHeaders,
+    missingHeaders,
+    ok: missingHeaders.length === 0 && invalidHeaders.length === 0,
+    status,
+  };
+}
+
+export function assertSafeSessionPath(sessionDir, rootDir = ROOT_DIR) {
+  const resolvedSessionDir = path.resolve(sessionDir);
+  const expectedSessionDir = path.resolve(
+    rootDir,
+    ".local",
+    "smoke",
+    "reviewer-web",
+  );
+
+  if (resolvedSessionDir !== expectedSessionDir) {
+    const error = new Error("Refusing to remove an unexpected smoke session path.");
+    error.code = "UNSAFE_SESSION_PATH";
+    throw error;
+  }
+
+  return resolvedSessionDir;
 }
 
 export function extractVisibleResultCounts(text) {
@@ -261,6 +395,11 @@ async function main() {
   let apiOwnership = "unknown";
   let expoOwnership = "unknown";
   let context = null;
+  let cleanupResult = { kept: 0, stopped: 0, succeeded: true };
+  let pendingFailure = null;
+  const removeSignalHandlers = installTerminationHandlers(startedServices, () =>
+    options,
+  );
 
   try {
     if (options.resetSession) {
@@ -280,34 +419,43 @@ async function main() {
       startedServices.push(expo.service);
     }
 
+    await ensureReviewerCorsPreflight({
+      apiOwnership,
+      expoOrigin: EXPO_WEB_URL,
+      expoOwnership,
+    });
+
     context = await launchPersistentBrowser(options);
     const smokeResult = await runBrowserSmoke(context);
 
-    printSuccess({
+    await printSuccess({
       apiOwnership,
       expoOwnership,
       ...smokeResult,
     });
   } catch (error) {
-    const failure = toSmokeFailure(error, {
+    pendingFailure = toSmokeFailure(error, {
       apiOwnership,
       expoOwnership,
     });
-    printFailure(failure);
-    process.exitCode = failure.code === "AUTH_REQUIRED" ? 2 : 1;
+    process.exitCode = pendingFailure.code === "AUTH_REQUIRED" ? 2 : 1;
   } finally {
     if (context) {
       await context.close().catch(() => {});
     }
 
-    await cleanupStartedServices(startedServices, options);
+    cleanupResult = await cleanupStartedServices(startedServices, options);
+    removeSignalHandlers();
+    if (pendingFailure) {
+      printFailure(pendingFailure, cleanupResult);
+    }
   }
 }
 
 async function ensureApiService() {
-  const healthOk = await isHttpOk(API_HEALTH_URL);
-  const portOpen = healthOk || (await isTcpPortOpen(API_PORT));
-  const decision = decideServiceStartup({ healthOk, portOpen });
+  const health = await checkApiHealth();
+  const portOpen = health.reachable || (await isTcpPortOpen(API_PORT));
+  const decision = decideServiceStartup({ healthOk: health.ok, portOpen });
 
   if (decision === "reuse") {
     return { ownership: "reused", service: null };
@@ -317,7 +465,12 @@ async function ensureApiService() {
     throw new SmokeFailure(
       "api-startup",
       "API_PORT_IN_USE",
-      `Port ${API_PORT} is occupied, but ${API_HEALTH_URL} is not healthy.`,
+      `Port ${API_PORT} is occupied, but ${API_HEALTH_URL} did not return the expected Stay Focused V2 health payload.`,
+      {
+        healthMatched: health.matched,
+        healthReachable: health.reachable,
+        status: health.status,
+      },
     );
   }
 
@@ -332,10 +485,11 @@ async function ensureApiService() {
   ]);
 
   await waitForServiceReadiness({
-    healthCheck: () => isHttpOk(API_HEALTH_URL),
+    healthCheck: async () => (await checkApiHealth()).ok,
+    exitCode: "API_START_FAILED",
     service,
     step: "api-startup",
-    timeoutCode: "API_HEALTH_TIMEOUT",
+    timeoutCode: "API_START_FAILED",
     timeoutMs: SERVICE_READY_TIMEOUT_MS,
     timeoutMessage: `Timed out waiting for ${API_HEALTH_URL}.`,
   });
@@ -344,10 +498,10 @@ async function ensureApiService() {
 }
 
 async function ensureExpoWebService() {
-  const reachable = await isHttpReachable(EXPO_WEB_URL);
-  const portOpen = reachable || (await isTcpPortOpen(EXPO_PORT));
+  const expo = await checkExpoWebCompatibility(EXPO_WEB_URL);
+  const portOpen = expo.reachable || (await isTcpPortOpen(EXPO_PORT));
   const decision = decideServiceStartup({
-    healthOk: reachable,
+    healthOk: expo.ok,
     portOpen,
   });
 
@@ -359,7 +513,11 @@ async function ensureExpoWebService() {
     throw new SmokeFailure(
       "expo-startup",
       "EXPO_PORT_IN_USE",
-      `Port ${EXPO_PORT} is occupied, but ${EXPO_WEB_URL} is not reachable as Expo Web.`,
+      `Port ${EXPO_PORT} is occupied, but ${EXPO_WEB_URL} did not look like the Stay Focused Expo Web app.`,
+      {
+        expoMatched: expo.matched,
+        status: expo.status,
+      },
     );
   }
 
@@ -383,10 +541,11 @@ async function ensureExpoWebService() {
   );
 
   await waitForServiceReadiness({
-    healthCheck: () => isHttpReachable(EXPO_WEB_URL),
+    healthCheck: async () => (await checkExpoWebCompatibility(EXPO_WEB_URL)).ok,
+    exitCode: "EXPO_START_FAILED",
     service,
     step: "expo-startup",
-    timeoutCode: "EXPO_WEB_TIMEOUT",
+    timeoutCode: "EXPO_NOT_READY",
     timeoutMs: SERVICE_READY_TIMEOUT_MS,
     timeoutMessage: `Timed out waiting for ${EXPO_WEB_URL}.`,
   });
@@ -394,18 +553,94 @@ async function ensureExpoWebService() {
   return { ownership: "started", service };
 }
 
-function startManagedService(name, npmArgs, envOverrides = {}) {
-  const child = spawn(npmCommand(), npmArgs, {
-    cwd: ROOT_DIR,
-    detached: process.platform !== "win32",
-    env: {
-      ...process.env,
-      ...envOverrides,
-      FORCE_COLOR: "0",
-    },
-    shell: false,
-    stdio: ["ignore", "pipe", "pipe"],
+async function ensureReviewerCorsPreflight({
+  apiOwnership,
+  expoOrigin,
+  expoOwnership,
+}) {
+  const result = await checkReviewerCorsPreflight({
+    apiBaseUrl: API_BASE_URL,
+    expoOrigin,
   });
+
+  if (!result.ok) {
+    throw new SmokeFailure(
+      "cors-preflight",
+      "CORS_PREFLIGHT_FAILED",
+      [
+        `Reviewer preflight failed for ${REVIEWER_GENERATE_URL}.`,
+        `Missing: ${result.missingHeaders.join(", ") || "none"}.`,
+        `Invalid: ${result.invalidHeaders.join(", ") || "none"}.`,
+      ].join(" "),
+      {
+        apiOwnership,
+        expoOrigin,
+        expoOwnership,
+        missingHeaders: result.missingHeaders,
+        invalidHeaders: result.invalidHeaders,
+        status: result.status,
+      },
+    );
+  }
+
+  return result;
+}
+
+async function checkReviewerCorsPreflight({ apiBaseUrl, expoOrigin }) {
+  const response = await fetchWithTimeout(
+    `${apiBaseUrl}/api/reviewer/generate`,
+    5_000,
+    {
+      headers: {
+        "Access-Control-Request-Headers": "authorization, content-type",
+        "Access-Control-Request-Method": "POST",
+        Origin: expoOrigin,
+      },
+      method: "OPTIONS",
+    },
+  );
+
+  if (!response) {
+    return {
+      invalidHeaders: ["request"],
+      missingHeaders: [],
+      ok: false,
+      status: undefined,
+    };
+  }
+
+  return validateCorsPreflightResponse({
+    expectedOrigin: expoOrigin,
+    headers: response.headers,
+    status: response.status,
+  });
+}
+
+function startManagedService(name, npmArgs, envOverrides = {}) {
+  const npm = createNpmInvocation(npmArgs);
+  let child;
+
+  try {
+    child = spawn(npm.command, npm.args, {
+      cwd: ROOT_DIR,
+      detached: process.platform !== "win32",
+      env: {
+        ...process.env,
+        ...envOverrides,
+        FORCE_COLOR: "0",
+      },
+      shell: npm.shell,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+  } catch (error) {
+    throw new SmokeFailure(
+      name === "API" ? "api-startup" : "expo-startup",
+      name === "API" ? "API_START_FAILED" : "EXPO_START_FAILED",
+      `${name} could not be started by the smoke runner.`,
+      { cause: error },
+    );
+  }
 
   const service = {
     child,
@@ -434,6 +669,7 @@ function appendLog(current, chunk) {
 }
 
 async function waitForServiceReadiness({
+  exitCode,
   healthCheck,
   service,
   step,
@@ -447,7 +683,7 @@ async function waitForServiceReadiness({
     if (service.exit) {
       throw new SmokeFailure(
         step,
-        "SERVICE_EXITED",
+        exitCode,
         `${service.name} exited before it became ready.`,
       );
     }
@@ -511,9 +747,17 @@ async function ensureAuthenticated(page) {
     });
   }
 
-  const credentials = readSmokeCredentials(process.env);
+  const credentialState = readSmokeCredentialState(process.env);
+  if (credentialState.status === "incomplete") {
+    throw new SmokeFailure(
+      "authentication",
+      "SMOKE_CREDENTIALS_INCOMPLETE",
+      "Set both SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD, or unset both to use persisted-session detection.",
+    );
+  }
+
   const authSelection = selectAuthenticationMode({
-    hasCredentials: Boolean(credentials),
+    hasCredentials: credentialState.status === "complete",
     hasValidSession: false,
   });
 
@@ -525,12 +769,12 @@ async function ensureAuthenticated(page) {
     );
   }
 
-  await signInWithCredentials(page, credentials);
+  await signInWithCredentials(page, credentialState.credentials);
   const signedInState = await waitForAuthState(page);
   if (signedInState !== "authenticated") {
     throw new SmokeFailure(
       "authentication",
-      "AUTH_FAILED",
+      "AUTHENTICATION_FAILED",
       "Configured smoke credentials did not reach the reviewer screen.",
     );
   }
@@ -557,7 +801,7 @@ async function waitForAuthState(page) {
 
   throw new SmokeFailure(
     "authentication",
-    "AUTH_STATE_TIMEOUT",
+    "SMOKE_TIMEOUT",
     "Timed out waiting for either the reviewer screen or the sign-in screen.",
   );
 }
@@ -604,9 +848,17 @@ async function generateReviewerThroughUi(page) {
   if (status !== undefined && status >= 400) {
     throw new SmokeFailure(
       "reviewer-post",
-      "REVIEWER_HTTP_ERROR",
+      "REVIEWER_POST_FAILED",
       `Reviewer POST returned HTTP ${status}.`,
       { status },
+    );
+  }
+
+  if (!reviewerResponse) {
+    throw new SmokeFailure(
+      "reviewer-post",
+      "REVIEWER_POST_FAILED",
+      "Reviewer result rendered, but the reviewer POST response was not observed.",
     );
   }
 
@@ -619,7 +871,7 @@ async function generateReviewerThroughUi(page) {
   if (sectionCount < 1) {
     throw new SmokeFailure(
       "result-validation",
-      "NO_SECTIONS_VISIBLE",
+      "REVIEWER_PREVIEW_NOT_RENDERED",
       "Reviewer Ready rendered, but no visible section count was found.",
       { status },
     );
@@ -628,7 +880,7 @@ async function generateReviewerThroughUi(page) {
   if (visibleKeyPointCount < 1) {
     throw new SmokeFailure(
       "result-validation",
-      "NO_KEY_POINTS_VISIBLE",
+      "REVIEWER_PREVIEW_NOT_RENDERED",
       "Reviewer Ready rendered, but no visible key-point count was found.",
       { status },
     );
@@ -664,7 +916,7 @@ async function waitForReviewerResult(page) {
 
   throw new SmokeFailure(
     "reviewer-ui",
-    "REVIEWER_RESULT_TIMEOUT",
+    "SMOKE_TIMEOUT",
     "Timed out waiting for Reviewer Ready.",
   );
 }
@@ -717,36 +969,14 @@ async function isVisibleText(page, text) {
     .catch(() => false);
 }
 
-function readSmokeCredentials(env) {
-  const email = env.SMOKE_TEST_EMAIL?.trim();
-  const password = env.SMOKE_TEST_PASSWORD;
-
-  if (!email || !password) {
-    return null;
-  }
-
-  return { email, password };
-}
-
 async function resetSessionDir() {
-  const resolvedSessionDir = path.resolve(SESSION_DIR);
-  const allowedPrefix = path.resolve(ROOT_DIR, ".local", "smoke");
-
-  if (
-    resolvedSessionDir !== path.join(allowedPrefix, "reviewer-web") ||
-    !resolvedSessionDir.startsWith(`${allowedPrefix}${path.sep}`)
-  ) {
-    throw new SmokeFailure(
-      "session-reset",
-      "UNSAFE_SESSION_PATH",
-      "Refusing to remove an unexpected smoke session path.",
-    );
-  }
-
+  const resolvedSessionDir = assertSafeSessionPath(SESSION_DIR);
   await fs.rm(resolvedSessionDir, { force: true, recursive: true });
 }
 
 async function cleanupStartedServices(startedServices, options) {
+  const result = { kept: 0, stopped: 0, succeeded: true };
+
   for (const service of startedServices.reverse()) {
     if (
       shouldStopService({
@@ -754,18 +984,24 @@ async function cleanupStartedServices(startedServices, options) {
         started: Boolean(service),
       })
     ) {
-      await stopManagedService(service);
+      const stopped = await stopManagedService(service);
+      result.stopped += stopped ? 1 : 0;
+      result.succeeded = result.succeeded && stopped;
+    } else {
+      result.kept += 1;
     }
   }
+
+  return result;
 }
 
 async function stopManagedService(service) {
   if (!service.child.pid || service.exit) {
-    return;
+    return true;
   }
 
   if (process.platform === "win32") {
-    await new Promise((resolve) => {
+    return await new Promise((resolve) => {
       const killer = spawn(
         "taskkill",
         ["/pid", String(service.child.pid), "/T", "/F"],
@@ -773,16 +1009,15 @@ async function stopManagedService(service) {
           stdio: "ignore",
         },
       );
-      killer.once("exit", resolve);
-      killer.once("error", resolve);
+      killer.once("exit", (code) => resolve(code === 0));
+      killer.once("error", () => resolve(false));
     });
-    return;
   }
 
   try {
     process.kill(-service.child.pid, "SIGTERM");
   } catch {
-    return;
+    return false;
   }
 
   await Promise.race([
@@ -793,6 +1028,7 @@ async function stopManagedService(service) {
       } catch {}
     }),
   ]);
+  return true;
 }
 
 function onceExit(child) {
@@ -801,23 +1037,53 @@ function onceExit(child) {
   });
 }
 
-async function isHttpOk(url) {
-  const response = await fetchWithTimeout(url, 2_000);
-  return Boolean(response?.ok);
+async function checkApiHealth() {
+  const response = await fetchWithTimeout(API_HEALTH_URL, 2_000);
+
+  if (!response) {
+    return { matched: false, ok: false, reachable: false };
+  }
+
+  let payload = null;
+  try {
+    payload = JSON.parse(await response.text());
+  } catch {}
+
+  const matched = response.ok && isCompatibleApiHealthPayload(payload);
+  return {
+    matched,
+    ok: matched,
+    reachable: true,
+    status: response.status,
+  };
 }
 
-async function isHttpReachable(url) {
+async function checkExpoWebCompatibility(url) {
   const response = await fetchWithTimeout(url, 2_000);
-  return Boolean(response && response.status < 500);
+
+  if (!response) {
+    return { matched: false, ok: false, reachable: false };
+  }
+
+  const text = await response.text().catch(() => "");
+  const matched = response.status < 500 && isStayFocusedExpoPage(text);
+
+  return {
+    matched,
+    ok: matched,
+    reachable: true,
+    status: response.status,
+  };
 }
 
-async function fetchWithTimeout(url, timeoutMs) {
+async function fetchWithTimeout(url, timeoutMs, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, {
       cache: "no-store",
+      ...options,
       signal: controller.signal,
     });
   } catch {
@@ -843,12 +1109,43 @@ function isTcpPortOpen(port) {
   });
 }
 
-function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+export function createNpmInvocation(npmArgs, env = process.env) {
+  if (env.npm_execpath) {
+    return {
+      args: [env.npm_execpath, ...npmArgs],
+      command: process.execPath,
+      shell: false,
+    };
+  }
+
+  return {
+    args: npmArgs,
+    command: process.platform === "win32" ? "npm.cmd" : "npm",
+    shell: process.platform === "win32",
+  };
 }
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function installTerminationHandlers(startedServices, getOptions) {
+  const handler = async () => {
+    await cleanupStartedServices(startedServices, getOptions() ?? {});
+    process.exit(130);
+  };
+
+  process.once("SIGINT", handler);
+  process.once("SIGTERM", handler);
+
+  return () => {
+    process.removeListener("SIGINT", handler);
+    process.removeListener("SIGTERM", handler);
+  };
 }
 
 function toSmokeFailure(error, ownership) {
@@ -866,21 +1163,34 @@ function toSmokeFailure(error, ownership) {
   );
 }
 
-function printSuccess(result) {
+async function getLocalHeadShort() {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: ROOT_DIR,
+      windowsHide: true,
+    });
+    return stdout.trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+async function printSuccess(result) {
   console.log("PASS reviewer-web smoke");
-  console.log(`API: reachable (${result.apiOwnership})`);
-  console.log(`Expo Web: reachable (${result.expoOwnership})`);
+  console.log(`Local HEAD: ${await getLocalHeadShort()}`);
+  console.log(`API: ${result.apiOwnership}`);
+  console.log("API health: passed");
+  console.log("CORS preflight: passed");
+  console.log(`Expo Web: ${result.expoOwnership}`);
+  console.log(`Expo URL: ${EXPO_WEB_URL}`);
   console.log(`Authentication: ${result.authenticationMode}`);
-  console.log(
-    `Reviewer response: rendered${
-      result.reviewerStatus ? ` (HTTP ${result.reviewerStatus})` : ""
-    }`,
-  );
+  console.log(`Reviewer POST: ${result.reviewerStatus}`);
+  console.log("Reviewer response: rendered");
   console.log(`Sections: ${result.sectionCount}`);
   console.log(`Visible key points: ${result.visibleKeyPointCount}`);
 }
 
-function printFailure(failure) {
+function printFailure(failure, cleanupResult) {
   console.error(
     failure.code === "AUTH_REQUIRED"
       ? "AUTH_REQUIRED reviewer-web smoke"
@@ -896,6 +1206,28 @@ function printFailure(failure) {
   console.error(`API: ${API_BASE_URL} (${failure.apiOwnership ?? "unknown"})`);
   console.error(
     `Expo Web: ${EXPO_WEB_URL} (${failure.expoOwnership ?? "unknown"})`,
+  );
+  if (failure.details?.expoOrigin) {
+    console.error(`Expo origin: ${failure.details.expoOrigin}`);
+  }
+  if (failure.details?.missingHeaders) {
+    console.error(
+      `Missing headers: ${failure.details.missingHeaders.join(", ") || "none"}`,
+    );
+  }
+  if (failure.details?.invalidHeaders) {
+    console.error(
+      `Invalid headers: ${failure.details.invalidHeaders.join(", ") || "none"}`,
+    );
+  }
+  if (failure.details?.healthMatched !== undefined) {
+    console.error(`Health matched expected app: ${failure.details.healthMatched}`);
+  }
+  if (failure.details?.expoMatched !== undefined) {
+    console.error(`Expo matched expected app: ${failure.details.expoMatched}`);
+  }
+  console.error(
+    `Cleanup: ${cleanupResult.succeeded ? "succeeded" : "failed"} (${cleanupResult.stopped} stopped, ${cleanupResult.kept} kept)`,
   );
   console.error(redactSensitive(failure.message));
 }

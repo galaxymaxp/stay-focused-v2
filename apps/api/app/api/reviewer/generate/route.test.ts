@@ -84,22 +84,25 @@ describe("POST /api/reviewer/generate", () => {
     mocks.runPipeline.mockResolvedValue(fakeReviewer);
   });
 
-  it("returns local web CORS headers for reviewer preflight", () => {
+  it.each([
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://[::1]:8081",
+  ])("returns local web CORS headers for reviewer preflight from %s", (origin) => {
     const response = OPTIONS(
       new Request("http://localhost/api/reviewer/generate", {
         method: "OPTIONS",
         headers: {
           "access-control-request-headers": "authorization, content-type",
           "access-control-request-method": "POST",
-          origin: "http://localhost:8081",
+          origin,
         },
       }),
     );
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:8081",
-    );
+    expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+    expect(response.headers.get("access-control-allow-origin")).not.toBe("*");
     expect(response.headers.get("access-control-allow-methods")).toBe(
       "POST, OPTIONS",
     );
@@ -121,6 +124,9 @@ describe("POST /api/reviewer/generate", () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    expect(response.headers.get("access-control-allow-origin")).not.toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toBeNull();
+    expect(response.headers.get("access-control-allow-headers")).toBeNull();
   });
 
   it("returns 401 when the Authorization header is missing", async () => {

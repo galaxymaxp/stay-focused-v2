@@ -31,6 +31,10 @@ Default order:
    `SMOKE_TEST_EMAIL` and `SMOKE_TEST_PASSWORD`.
 3. Stop with `AUTH_REQUIRED` when neither method is available.
 
+If only one credential variable is set, the runner stops with
+`SMOKE_CREDENTIALS_INCOMPLETE`. The diagnostic names only the variable names,
+not their values.
+
 The browser session is stored under:
 
 ```txt
@@ -79,6 +83,21 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
 
 The override is not written to committed env files.
 
+Before opening the browser, the runner also sends a browser-shaped preflight to
+`OPTIONS /api/reviewer/generate` with origin `http://localhost:8081`, method
+`POST`, and requested headers `authorization, content-type`. The smoke stops
+with `CORS_PREFLIGHT_FAILED` unless the API returns HTTP `204`, the exact Expo
+Web origin, `POST` and `OPTIONS` methods, and both requested headers. Wildcard
+origins and non-local origins are rejected.
+
+Allowed local browser origins are:
+
+```txt
+http://localhost:8081
+http://127.0.0.1:8081
+http://[::1]:8081
+```
+
 ## Options
 
 ```txt
@@ -109,11 +128,23 @@ external OCR output.
 
 - `AUTH_REQUIRED`: sign in once with `--headed`, or set
   `SMOKE_TEST_EMAIL` and `SMOKE_TEST_PASSWORD` in the shell.
+- `SMOKE_CREDENTIALS_INCOMPLETE`: set both smoke credential variables, or
+  unset both to rely on the persisted browser session.
 - `API_PORT_IN_USE`: something is listening on port `3000`, but
   `/api/health` is not passing. Stop that process or move it before rerunning.
+- `CORS_PREFLIGHT_FAILED`: the reviewer route did not authorize the exact local
+  Expo Web origin and requested browser headers.
 - `EXPO_PORT_IN_USE`: something is listening on port `8081`, but the Expo Web
   page is not reachable. Stop that process or run the compatible Expo Web
   server yourself.
+- `EXPO_NOT_READY` or `EXPO_START_FAILED`: Expo Web did not become compatible
+  with the Stay Focused app before the startup timeout.
+- `REVIEWER_POST_FAILED`, `REVIEWER_VALIDATION_FAILED`, or
+  `REVIEWER_PREVIEW_NOT_RENDERED`: authentication reached the reviewer screen,
+  but the generation request or rendered reviewer did not pass the smoke
+  assertions.
+- `SMOKE_TIMEOUT`: a bounded browser wait did not reach the next expected UI
+  state.
 - `BROWSER_UNAVAILABLE`: run `npm install`, then
   `npx playwright install chromium` if the browser binary is missing.
 - UI errors such as network, configuration, authentication, or reviewer

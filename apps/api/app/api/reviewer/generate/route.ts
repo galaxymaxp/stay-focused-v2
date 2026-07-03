@@ -314,7 +314,8 @@ function getAllowedCorsOrigin(origin: string | null): string | null {
     const isLocalhost =
       hostname === "localhost" ||
       hostname === "127.0.0.1" ||
-      hostname === "::1";
+      hostname === "::1" ||
+      hostname === "[::1]";
 
     if (
       (parsed.protocol === "http:" || parsed.protocol === "https:") &&

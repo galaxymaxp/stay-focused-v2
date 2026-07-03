@@ -61,6 +61,9 @@ npm run smoke:openai -w apps/api
 
 Normal engine evals and provider contract checks do not run this smoke test.
 
+For the reusable authenticated Expo Web reviewer smoke, see
+[Local Expo Web Reviewer Smoke](docs/testing/local-reviewer-smoke.md).
+
 ## Getting started
 
 ```sh
