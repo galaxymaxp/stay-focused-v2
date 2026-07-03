@@ -31,6 +31,15 @@ For laptop browser / Expo Web:
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
 ```
 
+For the reusable authenticated reviewer smoke, use:
+
+```bash
+npm run smoke:reviewer:web
+```
+
+See `docs/testing/local-reviewer-smoke.md` for persisted-session behavior,
+credential variable names, and safe troubleshooting.
+
 Expo Web runs on a different origin from the API. For reviewer generation,
 verify the browser-shaped preflight if the UI shows `network_error`:
 
