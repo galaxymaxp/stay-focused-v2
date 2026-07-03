@@ -33,7 +33,7 @@ export default function IndexScreen() {
 function RestoringState() {
   return (
     <Screen centered scroll={false}>
-      <Card elevated style={styles.restoringCard}>
+      <Card elevated style={styles.restoringCard} testID="auth-restoring-state">
         <ActivityIndicator color={colors.accent} />
         <Text style={styles.restoringTitle}>Restoring session</Text>
         <Text style={styles.mutedText}>Checking your saved sign-in state.</Text>
@@ -84,6 +84,7 @@ function LoginScreen() {
               }}
               placeholder="you@example.com"
               returnKeyType="next"
+              testID="auth-email-input"
               textContentType="emailAddress"
               value={email}
             />
@@ -99,13 +100,14 @@ function LoginScreen() {
               placeholder="Password"
               returnKeyType="done"
               secureTextEntry
+              testID="auth-password-input"
               textContentType="password"
               value={password}
             />
           </View>
 
           {error ? (
-            <View style={styles.errorBox}>
+            <View style={styles.errorBox} testID="auth-error-message">
               <Text style={styles.errorText}>{error.message}</Text>
             </View>
           ) : null}
@@ -114,6 +116,7 @@ function LoginScreen() {
             fullWidth
             loading={isSigningIn}
             onPress={handleSignIn}
+            testID="auth-submit-button"
             variant="primary"
           >
             Sign in

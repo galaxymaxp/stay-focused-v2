@@ -2,7 +2,7 @@ import type { ReviewerOutput } from "@stay-focused/engine";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 
-import { getAccessToken, useAuth } from "../../auth";
+import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
@@ -65,15 +65,8 @@ export function ReviewerGenerateScreen() {
       return;
     }
 
-    const token = await getAccessToken();
-    if (!token.ok) {
-      setGenerationError({
-        title: "Session check failed",
-        message: token.error.message,
-      });
-      return;
-    }
-    if (!token.data) {
+    const accessToken = session?.accessToken.trim();
+    if (!accessToken) {
       setGenerationError({
         title: "Session check failed",
         message:
@@ -92,7 +85,7 @@ export function ReviewerGenerateScreen() {
     try {
       const result = await generateReviewer({
         apiBaseUrl,
-        accessToken: token.data,
+        accessToken,
         sourceText: trimmedSourceText,
         ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
         signal: abortController.signal,
@@ -117,7 +110,7 @@ export function ReviewerGenerateScreen() {
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.stack}
       >
-        <View style={styles.header}>
+        <View style={styles.header} testID="reviewer-generate-screen">
           <Text style={styles.kicker}>Reviewer generator</Text>
           <Text style={styles.title}>Stay Focused</Text>
           <Text style={styles.subtitle}>{email}</Text>
@@ -129,6 +122,7 @@ export function ReviewerGenerateScreen() {
             onChangeText={setSourceTitle}
             placeholder="Optional title"
             returnKeyType="next"
+            testID="reviewer-title-input"
             value={sourceTitle}
           />
 
@@ -147,12 +141,13 @@ export function ReviewerGenerateScreen() {
               }
             }}
             placeholder="Paste notes, readings, or lecture text here."
+            testID="reviewer-source-input"
             textAlignVertical="top"
             value={sourceText}
           />
 
           {generationError ? (
-            <View style={styles.errorBox}>
+            <View style={styles.errorBox} testID="reviewer-generation-error">
               <Text style={styles.errorTitle}>{generationError.title}</Text>
               <Text style={styles.errorText}>{generationError.message}</Text>
               {generationError.detail ? (
@@ -165,6 +160,7 @@ export function ReviewerGenerateScreen() {
             fullWidth
             loading={isGenerating}
             onPress={handleGenerate}
+            testID="reviewer-generate-button"
             variant="primary"
           >
             Generate reviewer

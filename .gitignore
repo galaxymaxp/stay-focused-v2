@@ -7,7 +7,9 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.smoke.example
 !**/.env.example
+.env.smoke.local
 apps/api/.env
 apps/api/.env.local
 apps/mobile/.env

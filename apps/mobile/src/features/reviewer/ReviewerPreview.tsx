@@ -21,11 +21,11 @@ export function ReviewerPreview({ reviewer }: ReviewerPreviewProps) {
   const sourceTitle = reviewer.metadata.sourceTitle.trim();
 
   return (
-    <View style={styles.previewStack}>
+    <View style={styles.previewStack} testID="reviewer-ready">
       <Card elevated style={styles.headerCard}>
         <View style={styles.header}>
           <Text style={styles.kicker}>Reviewer Ready</Text>
-          <Text style={styles.title}>
+          <Text style={styles.title} testID="reviewer-title">
             {formatTitle(reviewer.title, "Untitled reviewer")}
           </Text>
           <View style={styles.metaStack}>
@@ -40,14 +40,17 @@ export function ReviewerPreview({ reviewer }: ReviewerPreviewProps) {
           <StatusPill
             label="Source-faithful"
             status={reviewer.metadata.groundingStatus}
+            testID="reviewer-source-faithful-status"
           />
           <StatusPill
             label="Coverage"
             status={reviewer.metadata.coverageStatus}
+            testID="reviewer-coverage-status"
           />
           <StatusPill
             label="Clean output"
             status={reviewer.metadata.leakageStatus}
+            testID="reviewer-clean-output-status"
           />
         </View>
       </Card>
@@ -74,12 +77,14 @@ export function ReviewerPreview({ reviewer }: ReviewerPreviewProps) {
 function StatusPill({
   label,
   status,
+  testID,
 }: {
   readonly label: string;
   readonly status: ReviewStatus;
+  readonly testID?: string;
 }) {
   return (
-    <View style={[styles.statusPill, getStatusPillStyle(status)]}>
+    <View style={[styles.statusPill, getStatusPillStyle(status)]} testID={testID}>
       <Text style={styles.statusLabel}>{label}</Text>
       <Text style={styles.statusValue}>{formatStatus(status)}</Text>
     </View>
@@ -97,7 +102,7 @@ function SectionPreview({
   const keyPointCount = countSectionKeyPoints(section);
 
   return (
-    <Card style={styles.sectionCard}>
+    <Card style={styles.sectionCard} testID="reviewer-section">
       <View style={styles.sectionHeader}>
         <View style={styles.sectionNumberBadge}>
           <Text style={styles.sectionNumber}>{sectionNumber}</Text>
@@ -187,7 +192,9 @@ function StudyCard({
       {showExplanation ? (
         <View style={styles.copyBlock}>
           <Text style={styles.copyLabel}>Explanation</Text>
-          <Text style={styles.explanationText}>{explanation}</Text>
+          <Text style={styles.explanationText} testID="reviewer-explanation">
+            {explanation}
+          </Text>
         </View>
       ) : null}
 
@@ -198,7 +205,9 @@ function StudyCard({
             {keyPoints.map((point, index) => (
               <View key={`${item.id}-point-${index}`} style={styles.bulletRow}>
                 <Text style={styles.bullet}>-</Text>
-                <Text style={styles.bodyText}>{point}</Text>
+                <Text style={styles.bodyText} testID="reviewer-key-point">
+                  {point}
+                </Text>
               </View>
             ))}
           </View>
