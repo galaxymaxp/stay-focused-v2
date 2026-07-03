@@ -160,6 +160,7 @@ export async function runPipeline(
   const initialLeakage = validateLeakage({
     outputs: initialOutputs,
     plan,
+    source,
   });
   const finalOutputs = await retryFailedSections({
     outputs: initialOutputs,
@@ -202,6 +203,7 @@ export async function runPipeline(
   const finalLeakage = validateLeakage({
     outputs: finalOutputs,
     plan,
+    source,
   });
   const state: PipelineAssemblyErrorState = {
     source,

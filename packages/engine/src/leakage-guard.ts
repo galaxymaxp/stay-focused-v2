@@ -4,6 +4,7 @@ import type {
   GenerationPlan,
   LeakageIssue,
   LeakageReport,
+  NormalizedSource,
   PlannedSection,
   SectionLeakageResult,
   SectionOutput,
@@ -58,6 +59,7 @@ export type InstructionLeakageGuardResult =
 export interface ValidateLeakageArgs {
   readonly plan: GenerationPlan;
   readonly outputs: readonly SectionOutput[];
+  readonly source?: NormalizedSource;
 }
 
 interface StudentFacingTextEntry {
@@ -118,7 +120,11 @@ export function validateLeakage(args: ValidateLeakageArgs): LeakageReport {
   );
   const outputsBySectionId = groupOutputsByPlannedSection(args.outputs);
   const sections = args.plan.sections.map((section) =>
-    validateSectionLeakage(section, outputsBySectionId.get(section.id) ?? []),
+    validateSectionLeakage(
+      section,
+      outputsBySectionId.get(section.id) ?? [],
+      args.source,
+    ),
   );
   const issues = sections.flatMap((section) => section.issues);
 
@@ -131,6 +137,7 @@ export function validateLeakage(args: ValidateLeakageArgs): LeakageReport {
       output,
       plannedSectionId: output.plannedSectionId,
       sourceSectionId: "",
+      sourceText: sourceTextForUnplannedOutput(args.source),
     });
     if (unplannedIssues.length > 0) {
       issues.push(...unplannedIssues);
@@ -166,6 +173,7 @@ export function validateLeakage(args: ValidateLeakageArgs): LeakageReport {
 function validateSectionLeakage(
   section: PlannedSection,
   outputs: readonly SectionOutput[],
+  source: NormalizedSource | undefined,
 ): SectionLeakageResult {
   const output = outputs[0];
   if (!output) {
@@ -182,6 +190,7 @@ function validateSectionLeakage(
     output,
     plannedSectionId: section.id,
     sourceSectionId: section.sourceSectionId,
+    sourceText: sourceTextForSection(source, section),
   });
 
   return {
@@ -197,12 +206,17 @@ function collectLeakageIssues(args: {
   readonly output: SectionOutput;
   readonly plannedSectionId: string;
   readonly sourceSectionId: string;
+  readonly sourceText?: string;
 }): readonly LeakageIssue[] {
   const issues: LeakageIssue[] = [];
 
   for (const entry of collectStudentFacingText(args.output)) {
     const matchedTerms = findLeakageTerms(entry.text);
     for (const match of matchedTerms) {
+      if (isSourceBackedLeakageTerm(args.sourceText, match.term)) {
+        continue;
+      }
+
       const excerpt = excerptAround(entry.text, match.index, match.term.length);
       issues.push({
         type: "leakage",
@@ -219,6 +233,32 @@ function collectLeakageIssues(args: {
   }
 
   return issues;
+}
+
+function sourceTextForSection(
+  source: NormalizedSource | undefined,
+  section: PlannedSection,
+): string | undefined {
+  if (!source) {
+    return undefined;
+  }
+
+  const sourceBlockIds = new Set(section.sourceBlockIds);
+  return source.blocks
+    .filter((block) => sourceBlockIds.has(block.id))
+    .sort((left, right) => left.order - right.order)
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
+}
+
+function sourceTextForUnplannedOutput(
+  source: NormalizedSource | undefined,
+): string | undefined {
+  return source?.blocks
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
 }
 
 function collectStudentFacingText(
@@ -276,6 +316,13 @@ function findLeakageTerms(text: string): readonly MatchedLeakageTerm[] {
   return matches;
 }
 
+function isSourceBackedLeakageTerm(
+  sourceText: string | undefined,
+  term: string,
+): boolean {
+  return sourceText !== undefined && findBoundedTerm(sourceText, term) !== undefined;
+}
+
 function findBoundedTerm(text: string, term: string): number | undefined {
   const escapedTerm = escapeRegExp(term).replace(/\s+/g, "\\s+");
   const expression = new RegExp(`(^|[^A-Za-z0-9])(${escapedTerm})(?=$|[^A-Za-z0-9])`, "i");
@@ -315,6 +362,11 @@ function validateLeakageArgs(args: ValidateLeakageArgs): void {
   }
   if (!Array.isArray(args.plan.sections)) {
     throw new Error("Leakage validation requires planned sections.");
+  }
+  if (args.source !== undefined && args.source.id !== args.plan.sourceId) {
+    throw new Error(
+      `Leakage validation source mismatch: plan source ID "${args.plan.sourceId}" does not match source ID "${args.source.id}".`,
+    );
   }
 }
 

@@ -37,6 +37,7 @@ export const studentVisibleFaithfulnessSuite: EvalSuite = {
     createUnsupportedConsequenceEnrichmentCase(),
     createUnsupportedExampleEnrichmentCase(),
     createUnsupportedVisibleTitleCase(),
+    createUnsupportedVisibleKeyPointCase(),
     createAssemblyExclusionCase(),
   ],
 };
@@ -154,6 +155,46 @@ function createUnsupportedVisibleTitleCase(): EvalCase {
           issue?.field,
           "title",
           "Unsupported visible title lacked a title-specific diagnostic.",
+        ),
+      ];
+    },
+  };
+}
+
+function createUnsupportedVisibleKeyPointCase(): EvalCase {
+  return {
+    name: "unsupported default-visible key point fails grounding",
+    run: async () => {
+      const context = createContext(
+        "Study Habits",
+        "Study habits include reviewing notes daily.",
+      );
+      const output = createOutput(context, {
+        sourceCore: {
+          explanation: context.sourceSentence,
+          keyPoints: ["Study habits involve daily review."],
+        },
+      });
+      const report = validateGrounding({
+        outputs: [output],
+        plan: context.plan,
+        source: context.source,
+        outline: context.outline,
+      });
+      const issue = report.sections[0]?.issues.find(
+        (candidate) => candidate.fieldPath === "sourceCore.keyPoints[0]",
+      );
+
+      return [
+        ...assertEqual(
+          report.status,
+          "failed",
+          "Unsupported visible key point did not fail default grounding.",
+        ),
+        ...assertEqual(
+          issue?.field,
+          "sourceCore.keyPoints",
+          "Unsupported visible key point lacked a key-point diagnostic.",
         ),
       ];
     },
@@ -334,6 +375,7 @@ function createOutput(
   context: FaithfulnessContext,
   overrides: {
     readonly title?: string;
+    readonly sourceCore?: SectionOutput["sourceCore"];
     readonly enrichment?: SectionOutput["enrichment"];
   } = {},
 ): SectionOutput {
@@ -343,7 +385,7 @@ function createOutput(
     plannedSectionId: context.section.id,
     title: overrides.title ?? context.section.title,
     sourceBlockIds: [...context.section.sourceBlockIds],
-    sourceCore: {
+    sourceCore: overrides.sourceCore ?? {
       explanation: context.sourceSentence,
       keyPoints: [context.sourceSentence],
     },

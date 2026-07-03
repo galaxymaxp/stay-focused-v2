@@ -13,6 +13,8 @@ import {
   type RetryFailedSectionsArgs,
 } from "../src/stage5-retry.js";
 import { verifyCoverage } from "../src/stage4-verify.js";
+import { validateGrounding } from "../src/stage5a-grounding.js";
+import { validateLeakage } from "../src/leakage-guard.js";
 import type {
   CoverageReport,
   GenerationPlan,
@@ -45,7 +47,8 @@ type BasicScenario =
   | "missing-generated"
   | "provider-failure-no-output"
   | "plan-order"
-  | "unplanned-excluded";
+  | "unplanned-excluded"
+  | "grounding-extractive-fallback";
 
 type PolicyScenario =
   | "weak-disabled"
@@ -162,6 +165,9 @@ async function runBasicScenario(
 ): Promise<readonly EvalIssue[]> {
   if (scenario === "plan-order") {
     return runPlanOrderCase();
+  }
+  if (scenario === "grounding-extractive-fallback") {
+    return runGroundingExtractiveFallbackCase();
   }
 
   const context = createContext(["concept-card"]);
@@ -392,6 +398,79 @@ async function runPlanOrderCase(): Promise<readonly EvalIssue[]> {
     context.plan.sections.map((section) => section.id),
     "Final outputs did not follow generation plan order.",
   );
+}
+
+async function runGroundingExtractiveFallbackCase(): Promise<readonly EvalIssue[]> {
+  const context = createSimpleProseContext();
+  const section = requireSection(context.sections[0]);
+  const unsupportedOutput = createUnsupportedSynonymOutput(
+    section,
+    "unsupported-initial",
+  );
+  const unsupportedRetry = createUnsupportedSynonymOutput(
+    section,
+    "unsupported-retry",
+  );
+  const initialGrounding = validateGrounding({
+    outputs: [unsupportedOutput],
+    plan: context.plan,
+    source: context.source,
+    outline: context.outline,
+  });
+  const provider = new FakeProvider([outputResponse(unsupportedRetry)]);
+  const outputs = await retryFailedSections({
+    ...baseArgs(context, [unsupportedOutput], provider),
+    coverage: createCoverage(context, [unsupportedOutput]),
+    grounding: initialGrounding,
+    leakage: validateLeakage({
+      outputs: [unsupportedOutput],
+      plan: context.plan,
+    }),
+    retryPolicy: policy({ maxRetries: 2 }),
+  });
+  const finalGrounding = validateGrounding({
+    outputs,
+    plan: context.plan,
+    source: context.source,
+    outline: context.outline,
+  });
+  const output = outputs[0];
+
+  return [
+    ...assertEqual(
+      initialGrounding.status,
+      "failed",
+      "Unsupported synonym output did not fail initial grounding.",
+    ),
+    ...assertEqual(
+      provider.requests.length,
+      2,
+      "Grounding fallback skipped bounded provider retries.",
+    ),
+    ...assertEqual(
+      output?.id,
+      unsupportedRetry.id,
+      "Extractive fallback should preserve the latest retry output identity.",
+    ),
+    ...assertDeepEqual(
+      output?.sourceCore,
+      {
+        explanation:
+          "Good study habits and time management help students become more prepared, less stressed, and more consistent in their academic performance.",
+        keyPoints: [
+          "Study habits are repeated actions that help students learn more effectively. Good study habits include reviewing notes daily, organizing tasks, avoiding distractions, and preparing before deadlines.",
+          "Time management is the process of planning how to divide time between activities. Students can manage time by using a calendar, setting priorities, breaking large tasks into smaller steps, and following a study schedule.",
+          "Common distractions include social media, mobile games, noisy environments, and multitasking. These distractions reduce focus, lower productivity, and make it harder to remember lessons.",
+        ],
+      },
+      "Extractive fallback did not rebuild sourceCore from exact source paragraphs.",
+    ),
+    ...assertEqual(
+      finalGrounding.status,
+      "passed",
+      "Extractive fallback output did not pass renewed grounding.",
+    ),
+  ];
 }
 
 async function runPolicyScenario(
@@ -683,6 +762,86 @@ function createContext(schemaKinds: readonly SectionSchemaKind[]): Stage5Context
   return { source, outline, plan, sections };
 }
 
+function createSimpleProseContext(): Stage5Context {
+  const title = "Pretend OCR Sample - Study Habits";
+  const blockTexts = [
+    "Module 1: Study Habits and Time Management",
+    "Study habits are repeated actions that help students learn more effectively. Good study habits include reviewing notes daily, organizing tasks, avoiding distractions, and preparing before deadlines.",
+    "Time management is the process of planning how to divide time between activities. Students can manage time by using a calendar, setting priorities, breaking large tasks into smaller steps, and following a study schedule.",
+    "Common distractions include social media, mobile games, noisy environments, and multitasking. These distractions reduce focus, lower productivity, and make it harder to remember lessons.",
+    "Good study habits and time management help students become more prepared, less stressed, and more consistent in their academic performance.",
+  ];
+  const blocks = blockTexts.map((text, index) => ({
+    id: `simple-prose-block-${index}`,
+    kind: "paragraph" as const,
+    text,
+    order: index,
+  }));
+  const sourceText = blockTexts.join("\n\n");
+  const source: NormalizedSource = {
+    id: "simple-prose-source",
+    title,
+    kind: "plain-text",
+    language: "en",
+    metadata: {},
+    blocks,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const sourceBlockIds = blocks.map((block) => block.id);
+  const section = createPlannedSection("concept-card", 0, sourceBlockIds);
+  const titledSection: PlannedSection = {
+    ...section,
+    id: "simple-prose-planned-section",
+    sourceSectionId: "simple-prose-outline-section",
+    title,
+    target: {
+      ...section.target,
+      itemCount: 3,
+      focus: "Study habits and time management",
+      requiredSourceBlockIds: sourceBlockIds,
+      coverageRules: ["Represent the short OCR prose source faithfully."],
+    },
+    tokenWeight: sourceText.split(/\s+/).length,
+    targetItemCount: 3,
+    sourceStartOffset: 0,
+    sourceEndOffset: sourceText.length,
+  };
+  const outline: SourceOutline = {
+    id: "simple-prose-outline",
+    sourceId: source.id,
+    title,
+    sections: [
+      {
+        id: titledSection.sourceSectionId,
+        title,
+        order: 0,
+        startOffset: 0,
+        endOffset: sourceText.length,
+        tokenWeight: titledSection.tokenWeight,
+        sourceBlockIds,
+        blockIds: sourceBlockIds,
+        roughStartBlockId: sourceBlockIds[0] ?? "",
+        roughEndBlockId: sourceBlockIds.at(-1) ?? "",
+        tags: ["concept"],
+        confidence: 1,
+      },
+    ],
+  };
+  const plan: GenerationPlan = {
+    id: "simple-prose-plan",
+    sourceId: source.id,
+    outlineId: outline.id,
+    title,
+    sections: [titledSection],
+    metadata: {
+      sectionCount: 1,
+      sourceBlockCount: blocks.length,
+    },
+  };
+
+  return { source, outline, plan, sections: [titledSection] };
+}
+
 function createPlannedSection(
   schemaKind: SectionSchemaKind,
   order: number,
@@ -707,6 +866,29 @@ function createPlannedSection(
     targetItemCount: 1,
     sourceStartOffset: order * 100,
     sourceEndOffset: order * 100 + 80,
+  };
+}
+
+function createUnsupportedSynonymOutput(
+  section: PlannedSection,
+  id: string,
+): SectionOutput {
+  return {
+    id,
+    kind: "concept-card",
+    plannedSectionId: section.id,
+    title: section.title,
+    sourceBlockIds: [...section.sourceBlockIds],
+    sourceCore: {
+      explanation:
+        "Good study habits produce better academic results.",
+      keyPoints: [
+        "Study habits involve daily review and organization.",
+        "Time management incorporates priorities and schedules.",
+        "Distractions cause poor learning outcomes.",
+      ],
+    },
+    enrichment: null,
   };
 }
 

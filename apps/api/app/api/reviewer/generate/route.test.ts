@@ -289,6 +289,16 @@ describe("POST /api/reviewer/generate", () => {
     const body = await expectError(response, "reviewer_validation_failed");
 
     expect(response.status).toBe(422);
+    expect(body).toMatchObject({
+      error: {
+        diagnostic: {
+          failingStage: "stage4-coverage",
+          failingSectionTitle: "Weak Section",
+          validationReason: "coverage-weak",
+          retryCount: 2,
+        },
+      },
+    });
     expect(JSON.stringify(body)).not.toContain("planned-1");
     expect(JSON.stringify(body)).not.toContain("Weak content field");
   });

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { detectInstructionLeakage, validateLeakage } from "./leakage-guard.js";
-import type { GenerationPlan, SectionOutput } from "./types.js";
+import type { GenerationPlan, NormalizedSource, SectionOutput } from "./types.js";
 
 const cleanOutput: SectionOutput = {
   kind: "concept-card",
@@ -48,6 +48,23 @@ const plan: GenerationPlan = {
     sectionCount: 1,
     sourceBlockCount: 1,
   },
+};
+
+const source: NormalizedSource = {
+  id: "source-1",
+  title: "Leakage Source",
+  kind: "plain-text",
+  language: "en",
+  metadata: {},
+  blocks: [
+    {
+      id: "source-block-1",
+      kind: "paragraph",
+      text: "Enough sleep helps the brain stay focused.",
+      order: 0,
+    },
+  ],
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 test("clean user-facing output passes leakage validation", () => {
@@ -129,6 +146,30 @@ test("project leakage in student-facing title and core fields is reported", () =
       },
     ],
   );
+});
+
+test("source-backed project-like phrase is not reported as leakage", () => {
+  const output: SectionOutput = {
+    ...cleanOutput,
+    sourceCore: {
+      explanation: "Enough sleep helps the brain stay focused.",
+      keyPoints: ["Enough sleep helps the brain stay focused."],
+    },
+  };
+
+  const withoutSource = validateLeakage({
+    plan,
+    outputs: [output],
+  });
+  const withSource = validateLeakage({
+    plan,
+    source,
+    outputs: [output],
+  });
+
+  assert.equal(withoutSource.status, "failed");
+  assert.equal(withSource.status, "passed");
+  assert.deepEqual(withSource.issues, []);
 });
 
 test("project terms in ids are not scanned as student-facing leakage", () => {

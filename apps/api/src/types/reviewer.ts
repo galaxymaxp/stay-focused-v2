@@ -15,6 +15,12 @@ export interface ReviewerGenerateErrorResponse {
   readonly error: {
     readonly code: string;
     readonly message: string;
+    readonly diagnostic?: {
+      readonly failingStage?: string;
+      readonly failingSectionTitle?: string;
+      readonly validationReason?: string;
+      readonly retryCount?: number;
+    };
   };
 }
 

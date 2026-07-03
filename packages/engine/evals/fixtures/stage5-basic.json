@@ -39,6 +39,10 @@
     {
       "name": "unplanned outputs are excluded deterministically",
       "scenario": "unplanned-excluded"
+    },
+    {
+      "name": "simple OCR prose falls back to extractive sourceCore after grounding retries",
+      "scenario": "grounding-extractive-fallback"
     }
   ]
 }

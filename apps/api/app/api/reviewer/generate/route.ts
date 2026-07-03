@@ -48,6 +48,7 @@ export async function POST(request: Request): Promise<Response> {
       mappedError.code,
       mappedError.message,
       request,
+      mappedError.diagnostic,
     );
   }
 }
@@ -144,6 +145,7 @@ async function handlePost(
       mappedError.code,
       mappedError.message,
       request,
+      mappedError.diagnostic,
     );
   } finally {
     logReviewerGenerationEnd(requestId, startedAt, outcome);
@@ -256,11 +258,16 @@ function errorResponse(
   code: string,
   message: string,
   request?: Request,
+  diagnostic?: ReviewerGenerateErrorResponse["error"]["diagnostic"],
 ): Response {
   return jsonResponse(
     {
       ok: false,
-      error: { code, message },
+      error: {
+        code,
+        message,
+        ...(diagnostic ? { diagnostic } : {}),
+      },
     },
     status,
     request,
@@ -326,12 +333,15 @@ function mapReviewerGenerationError(error: unknown): {
   readonly status: 422 | 500;
   readonly code: string;
   readonly message: string;
+  readonly diagnostic?: ReviewerGenerateErrorResponse["error"]["diagnostic"];
 } {
   if (isReviewerValidationFailure(error)) {
+    const diagnostic = createReviewerValidationDiagnostic(error);
     return {
       status: 422,
       code: REVIEWER_VALIDATION_FAILED_CODE,
       message: REVIEWER_VALIDATION_FAILED_MESSAGE,
+      ...(diagnostic ? { diagnostic } : {}),
     };
   }
 
@@ -340,6 +350,57 @@ function mapReviewerGenerationError(error: unknown): {
     code: "reviewer_generation_failed",
     message: "Reviewer generation failed.",
   };
+}
+
+function createReviewerValidationDiagnostic(
+  error: unknown,
+): ReviewerGenerateErrorResponse["error"]["diagnostic"] | undefined {
+  if (
+    process.env.NODE_ENV === "production" ||
+    !(error instanceof PipelineAssemblyError)
+  ) {
+    return undefined;
+  }
+
+  const validationFailure = error.diagnostics.sectionValidationFailures[0];
+  const failingSection = error.diagnostics.failingSections[0];
+  const validationReason =
+    failingSection?.failureReasons[0] ??
+    (validationFailure
+      ? `stage3-${validationFailure.reason}`
+      : undefined);
+  const diagnostic = {
+    failingStage: failingStageForReason(validationReason),
+    failingSectionTitle:
+      failingSection?.title ?? validationFailure?.sectionTitle,
+    validationReason,
+    retryCount: failingSection?.retryCount,
+  };
+
+  return Object.fromEntries(
+    Object.entries(diagnostic).filter(
+      ([, value]) => value !== undefined,
+    ),
+  ) as ReviewerGenerateErrorResponse["error"]["diagnostic"];
+}
+
+function failingStageForReason(reason: string | undefined): string | undefined {
+  if (!reason) {
+    return undefined;
+  }
+  if (reason.startsWith("coverage-")) {
+    return "stage4-coverage";
+  }
+  if (reason.startsWith("grounding-")) {
+    return "stage5a-grounding";
+  }
+  if (reason.startsWith("leakage-")) {
+    return "stage5-leakage";
+  }
+  if (reason === "missing-output" || reason.startsWith("stage3-")) {
+    return "stage3-generation";
+  }
+  return undefined;
 }
 
 function isReviewerValidationFailure(error: unknown): boolean {

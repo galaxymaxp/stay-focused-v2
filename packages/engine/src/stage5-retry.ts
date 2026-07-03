@@ -1,6 +1,7 @@
 import type { GenerationProvider } from "./provider";
 import { validateLeakage } from "./leakage-guard.js";
 import {
+  collectSectionSourceBlocks,
   generateSection,
   SectionValidationError,
 } from "./stage3-generate.js";
@@ -51,6 +52,11 @@ export const defaultRetryPolicy: RetryPolicy = {
   retryFailedSections: true,
 };
 
+const EXTRACTIVE_PROSE_MAX_CHARS = 2_500;
+const EXTRACTIVE_PROSE_MIN_CONTENT_BLOCKS = 3;
+const EXTRACTIVE_PROSE_MAX_CONTENT_BLOCKS = 12;
+const EXTRACTIVE_PROSE_MAX_BLOCK_CHARS = 350;
+
 export async function retryFailedSections(
   args: RetryFailedSectionsArgs,
 ): Promise<readonly SectionOutput[]> {
@@ -91,10 +97,17 @@ export async function retryFailedSections(
   );
 
   for (const section of plan.sections) {
-    const result = requireCoverageResult(section, coverageBySectionId);
-    const groundingResult = groundingBySectionId.get(section.id);
-    const leakageResult = leakageBySectionId.get(section.id);
-    if (!shouldRetry(result, groundingResult, leakageResult, retryPolicy)) {
+    let sectionCoverage = requireCoverageResult(section, coverageBySectionId);
+    let sectionGrounding = groundingBySectionId.get(section.id);
+    let sectionLeakage = leakageBySectionId.get(section.id);
+    if (
+      !shouldRetry(
+        sectionCoverage,
+        sectionGrounding,
+        sectionLeakage,
+        retryPolicy,
+      )
+    ) {
       continue;
     }
 
@@ -110,9 +123,9 @@ export async function retryFailedSections(
           model: args.model,
           temperature: args.temperature,
           retryGuidance: buildRetryGuidance(
-            result,
-            groundingResult,
-            leakageResult,
+            sectionCoverage,
+            sectionGrounding,
+            sectionLeakage,
           ),
           metadata: {
             ...args.metadata,
@@ -128,50 +141,172 @@ export async function retryFailedSections(
       }
 
       currentOutputs.set(section.id, generated);
-      const refreshedCoverage = verifyCoverage({
-        outputs: orderedOutputs(plan, currentOutputs),
+      const refreshed = refreshSectionReports({
+        section,
+        currentOutputs,
         plan,
         source,
         outline,
+        groundingEnabled: grounding !== undefined,
+        leakageEnabled: leakage !== undefined,
       });
-      const refreshedGrounding =
-        grounding === undefined
-          ? undefined
-          : validateGrounding({
-              outputs: orderedOutputs(plan, currentOutputs),
-              plan,
-              source,
-              outline,
-            });
-      const refreshedLeakage =
-        leakage === undefined
-          ? undefined
-          : validateLeakage({
-              outputs: orderedOutputs(plan, currentOutputs),
-              plan,
-            });
-      const refreshedResult = refreshedCoverage.sections.find(
-        (candidate) => candidate.plannedSectionId === section.id,
-      );
-      const refreshedGroundingResult = refreshedGrounding?.sections.find(
-        (candidate) => candidate.plannedSectionId === section.id,
-      );
-      const refreshedLeakageResult = refreshedLeakage?.sections.find(
-        (candidate) => candidate.plannedSectionId === section.id,
-      );
+      sectionCoverage = refreshed.coverage;
+      sectionGrounding = refreshed.grounding;
+      sectionLeakage = refreshed.leakage;
       if (
         isSectionAccepted(
-          refreshedResult,
-          refreshedGroundingResult,
-          refreshedLeakageResult,
+          sectionCoverage,
+          sectionGrounding,
+          sectionLeakage,
         )
       ) {
         break;
       }
     }
+
+    if (
+      isSectionAccepted(sectionCoverage, sectionGrounding, sectionLeakage) ||
+      sectionGrounding?.status !== "failed"
+    ) {
+      continue;
+    }
+
+    const fallbackOutput = createExtractiveProseFallbackOutput({
+      section,
+      source,
+      output: currentOutputs.get(section.id),
+    });
+    if (!fallbackOutput) {
+      continue;
+    }
+
+    currentOutputs.set(section.id, fallbackOutput);
   }
 
   return orderedOutputs(plan, currentOutputs);
+}
+
+function refreshSectionReports(args: {
+  readonly section: PlannedSection;
+  readonly currentOutputs: ReadonlyMap<string, SectionOutput>;
+  readonly plan: GenerationPlan;
+  readonly source: NormalizedSource;
+  readonly outline: SourceOutline;
+  readonly groundingEnabled: boolean;
+  readonly leakageEnabled: boolean;
+}): {
+  readonly coverage: SectionCoverageResult;
+  readonly grounding: SectionGroundingResult | undefined;
+  readonly leakage: SectionLeakageResult | undefined;
+} {
+  const outputs = orderedOutputs(args.plan, args.currentOutputs);
+  const refreshedCoverage = verifyCoverage({
+    outputs,
+    plan: args.plan,
+    source: args.source,
+    outline: args.outline,
+  });
+  const refreshedGrounding = args.groundingEnabled
+    ? validateGrounding({
+        outputs,
+        plan: args.plan,
+        source: args.source,
+        outline: args.outline,
+      })
+    : undefined;
+  const refreshedLeakage = args.leakageEnabled
+    ? validateLeakage({
+        outputs,
+        plan: args.plan,
+        source: args.source,
+      })
+    : undefined;
+  const coverage = refreshedCoverage.sections.find(
+    (candidate) => candidate.plannedSectionId === args.section.id,
+  );
+  if (!coverage) {
+    throw new Error(
+      `Stage 5 coverage is missing planned section "${args.section.id}".`,
+    );
+  }
+
+  return {
+    coverage,
+    grounding: refreshedGrounding?.sections.find(
+      (candidate) => candidate.plannedSectionId === args.section.id,
+    ),
+    leakage: refreshedLeakage?.sections.find(
+      (candidate) => candidate.plannedSectionId === args.section.id,
+    ),
+  };
+}
+
+function createExtractiveProseFallbackOutput(args: {
+  readonly section: PlannedSection;
+  readonly source: NormalizedSource;
+  readonly output: SectionOutput | undefined;
+}): SectionOutput | undefined {
+  if (!args.output) {
+    return undefined;
+  }
+
+  const sourceBlocks = collectSectionSourceBlocks(args.section, args.source);
+  const sourceText = sourceBlocks
+    .map((block) => block.text)
+    .join("\n")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    sourceText.length === 0 ||
+    sourceText.length > EXTRACTIVE_PROSE_MAX_CHARS
+  ) {
+    return undefined;
+  }
+
+  const contentBlocks = sourceBlocks
+    .map((block) => normalizeBlockText(block.text))
+    .filter((text) => isExtractiveProseContentBlock(text));
+  if (
+    contentBlocks.length < EXTRACTIVE_PROSE_MIN_CONTENT_BLOCKS ||
+    contentBlocks.length > EXTRACTIVE_PROSE_MAX_CONTENT_BLOCKS
+  ) {
+    return undefined;
+  }
+
+  const explanation = contentBlocks.at(-1);
+  if (!explanation) {
+    return undefined;
+  }
+
+  const keyPoints = contentBlocks.slice(0, -1);
+  return {
+    ...args.output,
+    title: args.section.title,
+    sourceCore: {
+      explanation,
+      keyPoints: keyPoints.length > 0 ? keyPoints : [explanation],
+    },
+    enrichment: null,
+  } as SectionOutput;
+}
+
+function normalizeBlockText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function isExtractiveProseContentBlock(value: string): boolean {
+  if (
+    value.length === 0 ||
+    value.length > EXTRACTIVE_PROSE_MAX_BLOCK_CHARS
+  ) {
+    return false;
+  }
+
+  return /[.!?]$/.test(value) && countTerms(value) >= 6;
+}
+
+function countTerms(value: string): number {
+  return [...value.matchAll(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g)].length;
 }
 
 function validateArgs(args: RetryFailedSectionsArgs): void {
