@@ -25,10 +25,11 @@ paths.
   the mobile app, not a replacement for the mobile-primary product.
 - User-facing source intake in the mobile app now supports manual paste,
   gallery-selected PNG/JPEG OCR, and camera-captured PNG/JPEG OCR with editable
-  extracted-text review. Physical-device live OCR validation is blocked until
-  the API process has a valid server-only Google OCR credential. Scanned-PDF
-  OCR, reviewer persistence, Study Library, Canvas integration, task
-  generation, and study schedule generation are pending.
+  extracted-text review. Physical-device live OCR validation passed on an
+  iPhone through Expo Go against the local Next.js API over LAN with
+  server-only Google Cloud Vision OCR. Scanned-PDF OCR, reviewer persistence,
+  Study Library, Canvas integration, task generation, and study schedule
+  generation are pending.
 
 ## Current Test Baselines
 
@@ -43,6 +44,9 @@ paths.
 - Mobile typecheck: passed.
 - Mobile OCR client/source-flow tests: 37 passed, 0 failed.
 - OCR web smoke: passed with mocked OCR response and real reviewer generation.
+- Phase 3C live iPhone camera/image OCR validation: passed with editable OCR
+  text, reviewer generation, Reviewer Ready, source-faithful, coverage, and
+  clean-output validation.
 - Latest recorded unattended reviewer smoke during Phase 3A verification:
   passed on local HEAD `00d3e8f` before the Phase 3A commit, using a persisted
   session and returning HTTP 200 from the reviewer POST.
@@ -51,8 +55,7 @@ paths.
 
 ## Immediate Next Task
 
-Phase 3C: provision valid server-only Google OCR credentials for the API, then
-validate gallery/camera OCR on a physical iPhone with live Google Cloud OCR.
+Phase 3D: scanned PDF ingestion.
 
 ## Known Blockers And Risks
 
@@ -63,14 +66,16 @@ validate gallery/camera OCR on a physical iPhone with live Google Cloud OCR.
   generation.
 - OCR layout preservation is a product risk because reviewer quality depends on
   line, heading, and list boundaries.
-- Live Google OCR remains credential-dependent; normal tests use fake clients,
-  and the OCR web smoke mocks only the OCR API response. The latest audit found
-  no valid service-account or authorized-user ADC JSON file in the standard
-  private locations checked on this machine.
-- Scanned-PDF OCR should wait until image OCR is stable.
+- Live Google OCR has passed on a correctly configured local API, but future
+  live OCR remains credential-, LAN-, and device-dependent. Credential paths
+  are machine-specific and must not be documented or committed.
+- Scanned-PDF OCR is the next ingestion risk because it adds multi-page input,
+  file parsing, and layout-preservation concerns beyond single-image OCR.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
   committed files.
+- Captured images, screenshots, credential files, OCR artifacts, tokens, and
+  private document OCR output must stay out of committed files.
 
 ## Historical Snapshot Before 2026-07-04
 
@@ -309,6 +314,28 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-04 Phase 3C live iPhone OCR validation
+
+- Confirmed Phase 3C live physical-device validation passed using iPhone Expo
+  Go against the local Next.js API over LAN.
+- Confirmed camera/image intake reached the server-side OCR path and Google
+  Cloud Vision extracted fictional study-habits text.
+- Confirmed extracted OCR text remained editable and the edited text was used
+  as the reviewer source.
+- Confirmed Reviewer Ready appeared after reviewer generation.
+- Confirmed source-faithful, coverage, and clean-output validation passed.
+- Confirmed the generated reviewer contained at least one section and key
+  point.
+- The earlier live OCR failure was caused by a machine-specific
+  `GOOGLE_APPLICATION_CREDENTIALS` path from another computer; after local
+  credential configuration was corrected and the API restarted, live OCR
+  succeeded. No credential path, filename, project ID, key, token, screenshot,
+  photo, environment value, or captured image is recorded here.
+- Google credentials remain server-only. No captured images, screenshots, OCR
+  test artifacts, credential files, or private OCR output are committed.
+- Verdict: COMPLETE - Phase 3C live camera/image OCR validation passed.
+- Next task: Phase 3D - scanned PDF ingestion.
 
 ### 2026-07-04 Phase 3C live iPhone OCR credential audit
 

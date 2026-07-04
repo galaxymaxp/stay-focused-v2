@@ -4,8 +4,8 @@ Last refreshed: 2026-07-04, Asia/Manila.
 
 ## Active Objective
 
-Add camera capture and physical-device OCR validation after the gallery OCR
-review path has landed.
+Prepare Phase 3D scanned PDF ingestion after completing Phase 3C live
+camera/image OCR validation.
 
 ## Completed Phase 3A Scope
 
@@ -27,16 +27,17 @@ review path has landed.
 - Keep the existing manual paste path available.
 - Keep OCR output editable before it enters the reviewer engine.
 
-## Active Phase 3C Scope
+## Completed Phase 3C Scope
 
-- Add camera capture without changing the OCR server contract. Completed in the
-  mobile client.
-- Validate gallery and camera OCR on a physical device with live Google Cloud
-  OCR credentials. Blocked until the API process has a valid server-only Google
-  OCR credential.
+- Add camera capture without changing the OCR server contract.
+- Validate camera/image OCR on a physical iPhone through Expo Go with live
+  Google Cloud Vision OCR from the local API.
 - Keep manual paste and editable OCR review intact.
+- Confirm edited OCR text is used as the reviewer source.
+- Confirm Reviewer Ready appears after generation.
+- Confirm source-faithful, coverage, and clean-output validation pass.
 
-## Out Of Scope
+## Out Of Scope For Phase 3C
 
 - Scanned PDFs.
 - Canvas integration.
@@ -75,15 +76,31 @@ review path has landed.
   response and real reviewer generation; live Google OCR remains unverified in
   this smoke.
 
-## Proposed Phase 3C Sequence
+## Phase 3C Results
+
+- Real iPhone Expo Go camera/image OCR validation passed against the local
+  Next.js API over LAN.
+- Google Cloud Vision successfully extracted fictional study-habits text from
+  the server-side OCR path.
+- Extracted text remained editable before reviewer generation.
+- Edited OCR text was sent through the existing reviewer route.
+- Reviewer Ready appeared.
+- Source-faithful, coverage, and clean-output validation passed.
+- The generated reviewer contained at least one section and key point.
+- The corrected Google credential setup stayed server-only.
+- Credential paths are machine-specific and are not documented.
+- No captured images, screenshots, OCR test artifacts, credential files, or
+  private OCR output are committed.
+
+## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
 2. Reuse the existing OCR upload and editable review path. Done.
-3. Provision valid API-only Google OCR credentials. Blocked locally: no valid
-   credential file was found in the standard private locations checked.
-4. Validate camera and gallery OCR on Expo Go with live Google credentials.
+3. Correct server-only Google OCR credential configuration for the local API.
+   Done; no paths or values recorded.
+4. Validate camera/image OCR on Expo Go with live Google credentials. Done.
 5. Keep the deterministic mocked Expo Web OCR smoke for regression coverage.
-6. Defer scanned PDFs to Phase 3D.
+6. Move scanned PDFs to Phase 3D.
 
 ## Exit Criteria
 
@@ -92,4 +109,11 @@ review path has landed.
 - Gallery and camera OCR route errors are shown safely in the mobile UI.
 - No Google credentials or uploaded image bytes are exposed to mobile code,
   browser code, logs, or committed files.
-- Scanned PDFs remain out of scope.
+- Live iPhone OCR produces editable source text that can generate a reviewer.
+- Reviewer Ready, source-faithful, coverage, and clean-output all pass on the
+  live OCR flow.
+- Scanned PDFs remain out of Phase 3C scope.
+
+## Next Objective
+
+Phase 3D - scanned PDF ingestion.

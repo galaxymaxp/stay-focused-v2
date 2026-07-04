@@ -45,7 +45,8 @@ Phase 3B adds the mobile client gallery call path, and Phase 3C extends the
 same path to camera capture: selected or captured PNG/JPEG images can be
 previewed, uploaded to `POST /api/ocr/extract`, and converted into editable
 source text. The reviewer engine receives only the final edited text through
-the existing reviewer route.
+the existing reviewer route. Live iPhone Expo Go validation has passed against
+the local Next.js API over LAN with server-only Google Cloud Vision OCR.
 
 ## Completed Capabilities
 
@@ -87,10 +88,12 @@ Verified in this documentation refresh:
 - Mobile OCR client and source-flow tests: 37 passed, 0 failed
 - Deterministic OCR web smoke: passed with mocked OCR response and real
   reviewer generation
-- Phase 3C live OCR/physical-device attempt: blocked by missing local Google
-  credentials. A follow-up audit found no valid service-account or
-  authorized-user ADC JSON file in the standard private locations checked; see
-  `docs/ai/phase3c-camera-ocr-validation-20260704.md`
+- Phase 3C live iPhone camera/image OCR validation: passed with local Expo Go
+  -> Next.js API over LAN -> server-only Google Cloud Vision -> editable OCR
+  text review -> reviewer generation. Reviewer Ready appeared, source-faithful,
+  coverage, and clean-output validation passed, and the generated reviewer
+  contained at least one section and key point. See
+  `docs/ai/phase3c-camera-ocr-validation-20260704.md`.
 
 Latest recorded unattended smoke during Phase 3A verification:
 
@@ -119,8 +122,8 @@ route. It does not validate live Google OCR.
 
 - Gallery import and camera capture support PNG/JPEG images and editable
   extracted-text review.
-- Physical-device live OCR validation is blocked until the API process has a
-  valid server-only Google OCR credential.
+- Google OCR credential paths are machine-specific local configuration and
+  must remain server-only.
 - Scanned-PDF OCR is not implemented.
 - Reviewer persistence and the Study Library are not implemented.
 - Canvas LMS integration is not implemented beyond the package boundary.
@@ -131,8 +134,7 @@ route. It does not validate live Google OCR.
 
 ## Immediate Next Task
 
-Phase 3C: provision valid server-only Google OCR credentials for the API, then
-validate gallery/camera OCR on a physical iPhone with live Google OCR.
+Phase 3D: scanned PDF ingestion.
 
 ## Known Risks
 
@@ -143,15 +145,18 @@ validate gallery/camera OCR on a physical iPhone with live Google OCR.
   generation.
 - OCR layout preservation is critical because reviewer quality depends on line,
   heading, and list boundaries.
-- The server OCR contract is proven with fake clients and the Expo Web OCR flow
-  is proven with a mocked OCR response; live Google OCR remains credential-,
-  network-, and device-dependent.
-- Scanned-PDF support is more complex than single-image OCR and should wait
-  until image OCR is stable.
+- The server OCR contract is proven with fake clients, the Expo Web OCR flow is
+  proven with a mocked OCR response, and live iPhone Google OCR has passed on a
+  correctly configured local API. Future live OCR remains dependent on
+  machine-specific server credential setup, LAN reachability, and device state.
+- Scanned-PDF support is more complex than single-image OCR and should build on
+  the completed image OCR path.
 - Mobile OAuth redirect completion still needs validation before it is claimed
   as complete.
 - Secrets must remain server-only; mobile env files may contain only public
   `EXPO_PUBLIC_` values.
+- Captured images, screenshots, credential files, OCR test artifacts, tokens,
+  and private document OCR output must stay out of committed files.
 
 ## Documentation Ownership
 

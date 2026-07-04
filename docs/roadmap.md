@@ -88,12 +88,15 @@ Completed in Phase 3C:
 - Captured-image preview and generated filename display.
 - Reuse of the authenticated `POST /api/ocr/extract` upload path.
 - Editable extracted-text review before reviewer generation.
+- Live physical-device validation on iPhone Expo Go with the local Next.js API
+  over LAN and server-only Google Cloud Vision OCR.
+- Verified that edited OCR text is used as the reviewer source.
+- Verified Reviewer Ready, source-faithful, coverage, and clean-output passed
+  for the live OCR-generated reviewer.
 
 Remaining Phase 3 deliverables:
 
-- Phase 3C: provision valid server-only Google OCR credentials, then complete
-  physical-device validation with live Google OCR.
-- Phase 3D: scanned-PDF support only after image OCR is stable.
+- Phase 3D: scanned-PDF ingestion.
 
 Exit criteria:
 
@@ -103,11 +106,12 @@ Exit criteria:
   behavior.
 - The reviewer input flow can use user-reviewed extracted text while manual
   paste remains available.
+- Live iPhone camera/image OCR validation passes without exposing Google
+  credentials to mobile code or committed files.
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: Phase 3C - fix local API Google OCR credential
-configuration, then complete physical-device gallery/camera OCR validation.
+Immediate next task: Phase 3D - scanned PDF ingestion.
 
 ## Phase 4 - Study Library And Persistence
 
