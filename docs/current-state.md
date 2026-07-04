@@ -5,9 +5,9 @@ Last refreshed: 2026-07-04, Asia/Manila.
 ## Repository Baseline
 
 - Branch: `main`
-- Local baseline commit: `ebb79d8 fix(mobile): make reviewer web smoke fully unattended`
+- Local baseline before Phase 3A: `00d3e8f docs: refresh project status and roadmap`
 - Upstream status at refresh: `main...origin/main`, with no reported ahead or behind count
-- Working tree before documentation edits: clean
+- Working tree before Phase 3A edits: clean
 
 ## Working Vertical Slice
 
@@ -29,6 +29,19 @@ creates the server-only OpenAI provider, runs the Stage 0 through Stage 6 engine
 pipeline, and returns a reviewer preview payload. Expo Web is the fast
 laptop-browser regression surface for this mobile flow.
 
+Phase 3A also adds a protected server OCR route:
+
+```text
+Bearer-authenticated multipart image upload
+-> MIME and size validation
+-> provider-agnostic OCR interface
+-> server-only Google Cloud Vision adapter
+-> normalized pages, blocks, and lines
+-> safe JSON response
+```
+
+The mobile app does not call this route yet.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -45,23 +58,30 @@ laptop-browser regression surface for this mobile flow.
 - Supabase email/password sign-in and session restore.
 - Automated reviewer web smoke runner with persisted browser session, output
   assertions, safe service startup, and runner-owned cleanup.
+- Provider-agnostic OCR contracts and deterministic normalization in
+  `@stay-focused/ocr`.
+- API-only Google Cloud Vision OCR adapter with injected fake-client tests.
+- Protected `POST /api/ocr/extract` route for PNG/JPEG multipart image uploads.
 
 ## Current Verification Baselines
 
 Verified in this documentation refresh:
 
+- OCR package normalization tests: 10 passed, 0 failed
+- Google OCR fake-client tests: 10 passed, 0 failed
+- OCR API route tests: 14 passed, 0 failed
 - Reviewer smoke-runner tests: 51 passed, 0 failed
-- Reviewer API route tests: 19 passed, 0 failed
+- API route and adapter tests: 43 passed, 0 failed
 - Engine build: passed
 - Engine evaluations: 266 passed, 0 failed
 - API typecheck: passed
 - Mobile typecheck: passed
 
-Latest recorded credential-backed smoke at baseline `ebb79d8`:
+Latest recorded unattended smoke during Phase 3A verification:
 
 - `npm run smoke:reviewer:web`: passed
-- Immediate repeat smoke: passed
-- Session-only smoke: passed
+- Local HEAD before Phase 3A commit: `00d3e8f`
+- Authentication: persisted session
 - Reviewer POST: HTTP 200
 - Source-faithful, coverage, and clean-output statuses: passed
 
@@ -77,8 +97,9 @@ reviewer output and validation statuses, and cleans up runner-owned services.
 
 ## Current Limitations
 
-- User-facing source input is still primarily pasted text.
-- Real image OCR is not implemented.
+- User-facing source input is still primarily pasted text in the mobile app.
+- Server image OCR exists, but mobile gallery/camera selection and editable
+  extracted-text review are not implemented.
 - Scanned-PDF OCR is not implemented.
 - Reviewer persistence and the Study Library are not implemented.
 - Canvas LMS integration is not implemented beyond the package boundary.
@@ -89,9 +110,8 @@ reviewer output and validation statuses, and cleans up runner-owned services.
 
 ## Immediate Next Task
 
-Phase 3A: audit the existing source contracts and implement a provider-agnostic
-Google Cloud OCR API boundary with fake-client tests. Prove the server OCR
-contract before building mobile camera or gallery UI.
+Phase 3B: add editable OCR text review plus gallery image selection while
+keeping manual paste available.
 
 ## Known Risks
 
@@ -102,6 +122,8 @@ contract before building mobile camera or gallery UI.
   generation.
 - OCR layout preservation is critical because reviewer quality depends on line,
   heading, and list boundaries.
+- The server OCR contract is proven with fake clients; live Google OCR remains
+  opt-in and credential-dependent.
 - Scanned-PDF support is more complex than single-image OCR and should wait
   until image OCR is stable.
 - Mobile OAuth redirect completion still needs validation before it is claimed

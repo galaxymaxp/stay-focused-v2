@@ -16,29 +16,37 @@ paths.
 - The current completed vertical slice is: sign in -> paste source text ->
   authenticated reviewer API -> OpenAI generation -> coverage, grounding, and
   leakage validation -> reviewer preview.
+- Phase 3A is implemented: provider-agnostic OCR contracts live in
+  `@stay-focused/ocr`, Google Cloud Vision OCR wiring lives only under
+  `apps/api/src/lib/ocr`, and `POST /api/ocr/extract` exposes a protected
+  multipart PNG/JPEG OCR route.
 - Expo Web is the fast laptop-browser development and regression surface for
   the mobile app, not a replacement for the mobile-primary product.
-- User-facing source intake is still primarily pasted text. Real image OCR,
-  scanned-PDF OCR, reviewer persistence, Study Library, Canvas integration,
-  task generation, and study schedule generation are pending.
+- User-facing source intake in the mobile app is still primarily pasted text.
+  Mobile gallery/camera selection, editable OCR review, scanned-PDF OCR,
+  reviewer persistence, Study Library, Canvas integration, task generation, and
+  study schedule generation are pending.
 
 ## Current Test Baselines
 
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
-- Reviewer API route tests: 19 passed, 0 failed.
+- OCR package normalization tests: 10 passed, 0 failed.
+- Google OCR fake-client tests: 10 passed, 0 failed.
+- OCR API route tests: 14 passed, 0 failed.
+- API route and adapter tests: 43 passed, 0 failed.
 - Engine build: passed.
 - Engine evaluations: 266 passed, 0 failed.
 - API typecheck: passed.
 - Mobile typecheck: passed.
-- Latest recorded credential-backed reviewer smoke at baseline `ebb79d8`:
-  passed, including immediate repeat and session-only smoke.
+- Latest recorded unattended reviewer smoke during Phase 3A verification:
+  passed on local HEAD `00d3e8f` before the Phase 3A commit, using a persisted
+  session and returning HTTP 200 from the reviewer POST.
 - Current unattended smoke command: `npm run smoke:reviewer:web`.
 
 ## Immediate Next Task
 
-Phase 3A: audit the existing source contracts and implement a
-provider-agnostic Google Cloud OCR API boundary with fake-client tests. Prove
-the protected server OCR contract before building camera or gallery UI.
+Phase 3B: add editable OCR text review plus gallery image selection while
+keeping manual paste available.
 
 ## Known Blockers And Risks
 
@@ -49,6 +57,8 @@ the protected server OCR contract before building camera or gallery UI.
   generation.
 - OCR layout preservation is a product risk because reviewer quality depends on
   line, heading, and list boundaries.
+- Live Google OCR remains optional and credential-dependent; normal tests use
+  fake clients only.
 - Scanned-PDF OCR should wait until image OCR is stable.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
@@ -291,6 +301,27 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-04 Phase 3A OCR server boundary
+
+- Added `packages/ocr` with provider-agnostic OCR input/result types,
+  `OcrProvider`, `OcrProviderError`, and deterministic normalization.
+- Added an API-only Google Cloud Vision adapter with an injected fake-client
+  boundary and no Google client construction during module import.
+- Added a server OCR provider factory that reads Google Cloud configuration at
+  runtime, normalizes escaped private-key newlines, supports Application
+  Default Credentials, and keeps credential values out of responses.
+- Added protected `POST /api/ocr/extract` with bearer auth, multipart parsing,
+  PNG/JPEG MIME validation, a 5 MiB image limit, empty-file rejection, typed
+  success responses, and safe error codes.
+- Added docs for the OCR architecture, route, env names, supported image types,
+  size limit, fake-test strategy, and Phase 3B handoff.
+- Verification added in this phase: OCR package tests 10/10, Google OCR
+  fake-client tests 10/10, OCR API route tests 14/14, API test suite 43/43,
+  root typecheck PASS, root build PASS, API typecheck PASS, mobile typecheck
+  PASS, engine build PASS, engine eval 266/266, and reviewer web smoke PASS.
+- Manual paste remains supported. Mobile gallery selection, editable OCR text
+  review, and scanned-PDF OCR remain pending.
 
 ### 2026-07-04 Documentation status and roadmap refresh
 

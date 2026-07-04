@@ -57,12 +57,12 @@ Immediate dependency: Phase 1 complete.
 
 ## Phase 3 - OCR And Source Ingestion
 
-Status: Next
+Status: In progress
 
 Purpose: Replace paste-only source intake with a server-side OCR contract that
 preserves layout enough for the reviewer engine to stay source-faithful.
 
-Major deliverables:
+Completed in Phase 3A:
 
 - Audit existing source and OCR-related contracts.
 - Provider-agnostic OCR boundary.
@@ -71,6 +71,9 @@ Major deliverables:
 - Protected image OCR API route.
 - MIME type and size validation.
 - Preserved line, list, and layout boundaries.
+
+Remaining Phase 3 deliverables:
+
 - Editable extracted-text preview.
 - Gallery and camera image selection after the server contract is proven.
 - Manual paste fallback.
@@ -87,8 +90,8 @@ Exit criteria:
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: Phase 3A - provider-agnostic OCR boundary and protected API
-contract with fake-client tests.
+Immediate next task: Phase 3B - editable OCR text review plus gallery image
+selection, while keeping manual paste available.
 
 ## Phase 4 - Study Library And Persistence
 

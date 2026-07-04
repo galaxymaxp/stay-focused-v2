@@ -4,9 +4,10 @@ Last refreshed: 2026-07-04, Asia/Manila.
 
 ## Active Objective
 
-Prove the OCR server boundary before building mobile capture UI.
+Add editable OCR text review plus gallery image selection while keeping manual
+paste available.
 
-## Sprint Scope
+## Completed Phase 3A Scope
 
 - Audit current source and OCR-related files.
 - Define typed OCR contracts outside the reviewer engine.
@@ -18,43 +19,53 @@ Prove the OCR server boundary before building mobile capture UI.
 - Document environment-variable names without values.
 - Keep manual paste as a fallback.
 
+## Active Phase 3B Scope
+
+- Add a mobile gallery image-selection path.
+- Submit selected PNG/JPEG images to `POST /api/ocr/extract`.
+- Show extracted text in an editable review step before reviewer generation.
+- Keep the existing manual paste path available.
+- Keep OCR output editable before it enters the reviewer engine.
+
 ## Out Of Scope
 
 - Scanned PDFs.
 - Canvas integration.
 - Reviewer persistence or Study Library work.
 - Camera redesign.
-- Gallery picker UI.
 - Engine prompt changes.
 - Generation-schema changes.
 - Task generation.
 - Study schedule generation.
 
-## Proposed Phase 3A Sequence
+## Phase 3A Results
 
-1. Read `docs/architecture/engine-contract.md`, `apps/api/app/api/reviewer/generate/route.ts`,
-   and source-normalization types in `packages/engine`.
-2. Inventory any OCR-looking fixtures or helper code without treating them as
-   implemented OCR ingestion.
-3. Define a typed OCR request/result contract that preserves text, line order,
-   page or image metadata, and safe diagnostics.
-4. Add an OCR provider interface and a fake-client test harness before adding a
-   real Google Cloud adapter.
-5. Implement server-only Google Cloud OCR adapter wiring behind that interface.
-6. Add a protected API route that validates auth, MIME type, and size before
-   invoking OCR.
-7. Add tests for auth rejection, missing file, unsupported MIME type, oversized
-   payload, provider failure, and successful layout-preserving extraction.
-8. Document required environment-variable names, including
-   `GOOGLE_CLOUD_PROJECT_ID` and `GOOGLE_CLOUD_CREDENTIALS_JSON`.
+- `@stay-focused/ocr` owns provider-agnostic contracts and deterministic
+  normalization.
+- `apps/api/src/lib/ocr` owns Google Cloud Vision adapter and server factory
+  code.
+- `POST /api/ocr/extract` accepts bearer-authenticated multipart PNG/JPEG
+  uploads using file field `image`.
+- Image size is capped at 5 MiB.
+- Server-only Google env names are documented without values.
+- Normal tests use fake clients only and do not require live Google
+  credentials.
+
+## Proposed Phase 3B Sequence
+
+1. Add image selection behind the existing reviewer input screen without
+   removing manual paste.
+2. Post selected images to the protected OCR route with the existing Supabase
+   bearer token.
+3. Render returned OCR text in an editable review step.
+4. Send the edited text through the existing reviewer generation route.
+5. Add mobile and API smoke coverage around the new client flow.
 
 ## Exit Criteria
 
-- Fake-client OCR tests pass without network access or credentials.
-- The protected OCR API route returns typed extracted text for valid image
-  input and safe errors for invalid input.
-- OCR output preserves line breaks needed by the Stage 0 through Stage 6
-  reviewer pipeline.
-- No server secret is exposed to mobile code, browser code, logs, or committed
-  files.
-- Camera and gallery UI remain for the next sprint.
+- Manual paste still works.
+- Selected image OCR text is editable before reviewer generation.
+- OCR route errors are shown safely in the mobile UI.
+- No Google credentials or uploaded image bytes are exposed to mobile code,
+  browser code, logs, or committed files.
+- Scanned PDFs remain out of scope.

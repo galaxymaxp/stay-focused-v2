@@ -14,6 +14,8 @@ mobile app. It is not a replacement for the mobile-primary product.
 - `apps/mobile`: Expo and Expo Router mobile app
 - `apps/api`: Next.js 15 App Router API
 - `packages/engine`: Provider-agnostic reviewer generation pipeline
+- `packages/ocr`: Provider-agnostic OCR contracts and deterministic
+  normalization
 - `packages/db`: Supabase client and database types
 - `packages/canvas`: Canvas LMS client and types
 - `packages/shared`: Shared types, constants, and utilities
@@ -48,22 +50,27 @@ Complete:
 - Local Expo Web CORS support for the reviewer route
 - Unattended authenticated Expo Web reviewer smoke runner
 - Persistent smoke-browser session and automatic output assertions
+- Provider-agnostic OCR contracts and normalization in `@stay-focused/ocr`
+- Server-only Google Cloud Vision OCR adapter with fake-client tests
+- Protected `POST /api/ocr/extract` image OCR route
 
 Working locally:
 
 - OpenAI-backed reviewer generation through the authenticated API route
+- Authenticated image OCR extraction through the API route contract
 - `npm run smoke:reviewer:web` for laptop-browser regression coverage
 - API route tests, smoke-runner tests, engine evals, API typecheck, mobile
   typecheck, and engine build
 
 Next:
 
-- Phase 3A: provider-agnostic OCR boundary and protected API contract with
-  fake-client tests
+- Phase 3B: editable OCR text review plus gallery image selection, with manual
+  paste still available
 
 Pending:
 
-- Real image OCR and scanned-PDF OCR
+- Mobile camera/gallery selection and editable extracted-text review
+- Scanned-PDF OCR
 - Reviewer persistence and the Study Library saved-content area
 - Canvas LMS integration
 - Task generation and study scheduling
@@ -82,12 +89,15 @@ harness currently reports **266 passed and 0 failed**.
 Default visible reviewer content is source-faithful: validation checks visible
 titles, explanations, and key points, while unsupported enrichment is excluded
 from default assembly. Short OCR-style prose has an extractive fallback, but
-real image and scanned-document OCR ingestion is not implemented yet.
+mobile image selection and scanned-document OCR ingestion are not implemented
+yet.
 
 See [ADR-004](docs/architecture/ADR-004-engine-pipeline.md), the
 [engine contract](docs/architecture/engine-contract.md), and
 [ADR-005](docs/architecture/ADR-005-openai-provider-adapter.md) for the core
-boundaries.
+generation boundaries. See
+[OCR API Boundary](docs/architecture/ocr-api-boundary.md) for the Phase 3A OCR
+server contract.
 
 ## Local Environment Setup
 
@@ -102,6 +112,9 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 Root and API env files may hold server credentials. Mobile must contain only
 public `EXPO_PUBLIC_` values. `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, and
 Google Cloud credentials must never be placed in mobile env files or committed.
+The OCR server factory supports `GOOGLE_CLOUD_PROJECT_ID`,
+`GOOGLE_CLOUD_CREDENTIALS_JSON`, and Application Default Credentials through
+`GOOGLE_APPLICATION_CREDENTIALS` or `GOOGLE_CLOUD_PROJECT`.
 
 Node.js 20 or newer and npm 10 or newer are required.
 
@@ -126,6 +139,7 @@ Useful non-live checks:
 
 ```sh
 npm run test:reviewer-web-smoke
+npm run test --workspace @stay-focused/ocr
 npm run test --workspace apps/api
 npm run typecheck --workspace apps/api
 npm run typecheck --workspace apps/mobile
@@ -147,7 +161,8 @@ tests do not run that opt-in provider smoke.
 ## Current Limitations
 
 - User-facing source input is still primarily pasted text.
-- Real image OCR is not implemented.
+- The server image OCR route exists, but the mobile camera/gallery and editable
+  extracted-text flow is not implemented.
 - Scanned-PDF OCR is not implemented.
 - Reviewers are not persisted; Study Library is pending.
 - Canvas integration is not implemented beyond a thin package boundary.
@@ -158,6 +173,5 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 3A is the immediate engineering milestone: audit source/OCR contracts and
-implement a provider-agnostic Google Cloud OCR API boundary with fake-client
-tests before building camera or gallery UI.
+Phase 3B is the immediate engineering milestone: add editable OCR text review
+plus gallery image selection while keeping manual paste available.
