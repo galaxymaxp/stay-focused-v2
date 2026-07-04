@@ -1,8 +1,9 @@
 # Mobile Device Validation Runbook
 
-This runbook validates the authenticated reviewer development flow with Expo Go
-on a physical iPhone. It documents local setup only; it does not deploy, run live
-OpenAI smoke tests, add OCR, or apply production migrations.
+This runbook validates the authenticated reviewer and gallery OCR development
+flow with Expo Go on a physical iPhone. It documents local setup only; it does
+not deploy, run live OpenAI smoke tests outside reviewer generation, add camera
+capture, add scanned-PDF OCR, or apply production migrations.
 
 ## Prerequisites
 
@@ -38,6 +39,17 @@ SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 OPENAI_API_KEY
 ```
+
+Required for live gallery OCR validation:
+
+```text
+GOOGLE_CLOUD_PROJECT_ID
+GOOGLE_CLOUD_CREDENTIALS_JSON
+```
+
+Application Default Credentials through `GOOGLE_APPLICATION_CREDENTIALS` and
+`GOOGLE_CLOUD_PROJECT` can also be used by the API. Keep all Google values in
+API/root local env files only. Never place them in `apps/mobile/.env.local`.
 
 Mobile env, normally in `apps/mobile/.env.local`:
 
@@ -130,6 +142,31 @@ with the iPhone camera or from Expo Go.
 11. Confirm a reviewer preview appears.
 12. Confirm errors are understandable when config, network, or auth is wrong.
 
+## Manual Gallery OCR Checklist
+
+Use only fictional or disposable test images. Do not use private notes,
+personal photos, credentials, IDs, or school documents.
+
+1. Start the API with Google OCR credentials available in the API environment.
+2. Start Expo Go with `EXPO_PUBLIC_API_BASE_URL` pointing to the laptop LAN API.
+3. Sign in with a Supabase test account.
+4. Open the reviewer generator screen.
+5. Tap `Import image`.
+6. Tap `Choose image` and allow photo-library access if prompted.
+7. Select a PNG or JPEG image containing fictional study text.
+8. Confirm the local preview and filename appear.
+9. Tap `Extract text`.
+10. Confirm the API receives `POST /api/ocr/extract`.
+11. Confirm extracted text appears in the editable source field with line breaks.
+12. Correct at least one OCR text detail.
+13. Tap `Generate reviewer`.
+14. Confirm the API receives `POST /api/reviewer/generate`.
+15. Confirm Reviewer Ready appears with passed validation statuses.
+16. Tap `Paste text` and confirm manual paste remains usable.
+17. Confirm the selected image is not saved to storage or a database.
+
+Camera capture is still pending Phase 3C. Scanned PDFs remain pending Phase 3D.
+
 ## Common Errors and Fixes
 
 ### Phone Cannot Reach API
@@ -194,11 +231,25 @@ Fixes:
 - Restart the API dev server.
 - Do not add `OPENAI_API_KEY` to the mobile env.
 
+### Missing Google OCR Credentials
+
+Symptoms:
+
+- OCR extraction shows that OCR is not configured.
+- API responds with `ocr_not_configured`.
+
+Fixes:
+
+- Set `GOOGLE_CLOUD_PROJECT_ID` and `GOOGLE_CLOUD_CREDENTIALS_JSON` in the API
+  env, or configure Application Default Credentials for the API process.
+- Restart the API dev server.
+- Do not add Google credentials to any `EXPO_PUBLIC_` mobile variable.
+
 ### API CORS or Network Issue
 
 Expo Go uses React Native networking rather than browser CORS enforcement, so
-most physical-device failures here are local network reachability issues. If a
-browser-based client is added later, verify CORS separately.
+most physical-device failures here are local network reachability issues. Expo
+Web CORS is covered by `npm run smoke:reviewer:web` and `npm run smoke:ocr:web`.
 
 For this flow:
 
@@ -213,6 +264,7 @@ Run these commands from the repository root before manual device validation:
 
 ```powershell
 npm run typecheck --workspace apps/mobile
+npm run test --workspace apps/mobile
 npm run test --workspace apps/api
 npm run typecheck --workspace apps/api
 npm run typecheck --workspace @stay-focused/engine
@@ -220,6 +272,8 @@ npm run build --workspace @stay-focused/engine
 npm run eval --workspace @stay-focused/engine
 ```
 
-The API route tests cover `/api/reviewer/generate` contract behavior without
-starting a long-running server. Do not run `smoke:openai` unless explicitly doing
-live provider validation.
+The API route tests cover `/api/reviewer/generate` and `/api/ocr/extract`
+contract behavior without starting a long-running server. `npm run
+smoke:ocr:web` verifies the Expo Web OCR client path with a mocked OCR response;
+it does not validate live Google OCR. Do not run `smoke:openai` unless
+explicitly doing live provider validation.

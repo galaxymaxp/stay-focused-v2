@@ -13,11 +13,10 @@ import { chromium } from "playwright";
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "..");
 const API_WORKSPACE_DIR = path.join(ROOT_DIR, "apps", "api");
-const API_DEV_SERVER_APP_DIR = path.join(
+const API_DEV_SERVER_OUTPUT_DIR = path.join(
   API_WORKSPACE_DIR,
   ".next",
   "server",
-  "app",
 );
 
 export const API_BASE_URL = "http://localhost:3000";
@@ -517,7 +516,6 @@ export function assertSafeApiDevOutputPath(
     "api",
     ".next",
     "server",
-    "app",
   );
 
   if (resolvedTargetDir !== expectedTargetDir) {
@@ -535,7 +533,7 @@ export async function removeApiDevServerAppOutput({
   rootDir = ROOT_DIR,
 } = {}) {
   const targetDir = assertSafeApiDevOutputPath(
-    path.join(rootDir, "apps", "api", ".next", "server", "app"),
+    path.join(rootDir, "apps", "api", ".next", "server"),
     rootDir,
   );
   const existed = await pathExists(targetDir);
@@ -853,7 +851,7 @@ async function main() {
   }
 }
 
-async function loadSmokeCredentialState({
+export async function loadSmokeCredentialState({
   env,
   envFilePath,
   sessionOnly = false,
@@ -896,7 +894,7 @@ async function pathExists(targetPath) {
   }
 }
 
-function assertCanAttemptAuthentication({
+export function assertCanAttemptAuthentication({
   credentialState,
   hasSessionCandidate,
   sessionOnly,
@@ -918,7 +916,7 @@ function assertCanAttemptAuthentication({
   }
 }
 
-async function ensureApiService() {
+export async function ensureApiService() {
   const health = await checkApiHealth();
   const portOpen = health.reachable || (await isTcpPortOpen(API_PORT));
   const decision = decideServiceStartup({ healthOk: health.ok, portOpen });
@@ -967,7 +965,7 @@ async function ensureApiService() {
   return { ownership: "started-by-runner", service };
 }
 
-async function ensureExpoWebService() {
+export async function ensureExpoWebService() {
   const expo = await checkExpoWebCompatibility(EXPO_WEB_URL);
   const portOpen = expo.reachable || (await isTcpPortOpen(EXPO_PORT));
   const decision = decideServiceStartup({
@@ -1025,7 +1023,7 @@ async function ensureExpoWebService() {
   return { ownership: "started-by-runner", service };
 }
 
-async function ensureReviewerCorsPreflight({
+export async function ensureReviewerCorsPreflight({
   apiOwnership,
   expoOrigin,
   expoOwnership,
@@ -1360,7 +1358,7 @@ export function tailSafeLog(value, maxLines = SERVICE_LOG_TAIL_LINES) {
   return lines.slice(-maxLines).join("\n").trim();
 }
 
-async function launchPersistentBrowser(options) {
+export async function launchPersistentBrowser(options) {
   await fs.mkdir(SESSION_DIR, { recursive: true });
 
   try {
@@ -1409,7 +1407,7 @@ async function runBrowserSmoke(context, { credentialState, sessionOnly }) {
   };
 }
 
-async function ensureAuthenticated(page, { credentialState, sessionOnly }) {
+export async function ensureAuthenticated(page, { credentialState, sessionOnly }) {
   const state = await waitForAuthState(page, PAGE_READY_TIMEOUT_MS);
 
   if (state === "authenticated") {
@@ -1918,7 +1916,7 @@ async function reviewerGenerationStarted(page, reviewerRequest, timeoutMs) {
   return false;
 }
 
-function createReviewerPostObserver(page) {
+export function createReviewerPostObserver(page) {
   const state = {
     failureCategory: undefined,
     hostname: undefined,
@@ -1985,7 +1983,7 @@ function createReviewerPostObserver(page) {
   };
 }
 
-async function waitForReviewerResult(page, reviewerRequest) {
+export async function waitForReviewerResult(page, reviewerRequest) {
   const deadline = Date.now() + REVIEWER_RESULT_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
@@ -2029,7 +2027,7 @@ async function waitForReviewerResult(page, reviewerRequest) {
   );
 }
 
-async function inspectReviewerOutput(page, reviewerPostStatus) {
+export async function inspectReviewerOutput(page, reviewerPostStatus) {
   await page
     .getByTestId(TEST_IDS.reviewerReady)
     .first()
@@ -2098,11 +2096,11 @@ async function getVisibleReviewerError(page) {
   return null;
 }
 
-async function getVisibleReviewerErrorText(page) {
+export async function getVisibleReviewerErrorText(page) {
   return (await getVisibleReviewerError(page))?.text ?? "";
 }
 
-async function verifyNoForbiddenResultErrors(page) {
+export async function verifyNoForbiddenResultErrors(page) {
   const visibleError = await getVisibleReviewerError(page);
   if (visibleError) {
     throw new SmokeFailure(
@@ -2209,7 +2207,7 @@ async function resetSessionDir() {
   await fs.rm(resolvedSessionDir, { force: true, recursive: true });
 }
 
-async function hasPersistedSessionCandidate() {
+export async function hasPersistedSessionCandidate() {
   try {
     const stat = await fs.stat(USER_DATA_DIR);
     return stat.isDirectory();
@@ -2218,7 +2216,7 @@ async function hasPersistedSessionCandidate() {
   }
 }
 
-async function cleanupStartedServices(startedServices, options) {
+export async function cleanupStartedServices(startedServices, options) {
   const result = { errors: [], kept: 0, stopped: 0, succeeded: true };
 
   for (const service of [...startedServices].reverse()) {
@@ -2439,7 +2437,7 @@ function pickSmokeCredentialVars(env) {
   };
 }
 
-function credentialSecrets(credentialState) {
+export function credentialSecrets(credentialState) {
   return [
     credentialState?.credentials?.email,
     credentialState?.credentials?.password,
@@ -2485,7 +2483,7 @@ async function visibleInnerTexts(locator) {
   return values;
 }
 
-function installTerminationHandlers(startedServices, getOptions) {
+export function installTerminationHandlers(startedServices, getOptions) {
   const handler = async () => {
     await cleanupStartedServices(startedServices, getOptions() ?? {});
     process.exit(130);
@@ -2500,7 +2498,7 @@ function installTerminationHandlers(startedServices, getOptions) {
   };
 }
 
-function toSmokeFailure(error, ownership) {
+export function toSmokeFailure(error, ownership) {
   if (error instanceof SmokeFailure) {
     error.apiOwnership ??= ownership.apiOwnership;
     error.expoOwnership ??= ownership.expoOwnership;

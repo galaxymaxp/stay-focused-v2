@@ -553,11 +553,11 @@ test("assertSafeSessionPath allows only the dedicated smoke profile", () => {
   });
 });
 
-test("assertSafeApiDevOutputPath allows only generated API app output", () => {
+test("assertSafeApiDevOutputPath allows only generated API server output", () => {
   const root = process.cwd();
   assert.equal(
-    assertSafeApiDevOutputPath("apps/api/.next/server/app", root),
-    path.join(root, "apps", "api", ".next", "server", "app"),
+    assertSafeApiDevOutputPath("apps/api/.next/server", root),
+    path.join(root, "apps", "api", ".next", "server"),
   );
   assert.throws(() => assertSafeApiDevOutputPath("apps/api/.next", root), {
     code: "UNSAFE_API_DEV_OUTPUT_PATH",
@@ -567,17 +567,18 @@ test("assertSafeApiDevOutputPath allows only generated API app output", () => {
   });
 });
 
-test("removeApiDevServerAppOutput removes only the generated app output directory", async () => {
+test("removeApiDevServerAppOutput removes only the generated server output directory", async () => {
   const root = await fs.mkdtemp(
     path.join(os.tmpdir(), "reviewer-web-smoke-"),
   );
-  const target = path.join(root, "apps", "api", ".next", "server", "app");
+  const target = path.join(root, "apps", "api", ".next", "server");
   const sibling = path.join(root, "apps", "api", ".next", "cache");
 
   try {
-    await fs.mkdir(target, { recursive: true });
+    await fs.mkdir(path.join(target, "app"), { recursive: true });
     await fs.mkdir(sibling, { recursive: true });
-    await fs.writeFile(path.join(target, "route.js"), "generated", "utf8");
+    await fs.writeFile(path.join(target, "app", "route.js"), "generated", "utf8");
+    await fs.writeFile(path.join(target, "edge-runtime-webpack.js"), "generated", "utf8");
     await fs.writeFile(path.join(sibling, "keep.txt"), "cache", "utf8");
 
     const result = await removeApiDevServerAppOutput({ rootDir: root });

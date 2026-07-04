@@ -72,12 +72,20 @@ Completed in Phase 3A:
 - MIME type and size validation.
 - Preserved line, list, and layout boundaries.
 
+Completed in Phase 3B:
+
+- Gallery image selection through Expo Image Picker.
+- Selected-image preview and filename display.
+- Authenticated upload to `POST /api/ocr/extract`.
+- Editable extracted-text review before reviewer generation.
+- Manual paste fallback as a separate source mode.
+- Deterministic Expo Web OCR smoke using a mocked OCR response and real
+  reviewer generation.
+
 Remaining Phase 3 deliverables:
 
-- Editable extracted-text preview.
-- Gallery and camera image selection after the server contract is proven.
-- Manual paste fallback.
-- Scanned-PDF support only after image OCR is stable.
+- Phase 3C: camera capture and physical-device validation with live Google OCR.
+- Phase 3D: scanned-PDF support only after image OCR is stable.
 
 Exit criteria:
 
@@ -85,13 +93,13 @@ Exit criteria:
   provider boundary, and returns typed extracted text without exposing secrets.
 - Fake-client tests prove success, error, size, MIME, and layout-preservation
   behavior.
-- The reviewer input flow can use extracted text while manual paste remains
-  available.
+- The reviewer input flow can use user-reviewed extracted text while manual
+  paste remains available.
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: Phase 3B - editable OCR text review plus gallery image
-selection, while keeping manual paste available.
+Immediate next task: Phase 3C - camera capture and physical-device OCR
+validation.
 
 ## Phase 4 - Study Library And Persistence
 

@@ -5,7 +5,7 @@ Last refreshed: 2026-07-04, Asia/Manila.
 ## Repository Baseline
 
 - Branch: `main`
-- Local baseline before Phase 3A: `00d3e8f docs: refresh project status and roadmap`
+- Local baseline before Phase 3B: `6e91231 feat(ocr): add provider-agnostic OCR API boundary`
 - Upstream status at refresh: `main...origin/main`, with no reported ahead or behind count
 - Working tree before Phase 3A edits: clean
 
@@ -15,7 +15,8 @@ The current product slice is:
 
 ```text
 Sign in
--> paste source text
+-> paste source text or import a gallery image
+-> review and edit source text
 -> authenticated reviewer API
 -> OpenAI generation
 -> coverage, grounding, and leakage validation
@@ -41,6 +42,10 @@ Bearer-authenticated multipart image upload
 ```
 
 The mobile app does not call this route yet.
+Phase 3B adds the mobile client call path: gallery-selected PNG/JPEG images can
+be previewed, uploaded to `POST /api/ocr/extract`, and converted into editable
+source text. The reviewer engine receives only the final edited text through the
+existing reviewer route.
 
 ## Completed Capabilities
 
@@ -62,6 +67,9 @@ The mobile app does not call this route yet.
   `@stay-focused/ocr`.
 - API-only Google Cloud Vision OCR adapter with injected fake-client tests.
 - Protected `POST /api/ocr/extract` route for PNG/JPEG multipart image uploads.
+- Expo gallery image selection with preview, explicit text extraction, editable
+  OCR text review, retry, and clear-image handling.
+- Manual pasted text remains available as a separate source mode.
 
 ## Current Verification Baselines
 
@@ -76,6 +84,9 @@ Verified in this documentation refresh:
 - Engine evaluations: 266 passed, 0 failed
 - API typecheck: passed
 - Mobile typecheck: passed
+- Mobile OCR client and source-flow tests: 32 passed, 0 failed
+- Deterministic OCR web smoke: passed with mocked OCR response and real
+  reviewer generation
 
 Latest recorded unattended smoke during Phase 3A verification:
 
@@ -89,17 +100,21 @@ Latest recorded unattended smoke during Phase 3A verification:
 
 ```sh
 npm run smoke:reviewer:web
+npm run smoke:ocr:web
 ```
 
 The smoke runner starts or reuses the API and Expo Web, authenticates or restores
 a persisted session, submits the fictional study-habits fixture, verifies
 reviewer output and validation statuses, and cleans up runner-owned services.
+The OCR web smoke uses the same auth/session infrastructure, injects a
+non-production fictional image fixture, mocks only the OCR response, verifies
+editable extracted text, and then generates a reviewer through the real reviewer
+route. It does not validate live Google OCR.
 
 ## Current Limitations
 
-- User-facing source input is still primarily pasted text in the mobile app.
-- Server image OCR exists, but mobile gallery/camera selection and editable
-  extracted-text review are not implemented.
+- Gallery import supports PNG/JPEG images and editable extracted-text review.
+- Camera capture and physical-device live OCR validation are not implemented.
 - Scanned-PDF OCR is not implemented.
 - Reviewer persistence and the Study Library are not implemented.
 - Canvas LMS integration is not implemented beyond the package boundary.
@@ -110,20 +125,21 @@ reviewer output and validation statuses, and cleans up runner-owned services.
 
 ## Immediate Next Task
 
-Phase 3B: add editable OCR text review plus gallery image selection while
-keeping manual paste available.
+Phase 3C: add camera capture and validate gallery/camera OCR on a physical
+device with live Google OCR credentials.
 
 ## Known Risks
 
 - OneDrive-backed generated Next output can create stale reparse-point artifacts;
-  the smoke runner currently clears only `apps/api/.next/server/app` before
+  the smoke runner clears the generated `apps/api/.next/server` directory before
   runner-owned API startup.
 - OpenAI cost, rate limits, and serverless latency can affect reviewer
   generation.
 - OCR layout preservation is critical because reviewer quality depends on line,
   heading, and list boundaries.
-- The server OCR contract is proven with fake clients; live Google OCR remains
-  opt-in and credential-dependent.
+- The server OCR contract is proven with fake clients and the Expo Web OCR flow
+  is proven with a mocked OCR response; live Google OCR remains credential- and
+  device-dependent.
 - Scanned-PDF support is more complex than single-image OCR and should wait
   until image OCR is stable.
 - Mobile OAuth redirect completion still needs validation before it is claimed

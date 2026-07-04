@@ -13,19 +13,21 @@ paths.
 - Branch: `main`.
 - Stay Focused V2 remains engine-first, evaluation-first, schedule-first, and
   mobile-primary through Expo/React Native.
-- The current completed vertical slice is: sign in -> paste source text ->
-  authenticated reviewer API -> OpenAI generation -> coverage, grounding, and
-  leakage validation -> reviewer preview.
+- The current completed vertical slice is: sign in -> paste source text or
+  import a gallery image -> review and edit source text -> authenticated
+  reviewer API -> OpenAI generation -> coverage, grounding, and leakage
+  validation -> reviewer preview.
 - Phase 3A is implemented: provider-agnostic OCR contracts live in
   `@stay-focused/ocr`, Google Cloud Vision OCR wiring lives only under
   `apps/api/src/lib/ocr`, and `POST /api/ocr/extract` exposes a protected
   multipart PNG/JPEG OCR route.
 - Expo Web is the fast laptop-browser development and regression surface for
   the mobile app, not a replacement for the mobile-primary product.
-- User-facing source intake in the mobile app is still primarily pasted text.
-  Mobile gallery/camera selection, editable OCR review, scanned-PDF OCR,
-  reviewer persistence, Study Library, Canvas integration, task generation, and
-  study schedule generation are pending.
+- User-facing source intake in the mobile app now supports manual paste and
+  gallery-selected PNG/JPEG OCR with editable extracted-text review. Camera
+  capture, physical-device live OCR validation, scanned-PDF OCR, reviewer
+  persistence, Study Library, Canvas integration, task generation, and study
+  schedule generation are pending.
 
 ## Current Test Baselines
 
@@ -38,27 +40,30 @@ paths.
 - Engine evaluations: 266 passed, 0 failed.
 - API typecheck: passed.
 - Mobile typecheck: passed.
+- Mobile OCR client/source-flow tests: 32 passed, 0 failed.
+- OCR web smoke: passed with mocked OCR response and real reviewer generation.
 - Latest recorded unattended reviewer smoke during Phase 3A verification:
   passed on local HEAD `00d3e8f` before the Phase 3A commit, using a persisted
   session and returning HTTP 200 from the reviewer POST.
 - Current unattended smoke command: `npm run smoke:reviewer:web`.
+- Current OCR browser smoke command: `npm run smoke:ocr:web`.
 
 ## Immediate Next Task
 
-Phase 3B: add editable OCR text review plus gallery image selection while
-keeping manual paste available.
+Phase 3C: add camera capture and validate gallery/camera OCR on a physical
+device with live Google Cloud OCR credentials.
 
 ## Known Blockers And Risks
 
 - OneDrive-backed generated Next output can leave stale reparse-point artifacts;
-  the smoke runner clears only `apps/api/.next/server/app` before runner-owned
-  API startup.
+  the smoke runner clears generated `apps/api/.next/server` before
+  runner-owned API startup.
 - OpenAI cost, rate limits, and serverless latency can affect reviewer
   generation.
 - OCR layout preservation is a product risk because reviewer quality depends on
   line, heading, and list boundaries.
 - Live Google OCR remains optional and credential-dependent; normal tests use
-  fake clients only.
+  fake clients, and the OCR web smoke mocks only the OCR API response.
 - Scanned-PDF OCR should wait until image OCR is stable.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
@@ -301,6 +306,34 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-04 Phase 3B gallery OCR intake
+
+- Added Expo SDK-compatible `expo-image-picker` to `apps/mobile`.
+- Added `apps/mobile/src/services/ocrApi.ts` for typed authenticated
+  multipart uploads to `POST /api/ocr/extract`, with PNG/JPEG validation,
+  native/web form-data handling, abort support, safe error mapping, and secret
+  redaction.
+- Added gallery image selection and source-flow state helpers for permission
+  denial, cancellation, selected-image preview, OCR loading, OCR success/failure,
+  retry, clearing images, preserving manual paste, and using edited OCR text for
+  reviewer generation.
+- Updated `ReviewerGenerateScreen` with `Paste text` and `Import image` modes,
+  selected-image preview, explicit `Extract text`, editable extracted-text
+  review, character count, OCR status/error states, and stable OCR test IDs.
+- Added mobile Vitest coverage: OCR client, gallery image mapping, and reviewer
+  source-flow tests pass 32/32.
+- Added `npm run smoke:ocr:web`, which uses a non-production Expo Web fixture
+  hook, mocks only `POST /api/ocr/extract` with fictional OCR text, confirms
+  authenticated multipart OCR upload, edits extracted text, then generates a
+  reviewer through the real reviewer route.
+- Updated the smoke runner generated-output cleanup to remove only
+  `apps/api/.next/server` before runner-owned API startup, avoiding stale
+  OneDrive-backed Next artifacts outside `.next/server/app`.
+- Manual paste remains supported. Images are previewed only from local URIs and
+  are not persisted, stored, logged, committed, or sent to the reviewer engine.
+- Live Google OCR on a physical device remains unverified and is now Phase 3C
+  with camera capture. Scanned PDFs remain Phase 3D.
 
 ### 2026-07-04 Phase 3A OCR server boundary
 

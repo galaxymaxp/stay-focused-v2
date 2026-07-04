@@ -4,8 +4,8 @@ Last refreshed: 2026-07-04, Asia/Manila.
 
 ## Active Objective
 
-Add editable OCR text review plus gallery image selection while keeping manual
-paste available.
+Add camera capture and physical-device OCR validation after the gallery OCR
+review path has landed.
 
 ## Completed Phase 3A Scope
 
@@ -19,7 +19,7 @@ paste available.
 - Document environment-variable names without values.
 - Keep manual paste as a fallback.
 
-## Active Phase 3B Scope
+## Completed Phase 3B Scope
 
 - Add a mobile gallery image-selection path.
 - Submit selected PNG/JPEG images to `POST /api/ocr/extract`.
@@ -27,12 +27,18 @@ paste available.
 - Keep the existing manual paste path available.
 - Keep OCR output editable before it enters the reviewer engine.
 
+## Active Phase 3C Scope
+
+- Add camera capture without changing the OCR server contract.
+- Validate gallery and camera OCR on a physical device with live Google Cloud
+  OCR credentials.
+- Keep manual paste and editable OCR review intact.
+
 ## Out Of Scope
 
 - Scanned PDFs.
 - Canvas integration.
 - Reviewer persistence or Study Library work.
-- Camera redesign.
 - Engine prompt changes.
 - Generation-schema changes.
 - Task generation.
@@ -51,21 +57,35 @@ paste available.
 - Normal tests use fake clients only and do not require live Google
   credentials.
 
-## Proposed Phase 3B Sequence
+## Phase 3B Results
 
-1. Add image selection behind the existing reviewer input screen without
-   removing manual paste.
-2. Post selected images to the protected OCR route with the existing Supabase
-   bearer token.
-3. Render returned OCR text in an editable review step.
-4. Send the edited text through the existing reviewer generation route.
-5. Add mobile and API smoke coverage around the new client flow.
+- `apps/mobile` depends on Expo SDK-compatible `expo-image-picker`.
+- Reviewer input now has separate `Paste text` and `Import image` modes.
+- Gallery-selected PNG/JPEG images show a local preview and filename.
+- The mobile OCR client posts authenticated multipart uploads to
+  `POST /api/ocr/extract` without setting a manual multipart boundary.
+- OCR text populates the editable source field and preserves line breaks.
+- Reviewer generation still sends only edited source text and optional title to
+  the existing reviewer API.
+- Images are not uploaded to storage, persisted to a database, or sent to the
+  reviewer engine.
+- `npm run smoke:ocr:web` verifies the browser OCR flow with a mocked OCR
+  response and real reviewer generation; live Google OCR remains unverified in
+  this smoke.
+
+## Proposed Phase 3C Sequence
+
+1. Add a camera capture source option beside gallery import.
+2. Reuse the existing OCR upload and editable review path.
+3. Validate camera and gallery OCR on Expo Go with live Google credentials.
+4. Keep the deterministic mocked Expo Web OCR smoke for regression coverage.
+5. Defer scanned PDFs to Phase 3D.
 
 ## Exit Criteria
 
 - Manual paste still works.
-- Selected image OCR text is editable before reviewer generation.
-- OCR route errors are shown safely in the mobile UI.
+- Selected image OCR text remains editable before reviewer generation.
+- Gallery and camera OCR route errors are shown safely in the mobile UI.
 - No Google credentials or uploaded image bytes are exposed to mobile code,
   browser code, logs, or committed files.
 - Scanned PDFs remain out of scope.

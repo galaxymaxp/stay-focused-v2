@@ -2,8 +2,11 @@
 
 Last refreshed: 2026-07-04, Asia/Manila.
 
-Phase 3A adds a server-side OCR boundary before any camera, gallery, or
-scanned-PDF UI work. The boundary accepts authenticated image uploads, invokes a
+Phase 3A added the server-side OCR boundary before camera, gallery, or
+scanned-PDF UI work. Phase 3B adds the first mobile client for that boundary:
+gallery-selected PNG/JPEG images are previewed locally, uploaded to the
+protected OCR route, and converted into editable source text before reviewer
+generation. The boundary accepts authenticated image uploads, invokes a
 server-only OCR provider, normalizes extracted text, and returns typed JSON that
 preserves useful page, block, paragraph, and line structure.
 
@@ -36,7 +39,7 @@ requests.
 - File field: `image`
 - Supported image types: `image/png`, `image/jpeg`
 - Maximum image size: `5,242,880` bytes, or 5 MiB
-- Scanned PDFs: out of scope for Phase 3A
+- Scanned PDFs: out of scope until Phase 3D
 
 The success response follows the existing API envelope style:
 
@@ -55,6 +58,27 @@ The success response follows the existing API envelope style:
 
 The route never returns credentials, stack traces, internal file paths,
 temporary names, uploaded bytes, raw Google responses, or Supabase internals.
+
+## Mobile Client Flow
+
+The Expo client uses `expo-image-picker` for gallery selection only. Camera
+capture remains Phase 3C. The client:
+
+- requests media-library access only when the user chooses an image
+- restricts selection to one image
+- accepts PNG/JPEG images and rejects unsupported MIME types when metadata is
+  available
+- rejects known oversized or empty files before upload
+- previews only the local selected URI
+- sends authenticated multipart form data to `POST /api/ocr/extract`
+- does not manually set the multipart `Content-Type` boundary
+- puts OCR text into an editable review field before reviewer generation
+- sends only the edited source text and optional source title to
+  `POST /api/reviewer/generate`
+
+Images are not uploaded to Supabase Storage, saved to the database, logged,
+persisted, or included in reviewer generation. The reviewer engine remains
+unaware of whether the source text came from paste or OCR.
 
 ## Safe Error Codes
 
@@ -115,7 +139,18 @@ Normal tests use fake clients only:
 - API route tests mock auth and OCR provider creation to cover auth rejection,
   missing files, MIME rejection, size rejection, empty files, valid PNG/JPEG,
   provider failures, missing configuration, and safe error bodies.
+- Mobile OCR client tests cover multipart request construction, bearer auth,
+  base URL normalization, success parsing, safe API error mapping, network
+  failures, cancellation, and secret redaction.
+- Mobile source-flow tests cover paste fallback, image mode, picker failures,
+  selected image state, OCR loading/success/failure, line-break preservation,
+  retry, clearing imported images, switching modes, and edited OCR text entering
+  reviewer generation.
+- `npm run smoke:ocr:web` uses Expo Web with a non-production fixture hook and a
+  mocked OCR API response. It verifies the browser gallery-intake UI path,
+  editable extracted text, and real reviewer generation without opening an
+  operating-system file picker or requiring live Google OCR credentials.
 
-Manual paste remains supported through the reviewer generation flow. Phase 3B
-should add editable OCR text review plus gallery image selection while keeping
-manual paste available.
+Manual paste remains supported through the reviewer generation flow. Live Google
+OCR and physical-device validation remain credential-dependent and are tracked
+for Phase 3C with camera capture.

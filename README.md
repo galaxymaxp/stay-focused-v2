@@ -4,7 +4,7 @@ Stay Focused V2 is a mobile-first, schedule-first student productivity app for
 turning school source material into useful study work. The current product is
 an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
 authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
-planned Canvas LMS plus Google Cloud OCR integration.
+Google Cloud OCR-backed source intake, with Canvas LMS still planned.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -26,7 +26,8 @@ The current completed flow is:
 
 ```text
 Sign in
--> paste source text
+-> paste source text or import a gallery image
+-> review and edit source text
 -> authenticated reviewer API
 -> OpenAI generation
 -> coverage, grounding, and leakage validation
@@ -53,23 +54,27 @@ Complete:
 - Provider-agnostic OCR contracts and normalization in `@stay-focused/ocr`
 - Server-only Google Cloud Vision OCR adapter with fake-client tests
 - Protected `POST /api/ocr/extract` image OCR route
+- Expo gallery image import with editable OCR text review before reviewer
+  generation
 
 Working locally:
 
 - OpenAI-backed reviewer generation through the authenticated API route
 - Authenticated image OCR extraction through the API route contract
+- Gallery-selected PNG/JPEG source intake in the mobile client
 - `npm run smoke:reviewer:web` for laptop-browser regression coverage
+- `npm run smoke:ocr:web` for deterministic Expo Web OCR UI coverage with a
+  mocked OCR response
 - API route tests, smoke-runner tests, engine evals, API typecheck, mobile
   typecheck, and engine build
 
 Next:
 
-- Phase 3B: editable OCR text review plus gallery image selection, with manual
-  paste still available
+- Phase 3C: camera capture and physical-device OCR validation
 
 Pending:
 
-- Mobile camera/gallery selection and editable extracted-text review
+- Camera capture and physical-device OCR validation
 - Scanned-PDF OCR
 - Reviewer persistence and the Study Library saved-content area
 - Canvas LMS integration
@@ -88,9 +93,9 @@ harness currently reports **266 passed and 0 failed**.
 
 Default visible reviewer content is source-faithful: validation checks visible
 titles, explanations, and key points, while unsupported enrichment is excluded
-from default assembly. Short OCR-style prose has an extractive fallback, but
-mobile image selection and scanned-document OCR ingestion are not implemented
-yet.
+from default assembly. Short OCR-style prose has an extractive fallback, and the
+mobile client can now send edited OCR text into the same reviewer generation
+flow. Scanned-document OCR is not implemented yet.
 
 See [ADR-004](docs/architecture/ADR-004-engine-pipeline.md), the
 [engine contract](docs/architecture/engine-contract.md), and
@@ -125,12 +130,16 @@ root:
 
 ```sh
 npm run smoke:reviewer:web
+npm run smoke:ocr:web
 ```
 
-The command starts or reuses the API and Expo Web services, authenticates or
-restores a persisted smoke session, submits a fictional study-habits fixture,
-verifies reviewer output and validation statuses, and cleans up
-runner-owned services. It supports immediate repeat runs.
+The reviewer smoke submits the pasted-text fixture. The OCR web smoke switches
+to image mode, injects a tiny fictional image fixture without opening the
+operating-system picker, mocks only `POST /api/ocr/extract`, verifies editable
+extracted text, then uses the real reviewer route. It does not prove live Google
+OCR. Both commands start or reuse local services, authenticate or restore a
+persisted smoke session, verify reviewer output, and clean up runner-owned
+services.
 
 See [Local Expo Web Reviewer Smoke](docs/testing/local-reviewer-smoke.md) for
 credential setup, session-only mode, failure codes, and diagnostics.
@@ -139,6 +148,7 @@ Useful non-live checks:
 
 ```sh
 npm run test:reviewer-web-smoke
+npm run test --workspace apps/mobile
 npm run test --workspace @stay-focused/ocr
 npm run test --workspace apps/api
 npm run typecheck --workspace apps/api
@@ -160,9 +170,9 @@ tests do not run that opt-in provider smoke.
 
 ## Current Limitations
 
-- User-facing source input is still primarily pasted text.
-- The server image OCR route exists, but the mobile camera/gallery and editable
-  extracted-text flow is not implemented.
+- Gallery image import supports PNG/JPEG OCR into editable text, and manual
+  paste remains available.
+- Camera capture is not implemented.
 - Scanned-PDF OCR is not implemented.
 - Reviewers are not persisted; Study Library is pending.
 - Canvas integration is not implemented beyond a thin package boundary.
@@ -173,5 +183,5 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 3B is the immediate engineering milestone: add editable OCR text review
-plus gallery image selection while keeping manual paste available.
+Phase 3C is the immediate engineering milestone: add camera capture and validate
+the gallery/camera OCR flow on a physical device with live Google credentials.

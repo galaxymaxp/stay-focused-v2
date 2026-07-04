@@ -5,6 +5,7 @@ against the local API:
 
 ```powershell
 npm run smoke:reviewer:web
+npm run smoke:ocr:web
 ```
 
 The smoke runner starts only the local services it needs, reuses compatible
@@ -114,7 +115,7 @@ released. If a runner-owned port remains bound, cleanup reports
 `CLEANUP_PORT_STILL_BOUND`.
 
 Before starting a runner-owned API process, the command removes only the
-generated Next.js dev output directory at `apps/api/.next/server/app`. This
+generated Next.js dev server output directory at `apps/api/.next/server`. This
 keeps stale OneDrive-backed reparse-point build artifacts from making Next.js
 exit during startup, while preserving the rest of `.next`.
 
@@ -164,6 +165,40 @@ rendered output:
 The command reports the reviewer POST HTTP status, section count, visible
 key-point count, validation statuses, explanation presence, authentication mode,
 session persistence, and cleanup result.
+
+## OCR Web Smoke
+
+`npm run smoke:ocr:web` is separate from the pasted-text reviewer smoke. It uses
+the same API/Expo startup, authentication, persisted browser profile, CORS
+checks, and cleanup behavior, then opens Expo Web with a non-production
+`?ocrSmoke=1` fixture hook.
+
+The OCR smoke does not automate an operating-system gallery dialog and does not
+require live Google OCR credentials. Instead, it:
+
+- switches to the image source mode
+- injects a tiny fictional PNG fixture
+- mocks only `POST /api/ocr/extract` with fictional extracted text
+- verifies the OCR request is authenticated multipart form data
+- confirms extracted text appears in the editable source field
+- edits the extracted text
+- generates a reviewer through the real `POST /api/reviewer/generate` route
+- confirms Reviewer Ready, passed validation statuses, at least one section, and
+  at least one key point
+
+The fixture text is:
+
+```txt
+STUDY HABITS
+
+Set one clear goal before studying.
+Turn off notifications.
+Review notes after a short break.
+Check understanding without looking at the notes.
+```
+
+Live Google OCR, camera capture, and physical-device OCR validation are not
+covered by this browser smoke.
 
 ## Diagnostics
 

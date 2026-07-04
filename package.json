@@ -10,6 +10,7 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
+    "smoke:ocr:web": "node scripts/ocr-web-smoke.mjs",
     "smoke:reviewer:web": "node scripts/reviewer-web-smoke.mjs",
     "test:reviewer-web-smoke": "node --test scripts/reviewer-web-smoke.test.mjs",
     "typecheck": "turbo typecheck",
