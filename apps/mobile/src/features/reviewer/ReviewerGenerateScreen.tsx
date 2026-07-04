@@ -22,8 +22,10 @@ import {
 } from "../../services/reviewerApi";
 import { extractOcrText } from "../../services/ocrApi";
 import {
+  captureImageWithCamera,
   chooseImageFromGallery,
   createOcrSmokeFixtureImage,
+  type GallerySelectionResult,
   type SelectedGalleryImage,
 } from "./galleryImage";
 import {
@@ -161,6 +163,18 @@ export function ReviewerGenerateScreen() {
     setGenerationError(null);
 
     const result = await chooseImageFromGallery();
+    applyImageSelectionResult(result);
+  };
+
+  const handleCaptureImage = async () => {
+    setValidationMessage(null);
+    setGenerationError(null);
+
+    const result = await captureImageWithCamera();
+    applyImageSelectionResult(result);
+  };
+
+  const applyImageSelectionResult = (result: GallerySelectionResult) => {
     if (result.status === "cancelled") {
       dispatchSource({ type: "image_selection_cancelled" });
       return;
@@ -302,6 +316,7 @@ export function ReviewerGenerateScreen() {
               error={sourceState.ocrError}
               isSmokeFixtureEnabled={OCR_SMOKE_FIXTURE_ENABLED}
               onChooseImage={handleChooseImage}
+              onCaptureImage={handleCaptureImage}
               onClearImage={handleClearImage}
               onExtractText={handleExtractText}
               onUseSmokeFixture={handleUseSmokeFixtureImage}
@@ -388,6 +403,7 @@ function ImageImportPanel({
   error,
   isSmokeFixtureEnabled,
   onChooseImage,
+  onCaptureImage,
   onClearImage,
   onExtractText,
   onUseSmokeFixture,
@@ -398,6 +414,7 @@ function ImageImportPanel({
   readonly error: SourceFlowError | null;
   readonly isSmokeFixtureEnabled: boolean;
   readonly onChooseImage: () => void;
+  readonly onCaptureImage: () => void;
   readonly onClearImage: () => void;
   readonly onExtractText: () => void;
   readonly onUseSmokeFixture: () => void;
@@ -417,6 +434,16 @@ function ImageImportPanel({
           variant="secondary"
         >
           Choose image
+        </Button>
+
+        <Button
+          disabled={isUploading}
+          onPress={onCaptureImage}
+          style={styles.imageActionButton}
+          testID="reviewer-capture-image-button"
+          variant="secondary"
+        >
+          Take photo
         </Button>
 
         {isSmokeFixtureEnabled ? (
@@ -453,7 +480,9 @@ function ImageImportPanel({
           </View>
         </View>
       ) : (
-        <Text style={styles.helperText}>Choose a PNG or JPEG image from your gallery.</Text>
+        <Text style={styles.helperText}>
+          Choose a PNG or JPEG image from your gallery, or take a photo.
+        </Text>
       )}
 
       {selectedImage ? (

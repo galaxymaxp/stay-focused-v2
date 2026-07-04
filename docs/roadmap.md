@@ -82,9 +82,16 @@ Completed in Phase 3B:
 - Deterministic Expo Web OCR smoke using a mocked OCR response and real
   reviewer generation.
 
+Completed in Phase 3C:
+
+- Camera capture through the existing Expo image-picker boundary.
+- Captured-image preview and generated filename display.
+- Reuse of the authenticated `POST /api/ocr/extract` upload path.
+- Editable extracted-text review before reviewer generation.
+
 Remaining Phase 3 deliverables:
 
-- Phase 3C: camera capture and physical-device validation with live Google OCR.
+- Phase 3C: physical-device validation with live Google OCR.
 - Phase 3D: scanned-PDF support only after image OCR is stable.
 
 Exit criteria:
@@ -98,8 +105,7 @@ Exit criteria:
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: Phase 3C - camera capture and physical-device OCR
-validation.
+Immediate next task: Phase 3C - physical-device gallery/camera OCR validation.
 
 ## Phase 4 - Study Library And Persistence
 

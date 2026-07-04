@@ -2,13 +2,14 @@
 
 Last refreshed: 2026-07-04, Asia/Manila.
 
-Phase 3A added the server-side OCR boundary before camera, gallery, or
-scanned-PDF UI work. Phase 3B adds the first mobile client for that boundary:
-gallery-selected PNG/JPEG images are previewed locally, uploaded to the
-protected OCR route, and converted into editable source text before reviewer
-generation. The boundary accepts authenticated image uploads, invokes a
-server-only OCR provider, normalizes extracted text, and returns typed JSON that
-preserves useful page, block, paragraph, and line structure.
+Phase 3A added the server-side OCR boundary before mobile source-ingestion UI
+work. Phase 3B added gallery import, and Phase 3C adds camera capture through
+the same mobile client boundary: selected or captured PNG/JPEG images are
+previewed locally, uploaded to the protected OCR route, and converted into
+editable source text before reviewer generation. The boundary accepts
+authenticated image uploads, invokes a server-only OCR provider, normalizes
+extracted text, and returns typed JSON that preserves useful page, block,
+paragraph, and line structure.
 
 ## Package Boundary
 
@@ -61,13 +62,16 @@ temporary names, uploaded bytes, raw Google responses, or Supabase internals.
 
 ## Mobile Client Flow
 
-The Expo client uses `expo-image-picker` for gallery selection only. Camera
-capture remains Phase 3C. The client:
+The Expo client uses `expo-image-picker` for gallery selection and camera
+capture. The client:
 
-- requests media-library access only when the user chooses an image
+- requests media-library access only when the user chooses a gallery image
+- requests camera access only when the user takes a photo
 - restricts selection to one image
 - accepts PNG/JPEG images and rejects unsupported MIME types when metadata is
   available
+- treats sparse camera metadata as JPEG when Expo does not provide a MIME type
+  or filename
 - rejects known oversized or empty files before upload
 - previews only the local selected URI
 - sends authenticated multipart form data to `POST /api/ocr/extract`
@@ -143,14 +147,14 @@ Normal tests use fake clients only:
   base URL normalization, success parsing, safe API error mapping, network
   failures, cancellation, and secret redaction.
 - Mobile source-flow tests cover paste fallback, image mode, picker failures,
-  selected image state, OCR loading/success/failure, line-break preservation,
-  retry, clearing imported images, switching modes, and edited OCR text entering
-  reviewer generation.
+  camera permission failures, selected image state, OCR
+  loading/success/failure, line-break preservation, retry, clearing imported
+  images, switching modes, and edited OCR text entering reviewer generation.
 - `npm run smoke:ocr:web` uses Expo Web with a non-production fixture hook and a
   mocked OCR API response. It verifies the browser gallery-intake UI path,
   editable extracted text, and real reviewer generation without opening an
   operating-system file picker or requiring live Google OCR credentials.
 
 Manual paste remains supported through the reviewer generation flow. Live Google
-OCR and physical-device validation remain credential-dependent and are tracked
-for Phase 3C with camera capture.
+OCR and physical-device validation remain credential-dependent and are covered
+by the mobile device runbook.

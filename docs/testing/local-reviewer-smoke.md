@@ -197,8 +197,8 @@ Review notes after a short break.
 Check understanding without looking at the notes.
 ```
 
-Live Google OCR, camera capture, and physical-device OCR validation are not
-covered by this browser smoke.
+Live Google OCR, operating-system gallery/camera dialogs, and physical-device
+OCR validation are not covered by this browser smoke.
 
 ## Diagnostics
 

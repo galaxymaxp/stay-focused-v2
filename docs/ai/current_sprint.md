@@ -29,7 +29,8 @@ review path has landed.
 
 ## Active Phase 3C Scope
 
-- Add camera capture without changing the OCR server contract.
+- Add camera capture without changing the OCR server contract. Completed in the
+  mobile client.
 - Validate gallery and camera OCR on a physical device with live Google Cloud
   OCR credentials.
 - Keep manual paste and editable OCR review intact.
@@ -75,8 +76,8 @@ review path has landed.
 
 ## Proposed Phase 3C Sequence
 
-1. Add a camera capture source option beside gallery import.
-2. Reuse the existing OCR upload and editable review path.
+1. Add a camera capture source option beside gallery import. Done.
+2. Reuse the existing OCR upload and editable review path. Done.
 3. Validate camera and gallery OCR on Expo Go with live Google credentials.
 4. Keep the deterministic mocked Expo Web OCR smoke for regression coverage.
 5. Defer scanned PDFs to Phase 3D.

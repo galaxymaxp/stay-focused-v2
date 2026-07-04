@@ -26,7 +26,7 @@ The current completed flow is:
 
 ```text
 Sign in
--> paste source text or import a gallery image
+-> paste source text, import a gallery image, or take a camera photo
 -> review and edit source text
 -> authenticated reviewer API
 -> OpenAI generation
@@ -54,14 +54,15 @@ Complete:
 - Provider-agnostic OCR contracts and normalization in `@stay-focused/ocr`
 - Server-only Google Cloud Vision OCR adapter with fake-client tests
 - Protected `POST /api/ocr/extract` image OCR route
-- Expo gallery image import with editable OCR text review before reviewer
-  generation
+- Expo gallery image import and camera capture with editable OCR text review
+  before reviewer generation
 
 Working locally:
 
 - OpenAI-backed reviewer generation through the authenticated API route
 - Authenticated image OCR extraction through the API route contract
-- Gallery-selected PNG/JPEG source intake in the mobile client
+- Gallery-selected and camera-captured PNG/JPEG source intake in the mobile
+  client
 - `npm run smoke:reviewer:web` for laptop-browser regression coverage
 - `npm run smoke:ocr:web` for deterministic Expo Web OCR UI coverage with a
   mocked OCR response
@@ -70,11 +71,12 @@ Working locally:
 
 Next:
 
-- Phase 3C: camera capture and physical-device OCR validation
+- Complete and record physical-device gallery/camera OCR validation with live
+  Google credentials
 
 Pending:
 
-- Camera capture and physical-device OCR validation
+- Physical-device live OCR validation
 - Scanned-PDF OCR
 - Reviewer persistence and the Study Library saved-content area
 - Canvas LMS integration
@@ -170,9 +172,10 @@ tests do not run that opt-in provider smoke.
 
 ## Current Limitations
 
-- Gallery image import supports PNG/JPEG OCR into editable text, and manual
-  paste remains available.
-- Camera capture is not implemented.
+- Gallery image import and camera capture support PNG/JPEG OCR into editable
+  text, and manual paste remains available.
+- Physical-device live OCR validation depends on local API, Supabase, and
+  Google Cloud OCR credentials.
 - Scanned-PDF OCR is not implemented.
 - Reviewers are not persisted; Study Library is pending.
 - Canvas integration is not implemented beyond a thin package boundary.
@@ -183,5 +186,5 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 3C is the immediate engineering milestone: add camera capture and validate
-the gallery/camera OCR flow on a physical device with live Google credentials.
+Phase 3C is the active engineering milestone: validate the gallery/camera OCR
+flow on a physical device with live Google credentials.

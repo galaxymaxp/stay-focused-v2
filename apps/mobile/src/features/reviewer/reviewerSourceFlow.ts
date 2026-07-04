@@ -178,6 +178,12 @@ export function formatGallerySelectionError(
   error: GallerySelectionError,
 ): SourceFlowError {
   switch (error.code) {
+    case "camera_permission_denied":
+      return {
+        code: error.code,
+        title: "Camera access needed",
+        message: "Allow camera access to take a photo.",
+      };
     case "permission_denied":
       return {
         code: error.code,

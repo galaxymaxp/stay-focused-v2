@@ -55,6 +55,23 @@ describe("reviewer source flow", () => {
     expect(JSON.stringify(state)).not.toContain("native permission detail");
   });
 
+  it("shows camera permission denied safely", () => {
+    const state = reviewerSourceReducer(initialReviewerSourceState, {
+      type: "image_selection_failed",
+      error: {
+        code: "camera_permission_denied",
+        message: "native camera permission detail",
+      },
+    });
+
+    expect(state.mode).toBe("image");
+    expect(state.ocrError).toMatchObject({
+      code: "camera_permission_denied",
+      title: "Camera access needed",
+    });
+    expect(JSON.stringify(state)).not.toContain("native camera permission detail");
+  });
+
   it("stores a selected image and shows it as ready to extract", () => {
     const state = reviewerSourceReducer(initialReviewerSourceState, {
       type: "image_selected",

@@ -15,7 +15,7 @@ The current product slice is:
 
 ```text
 Sign in
--> paste source text or import a gallery image
+-> paste source text, import a gallery image, or take a camera photo
 -> review and edit source text
 -> authenticated reviewer API
 -> OpenAI generation
@@ -41,11 +41,11 @@ Bearer-authenticated multipart image upload
 -> safe JSON response
 ```
 
-The mobile app does not call this route yet.
-Phase 3B adds the mobile client call path: gallery-selected PNG/JPEG images can
-be previewed, uploaded to `POST /api/ocr/extract`, and converted into editable
-source text. The reviewer engine receives only the final edited text through the
-existing reviewer route.
+Phase 3B adds the mobile client gallery call path, and Phase 3C extends the
+same path to camera capture: selected or captured PNG/JPEG images can be
+previewed, uploaded to `POST /api/ocr/extract`, and converted into editable
+source text. The reviewer engine receives only the final edited text through
+the existing reviewer route.
 
 ## Completed Capabilities
 
@@ -67,8 +67,8 @@ existing reviewer route.
   `@stay-focused/ocr`.
 - API-only Google Cloud Vision OCR adapter with injected fake-client tests.
 - Protected `POST /api/ocr/extract` route for PNG/JPEG multipart image uploads.
-- Expo gallery image selection with preview, explicit text extraction, editable
-  OCR text review, retry, and clear-image handling.
+- Expo gallery image selection and camera capture with preview, explicit text
+  extraction, editable OCR text review, retry, and clear-image handling.
 - Manual pasted text remains available as a separate source mode.
 
 ## Current Verification Baselines
@@ -84,9 +84,12 @@ Verified in this documentation refresh:
 - Engine evaluations: 266 passed, 0 failed
 - API typecheck: passed
 - Mobile typecheck: passed
-- Mobile OCR client and source-flow tests: 32 passed, 0 failed
+- Mobile OCR client and source-flow tests: 37 passed, 0 failed
 - Deterministic OCR web smoke: passed with mocked OCR response and real
   reviewer generation
+- Phase 3C live OCR/physical-device attempt: blocked by missing local Google
+  credentials file and no controllable physical device in the workspace; see
+  `docs/ai/phase3c-camera-ocr-validation-20260704.md`
 
 Latest recorded unattended smoke during Phase 3A verification:
 
@@ -113,8 +116,9 @@ route. It does not validate live Google OCR.
 
 ## Current Limitations
 
-- Gallery import supports PNG/JPEG images and editable extracted-text review.
-- Camera capture and physical-device live OCR validation are not implemented.
+- Gallery import and camera capture support PNG/JPEG images and editable
+  extracted-text review.
+- Physical-device live OCR validation is credential- and device-dependent.
 - Scanned-PDF OCR is not implemented.
 - Reviewer persistence and the Study Library are not implemented.
 - Canvas LMS integration is not implemented beyond the package boundary.
@@ -125,8 +129,8 @@ route. It does not validate live Google OCR.
 
 ## Immediate Next Task
 
-Phase 3C: add camera capture and validate gallery/camera OCR on a physical
-device with live Google OCR credentials.
+Phase 3C: validate gallery/camera OCR on a physical device with live Google OCR
+credentials.
 
 ## Known Risks
 
@@ -138,8 +142,8 @@ device with live Google OCR credentials.
 - OCR layout preservation is critical because reviewer quality depends on line,
   heading, and list boundaries.
 - The server OCR contract is proven with fake clients and the Expo Web OCR flow
-  is proven with a mocked OCR response; live Google OCR remains credential- and
-  device-dependent.
+  is proven with a mocked OCR response; live Google OCR remains credential-,
+  network-, and device-dependent.
 - Scanned-PDF support is more complex than single-image OCR and should wait
   until image OCR is stable.
 - Mobile OAuth redirect completion still needs validation before it is claimed

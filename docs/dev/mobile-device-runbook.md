@@ -1,9 +1,9 @@
 # Mobile Device Validation Runbook
 
-This runbook validates the authenticated reviewer and gallery OCR development
-flow with Expo Go on a physical iPhone. It documents local setup only; it does
-not deploy, run live OpenAI smoke tests outside reviewer generation, add camera
-capture, add scanned-PDF OCR, or apply production migrations.
+This runbook validates the authenticated reviewer plus gallery and camera OCR
+development flow with Expo Go on a physical iPhone. It documents local setup
+only; it does not deploy, run live OpenAI smoke tests outside reviewer
+generation, add scanned-PDF OCR, or apply production migrations.
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ SUPABASE_SERVICE_ROLE_KEY
 OPENAI_API_KEY
 ```
 
-Required for live gallery OCR validation:
+Required for live gallery/camera OCR validation:
 
 ```text
 GOOGLE_CLOUD_PROJECT_ID
@@ -165,7 +165,31 @@ personal photos, credentials, IDs, or school documents.
 16. Tap `Paste text` and confirm manual paste remains usable.
 17. Confirm the selected image is not saved to storage or a database.
 
-Camera capture is still pending Phase 3C. Scanned PDFs remain pending Phase 3D.
+## Manual Camera OCR Checklist
+
+Use only fictional or disposable paper notes. Do not photograph private notes,
+personal documents, credentials, IDs, or school documents.
+
+1. Start the API with Google OCR credentials available in the API environment.
+2. Start Expo Go with `EXPO_PUBLIC_API_BASE_URL` pointing to the laptop LAN API.
+3. Sign in with a Supabase test account.
+4. Open the reviewer generator screen.
+5. Tap `Import image`.
+6. Tap `Take photo` and allow camera access if prompted.
+7. Photograph a PNG/JPEG-compatible study note with fictional text.
+8. Accept the photo in the system camera UI.
+9. Confirm the local preview and generated filename appear.
+10. Tap `Extract text`.
+11. Confirm the API receives `POST /api/ocr/extract`.
+12. Confirm extracted text appears in the editable source field with line breaks.
+13. Correct at least one OCR text detail.
+14. Tap `Generate reviewer`.
+15. Confirm the API receives `POST /api/reviewer/generate`.
+16. Confirm Reviewer Ready appears with passed validation statuses.
+17. Tap `Clear image` and confirm the captured image and OCR text are removed.
+18. Confirm the captured image is not saved to storage or a database.
+
+Scanned PDFs remain pending Phase 3D.
 
 ## Common Errors and Fixes
 
@@ -218,6 +242,20 @@ Fixes:
 - Confirm the mobile Supabase project matches the API Supabase project.
 - Confirm the API is using the service role key for the same project.
 - Check that the request includes `Authorization: Bearer <access-token>`.
+
+### Camera Permission Denied
+
+Symptoms:
+
+- The app shows `Camera access needed`.
+- Tapping `Take photo` does not open the camera UI.
+
+Fixes:
+
+- Allow camera access from the iOS permission prompt.
+- If access was denied earlier, open iOS Settings, find Expo Go, and enable
+  Camera.
+- Restart the Expo Go session after changing permissions.
 
 ### Missing OpenAI Key
 

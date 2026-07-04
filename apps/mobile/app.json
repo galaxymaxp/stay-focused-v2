@@ -6,7 +6,17 @@
     "orientation": "portrait",
     "scheme": "stayfocused",
     "userInterfaceStyle": "automatic",
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Stay Focused to import study images for OCR.",
+          "cameraPermission": "Allow Stay Focused to take study photos for OCR."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

@@ -34,6 +34,7 @@ export type GallerySelectionResult =
     };
 
 export type GallerySelectionErrorCode =
+  | "camera_permission_denied"
   | "permission_denied"
   | "selection_failed"
   | "unsupported_media_type"
@@ -91,8 +92,59 @@ export async function chooseImageFromGallery(): Promise<GallerySelectionResult> 
   return mapImagePickerAsset(asset);
 }
 
+export async function captureImageWithCamera(): Promise<GallerySelectionResult> {
+  const ImagePicker = await import("expo-image-picker");
+  let permission: ExpoImagePicker.CameraPermissionResponse;
+  try {
+    permission = await ImagePicker.requestCameraPermissionsAsync();
+  } catch {
+    return failure(
+      "camera_permission_denied",
+      "Camera access could not be requested.",
+    );
+  }
+
+  if (!hasCameraAccess(permission)) {
+    return failure(
+      "camera_permission_denied",
+      "Allow camera access to take a photo.",
+    );
+  }
+
+  let result: ExpoImagePicker.ImagePickerResult;
+  try {
+    result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      base64: false,
+      exif: false,
+      mediaTypes: ["images"],
+      quality: 1,
+    });
+  } catch {
+    return failure("selection_failed", "Camera capture could not be completed.");
+  }
+
+  if (result.canceled) {
+    return { status: "cancelled" };
+  }
+
+  const asset = result.assets[0];
+  if (!asset) {
+    return failure("selection_failed", "No image was returned from the camera.");
+  }
+
+  return mapImagePickerAsset(asset, {
+    fallbackMimeType: "image/jpeg",
+    fallbackFileNamePrefix: "captured-image",
+  });
+}
+
 export function mapImagePickerAsset(
   asset: ExpoImagePicker.ImagePickerAsset,
+  options: {
+    readonly fallbackMimeType?: OcrImageMimeType;
+    readonly fallbackFileNamePrefix?: string;
+  } = {},
 ): GallerySelectionResult {
   if (asset.type && asset.type !== "image") {
     return failure("unsupported_media_type", "Choose a PNG or JPEG image.");
@@ -101,7 +153,8 @@ export function mapImagePickerAsset(
   const mimeType =
     readSupportedMimeType(asset.mimeType) ??
     inferOcrImageMimeType(asset.fileName ?? "") ??
-    inferOcrImageMimeType(asset.uri);
+    inferOcrImageMimeType(asset.uri) ??
+    options.fallbackMimeType;
 
   if (!mimeType) {
     return failure("unsupported_media_type", "Choose a PNG or JPEG image.");
@@ -127,7 +180,11 @@ export function mapImagePickerAsset(
     image: {
       uri: asset.uri,
       mimeType,
-      fileName: sanitizeImageFileName(asset.fileName, mimeType),
+      fileName: sanitizeImageFileName(
+        asset.fileName,
+        mimeType,
+        options.fallbackFileNamePrefix,
+      ),
       ...(asset.fileSize !== undefined ? { fileSize: asset.fileSize } : {}),
       ...(asset.width > 0 ? { width: asset.width } : {}),
       ...(asset.height > 0 ? { height: asset.height } : {}),
@@ -157,6 +214,12 @@ function hasMediaLibraryAccess(
   );
 }
 
+function hasCameraAccess(
+  permission: ExpoImagePicker.CameraPermissionResponse,
+): boolean {
+  return permission.status === "granted" || permission.granted === true;
+}
+
 function readSupportedMimeType(value: string | undefined): OcrImageMimeType | null {
   if (!value) {
     return null;
@@ -169,13 +232,16 @@ function readSupportedMimeType(value: string | undefined): OcrImageMimeType | nu
 function sanitizeImageFileName(
   value: string | null | undefined,
   mimeType: OcrImageMimeType,
+  fallbackPrefix = "selected-image",
 ): string {
   const sanitized = value?.trim().replace(/[\\/:*?"<>|]+/g, "-");
   if (sanitized) {
     return sanitized;
   }
 
-  return mimeType === "image/png" ? "selected-image.png" : "selected-image.jpg";
+  const sanitizedPrefix = fallbackPrefix.trim().replace(/[\\/:*?"<>|.]+/g, "-");
+  const prefix = sanitizedPrefix || "selected-image";
+  return mimeType === "image/png" ? `${prefix}.png` : `${prefix}.jpg`;
 }
 
 function failure(
