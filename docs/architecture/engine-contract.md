@@ -219,17 +219,16 @@ case fails.
 - LLM response quality, latency, cost, and provider reliability are not yet
   measured.
 - File and OCR extraction remain external to the engine.
-- Supabase auth and the reviewer API route are wired around the pipeline, but
-  persistence, Canvas, OCR ingestion, task generation, and scheduling are still
-  external pending integrations.
+- Supabase auth, OCR ingestion, the reviewer API route, and reviewer
+  persistence are wired around the pipeline. Canvas, task generation, and
+  scheduling remain external pending integrations.
 
 ## Next Engineering Steps
 
-1. Implement Phase 3A: provider-agnostic OCR boundary and a protected API
-   contract with fake-client tests.
+1. Validate the live Phase 4 reviewer persistence migration and RLS policies.
 2. Preserve OCR line and layout boundaries before passing extracted text into
    Stage 0.
 3. Add LLM quality, latency, and cost evaluation separately from deterministic
    engine evals.
-4. Add persistence, Canvas, tasks, and schedules only through adapters around
-   the documented engine boundary.
+4. Keep persistence, Canvas, tasks, and schedules behind adapters around the
+   documented engine boundary.

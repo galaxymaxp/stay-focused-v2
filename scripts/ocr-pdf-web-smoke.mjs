@@ -253,9 +253,7 @@ async function runPdfOcrBrowserSmoke(context, { credentialState, sessionOnly }) 
   await page.getByTestId("reviewer-pdf-name").waitFor({ state: "visible" });
 
   await page.getByTestId("reviewer-extract-pdf-text-button").click();
-  await page.getByTestId("reviewer-pdf-ocr-loading").waitFor({
-    state: "visible",
-  });
+  await waitForPdfOcrProgress(page);
   await waitForPdfOcrReady(page, ocrRequest);
 
   const sourceInput = page.getByTestId(TEST_IDS.reviewerSourceInput);
@@ -471,6 +469,45 @@ async function waitForPdfOcrReady(page, ocrRequest) {
     "OCR_PDF_READY_TIMEOUT",
     "Timed out waiting for PDF OCR extracted text.",
     { status: ocrRequest.getState().status },
+  );
+}
+
+async function waitForPdfOcrProgress(page) {
+  const deadline = Date.now() + 15_000;
+
+  while (Date.now() < deadline) {
+    if (
+      (await page
+        .getByTestId("reviewer-pdf-ocr-loading")
+        .isVisible()
+        .catch(() => false)) ||
+      (await page
+        .getByTestId("reviewer-pdf-ocr-ready")
+        .isVisible()
+        .catch(() => false))
+    ) {
+      return;
+    }
+
+    const error = await page
+      .getByTestId("reviewer-pdf-ocr-error")
+      .isVisible()
+      .catch(() => false);
+    if (error) {
+      throw new SmokeFailure(
+        "ocr-pdf-ui",
+        "OCR_PDF_ERROR_VISIBLE",
+        await page.getByTestId("reviewer-pdf-ocr-error").innerText(),
+      );
+    }
+
+    await delay(100);
+  }
+
+  throw new SmokeFailure(
+    "ocr-pdf-ui",
+    "OCR_PDF_PROGRESS_TIMEOUT",
+    "Timed out waiting for PDF OCR progress.",
   );
 }
 

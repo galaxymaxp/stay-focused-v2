@@ -26,12 +26,14 @@ The current completed flow is:
 
 ```text
 Sign in
--> paste source text, import a gallery image, or take a camera photo
+-> paste source text, import a gallery image, take a camera photo, or import a PDF
 -> review and edit source text
 -> authenticated reviewer API
 -> OpenAI generation
 -> coverage, grounding, and leakage validation
 -> reviewer preview
+-> save to Study Library
+-> list, open, rename, or delete saved reviewers
 ```
 
 This slice uses Supabase email/password authentication in the Expo app. The
@@ -56,29 +58,36 @@ Complete:
 - Protected `POST /api/ocr/extract` image OCR route
 - Expo gallery image import and camera capture with editable OCR text review
   before reviewer generation
+- Protected `POST /api/ocr/extract-pdf` scanned-PDF OCR route for synchronous
+  1-5 page PDF intake
+- Expo PDF import with editable OCR text review before reviewer generation
+- Supabase reviewer persistence migration and authenticated reviewer CRUD API
+- Expo Study Library for saved reviewer list, open, rename, and delete
 
 Working locally:
 
 - OpenAI-backed reviewer generation through the authenticated API route
 - Authenticated image OCR extraction through the API route contract
-- Gallery-selected and camera-captured PNG/JPEG source intake in the mobile
-  client
+- Gallery-selected, camera-captured, and scanned-PDF source intake in the
+  mobile client
+- Save, list, open, rename, and delete flows against the reviewer library API
+  contract
 - `npm run smoke:reviewer:web` for laptop-browser regression coverage
 - `npm run smoke:ocr:web` for deterministic Expo Web OCR UI coverage with a
   mocked OCR response
+- `npm run smoke:ocr-pdf:web` for deterministic Expo Web PDF OCR UI coverage
+  with a mocked OCR response
 - API route tests, smoke-runner tests, engine evals, API typecheck, mobile
   typecheck, and engine build
 
 Next:
 
-- Complete and record physical-device gallery/camera OCR validation with live
-  Google credentials
+- Apply the Phase 4 `reviewers` migration to the target Supabase project and
+  validate live Study Library persistence/RLS
 
 Pending:
 
-- Physical-device live OCR validation
-- Scanned-PDF OCR
-- Reviewer persistence and the Study Library saved-content area
+- Live migrated Supabase validation for Study Library persistence
 - Canvas LMS integration
 - Task generation and study scheduling
 - Completed mobile OAuth redirects, deployment validation, product polish, and
@@ -97,7 +106,8 @@ Default visible reviewer content is source-faithful: validation checks visible
 titles, explanations, and key points, while unsupported enrichment is excluded
 from default assembly. Short OCR-style prose has an extractive fallback, and the
 mobile client can now send edited OCR text into the same reviewer generation
-flow. Scanned-document OCR is not implemented yet.
+flow. Scanned-document OCR is implemented as a synchronous small-PDF MVP, and
+reviewer persistence sits outside the engine behind authenticated API routes.
 
 See [ADR-004](docs/architecture/ADR-004-engine-pipeline.md), the
 [engine contract](docs/architecture/engine-contract.md), and
@@ -133,15 +143,17 @@ root:
 ```sh
 npm run smoke:reviewer:web
 npm run smoke:ocr:web
+npm run smoke:ocr-pdf:web
 ```
 
 The reviewer smoke submits the pasted-text fixture. The OCR web smoke switches
 to image mode, injects a tiny fictional image fixture without opening the
 operating-system picker, mocks only `POST /api/ocr/extract`, verifies editable
-extracted text, then uses the real reviewer route. It does not prove live Google
-OCR. Both commands start or reuse local services, authenticate or restore a
-persisted smoke session, verify reviewer output, and clean up runner-owned
-services.
+extracted text, then uses the real reviewer route. The PDF OCR web smoke follows
+the same pattern with a fictional PDF fixture and mocked
+`POST /api/ocr/extract-pdf`. These OCR smokes do not prove live Google OCR. The
+commands start or reuse local services, authenticate or restore a persisted
+smoke session, verify reviewer output, and clean up runner-owned services.
 
 See [Local Expo Web Reviewer Smoke](docs/testing/local-reviewer-smoke.md) for
 credential setup, session-only mode, failure codes, and diagnostics.
@@ -153,6 +165,7 @@ npm run test:reviewer-web-smoke
 npm run test --workspace apps/mobile
 npm run test --workspace @stay-focused/ocr
 npm run test --workspace apps/api
+npm run typecheck --workspace @stay-focused/db
 npm run typecheck --workspace apps/api
 npm run typecheck --workspace apps/mobile
 npm run build --workspace @stay-focused/engine
@@ -174,10 +187,12 @@ tests do not run that opt-in provider smoke.
 
 - Gallery image import and camera capture support PNG/JPEG OCR into editable
   text, and manual paste remains available.
+- Scanned-PDF import supports one server-bound PDF per request, 1-5 pages, and
+  editable extracted-text review.
 - Physical-device live OCR validation depends on local API, Supabase, and
   Google Cloud OCR credentials.
-- Scanned-PDF OCR is not implemented.
-- Reviewers are not persisted; Study Library is pending.
+- Study Library persistence is implemented locally, but the live Supabase
+  project still needs the Phase 4 migration applied and RLS validated.
 - Canvas integration is not implemented beyond a thin package boundary.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
@@ -186,5 +201,6 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 3C is the active engineering milestone: validate the gallery/camera OCR
-flow on a physical device with live Google credentials.
+Phase 4 live validation is the active milestone: apply the reviewer persistence
+migration to Supabase, then prove save, list, open, rename, delete, and
+cross-user denial against the live project.

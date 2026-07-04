@@ -4,10 +4,11 @@ Last refreshed: 2026-07-05, Asia/Manila.
 
 ## Active Objective
 
-Phase 3D scanned PDF ingestion is complete. Live iPhone validation passed with
-a fictional, image-only, two-page scanned PDF, and the oversized-page-count
-rejection path was validated with a separate PDF containing more than five
-pages.
+Phase 4 Study Library and Persistence is implemented in code. Automated API,
+mobile, DB, engine, OCR, and browser-smoke regressions pass. The remaining
+external step is applying the `reviewers` migration to the target Supabase
+project and validating live RLS-backed persistence before marking Phase 4
+complete.
 
 ## Completed Phase 3A Scope
 
@@ -58,6 +59,26 @@ pages.
 - Add mocked PDF OCR web smoke with a fictional PDF fixture and real reviewer
   generation.
 
+## Completed Phase 4 Scope
+
+- Add a Supabase `reviewers` migration for saved reviewer output, safe source
+  metadata, section count, timestamps, and owner-scoped RLS.
+- Add typed reviewer persistence shapes to `@stay-focused/db`.
+- Add authenticated reviewer CRUD API routes under `/api/reviewers`.
+- Use verified bearer auth and caller-scoped Supabase access for reviewer CRUD;
+  do not use service-role CRUD for user library actions.
+- Add a mobile Study Library screen with loading, empty, error, list, open,
+  rename, delete, refresh, create-new, and logout paths.
+- Add a save-to-library panel after successful reviewer generation.
+- Preserve the proven reviewer engine, authenticated reviewer flow, image OCR,
+  camera OCR, scanned PDF OCR, and editable OCR-before-reviewer behavior.
+- Store only allowlisted source metadata and generated reviewer output; do not
+  persist raw source text, OCR text, uploaded image/PDF bytes, file paths,
+  credentials, tokens, or private document artifacts.
+- Harden the PDF OCR web smoke so fast mocked OCR completion can satisfy the
+  progress wait while the smoke still verifies the OCR POST shape and editable
+  text.
+
 ## Out Of Scope For Phase 3D Validation Documentation
 
 - Automatic repeated header/footer detection or cleanup.
@@ -67,6 +88,16 @@ pages.
 - Generation-schema changes.
 - Task generation.
 - Study schedule generation.
+
+## Out Of Scope For Phase 4
+
+- Applying the migration to the live Supabase project from this local agent.
+- Live cross-user RLS validation until the migrated table is available.
+- Canvas LMS integration.
+- Task generation.
+- Study schedule generation.
+- Background storage of uploads, OCR text, images, or PDFs.
+- Service-role reviewer CRUD for user library operations.
 
 ## Phase 3A Results
 
@@ -153,6 +184,35 @@ pages.
   and may become reviewer sections. Users can remove them in the editable OCR
   text field; automatic repeated header/footer detection is deferred.
 
+## Phase 4 Results
+
+- `packages/db/migrations/202607050001_create_reviewers.sql` creates the
+  `reviewers` table, update timestamp trigger, list index, and owner-scoped RLS
+  policies.
+- `apps/api` exposes save, list, open, rename, and delete routes for saved
+  reviewers.
+- Reviewer list responses return summaries only; full reviewer output is
+  returned by create/open responses.
+- The create route rejects client-supplied user IDs and unsupported metadata
+  keys.
+- The rename route allows title-only updates.
+- Missing or inaccessible reviewer IDs return `reviewer_not_found`.
+- The mobile Study Library reuses `ReviewerPreview` for saved reviewers and
+  opens them without regeneration.
+- Save metadata is limited to source mode, source character count, optional PDF
+  page count, and optional source label.
+- Automated verification passed:
+  - DB typecheck: passed
+  - API typecheck/tests: passed; 94/94 tests
+  - Mobile typecheck/tests: passed; 66/66 tests
+  - OCR package tests: 14/14
+  - Smoke-runner tests: 51/51
+  - Engine build/evals: passed; 266/266 eval cases
+  - Reviewer, image OCR, and PDF OCR web smokes passed with mocked OCR where
+    applicable.
+- Live Study Library validation was not run because the target Supabase project
+  still needs the Phase 4 migration applied.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -178,9 +238,16 @@ pages.
 - Live iPhone PDF OCR validates PDF selection, server-side Google Vision PDF
   OCR, editable extracted text, and reviewer generation with a fictional
   image-only scanned PDF.
+- Authenticated users can save, list, open, rename, and delete their own saved
+  reviewers.
+- RLS denies cross-user saved-reviewer access after the migration is applied to
+  a live Supabase project.
+- Saved reviewer metadata avoids raw source text, OCR output, uploads, file
+  paths, and credentials.
 
 ## Next Objective
 
-Choose the next scoped product task in a separate implementation pass. This
-documentation pass does not start Phase 4 or the deferred header/footer cleanup
-task.
+Apply the Phase 4 migration to the target Supabase project and run minimal live
+Study Library validation. After save, list, open, rename, delete, and cross-user
+denial are proven live, mark Phase 4 complete and begin the next scoped Phase 5
+Canvas task. The deferred header/footer cleanup task remains separate.

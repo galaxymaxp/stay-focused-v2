@@ -185,8 +185,10 @@ job is intentionally configured.
 - The authenticated reviewer route can invoke the real provider when server
   credentials are configured, but model quality, latency, cost, refusal, and
   operational behavior still need broader measurement.
-- User-facing source input is still primarily pasted text; OCR ingestion,
-  scanned PDFs, persistence, Canvas, tasks, and schedules are pending.
+- User-facing source input supports pasted text, image OCR, camera OCR, and
+  scanned-PDF OCR before reviewer generation. Reviewer persistence is handled by
+  authenticated API routes outside the OpenAI provider boundary. Canvas, tasks,
+  and schedules are pending.
 - Engine evals still use fake providers and remain unchanged.
 
 Node.js and npm are prerequisites for SDK installation and verification. V1

@@ -20,6 +20,13 @@ import {
   generateReviewer,
   type GenerateReviewerError,
 } from "../../services/reviewerApi";
+import {
+  saveReviewer,
+  type ReviewerLibraryError,
+  type SavedReviewerSourceMetadata,
+  type SavedReviewerSourceMode,
+  type SavedReviewerSummary,
+} from "../../services/reviewerLibraryApi";
 import { extractOcrText, extractPdfOcrText } from "../../services/ocrApi";
 import {
   captureImageWithCamera,
@@ -40,6 +47,7 @@ import {
   getSourceCharacterCount,
   initialReviewerSourceState,
   reviewerSourceReducer,
+  type ReviewerSourceState,
   type SourceFlowError,
 } from "./reviewerSourceFlow";
 import { ReviewerPreview } from "./ReviewerPreview";
@@ -47,15 +55,23 @@ import { ReviewerPreview } from "./ReviewerPreview";
 const DEFAULT_SOURCE_TEXT_HEIGHT = 180;
 const OCR_SMOKE_FIXTURE_ENABLED = isOcrSmokeFixtureEnabled();
 
+interface ReviewerGenerateScreenProps {
+  readonly onOpenLibrary?: () => void;
+}
+
 interface GenerationDisplayError {
   readonly title: string;
   readonly message: string;
   readonly detail?: string;
 }
 
-export function ReviewerGenerateScreen() {
+export function ReviewerGenerateScreen({
+  onOpenLibrary,
+}: ReviewerGenerateScreenProps) {
   const { isSigningOut, session, signOut } = useAuth();
   const [sourceTitle, setSourceTitle] = useState("");
+  const [imageSourceMode, setImageSourceMode] =
+    useState<Extract<SavedReviewerSourceMode, "gallery" | "camera">>("gallery");
   const [sourceState, dispatchSource] = useReducer(
     reviewerSourceReducer,
     initialReviewerSourceState,
@@ -64,7 +80,12 @@ export function ReviewerGenerateScreen() {
   const [generationError, setGenerationError] =
     useState<GenerationDisplayError | null>(null);
   const [reviewer, setReviewer] = useState<ReviewerOutput | null>(null);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [savedReviewer, setSavedReviewer] =
+    useState<SavedReviewerSummary | null>(null);
+  const [saveError, setSaveError] = useState<GenerationDisplayError | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingReviewer, setIsSavingReviewer] = useState(false);
   const reviewerAbortControllerRef = useRef<AbortController | null>(null);
   const ocrAbortControllerRef = useRef<AbortController | null>(null);
 
@@ -137,6 +158,9 @@ export function ReviewerGenerateScreen() {
     reviewerAbortControllerRef.current = abortController;
 
     setReviewer(null);
+    setSavedReviewer(null);
+    setSaveError(null);
+    setSaveTitle("");
     setIsGenerating(true);
 
     try {
@@ -150,6 +174,9 @@ export function ReviewerGenerateScreen() {
 
       if (result.ok) {
         setReviewer(result.reviewer);
+        setSaveTitle(
+          defaultReviewerSaveTitle(result.reviewer, trimmedSourceTitle),
+        );
       } else {
         setGenerationError(formatGenerateReviewerError(result.error));
       }
@@ -177,6 +204,9 @@ export function ReviewerGenerateScreen() {
 
     const result = await chooseImageFromGallery();
     applyImageSelectionResult(result);
+    if (result.status === "selected") {
+      setImageSourceMode("gallery");
+    }
   };
 
   const handleChoosePdf = async () => {
@@ -193,6 +223,9 @@ export function ReviewerGenerateScreen() {
 
     const result = await captureImageWithCamera();
     applyImageSelectionResult(result);
+    if (result.status === "selected") {
+      setImageSourceMode("camera");
+    }
   };
 
   const applyImageSelectionResult = (result: GallerySelectionResult) => {
@@ -224,6 +257,7 @@ export function ReviewerGenerateScreen() {
   };
 
   const handleUseSmokeFixtureImage = () => {
+    setImageSourceMode("gallery");
     dispatchSource({
       type: "image_selected",
       image: createOcrSmokeFixtureImage(),
@@ -378,6 +412,68 @@ export function ReviewerGenerateScreen() {
     }
   };
 
+  const handleSaveReviewer = async () => {
+    if (!reviewer) {
+      return;
+    }
+
+    const trimmedSaveTitle = saveTitle.trim();
+    setSaveError(null);
+
+    if (!trimmedSaveTitle) {
+      setSaveError({
+        title: "Save needs a title",
+        message: "Enter a title before saving this reviewer.",
+      });
+      return;
+    }
+
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    if (!apiBaseUrl) {
+      setSaveError({
+        title: "API address needs setup",
+        message: API_BASE_URL_SETUP_HINT,
+      });
+      return;
+    }
+
+    const accessToken = session?.accessToken.trim();
+    if (!accessToken) {
+      setSaveError({
+        title: "Login session expired",
+        message:
+          "Sign out and sign in again before saving this reviewer.",
+      });
+      return;
+    }
+
+    setIsSavingReviewer(true);
+
+    try {
+      const result = await saveReviewer({
+        apiBaseUrl,
+        accessToken,
+        title: trimmedSaveTitle,
+        sourceMetadata: createSavedReviewerSourceMetadata({
+          imageSourceMode,
+          sourceCharacterCount,
+          sourceState,
+          sourceTitle,
+        }),
+        reviewerOutput: reviewer,
+      });
+
+      if (result.ok) {
+        setSavedReviewer(result.data);
+        setSaveTitle(result.data.title);
+      } else {
+        setSaveError(formatSaveReviewerError(result.error));
+      }
+    } finally {
+      setIsSavingReviewer(false);
+    }
+  };
+
   return (
     <Screen contentContainerStyle={styles.content}>
       <KeyboardAvoidingView
@@ -513,6 +609,17 @@ export function ReviewerGenerateScreen() {
           >
             Log out
           </Button>
+
+          {onOpenLibrary ? (
+            <Button
+              fullWidth
+              onPress={onOpenLibrary}
+              testID="study-library-open-button"
+              variant="secondary"
+            >
+              Study Library
+            </Button>
+          ) : null}
         </Card>
 
         {isGenerating ? (
@@ -523,6 +630,23 @@ export function ReviewerGenerateScreen() {
               into readable study cards.
             </Text>
           </Card>
+        ) : null}
+
+        {reviewer ? (
+          <SaveReviewerPanel
+            isSaving={isSavingReviewer}
+            onChangeTitle={(value) => {
+              setSaveTitle(value);
+              setSaveError(null);
+            }}
+            onOpenLibrary={onOpenLibrary}
+            onSave={() => {
+              void handleSaveReviewer();
+            }}
+            savedReviewer={savedReviewer}
+            saveError={saveError}
+            saveTitle={saveTitle}
+          />
         ) : null}
 
         {reviewer ? <ReviewerPreview reviewer={reviewer} /> : null}
@@ -776,6 +900,87 @@ function PdfImportPanel({
   );
 }
 
+function SaveReviewerPanel({
+  isSaving,
+  onChangeTitle,
+  onOpenLibrary,
+  onSave,
+  savedReviewer,
+  saveError,
+  saveTitle,
+}: {
+  readonly isSaving: boolean;
+  readonly onChangeTitle: (value: string) => void;
+  readonly onOpenLibrary?: () => void;
+  readonly onSave: () => void;
+  readonly savedReviewer: SavedReviewerSummary | null;
+  readonly saveError: GenerationDisplayError | null;
+  readonly saveTitle: string;
+}) {
+  return (
+    <Card style={styles.saveCard} testID="reviewer-save-card">
+      <View style={styles.saveHeader}>
+        <Text style={styles.statusTitle}>Save to Study Library</Text>
+        <Text style={styles.statusText}>
+          Save this validated reviewer so you can reopen it later without
+          regenerating.
+        </Text>
+      </View>
+
+      <TextField
+        editable={!savedReviewer}
+        label="Saved reviewer title"
+        onChangeText={onChangeTitle}
+        testID="reviewer-save-title-input"
+        value={saveTitle}
+      />
+
+      {saveError ? (
+        <View style={styles.errorBox} testID="reviewer-save-error">
+          <Text style={styles.errorTitle}>{saveError.title}</Text>
+          <Text style={styles.errorText}>{saveError.message}</Text>
+          {saveError.detail ? (
+            <Text style={styles.errorDetail}>{saveError.detail}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {savedReviewer ? (
+        <View style={styles.successBox} testID="reviewer-save-success">
+          <Text style={styles.successText}>
+            Saved to Study Library as {savedReviewer.title}.
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={styles.imageActions}>
+        <Button
+          disabled={Boolean(savedReviewer) || saveTitle.trim().length === 0}
+          loading={isSaving}
+          onPress={onSave}
+          style={styles.imageActionButton}
+          testID="reviewer-save-button"
+          variant="primary"
+        >
+          {savedReviewer ? "Saved" : "Save reviewer"}
+        </Button>
+
+        {onOpenLibrary ? (
+          <Button
+            disabled={isSaving}
+            onPress={onOpenLibrary}
+            style={styles.imageActionButton}
+            testID="reviewer-save-open-library-button"
+            variant="secondary"
+          >
+            Open Study Library
+          </Button>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
 function formatImageSize(bytes: number): string {
   return formatFileSize(bytes);
 }
@@ -869,6 +1074,90 @@ function formatGenerateReviewerError(
     message:
       "Something went wrong while generating the reviewer. Try again in a moment.",
     detail,
+  };
+}
+
+function formatSaveReviewerError(
+  error: ReviewerLibraryError,
+): GenerationDisplayError {
+  const detail =
+    error.status !== undefined
+      ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
+      : `Details: code ${error.apiCode ?? error.code}.`;
+
+  if (error.code === "unauthorized" || error.code === "missing_access_token") {
+    return {
+      title: "Login session expired",
+      message: "Sign out and sign in again before saving this reviewer.",
+      detail,
+    };
+  }
+
+  if (error.code === "invalid_title") {
+    return {
+      title: "Save title needs a change",
+      message: error.message,
+      detail,
+    };
+  }
+
+  if (error.code === "network_error") {
+    return {
+      title: "Could not reach the API",
+      message: "Check the API address and network connection.",
+      detail,
+    };
+  }
+
+  if (error.code === "reviewer_storage_not_configured") {
+    return {
+      title: "Study Library is not configured",
+      message: error.message,
+      detail,
+    };
+  }
+
+  return {
+    title: "Reviewer could not be saved",
+    message: error.message,
+    detail,
+  };
+}
+
+function defaultReviewerSaveTitle(
+  reviewer: ReviewerOutput,
+  sourceTitle: string,
+): string {
+  const title = sourceTitle.trim() || reviewer.title.trim();
+  return title || "Untitled reviewer";
+}
+
+function createSavedReviewerSourceMetadata({
+  imageSourceMode,
+  sourceCharacterCount,
+  sourceState,
+  sourceTitle,
+}: {
+  readonly imageSourceMode: Extract<SavedReviewerSourceMode, "gallery" | "camera">;
+  readonly sourceCharacterCount: number;
+  readonly sourceState: ReviewerSourceState;
+  readonly sourceTitle: string;
+}): SavedReviewerSourceMetadata {
+  const sourceMode =
+    sourceState.mode === "paste"
+      ? "paste"
+      : sourceState.mode === "pdf"
+        ? "pdf"
+        : imageSourceMode;
+  const sourceLabel = sourceTitle.trim();
+
+  return {
+    sourceMode,
+    sourceCharacterCount,
+    ...(sourceState.mode === "pdf" && sourceState.pdfPageCount !== null
+      ? { pdfPageCount: sourceState.pdfPageCount }
+      : {}),
+    ...(sourceLabel ? { sourceLabel } : {}),
   };
 }
 
@@ -1117,6 +1406,12 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   statusCard: {
+    gap: spacing[2],
+  },
+  saveCard: {
+    gap: spacing[4],
+  },
+  saveHeader: {
     gap: spacing[2],
   },
   statusTitle: {

@@ -21,6 +21,8 @@ Sign in
 -> OpenAI generation
 -> coverage, grounding, and leakage validation
 -> reviewer preview
+-> save to Study Library
+-> list, open, rename, or delete saved reviewers
 ```
 
 The Expo app supports email/password Supabase sign-in, restores sessions, and
@@ -64,6 +66,23 @@ Storage is not used, and PDFs over five pages are rejected instead of silently
 truncated. Live iPhone Expo Go validation has passed against the local Next.js
 API over LAN with server-only Google Cloud Vision PDF OCR.
 
+Phase 4 adds user-owned reviewer persistence:
+
+```text
+Validated reviewer output
+-> authenticated reviewer CRUD API
+-> caller-scoped Supabase client
+-> reviewers table protected by RLS
+-> Study Library list/open/rename/delete
+```
+
+The mobile app can save a generated reviewer after the existing reviewer
+pipeline succeeds. Saved reviewers reopen in the existing `ReviewerPreview`
+without regeneration. The library stores reviewer output and a small
+allowlisted source-metadata object; raw pasted source text, OCR text, uploaded
+images, PDFs, file paths, credentials, and private OCR artifacts are not stored
+by the save flow.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -95,27 +114,42 @@ API over LAN with server-only Google Cloud Vision PDF OCR.
 - Mocked PDF OCR web smoke with a fictional in-memory PDF fixture and real
   reviewer generation.
 - Manual pasted text remains available as a separate source mode.
+- Supabase `reviewers` migration with timestamps, source metadata, reviewer
+  JSON output, section count, and owner-scoped RLS policies.
+- Typed reviewer persistence shapes in `@stay-focused/db`.
+- Protected `GET /api/reviewers`, `POST /api/reviewers`,
+  `GET /api/reviewers/[id]`, `PATCH /api/reviewers/[id]`, and
+  `DELETE /api/reviewers/[id]` routes using verified bearer auth and
+  user-scoped Supabase access.
+- Mobile Study Library list, open, rename, delete, refresh, create-new, and
+  save-after-generation flows.
+- Save-to-library flow preserves editable OCR-before-reviewer behavior and
+  does not persist raw source text or OCR/upload bytes.
 
 ## Current Verification Baselines
 
-Verified across the Phase 3D implementation and live-validation pass:
+Verified across the Phase 4 implementation pass:
 
+- DB package typecheck: passed
 - OCR package typecheck: passed
 - OCR package build: passed
 - OCR package normalization tests: 14 passed, 0 failed
 - Google OCR fake-client tests: included in API tests
-- OCR API route and adapter tests: 72 passed, 0 failed
+- API route, reviewer library, OCR route, and adapter tests: 94 passed, 0 failed
 - Reviewer smoke-runner tests: 51 passed, 0 failed
 - Engine build: passed
 - Engine evaluations: 266 passed, 0 failed
 - API typecheck: passed
 - Mobile typecheck: passed
-- Mobile OCR client, picker, and source-flow tests: 61 passed, 0 failed
+- Mobile OCR client, picker, source-flow, and Study Library API tests: 66
+  passed, 0 failed
 - Reviewer web smoke: passed with real reviewer generation
 - Deterministic OCR web smoke: passed with mocked OCR response and real
   reviewer generation
 - Deterministic PDF OCR web smoke: passed with a fictional PDF fixture, mocked
   OCR response, editable extracted text, and real reviewer generation
+- Live Supabase Study Library validation: pending until the Phase 4 migration
+  is applied to the target Supabase project.
 - Phase 3C live iPhone camera/image OCR validation: passed with local Expo Go
   -> Next.js API over LAN -> server-only Google Cloud Vision -> editable OCR
   text review -> reviewer generation. Reviewer Ready appeared, source-faithful,
@@ -132,17 +166,29 @@ Verified across the Phase 3D implementation and live-validation pass:
   with the expected UI messages. See
   `docs/ai/phase3d-pdf-ocr-validation-20260704.md`.
 
-Latest recorded unattended smoke during Phase 3A verification:
+Latest recorded unattended smokes during Phase 4 implementation:
 
 - `npm run smoke:reviewer:web`: passed
-- Local HEAD before Phase 3A commit: `00d3e8f`
 - Authentication: persisted session
 - Reviewer POST: HTTP 200
 - Source-faithful, coverage, and clean-output statuses: passed
+- `npm run smoke:ocr:web`: passed with mocked OCR response, editable extracted
+  text, and real reviewer generation
+- `npm run smoke:ocr-pdf:web`: passed with mocked PDF OCR response, editable
+  extracted text, and real reviewer generation
 
 ## Known Local Test Command
 
 ```sh
+npm run typecheck --workspace @stay-focused/db
+npm run typecheck --workspace apps/api
+npm run test --workspace apps/api
+npm run typecheck --workspace apps/mobile
+npm run test --workspace apps/mobile
+npm run build --workspace @stay-focused/engine
+npm run eval --workspace @stay-focused/engine
+npm run test --workspace @stay-focused/ocr
+npm run test:reviewer-web-smoke
 npm run smoke:reviewer:web
 npm run smoke:ocr:web
 npm run smoke:ocr-pdf:web
@@ -170,7 +216,9 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
-- Reviewer persistence and the Study Library are not implemented.
+- Study Library implementation is code-complete locally, but the Phase 4
+  migration still needs to be applied and validated against the target live
+  Supabase project before the roadmap phase is marked complete.
 - Canvas LMS integration is not implemented beyond the package boundary.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
@@ -179,15 +227,19 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Phase 3 source ingestion is complete. Choose the next scoped product task in a
-separate implementation pass; repeated PDF header/footer cleanup remains a
-deferred OCR cleanup candidate.
+Apply the Phase 4 `reviewers` migration to the target Supabase project and run
+minimal live Study Library validation: save, list, open, rename, delete, and
+cross-user denial. After that, mark Phase 4 complete and choose the next scoped
+Phase 5 Canvas task. Repeated PDF header/footer cleanup remains a deferred OCR
+cleanup candidate.
 
 ## Known Risks
 
 - OneDrive-backed generated Next output can create stale reparse-point artifacts;
   the smoke runner clears the generated `apps/api/.next/server` directory before
-  runner-owned API startup.
+  runner-owned API startup. During Phase 4 verification, one stale
+  `apps/api/.next/types/cache-life.d.ts` generated reparse-point artifact had to
+  be removed manually before rerunning the PDF OCR smoke.
 - OpenAI cost, rate limits, and serverless latency can affect reviewer
   generation.
 - OCR layout preservation is critical because reviewer quality depends on line,
@@ -200,6 +252,9 @@ deferred OCR cleanup candidate.
 - Scanned-PDF support is implemented as a synchronous 1-5 page MVP. Visible
   repeated headers and footers may still need manual removal before generation
   until a later cleanup task adds automatic repeated header/footer detection.
+- Reviewer persistence depends on the live Supabase `reviewers` migration and
+  RLS policies being present. API tests use mocked clients and do not replace a
+  live cross-user RLS validation.
 - Mobile OAuth redirect completion still needs validation before it is claimed
   as complete.
 - Secrets must remain server-only; mobile env files may contain only public

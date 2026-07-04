@@ -145,13 +145,13 @@ extracted as source text and become reviewer sections. Users can remove them in
 the editable OCR text field. Automatic repeated header/footer detection is
 deferred to a later OCR cleanup task.
 
-Immediate next task: choose the next scoped product task in a separate
-implementation pass. Phase 4 remains pending and was not started by the Phase
-3D validation documentation pass.
+Immediate next task after Phase 3D: Phase 4 Study Library and Persistence.
+Phase 4 implementation now exists in code; live migrated Supabase validation is
+still required before marking that phase complete.
 
 ## Phase 4 - Study Library And Persistence
 
-Status: Pending
+Status: Implemented in code; live migrated Supabase validation pending
 
 Purpose: Save generated study content to a user-owned library so reviewers can
 be reopened, renamed, and managed across sessions.
@@ -165,15 +165,33 @@ Major deliverables:
 - Open, rename, and delete actions
 - Study Library as the saved-content destination
 
+Implemented foundations:
+
+- `reviewers` Supabase migration with owner-scoped RLS policies, timestamps,
+  section count, source metadata, and reviewer JSON output.
+- Typed reviewer table shapes in `@stay-focused/db`.
+- Authenticated Next.js reviewer CRUD API using the caller's bearer token and
+  user-scoped Supabase access instead of service-role CRUD.
+- Mobile Study Library screen with list, open, rename, delete, refresh, and
+  return-to-generator actions.
+- Save-to-library action after reviewer generation, preserving editable
+  OCR-before-reviewer behavior and storing only safe source metadata.
+- Regression-hardened PDF OCR web smoke wait for fast mocked OCR completion.
+
 Exit criteria:
 
 - Authenticated users can save, list, open, rename, and delete their own
   reviewers.
 - RLS prevents cross-user access.
 - Reviewer metadata preserves enough source context for later study workflows.
+- Automated API, mobile, DB typecheck, engine, OCR, and browser smoke
+  regression checks pass.
+- Live migrated Supabase validation proves save, list, open, rename, delete,
+  and cross-user denial against the deployed `reviewers` table.
 
-Immediate dependency: Phase 3 source-ingestion contracts stable enough to store
-source metadata consistently.
+Immediate dependency: Phase 3 source-ingestion contracts are stable enough to
+store source metadata consistently. Remaining external dependency: apply the
+Phase 4 migration to the target Supabase project and validate live RLS.
 
 ## Phase 5 - Canvas Integration
 

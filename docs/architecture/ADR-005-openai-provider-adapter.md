@@ -104,13 +104,14 @@ are provided.
 
 ## Current Implementation Note
 
-As of `ebb79d8`, the API package includes the OpenAI SDK, the
+As of Phase 4, the API package includes the OpenAI SDK, the
 `createServerOpenAIProvider` factory, and the protected
 `POST /api/reviewer/generate` route. The current completed vertical slice signs
-in with Supabase email/password, submits pasted text from Expo, calls the
-authenticated reviewer API, uses OpenAI-backed generation, validates coverage
-and grounding, and renders a reviewer preview. OCR ingestion, Canvas sync,
-reviewer persistence, tasks, and schedules remain pending product phases.
+in with Supabase email/password, submits pasted text or edited OCR/PDF OCR text
+from Expo, calls the authenticated reviewer API, uses OpenAI-backed generation,
+validates coverage and grounding, renders a reviewer preview, and can save/open
+reviewers through authenticated persistence routes. Canvas sync, tasks, and
+schedules remain pending product phases.
 
 ## Alternatives Considered
 
