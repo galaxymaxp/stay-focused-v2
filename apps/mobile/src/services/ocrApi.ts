@@ -1,8 +1,11 @@
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
 
 const OCR_EXTRACT_PATH = "/api/ocr/extract";
+const OCR_EXTRACT_PDF_PATH = "/api/ocr/extract-pdf";
 const OCR_IMAGE_FORM_FIELD = "image";
+const OCR_PDF_FORM_FIELD = "pdf";
 export const OCR_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const OCR_MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_ERROR_MESSAGE_CHARS = 300;
 
 export const SUPPORTED_OCR_IMAGE_MIME_TYPES = [
@@ -11,8 +14,17 @@ export const SUPPORTED_OCR_IMAGE_MIME_TYPES = [
 ] as const;
 
 export type OcrImageMimeType = (typeof SUPPORTED_OCR_IMAGE_MIME_TYPES)[number];
+export type OcrPdfMimeType = "application/pdf";
 
 export interface OcrImageUpload {
+  readonly uri: string;
+  readonly mimeType: string;
+  readonly fileName?: string;
+  readonly fileSize?: number;
+  readonly webFile?: Blob;
+}
+
+export interface OcrPdfUpload {
   readonly uri: string;
   readonly mimeType: string;
   readonly fileName?: string;
@@ -24,6 +36,15 @@ export interface ExtractOcrTextInput {
   readonly apiBaseUrl: string;
   readonly accessToken: string;
   readonly image: OcrImageUpload;
+  readonly signal?: AbortSignal;
+  readonly fetchImpl?: typeof fetch;
+  readonly platformOS?: OcrUploadPlatform;
+}
+
+export interface ExtractPdfOcrTextInput {
+  readonly apiBaseUrl: string;
+  readonly accessToken: string;
+  readonly pdf: OcrPdfUpload;
   readonly signal?: AbortSignal;
   readonly fetchImpl?: typeof fetch;
   readonly platformOS?: OcrUploadPlatform;
@@ -51,9 +72,16 @@ export type OcrClientErrorCode =
   | "invalid_api_base_url"
   | "missing_access_token"
   | "invalid_image"
+  | "invalid_pdf"
   | "unsupported_media_type"
+  | "unsupported_file_type"
   | "image_too_large"
+  | "file_too_large"
   | "empty_image"
+  | "empty_file"
+  | "pdf_encrypted"
+  | "pdf_page_limit_exceeded"
+  | "no_text_detected"
   | "unauthorized"
   | "ocr_not_configured"
   | "ocr_provider_failed"
@@ -74,6 +102,8 @@ export interface OcrExtractData {
   readonly text: string;
   readonly pages: readonly unknown[];
   readonly mimeType: string;
+  readonly pageCount?: number;
+  readonly processedPageCount?: number;
   readonly provider: string;
   readonly warnings: readonly unknown[];
 }
@@ -94,13 +124,13 @@ interface OcrExtractErrorResponse {
 type NativeFormDataFile = {
   readonly uri: string;
   readonly name: string;
-  readonly type: OcrImageMimeType;
+  readonly type: OcrImageMimeType | OcrPdfMimeType;
 };
 
 export async function extractOcrText(
   input: ExtractOcrTextInput,
 ): Promise<ExtractOcrTextResult> {
-  const endpoint = createOcrEndpoint(input.apiBaseUrl);
+  const endpoint = createOcrEndpoint(input.apiBaseUrl, OCR_EXTRACT_PATH);
   if (!endpoint.ok) {
     return endpoint;
   }
@@ -136,7 +166,7 @@ export async function extractOcrText(
       signal: input.signal,
     });
 
-    return await parseOcrResponse(response);
+    return await parseOcrResponse(response, "image");
   } catch (error) {
     if (isAbortError(error) || input.signal?.aborted) {
       return clientError("request_cancelled", "OCR extraction was cancelled.");
@@ -149,6 +179,58 @@ export async function extractOcrText(
   }
 }
 
+export async function extractPdfOcrText(
+  input: ExtractPdfOcrTextInput,
+): Promise<ExtractOcrTextResult> {
+  const endpoint = createOcrEndpoint(input.apiBaseUrl, OCR_EXTRACT_PDF_PATH);
+  if (!endpoint.ok) {
+    return endpoint;
+  }
+
+  const accessToken = input.accessToken.trim();
+  if (!accessToken) {
+    return clientError(
+      "missing_access_token",
+      "An access token is required to extract text from a PDF.",
+    );
+  }
+
+  const pdf = validateOcrPdfUpload(input.pdf);
+  if (!pdf.ok) {
+    return pdf;
+  }
+
+  const fetcher = input.fetchImpl ?? fetch;
+
+  try {
+    const formData = await createOcrPdfFormData({
+      fetchImpl: fetcher,
+      pdf: pdf.value,
+      platformOS: input.platformOS ?? getDefaultUploadPlatform(),
+    });
+
+    const response = await fetcher(endpoint.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+      signal: input.signal,
+    });
+
+    return await parseOcrResponse(response, "pdf");
+  } catch (error) {
+    if (isAbortError(error) || input.signal?.aborted) {
+      return clientError("request_cancelled", "OCR extraction was cancelled.");
+    }
+
+    return clientError(
+      "network_error",
+      `PDF OCR request failed before receiving a response. Check that the API host and port are reachable from this device. ${API_BASE_URL_SETUP_HINT}`,
+    );
+  }
+}
+
 export function createNativeOcrUploadPart(
   image: ValidatedOcrImageUpload,
 ): NativeFormDataFile {
@@ -156,6 +238,16 @@ export function createNativeOcrUploadPart(
     uri: image.uri,
     name: image.fileName,
     type: image.mimeType,
+  };
+}
+
+export function createNativeOcrPdfUploadPart(
+  pdf: ValidatedOcrPdfUpload,
+): NativeFormDataFile {
+  return {
+    uri: pdf.uri,
+    name: pdf.fileName,
+    type: pdf.mimeType,
   };
 }
 
@@ -183,6 +275,30 @@ export async function createOcrImageFormData({
   return formData;
 }
 
+export async function createOcrPdfFormData({
+  fetchImpl = fetch,
+  pdf,
+  platformOS = getDefaultUploadPlatform(),
+}: {
+  readonly fetchImpl?: typeof fetch;
+  readonly pdf: ValidatedOcrPdfUpload;
+  readonly platformOS?: OcrUploadPlatform;
+}): Promise<FormData> {
+  const formData = new FormData();
+
+  if (platformOS === "web") {
+    const webFile = await createWebOcrPdfUploadFile(pdf, fetchImpl);
+    formData.append(OCR_PDF_FORM_FIELD, webFile, pdf.fileName);
+    return formData;
+  }
+
+  formData.append(
+    OCR_PDF_FORM_FIELD,
+    createNativeOcrPdfUploadPart(pdf) as unknown as Blob,
+  );
+  return formData;
+}
+
 function getDefaultUploadPlatform(): OcrUploadPlatform {
   return typeof document === "undefined" ? "native" : "web";
 }
@@ -190,6 +306,14 @@ function getDefaultUploadPlatform(): OcrUploadPlatform {
 export interface ValidatedOcrImageUpload {
   readonly uri: string;
   readonly mimeType: OcrImageMimeType;
+  readonly fileName: string;
+  readonly fileSize?: number;
+  readonly webFile?: Blob;
+}
+
+export interface ValidatedOcrPdfUpload {
+  readonly uri: string;
+  readonly mimeType: OcrPdfMimeType;
   readonly fileName: string;
   readonly fileSize?: number;
   readonly webFile?: Blob;
@@ -242,6 +366,49 @@ export function validateOcrImageUpload(
   };
 }
 
+export function validateOcrPdfUpload(
+  pdf: OcrPdfUpload,
+):
+  | { readonly ok: true; readonly value: ValidatedOcrPdfUpload }
+  | { readonly ok: false; readonly error: OcrClientError } {
+  const uri = pdf.uri.trim();
+  if (!uri) {
+    return clientError("invalid_pdf", "Choose a PDF before extracting text.");
+  }
+
+  const mimeType = normalizeMimeType(pdf.mimeType);
+  if (mimeType !== "application/pdf") {
+    return clientError("unsupported_file_type", "Choose a PDF file.", 415);
+  }
+
+  if (pdf.fileSize !== undefined) {
+    if (!Number.isFinite(pdf.fileSize) || pdf.fileSize < 0) {
+      return clientError("invalid_pdf", "The selected PDF is invalid.");
+    }
+    if (pdf.fileSize === 0) {
+      return clientError("empty_file", "The selected PDF is empty.", 400);
+    }
+    if (pdf.fileSize > OCR_MAX_PDF_BYTES) {
+      return clientError(
+        "file_too_large",
+        `Choose a PDF that is at most ${formatBytes(OCR_MAX_PDF_BYTES)}.`,
+        413,
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      uri,
+      mimeType: "application/pdf",
+      fileName: sanitizePdfFileName(pdf.fileName),
+      ...(pdf.fileSize !== undefined ? { fileSize: pdf.fileSize } : {}),
+      ...(pdf.webFile ? { webFile: pdf.webFile } : {}),
+    },
+  };
+}
+
 export function isSupportedOcrImageMimeType(
   value: string,
 ): value is OcrImageMimeType {
@@ -279,6 +446,7 @@ export function sanitizeOcrDiagnosticText(value: string): string {
 
 function createOcrEndpoint(
   apiBaseUrl: string,
+  path: typeof OCR_EXTRACT_PATH | typeof OCR_EXTRACT_PDF_PATH,
 ):
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly error: OcrClientError } {
@@ -309,7 +477,7 @@ function createOcrEndpoint(
 
   return {
     ok: true,
-    url: `${normalizedBaseUrl}${OCR_EXTRACT_PATH}`,
+    url: `${normalizedBaseUrl}${path}`,
   };
 }
 
@@ -341,18 +509,51 @@ async function fetchImageBlob(
   return await response.blob();
 }
 
-async function parseOcrResponse(response: Response): Promise<ExtractOcrTextResult> {
+async function createWebOcrPdfUploadFile(
+  pdf: ValidatedOcrPdfUpload,
+  fetchImpl: typeof fetch,
+): Promise<Blob> {
+  const sourceBlob = pdf.webFile ?? (await fetchPdfBlob(pdf.uri, fetchImpl));
+  const typedBlob =
+    sourceBlob.type === pdf.mimeType
+      ? sourceBlob
+      : new Blob([sourceBlob], { type: pdf.mimeType });
+
+  if (typeof File === "function" && !(typedBlob instanceof File)) {
+    return new File([typedBlob], pdf.fileName, { type: pdf.mimeType });
+  }
+
+  return typedBlob;
+}
+
+async function fetchPdfBlob(
+  uri: string,
+  fetchImpl: typeof fetch,
+): Promise<Blob> {
+  const response = await fetchImpl(uri);
+  if (!response.ok) {
+    throw new Error("Selected PDF could not be read.");
+  }
+  return await response.blob();
+}
+
+async function parseOcrResponse(
+  response: Response,
+  sourceKind: "image" | "pdf",
+): Promise<ExtractOcrTextResult> {
   const parsed = await readJson(response);
 
   if (!response.ok) {
-    return apiError(response.status, parsed);
+    return apiError(response.status, parsed, sourceKind);
   }
 
   if (isOcrExtractSuccessResponse(parsed)) {
     if (parsed.data.text.trim().length === 0) {
       return clientError(
-        "ocr_empty_result",
-        "OCR returned no readable text from this image.",
+        sourceKind === "pdf" ? "no_text_detected" : "ocr_empty_result",
+        sourceKind === "pdf"
+          ? "No readable text was detected in this PDF."
+          : "OCR returned no readable text from this image.",
         422,
       );
     }
@@ -380,14 +581,23 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-function apiError(status: number, parsed: unknown): ExtractOcrTextResult {
+function apiError(
+  status: number,
+  parsed: unknown,
+  sourceKind: "image" | "pdf",
+): ExtractOcrTextResult {
   if (isOcrExtractErrorResponse(parsed)) {
     const code = mapApiErrorCode(parsed.error.code);
     return {
       ok: false,
       error: {
         code,
-        message: safeApiErrorMessage(parsed.error.message, status, code),
+        message: safeApiErrorMessage(
+          parsed.error.message,
+          status,
+          code,
+          sourceKind,
+        ),
         status,
         ...(code === "unknown_error" ? { apiCode: parsed.error.code } : {}),
       },
@@ -395,8 +605,8 @@ function apiError(status: number, parsed: unknown): ExtractOcrTextResult {
   }
 
   return clientError(
-    statusToClientErrorCode(status),
-    statusToClientErrorMessage(status),
+    statusToClientErrorCode(status, sourceKind),
+    statusToClientErrorMessage(status, sourceKind),
     status,
   );
 }
@@ -420,9 +630,16 @@ function mapApiErrorCode(code: string): OcrClientErrorCode {
   switch (code) {
     case "unauthorized":
     case "unsupported_media_type":
+    case "unsupported_file_type":
     case "invalid_image":
+    case "invalid_pdf":
     case "image_too_large":
+    case "file_too_large":
     case "empty_image":
+    case "empty_file":
+    case "pdf_encrypted":
+    case "pdf_page_limit_exceeded":
+    case "no_text_detected":
     case "ocr_not_configured":
     case "ocr_provider_failed":
     case "ocr_empty_result":
@@ -433,18 +650,21 @@ function mapApiErrorCode(code: string): OcrClientErrorCode {
   }
 }
 
-function statusToClientErrorCode(status: number): OcrClientErrorCode {
+function statusToClientErrorCode(
+  status: number,
+  sourceKind: "image" | "pdf",
+): OcrClientErrorCode {
   if (status === 401) {
     return "unauthorized";
   }
   if (status === 413) {
-    return "image_too_large";
+    return sourceKind === "pdf" ? "file_too_large" : "image_too_large";
   }
   if (status === 415) {
-    return "unsupported_media_type";
+    return sourceKind === "pdf" ? "unsupported_file_type" : "unsupported_media_type";
   }
   if (status === 422) {
-    return "ocr_empty_result";
+    return sourceKind === "pdf" ? "no_text_detected" : "ocr_empty_result";
   }
   if (status >= 500) {
     return "ocr_provider_failed";
@@ -452,18 +672,25 @@ function statusToClientErrorCode(status: number): OcrClientErrorCode {
   return "invalid_response";
 }
 
-function statusToClientErrorMessage(status: number): string {
+function statusToClientErrorMessage(
+  status: number,
+  sourceKind: "image" | "pdf",
+): string {
   if (status === 401) {
     return "OCR extraction requires a valid session.";
   }
   if (status === 413) {
-    return `Choose an image that is at most ${formatBytes(OCR_MAX_IMAGE_BYTES)}.`;
+    return sourceKind === "pdf"
+      ? `Choose a PDF that is at most ${formatBytes(OCR_MAX_PDF_BYTES)}.`
+      : `Choose an image that is at most ${formatBytes(OCR_MAX_IMAGE_BYTES)}.`;
   }
   if (status === 415) {
-    return "Choose a PNG or JPEG image.";
+    return sourceKind === "pdf" ? "Choose a PDF file." : "Choose a PNG or JPEG image.";
   }
   if (status === 422) {
-    return "OCR returned no readable text from this image.";
+    return sourceKind === "pdf"
+      ? "No readable text was detected in this PDF."
+      : "OCR returned no readable text from this image.";
   }
   if (status >= 500) {
     return "OCR extraction failed on the server.";
@@ -475,6 +702,7 @@ function safeApiErrorMessage(
   message: string,
   status: number,
   code: OcrClientErrorCode,
+  sourceKind: "image" | "pdf",
 ): string {
   if (code === "ocr_provider_failed") {
     return "OCR extraction failed on the server.";
@@ -492,7 +720,7 @@ function safeApiErrorMessage(
     .trim()
     .slice(0, MAX_ERROR_MESSAGE_CHARS);
   if (!normalized || looksLikeStackTrace(normalized)) {
-    return statusToClientErrorMessage(status);
+    return statusToClientErrorMessage(status, sourceKind);
   }
   return normalized;
 }
@@ -511,6 +739,15 @@ function sanitizeFileName(
   }
 
   return mimeType === "image/png" ? "selected-image.png" : "selected-image.jpg";
+}
+
+function sanitizePdfFileName(fileName: string | undefined): string {
+  const normalized = fileName?.trim().replace(/[\\/:*?"<>|]+/g, "-");
+  if (normalized) {
+    return normalized;
+  }
+
+  return "selected-document.pdf";
 }
 
 function formatBytes(bytes: number): string {

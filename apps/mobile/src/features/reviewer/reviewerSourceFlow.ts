@@ -3,8 +3,12 @@ import type {
   GallerySelectionError,
   SelectedGalleryImage,
 } from "./galleryImage";
+import type {
+  PdfSelectionError,
+  SelectedPdfDocument,
+} from "./pdfDocument";
 
-export type ReviewerSourceMode = "paste" | "image";
+export type ReviewerSourceMode = "paste" | "image" | "pdf";
 export type OcrSourceStatus = "idle" | "selected" | "uploading" | "ready" | "failed";
 
 export interface ReviewerSourceState {
@@ -12,6 +16,8 @@ export interface ReviewerSourceState {
   readonly manualText: string;
   readonly ocrText: string;
   readonly selectedImage: SelectedGalleryImage | null;
+  readonly selectedPdf: SelectedPdfDocument | null;
+  readonly pdfPageCount: number | null;
   readonly ocrStatus: OcrSourceStatus;
   readonly ocrError: SourceFlowError | null;
 }
@@ -19,6 +25,7 @@ export interface ReviewerSourceState {
 export type SourceFlowError = {
   readonly code:
     | GallerySelectionError["code"]
+    | PdfSelectionError["code"]
     | OcrClientError["code"]
     | "unknown_error";
   readonly title: string;
@@ -46,11 +53,23 @@ export type ReviewerSourceAction =
       readonly image: SelectedGalleryImage;
     }
   | {
+      readonly type: "pdf_selection_cancelled";
+    }
+  | {
+      readonly type: "pdf_selection_failed";
+      readonly error: PdfSelectionError;
+    }
+  | {
+      readonly type: "pdf_selected";
+      readonly pdf: SelectedPdfDocument;
+    }
+  | {
       readonly type: "ocr_started";
     }
   | {
       readonly type: "ocr_succeeded";
       readonly text: string;
+      readonly pageCount?: number;
     }
   | {
       readonly type: "ocr_failed";
@@ -58,6 +77,9 @@ export type ReviewerSourceAction =
     }
   | {
       readonly type: "clear_image";
+    }
+  | {
+      readonly type: "clear_pdf";
     }
   | {
       readonly type: "clear_error";
@@ -68,6 +90,8 @@ export const initialReviewerSourceState: ReviewerSourceState = {
   manualText: "",
   ocrText: "",
   selectedImage: null,
+  selectedPdf: null,
+  pdfPageCount: null,
   ocrStatus: "idle",
   ocrError: null,
 };
@@ -85,9 +109,9 @@ export function reviewerSourceReducer(
       };
 
     case "edit_source_text":
-      return state.mode === "image"
-        ? { ...state, ocrText: action.value, ocrError: null }
-        : { ...state, manualText: action.value, ocrError: null };
+      return state.mode === "paste"
+        ? { ...state, manualText: action.value, ocrError: null }
+        : { ...state, ocrText: action.value, ocrError: null };
 
     case "image_selection_cancelled":
       return {
@@ -108,6 +132,34 @@ export function reviewerSourceReducer(
         ...state,
         mode: "image",
         selectedImage: action.image,
+        selectedPdf: null,
+        pdfPageCount: null,
+        ocrText: "",
+        ocrError: null,
+        ocrStatus: "selected",
+      };
+
+    case "pdf_selection_cancelled":
+      return {
+        ...state,
+        ocrError: null,
+      };
+
+    case "pdf_selection_failed":
+      return {
+        ...state,
+        mode: "pdf",
+        ocrError: formatPdfSelectionError(action.error),
+        ocrStatus: state.selectedPdf ? state.ocrStatus : "idle",
+      };
+
+    case "pdf_selected":
+      return {
+        ...state,
+        mode: "pdf",
+        selectedImage: null,
+        selectedPdf: action.pdf,
+        pdfPageCount: null,
         ocrText: "",
         ocrError: null,
         ocrStatus: "selected",
@@ -124,16 +176,22 @@ export function reviewerSourceReducer(
       const text = action.text.replace(/\r\n?/g, "\n");
       return {
         ...state,
-        mode: "image",
         ocrText: text,
         ocrError:
           text.trim().length === 0
             ? {
-                code: "ocr_empty_result",
+                code: state.mode === "pdf" ? "no_text_detected" : "ocr_empty_result",
                 title: "No readable text found",
-                message: "OCR returned no readable text from this image.",
+                message:
+                  state.mode === "pdf"
+                    ? "No readable text was detected in this PDF."
+                    : "OCR returned no readable text from this image.",
               }
             : null,
+        pdfPageCount:
+          state.mode === "pdf" && action.pageCount !== undefined
+            ? action.pageCount
+            : state.pdfPageCount,
         ocrStatus: text.trim().length === 0 ? "failed" : "ready",
       };
     }
@@ -154,6 +212,16 @@ export function reviewerSourceReducer(
         ocrStatus: "idle",
       };
 
+    case "clear_pdf":
+      return {
+        ...state,
+        selectedPdf: null,
+        pdfPageCount: null,
+        ocrText: "",
+        ocrError: null,
+        ocrStatus: "idle",
+      };
+
     case "clear_error":
       return {
         ...state,
@@ -163,7 +231,7 @@ export function reviewerSourceReducer(
 }
 
 export function getCurrentSourceText(state: ReviewerSourceState): string {
-  return state.mode === "image" ? state.ocrText : state.manualText;
+  return state.mode === "paste" ? state.manualText : state.ocrText;
 }
 
 export function getSourceCharacterCount(state: ReviewerSourceState): number {
@@ -172,6 +240,10 @@ export function getSourceCharacterCount(state: ReviewerSourceState): number {
 
 export function canExtractOcrText(state: ReviewerSourceState): boolean {
   return Boolean(state.selectedImage && state.ocrStatus !== "uploading");
+}
+
+export function canExtractPdfText(state: ReviewerSourceState): boolean {
+  return Boolean(state.selectedPdf && state.ocrStatus !== "uploading");
 }
 
 export function formatGallerySelectionError(
@@ -217,6 +289,37 @@ export function formatGallerySelectionError(
   }
 }
 
+export function formatPdfSelectionError(
+  error: PdfSelectionError,
+): SourceFlowError {
+  switch (error.code) {
+    case "unsupported_file_type":
+      return {
+        code: error.code,
+        title: "Use PDF",
+        message: "Choose a PDF file.",
+      };
+    case "file_too_large":
+      return {
+        code: error.code,
+        title: "PDF is too large",
+        message: "Choose a PDF that is at most 10 MiB.",
+      };
+    case "empty_file":
+      return {
+        code: error.code,
+        title: "PDF is empty",
+        message: "Choose a non-empty PDF.",
+      };
+    case "selection_failed":
+      return {
+        code: error.code,
+        title: "PDF selection failed",
+        message: "Choose the PDF again.",
+      };
+  }
+}
+
 export function formatOcrClientError(error: OcrClientError): SourceFlowError {
   switch (error.code) {
     case "unauthorized":
@@ -232,6 +335,12 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
         title: "Use PNG or JPEG",
         message: "Choose a PNG or JPEG image.",
       };
+    case "unsupported_file_type":
+      return {
+        code: error.code,
+        title: "Use PDF",
+        message: "Choose a PDF file.",
+      };
     case "image_too_large":
       return {
         code: error.code,
@@ -243,6 +352,42 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
         code: error.code,
         title: "Image is empty",
         message: "Choose a non-empty image.",
+      };
+    case "invalid_pdf":
+      return {
+        code: error.code,
+        title: "Invalid PDF",
+        message: "Choose a valid PDF file.",
+      };
+    case "file_too_large":
+      return {
+        code: error.code,
+        title: "PDF is too large",
+        message: "Choose a PDF that is at most 10 MiB.",
+      };
+    case "empty_file":
+      return {
+        code: error.code,
+        title: "PDF is empty",
+        message: "Choose a non-empty PDF.",
+      };
+    case "pdf_page_limit_exceeded":
+      return {
+        code: error.code,
+        title: "PDF has too many pages",
+        message: "PDF OCR supports up to 5 pages per request.",
+      };
+    case "pdf_encrypted":
+      return {
+        code: error.code,
+        title: "PDF is password-protected",
+        message: "Choose a PDF that does not require a password.",
+      };
+    case "no_text_detected":
+      return {
+        code: error.code,
+        title: "No readable text found",
+        message: "No readable text was detected in this PDF.",
       };
     case "ocr_empty_result":
       return {

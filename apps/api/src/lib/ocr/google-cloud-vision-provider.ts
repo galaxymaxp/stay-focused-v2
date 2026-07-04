@@ -9,6 +9,7 @@ import {
   type OcrDraftPage,
   type OcrImageMimeType,
   type OcrInput,
+  type OcrPdfMimeType,
   type OcrProvider,
   type OcrResult,
   type OcrWarning,
@@ -23,15 +24,35 @@ export interface GoogleVisionDocumentTextRequest {
   readonly mimeType: OcrImageMimeType;
 }
 
+export interface GoogleVisionPdfTextRequest {
+  readonly inputConfig: {
+    readonly content: Uint8Array;
+    readonly mimeType: OcrPdfMimeType;
+  };
+  readonly pages: readonly number[];
+}
+
 export interface GoogleVisionDocumentTextClient {
   documentTextDetection(
     request: GoogleVisionDocumentTextRequest,
   ): Promise<GoogleVisionDocumentTextResponse>;
+  batchAnnotateFiles(
+    request: GoogleVisionPdfTextRequest,
+  ): Promise<GoogleVisionBatchAnnotateFilesResponse>;
 }
 
 export interface GoogleVisionDocumentTextResponse {
   readonly fullTextAnnotation?: GoogleVisionFullTextAnnotation | null;
   readonly textAnnotations?: readonly GoogleVisionEntityAnnotation[] | null;
+  readonly error?: GoogleVisionResponseError | null;
+}
+
+export interface GoogleVisionBatchAnnotateFilesResponse {
+  readonly responses?: readonly GoogleVisionAnnotateFileResponse[] | null;
+}
+
+export interface GoogleVisionAnnotateFileResponse {
+  readonly responses?: readonly GoogleVisionDocumentTextResponse[] | null;
   readonly error?: GoogleVisionResponseError | null;
 }
 
@@ -105,7 +126,11 @@ export class GoogleCloudVisionOcrProvider implements OcrProvider {
   public readonly id = GOOGLE_CLOUD_VISION_PROVIDER_ID;
 
   public constructor(private readonly client: GoogleVisionDocumentTextClient) {
-    if (!client || typeof client.documentTextDetection !== "function") {
+    if (
+      !client ||
+      typeof client.documentTextDetection !== "function" ||
+      typeof client.batchAnnotateFiles !== "function"
+    ) {
       throw new OcrProviderError({
         code: "ocr_not_configured",
         message: "Google Cloud Vision OCR client is not configured.",
@@ -115,14 +140,12 @@ export class GoogleCloudVisionOcrProvider implements OcrProvider {
   }
 
   public async extract(input: OcrInput): Promise<OcrResult> {
-    if (input.kind !== "image") {
-      throw new OcrProviderError({
-        code: "ocr_provider_failed",
-        message: "Google Cloud Vision OCR received an unsupported input kind.",
-        provider: this.id,
-      });
-    }
+    return input.kind === "image"
+      ? await this.extractImage(input)
+      : await this.extractPdf(input);
+  }
 
+  private async extractImage(input: Extract<OcrInput, { readonly kind: "image" }>): Promise<OcrResult> {
     let response: unknown;
     try {
       response = await this.client.documentTextDetection({
@@ -135,6 +158,38 @@ export class GoogleCloudVisionOcrProvider implements OcrProvider {
 
     const result = normalizeOcrResult(
       mapGoogleVisionResponse(response, input.mimeType),
+    );
+    if (result.text.length === 0) {
+      throw new OcrProviderError({
+        code: "ocr_empty_result",
+        message: "Google Cloud Vision OCR returned no extracted text.",
+        provider: this.id,
+      });
+    }
+
+    return result;
+  }
+
+  private async extractPdf(input: Extract<OcrInput, { readonly kind: "pdf" }>): Promise<OcrResult> {
+    if (input.requestedPages.length === 0) {
+      throw providerFailure(new Error("PDF OCR requires at least one page."));
+    }
+
+    let response: unknown;
+    try {
+      response = await this.client.batchAnnotateFiles({
+        inputConfig: {
+          content: input.bytes,
+          mimeType: input.mimeType,
+        },
+        pages: input.requestedPages,
+      });
+    } catch (error) {
+      throw providerFailure(error);
+    }
+
+    const result = normalizeOcrResult(
+      mapGoogleVisionPdfResponse(response, input.mimeType, input.requestedPages),
     );
     if (result.text.length === 0) {
       throw new OcrProviderError({
@@ -201,6 +256,99 @@ function mapGoogleVisionResponse(
     provider: GOOGLE_CLOUD_VISION_PROVIDER_ID,
     pages: fallbackText ? [{ pageNumber: 1, text: fallbackText }] : [],
     warnings,
+  };
+}
+
+function mapGoogleVisionPdfResponse(
+  response: unknown,
+  mimeType: OcrPdfMimeType,
+  requestedPages: readonly number[],
+): NormalizeOcrResultInput {
+  if (!isGoogleVisionBatchAnnotateFilesResponse(response)) {
+    throw providerFailure(new Error("Malformed Google Vision PDF response."));
+  }
+
+  const fileResponse = (response.responses ?? [])[0];
+  if (!fileResponse) {
+    throw providerFailure(new Error("Google Vision returned no file response."));
+  }
+
+  const fileError = readNonEmptyString(fileResponse.error?.message);
+  if (fileError) {
+    throw providerFailure(new Error("Google Vision returned a file error."));
+  }
+
+  const pageResponses = fileResponse.responses;
+  if (!Array.isArray(pageResponses) || pageResponses.length < requestedPages.length) {
+    throw providerFailure(new Error("Google Vision returned missing page responses."));
+  }
+
+  const warnings: OcrWarning[] = [];
+  const pages = requestedPages.map((pageNumber, index) =>
+    mapPdfPageResponse(pageResponses[index], pageNumber, warnings),
+  );
+
+  return {
+    mimeType,
+    provider: GOOGLE_CLOUD_VISION_PROVIDER_ID,
+    pages,
+    warnings,
+  };
+}
+
+function mapPdfPageResponse(
+  response: unknown,
+  pageNumber: number,
+  warnings: OcrWarning[],
+): OcrDraftPage {
+  if (!isGoogleVisionDocumentTextResponse(response)) {
+    throw providerFailure(new Error("Malformed Google Vision page response."));
+  }
+
+  const pageError = readNonEmptyString(response.error?.message);
+  if (pageError) {
+    throw providerFailure(new Error("Google Vision returned a page error."));
+  }
+
+  const annotation = response.fullTextAnnotation;
+  const fullText = readNonEmptyString(annotation?.text);
+  const annotationPages = Array.isArray(annotation?.pages) ? annotation.pages : [];
+  const annotationPage = annotationPages[0];
+  if (annotationPage) {
+    const mappedPage = mapPage(annotationPage, pageNumber);
+    const hasMappedText = (mappedPage.blocks ?? []).some(
+      (block) => (block.text ?? "").trim().length > 0,
+    );
+    if (hasMappedText || !fullText) {
+      return mappedPage;
+    }
+
+    warnings.push({
+      code: "missing_layout",
+      message: "Google Cloud Vision returned text without page layout.",
+      pageNumber,
+    });
+    return {
+      ...mappedPage,
+      text: fullText,
+    };
+  }
+
+  const fallbackText =
+    fullText ??
+    readNonEmptyString(response.textAnnotations?.[0]?.description) ??
+    "";
+  if (fallbackText) {
+    warnings.push({
+      code: "missing_layout",
+      message: "Google Cloud Vision returned text without page layout.",
+      pageNumber,
+    });
+  }
+
+  return {
+    pageNumber,
+    text: fallbackText,
   };
 }
 
@@ -421,8 +569,18 @@ function providerFailure(error: unknown): OcrProviderError {
   });
 }
 
+function isGoogleVisionBatchAnnotateFilesResponse(
+  value: unknown,
+): value is GoogleVisionBatchAnnotateFilesResponse {
+  return isRecord(value) && Array.isArray(value.responses);
+}
+
 function isGoogleVisionDocumentTextResponse(
   value: unknown,
 ): value is GoogleVisionDocumentTextResponse {
+  return isRecord(value);
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

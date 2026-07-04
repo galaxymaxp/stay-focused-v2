@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  extractPdfOcrText,
   extractOcrText,
   OCR_MAX_IMAGE_BYTES,
+  OCR_MAX_PDF_BYTES,
   sanitizeOcrDiagnosticText,
 } from "./ocrApi";
 
@@ -12,6 +14,19 @@ const SUCCESS_BODY = {
     text: "STUDY HABITS\nSet one clear goal.",
     pages: [],
     mimeType: "image/png",
+    provider: "google-cloud-vision",
+    warnings: [],
+  },
+};
+
+const SUCCESS_PDF_BODY = {
+  ok: true,
+  data: {
+    text: "STUDY HABITS\n\nREVIEW METHODS",
+    pages: [],
+    mimeType: "application/pdf",
+    pageCount: 2,
+    processedPageCount: 2,
     provider: "google-cloud-vision",
     warnings: [],
   },
@@ -35,7 +50,9 @@ describe("extractOcrText", () => {
     expect(request.init.headers).toEqual({ Authorization: "Bearer token-value" });
     expect(request.init.headers).not.toHaveProperty("Content-Type");
     expect(request.init.body).toBeInstanceOf(FormData);
-    expect(readFormDataFile(request.init.body as FormData).type).toBe("image/png");
+    expect(readFormDataFile(request.init.body as FormData, "image").type).toBe(
+      "image/png",
+    );
   });
 
   it("sends a valid JPEG multipart request", async () => {
@@ -53,9 +70,9 @@ describe("extractOcrText", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(readFormDataFile(lastApiRequest(fetchImpl).init.body as FormData).type).toBe(
-      "image/jpeg",
-    );
+    expect(
+      readFormDataFile(lastApiRequest(fetchImpl).init.body as FormData, "image").type,
+    ).toBe("image/jpeg");
   });
 
   it("normalizes the API base URL", async () => {
@@ -264,6 +281,131 @@ describe("extractOcrText", () => {
   });
 });
 
+describe("extractPdfOcrText", () => {
+  it("sends a valid PDF multipart request", async () => {
+    const fetchImpl = createApiFetch(SUCCESS_PDF_BODY);
+
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl,
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      data: SUCCESS_PDF_BODY.data,
+    });
+    const request = lastApiRequest(fetchImpl);
+    expect(request.url).toBe("http://localhost:3000/api/ocr/extract-pdf");
+    expect(request.init.headers).toEqual({ Authorization: "Bearer token-value" });
+    expect(request.init.headers).not.toHaveProperty("Content-Type");
+    expect(request.init.body).toBeInstanceOf(FormData);
+    const file = readFormDataFile(request.init.body as FormData, "pdf");
+    expect(file.type).toBe("application/pdf");
+  });
+
+  it("rejects unsupported PDF MIME types before upload", async () => {
+    const fetchImpl = vi.fn();
+
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl,
+      pdf: createPdf({ mimeType: "text/plain", fileName: "notes.txt" }),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "unsupported_file_type" },
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized PDFs before upload when size is known", async () => {
+    const fetchImpl = vi.fn();
+
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl,
+      pdf: createPdf({ fileSize: OCR_MAX_PDF_BYTES + 1 }),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "file_too_large", status: 413 },
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("maps PDF page-limit responses", async () => {
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl: createApiFetch(
+        {
+          ok: false,
+          error: {
+            code: "pdf_page_limit_exceeded",
+            message: "PDF OCR supports up to 5 pages per request.",
+          },
+        },
+        422,
+      ),
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "pdf_page_limit_exceeded", status: 422 },
+    });
+  });
+
+  it("maps password-protected PDF responses", async () => {
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl: createApiFetch(
+        {
+          ok: false,
+          error: {
+            code: "pdf_encrypted",
+            message: "Password-protected PDFs cannot be read.",
+          },
+        },
+        422,
+      ),
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "pdf_encrypted", status: 422 },
+    });
+  });
+
+  it("maps PDF network failures", async () => {
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl: vi.fn().mockRejectedValue(new Error("socket failed")),
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "network_error" },
+    });
+  });
+});
+
 function createImage(
   overrides: {
     readonly fileName?: string;
@@ -278,6 +420,23 @@ function createImage(
     fileName: overrides.fileName ?? "notes.png",
     fileSize: overrides.fileSize ?? 4,
     webFile: new Blob([new Uint8Array([1, 2, 3, 4])], { type: mimeType }),
+  };
+}
+
+function createPdf(
+  overrides: {
+    readonly fileName?: string;
+    readonly fileSize?: number;
+    readonly mimeType?: string;
+  } = {},
+) {
+  const mimeType = overrides.mimeType ?? "application/pdf";
+  return {
+    uri: "memory://notes.pdf",
+    mimeType,
+    fileName: overrides.fileName ?? "notes.pdf",
+    fileSize: overrides.fileSize ?? 4,
+    webFile: new Blob([new Uint8Array([37, 80, 68, 70])], { type: mimeType }),
   };
 }
 
@@ -302,10 +461,10 @@ function lastApiRequest(fetchImpl: ReturnType<typeof createApiFetch>) {
   };
 }
 
-function readFormDataFile(formData: FormData): Blob {
-  const file = formData.get("image");
+function readFormDataFile(formData: FormData, fieldName: string): Blob {
+  const file = formData.get(fieldName);
   if (!(file instanceof Blob)) {
-    throw new Error("FormData image field was not a Blob");
+    throw new Error(`FormData ${fieldName} field was not a Blob`);
   }
   return file;
 }

@@ -6,6 +6,8 @@ export interface OcrExtractSuccessResponse {
     readonly text: string;
     readonly pages: readonly OcrPage[];
     readonly mimeType: string;
+    readonly pageCount?: number;
+    readonly processedPageCount?: number;
     readonly provider: string;
     readonly warnings: readonly OcrWarning[];
   };
@@ -14,9 +16,16 @@ export interface OcrExtractSuccessResponse {
 export type OcrExtractErrorCode =
   | "unauthorized"
   | "unsupported_media_type"
+  | "unsupported_file_type"
   | "invalid_image"
+  | "invalid_pdf"
   | "image_too_large"
+  | "pdf_encrypted"
+  | "pdf_page_limit_exceeded"
+  | "file_too_large"
   | "empty_image"
+  | "empty_file"
+  | "no_text_detected"
   | "ocr_not_configured"
   | "ocr_provider_failed"
   | "ocr_empty_result"

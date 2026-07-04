@@ -19,10 +19,7 @@ interface IndexedValue<TValue> {
 export function normalizeOcrResult(input: NormalizeOcrResultInput): OcrResult {
   const warnings: OcrWarning[] = [...(input.warnings ?? [])];
   const pages = normalizePages(input.pages, warnings);
-  const text = pages
-    .map((page) => page.text)
-    .filter((pageText) => pageText.length > 0)
-    .join("\n\n");
+  const text = normalizeOcrText(pages.map((page) => page.text).join("\n\n"));
 
   if (text.length === 0) {
     warnings.push({

@@ -94,9 +94,27 @@ Completed in Phase 3C:
 - Verified Reviewer Ready, source-faithful, coverage, and clean-output passed
   for the live OCR-generated reviewer.
 
+Implemented in Phase 3D - live validation pending:
+
+- Synchronous small-batch PDF OCR ingestion for one PDF per request.
+- PDF selection through Expo Document Picker.
+- Authenticated upload to `POST /api/ocr/extract-pdf`.
+- Server-side PDF validation for MIME type, `%PDF-` signature, parseability,
+  encrypted/password-protected files, upload size, and 1-5 page count.
+- Google Vision `DOCUMENT_TEXT_DETECTION` through synchronous
+  `batchAnnotateFiles` with inline PDF bytes and explicit pages.
+- Page-ordered normalized text with editable extracted-text review before
+  reviewer generation.
+- PDFs over five pages are rejected, not silently truncated.
+- PDF files stay server-bound; Google credentials remain server-only.
+- No Cloud Storage, background jobs, polling, local PDF rasterization, Poppler,
+  or Ghostscript in this phase.
+- Mocked PDF OCR web smoke using a fictional PDF fixture and real reviewer
+  generation.
+
 Remaining Phase 3 deliverables:
 
-- Phase 3D: scanned-PDF ingestion.
+- Live iPhone validation for Phase 3D scanned-PDF ingestion.
 
 Exit criteria:
 
@@ -108,10 +126,13 @@ Exit criteria:
   paste remains available.
 - Live iPhone camera/image OCR validation passes without exposing Google
   credentials to mobile code or committed files.
+- Live iPhone PDF OCR validation passes using a fictional 1-2 page scanned PDF,
+  editable OCR text, and reviewer generation.
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: Phase 3D - scanned PDF ingestion.
+Immediate next task: live iPhone validation using a fictional 1-2 page scanned
+PDF.
 
 ## Phase 4 - Study Library And Persistence
 

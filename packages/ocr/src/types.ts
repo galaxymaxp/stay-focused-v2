@@ -5,6 +5,12 @@ export const OCR_SUPPORTED_IMAGE_MIME_TYPES = [
 
 export type OcrImageMimeType = (typeof OCR_SUPPORTED_IMAGE_MIME_TYPES)[number];
 
+export const OCR_PDF_MIME_TYPE = "application/pdf" as const;
+
+export type OcrPdfMimeType = typeof OCR_PDF_MIME_TYPE;
+
+export type OcrMimeType = OcrImageMimeType | OcrPdfMimeType;
+
 export interface OcrPoint {
   readonly x: number;
   readonly y: number;
@@ -21,7 +27,15 @@ export interface OcrImageInput {
   readonly fileName?: string;
 }
 
-export type OcrInput = OcrImageInput;
+export interface OcrPdfInput {
+  readonly kind: "pdf";
+  readonly mimeType: OcrPdfMimeType;
+  readonly bytes: Uint8Array;
+  readonly requestedPages: readonly number[];
+  readonly fileName?: string;
+}
+
+export type OcrInput = OcrImageInput | OcrPdfInput;
 
 export type OcrBlockKind = "block" | "paragraph" | "line-group";
 
@@ -66,7 +80,7 @@ export interface OcrWarning {
 export interface OcrResult {
   readonly text: string;
   readonly pages: readonly OcrPage[];
-  readonly mimeType: OcrImageMimeType;
+  readonly mimeType: OcrMimeType;
   readonly provider: string;
   readonly warnings: readonly OcrWarning[];
 }
@@ -128,7 +142,7 @@ export interface OcrDraftPage {
 }
 
 export interface NormalizeOcrResultInput {
-  readonly mimeType: OcrImageMimeType;
+  readonly mimeType: OcrMimeType;
   readonly provider: string;
   readonly pages: readonly OcrDraftPage[];
   readonly warnings?: readonly OcrWarning[];

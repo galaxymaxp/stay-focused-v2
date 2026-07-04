@@ -14,9 +14,9 @@ paths.
 - Stay Focused V2 remains engine-first, evaluation-first, schedule-first, and
   mobile-primary through Expo/React Native.
 - The current completed vertical slice is: sign in -> paste source text,
-  import a gallery image, or take a camera photo -> review and edit source
-  text -> authenticated reviewer API -> OpenAI generation -> coverage,
-  grounding, and leakage validation -> reviewer preview.
+  import a gallery image, take a camera photo, or import a PDF -> review and
+  edit source text -> authenticated reviewer API -> OpenAI generation ->
+  coverage, grounding, and leakage validation -> reviewer preview.
 - Phase 3A is implemented: provider-agnostic OCR contracts live in
   `@stay-focused/ocr`, Google Cloud Vision OCR wiring lives only under
   `apps/api/src/lib/ocr`, and `POST /api/ocr/extract` exposes a protected
@@ -24,26 +24,29 @@ paths.
 - Expo Web is the fast laptop-browser development and regression surface for
   the mobile app, not a replacement for the mobile-primary product.
 - User-facing source intake in the mobile app now supports manual paste,
-  gallery-selected PNG/JPEG OCR, and camera-captured PNG/JPEG OCR with editable
-  extracted-text review. Physical-device live OCR validation passed on an
-  iPhone through Expo Go against the local Next.js API over LAN with
-  server-only Google Cloud Vision OCR. Scanned-PDF OCR, reviewer persistence,
-  Study Library, Canvas integration, task generation, and study schedule
-  generation are pending.
+  gallery-selected PNG/JPEG OCR, camera-captured PNG/JPEG OCR, and PDF OCR with
+  editable extracted-text review. Physical-device live image OCR validation
+  passed on an iPhone through Expo Go against the local Next.js API over LAN
+  with server-only Google Cloud Vision OCR. Phase 3D PDF OCR is implemented,
+  but live iPhone PDF validation is pending. Reviewer persistence, Study
+  Library, Canvas integration, task generation, and study schedule generation
+  are pending.
 
 ## Current Test Baselines
 
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
-- OCR package normalization tests: 10 passed, 0 failed.
-- Google OCR fake-client tests: 10 passed, 0 failed.
-- OCR API route tests: 14 passed, 0 failed.
-- API route and adapter tests: 43 passed, 0 failed.
+- OCR package typecheck/build/tests: passed; 14 tests passed, 0 failed.
+- API typecheck/tests: passed; 72 tests passed, 0 failed.
 - Engine build: passed.
 - Engine evaluations: 266 passed, 0 failed.
-- API typecheck: passed.
 - Mobile typecheck: passed.
-- Mobile OCR client/source-flow tests: 37 passed, 0 failed.
-- OCR web smoke: passed with mocked OCR response and real reviewer generation.
+- Mobile OCR client/picker/source-flow tests: 61 passed, 0 failed.
+- Reviewer smoke-runner tests: 51 passed, 0 failed.
+- Reviewer web smoke: passed with real reviewer generation.
+- OCR web smoke: passed with mocked image OCR response and real reviewer
+  generation.
+- PDF OCR web smoke: passed with a fictional in-memory PDF fixture, mocked PDF
+  OCR response, editable extracted text, and real reviewer generation.
 - Phase 3C live iPhone camera/image OCR validation: passed with editable OCR
   text, reviewer generation, Reviewer Ready, source-faithful, coverage, and
   clean-output validation.
@@ -51,11 +54,12 @@ paths.
   passed on local HEAD `00d3e8f` before the Phase 3A commit, using a persisted
   session and returning HTTP 200 from the reviewer POST.
 - Current unattended smoke command: `npm run smoke:reviewer:web`.
-- Current OCR browser smoke command: `npm run smoke:ocr:web`.
+- Current OCR browser smoke commands: `npm run smoke:ocr:web` and
+  `npm run smoke:ocr-pdf:web`.
 
 ## Immediate Next Task
 
-Phase 3D: scanned PDF ingestion.
+Live iPhone validation using a fictional 1-2 page scanned PDF.
 
 ## Known Blockers And Risks
 
@@ -69,8 +73,9 @@ Phase 3D: scanned PDF ingestion.
 - Live Google OCR has passed on a correctly configured local API, but future
   live OCR remains credential-, LAN-, and device-dependent. Credential paths
   are machine-specific and must not be documented or committed.
-- Scanned-PDF OCR is the next ingestion risk because it adds multi-page input,
-  file parsing, and layout-preservation concerns beyond single-image OCR.
+- Scanned-PDF OCR is implemented as a synchronous 1-5 page MVP. Live validation
+  remains the next risk because it depends on Expo Go, LAN reachability,
+  server-only Google credentials, and a fictional scanned PDF fixture.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
   committed files.
@@ -314,6 +319,37 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-04 Phase 3D scanned PDF OCR ingestion
+
+- Implemented synchronous small-batch scanned PDF OCR ingestion.
+- Added Expo Document Picker PDF selection with one-file `application/pdf`
+  intake, cache-copy enabled, filename/type/size display, page-count display
+  after server validation, retry, and clear-PDF handling.
+- Added `POST /api/ocr/extract-pdf` with Supabase bearer authentication,
+  multipart field `pdf`, 10 MiB upload cap, `%PDF-` signature validation,
+  `pdf-lib` parse/page-count validation, encrypted/malformed PDF safe errors,
+  and a 1-5 page limit.
+- Added Google Vision PDF OCR through synchronous `batchAnnotateFiles` with
+  inline PDF bytes, `DOCUMENT_TEXT_DETECTION`, and explicit pages. No Cloud
+  Storage, async operation, polling, or local PDF rasterization was added.
+- Extended `@stay-focused/ocr` to accept PDF inputs while preserving the
+  normalized document result shape used by image OCR.
+- Added PDF-specific mobile API upload, safe error mapping, source-flow state,
+  and editable extracted-text review before reviewer generation.
+- Added mocked PDF OCR web smoke using a fictional in-memory PDF fixture and
+  real reviewer generation.
+- Verification passed: OCR package typecheck/build/test 14/14; API typecheck
+  and tests 72/72; mobile typecheck and tests 61/61; smoke-runner tests 51/51;
+  engine build and eval 266/266; reviewer web smoke passed; image OCR web smoke
+  passed; PDF OCR web smoke passed.
+- Existing paste, gallery-image, camera-image, and image OCR API regression
+  paths remained covered by tests and smokes.
+- Google credentials remain server-only. No credential files, env files,
+  private PDFs, uploaded content, screenshots, tokens, or OCR output artifacts
+  were committed.
+- Verdict: IMPLEMENTED - LIVE VALIDATION PENDING.
+- Next task: live iPhone validation using a fictional 1-2 page scanned PDF.
 
 ### 2026-07-04 Phase 3C live iPhone OCR validation
 

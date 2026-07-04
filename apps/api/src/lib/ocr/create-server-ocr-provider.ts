@@ -6,6 +6,8 @@ import {
   type GoogleVisionDocumentTextClient,
   type GoogleVisionDocumentTextRequest,
   type GoogleVisionDocumentTextResponse,
+  type GoogleVisionBatchAnnotateFilesResponse,
+  type GoogleVisionPdfTextRequest,
 } from "./google-cloud-vision-provider";
 
 export type ServerOcrProviderEnvironment = Readonly<
@@ -111,6 +113,23 @@ function createGoogleVisionSdkClient(
   const client = new ImageAnnotatorClient(options);
 
   return {
+    batchAnnotateFiles: async (
+      request: GoogleVisionPdfTextRequest,
+    ): Promise<GoogleVisionBatchAnnotateFilesResponse> => {
+      const [response] = await client.batchAnnotateFiles({
+        requests: [
+          {
+            inputConfig: {
+              content: Buffer.from(request.inputConfig.content),
+              mimeType: request.inputConfig.mimeType,
+            },
+            features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+            pages: [...request.pages],
+          },
+        ],
+      });
+      return response as unknown as GoogleVisionBatchAnnotateFilesResponse;
+    },
     documentTextDetection: async (
       request: GoogleVisionDocumentTextRequest,
     ): Promise<GoogleVisionDocumentTextResponse> => {

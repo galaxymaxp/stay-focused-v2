@@ -4,8 +4,8 @@ Last refreshed: 2026-07-04, Asia/Manila.
 
 ## Active Objective
 
-Prepare Phase 3D scanned PDF ingestion after completing Phase 3C live
-camera/image OCR validation.
+Phase 3D scanned PDF ingestion is implemented. Live iPhone validation with a
+fictional 1-2 page scanned PDF is pending.
 
 ## Completed Phase 3A Scope
 
@@ -36,6 +36,25 @@ camera/image OCR validation.
 - Confirm edited OCR text is used as the reviewer source.
 - Confirm Reviewer Ready appears after generation.
 - Confirm source-faithful, coverage, and clean-output validation pass.
+
+## Implemented Phase 3D Scope - Live Validation Pending
+
+- Add `expo-document-picker` for one-file PDF selection from Files.
+- Add `Paste text`, `Import image`, and `Import PDF` source modes.
+- Show selected PDF filename, `APPLICATION/PDF`, size, and page count after
+  server validation when available.
+- Add authenticated multipart PDF upload to `POST /api/ocr/extract-pdf`.
+- Validate PDF MIME type, signature, parseability, encrypted/password-protected
+  files, upload size, and 1-5 page count on the API.
+- Reject PDFs over five pages instead of extracting only the first five.
+- Use Google Vision synchronous `batchAnnotateFiles` with inline PDF bytes,
+  `DOCUMENT_TEXT_DETECTION`, and explicit page numbers.
+- Normalize page-ordered PDF text into the existing editable extracted-text
+  review field.
+- Keep the existing paste, gallery-image, and camera-image flows unchanged and
+  regression-tested.
+- Add mocked PDF OCR web smoke with a fictional PDF fixture and real reviewer
+  generation.
 
 ## Out Of Scope For Phase 3C
 
@@ -92,6 +111,30 @@ camera/image OCR validation.
 - No captured images, screenshots, OCR test artifacts, credential files, or
   private OCR output are committed.
 
+## Phase 3D Results
+
+- `@stay-focused/ocr` now accepts image and PDF OCR inputs while preserving the
+  existing normalized document result shape.
+- `apps/api/src/lib/ocr` keeps the existing Google image OCR method and adds a
+  PDF path through `batchAnnotateFiles`.
+- `POST /api/ocr/extract-pdf` accepts bearer-authenticated multipart PDF uploads
+  using file field `pdf`.
+- PDF upload size is capped at 10 MiB.
+- PDF page count is detected with `pdf-lib`; encrypted or malformed PDFs return
+  safe errors.
+- Server-only Google credentials are reused; no Google credential is added to
+  mobile code or `EXPO_PUBLIC_*` variables.
+- Cloud Storage, background jobs, polling, and local PDF rasterization are not
+  used in this phase.
+- Automated verification passed:
+  - OCR package tests: 14/14
+  - API tests: 72/72
+  - Mobile tests: 61/61
+  - Smoke-runner tests: 51/51
+  - Engine evals: 266/266
+  - Reviewer, image OCR, and PDF OCR web smokes passed with mocked OCR where
+    applicable.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -113,7 +156,10 @@ camera/image OCR validation.
 - Reviewer Ready, source-faithful, coverage, and clean-output all pass on the
   live OCR flow.
 - Scanned PDFs remain out of Phase 3C scope.
+- Phase 3D is not complete until live iPhone PDF OCR validates PDF selection,
+  server-side Google Vision PDF OCR, editable extracted text, and reviewer
+  generation with a fictional 1-2 page scanned PDF.
 
 ## Next Objective
 
-Phase 3D - scanned PDF ingestion.
+Live iPhone validation using a fictional 1-2 page scanned PDF.

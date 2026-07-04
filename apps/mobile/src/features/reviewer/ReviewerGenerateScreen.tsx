@@ -20,7 +20,7 @@ import {
   generateReviewer,
   type GenerateReviewerError,
 } from "../../services/reviewerApi";
-import { extractOcrText } from "../../services/ocrApi";
+import { extractOcrText, extractPdfOcrText } from "../../services/ocrApi";
 import {
   captureImageWithCamera,
   chooseImageFromGallery,
@@ -29,7 +29,13 @@ import {
   type SelectedGalleryImage,
 } from "./galleryImage";
 import {
+  choosePdfDocument,
+  type PdfSelectionResult,
+  type SelectedPdfDocument,
+} from "./pdfDocument";
+import {
   canExtractOcrText,
+  canExtractPdfText,
   getCurrentSourceText,
   getSourceCharacterCount,
   initialReviewerSourceState,
@@ -84,6 +90,13 @@ export function ReviewerGenerateScreen() {
     };
   }, [sourceState.selectedImage?.uri]);
 
+  useEffect(() => {
+    const pdfUri = sourceState.selectedPdf?.uri;
+    return () => {
+      revokeWebObjectUrl(pdfUri);
+    };
+  }, [sourceState.selectedPdf?.uri]);
+
   const handleGenerate = async () => {
     const trimmedSourceText = visibleSourceText.trim();
     const trimmedSourceTitle = sourceTitle.trim();
@@ -93,8 +106,8 @@ export function ReviewerGenerateScreen() {
 
     if (!trimmedSourceText) {
       setValidationMessage(
-        sourceState.mode === "image"
-          ? "Extract text from an image, or enter corrected text before generating."
+        sourceState.mode === "image" || sourceState.mode === "pdf"
+          ? "Extract text from the selected file, or enter corrected text before generating."
           : "Paste source text before generating a reviewer.",
       );
       return;
@@ -166,6 +179,14 @@ export function ReviewerGenerateScreen() {
     applyImageSelectionResult(result);
   };
 
+  const handleChoosePdf = async () => {
+    setValidationMessage(null);
+    setGenerationError(null);
+
+    const result = await choosePdfDocument();
+    applyPdfSelectionResult(result);
+  };
+
   const handleCaptureImage = async () => {
     setValidationMessage(null);
     setGenerationError(null);
@@ -188,6 +209,20 @@ export function ReviewerGenerateScreen() {
     dispatchSource({ type: "image_selected", image: result.image });
   };
 
+  const applyPdfSelectionResult = (result: PdfSelectionResult) => {
+    if (result.status === "cancelled") {
+      dispatchSource({ type: "pdf_selection_cancelled" });
+      return;
+    }
+
+    if (result.status === "failed") {
+      dispatchSource({ type: "pdf_selection_failed", error: result.error });
+      return;
+    }
+
+    dispatchSource({ type: "pdf_selected", pdf: result.pdf });
+  };
+
   const handleUseSmokeFixtureImage = () => {
     dispatchSource({
       type: "image_selected",
@@ -199,6 +234,12 @@ export function ReviewerGenerateScreen() {
     ocrAbortControllerRef.current?.abort();
     ocrAbortControllerRef.current = null;
     dispatchSource({ type: "clear_image" });
+  };
+
+  const handleClearPdf = () => {
+    ocrAbortControllerRef.current?.abort();
+    ocrAbortControllerRef.current = null;
+    dispatchSource({ type: "clear_pdf" });
   };
 
   const handleExtractText = async () => {
@@ -266,6 +307,77 @@ export function ReviewerGenerateScreen() {
     }
   };
 
+  const handleExtractPdfText = async () => {
+    const selectedPdf = sourceState.selectedPdf;
+    if (!selectedPdf) {
+      dispatchSource({
+        type: "ocr_failed",
+        error: {
+          code: "invalid_pdf",
+          message: "Choose a PDF before extracting text.",
+        },
+      });
+      return;
+    }
+
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    if (!apiBaseUrl) {
+      dispatchSource({
+        type: "ocr_failed",
+        error: {
+          code: "invalid_api_base_url",
+          message: API_BASE_URL_SETUP_HINT,
+        },
+      });
+      return;
+    }
+
+    const accessToken = session?.accessToken.trim();
+    if (!accessToken) {
+      dispatchSource({
+        type: "ocr_failed",
+        error: {
+          code: "missing_access_token",
+          message:
+            "Your session is missing an access token. Sign out and sign in again.",
+        },
+      });
+      return;
+    }
+
+    ocrAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    ocrAbortControllerRef.current = abortController;
+
+    dispatchSource({ type: "ocr_started" });
+
+    try {
+      const result = await extractPdfOcrText({
+        apiBaseUrl,
+        accessToken,
+        pdf: selectedPdf,
+        platformOS: Platform.OS,
+        signal: abortController.signal,
+      });
+
+      if (result.ok) {
+        dispatchSource({
+          type: "ocr_succeeded",
+          text: result.data.text,
+          ...(result.data.pageCount !== undefined
+            ? { pageCount: result.data.pageCount }
+            : {}),
+        });
+      } else {
+        dispatchSource({ type: "ocr_failed", error: result.error });
+      }
+    } finally {
+      if (ocrAbortControllerRef.current === abortController) {
+        ocrAbortControllerRef.current = null;
+      }
+    }
+  };
+
   return (
     <Screen contentContainerStyle={styles.content}>
       <KeyboardAvoidingView
@@ -307,6 +419,14 @@ export function ReviewerGenerateScreen() {
               >
                 Import image
               </Button>
+              <Button
+                onPress={() => dispatchSource({ type: "switch_mode", mode: "pdf" })}
+                style={styles.sourceModeButton}
+                testID="reviewer-source-mode-pdf"
+                variant={sourceState.mode === "pdf" ? "primary" : "secondary"}
+              >
+                Import PDF
+              </Button>
             </View>
           </View>
 
@@ -325,18 +445,31 @@ export function ReviewerGenerateScreen() {
             />
           ) : null}
 
+          {sourceState.mode === "pdf" ? (
+            <PdfImportPanel
+              canExtract={canExtractPdfText(sourceState)}
+              error={sourceState.ocrError}
+              onChoosePdf={handleChoosePdf}
+              onClearPdf={handleClearPdf}
+              onExtractText={handleExtractPdfText}
+              pageCount={sourceState.pdfPageCount}
+              selectedPdf={sourceState.selectedPdf}
+              status={sourceState.ocrStatus}
+            />
+          ) : null}
+
           <TextField
             error={validationMessage}
             inputStyle={styles.sourceTextInput}
             label={
-              sourceState.mode === "image"
+              sourceState.mode === "image" || sourceState.mode === "pdf"
                 ? "Extracted text review"
                 : "Source text"
             }
             multiline
             onChangeText={handleSourceTextChange}
             placeholder={
-              sourceState.mode === "image"
+              sourceState.mode === "image" || sourceState.mode === "pdf"
                 ? "Extracted text will appear here. Correct OCR mistakes before generating."
                 : "Paste notes, readings, or lecture text here."
             }
@@ -537,7 +670,117 @@ function ImageImportPanel({
   );
 }
 
+function PdfImportPanel({
+  canExtract,
+  error,
+  onChoosePdf,
+  onClearPdf,
+  onExtractText,
+  pageCount,
+  selectedPdf,
+  status,
+}: {
+  readonly canExtract: boolean;
+  readonly error: SourceFlowError | null;
+  readonly onChoosePdf: () => void;
+  readonly onClearPdf: () => void;
+  readonly onExtractText: () => void;
+  readonly pageCount: number | null;
+  readonly selectedPdf: SelectedPdfDocument | null;
+  readonly status: "idle" | "selected" | "uploading" | "ready" | "failed";
+}) {
+  const isUploading = status === "uploading";
+
+  return (
+    <View style={styles.imagePanel}>
+      <View style={styles.imageActions}>
+        <Button
+          disabled={isUploading}
+          onPress={onChoosePdf}
+          style={styles.imageActionButton}
+          testID="reviewer-choose-pdf-button"
+          variant="secondary"
+        >
+          Choose PDF
+        </Button>
+      </View>
+
+      {selectedPdf ? (
+        <View style={styles.selectedPdfGroup} testID="reviewer-pdf-summary">
+          <Text style={styles.imageName} testID="reviewer-pdf-name">
+            {selectedPdf.fileName || "Selected PDF"}
+          </Text>
+          <Text style={styles.imageMetaText} testID="reviewer-pdf-meta">
+            {selectedPdf.mimeType.toUpperCase()}
+            {selectedPdf.fileSize !== undefined
+              ? ` - ${formatFileSize(selectedPdf.fileSize)}`
+              : ""}
+            {pageCount !== null
+              ? ` - ${pageCount} ${pageCount === 1 ? "page" : "pages"}`
+              : ""}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.helperText}>Choose a PDF from Files.</Text>
+      )}
+
+      {selectedPdf ? (
+        <View style={styles.imageActions}>
+          <Button
+            disabled={!canExtract}
+            loading={isUploading}
+            onPress={onExtractText}
+            style={styles.imageActionButton}
+            testID="reviewer-extract-pdf-text-button"
+            variant="primary"
+          >
+            {status === "failed" ? "Retry extraction" : "Extract text"}
+          </Button>
+          <Button
+            disabled={isUploading}
+            onPress={onClearPdf}
+            style={styles.imageActionButton}
+            testID="reviewer-clear-pdf-button"
+            variant="secondary"
+          >
+            Clear PDF
+          </Button>
+        </View>
+      ) : null}
+
+      {isUploading ? (
+        <View style={styles.infoBox} testID="reviewer-pdf-ocr-loading">
+          <Text style={styles.statusTitle}>Extracting text...</Text>
+          <Text style={styles.statusText}>
+            The PDF is uploaded to the protected OCR API. You can edit the
+            extracted text before reviewer generation.
+          </Text>
+        </View>
+      ) : null}
+
+      {status === "ready" ? (
+        <View style={styles.successBox} testID="reviewer-pdf-ocr-ready">
+          <Text style={styles.successText}>
+            Text extracted. Review and correct it before generating.
+          </Text>
+        </View>
+      ) : null}
+
+      {error ? (
+        <View style={styles.errorBox} testID="reviewer-pdf-ocr-error">
+          <Text style={styles.errorTitle}>{error.title}</Text>
+          <Text style={styles.errorText}>{error.message}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function formatImageSize(bytes: number): string {
+  return formatFileSize(bytes);
+}
+
+function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
   }
@@ -773,6 +1016,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing[3],
+  },
+  selectedPdfGroup: {
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.borderStrong,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: spacing[1],
+    padding: spacing[3],
   },
   imagePreview: {
     backgroundColor: colors.cardElevated,

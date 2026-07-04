@@ -88,6 +88,65 @@ describe("normalizeOcrResult", () => {
     expect(result.pages.map((page) => page.pageNumber)).toEqual([1, 2]);
   });
 
+  it("normalizes a single-page PDF document", () => {
+    const result = normalizeOcrResult({
+      mimeType: "application/pdf",
+      provider: "fake-ocr",
+      pages: [{ pageNumber: 1, text: "PDF HEADING\nA line from a scan." }],
+    });
+
+    expect(result.mimeType).toBe("application/pdf");
+    expect(result.pages).toHaveLength(1);
+    expect(result.text).toBe("PDF HEADING\nA line from a scan.");
+  });
+
+  it("preserves multi-page PDF ordering and separation", () => {
+    const result = normalizeOcrResult({
+      mimeType: "application/pdf",
+      provider: "fake-ocr",
+      pages: [
+        { pageNumber: 3, text: "Third page" },
+        { pageNumber: 1, text: "First page" },
+        { pageNumber: 2, text: "Second page" },
+      ],
+    });
+
+    expect(result.pages.map((page) => page.pageNumber)).toEqual([1, 2, 3]);
+    expect(result.text).toBe("First page\n\nSecond page\n\nThird page");
+  });
+
+  it("retains empty PDF pages without inventing content", () => {
+    const result = normalizeOcrResult({
+      mimeType: "application/pdf",
+      provider: "fake-ocr",
+      pages: [
+        { pageNumber: 1, text: "First page" },
+        { pageNumber: 2, text: "" },
+      ],
+    });
+
+    expect(result.pages).toEqual([
+      expect.objectContaining({ pageNumber: 1, text: "First page" }),
+      expect.objectContaining({ pageNumber: 2, text: "" }),
+    ]);
+    expect(result.text).toBe("First page");
+  });
+
+  it("reports an entire PDF document with no text", () => {
+    const result = normalizeOcrResult({
+      mimeType: "application/pdf",
+      provider: "fake-ocr",
+      pages: [{ pageNumber: 1, text: "" }],
+    });
+
+    expect(result.pages).toHaveLength(1);
+    expect(result.text).toBe("");
+    expect(result.warnings).toContainEqual({
+      code: "empty_text",
+      message: "The OCR provider returned no extracted text.",
+    });
+  });
+
   it("handles empty provider pages safely", () => {
     const result = normalizeOcrResult({
       mimeType: "image/png",
