@@ -8,14 +8,14 @@ expectations, and reports passed and failed cases with useful issue messages.
 ## Current Status
 
 Stage 0 through Stage 6 plus end-to-end pipeline integration are covered. The
-current aggregate result is **176 passed, 0 failed**. The harness is
+current aggregate result is **266 passed, 0 failed**. The harness is
 deterministic and dependency-free; provider-facing cases use fake providers
-only. LLM quality evals are intentionally deferred until a real provider
-adapter exists.
+only. LLM quality, latency, and cost evaluation remain separate from these
+deterministic contract evals.
 
 API-layer provider adapter contract checks are maintained separately from these
-176 engine evals. They use injected fake clients and do not replace the engine's
-fake-provider suites or require a real API key.
+266 engine evals. They use injected fake clients where possible and do not
+replace the engine's fake-provider suites.
 
 ## Why Evals Come Before Each Stage
 
@@ -41,8 +41,9 @@ Stable planning prevents provider behavior from hiding structural mistakes.
 Stage 3 evaluates the provider boundary without using a real model. Its suite
 checks provider-agnostic schema selection, deterministic prompt and request
 construction, source excerpt isolation, fake-provider failures, and runtime
-validation of all four section output shapes. Real OpenAI integration remains
-intentionally deferred so provider work cannot weaken the engine boundary.
+validation of all four section output shapes. The authenticated API route can
+construct the server OpenAI provider outside the engine; these evals still use
+fake providers so provider work cannot weaken the engine boundary.
 
 Stage 4 is deterministic coverage verification. Its evals compare generated
 outputs with planned schema kinds, required fields, and required source-block
@@ -53,9 +54,8 @@ Stage 5 performs bounded retries only. Its evals verify that passed outputs are
 preserved, only retryable weak or failed sections are regenerated, policy
 switches and retry limits are honored, provider failures remain contained, and
 final outputs follow plan order. Fake providers keep these cases deterministic;
-real OpenAI integration is intentionally deferred. The bounded flow prevents
-weak sections from silently reaching reviewer assembly without introducing an
-unbounded provider loop.
+the bounded flow prevents weak sections from silently reaching reviewer assembly
+without introducing an unbounded provider loop.
 
 Stage 6 performs deterministic reviewer assembly without a final model pass.
 Its evals cover all four typed section shapes, coverage acceptance, stable IDs,
@@ -68,8 +68,8 @@ The pipeline integration suite exercises `runPipeline` across Stage 0 through
 Stage 6 using extracted text inputs and deterministic fake providers. It checks
 schema routing, request counts, bounded retry behavior, final coverage,
 ordering, metadata, and contextual errors without connecting a real provider.
-Real OpenAI integration remains deferred, and GUI/mobile work remains deferred
-until the completed engine contract is documented and stable.
+OpenAI-backed API/mobile integration is covered by separate route, typecheck,
+and smoke workflows, not by this deterministic engine harness.
 
 ## Running Evals
 
@@ -140,6 +140,6 @@ case fails.
 5. Keep deterministic stage evals independent of UI and storage, and use fake
    providers for end-to-end pipeline fixtures.
 
-The current harness evaluates deterministic contracts only. It does not yet
-measure LLM response quality because generation-provider integration is
-intentionally not implemented.
+The current harness evaluates deterministic contracts only. It does not measure
+LLM response quality, OCR accuracy, Canvas behavior, persistence, or mobile UI
+behavior.

@@ -43,10 +43,11 @@ contracts.
 
 This pipeline is a capstone-ready technical contribution because it is
 documented and independently testable, not because real-provider quality is
-already complete. The dependency-free harness currently passes 219 cases and
-helps prevent V1-style regressions such as silently weak reviewers or missing
-later source sections. Provider quality evaluation and application integration
-remain future work.
+already complete. The dependency-free harness currently passes 266 cases and
+helps prevent V1-style regressions such as silently weak reviewers, missing
+later source sections, unsupported visible enrichment, and token-fidelity
+drift. Broader provider quality, latency, cost, and production evaluation remain
+future work.
 
 V2 also separates AI provider integration from the core engine. The OpenAI
 adapter is defined in the server/API layer behind `GenerationProvider`, where
@@ -54,8 +55,18 @@ it can be tested with fake clients without changing the pipeline or exposing
 credentials to mobile code. This separation improves maintainability and makes
 provider-specific failures testable before real network integration. Real SDK
 construction is isolated in a server-only factory and evaluated separately
-from deterministic engine behavior; the normal engine suite still performs no
-network calls.
+from deterministic engine behavior. The authenticated reviewer route can use
+that server provider for the current paste-text vertical slice; the normal
+engine suite still performs no network calls.
+
+## Current Product Slice
+
+The latest completed V2 slice lets a user sign in with Supabase
+email/password, paste source text into the Expo reviewer screen, submit it to a
+protected Next.js API route, generate reviewer content with OpenAI, validate
+coverage and source grounding through the engine, and preview the reviewer in
+the app. This proves the engine-to-mobile loop locally, but it is still a
+paste-first reviewer flow.
 
 ## Thesis Deliverables
 
@@ -63,3 +74,7 @@ network calls.
 - A documented and testable AI generation pipeline.
 - Technical documentation covering architecture, implementation, evaluation,
   security, and deployment.
+
+Canvas LMS integration, OCR ingestion, Study Library persistence, task
+generation, study scheduling, deployment validation, and production readiness
+remain future thesis/product work.

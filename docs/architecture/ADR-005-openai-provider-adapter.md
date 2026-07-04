@@ -23,16 +23,18 @@ engine. Implement the OpenAI adapter in `apps/api`, inject a narrow Responses
 API client, and map its output back to parsed structured data for Stage 3 to
 validate.
 
-Core engine stages must not import the OpenAI SDK. Real SDK construction,
-production route wiring, and network smoke tests remain deferred.
+Core engine stages must not import the OpenAI SDK. The current API layer now
+contains real SDK construction and the protected reviewer route wires the
+adapter into `runPipeline`; normal tests still use fake clients unless an
+explicit smoke command is run.
 
 ## Adapter Location
 
 The adapter lives in `apps/api/src/providers/openai-provider.ts`.
 
-`apps/api` is responsible for server-only configuration and future HTTP route
-wiring. This location prevents `OPENAI_API_KEY` and SDK code from entering the
-engine, browser bundles, or mobile application.
+`apps/api` is responsible for server-only configuration and HTTP route wiring.
+This location prevents `OPENAI_API_KEY` and SDK code from entering the engine,
+browser bundles, or mobile application.
 
 ## Provider Contract
 
@@ -87,9 +89,9 @@ request mapping, strict schema configuration, model selection, temperature,
 response parsing, validation errors, and client failure wrapping. They do not
 read `OPENAI_API_KEY` or make network calls.
 
-Real provider smoke tests are deferred. When added, they must be opt-in,
-server-side, excluded from deterministic evals, and skipped unless an explicit
-local credential and command are provided.
+Real provider smoke tests must be opt-in, server-side, excluded from
+deterministic evals, and skipped unless an explicit local credential and command
+are provided.
 
 ## Consequences
 
@@ -97,8 +99,18 @@ local credential and command are provided.
 - OpenAI SDK changes can be isolated to API adapter wiring.
 - Provider mapping is testable without credentials or network access.
 - Server and mobile secret boundaries are explicit.
-- Production integration still requires SDK installation, client construction,
-  route wiring, and opt-in operational testing.
+- Production hardening still requires broader operational testing, deployment
+  validation, cost tracking, latency measurement, and failure monitoring.
+
+## Current Implementation Note
+
+As of `ebb79d8`, the API package includes the OpenAI SDK, the
+`createServerOpenAIProvider` factory, and the protected
+`POST /api/reviewer/generate` route. The current completed vertical slice signs
+in with Supabase email/password, submits pasted text from Expo, calls the
+authenticated reviewer API, uses OpenAI-backed generation, validates coverage
+and grounding, and renders a reviewer preview. OCR ingestion, Canvas sync,
+reviewer persistence, tasks, and schedules remain pending product phases.
 
 ## Alternatives Considered
 

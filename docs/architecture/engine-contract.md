@@ -153,11 +153,11 @@ The request contains:
   attempt when applicable.
 
 The engine calls this interface only. No direct OpenAI SDK import belongs in
-Stage 0 through Stage 6. A future provider adapter may translate this request
+Stage 0 through Stage 6. The API-layer OpenAI adapter translates this request
 into vendor-specific API calls without changing the stage contracts. The
-API-layer OpenAI adapter boundary is now defined by
-[ADR-005](ADR-005-openai-provider-adapter.md); real SDK client construction and
-network wiring remain deferred.
+adapter boundary is defined by
+[ADR-005](ADR-005-openai-provider-adapter.md), and the protected reviewer route
+uses it outside `packages/engine`.
 
 ## Schema Family
 
@@ -196,38 +196,40 @@ rather than silently dropping them.
 The dependency-free harness compiles with the engine and uses JSON fixtures plus
 small TypeScript assertions. It covers:
 
-- Stage 0 normalization: 14 cases;
-- Stage 1 outline detection: 14 cases;
-- Stage 2 generation planning: 24 cases;
-- Stage 3 request construction and output validation: 24 cases;
-- Stage 4 coverage verification: 21 cases;
-- Stage 5 bounded retries: 28 cases;
-- Stage 6 reviewer assembly: 30 cases; and
-- end-to-end pipeline integration: 21 cases.
+- Stage 0 normalization: 19 cases;
+- Stage 1 outline detection: 16 cases;
+- Stage 2 generation planning: 26 cases;
+- Stage 3 request construction and output validation: 46 cases;
+- Stage 4 coverage verification: 22 cases;
+- Stage 5a grounding validation: 24 cases;
+- Stage 5 bounded retries: 29 cases;
+- Stage 6 reviewer assembly: 30 cases;
+- student-visible source faithfulness: 7 cases;
+- source-token fidelity: 23 cases; and
+- end-to-end pipeline integration: 24 cases.
 
-Current result: **219 passed, 0 failed**. Provider-facing and integration cases
+Current result: **266 passed, 0 failed**. Provider-facing and integration cases
 use deterministic fake providers only. The runner exits with code 1 when any
 case fails.
 
 ## Current Limitations
 
-- Engine evals use fake providers. The API adapter has fake-client contract
-  checks, but real OpenAI integration is not present.
+- Engine evals use fake providers. The API route can use the server OpenAI
+  provider, but deterministic evals do not make network calls.
 - LLM response quality, latency, cost, and provider reliability are not yet
   measured.
 - File and OCR extraction remain external to the engine.
-- Supabase, Canvas, authentication, API, and mobile integration are not wired
-  into the pipeline.
-- Local npm verification is blocked because `npm` is unavailable on `PATH`;
-  direct TypeScript 5.8.3 typecheck/build and the compiled eval runner currently
-  pass through the bundled runtime.
+- Supabase auth and the reviewer API route are wired around the pipeline, but
+  persistence, Canvas, OCR ingestion, task generation, and scheduling are still
+  external pending integrations.
 
 ## Next Engineering Steps
 
-1. Restore Node.js/npm access, then install and wire the OpenAI SDK in the API
-   layer without changing engine contracts.
-2. Add opt-in real-provider smoke tests with explicit timeout and cost limits.
+1. Implement Phase 3A: provider-agnostic OCR boundary and a protected API
+   contract with fake-client tests.
+2. Preserve OCR line and layout boundaries before passing extracted text into
+   Stage 0.
 3. Add LLM quality, latency, and cost evaluation separately from deterministic
    engine evals.
-4. Integrate extraction, storage, Canvas, and mobile only after the provider
-   adapter preserves the documented engine boundary.
+4. Add persistence, Canvas, tasks, and schedules only through adapters around
+   the documented engine boundary.

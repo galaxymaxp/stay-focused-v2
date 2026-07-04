@@ -1,8 +1,63 @@
 # Stay Focused V2 - Local Agent Handoff
 
-This file is local-only and intentionally ignored by Git.
+This handoff is tracked in the repository and must not contain secrets,
+credential values, tokens, or machine-specific local paths beyond repository
+paths.
 
 ## Current Status
+
+- Baseline before this documentation refresh:
+  `ebb79d8 fix(mobile): make reviewer web smoke fully unattended`.
+- Documentation refresh commit: the commit containing this handoff update,
+  `docs: refresh project status and roadmap`.
+- Branch: `main`.
+- Stay Focused V2 remains engine-first, evaluation-first, schedule-first, and
+  mobile-primary through Expo/React Native.
+- The current completed vertical slice is: sign in -> paste source text ->
+  authenticated reviewer API -> OpenAI generation -> coverage, grounding, and
+  leakage validation -> reviewer preview.
+- Expo Web is the fast laptop-browser development and regression surface for
+  the mobile app, not a replacement for the mobile-primary product.
+- User-facing source intake is still primarily pasted text. Real image OCR,
+  scanned-PDF OCR, reviewer persistence, Study Library, Canvas integration,
+  task generation, and study schedule generation are pending.
+
+## Current Test Baselines
+
+- Reviewer smoke-runner tests: 51 passed, 0 failed.
+- Reviewer API route tests: 19 passed, 0 failed.
+- Engine build: passed.
+- Engine evaluations: 266 passed, 0 failed.
+- API typecheck: passed.
+- Mobile typecheck: passed.
+- Latest recorded credential-backed reviewer smoke at baseline `ebb79d8`:
+  passed, including immediate repeat and session-only smoke.
+- Current unattended smoke command: `npm run smoke:reviewer:web`.
+
+## Immediate Next Task
+
+Phase 3A: audit the existing source contracts and implement a
+provider-agnostic Google Cloud OCR API boundary with fake-client tests. Prove
+the protected server OCR contract before building camera or gallery UI.
+
+## Known Blockers And Risks
+
+- OneDrive-backed generated Next output can leave stale reparse-point artifacts;
+  the smoke runner clears only `apps/api/.next/server/app` before runner-owned
+  API startup.
+- OpenAI cost, rate limits, and serverless latency can affect reviewer
+  generation.
+- OCR layout preservation is a product risk because reviewer quality depends on
+  line, heading, and list boundaries.
+- Scanned-PDF OCR should wait until image OCR is stable.
+- Mobile OAuth redirect completion is not yet validated as complete.
+- Server secrets must stay out of mobile env files, browser bundles, logs, and
+  committed files.
+
+## Historical Snapshot Before 2026-07-04
+
+The following undated snapshot is retained for history only. The current status
+is the section above.
 
 - Stay Focused V2 uses an engine-first, evaluation-first workflow.
 - Stages 0 through 6 and the end-to-end pipeline are implemented with typed
@@ -24,7 +79,7 @@ This file is local-only and intentionally ignored by Git.
 - Supabase JWT Bearer authentication is now enforced on `/api/review`.
 - This handoff is local-only, ignored by Git, and was not committed.
 
-## Recent Completed Work
+### Historical Recent Completed Work
 
 ### Stage 0 - Domain Contracts and Source Normalization
 
@@ -135,7 +190,7 @@ This file is local-only and intentionally ignored by Git.
 - Expanded fake-client provider contract coverage to 18 passing checks.
 - Restored local Node/npm access without changing system PATH.
 
-## Active Branch / Commits
+### Historical Active Branch / Commits
 
 - Branch: `main`
 - `d8374e9` - `feat(api): wire server openai provider`
@@ -155,7 +210,7 @@ This file is local-only and intentionally ignored by Git.
 `origin/main` currently points to `a0233be`, confirming that the OpenAI adapter
 boundary commit was pushed.
 
-## Test / Verification Status
+### Historical Test / Verification Status
 
 Latest full verification through pipeline integration on 2026-06-15:
 
@@ -193,7 +248,7 @@ Latest full verification through pipeline integration on 2026-06-15:
 - The OpenAI smoke test was not run because it is opt-in and
   `RUN_OPENAI_SMOKE=1` was not explicitly enabled.
 
-## Important Architecture Decisions
+### Historical Important Architecture Decisions
 
 - Engine-first development continues.
 - Evaluation-first development is the standard workflow for each engine stage.
@@ -205,7 +260,7 @@ Latest full verification through pipeline integration on 2026-06-15:
 - Real model quality evaluation remains separate from deterministic engine
   contract evaluation.
 
-## Known Constraints
+### Historical Known Constraints
 
 - New shells inherit `C:\Program Files\nodejs` from the user PATH. Existing
   long-lived parent processes may require a restart to observe the updated
@@ -219,7 +274,7 @@ Latest full verification through pipeline integration on 2026-06-15:
   forced audit fix was applied because that could introduce unrelated breaking
   changes.
 
-## Blockers
+### Historical Blockers
 
 - Root workspace typecheck is blocked by duplicate React type definitions in
   the existing mobile workspace.
@@ -227,7 +282,7 @@ Latest full verification through pipeline integration on 2026-06-15:
   does not include `react-native-web`.
 - CRLF warnings appear during some Git checks but do not block verification.
 
-## Recommended Next Task
+### Historical Recommended Next Task
 
 - Run the opt-in OpenAI smoke test in a deliberate credentialed session, then
   add a protected API route that constructs the server provider and invokes the
@@ -236,6 +291,28 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-04 Documentation status and roadmap refresh
+
+- Refreshed `README.md`, `docs/current-state.md`, `docs/roadmap.md`,
+  `docs/ai/current_sprint.md`, supporting architecture/eval docs, thesis
+  overview, and this handoff so they match local HEAD at baseline `ebb79d8`.
+- Canonical current state is now `docs/current-state.md`; canonical roadmap is
+  `docs/roadmap.md`; canonical current sprint is `docs/ai/current_sprint.md`.
+- Current product state: Supabase email/password sign-in, protected reviewer
+  API, OpenAI-backed reviewer generation, source-faithful validation, Expo
+  reviewer preview, and unattended Expo Web smoke are complete locally.
+- Current limitations: source input is still pasted text; OCR ingestion,
+  scanned PDFs, Study Library persistence, Canvas sync, tasks, schedules,
+  completed mobile OAuth redirects, deployment validation, and production
+  readiness remain pending.
+- Verification in this documentation refresh: smoke-runner unit tests 51/51,
+  reviewer API route tests 19/19, engine build PASS, engine eval PASS 266/266,
+  API typecheck PASS, mobile typecheck PASS.
+- Current smoke command: `npm run smoke:reviewer:web`.
+- Next engineering task: Phase 3A - audit source/OCR contracts, add a
+  provider-agnostic OCR boundary, add fake Google OCR client tests, and expose a
+  protected server OCR API contract before building camera or gallery UI.
 
 ### 2026-06-15 - Session 14 Supabase JWT Auth on /api/review
 

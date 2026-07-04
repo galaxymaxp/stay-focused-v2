@@ -1,36 +1,93 @@
 # Stay Focused V2
 
-Engine-first rebuild of Stay Focused, a schedule-first student productivity app
-with Canvas LMS integration and AI-generated study materials.
+Stay Focused V2 is a mobile-first, schedule-first student productivity app for
+turning school source material into useful study work. The current product is
+an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
+authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
+planned Canvas LMS plus Google Cloud OCR integration.
+
+Expo Web is the fast laptop-browser development and regression surface for the
+mobile app. It is not a replacement for the mobile-primary product.
 
 ## Workspace
 
 - `apps/mobile`: Expo and Expo Router mobile app
-- `apps/api`: Next.js 15 App Router API and future web app
-- `packages/engine`: Provider-agnostic generation pipeline
+- `apps/api`: Next.js 15 App Router API
+- `packages/engine`: Provider-agnostic reviewer generation pipeline
 - `packages/db`: Supabase client and database types
 - `packages/canvas`: Canvas LMS client and types
 - `packages/shared`: Shared types, constants, and utilities
 
-## Engine Status
+## Current Working Vertical Slice
+
+The current completed flow is:
+
+```text
+Sign in
+-> paste source text
+-> authenticated reviewer API
+-> OpenAI generation
+-> coverage, grounding, and leakage validation
+-> reviewer preview
+```
+
+This slice uses Supabase email/password authentication in the Expo app. The
+mobile client sends a Supabase bearer token to `POST /api/reviewer/generate`;
+the API verifies it with Supabase, creates the server-only OpenAI provider, runs
+the Stage 0 through Stage 6 engine pipeline, and returns a reviewer preview.
+
+## Current Implementation Status
+
+Complete:
+
+- Stage 0 through Stage 6 provider-agnostic reviewer engine
+- OpenAI provider boundary in the API layer
+- Supabase bearer-token protection for reviewer generation
+- Expo reviewer input and preview
+- Email/password sign-in and session restore
+- Local Expo Web CORS support for the reviewer route
+- Unattended authenticated Expo Web reviewer smoke runner
+- Persistent smoke-browser session and automatic output assertions
+
+Working locally:
+
+- OpenAI-backed reviewer generation through the authenticated API route
+- `npm run smoke:reviewer:web` for laptop-browser regression coverage
+- API route tests, smoke-runner tests, engine evals, API typecheck, mobile
+  typecheck, and engine build
+
+Next:
+
+- Phase 3A: provider-agnostic OCR boundary and protected API contract with
+  fake-client tests
+
+Pending:
+
+- Real image OCR and scanned-PDF OCR
+- Reviewer persistence and the Study Library saved-content area
+- Canvas LMS integration
+- Task generation and study scheduling
+- Completed mobile OAuth redirects, deployment validation, product polish, and
+  capstone evidence
+
+See [Current State](docs/current-state.md), [Roadmap](docs/roadmap.md), and
+[Current Sprint](docs/ai/current_sprint.md) for the detailed working status.
+
+## Reviewer Engine Status
 
 The provider-agnostic Stage 0 through Stage 6 pipeline and end-to-end
-`runPipeline` integration are complete. The dependency-free eval harness
-currently reports 242 passed and 0 failed using deterministic fake providers.
-Default assembled reviewer cards are source-faithful: Stage 5 validates every
-default-visible title, explanation, and key point, while source-external
-enrichment is excluded from the default reviewer output.
+`runPipeline` integration are complete. The deterministic engine evaluation
+harness currently reports **266 passed and 0 failed**.
 
-Real OpenAI, Supabase, Canvas, OCR, and mobile integration are intentionally
-deferred. The OpenAI SDK and server-only provider factory now live in
-`apps/api`; normal contract checks still use injected fake clients and make no
-network calls. Production route wiring remains deferred. GUI/mobile work
-remains deferred until provider integration and engine validation are stable.
+Default visible reviewer content is source-faithful: validation checks visible
+titles, explanations, and key points, while unsupported enrichment is excluded
+from default assembly. Short OCR-style prose has an extractive fallback, but
+real image and scanned-document OCR ingestion is not implemented yet.
 
-See [ADR-004](docs/architecture/ADR-004-engine-pipeline.md) and the
-[engine contract](docs/architecture/engine-contract.md) for the completed
-pipeline boundaries. See [ADR-005](docs/architecture/ADR-005-openai-provider-adapter.md)
-for the provider adapter decision.
+See [ADR-004](docs/architecture/ADR-004-engine-pipeline.md), the
+[engine contract](docs/architecture/engine-contract.md), and
+[ADR-005](docs/architecture/ADR-005-openai-provider-adapter.md) for the core
+boundaries.
 
 ## Local Environment Setup
 
@@ -43,15 +100,40 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 ```
 
 Root and API env files may hold server credentials. Mobile must contain only
-`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
-`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, and Google Cloud credentials must
-never be placed in mobile env files or committed.
+public `EXPO_PUBLIC_` values. `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, and
+Google Cloud credentials must never be placed in mobile env files or committed.
 
-Node.js 20 or newer and npm 10 or newer must be available before provider
-setup. The OpenAI SDK is installed only in `apps/api`, and
-`OPENAI_API_KEY` is read only by the server provider factory.
+Node.js 20 or newer and npm 10 or newer are required.
 
-The real provider smoke test is opt-in and makes one API request:
+## Local Testing
+
+Run the reusable authenticated Expo Web reviewer smoke from the repository
+root:
+
+```sh
+npm run smoke:reviewer:web
+```
+
+The command starts or reuses the API and Expo Web services, authenticates or
+restores a persisted smoke session, submits a fictional study-habits fixture,
+verifies reviewer output and validation statuses, and cleans up
+runner-owned services. It supports immediate repeat runs.
+
+See [Local Expo Web Reviewer Smoke](docs/testing/local-reviewer-smoke.md) for
+credential setup, session-only mode, failure codes, and diagnostics.
+
+Useful non-live checks:
+
+```sh
+npm run test:reviewer-web-smoke
+npm run test --workspace apps/api
+npm run typecheck --workspace apps/api
+npm run typecheck --workspace apps/mobile
+npm run build --workspace @stay-focused/engine
+npm run eval --workspace @stay-focused/engine
+```
+
+The API-layer OpenAI provider also has a separate opt-in one-call smoke test:
 
 ```powershell
 $env:RUN_OPENAI_SMOKE="1"
@@ -59,15 +141,23 @@ $env:OPENAI_API_KEY="<server-only-key>"
 npm run smoke:openai -w apps/api
 ```
 
-Normal engine evals and provider contract checks do not run this smoke test.
+Normal engine evals, provider contract checks, and reviewer smoke-runner unit
+tests do not run that opt-in provider smoke.
 
-For the reusable authenticated Expo Web reviewer smoke, see
-[Local Expo Web Reviewer Smoke](docs/testing/local-reviewer-smoke.md).
+## Current Limitations
 
-## Getting started
+- User-facing source input is still primarily pasted text.
+- Real image OCR is not implemented.
+- Scanned-PDF OCR is not implemented.
+- Reviewers are not persisted; Study Library is pending.
+- Canvas integration is not implemented beyond a thin package boundary.
+- Task and schedule generation are not implemented.
+- Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
+  flows are not validated as a finished feature.
+- Production deployment and iPhone production readiness are not complete.
 
-```sh
-npm install
-npm run typecheck
-npm run build
-```
+## Next Milestone
+
+Phase 3A is the immediate engineering milestone: audit source/OCR contracts and
+implement a provider-agnostic Google Cloud OCR API boundary with fake-client
+tests before building camera or gallery UI.

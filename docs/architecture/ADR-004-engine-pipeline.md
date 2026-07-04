@@ -68,21 +68,22 @@ receives a deterministic prompt, a serializable structured-output schema, a
 model name, optional temperature, and metadata. Core stages do not import a
 vendor SDK.
 
-Real OpenAI integration is intentionally deferred until this engine contract
-is stable and documented. The current default model name passed through the
-provider request is `gpt-4o`, but model execution is not implemented in the
-core engine.
+Model execution is intentionally outside the core engine. The current default
+model name passed through the provider request is `gpt-4o`; the API-layer
+OpenAI adapter and protected reviewer route execute real provider calls around
+the engine without importing vendor SDKs into Stage 0 through Stage 6.
 
 ## Evaluation Strategy
 
 Each stage was developed eval-first using dependency-free TypeScript suites and
 readable JSON fixtures. Provider-facing cases use deterministic fake providers.
-The aggregate harness currently reports 219 passing cases and 0 failures,
+The aggregate harness currently reports 266 passing cases and 0 failures,
 covering Stage 0 through Stage 6 and end-to-end pipeline integration.
 
 These evals test contracts, ordering, validation, retry bounds, failure
 behavior, source grounding, and deterministic IDs. LLM response-quality evals
-are not included yet because a real provider adapter has not been added.
+are separate from this deterministic harness even though the API layer now has
+an OpenAI adapter.
 
 ## Consequences
 
@@ -92,8 +93,8 @@ are not included yet because a real provider adapter has not been added.
 - Provider replacement does not require rewriting the engine stages.
 - File extraction, storage, LMS access, authentication, and presentation remain
   separate integration responsibilities.
-- The system requires explicit adapters before it can process real files or
-  call a real model.
+- The system requires explicit adapters before it can process real files,
+  persist reviewers, read Canvas material, or expose new product workflows.
 
 ## Alternatives Considered
 

@@ -51,9 +51,9 @@ existing `OpenAIResponsesClient` boundary. It throws before client construction
 when the key is missing.
 
 The SDK is a dependency of `apps/api` only. Core engine stages and mobile code
-must not import the SDK, the factory, or server credentials. API route wiring is
-still intentionally deferred, so adding the factory does not change
-`runPipeline` or any Stage 0 through Stage 6 contract.
+must not import the SDK, the factory, or server credentials. The authenticated
+reviewer route now constructs this provider and passes it to `runPipeline`
+without changing any Stage 0 through Stage 6 contract.
 
 ## Request Mapping
 
@@ -146,7 +146,7 @@ values only through approved variable-name matching.
 - client error wrapping with model context.
 
 The checks require no API key or network connection. They are kept separate
-from the 219 deterministic engine evals because they test an API-layer adapter
+from the 266 deterministic engine evals because they test an API-layer adapter
 rather than engine behavior.
 
 The installed SDK module is present for compilation, but fake checks inject a
@@ -181,10 +181,12 @@ job is intentionally configured.
 
 ## Current Limitations
 
-- No real OpenAI request has been made.
-- Production API routes do not yet construct or invoke the real provider.
-- Real model quality, latency, cost, refusal, and operational behavior remain
-  unevaluated until the opt-in smoke and later provider evaluations are run.
+- Normal tests do not make real OpenAI requests.
+- The authenticated reviewer route can invoke the real provider when server
+  credentials are configured, but model quality, latency, cost, refusal, and
+  operational behavior still need broader measurement.
+- User-facing source input is still primarily pasted text; OCR ingestion,
+  scanned PDFs, persistence, Canvas, tasks, and schedules are pending.
 - Engine evals still use fake providers and remain unchanged.
 
 Node.js and npm are prerequisites for SDK installation and verification. V1
