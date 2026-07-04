@@ -13,21 +13,22 @@ paths.
 - Branch: `main`.
 - Stay Focused V2 remains engine-first, evaluation-first, schedule-first, and
   mobile-primary through Expo/React Native.
-- The current completed vertical slice is: sign in -> paste source text or
-  import a gallery image -> review and edit source text -> authenticated
-  reviewer API -> OpenAI generation -> coverage, grounding, and leakage
-  validation -> reviewer preview.
+- The current completed vertical slice is: sign in -> paste source text,
+  import a gallery image, or take a camera photo -> review and edit source
+  text -> authenticated reviewer API -> OpenAI generation -> coverage,
+  grounding, and leakage validation -> reviewer preview.
 - Phase 3A is implemented: provider-agnostic OCR contracts live in
   `@stay-focused/ocr`, Google Cloud Vision OCR wiring lives only under
   `apps/api/src/lib/ocr`, and `POST /api/ocr/extract` exposes a protected
   multipart PNG/JPEG OCR route.
 - Expo Web is the fast laptop-browser development and regression surface for
   the mobile app, not a replacement for the mobile-primary product.
-- User-facing source intake in the mobile app now supports manual paste and
-  gallery-selected PNG/JPEG OCR with editable extracted-text review. Camera
-  capture, physical-device live OCR validation, scanned-PDF OCR, reviewer
-  persistence, Study Library, Canvas integration, task generation, and study
-  schedule generation are pending.
+- User-facing source intake in the mobile app now supports manual paste,
+  gallery-selected PNG/JPEG OCR, and camera-captured PNG/JPEG OCR with editable
+  extracted-text review. Physical-device live OCR validation is blocked until
+  the API process has a valid server-only Google OCR credential. Scanned-PDF
+  OCR, reviewer persistence, Study Library, Canvas integration, task
+  generation, and study schedule generation are pending.
 
 ## Current Test Baselines
 
@@ -40,7 +41,7 @@ paths.
 - Engine evaluations: 266 passed, 0 failed.
 - API typecheck: passed.
 - Mobile typecheck: passed.
-- Mobile OCR client/source-flow tests: 32 passed, 0 failed.
+- Mobile OCR client/source-flow tests: 37 passed, 0 failed.
 - OCR web smoke: passed with mocked OCR response and real reviewer generation.
 - Latest recorded unattended reviewer smoke during Phase 3A verification:
   passed on local HEAD `00d3e8f` before the Phase 3A commit, using a persisted
@@ -50,8 +51,8 @@ paths.
 
 ## Immediate Next Task
 
-Phase 3C: add camera capture and validate gallery/camera OCR on a physical
-device with live Google Cloud OCR credentials.
+Phase 3C: provision valid server-only Google OCR credentials for the API, then
+validate gallery/camera OCR on a physical iPhone with live Google Cloud OCR.
 
 ## Known Blockers And Risks
 
@@ -62,8 +63,10 @@ device with live Google Cloud OCR credentials.
   generation.
 - OCR layout preservation is a product risk because reviewer quality depends on
   line, heading, and list boundaries.
-- Live Google OCR remains optional and credential-dependent; normal tests use
-  fake clients, and the OCR web smoke mocks only the OCR API response.
+- Live Google OCR remains credential-dependent; normal tests use fake clients,
+  and the OCR web smoke mocks only the OCR API response. The latest audit found
+  no valid service-account or authorized-user ADC JSON file in the standard
+  private locations checked on this machine.
 - Scanned-PDF OCR should wait until image OCR is stable.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
@@ -306,6 +309,31 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-04 Phase 3C live iPhone OCR credential audit
+
+- Confirmed local branch `main` is at
+  `57b8811 feat(ocr): add camera capture source`, and `origin/main` contains
+  that commit.
+- Confirmed the camera implementation is already landed; no camera UI or OCR
+  client redesign was attempted.
+- Inspected OCR configuration by variable name and safe readiness metadata
+  only. No credential values, paths, private keys, tokens, or OCR text were
+  recorded.
+- Result: `apps/api/.env.local` has no usable Google OCR credential
+  configuration. Root env has a Google project value and a credential path, but
+  the referenced file does not exist.
+- Checked standard private credential locations on this machine and found no
+  valid service-account JSON and no valid authorized-user ADC JSON.
+- Per the Phase 3C task stop condition, physical iPhone validation was not
+  claimed and the API/Expo phone environment was not started for live OCR.
+- Required next action: create or place a valid Google OCR credential outside
+  the repository and tracked files, configure the API process with
+  `GOOGLE_APPLICATION_CREDENTIALS` plus project id or
+  `GOOGLE_CLOUD_CREDENTIALS_JSON` plus project id, then rerun the iPhone
+  checklist in `docs/dev/mobile-device-runbook.md`.
+- Verdict: PARTIAL - camera implementation passes but live validation remains
+  blocked by server-only Google credential setup.
 
 ### 2026-07-04 Phase 3B gallery OCR intake
 

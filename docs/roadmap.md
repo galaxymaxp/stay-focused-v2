@@ -91,7 +91,8 @@ Completed in Phase 3C:
 
 Remaining Phase 3 deliverables:
 
-- Phase 3C: physical-device validation with live Google OCR.
+- Phase 3C: provision valid server-only Google OCR credentials, then complete
+  physical-device validation with live Google OCR.
 - Phase 3D: scanned-PDF support only after image OCR is stable.
 
 Exit criteria:
@@ -105,7 +106,8 @@ Exit criteria:
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: Phase 3C - physical-device gallery/camera OCR validation.
+Immediate next task: Phase 3C - fix local API Google OCR credential
+configuration, then complete physical-device gallery/camera OCR validation.
 
 ## Phase 4 - Study Library And Persistence
 

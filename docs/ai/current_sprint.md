@@ -32,7 +32,8 @@ review path has landed.
 - Add camera capture without changing the OCR server contract. Completed in the
   mobile client.
 - Validate gallery and camera OCR on a physical device with live Google Cloud
-  OCR credentials.
+  OCR credentials. Blocked until the API process has a valid server-only Google
+  OCR credential.
 - Keep manual paste and editable OCR review intact.
 
 ## Out Of Scope
@@ -78,9 +79,11 @@ review path has landed.
 
 1. Add a camera capture source option beside gallery import. Done.
 2. Reuse the existing OCR upload and editable review path. Done.
-3. Validate camera and gallery OCR on Expo Go with live Google credentials.
-4. Keep the deterministic mocked Expo Web OCR smoke for regression coverage.
-5. Defer scanned PDFs to Phase 3D.
+3. Provision valid API-only Google OCR credentials. Blocked locally: no valid
+   credential file was found in the standard private locations checked.
+4. Validate camera and gallery OCR on Expo Go with live Google credentials.
+5. Keep the deterministic mocked Expo Web OCR smoke for regression coverage.
+6. Defer scanned PDFs to Phase 3D.
 
 ## Exit Criteria
 

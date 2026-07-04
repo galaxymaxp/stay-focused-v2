@@ -88,7 +88,8 @@ Verified in this documentation refresh:
 - Deterministic OCR web smoke: passed with mocked OCR response and real
   reviewer generation
 - Phase 3C live OCR/physical-device attempt: blocked by missing local Google
-  credentials file and no controllable physical device in the workspace; see
+  credentials. A follow-up audit found no valid service-account or
+  authorized-user ADC JSON file in the standard private locations checked; see
   `docs/ai/phase3c-camera-ocr-validation-20260704.md`
 
 Latest recorded unattended smoke during Phase 3A verification:
@@ -118,7 +119,8 @@ route. It does not validate live Google OCR.
 
 - Gallery import and camera capture support PNG/JPEG images and editable
   extracted-text review.
-- Physical-device live OCR validation is credential- and device-dependent.
+- Physical-device live OCR validation is blocked until the API process has a
+  valid server-only Google OCR credential.
 - Scanned-PDF OCR is not implemented.
 - Reviewer persistence and the Study Library are not implemented.
 - Canvas LMS integration is not implemented beyond the package boundary.
@@ -129,8 +131,8 @@ route. It does not validate live Google OCR.
 
 ## Immediate Next Task
 
-Phase 3C: validate gallery/camera OCR on a physical device with live Google OCR
-credentials.
+Phase 3C: provision valid server-only Google OCR credentials for the API, then
+validate gallery/camera OCR on a physical iPhone with live Google OCR.
 
 ## Known Risks
 
