@@ -1,6 +1,9 @@
-# Phase 3D PDF OCR Validation - 2026-07-04
+# Phase 3D PDF OCR Validation
 
-Status: IMPLEMENTED - LIVE VALIDATION PENDING
+Implementation date: 2026-07-04, Asia/Manila.
+Live validation date: 2026-07-05, Asia/Manila.
+
+Status: COMPLETE
 
 ## Scope Implemented
 
@@ -67,17 +70,67 @@ Status: IMPLEMENTED - LIVE VALIDATION PENDING
 - No Google credentials are exposed to mobile.
 - No Cloud Storage bucket or temporary server file workflow was added.
 
-## Live Validation Still Required
+## Live iPhone Validation Result
 
-Run live iPhone Expo Go validation using a fictional 1-2 page scanned PDF:
+Physical-device validation passed on a real iPhone through Expo Go using the
+local Next.js API and real server-only Google Cloud Vision credentials.
 
-1. Select the PDF from Files.
-2. Confirm filename, `APPLICATION/PDF`, size, and page count are shown.
-3. Extract text through the local Next.js API over LAN.
-4. Confirm live Google Vision PDF OCR returns page-ordered text.
-5. Edit one extracted line.
-6. Generate the reviewer from the edited text.
-7. Confirm Reviewer Ready appears.
-8. Confirm source-faithful, coverage, and clean-output statuses pass.
+The successful PDF OCR test used a fictional, image-only, two-page scanned PDF:
 
-Do not mark Phase 3D complete until that physical-device PDF flow passes.
+- The PDF was selected from the iPhone Files picker.
+- The app displayed the PDF filename, `APPLICATION/PDF`, file size, and a
+  detected page count of 2.
+- The protected PDF OCR request reached the API.
+- Google Vision synchronous PDF OCR succeeded.
+- Both PDF pages were extracted.
+- Page order was preserved.
+- Extracted text appeared in the editable review field.
+- The user edited the extracted text before generating.
+- Reviewer generation used the edited OCR text as its source.
+- Reviewer Ready appeared.
+- Source-faithful validation passed.
+- Coverage validation passed.
+- Clean-output validation passed.
+- Multiple reviewer sections and key points were generated.
+
+Retained logs are not available for an exact HTTP status code, so this report
+does not claim one.
+
+## Oversized PDF Validation
+
+The five-page limit was validated with a separate PDF containing more than five
+pages:
+
+- The PDF was rejected safely.
+- The UI displayed `PDF has too many pages`.
+- The UI displayed `PDF OCR supports up to 5 pages per request.`
+- No silent truncation to the first five pages was observed.
+
+## Known Limitation
+
+The fictional scanned PDF contained visible footer text:
+
+- `FICTIONAL OCR TEST DOCUMENT - PAGE 1 OF 2`
+- `FICTIONAL OCR TEST DOCUMENT - PAGE 2 OF 2`
+
+Google Vision correctly extracted those visible footer lines. The reviewer
+engine then treated the extracted footer text as source headings or sections.
+This is not an OCR failure and not a grounding failure; the text was visible in
+the source PDF.
+
+Current behavior:
+
+- Visible repeated headers and footers in scanned PDFs may become reviewer
+  sections.
+- Users can remove header/footer text in the editable OCR text field before
+  reviewer generation.
+- Automatic repeated header/footer detection is deferred to a later OCR cleanup
+  task.
+- No automatic header/footer cleanup was implemented in Phase 3D.
+
+## Completion Verdict
+
+Phase 3D is complete. Scanned PDF ingestion, live Google Vision PDF OCR,
+editable OCR review, reviewer generation from edited OCR text, validation
+statuses, and the oversized-page-count rejection path all passed the documented
+live validation.

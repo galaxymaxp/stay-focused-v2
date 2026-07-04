@@ -27,8 +27,9 @@ paths.
   gallery-selected PNG/JPEG OCR, camera-captured PNG/JPEG OCR, and PDF OCR with
   editable extracted-text review. Physical-device live image OCR validation
   passed on an iPhone through Expo Go against the local Next.js API over LAN
-  with server-only Google Cloud Vision OCR. Phase 3D PDF OCR is implemented,
-  but live iPhone PDF validation is pending. Reviewer persistence, Study
+  with server-only Google Cloud Vision OCR. Phase 3D PDF OCR live validation
+  also passed on an iPhone through Expo Go against the local Next.js API over
+  LAN with server-only Google Cloud Vision PDF OCR. Reviewer persistence, Study
   Library, Canvas integration, task generation, and study schedule generation
   are pending.
 
@@ -50,6 +51,11 @@ paths.
 - Phase 3C live iPhone camera/image OCR validation: passed with editable OCR
   text, reviewer generation, Reviewer Ready, source-faithful, coverage, and
   clean-output validation.
+- Phase 3D live iPhone PDF OCR validation: passed with a fictional,
+  image-only, two-page scanned PDF, editable OCR text, reviewer generation,
+  Reviewer Ready, source-faithful, coverage, and clean-output validation.
+- Phase 3D oversized-PDF validation: a separate PDF with more than five pages
+  was rejected safely with the expected UI messages.
 - Latest recorded unattended reviewer smoke during Phase 3A verification:
   passed on local HEAD `00d3e8f` before the Phase 3A commit, using a persisted
   session and returning HTTP 200 from the reviewer POST.
@@ -59,7 +65,9 @@ paths.
 
 ## Immediate Next Task
 
-Live iPhone validation using a fictional 1-2 page scanned PDF.
+Choose the next scoped product task in a separate implementation pass. Phase 3
+source ingestion is complete; automatic repeated scanned-PDF header/footer
+detection remains a deferred OCR cleanup candidate.
 
 ## Known Blockers And Risks
 
@@ -73,9 +81,10 @@ Live iPhone validation using a fictional 1-2 page scanned PDF.
 - Live Google OCR has passed on a correctly configured local API, but future
   live OCR remains credential-, LAN-, and device-dependent. Credential paths
   are machine-specific and must not be documented or committed.
-- Scanned-PDF OCR is implemented as a synchronous 1-5 page MVP. Live validation
-  remains the next risk because it depends on Expo Go, LAN reachability,
-  server-only Google credentials, and a fictional scanned PDF fixture.
+- Scanned-PDF OCR is implemented and live-validated as a synchronous 1-5 page
+  MVP. Visible repeated headers and footers in scanned PDFs may be extracted as
+  source text and become reviewer sections until a later cleanup task adds
+  automatic repeated header/footer detection.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
   committed files.
@@ -320,6 +329,37 @@ Latest full verification through pipeline integration on 2026-06-15:
 
 ## Session Log
 
+### 2026-07-05 Phase 3D live iPhone PDF OCR validation
+
+- Confirmed Phase 3D live physical-device validation passed using iPhone Expo
+  Go against the local Next.js API over LAN with real server-only Google Cloud
+  Vision credentials.
+- Confirmed a fictional, image-only, two-page scanned PDF could be selected
+  from the iPhone Files picker.
+- Confirmed the app displayed the PDF filename, `APPLICATION/PDF`, file size,
+  and detected page count of 2.
+- Confirmed the protected PDF OCR request reached the API and Google Vision
+  synchronous PDF OCR succeeded.
+- Confirmed both PDF pages were extracted in preserved page order.
+- Confirmed extracted text appeared in the editable review field and the user
+  edited that text before generation.
+- Confirmed reviewer generation used the edited OCR text as its source.
+- Confirmed Reviewer Ready appeared, source-faithful passed, coverage passed,
+  and clean output passed.
+- Confirmed multiple reviewer sections and key points were generated.
+- Confirmed the five-page limit using a separate PDF with more than five pages:
+  the PDF was rejected safely and the UI displayed `PDF has too many pages` and
+  `PDF OCR supports up to 5 pages per request.`
+- Retained logs are not available for an exact HTTP status code, so no status
+  code is claimed.
+- Known limitation: visible scanned-PDF footer text such as `FICTIONAL OCR TEST
+  DOCUMENT - PAGE 1 OF 2` and `FICTIONAL OCR TEST DOCUMENT - PAGE 2 OF 2` was
+  correctly extracted by Google Vision and may become reviewer headings or
+  sections. Users can remove this text in the editable OCR text field.
+  Automatic repeated header/footer detection is deferred to a later cleanup
+  task and was not implemented here.
+- Verdict: COMPLETE - Phase 3D live PDF OCR validation passed.
+
 ### 2026-07-04 Phase 3D scanned PDF OCR ingestion
 
 - Implemented synchronous small-batch scanned PDF OCR ingestion.
@@ -348,8 +388,8 @@ Latest full verification through pipeline integration on 2026-06-15:
 - Google credentials remain server-only. No credential files, env files,
   private PDFs, uploaded content, screenshots, tokens, or OCR output artifacts
   were committed.
-- Verdict: IMPLEMENTED - LIVE VALIDATION PENDING.
-- Next task: live iPhone validation using a fictional 1-2 page scanned PDF.
+- Verdict at implementation time: implemented; live validation recorded in the
+  2026-07-05 session log entry above.
 
 ### 2026-07-04 Phase 3C live iPhone OCR validation
 
@@ -371,7 +411,7 @@ Latest full verification through pipeline integration on 2026-06-15:
 - Google credentials remain server-only. No captured images, screenshots, OCR
   test artifacts, credential files, or private OCR output are committed.
 - Verdict: COMPLETE - Phase 3C live camera/image OCR validation passed.
-- Next task: Phase 3D - scanned PDF ingestion.
+- Historical follow-up: Phase 3D scanned PDF ingestion is now complete.
 
 ### 2026-07-04 Phase 3C live iPhone OCR credential audit
 
@@ -423,8 +463,8 @@ Latest full verification through pipeline integration on 2026-06-15:
   OneDrive-backed Next artifacts outside `.next/server/app`.
 - Manual paste remains supported. Images are previewed only from local URIs and
   are not persisted, stored, logged, committed, or sent to the reviewer engine.
-- Live Google OCR on a physical device remains unverified and is now Phase 3C
-  with camera capture. Scanned PDFs remain Phase 3D.
+- Historical follow-up: live physical-device image OCR passed in Phase 3C, and
+  scanned PDF OCR is now complete in Phase 3D.
 
 ### 2026-07-04 Phase 3A OCR server boundary
 

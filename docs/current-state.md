@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-07-04, Asia/Manila.
+Last refreshed: 2026-07-05, Asia/Manila.
 
 ## Repository Baseline
 
@@ -48,8 +48,7 @@ source text. The reviewer engine receives only the final edited text through
 the existing reviewer route. Live iPhone Expo Go validation has passed against
 the local Next.js API over LAN with server-only Google Cloud Vision OCR.
 
-Phase 3D adds scanned-PDF ingestion as an implemented synchronous small-batch
-MVP, with live validation pending:
+Phase 3D adds scanned-PDF ingestion as a validated synchronous small-batch MVP:
 
 ```text
 Bearer-authenticated multipart PDF upload
@@ -62,7 +61,8 @@ Bearer-authenticated multipart PDF upload
 
 PDF files stay server-bound, Google credentials remain server-only, Cloud
 Storage is not used, and PDFs over five pages are rejected instead of silently
-truncated.
+truncated. Live iPhone Expo Go validation has passed against the local Next.js
+API over LAN with server-only Google Cloud Vision PDF OCR.
 
 ## Completed Capabilities
 
@@ -98,7 +98,7 @@ truncated.
 
 ## Current Verification Baselines
 
-Verified in this Phase 3D implementation pass:
+Verified across the Phase 3D implementation and live-validation pass:
 
 - OCR package typecheck: passed
 - OCR package build: passed
@@ -122,6 +122,15 @@ Verified in this Phase 3D implementation pass:
   coverage, and clean-output validation passed, and the generated reviewer
   contained at least one section and key point. See
   `docs/ai/phase3c-camera-ocr-validation-20260704.md`.
+- Phase 3D live iPhone PDF OCR validation: passed with local Expo Go ->
+  Next.js API over LAN -> server-only Google Cloud Vision synchronous PDF OCR
+  -> editable OCR text review -> reviewer generation. A fictional, image-only,
+  two-page scanned PDF was extracted in page order; edited OCR text was used as
+  the reviewer source; Reviewer Ready appeared; source-faithful, coverage, and
+  clean-output validation passed; and multiple reviewer sections and key points
+  were generated. A separate PDF with more than five pages was rejected safely
+  with the expected UI messages. See
+  `docs/ai/phase3d-pdf-ocr-validation-20260704.md`.
 
 Latest recorded unattended smoke during Phase 3A verification:
 
@@ -154,7 +163,11 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 - Gallery import and camera capture support PNG/JPEG images and editable
   extracted-text review.
 - PDF import supports one server-bound PDF per request, 1-5 pages, and editable
-  extracted-text review. Live iPhone PDF OCR validation is still pending.
+  extracted-text review. Live iPhone PDF OCR validation has passed.
+- Visible repeated headers and footers in scanned PDFs may be extracted as
+  source text and can become reviewer sections. Users can remove them in the
+  editable OCR text field; automatic repeated header/footer detection is
+  deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
 - Reviewer persistence and the Study Library are not implemented.
@@ -166,7 +179,9 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Live iPhone validation using a fictional 1-2 page scanned PDF.
+Phase 3 source ingestion is complete. Choose the next scoped product task in a
+separate implementation pass; repeated PDF header/footer cleanup remains a
+deferred OCR cleanup candidate.
 
 ## Known Risks
 
@@ -178,11 +193,13 @@ Live iPhone validation using a fictional 1-2 page scanned PDF.
 - OCR layout preservation is critical because reviewer quality depends on line,
   heading, and list boundaries.
 - The server OCR contract is proven with fake clients, the Expo Web OCR flow is
-  proven with a mocked OCR response, and live iPhone Google OCR has passed on a
-  correctly configured local API. Future live OCR remains dependent on
-  machine-specific server credential setup, LAN reachability, and device state.
-- Scanned-PDF support is implemented as a synchronous 1-5 page MVP, but live
-  iPhone PDF OCR remains credential-, LAN-, device-, and PDF-fixture-dependent.
+  proven with a mocked OCR response, and live iPhone Google OCR for images and
+  PDFs has passed on a correctly configured local API. Future live OCR remains
+  dependent on machine-specific server credential setup, LAN reachability, and
+  device state.
+- Scanned-PDF support is implemented as a synchronous 1-5 page MVP. Visible
+  repeated headers and footers may still need manual removal before generation
+  until a later cleanup task adds automatic repeated header/footer detection.
 - Mobile OAuth redirect completion still needs validation before it is claimed
   as complete.
 - Secrets must remain server-only; mobile env files may contain only public

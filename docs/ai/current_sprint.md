@@ -1,11 +1,13 @@
 # Current Sprint
 
-Last refreshed: 2026-07-04, Asia/Manila.
+Last refreshed: 2026-07-05, Asia/Manila.
 
 ## Active Objective
 
-Phase 3D scanned PDF ingestion is implemented. Live iPhone validation with a
-fictional 1-2 page scanned PDF is pending.
+Phase 3D scanned PDF ingestion is complete. Live iPhone validation passed with
+a fictional, image-only, two-page scanned PDF, and the oversized-page-count
+rejection path was validated with a separate PDF containing more than five
+pages.
 
 ## Completed Phase 3A Scope
 
@@ -37,7 +39,7 @@ fictional 1-2 page scanned PDF is pending.
 - Confirm Reviewer Ready appears after generation.
 - Confirm source-faithful, coverage, and clean-output validation pass.
 
-## Implemented Phase 3D Scope - Live Validation Pending
+## Completed Phase 3D Scope
 
 - Add `expo-document-picker` for one-file PDF selection from Files.
 - Add `Paste text`, `Import image`, and `Import PDF` source modes.
@@ -56,9 +58,9 @@ fictional 1-2 page scanned PDF is pending.
 - Add mocked PDF OCR web smoke with a fictional PDF fixture and real reviewer
   generation.
 
-## Out Of Scope For Phase 3C
+## Out Of Scope For Phase 3D Validation Documentation
 
-- Scanned PDFs.
+- Automatic repeated header/footer detection or cleanup.
 - Canvas integration.
 - Reviewer persistence or Study Library work.
 - Engine prompt changes.
@@ -134,6 +136,22 @@ fictional 1-2 page scanned PDF is pending.
   - Engine evals: 266/266
   - Reviewer, image OCR, and PDF OCR web smokes passed with mocked OCR where
     applicable.
+- Live iPhone PDF OCR validation passed through Expo Go against the local
+  Next.js API over LAN with real server-only Google Cloud Vision credentials.
+- A fictional, image-only, two-page scanned PDF selected from Files displayed
+  filename, `APPLICATION/PDF`, file size, and a detected page count of 2.
+- Google Vision synchronous PDF OCR extracted both pages, preserved page order,
+  and populated the editable OCR text field.
+- The user edited the extracted text before generation, and reviewer generation
+  used the edited OCR text as its source.
+- Reviewer Ready appeared; source-faithful, coverage, and clean-output
+  validation passed; and multiple reviewer sections and key points were
+  generated.
+- A separate PDF with more than five pages was rejected safely with `PDF has too
+  many pages` and `PDF OCR supports up to 5 pages per request.`
+- Visible repeated scanned-PDF footers were correctly extracted as source text
+  and may become reviewer sections. Users can remove them in the editable OCR
+  text field; automatic repeated header/footer detection is deferred.
 
 ## Phase 3C Completion Sequence
 
@@ -155,11 +173,14 @@ fictional 1-2 page scanned PDF is pending.
 - Live iPhone OCR produces editable source text that can generate a reviewer.
 - Reviewer Ready, source-faithful, coverage, and clean-output all pass on the
   live OCR flow.
-- Scanned PDFs remain out of Phase 3C scope.
-- Phase 3D is not complete until live iPhone PDF OCR validates PDF selection,
-  server-side Google Vision PDF OCR, editable extracted text, and reviewer
-  generation with a fictional 1-2 page scanned PDF.
+- Scanned PDF OCR supports one server-bound PDF per request, validates 1-5
+  pages, and rejects oversized page counts safely.
+- Live iPhone PDF OCR validates PDF selection, server-side Google Vision PDF
+  OCR, editable extracted text, and reviewer generation with a fictional
+  image-only scanned PDF.
 
 ## Next Objective
 
-Live iPhone validation using a fictional 1-2 page scanned PDF.
+Choose the next scoped product task in a separate implementation pass. This
+documentation pass does not start Phase 4 or the deferred header/footer cleanup
+task.

@@ -1,6 +1,6 @@
 # Roadmap
 
-Last refreshed: 2026-07-04, Asia/Manila.
+Last refreshed: 2026-07-05, Asia/Manila.
 
 ## Phase 1 - Foundation And Reviewer Engine
 
@@ -57,7 +57,7 @@ Immediate dependency: Phase 1 complete.
 
 ## Phase 3 - OCR And Source Ingestion
 
-Status: In progress
+Status: Complete
 
 Purpose: Replace paste-only source intake with a server-side OCR contract that
 preserves layout enough for the reviewer engine to stay source-faithful.
@@ -94,7 +94,7 @@ Completed in Phase 3C:
 - Verified Reviewer Ready, source-faithful, coverage, and clean-output passed
   for the live OCR-generated reviewer.
 
-Implemented in Phase 3D - live validation pending:
+Completed in Phase 3D:
 
 - Synchronous small-batch PDF OCR ingestion for one PDF per request.
 - PDF selection through Expo Document Picker.
@@ -111,10 +111,19 @@ Implemented in Phase 3D - live validation pending:
   or Ghostscript in this phase.
 - Mocked PDF OCR web smoke using a fictional PDF fixture and real reviewer
   generation.
+- Live physical-device validation on iPhone Expo Go with the local Next.js API
+  over LAN and server-only Google Cloud Vision PDF OCR.
+- Verified that a fictional, image-only, two-page scanned PDF extracted both
+  pages in page order.
+- Verified that edited PDF OCR text is used as the reviewer source.
+- Verified Reviewer Ready, source-faithful, coverage, and clean-output passed
+  for the live PDF OCR-generated reviewer.
+- Verified that a separate PDF with more than five pages is rejected safely with
+  the expected UI messages instead of being silently truncated.
 
 Remaining Phase 3 deliverables:
 
-- Live iPhone validation for Phase 3D scanned-PDF ingestion.
+- None.
 
 Exit criteria:
 
@@ -131,8 +140,14 @@ Exit criteria:
 
 Immediate dependency: Phase 2 complete.
 
-Immediate next task: live iPhone validation using a fictional 1-2 page scanned
-PDF.
+Known limitation: visible repeated headers and footers in scanned PDFs may be
+extracted as source text and become reviewer sections. Users can remove them in
+the editable OCR text field. Automatic repeated header/footer detection is
+deferred to a later OCR cleanup task.
+
+Immediate next task: choose the next scoped product task in a separate
+implementation pass. Phase 4 remains pending and was not started by the Phase
+3D validation documentation pass.
 
 ## Phase 4 - Study Library And Persistence
 
