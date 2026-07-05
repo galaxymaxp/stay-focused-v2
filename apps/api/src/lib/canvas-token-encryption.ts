@@ -7,7 +7,10 @@ import {
 const ALGORITHM = "aes-256-gcm";
 export const CANVAS_TOKEN_ENCRYPTION_VERSION = "aes-256-gcm:v1";
 const IV_BYTES = 12;
+const AUTH_TAG_BYTES = 16;
 const KEY_BYTES = 32;
+const CANONICAL_BASE64_PATTERN =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 export type CanvasTokenEncryptionErrorCode =
   | "missing_key"
@@ -72,10 +75,10 @@ export function decryptCanvasToken(
 
   const key = decodeCanvasTokenEncryptionKey(encodedKey);
   const ciphertext = decodeBase64Field(encrypted.ciphertext);
-  const iv = decodeBase64Field(encrypted.iv);
-  const authTag = decodeBase64Field(encrypted.authTag);
+  const iv = decodeBase64Field(encrypted.iv, IV_BYTES);
+  const authTag = decodeBase64Field(encrypted.authTag, AUTH_TAG_BYTES);
 
-  if (iv.length !== IV_BYTES || authTag.length === 0 || ciphertext.length === 0) {
+  if (ciphertext.length === 0) {
     throw new CanvasTokenEncryptionError(
       "invalid_payload",
       "Encrypted Canvas token payload is invalid.",
@@ -97,7 +100,7 @@ export function decryptCanvasToken(
   }
 }
 
-function decodeCanvasTokenEncryptionKey(
+export function decodeCanvasTokenEncryptionKey(
   encodedKey: string | undefined,
 ): Buffer {
   const trimmed = encodedKey?.trim();
@@ -108,23 +111,55 @@ function decodeCanvasTokenEncryptionKey(
     );
   }
 
-  const decoded = Buffer.from(trimmed, "base64");
-  if (decoded.length !== KEY_BYTES) {
-    throw new CanvasTokenEncryptionError(
-      "invalid_key",
-      "Canvas token encryption key must decode to 32 bytes.",
-    );
-  }
-  return decoded;
+  return decodeStrictBase64(trimmed, {
+    expectedBytes: KEY_BYTES,
+    errorCode: "invalid_key",
+    message: "Canvas token encryption key must be canonical Base64.",
+  });
 }
 
-function decodeBase64Field(value: string): Buffer {
-  try {
-    return Buffer.from(value, "base64");
-  } catch {
-    throw new CanvasTokenEncryptionError(
-      "invalid_payload",
-      "Encrypted Canvas token payload is invalid.",
-    );
+function decodeBase64Field(value: string, expectedBytes?: number): Buffer {
+  return decodeStrictBase64(value, {
+    expectedBytes,
+    errorCode: "invalid_payload",
+    message: "Encrypted Canvas token payload is invalid.",
+  });
+}
+
+function decodeStrictBase64(
+  value: string,
+  {
+    errorCode,
+    expectedBytes,
+    message,
+  }: {
+    readonly errorCode: "invalid_key" | "invalid_payload";
+    readonly expectedBytes?: number;
+    readonly message: string;
+  },
+): Buffer {
+  if (
+    !value ||
+    value !== value.trim() ||
+    value.length % 4 !== 0 ||
+    !CANONICAL_BASE64_PATTERN.test(value)
+  ) {
+    throw new CanvasTokenEncryptionError(errorCode, message);
   }
+
+  let decoded: Buffer;
+  try {
+    decoded = Buffer.from(value, "base64");
+  } catch {
+    throw new CanvasTokenEncryptionError(errorCode, message);
+  }
+
+  if (decoded.length === 0 || decoded.toString("base64") !== value) {
+    throw new CanvasTokenEncryptionError(errorCode, message);
+  }
+  if (expectedBytes !== undefined && decoded.length !== expectedBytes) {
+    throw new CanvasTokenEncryptionError(errorCode, message);
+  }
+
+  return decoded;
 }

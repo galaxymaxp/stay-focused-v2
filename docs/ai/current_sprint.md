@@ -5,14 +5,17 @@ Last refreshed: 2026-07-05, Asia/Manila.
 ## Active Objective
 
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
-Secure Canvas Connection and Capability Discovery is complete and live
-validated: direct server-side Canvas validation used one developer-owned
-personal access token, returned 17 courses for that token, and proved only that
-user's available Canvas capabilities; remote Supabase Canvas table and RLS
-validation passed; and the protected API
+Secure Canvas Connection and Capability Discovery is complete, live validated,
+and audit-hardened: direct server-side Canvas validation used one
+developer-owned personal access token, returned 17 courses for that token, and
+proved only that user's available Canvas capabilities; remote Supabase Canvas
+table and RLS validation passed; the protected API
 connect/status/courses/capabilities/disconnect lifecycle passed after
-configuring a real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY`. There is no
-school-wide Canvas token.
+configuring a real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY`; and Phase 5A.2
+closed the audit conditions for strict Base64 validation, atomic persistence,
+two-user automated authorization evidence, redirect rejection, request
+validation coverage, README status, and ADR numbering. There is no school-wide
+Canvas token.
 
 ## Completed Phase 3A Scope
 
@@ -91,6 +94,8 @@ school-wide Canvas token.
 - Add ADR-006 through ADR-010 for Canvas academic graph synchronization,
   capability-based integration, Canvas credential storage, and grade-data
   separation, plus Canvas authentication phases.
+- Resolve duplicate ADR-004 numbering by renaming Fast Testing Surfaces to
+  ADR-011 while keeping ADR-004 as the engine pipeline decision.
 - Expand `@stay-focused/canvas` into the canonical typed Canvas client.
 - Add strict Canvas base-URL normalization, HTTPS enforcement, no credentials in
   URLs, bearer-token requests, timeout support, safe pagination, cross-origin
@@ -101,6 +106,11 @@ school-wide Canvas token.
 - Add the `canvas_connections` and `canvas_capabilities` migration foundation
   with RLS enabled and no direct authenticated grants over encrypted credential
   fields.
+- Add Phase 5A.2 hardening: strict canonical Base64 validation for Canvas
+  encryption keys and stored encrypted payload fields, atomic connection and
+  capability persistence through a service-role-only RPC, database capability
+  ownership consistency, redirect rejection, realistic two-user authorization
+  tests, request validation coverage, and ADR numbering cleanup.
 - Add protected Canvas connection, courses, and capabilities API routes.
 - Add the mobile Courses surface with disconnected/connected states, secure
   token entry, course refresh, disconnect confirmation, and compact capability
@@ -294,15 +304,15 @@ school-wide Canvas token.
 - Automated verification passed:
   - Canvas package typecheck: passed
   - Canvas package build: passed
-  - Canvas package tests: 20/20
+  - Canvas package tests: 22/22
   - DB package typecheck: passed
-  - API typecheck/tests: passed; 110/110
+  - API typecheck/tests: passed; 146/146
   - Mobile typecheck/tests: passed; 70/70
   - Root workspace typecheck: passed after broad build regenerated Next
     `.next/types`
   - Root workspace build: passed
-  - Workspace tests with scripts: passed; API 110/110, mobile 70/70, Canvas
-    20/20, OCR 14/14
+  - Workspace tests with scripts: passed; API 146/146, mobile 70/70, Canvas
+    22/22, OCR 14/14
   - `git diff --check`: passed with CRLF warnings only
 - Phase 5A.1 verification passed:
   - `node --test scripts/phase5a-live-canvas-validation.test.mjs`: 5/5
@@ -340,7 +350,8 @@ school-wide Canvas token.
     select grants
 - Protected API validation passed after configuring a real app-owned
   `CANVAS_TOKEN_ENCRYPTION_KEY` in the ignored API-local environment file. The
-  key format is Base64 encoded and must decode to exactly 32 bytes.
+  hardened key format is canonical padded Base64 and must decode to exactly 32
+  bytes.
 - Protected lifecycle result:
   - API health: passed
   - Supabase bearer authentication: acquired for the established smoke-test user
@@ -360,6 +371,17 @@ school-wide Canvas token.
 - Cross-user protection distinction: automated route tests passed for user
   scoping. Live second-user validation was unavailable because no separate
   second test-user credentials were present.
+- Phase 5A.2 hardening result:
+  - `202607050003_harden_canvas_connection_persistence.sql` applied remotely.
+  - `replace_canvas_connection_with_capabilities` exists and is executable by
+    the server-side service-role workflow only.
+  - Composite capability ownership foreign key is validated.
+  - RLS remains enabled and direct `anon`/`authenticated` Canvas table access
+    remains revoked.
+  - Automated two-user authorization validation: PASS.
+  - Live second-user authorization validation: not run.
+  - Focused and full verification passed, including API 146/146, mobile 70/70,
+    Canvas 22/22, and OCR 14/14 workspace tests.
 
 ## Phase 3C Completion Sequence
 
@@ -394,5 +416,6 @@ school-wide Canvas token.
 
 ## Next Objective
 
+Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
 Phase 5B can begin when requested. The deferred header/footer cleanup task
 remains separate.

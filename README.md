@@ -4,8 +4,8 @@ Stay Focused V2 is a mobile-first, schedule-first student productivity app for
 turning school source material into useful study work. The current product is
 an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
 authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
-Google Cloud OCR-backed source intake. Canvas LMS Phase 5A is implemented as a
-partially live-validated, per-user connection foundation.
+Google Cloud OCR-backed source intake. Canvas LMS Phase 5A is implemented,
+live validated, and hardened as a per-user connection foundation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -92,12 +92,16 @@ Working locally:
   typecheck, and engine build
 - Direct developer-owned Canvas live validation returned 17 courses for that
   validating account only; this does not prove institution-wide access.
-- Remote Canvas migration/RLS validation passed. Protected Canvas API
-  persistence remains pending until `CANVAS_TOKEN_ENCRYPTION_KEY` is configured.
+- Remote Canvas migration/RLS validation passed. Protected Canvas API lifecycle
+  validation passed with encrypted persistence, course loading, capabilities,
+  invalid replacement preservation, disconnect, and a final disconnected state.
+- Phase 5A hardening closed the audit conditions for strict Base64 validation,
+  atomic connection/capability persistence, automated two-user authorization
+  evidence, redirect rejection, request validation coverage, README status, and
+  ADR numbering.
 
 Pending:
 
-- Canvas protected API connection lifecycle live validation
 - Canvas academic graph synchronization, content ingestion, grade sync, and
   background sync
 - Canvas OAuth production authorization with an institution-approved Developer
@@ -156,7 +160,7 @@ credentials for all users.
 `CANVAS_TOKEN_ENCRYPTION_KEY` is a required API-side application encryption
 secret before stored Canvas connections can be persisted. It is generated and
 owned by the Stay Focused deployment, not by Canvas, the school, or the student,
-and must decode to exactly 32 bytes.
+and must be canonical padded Base64 that decodes to exactly 32 bytes.
 
 Node.js 20 or newer and npm 10 or newer are required.
 
@@ -216,12 +220,15 @@ tests do not run that opt-in provider smoke.
   editable extracted-text review.
 - Physical-device live OCR validation depends on local API, Supabase, and
   Google Cloud OCR credentials.
-- Phase 5A Canvas is partial: direct developer-owned live validation and remote
-  migration/RLS validation passed, but protected API connection lifecycle live
-  validation is pending until `CANVAS_TOKEN_ENCRYPTION_KEY` is configured.
+- Phase 5A Canvas is complete and live validated for the secure connection
+  lifecycle. Per-user PAT connect, encrypted persistence, remote migration,
+  course loading, capability status, invalid replacement preservation,
+  disconnect, and final disconnected state passed.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
   prove access for every user, course, role, or institution.
+- Automated user-scoping coverage is strengthened with two-user route tests.
+  Live second-user Canvas validation was not run.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
 - Task and schedule generation are not implemented.
@@ -231,6 +238,6 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Configure `CANVAS_TOKEN_ENCRYPTION_KEY` and complete the protected Phase 5A
-Canvas API connection lifecycle validation. After that, Phase 5B can begin
-academic graph synchronization.
+Phase 5A hardening is complete. Phase 5B can begin academic graph
+synchronization when requested; Canvas OAuth remains a future production
+authorization phase.

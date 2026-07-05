@@ -70,6 +70,7 @@ export type CanvasClientErrorCode =
   | "canvas_timeout"
   | "canvas_malformed_json"
   | "canvas_invalid_response"
+  | "canvas_redirect_rejected"
   | "canvas_pagination_rejected"
   | "canvas_request_failed";
 

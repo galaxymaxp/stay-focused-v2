@@ -118,6 +118,49 @@ describe("CanvasClient", () => {
     });
   });
 
+  it("rejects same-origin redirects without following them", async () => {
+    const fetchImpl = createRedirectFetch(
+      "https://canvas.test/api/v1/users/self/profile",
+      "https://canvas.test/login",
+    );
+    const client = createClient(fetchImpl, "secret-token");
+
+    await expect(client.getCurrentUser()).rejects.toMatchObject({
+      code: "canvas_redirect_rejected",
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: "https://canvas.test/api/v1/users/self/profile",
+    });
+    expect(lastRequest(fetchImpl).init.redirect).toBe("manual");
+  });
+
+  it("rejects cross-origin redirects without forwarding bearer auth", async () => {
+    const fetchImpl = createRedirectFetch(
+      "https://canvas.test/api/v1/users/self/profile",
+      "https://evil.test/collect?next=secret",
+    );
+    const client = createClient(fetchImpl, "secret-token");
+
+    const error = await client.getCurrentUser().catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      code: "canvas_redirect_rejected",
+    });
+    expect(String((error as Error).message)).not.toMatch(/secret-token/);
+    expect(String((error as Error).message)).not.toMatch(/evil\.test/);
+
+    expect(
+      fetchImpl.mock.calls.some(([url]) => String(url).startsWith("https://evil.test")),
+    ).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    for (const call of fetchImpl.mock.calls) {
+      const init = call[1] as RequestInit;
+      expect(init.redirect).toBe("manual");
+    }
+  });
+
   it("respects pagination limits", async () => {
     const fetchImpl = createFetch([
       jsonResponse([{ id: 1, name: "One" }], {
@@ -232,6 +275,24 @@ function createClient(
     maxPages,
     personalAccessToken: token,
   });
+}
+
+function createRedirectFetch(
+  initialUrl: string,
+  redirectUrl: string,
+): FetchMock {
+  const mock = vi.fn(
+    async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      if (String(url) === initialUrl && init?.redirect !== "manual") {
+        await mock(redirectUrl, init);
+      }
+      return new Response("", {
+        status: 302,
+        headers: { location: redirectUrl },
+      });
+    },
+  ) as FetchMock;
+  return mock;
 }
 
 function createFetch(responses: readonly Response[]): FetchMock {

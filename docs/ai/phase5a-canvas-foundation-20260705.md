@@ -50,8 +50,9 @@
 ## Encryption Design
 
 - API environment variable: `CANVAS_TOKEN_ENCRYPTION_KEY`
-- Required key format: Base64-encoded value; decoded key must be exactly 32
-  bytes.
+- Required key format after Phase 5A.2: canonical padded Base64-encoded value;
+  decoded key must be exactly 32 bytes. Surrounding environment whitespace is
+  accepted for the key only.
 - Ownership: application/deployment-owned Stay Focused secret, not supplied by
   Canvas, the school, or the student.
 - Algorithm: AES-256-GCM through Node `crypto`.
@@ -59,9 +60,34 @@
   version.
 - Decryption fails closed for corrupted ciphertext, corrupted authentication
   tag, unsupported version, and invalid key.
-- Whitespace is trimmed before Base64 decode.
-- The key is validated when encryption or decryption is used, not at process
-  startup.
+- Stored ciphertext, IV, and authentication-tag fields are decoded as strict
+  canonical Base64; IV must decode to 12 bytes and authentication tag to 16
+  bytes.
+- The key and encrypted payload fields are validated when encryption or
+  decryption is used, not at process startup.
+
+## Phase 5A.2 Hardening Addendum
+
+- Audit source verdict: PASS WITH CONDITIONS.
+- Findings F1 through F7 are closed by strict canonical Base64 validation,
+  atomic connection/capability persistence, realistic two-user authorization
+  tests, explicit redirect rejection, README correction, ADR renumbering, and
+  expanded request validation tests.
+- Migration:
+  `packages/db/migrations/202607050003_harden_canvas_connection_persistence.sql`.
+- Remote migration status: applied; migration history includes `202607050003`.
+- RPC: `replace_canvas_connection_with_capabilities`.
+- Capability ownership: enforced by a unique `(id, user_id)` constraint on
+  `canvas_connections` and a composite `(canvas_connection_id, user_id)`
+  foreign key on `canvas_capabilities` with cascade delete preserved.
+- Redirect policy: authenticated Canvas requests use `redirect: "manual"` and
+  reject all redirect responses with `canvas_redirect_rejected`.
+- Automated two-user authorization validation: PASS.
+- Live second-user authorization validation: not run.
+- ADR duplicate resolved: Fast Testing Surfaces is now ADR-011; ADR-004 remains
+  the Stage-Based Generation Engine Pipeline.
+- Phase 5A hardening complete. Phase 5A quality conditions closed. Phase 5B
+  ready to begin when requested.
 
 ## Authentication Model
 
@@ -106,16 +132,16 @@ credential columns are not returned.
 
 - `npm run typecheck --workspace @stay-focused/canvas`: passed
 - `npm run build --workspace @stay-focused/canvas`: passed
-- `npm run test --workspace @stay-focused/canvas`: passed; 20/20
+- `npm run test --workspace @stay-focused/canvas`: passed; 22/22
 - `npm run typecheck --workspace @stay-focused/db`: passed
 - `npm run typecheck --workspace apps/api`: passed
-- `npm run test --workspace apps/api`: passed; 110/110
+- `npm run test --workspace apps/api`: passed; 146/146
 - `npm run typecheck --workspace apps/mobile`: passed
 - `npm run test --workspace apps/mobile`: passed; 70/70
 - `npm run typecheck`: passed after broad build regenerated Next `.next/types`
 - `npm run build`: passed
-- `npm run test --workspaces --if-present`: passed; API 110/110, mobile 70/70,
-  Canvas 20/20, OCR 14/14
+- `npm run test --workspaces --if-present`: passed; API 146/146, mobile 70/70,
+  Canvas 22/22, OCR 14/14
 - `git diff --check`: passed with CRLF warnings only
 - Targeted secret scan: no real Canvas tokens, encryption keys, Supabase
   service-role keys, OpenAI keys, or Google credential values found in changed

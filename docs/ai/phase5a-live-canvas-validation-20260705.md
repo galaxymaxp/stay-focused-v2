@@ -71,9 +71,10 @@ any locked, hidden, unpublished, or permission-restricted content.
 
 PASS. The migration is applied and a real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY`
 is configured in the ignored API-local environment file. The value is not
-printed, committed, or documented. The required format is Base64 encoded with a
-decoded length of exactly 32 bytes; the helper trims whitespace and validates
-the key only when encryption or decryption is used.
+printed, committed, or documented. The hardened required format is canonical
+padded Base64 with a decoded length of exactly 32 bytes; the helper accepts
+surrounding environment whitespace and validates the key only when encryption
+or decryption is used.
 
 | Operation | Result | Notes |
 | --- | --- | --- |
@@ -104,3 +105,24 @@ connection, courses, capabilities, and disconnect behavior.
 | Database operations user-scoped | PASS | Live validation stored and deleted only the selected user's connection; automated tests filter Canvas rows by authenticated user. |
 | No school-wide token exists | PASS | Phase 5A uses one user-generated personal access token per connected Canvas user. |
 | OAuth implemented | NOT_IMPLEMENTED | Canvas OAuth requires an institution-approved Developer Key and remains a future production authorization phase. |
+
+## Phase 5A.2 Hardening Update
+
+This update does not rerun destructive live Canvas lifecycle validation and does
+not change the original live limitations above.
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Audit verdict | PASS WITH CONDITIONS | Conditions F1-F7 are closed by the hardening pass. |
+| Strict Base64 | PASS | Key requires canonical padded Base64 and 32 decoded bytes; stored ciphertext, IV, and authentication tag decode strictly and fail closed. |
+| Atomic persistence | PASS | `PUT /api/canvas/connection` uses the `replace_canvas_connection_with_capabilities` RPC. |
+| Remote migration | PASS | `202607050003_harden_canvas_connection_persistence.sql` is applied remotely. |
+| Capability ownership | PASS | Composite `(canvas_connection_id, user_id)` foreign key is validated and preserves cascade delete. |
+| Redirect protection | PASS | Authenticated Canvas fetches use `redirect: "manual"` and reject redirects with `canvas_redirect_rejected`. |
+| Automated two-user authorization validation | PASS | Route tests prove User B cannot read, list courses through, delete, or mutate User A's Canvas connection/capabilities. |
+| Live second-user authorization validation | NOT_RUN | No separate live second Canvas/Stay Focused test user was used for this hardening pass. |
+| Request validation | PASS | Malformed JSON, oversized bodies, unsafe URLs, URL length, PAT length, content type, non-object JSON, unexpected types, and extra fields are covered. |
+| ADR numbering | PASS | Fast Testing Surfaces is ADR-011; ADR-004 remains the engine pipeline ADR. |
+
+Phase 5A hardening complete. Phase 5A quality conditions closed. Phase 5B ready
+to begin when requested.

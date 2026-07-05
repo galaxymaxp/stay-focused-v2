@@ -319,6 +319,7 @@ export class CanvasClient {
           Accept: "application/json",
           Authorization: `Bearer ${this.personalAccessToken}`,
         },
+        redirect: "manual",
         signal: controller.signal,
       });
     } catch (error) {
@@ -334,6 +335,14 @@ export class CanvasClient {
       );
     } finally {
       clearTimeout(timeoutId);
+    }
+
+    if (isRedirectStatus(response.status)) {
+      throw new CanvasClientError(
+        "canvas_redirect_rejected",
+        "Canvas redirects are not followed for authenticated requests.",
+        { status: response.status },
+      );
     }
 
     if (!response.ok) {
@@ -556,6 +565,10 @@ function mapHttpError(status: number): CanvasClientError {
   );
 }
 
+function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status < 400;
+}
+
 function statusForProbeError(error: unknown): CanvasCapabilityStatus {
   if (!(error instanceof CanvasClientError)) {
     return "temporarily_failed";
@@ -570,6 +583,7 @@ function statusForProbeError(error: unknown): CanvasCapabilityStatus {
     error.code === "canvas_rate_limited" ||
     error.code === "canvas_timeout" ||
     error.code === "canvas_unavailable" ||
+    error.code === "canvas_redirect_rejected" ||
     error.code === "canvas_request_failed"
   ) {
     return "temporarily_failed";

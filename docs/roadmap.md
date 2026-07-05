@@ -233,9 +233,11 @@ CanvasCredentialProvider
 
 ### Phase 5A - Secure Canvas Connection And Capability Discovery
 
-Status: Complete and live validated. Direct server-side Canvas validation,
-remote Supabase migration/RLS validation, and the protected API
-connect/status/courses/capabilities/disconnect lifecycle have passed.
+Status: Complete, live validated, and audit-hardened. Direct server-side Canvas
+validation, remote Supabase migration/RLS validation, protected API
+connect/status/courses/capabilities/disconnect lifecycle, strict encrypted
+payload validation, atomic connection/capability persistence, redirect
+rejection, and automated two-user authorization tests have passed.
 
 Scope:
 
@@ -304,9 +306,10 @@ Validation status as of 2026-07-05:
 - Supabase migration `202607050002_create_canvas_connections.sql` applied
   remotely and read-only checks verified both tables, RLS, and no direct
   `anon`/`authenticated` access to encrypted token columns.
-- `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally as a Base64-encoded key
-  that decodes to exactly 32 bytes. The helper trims whitespace, decodes as
-  Base64, and validates only when encryption or decryption is used.
+- `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally as a canonical padded
+  Base64 key that decodes to exactly 32 bytes. The helper accepts surrounding
+  environment whitespace, rejects malformed or non-canonical key material, and
+  validates only when encryption or decryption is used.
 - Protected API lifecycle validation passed against `http://localhost:3000`:
   Supabase bearer authentication was acquired for an established smoke-test
   user, `PUT /api/canvas/connection` validated the Canvas profile before
@@ -328,6 +331,14 @@ Validation status as of 2026-07-05:
 - Automated route tests cover cross-user scoping for connection, courses,
   capabilities, and disconnect behavior. A live second-user validation was not
   run because no separate second test-user credentials were available.
+- Phase 5A.2 hardening adds strict canonical Base64 validation for encrypted
+  payload fields, the atomic `replace_canvas_connection_with_capabilities` RPC,
+  a composite capability ownership foreign key, explicit redirect rejection,
+  expanded request validation coverage, and realistic two-user route tests.
+- Remote migration `202607050003_harden_canvas_connection_persistence.sql` is
+  applied. Read-only checks passed for RPC existence, revoked public execution,
+  service-role execution, validated ownership constraint, RLS, and revoked
+  direct grants.
 
 ### Phase 5B - Academic Graph Synchronization
 

@@ -92,11 +92,11 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: "canvas_capabilities_canvas_connection_id_fkey";
-            columns: ["canvas_connection_id"];
+            foreignKeyName: "canvas_capabilities_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
             isOneToOne: false;
             referencedRelation: "canvas_connections";
-            referencedColumns: ["id"];
+            referencedColumns: ["id", "user_id"];
           },
           {
             foreignKeyName: "canvas_capabilities_user_id_fkey";
@@ -212,7 +212,36 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      replace_canvas_connection_with_capabilities: {
+        Args: {
+          p_user_id: string;
+          p_base_url: string;
+          p_canvas_user_id: string;
+          p_canvas_user_name: string;
+          p_canvas_user_email: string | null;
+          p_token_ciphertext: string;
+          p_token_iv: string;
+          p_token_auth_tag: string;
+          p_encryption_version: string;
+          p_last_verified_at: string;
+          p_capabilities: Json;
+        };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          base_url: string;
+          canvas_user_id: string;
+          canvas_user_name: string;
+          canvas_user_email: string | null;
+          status: string;
+          last_verified_at: string;
+          last_error_code: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

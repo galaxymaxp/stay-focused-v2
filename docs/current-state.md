@@ -139,9 +139,10 @@ applied remotely and verified for table presence, RLS, and no direct
 `anon`/`authenticated` access to encrypted credential columns. The protected
 Phase 5A API lifecycle is now complete and live validated after configuring a
 real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY` in the ignored API-local
-environment file. The key is Base64-encoded and must decode to exactly 32
-bytes; the encryption helper trims whitespace and validates the key only when
-encrypting or decrypting.
+  environment file. The key is canonical padded Base64 and must decode to
+  exactly 32 bytes; the encryption helper accepts surrounding environment
+  whitespace but rejects non-canonical or malformed key material when
+  encrypting or decrypting.
 
 Protected lifecycle validation passed on `http://localhost:3000` with the
 established smoke-test Stay Focused user and finished disconnected:
@@ -167,6 +168,18 @@ plaintext PAT column, ciphertext not equal to the submitted PAT, and capability
 rows scoped to the same user and connection. Disconnect removed the connection
 and dependent capability rows, left saved reviewers unchanged, and the final
 status returned `connection: null`.
+
+Phase 5A.2 hardening closed the independent audit conditions. Stored
+ciphertext, IV, and authentication-tag fields now use strict canonical Base64
+decoding and fail closed when malformed. `PUT /api/canvas/connection` persists
+the connection and full capability snapshot through the atomic
+`replace_canvas_connection_with_capabilities` RPC, and the database enforces
+capability ownership with a composite `(canvas_connection_id, user_id)` foreign
+key. Automated two-user route tests now prove User B receives disconnected or
+empty states for User A's Canvas data and cannot delete or mutate User A's
+connection or capabilities. The Canvas client rejects HTTP redirects with
+`canvas_redirect_rejected` and uses `redirect: "manual"` for authenticated
+requests. Live second-user Canvas validation remains not run.
 
 ## Completed Capabilities
 
@@ -219,13 +232,17 @@ status returned `connection: null`.
 - ADR-006 through ADR-010 for Canvas academic graph synchronization,
   capability-based integration, Canvas credential storage, and grade-data
   separation, plus Canvas authentication phases.
+- ADR-011 for fast testing surfaces; this resolves the former duplicate
+  ADR-004 numbering while preserving ADR-004 for the engine pipeline.
 - `@stay-focused/canvas` client with strict URL normalization, bearer auth,
-  safe pagination, timeout support, cross-origin pagination rejection,
+  explicit redirect rejection, safe pagination, timeout support,
+  cross-origin pagination rejection,
   normalized typed errors, course discovery, current-profile validation, and
   independent capability probes.
 - Supabase Canvas connection/capability migration foundation with no plaintext
-  Canvas token storage and no direct authenticated grants over encrypted
-  credential fields.
+  Canvas token storage, atomic connection/capability replacement, database
+  ownership consistency for capability rows, and no direct authenticated grants
+  over encrypted credential fields.
 - Live remote Supabase application of the Canvas migration, with both Canvas
   tables, RLS, and no direct `anon`/`authenticated` encrypted-column access
   verified.
@@ -254,8 +271,8 @@ Verified across the latest Phase 4 and Phase 5A validation passes:
 - Mobile typecheck: passed
 - Mobile OCR client, picker, source-flow, and Study Library API tests: 66
   passed, 0 failed
-- Canvas package typecheck/build/tests: passed; 20 tests passed, 0 failed
-- API Canvas route/encryption tests: included in API tests; 110 passed, 0
+- Canvas package typecheck/build/tests: passed; 22 tests passed, 0 failed
+- API Canvas route/encryption tests: included in API tests; 146 passed, 0
   failed
 - Mobile Canvas API service tests: included in mobile tests; 70 passed, 0
   failed
@@ -263,7 +280,7 @@ Verified across the latest Phase 4 and Phase 5A validation passes:
 - Root workspace typecheck: passed after broad build regenerated Next
   `.next/types`
 - Root workspace build: passed
-- Workspace tests with scripts: passed; API 110/110, mobile 70/70, Canvas 20/20,
+- Workspace tests with scripts: passed; API 146/146, mobile 70/70, Canvas 22/22,
   OCR 14/14
 - `git diff --check`: passed with CRLF warnings only
 - Live Supabase schema verification: migration already applied; table, RLS,
@@ -316,6 +333,11 @@ Verified across the latest Phase 4 and Phase 5A validation passes:
   encrypted persistence checks passed, invalid replacement PAT preserved the
   valid connection, saved reviewers were unchanged, and the test finished with
   the user disconnected.
+- Phase 5A.2 hardening verification: `202607050003` applied remotely; read-only
+  checks passed for RPC existence, service-role-only execution, composite
+  capability ownership, RLS, revoked direct table grants, and revoked encrypted
+  column access. Automated two-user authorization validation: PASS. Live
+  second-user authorization validation: not run.
 
 Latest recorded unattended smokes during Phase 4 implementation:
 
@@ -367,11 +389,13 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
-- Canvas LMS Phase 5A is complete and live validated: direct server-side Canvas
-  validation with one developer-owned personal access token, remote Supabase
-  migration/RLS validation, and the protected API connection lifecycle have
-  passed. There is no school-wide Canvas credential. The live validation test
-  finished disconnected.
+- Canvas LMS Phase 5A is complete, live validated, and audit-hardened: direct
+  server-side Canvas validation with one developer-owned personal access token,
+  remote Supabase migration/RLS validation, protected API connection lifecycle,
+  strict encrypted payload validation, atomic connection/capability
+  persistence, redirect rejection, and automated two-user authorization tests
+  have passed. There is no school-wide Canvas credential. The live validation
+  test finished disconnected.
 - Canvas content ingestion is not implemented yet. Modules, Pages, files,
   assignments, discussions, announcements, quiz metadata, grades, rubrics,
   background sync, and source snapshots remain Phase 5B through Phase 5F work.
@@ -382,6 +406,7 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
+Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
 Phase 5B Academic Graph Synchronization can begin when requested. Repeated PDF
 header/footer cleanup remains a deferred OCR cleanup candidate.
 
@@ -415,8 +440,10 @@ header/footer cleanup remains a deferred OCR cleanup candidate.
   one personal access token does not prove access to modules, files, grades,
   quizzes, captions, conversations, external-tool content, or other users'
   courses.
-- `CANVAS_TOKEN_ENCRYPTION_KEY` must decode to exactly 32 bytes in the API
-  environment before Canvas connections can be saved.
+- `CANVAS_TOKEN_ENCRYPTION_KEY` must be canonical padded Base64 and decode to
+  exactly 32 bytes in the API environment before Canvas connections can be
+  saved. Stored ciphertext, IV, and authentication-tag fields are decoded
+  strictly and fail closed when malformed.
 - `CANVAS_PERSONAL_ACCESS_TOKEN` is developer-owned live-validation input only;
   normal application connections use each authenticated user's submitted and
   encrypted Canvas credential.

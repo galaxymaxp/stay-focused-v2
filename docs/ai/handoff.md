@@ -63,13 +63,29 @@ paths.
   `anon`/`authenticated` encrypted-column access.
 - Phase 5A protected API flow validation passed after configuring a real
   app-owned `CANVAS_TOKEN_ENCRYPTION_KEY` in the ignored API-local environment
-  file. The key is Base64 encoded and must decode to exactly 32 bytes.
+  file. The hardened key format is canonical padded Base64 and must decode to
+  exactly 32 bytes.
 - Protected API validation passed on `http://localhost:3000`: API health,
   Supabase bearer authentication for the established smoke-test user,
   connect/status/courses/capabilities/disconnect, encrypted persistence checks,
   invalid replacement PAT preservation, reviewer-count preservation, and final
   disconnected state all passed. Course count was 17; capability count was 25
   with statuses `available` and `not_tested`.
+- Phase 5A.2 hardening is complete. The audit returned PASS WITH CONDITIONS and
+  the conditions are now closed: Base64 validation is strict and canonical,
+  Canvas connection/capability persistence is atomic through
+  `replace_canvas_connection_with_capabilities`, capability ownership is
+  database-enforced with a composite foreign key, redirect responses are
+  rejected with `canvas_redirect_rejected`, request validation tests cover
+  malformed and oversized input, realistic automated two-user route tests prove
+  user isolation, README status is current, and duplicate ADR numbering is
+  resolved by renaming Fast Testing Surfaces to ADR-011.
+- Remote migration `202607050003_harden_canvas_connection_persistence.sql` is
+  applied. Read-only checks passed for migration history, RPC existence,
+  revoked `anon`/`authenticated` execution, service-role execution, validated
+  ownership constraint, RLS, revoked direct table grants, and revoked encrypted
+  column access. The Supabase CLI again emitted a non-fatal Docker catalog-cache
+  warning after push.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
@@ -91,9 +107,9 @@ paths.
 - Mobile typecheck: passed.
 - Mobile OCR client/picker/source-flow/library/Canvas service tests: 70 passed,
   0 failed.
-- Canvas package typecheck/build/tests: passed; 20 tests passed, 0 failed.
+- Canvas package typecheck/build/tests: passed; 22 tests passed, 0 failed.
 - DB package typecheck after Canvas migration/types: passed.
-- API typecheck/tests including Canvas routes and encryption: passed; 110 tests
+- API typecheck/tests including Canvas routes and encryption: passed; 146 tests
   passed, 0 failed.
 - Direct live Canvas validation: passed through
   `scripts/phase5a-live-canvas-validation.mjs` with sanitized output only; 17
@@ -101,6 +117,8 @@ paths.
   that script.
 - Remote Canvas migration verification: passed; both Canvas tables, RLS, and no
   direct encrypted-column access were verified.
+- Phase 5A.2 remote hardening migration verification: passed; RPC, grants,
+  ownership constraint, RLS, and direct grant restrictions verified.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -131,6 +149,7 @@ paths.
 
 ## Immediate Next Task
 
+Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
 Phase 5B Academic Graph Synchronization can begin when requested. Automatic
 repeated scanned-PDF header/footer detection remains a deferred OCR cleanup
 candidate.
@@ -157,8 +176,10 @@ candidate.
   persistence changes should preserve owner-scoped access, safe 404 denial, and
   owner-only cleanup behavior.
 - Phase 5A Canvas storage requires `CANVAS_TOKEN_ENCRYPTION_KEY`, which must be
-  Base64 encoded and decode to exactly 32 bytes. Do not generate a permanent
-  fallback key and do not log the key or Canvas tokens.
+  canonical padded Base64 and decode to exactly 32 bytes. Stored ciphertext, IV,
+  and authentication-tag fields are strictly decoded and fail closed when
+  malformed. Do not generate a permanent fallback key and do not log the key or
+  Canvas tokens.
 - The protected connect/status/courses/capabilities/disconnect flow has passed
   locally with a real app-owned ignored local key, not a temporary test key.
 - Each Canvas personal access token is validated through the API, encrypted

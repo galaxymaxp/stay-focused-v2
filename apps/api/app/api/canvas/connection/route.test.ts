@@ -111,10 +111,22 @@ vi.mock("@stay-focused/canvas", () => {
     CanvasClient,
     CanvasClientError,
     normalizeCanvasBaseUrl: (value: string) => {
-      if (!value.startsWith("https://")) {
+      let parsed: URL;
+      try {
+        parsed = new URL(value.trim());
+      } catch {
         throw new CanvasClientError("invalid_base_url", "invalid");
       }
-      return value.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+      if (parsed.protocol !== "https:") {
+        throw new CanvasClientError("invalid_base_url", "invalid");
+      }
+      if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+        throw new CanvasClientError("invalid_base_url", "invalid");
+      }
+      parsed.pathname = parsed.pathname
+        .replace(/\/api\/v1\/?$/, "")
+        .replace(/\/+$/, "");
+      return parsed.toString().replace(/\/$/, "");
     },
   };
 });
@@ -181,7 +193,134 @@ describe("/api/canvas", () => {
 
     expect(response.status).toBe(400);
     await expectError(response, "invalid_canvas_url");
-    expect(db.upsertPayload).toBeUndefined();
+    expect(db.rpcPayload).toBeUndefined();
+  });
+
+  it.each([
+    ["malformed JSON", { rawBody: "{nope" }, 400, "invalid_json"],
+    ["empty JSON body", { rawBody: "" }, 400, "invalid_json"],
+    ["non-object JSON", { body: [] }, 400, "invalid_request"],
+    [
+      "missing base URL",
+      { body: { personalAccessToken: "secret-token" } },
+      400,
+      "invalid_request",
+    ],
+    [
+      "missing PAT",
+      { body: { baseUrl: "https://canvas.test" } },
+      400,
+      "invalid_request",
+    ],
+    [
+      "blank PAT",
+      {
+        body: {
+          baseUrl: "https://canvas.test",
+          personalAccessToken: "   ",
+        },
+      },
+      400,
+      "invalid_request",
+    ],
+    [
+      "unexpected field types",
+      { body: { baseUrl: 42, personalAccessToken: true } },
+      400,
+      "invalid_request",
+    ],
+    [
+      "URL exceeding maximum length",
+      {
+        body: {
+          baseUrl: `https://canvas.test/${"a".repeat(2049)}`,
+          personalAccessToken: "secret-token",
+        },
+      },
+      400,
+      "invalid_request",
+    ],
+    [
+      "PAT exceeding maximum length",
+      {
+        body: {
+          baseUrl: "https://canvas.test",
+          personalAccessToken: "x".repeat(4097),
+        },
+      },
+      400,
+      "invalid_request",
+    ],
+    [
+      "request body exceeding maximum size",
+      {
+        rawBody: JSON.stringify({
+          baseUrl: "https://canvas.test",
+          personalAccessToken: "x".repeat(20_000),
+        }),
+      },
+      413,
+      "payload_too_large",
+    ],
+    [
+      "incorrect content type",
+      {
+        body: {
+          baseUrl: "https://canvas.test",
+          personalAccessToken: "secret-token",
+        },
+        contentType: "text/plain",
+      },
+      400,
+      "invalid_request",
+    ],
+    [
+      "unknown extra fields",
+      {
+        body: {
+          baseUrl: "https://canvas.test",
+          personalAccessToken: "secret-token",
+          extra: "nope",
+        },
+      },
+      400,
+      "invalid_request",
+    ],
+  ] as const)("rejects %s safely", async (_name, requestOptions, status, code) => {
+    const db = createDbClient();
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await connectionRoute.PUT(createRequest(requestOptions));
+    const body = await expectError(response, code);
+
+    expect(response.status).toBe(status);
+    expect(JSON.stringify(body)).not.toContain("secret-token");
+    expect(db.rpcPayload).toBeUndefined();
+  });
+
+  it.each([
+    ["malformed Canvas URL", "not a url"],
+    ["embedded URL credentials", "https://token:secret@canvas.test"],
+    ["URL query strings", "https://canvas.test?token=secret-token"],
+    ["URL fragments", "https://canvas.test#secret-token"],
+    ["non-HTTPS URL", "http://canvas.test"],
+  ])("rejects %s before saving credentials", async (_name, baseUrl) => {
+    const db = createDbClient();
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await connectionRoute.PUT(
+      createRequest({
+        body: {
+          baseUrl,
+          personalAccessToken: "secret-token",
+        },
+      }),
+    );
+    const body = await expectError(response, "invalid_canvas_url");
+
+    expect(response.status).toBe(400);
+    expect(JSON.stringify(body)).not.toContain("secret-token");
+    expect(db.rpcPayload).toBeUndefined();
   });
 
   it("keeps an existing connection when replacement token validation fails", async () => {
@@ -204,12 +343,12 @@ describe("/api/canvas", () => {
     const body = await expectError(response, "invalid_canvas_token");
     expect(response.status).toBe(401);
     expect(JSON.stringify(body)).not.toContain("secret-token");
-    expect(db.upsertPayload).toBeUndefined();
+    expect(db.rpcPayload).toBeUndefined();
     expect(db.deletedConnectionUserId).toBeUndefined();
   });
 
   it("validates, encrypts, stores, and returns safe Canvas connection data", async () => {
-    const db = createDbClient({ upsertRow: connectionRow() });
+    const db = createDbClient({ connectionRow: null });
     mocks.createCanvasServiceClient.mockReturnValue(db);
 
     const response = await connectionRoute.PUT(
@@ -236,19 +375,22 @@ describe("/api/canvas", () => {
         { capability: "files", status: "not_tested" },
       ],
     });
-    expect(db.upsertPayload).toMatchObject({
-      user_id: "user-1",
-      base_url: "https://canvas.test",
-      canvas_user_id: "canvas-user-1",
-      token_iv: expect.any(String),
-      token_auth_tag: expect.any(String),
-      encryption_version: "aes-256-gcm:v1",
+    expect(db.rpcPayload).toMatchObject({
+      p_user_id: "user-1",
+      p_base_url: "https://canvas.test",
+      p_canvas_user_id: "canvas-user-1",
+      p_token_iv: expect.any(String),
+      p_token_auth_tag: expect.any(String),
+      p_encryption_version: "aes-256-gcm:v1",
     });
-    expect(JSON.stringify(db.upsertPayload)).not.toContain("secret-token");
+    expect(JSON.stringify(db.rpcPayload)).not.toContain("secret-token");
     expect(JSON.stringify(body)).not.toContain("secret-token");
-    expect(db.deletedCapabilitiesConnectionId).toBe("connection-1");
-    expect(db.insertedCapabilities).toHaveLength(3);
-    expect(db.insertedCapabilities?.[1]).toMatchObject({
+    expect(db.connectionFor("user-1")).toMatchObject({
+      id: "connection-1",
+      base_url: "https://canvas.test",
+    });
+    expect(db.capabilitiesFor("user-1")).toHaveLength(3);
+    expect(db.capabilitiesFor("user-1")[1]).toMatchObject({
       user_id: "user-1",
       canvas_connection_id: "connection-1",
       capability: "modules",
@@ -358,15 +500,181 @@ describe("/api/canvas", () => {
     });
     expect(db.capabilityUserId).toBe("user-1");
   });
+
+  it.each([
+    "capability_delete",
+    "capability_insert",
+    "partial_capability_insert",
+  ] as const)(
+    "rolls back connection replacement when %s fails inside the atomic RPC",
+    async (rpcFailure) => {
+      const oldConnection = connectionRow({
+        base_url: "https://old.canvas.test",
+        canvas_user_name: "Existing Student",
+      });
+      const oldCapability = capabilityRow({
+        capability: "courses",
+        status: "available",
+      });
+      const db = createDbClient({
+        capabilityRows: [oldCapability],
+        connectionRow: oldConnection,
+        rpcFailure,
+      });
+      mocks.createCanvasServiceClient.mockReturnValue(db);
+
+      const response = await connectionRoute.PUT(
+        createRequest({
+          body: {
+            baseUrl: "https://new.canvas.test",
+            personalAccessToken: "secret-token",
+          },
+        }),
+      );
+
+      await expectError(response, "canvas_storage_failed");
+      expect(response.status).toBe(500);
+      expect(db.connectionFor("user-1")).toMatchObject({
+        base_url: "https://old.canvas.test",
+        canvas_user_name: "Existing Student",
+      });
+      expect(db.capabilitiesFor("user-1")).toEqual([oldCapability]);
+    },
+  );
+
+  it("keeps a new user disconnected when the atomic RPC fails", async () => {
+    const db = createDbClient({
+      connectionRow: null,
+      rpcFailure: "capability_insert",
+    });
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await connectionRoute.PUT(createRequest());
+
+    await expectError(response, "canvas_storage_failed");
+    expect(response.status).toBe(500);
+    expect(db.connectionFor("user-1")).toBeNull();
+    expect(db.capabilitiesFor("user-1")).toEqual([]);
+  });
+
+  it("updates the connection and complete capabilities snapshot together", async () => {
+    const db = createDbClient({
+      capabilityRows: [
+        capabilityRow({ capability: "old_capability", status: "available" }),
+      ],
+      connectionRow: connectionRow({ base_url: "https://old.canvas.test" }),
+    });
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await connectionRoute.PUT(createRequest());
+
+    expect(response.status).toBe(200);
+    expect(db.connectionFor("user-1")).toMatchObject({
+      base_url: "https://canvas.test",
+    });
+    expect(db.capabilitiesFor("user-1")).toHaveLength(3);
+    expect(db.capabilitiesFor("user-1").map((row) => row.capability)).toEqual([
+      "profile",
+      "modules",
+      "files",
+    ]);
+    expect(db.hasCapabilityOwnershipMismatch()).toBe(false);
+  });
+
+  it("proves User A and User B are isolated across connection routes", async () => {
+    const userA = "00000000-0000-0000-0000-00000000000a";
+    const userB = "00000000-0000-0000-0000-00000000000b";
+    const encryptedA = encryptCanvasToken("stored-token-a", ENCRYPTION_KEY);
+    const userAConnection = connectionRow({
+      id: "connection-a",
+      user_id: userA,
+      canvas_user_name: "User A",
+      token_ciphertext: encryptedA.ciphertext,
+      token_iv: encryptedA.iv,
+      token_auth_tag: encryptedA.authTag,
+      encryption_version: encryptedA.encryptionVersion,
+    });
+    const userACapability = capabilityRow({
+      id: "capability-a",
+      user_id: userA,
+      canvas_connection_id: "connection-a",
+      capability: "courses",
+      status: "available",
+    });
+    const db = createDbClient({
+      capabilityRows: [userACapability],
+      connectionRows: [userAConnection],
+    });
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    mocks.verifyBearerToken.mockResolvedValue({ id: userA });
+    const userARead = await connectionRoute.GET(createRequest());
+    expect(userARead.status).toBe(200);
+    await expect(userARead.json()).resolves.toMatchObject({
+      ok: true,
+      connection: { id: "connection-a", canvasUserName: "User A" },
+    });
+
+    mocks.verifyBearerToken.mockResolvedValue({ id: userB });
+    const userBRead = await connectionRoute.GET(createRequest());
+    expect(userBRead.status).toBe(200);
+    await expect(userBRead.json()).resolves.toEqual({
+      ok: true,
+      connection: null,
+    });
+
+    const userBCourses = await coursesRoute.GET(createRequest());
+    await expectError(userBCourses, "canvas_connection_missing");
+    expect(userBCourses.status).toBe(404);
+    expect(mocks.constructorCalls).toHaveLength(0);
+
+    const userBCapabilities = await capabilitiesRoute.GET(createRequest());
+    expect(userBCapabilities.status).toBe(200);
+    await expect(userBCapabilities.json()).resolves.toEqual({
+      ok: true,
+      capabilities: [],
+    });
+
+    const userBDelete = await connectionRoute.DELETE(createRequest());
+    expect(userBDelete.status).toBe(200);
+    expect(db.connectionFor(userA)).toEqual(userAConnection);
+    expect(db.capabilitiesFor(userA)).toEqual([userACapability]);
+
+    const userBReplace = await connectionRoute.PUT(
+      createRequest({
+        body: {
+          baseUrl: "https://canvas-b.test",
+          personalAccessToken: "secret-token-b",
+        },
+      }),
+    );
+    expect(userBReplace.status).toBe(200);
+    expect(db.connectionFor(userA)).toEqual(userAConnection);
+    expect(db.capabilitiesFor(userA)).toEqual([userACapability]);
+    expect(db.connectionFor(userB)).toMatchObject({
+      user_id: userB,
+      base_url: "https://canvas-b.test",
+    });
+    expect(db.hasCapabilityOwnershipMismatch()).toBe(false);
+  });
 });
 
 function createRequest(
   options: {
     readonly auth?: string | null;
+    readonly contentLength?: string;
+    readonly contentType?: string | null;
     readonly body?: unknown;
+    readonly rawBody?: string;
   } = {},
 ): Request {
-  const headers = new Headers({ "content-type": "application/json" });
+  const headers = new Headers();
+  if (options.contentType !== null) {
+    headers.set("content-type", options.contentType ?? "application/json");
+  }
+  if (options.contentLength) {
+    headers.set("content-length", options.contentLength);
+  }
   if (options.auth !== null) {
     headers.set("authorization", options.auth ?? "Bearer stay-focused-token");
   }
@@ -374,100 +682,194 @@ function createRequest(
   return new Request("http://localhost/api/canvas/connection", {
     method: "PUT",
     headers,
-    body: JSON.stringify(
-      options.body ?? {
-        baseUrl: "https://canvas.test",
-        personalAccessToken: "secret-token",
-      },
-    ),
+    body:
+      options.rawBody ??
+      JSON.stringify(
+        options.body ?? {
+          baseUrl: "https://canvas.test",
+          personalAccessToken: "secret-token",
+        },
+      ),
   });
 }
 
 function createDbClient(options: {
   readonly connectionRow?: unknown;
-  readonly upsertRow?: unknown;
+  readonly connectionRows?: readonly unknown[];
   readonly capabilityRows?: readonly unknown[];
+  readonly rpcFailure?:
+    | "capability_delete"
+    | "capability_insert"
+    | "partial_capability_insert";
 } = {}) {
   const state: {
     capabilityUserId?: string;
-    deletedCapabilitiesConnectionId?: string;
     deletedConnectionUserId?: string;
-    insertedCapabilities?: readonly unknown[];
-    upsertPayload?: unknown;
+    rpcPayload?: Record<string, unknown>;
   } = {};
+  const connections = new Map<string, Record<string, unknown>>();
+  const capabilities: Array<Record<string, unknown>> = [];
+
+  if (options.connectionRows) {
+    for (const row of options.connectionRows) {
+      const record = row as Record<string, unknown>;
+      connections.set(String(record.user_id), { ...record });
+    }
+  } else if (options.connectionRow !== undefined && options.connectionRow !== null) {
+    const record = options.connectionRow as Record<string, unknown>;
+    connections.set(String(record.user_id ?? "user-1"), { ...record });
+  } else if (options.connectionRow === undefined) {
+    const row = connectionRow();
+    connections.set(String(row.user_id), row);
+  }
+
+  for (const row of options.capabilityRows ?? []) {
+    const record = row as Record<string, unknown>;
+    capabilities.push({
+      user_id: record.user_id ?? "user-1",
+      canvas_connection_id: record.canvas_connection_id ?? "connection-1",
+      ...record,
+    });
+  }
 
   return {
     get capabilityUserId() {
       return state.capabilityUserId;
     },
-    get deletedCapabilitiesConnectionId() {
-      return state.deletedCapabilitiesConnectionId;
-    },
     get deletedConnectionUserId() {
       return state.deletedConnectionUserId;
     },
-    get insertedCapabilities() {
-      return state.insertedCapabilities;
+    get rpcPayload() {
+      return state.rpcPayload;
     },
-    get upsertPayload() {
-      return state.upsertPayload;
+    capabilitiesFor(userId: string) {
+      return capabilities.filter((row) => row.user_id === userId);
     },
+    connectionFor(userId: string) {
+      return connections.get(userId) ?? null;
+    },
+    hasCapabilityOwnershipMismatch() {
+      return capabilities.some((row) => {
+        const owner = [...connections.values()].find(
+          (connection) => connection.id === row.canvas_connection_id,
+        );
+        return owner ? owner.user_id !== row.user_id : false;
+      });
+    },
+    rpc: vi.fn((name: string, payload: Record<string, unknown>) => {
+      state.rpcPayload = payload;
+      return {
+        single: vi.fn(async () => {
+          if (name !== "replace_canvas_connection_with_capabilities") {
+            return { data: null, error: { message: "unknown rpc" } };
+          }
+          if (options.rpcFailure) {
+            return { data: null, error: { message: options.rpcFailure } };
+          }
+
+          const userId = String(payload.p_user_id);
+          const previous = connections.get(userId);
+          const id = String(previous?.id ?? nextConnectionId(userId));
+          const savedConnection = connectionRow({
+            id,
+            user_id: userId,
+            base_url: payload.p_base_url,
+            canvas_user_id: payload.p_canvas_user_id,
+            canvas_user_name: payload.p_canvas_user_name,
+            canvas_user_email: payload.p_canvas_user_email,
+            token_ciphertext: payload.p_token_ciphertext,
+            token_iv: payload.p_token_iv,
+            token_auth_tag: payload.p_token_auth_tag,
+            encryption_version: payload.p_encryption_version,
+            last_verified_at: payload.p_last_verified_at,
+            created_at:
+              typeof previous?.created_at === "string"
+                ? previous.created_at
+                : "2026-07-05T01:00:00.000Z",
+            updated_at: payload.p_last_verified_at,
+          });
+          const nextCapabilities = (payload.p_capabilities as Array<
+            Record<string, unknown>
+          >).map((capability, index) => ({
+            id: `capability-${userId}-${index + 1}`,
+            user_id: userId,
+            canvas_connection_id: id,
+            capability: capability.capability,
+            status: capability.status,
+            tested_at: capability.tested_at,
+            safe_error_code: capability.safe_error_code,
+            course_id: capability.course_id,
+            integration_version: capability.integration_version,
+            created_at: String(payload.p_last_verified_at),
+            updated_at: String(payload.p_last_verified_at),
+          }));
+
+          connections.set(userId, savedConnection);
+          for (let index = capabilities.length - 1; index >= 0; index -= 1) {
+            if (
+              capabilities[index]?.user_id === userId &&
+              capabilities[index]?.canvas_connection_id === id
+            ) {
+              capabilities.splice(index, 1);
+            }
+          }
+          capabilities.push(...nextCapabilities);
+
+          return { data: savedConnection, error: null };
+        }),
+      };
+    }),
     from: vi.fn((table: string) => {
       if (table === "canvas_connections") {
         return {
           delete: vi.fn(() => ({
             eq: vi.fn(async (_column: string, value: string) => {
               state.deletedConnectionUserId = value;
+              const removed = connections.get(value);
+              connections.delete(value);
+              if (removed) {
+                for (let index = capabilities.length - 1; index >= 0; index -= 1) {
+                  if (capabilities[index]?.canvas_connection_id === removed.id) {
+                    capabilities.splice(index, 1);
+                  }
+                }
+              }
               return { error: null };
             }),
           })),
           select: vi.fn(() => ({
             eq: vi.fn((_column: string, value: string) => ({
               maybeSingle: vi.fn(async () => ({
-                data:
-                  options.connectionRow === undefined
-                    ? connectionRow({ user_id: value })
-                    : options.connectionRow,
+                data: connections.get(value) ?? null,
                 error: null,
               })),
             })),
           })),
-          upsert: vi.fn((payload: unknown) => {
-            state.upsertPayload = payload;
-            return {
-              select: vi.fn(() => ({
-                single: vi.fn(async () => ({
-                  data: options.upsertRow ?? connectionRow(),
-                  error: null,
-                })),
-              })),
-            };
-          }),
         };
       }
 
       return {
         delete: vi.fn(() => ({
           eq: vi.fn(async (_column: string, value: string) => {
-            state.deletedCapabilitiesConnectionId = value;
+            for (let index = capabilities.length - 1; index >= 0; index -= 1) {
+              if (capabilities[index]?.canvas_connection_id === value) {
+                capabilities.splice(index, 1);
+              }
+            }
             return { error: null };
           }),
         })),
-        insert: vi.fn(async (payload: readonly unknown[]) => {
-          state.insertedCapabilities = payload;
+        insert: vi.fn(async (payload: readonly Record<string, unknown>[]) => {
+          capabilities.push(...payload);
           return { error: null };
         }),
         select: vi.fn(() => ({
           eq: vi.fn((_column: string, value: string) => {
             state.capabilityUserId = value;
-            const ordered = {
-              order: vi.fn(() => ordered),
-              then: undefined,
-            };
             return {
               order: vi.fn(() => ({
                 order: vi.fn(async () => ({
-                  data: options.capabilityRows ?? [],
+                  data: capabilities.filter((row) => row.user_id === value),
                   error: null,
                 })),
               })),
@@ -477,6 +879,10 @@ function createDbClient(options: {
       };
     }),
   };
+}
+
+function nextConnectionId(userId: string): string {
+  return userId === "user-1" ? "connection-1" : `connection-${userId}`;
 }
 
 function connectionRow(overrides: Record<string, unknown> = {}) {
@@ -494,6 +900,23 @@ function connectionRow(overrides: Record<string, unknown> = {}) {
     status: "active",
     last_verified_at: "2026-07-05T01:00:00.000Z",
     last_error_code: null,
+    created_at: "2026-07-05T01:00:00.000Z",
+    updated_at: "2026-07-05T01:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function capabilityRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "capability-1",
+    user_id: "user-1",
+    canvas_connection_id: "connection-1",
+    capability: "courses",
+    status: "available",
+    tested_at: "2026-07-05T01:00:00.000Z",
+    safe_error_code: null,
+    course_id: null,
+    integration_version: "phase5a",
     created_at: "2026-07-05T01:00:00.000Z",
     updated_at: "2026-07-05T01:00:00.000Z",
     ...overrides,

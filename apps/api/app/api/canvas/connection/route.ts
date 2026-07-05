@@ -1,6 +1,5 @@
 import {
   createCanvasClient,
-  createCapabilityInserts,
   createConnectionInsert,
   errorResponse,
   jsonResponse,
@@ -12,6 +11,7 @@ import {
   readConnectRequest,
   readConnection,
   requireCanvasAuth,
+  replaceConnectionWithCapabilities,
 } from "@/lib/canvas-routes";
 import { encryptCanvasToken } from "@/lib/canvas-token-encryption";
 
@@ -105,51 +105,17 @@ export async function PUT(request: Request): Promise<Response> {
     verifiedAt,
   });
 
-  const { data: savedConnection, error: saveError } = await auth.value.client
-    .from("canvas_connections")
-    .upsert(connectionInsert, { onConflict: "user_id" })
-    .select(
-      "id,user_id,base_url,canvas_user_id,canvas_user_name,canvas_user_email,status,last_verified_at,last_error_code,created_at,updated_at",
-    )
-    .single();
-
-  if (saveError || !savedConnection) {
-    return errorResponse(
-      500,
-      "canvas_storage_failed",
-      "Canvas connection could not be saved.",
-      request,
-    );
-  }
-
-  const deleteCapabilities = await auth.value.client
-    .from("canvas_capabilities")
-    .delete()
-    .eq("canvas_connection_id", savedConnection.id);
-
-  if (deleteCapabilities.error) {
-    return errorResponse(
-      500,
-      "canvas_storage_failed",
-      "Canvas capability results could not be refreshed.",
-      request,
-    );
-  }
-
-  const capabilityInserts = createCapabilityInserts({
+  const savedConnection = await replaceConnectionWithCapabilities({
     capabilities,
-    connectionId: savedConnection.id,
-    userId: auth.value.user.id,
+    client: auth.value.client,
+    connection: connectionInsert,
   });
-  const insertCapabilities = await auth.value.client
-    .from("canvas_capabilities")
-    .insert(capabilityInserts);
 
-  if (insertCapabilities.error) {
+  if (!savedConnection.ok) {
     return errorResponse(
       500,
       "canvas_storage_failed",
-      "Canvas capability results could not be saved.",
+      "Canvas connection and capability results could not be saved.",
       request,
     );
   }
@@ -157,7 +123,7 @@ export async function PUT(request: Request): Promise<Response> {
   return jsonResponse(
     {
       ok: true,
-      connection: mapConnection(savedConnection),
+      connection: mapConnection(savedConnection.row),
       courses,
       capabilities: capabilities.map(mapCapability),
     },

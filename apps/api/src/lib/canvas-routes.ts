@@ -37,6 +37,7 @@ const CORS_MAX_AGE_SECONDS = "600";
 const MAX_CONNECT_BODY_BYTES = 16 * 1024;
 const MAX_CANVAS_BASE_URL_CHARS = 2048;
 const MAX_CANVAS_TOKEN_CHARS = 4096;
+const CONNECT_REQUEST_FIELDS = new Set(["baseUrl", "personalAccessToken"]);
 const CONNECTION_SAFE_COLUMNS =
   "id,user_id,base_url,canvas_user_id,canvas_user_name,canvas_user_email,status,last_verified_at,last_error_code,created_at,updated_at";
 const CONNECTION_SECRET_COLUMNS =
@@ -131,6 +132,10 @@ export async function readConnectRequest(
       readonly message: string;
     }
 > {
+  if (!isJsonContentType(request.headers.get("content-type"))) {
+    return invalidConnectRequest("Request content type must be application/json.");
+  }
+
   if (isOversizedContentLength(request.headers.get("content-length"))) {
     return {
       ok: false,
@@ -140,7 +145,17 @@ export async function readConnectRequest(
     };
   }
 
-  const body = await readJson(request);
+  const rawBody = await readBoundedTextBody(request);
+  if (!rawBody.ok) {
+    return {
+      ok: false,
+      status: 413,
+      code: "payload_too_large",
+      message: `Request body must be at most ${MAX_CONNECT_BODY_BYTES} bytes.`,
+    };
+  }
+
+  const body = parseJson(rawBody.value);
   if (!body.ok) {
     return {
       ok: false,
@@ -152,6 +167,9 @@ export async function readConnectRequest(
 
   if (!isRecord(body.value)) {
     return invalidConnectRequest("Request body must be a JSON object.");
+  }
+  if (!hasOnlyConnectRequestFields(body.value)) {
+    return invalidConnectRequest("Request body contains unsupported fields.");
   }
 
   const baseUrl = body.value.baseUrl;
@@ -350,6 +368,7 @@ export function mapCanvasClientError(error: unknown): {
       };
     case "canvas_malformed_json":
     case "canvas_invalid_response":
+    case "canvas_redirect_rejected":
     case "canvas_pagination_rejected":
     case "canvas_request_failed":
       return {
@@ -451,19 +470,71 @@ export async function readCapabilities(
   return { ok: true, rows: data as unknown as readonly CanvasCapabilitySummaryRow[] };
 }
 
-export { CONNECTION_SAFE_COLUMNS, CONNECTION_SECRET_COLUMNS };
-
-async function readJson(
-  request: Request,
-): Promise<
-  | { readonly ok: true; readonly value: unknown }
+export async function replaceConnectionWithCapabilities({
+  capabilities,
+  client,
+  connection,
+}: {
+  readonly capabilities: readonly CanvasCapabilityProbeResult[];
+  readonly client: SupabaseClient<Database>;
+  readonly connection: CanvasConnectionInsert;
+}): Promise<
+  | { readonly ok: true; readonly row: CanvasConnectionSummaryRow }
   | { readonly ok: false }
 > {
+  const { data, error } = await client
+    .rpc("replace_canvas_connection_with_capabilities", {
+      p_base_url: connection.base_url,
+      p_canvas_user_email: connection.canvas_user_email ?? null,
+      p_canvas_user_id: connection.canvas_user_id,
+      p_canvas_user_name: connection.canvas_user_name,
+      p_capabilities: capabilities.map((capability) => ({
+        capability: capability.capability,
+        course_id: capability.courseId,
+        integration_version: capability.integrationVersion,
+        safe_error_code: capability.safeErrorCode,
+        status: capability.status,
+        tested_at: capability.testedAt,
+      })),
+      p_encryption_version: connection.encryption_version,
+      p_last_verified_at: connection.last_verified_at,
+      p_token_auth_tag: connection.token_auth_tag,
+      p_token_ciphertext: connection.token_ciphertext,
+      p_token_iv: connection.token_iv,
+      p_user_id: connection.user_id,
+    })
+    .single();
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, row: data as CanvasConnectionSummaryRow };
+}
+
+export { CONNECTION_SAFE_COLUMNS, CONNECTION_SECRET_COLUMNS };
+
+function parseJson(text: string): (
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false }
+) {
   try {
-    return { ok: true, value: (await request.json()) as unknown };
+    return { ok: true, value: JSON.parse(text) as unknown };
   } catch {
     return { ok: false };
   }
+}
+
+async function readBoundedTextBody(
+  request: Request,
+): Promise<
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false }
+> {
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_CONNECT_BODY_BYTES) {
+    return { ok: false };
+  }
+  return { ok: true, value: text };
 }
 
 function invalidConnectRequest(message: string): {
@@ -486,6 +557,22 @@ function isOversizedContentLength(contentLength: string | null): boolean {
   }
   const parsed = Number(contentLength);
   return Number.isFinite(parsed) && parsed > MAX_CONNECT_BODY_BYTES;
+}
+
+function isJsonContentType(contentType: string | null): boolean {
+  if (!contentType) {
+    return false;
+  }
+  return contentType
+    .split(";")[0]
+    ?.trim()
+    .toLowerCase() === "application/json";
+}
+
+function hasOnlyConnectRequestFields(
+  value: Readonly<Record<string, unknown>>,
+): boolean {
+  return Object.keys(value).every((key) => CONNECT_REQUEST_FIELDS.has(key));
 }
 
 function getCanvasClientErrorCode(error: unknown): CanvasClientErrorCode {
@@ -514,6 +601,7 @@ function isCanvasClientErrorCode(
     value === "canvas_timeout" ||
     value === "canvas_malformed_json" ||
     value === "canvas_invalid_response" ||
+    value === "canvas_redirect_rejected" ||
     value === "canvas_pagination_rejected" ||
     value === "canvas_request_failed"
   );
