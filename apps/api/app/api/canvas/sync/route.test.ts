@@ -36,16 +36,24 @@ vi.mock("@stay-focused/canvas", () => {
   class CanvasClientError extends Error {
     public readonly code: string;
     public readonly status: number | null;
+    public readonly retryAfterMs: number | null;
+    public readonly attemptCount: number;
 
     public constructor(
       code: string,
       message: string,
-      options: { readonly status?: number } = {},
+      options: {
+        readonly status?: number;
+        readonly retryAfterMs?: number | null;
+        readonly attemptCount?: number;
+      } = {},
     ) {
       super(message);
       this.name = "CanvasClientError";
       this.code = code;
       this.status = options.status ?? null;
+      this.retryAfterMs = options.retryAfterMs ?? null;
+      this.attemptCount = options.attemptCount ?? 1;
     }
   }
 
@@ -121,6 +129,18 @@ vi.mock("@stay-focused/canvas", () => {
 
   function throwIfConfigured(key: string): void {
     const error = mocks.canvas.errors.get(key);
+    if (Array.isArray(error)) {
+      const [next, ...remaining] = error;
+      if (remaining.length > 0) {
+        mocks.canvas.errors.set(key, remaining);
+      } else {
+        mocks.canvas.errors.delete(key);
+      }
+      if (next) {
+        throw next;
+      }
+      return;
+    }
     if (error) {
       throw error;
     }
@@ -442,8 +462,25 @@ describe("POST /api/canvas/sync", () => {
       ok: true,
       status: "partial",
       courses: { discovered: 2, succeeded: 1, failed: 1 },
-      failures: [{ code: "canvas_unavailable", count: 1 }],
+      failures: [{ code: "canvas_course_page_detail_failed", count: 1 }],
     });
+    expect(db.courseResults()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          failedOperation: "page_detail",
+          failureCategory: "server_error",
+          failureCode: "canvas_course_page_detail_failed",
+          retryCount: 2,
+          retryable: true,
+          status: "failed",
+        }),
+        expect.objectContaining({
+          failureCode: null,
+          retryCount: 0,
+          status: "succeeded",
+        }),
+      ]),
+    );
     expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).not.toBeNull();
     expect(db.graphFor(USER_A, CONNECTION_A, "course-2")).toMatchObject({
       modules: [expect.objectContaining({ canvasId: "old-module" })],
@@ -482,14 +519,102 @@ describe("POST /api/canvas/sync", () => {
       mocks.createCanvasServiceClient.mockReturnValue(db);
 
       const response = await syncRoute.POST(createRequest());
+      const expectedCode =
+        failure === "module-item"
+          ? "canvas_course_module_items_failed"
+          : failure === "assignment"
+            ? "canvas_course_assignments_failed"
+            : "canvas_course_persistence_failed";
+      const expectedOperation =
+        failure === "module-item"
+          ? "module_items"
+          : failure === "assignment"
+            ? "assignments"
+            : "persistence";
 
       expect(response.status).toBe(failure === "rpc" ? 500 : 502);
+      expect(db.courseResults()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            failedOperation: expectedOperation,
+            failureCode: expectedCode,
+            status: "failed",
+          }),
+        ]),
+      );
       expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).toMatchObject({
         modules: [expect.objectContaining({ canvasId: "old-module" })],
         moduleItems: [expect.objectContaining({ canvasId: "old-item" })],
         assignments: [expect.objectContaining({ canvasId: "old-assignment" })],
       });
     }
+  });
+
+  it("retries transient course operations and records recovered courses", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.canvas.errors.set("assignments:course-1", [
+      new CanvasClientError("canvas_rate_limited", "Private transient body", {
+        retryAfterMs: 10_000,
+        status: 429,
+      }),
+      new CanvasClientError("canvas_unavailable", "Private transient body", {
+        status: 503,
+      }),
+    ]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await syncRoute.POST(createRequest());
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(text)).toMatchObject({
+      ok: true,
+      status: "succeeded",
+      courses: { discovered: 1, succeeded: 1, failed: 0 },
+    });
+    expect(db.courseResults()).toEqual([
+      expect.objectContaining({
+        failureCode: null,
+        retryCount: 2,
+        status: "succeeded",
+      }),
+    ]);
+    expect(text).not.toContain("Private transient body");
+  });
+
+  it("does not retry non-retryable course operation failures", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    db.seedGraph(USER_A, CONNECTION_A, "course-1", {
+      modules: ["old-module"],
+      pages: ["old-page"],
+    });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.canvas.errors.set(
+      "page:course-1:page-1",
+      new CanvasClientError("canvas_not_found", "Private missing page", {
+        status: 404,
+      }),
+    );
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await syncRoute.POST(createRequest());
+
+    expect(response.status).toBe(502);
+    expect(db.courseResults()).toEqual([
+      expect.objectContaining({
+        failedOperation: "page_detail",
+        failureCategory: "resource_not_found",
+        failureCode: "canvas_course_page_detail_failed",
+        retryCount: 0,
+        retryable: false,
+        status: "failed",
+      }),
+    ]);
+    expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).toMatchObject({
+      modules: [expect.objectContaining({ canvasId: "old-module" })],
+      pages: [expect.objectContaining({ canvasId: "old-page" })],
+    });
   });
 
   it("removes stale children only for a course with a complete empty snapshot", async () => {
@@ -614,6 +739,7 @@ function createSyncDb(options: {
 
   const graph = new Map<string, StoredGraph>();
   const runs: StoredRun[] = [];
+  const courseResults: StoredCourseResult[] = [];
   let idSequence = 0;
   let syncSequence = 0;
 
@@ -631,6 +757,9 @@ function createSyncDb(options: {
   }
 
   const api = {
+    courseResults() {
+      return [...courseResults];
+    },
     duplicateIdentityCount(userId: string, connectionId: string, courseId: string) {
       const stored = graph.get(graphKey(userId, connectionId, courseId));
       if (!stored) return 0;
@@ -690,6 +819,9 @@ function createSyncDb(options: {
         }
         if (name === "replace_canvas_course_academic_snapshot") {
           return replaceSnapshot(payload, options.rpcFailure === true);
+        }
+        if (name === "record_canvas_sync_course_result") {
+          return recordCourseResult(payload);
         }
         return finishOrProgress(name, payload);
       }),
@@ -759,6 +891,49 @@ function createSyncDb(options: {
       run.heartbeatAt = String(payload.p_heartbeat_at);
     }
     return { data: run ? runRow(run) : null, error: run ? null : { message: "run" } };
+  }
+
+  function recordCourseResult(payload: Record<string, unknown>) {
+    const runId = String(payload.p_sync_run_id);
+    const run = runs.find((entry) => entry.id === runId);
+    if (!run) {
+      return { data: null, error: { message: "run" } };
+    }
+
+    const result: StoredCourseResult = {
+      courseFingerprint: String(payload.p_course_fingerprint),
+      failedOperation:
+        typeof payload.p_failed_operation === "string"
+          ? payload.p_failed_operation
+          : null,
+      failureCategory:
+        typeof payload.p_failure_category === "string"
+          ? payload.p_failure_category
+          : null,
+      failureCode:
+        typeof payload.p_failure_code === "string" ? payload.p_failure_code : null,
+      httpStatusClass:
+        typeof payload.p_http_status_class === "string"
+          ? payload.p_http_status_class
+          : null,
+      retryCount:
+        typeof payload.p_retry_count === "number" ? payload.p_retry_count : 0,
+      retryable:
+        typeof payload.p_retryable === "boolean" ? payload.p_retryable : null,
+      runId,
+      status: String(payload.p_status),
+    };
+    const existingIndex = courseResults.findIndex(
+      (entry) =>
+        entry.runId === result.runId &&
+        entry.courseFingerprint === result.courseFingerprint,
+    );
+    if (existingIndex >= 0) {
+      courseResults[existingIndex] = result;
+    } else {
+      courseResults.push(result);
+    }
+    return { data: result, error: null };
   }
 
   function replaceSnapshot(
@@ -1079,6 +1254,18 @@ interface StoredRun {
   status: string;
   heartbeatAt: string;
   recovered: boolean;
+}
+
+interface StoredCourseResult {
+  readonly runId: string;
+  readonly courseFingerprint: string;
+  readonly status: string;
+  readonly failureCode: string | null;
+  readonly failedOperation: string | null;
+  readonly failureCategory: string | null;
+  readonly httpStatusClass: string | null;
+  readonly retryable: boolean | null;
+  readonly retryCount: number;
 }
 
 interface StoredIdentity {

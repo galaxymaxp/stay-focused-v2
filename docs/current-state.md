@@ -233,6 +233,24 @@ internal identities, kept `first_synced_at` stable, advanced `last_synced_at`,
 introduced no duplicate identities, and left zero running sync rows. The
 encrypted Canvas connection remains stored for later Canvas phases.
 
+Phase 5B.3A is complete. Remote migration
+`202607050007_add_canvas_sync_course_results.sql` adds sanitized per-course
+sync diagnostics through `record_canvas_sync_course_result`, with RLS enabled,
+direct `anon`/`authenticated` grants revoked, and public RPC execution revoked.
+The hardened sync path keeps the Phase 5B.2 synchronous manual route and
+per-course atomic transaction boundary, adds two bounded retries for transient
+Canvas failures, respects capped `Retry-After`, and does not retry
+non-retryable Canvas 4xx, malformed, redirect, pagination, or persistence
+failures. Two hardened live syncs returned HTTP 200 partial results: 17 courses
+discovered, 13 succeeded, and 4 failed with sanitized
+`canvas_course_pages_failed` Page-listing `resource_not_found` 4xx diagnostics,
+zero retry attempts, 27 modules, 311 module items, 459 Pages, 18 assignment
+groups, and 25 assignments. Duplicate identities remained 0, internal
+identities remained stable, first-sync timestamps remained stable, last-sync
+timestamps advanced for successful courses, and zero sync rows remained
+running. Incremental synchronization and secondary Canvas resources remain
+unimplemented.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -485,10 +503,11 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
-academic graph synchronization is complete and live validated. The recommended
-next task is Phase 5B.3 incremental synchronization, secondary Canvas
-resources, and recovery hardening. Repeated PDF header/footer cleanup remains a
-deferred OCR cleanup candidate.
+academic graph synchronization is complete and live validated. Phase 5B.3A
+course recovery hardening is complete and live validated. The recommended next
+task is Phase 5B.3B incremental academic graph synchronization foundation.
+Secondary Canvas resources and repeated PDF header/footer cleanup remain
+deferred candidates.
 
 ## Known Risks
 

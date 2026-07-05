@@ -522,6 +522,52 @@ school-wide Canvas token.
   but the first run was close to the limit. Larger accounts may need resumable
   or background synchronization in a later phase.
 
+## Phase 5B.3A Results
+
+- Added `202607050007_add_canvas_sync_course_results.sql`.
+- Added `record_canvas_sync_course_result` for sanitized per-course sync
+  diagnostics behind the service-role boundary.
+- Added operation-specific course failure codes and bounded transient retries:
+  2 retries after the initial attempt, capped `Retry-After`, finite Canvas
+  request timeouts, and no retries for non-retryable 4xx, malformed, redirect,
+  pagination, ownership, or persistence failures.
+- Remote migration history includes `202607050007`.
+- Remote rollback SQL verification passed through
+  `scripts/phase5b3a-recovery-verification.sql`.
+- First hardened live sync:
+  - HTTP 200
+  - Status `partial`
+  - Duration 52.318 seconds
+  - 17 courses discovered
+  - 13 courses succeeded
+  - 4 courses failed with sanitized `canvas_course_pages_failed`
+  - Failed operation: Page listing
+  - Failure category: `resource_not_found`
+  - HTTP class: 4xx
+  - Retryable: false
+  - Retry attempts: 0
+  - 27 modules
+  - 311 module items
+  - 459 Pages
+  - 18 assignment groups
+  - 25 assignments
+  - 0 running sync rows after completion
+- Second hardened live sync:
+  - HTTP 200
+  - Status `partial`
+  - Duration 50.622 seconds
+  - Failure categories stable
+  - Duplicate identities: 0
+  - Internal identities stable
+  - First-sync timestamps stable
+  - Last-sync timestamps advanced
+  - 0 running sync rows after completion
+- The four previously generic failures are confirmed permanent Canvas/resource
+  limitations for the required Page-listing operation. No incomplete course
+  snapshots were persisted or pruned.
+- Next recommended Canvas phase: Phase 5B.3B incremental academic graph
+  synchronization foundation.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -557,7 +603,8 @@ school-wide Canvas token.
 
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
-academic graph synchronization is complete and live validated. The recommended
-next phase is Phase 5B.3 incremental synchronization, secondary Canvas
-resources, and recovery hardening. The deferred header/footer cleanup task
-remains separate.
+academic graph synchronization is complete and live validated. Phase 5B.3A
+course recovery hardening is complete and live validated. The recommended next
+phase is Phase 5B.3B incremental academic graph synchronization foundation.
+Secondary Canvas resources and the deferred header/footer cleanup task remain
+separate.

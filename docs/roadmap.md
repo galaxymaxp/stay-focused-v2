@@ -210,9 +210,10 @@ complete.
 
 Status: In progress. Phase 5A is complete and live validated; Phase 5B.1
 academic graph foundation is complete; Phase 5B.2 initial full academic graph
-synchronization is complete and live validated; Phase 5B.3 through Phase 5F
-remain planned and must not be collapsed into a single generic Canvas
-integration task.
+synchronization is complete and live validated; Phase 5B.3A course recovery
+hardening is complete and live validated; Phase 5B.3B through Phase 5F remain
+planned and must not be collapsed into a single generic Canvas integration
+task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -382,8 +383,8 @@ Deferred from Phase 5B.1:
 - Incremental sync cursors and destructive stale cleanup
 - Reviewer generation from Canvas content
 
-Recommended next phase: Phase 5B.3 - Incremental synchronization, secondary
-Canvas resources, and recovery hardening.
+Recommended next phase: Phase 5B.3B - Incremental academic graph
+synchronization foundation.
 
 #### Phase 5B.2 - Initial Full Academic Graph Synchronization
 
@@ -452,7 +453,37 @@ Validation:
   identities, kept first-sync timestamps stable, advanced last-sync timestamps,
   and left zero running sync rows.
 
-#### Phase 5B.3 - Incremental Synchronization, Secondary Canvas Resources, And Recovery Hardening
+#### Phase 5B.3A - Course Failure Diagnostics And Recovery Hardening
+
+Status: Complete.
+
+Scope:
+
+- Added migration `202607050007_add_canvas_sync_course_results.sql`.
+- Added sanitized per-course sync diagnostics through
+  `record_canvas_sync_course_result`.
+- Preserved manual synchronous sync and atomic per-course persistence.
+- Added operation-specific failure codes and bounded transient retries.
+- Preserved course/module-item/Page-detail concurrency limits.
+- Confirmed the four previous generic failures are Page-listing
+  `resource_not_found` 4xx permanent Canvas limitations, not implementation
+  defects.
+
+Validation:
+
+- Remote migration history includes `202607050007`.
+- Remote rollback verification passed through
+  `scripts/phase5b3a-recovery-verification.sql`.
+- Two hardened live sync calls returned HTTP 200 partial results:
+  17 courses discovered, 13 succeeded, 4 failed with sanitized
+  `canvas_course_pages_failed`, 27 modules, 311 module items, 459 Pages,
+  18 assignment groups, and 25 assignments.
+- Retry attempts in live validation: 0, because the four failures are
+  non-retryable 4xx resource-not-found responses.
+- Duplicate identities remained 0, internal identities remained stable, and
+  zero sync rows remained running.
+
+#### Phase 5B.3B - Incremental Synchronization Foundation
 
 Status: Pending.
 

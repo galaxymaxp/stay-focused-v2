@@ -88,12 +88,50 @@ export type CanvasSyncRunStatus =
   | "succeeded"
   | "partial"
   | "failed";
+export type CanvasSyncCourseResultStatus = "succeeded" | "failed";
+export type CanvasSyncCourseFailureOperation =
+  | "modules"
+  | "module_items"
+  | "pages"
+  | "page_detail"
+  | "assignment_groups"
+  | "assignments"
+  | "response_parsing"
+  | "persistence"
+  | "unknown";
+export type CanvasSyncCourseFailureCategory =
+  | "authentication_failure"
+  | "permission_denied"
+  | "resource_not_found"
+  | "rate_limited"
+  | "server_error"
+  | "network_error"
+  | "timeout"
+  | "malformed_response"
+  | "pagination_rejected"
+  | "redirect_rejected"
+  | "persistence_failure"
+  | "normalization_failure"
+  | "unknown";
+export type CanvasSyncHttpStatusClass =
+  | "none"
+  | "1xx"
+  | "2xx"
+  | "3xx"
+  | "4xx"
+  | "5xx";
 export type CanvasSyncRunRow =
   Database["public"]["Tables"]["canvas_sync_runs"]["Row"];
 export type CanvasSyncRunInsert =
   Database["public"]["Tables"]["canvas_sync_runs"]["Insert"];
 export type CanvasSyncRunUpdate =
   Database["public"]["Tables"]["canvas_sync_runs"]["Update"];
+export type CanvasSyncCourseResultRow =
+  Database["public"]["Tables"]["canvas_sync_course_results"]["Row"];
+export type CanvasSyncCourseResultInsert =
+  Database["public"]["Tables"]["canvas_sync_course_results"]["Insert"];
+export type CanvasSyncCourseResultUpdate =
+  Database["public"]["Tables"]["canvas_sync_course_results"]["Update"];
 export type CanvasCourseAcademicSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_academic_snapshot"]["Returns"][number];
 
@@ -827,6 +865,82 @@ export interface Database {
           },
         ];
       };
+      canvas_sync_course_results: {
+        Row: {
+          id: string;
+          sync_run_id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_fingerprint: string;
+          status: CanvasSyncCourseResultStatus;
+          failure_code: string | null;
+          failed_operation: CanvasSyncCourseFailureOperation | null;
+          failure_category: CanvasSyncCourseFailureCategory | null;
+          http_status_class: CanvasSyncHttpStatusClass | null;
+          retryable: boolean | null;
+          retry_count: number;
+          duration_ms: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          sync_run_id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_fingerprint: string;
+          status: CanvasSyncCourseResultStatus;
+          failure_code?: string | null;
+          failed_operation?: CanvasSyncCourseFailureOperation | null;
+          failure_category?: CanvasSyncCourseFailureCategory | null;
+          http_status_class?: CanvasSyncHttpStatusClass | null;
+          retryable?: boolean | null;
+          retry_count?: number;
+          duration_ms?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          sync_run_id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_fingerprint?: string;
+          status?: CanvasSyncCourseResultStatus;
+          failure_code?: string | null;
+          failed_operation?: CanvasSyncCourseFailureOperation | null;
+          failure_category?: CanvasSyncCourseFailureCategory | null;
+          http_status_class?: CanvasSyncHttpStatusClass | null;
+          retryable?: boolean | null;
+          retry_count?: number;
+          duration_ms?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_sync_course_results_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_sync_course_results_sync_run_id_fkey";
+            columns: ["sync_run_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_sync_runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "canvas_sync_course_results_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -925,6 +1039,39 @@ export interface Database {
           resource_counts: Json;
           failure_code: string | null;
           failure_summary: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+      record_canvas_sync_course_result: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_course_fingerprint: string;
+          p_status: CanvasSyncCourseResultStatus;
+          p_failure_code: string | null;
+          p_failed_operation: CanvasSyncCourseFailureOperation | null;
+          p_failure_category: CanvasSyncCourseFailureCategory | null;
+          p_http_status_class: CanvasSyncHttpStatusClass | null;
+          p_retryable: boolean | null;
+          p_retry_count: number;
+          p_duration_ms: number;
+        };
+        Returns: Array<{
+          id: string;
+          sync_run_id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_fingerprint: string;
+          status: CanvasSyncCourseResultStatus;
+          failure_code: string | null;
+          failed_operation: CanvasSyncCourseFailureOperation | null;
+          failure_category: CanvasSyncCourseFailureCategory | null;
+          http_status_class: CanvasSyncHttpStatusClass | null;
+          retryable: boolean | null;
+          retry_count: number;
+          duration_ms: number;
           created_at: string;
           updated_at: string;
         }>;

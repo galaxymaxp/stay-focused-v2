@@ -199,10 +199,11 @@ paths.
 
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
-academic graph synchronization is complete and live validated. The recommended
-next phase is Phase 5B.3 incremental synchronization, secondary Canvas
-resources, and recovery hardening. Automatic repeated scanned-PDF
-header/footer detection remains a deferred OCR cleanup candidate.
+academic graph synchronization is complete and live validated. Phase 5B.3A
+course recovery hardening is complete and live validated. The recommended next
+phase is Phase 5B.3B incremental academic graph synchronization foundation.
+Secondary Canvas resources and automatic repeated scanned-PDF header/footer
+detection remain deferred candidates.
 
 ## Known Blockers And Risks
 
@@ -499,6 +500,50 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-06 Phase 5B.3A Canvas course recovery hardening
+
+- Starting baseline: `main` at `1cd23c1`, matching `origin/main` with ahead 0
+  and behind 0. Known unrelated dirty files remained untouched:
+  `apps/api/next-env.d.ts`, `apps/mobile/expo-env.d.ts`, and
+  `apps/mobile/.gitignore`.
+- Added `202607050007_add_canvas_sync_course_results.sql` and updated
+  `packages/db/src/types.ts`.
+- Added sanitized per-course diagnostics through
+  `record_canvas_sync_course_result`, with RLS enabled, direct
+  `anon`/`authenticated` grants revoked, and public RPC execution revoked.
+- Extended Canvas error classification to distinguish resource-not-found and
+  network failures while preserving redirect and same-origin pagination
+  protections.
+- Added operation-specific course sync failure codes and bounded transient
+  retries: 2 retries after the initial attempt, bounded exponential backoff,
+  capped `Retry-After`, finite request timeouts, and no retries for
+  non-retryable 4xx, malformed responses, redirects, pagination rejection,
+  ownership failures, or persistence failures.
+- Remote migration push applied only `202607050007`; migration history includes
+  `202607050007`. The CLI emitted the known non-fatal Docker catalog-cache
+  warning after remote application.
+- Remote rollback SQL verification passed through
+  `scripts/phase5b3a-recovery-verification.sql`.
+- Hardened live validation used the existing encrypted Canvas connection and
+  protected `POST /api/canvas/sync` flow. No PATs, bearer tokens, Canvas URLs,
+  Canvas IDs, course names, Page titles/bodies, assignment names/descriptions,
+  or raw Canvas responses were printed or committed.
+- First hardened live sync: HTTP 200, `partial`, 52.318 seconds, 17 courses
+  discovered, 13 succeeded, 4 failed, 27 modules, 311 module items, 459 Pages,
+  18 assignment groups, 25 assignments, 0 retry attempts, 0 running rows.
+- Second hardened live sync: HTTP 200, `partial`, 50.622 seconds, same
+  aggregate counts, 0 retry attempts, 0 running rows.
+- The four previously generic failures are now
+  `canvas_course_pages_failed`, operation `pages`, category
+  `resource_not_found`, HTTP class 4xx, non-retryable, retry count 0. They are
+  documented as permanent Canvas/resource limitations for the required
+  Page-listing operation, not implementation defects.
+- Duplicate identities remained 0, internal identities remained stable on the
+  second run, first-sync timestamps remained stable, and last-sync timestamps
+  advanced for successful courses.
+- Next recommended phase: Phase 5B.3B incremental academic graph
+  synchronization foundation.
 
 ### 2026-07-05 Phase 4 live Study Library RLS validation
 

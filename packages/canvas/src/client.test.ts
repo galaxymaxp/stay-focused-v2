@@ -451,6 +451,7 @@ describe("CanvasClient", () => {
   it.each([
     [401, "canvas_unauthorized"],
     [403, "canvas_forbidden"],
+    [404, "canvas_not_found"],
     [429, "canvas_rate_limited"],
     [503, "canvas_unavailable"],
   ] as const)("maps HTTP %s safely", async (status, code) => {
@@ -460,6 +461,36 @@ describe("CanvasClient", () => {
     const client = createClient(fetchImpl, "secret-token");
 
     await expect(client.getCurrentUser()).rejects.toMatchObject({ code });
+    await expect(client.getCurrentUser()).rejects.not.toThrow(/secret-token/);
+  });
+
+  it("captures retry-after metadata without exposing response bodies", async () => {
+    const fetchImpl = createFetch([
+      new Response(JSON.stringify({ raw: "private-body" }), {
+        status: 429,
+        headers: { "retry-after": "2" },
+      }),
+    ]);
+    const client = createClient(fetchImpl, "secret-token");
+
+    await expect(client.getCurrentUser()).rejects.toMatchObject({
+      code: "canvas_rate_limited",
+      retryAfterMs: 2000,
+      status: 429,
+    });
+    await expect(client.getCurrentUser()).rejects.not.toThrow(/private-body/);
+  });
+
+  it("classifies network failures separately from HTTP failures", async () => {
+    const fetchImpl = vi.fn(async (): Promise<Response> => {
+      throw new TypeError("network dropped secret-token");
+    }) as FetchMock;
+    const client = createClient(fetchImpl, "secret-token");
+
+    await expect(client.getCurrentUser()).rejects.toMatchObject({
+      code: "canvas_network_error",
+      status: null,
+    });
     await expect(client.getCurrentUser()).rejects.not.toThrow(/secret-token/);
   });
 

@@ -8,7 +8,9 @@ Google Cloud OCR-backed source intake. Canvas LMS Phase 5A is implemented,
 live validated, and hardened as a per-user connection foundation. Phase 5B.1
 adds the academic graph schema and typed Canvas retrieval contracts. Phase 5B.2
 adds manually triggered synchronous initial full synchronization into that
-graph with atomic per-course persistence.
+graph with atomic per-course persistence. Phase 5B.3A hardens that sync path
+with operation-specific course failure diagnostics and bounded transient
+retries.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -80,6 +82,9 @@ Complete:
   persistence, bounded concurrency, atomic per-course replacement, stale-child
   cleanup after complete course snapshots, and mobile service support without a
   screen
+- Phase 5B.3A Canvas sync recovery hardening with sanitized per-course
+  diagnostics, non-retryable Page-listing failure classification, bounded
+  transient retries, and diagnostic persistence through a service-role RPC
 
 Working locally:
 
@@ -118,11 +123,18 @@ Working locally:
   result with 13 successful courses, 4 sanitized course-fetch failures, stable
   identities on the second run, no duplicate graph identities, and no running
   sync rows left behind.
+- Phase 5B.3A remote migration verification and live validation passed. The
+  four previously generic course failures are now sanitized
+  `canvas_course_pages_failed` results classified as Page-listing
+  `resource_not_found` 4xx failures, non-retryable with zero retry attempts.
+  Two hardened live syncs returned HTTP 200 partial results with 13 successful
+  courses, 4 permanent Canvas limitations, stable identities, no duplicate
+  graph identities, and no running sync rows left behind.
 
 Pending:
 
 - Incremental Canvas synchronization, secondary Canvas resources, content
-  ingestion, grade sync, and background sync
+  ingestion, grade sync, and background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -267,7 +279,8 @@ tests do not run that opt-in provider smoke.
 ## Next Milestone
 
 Phase 5A hardening is complete, Phase 5B.1 academic graph foundation is in
-place, and Phase 5B.2 initial full academic graph synchronization is live
-validated. The recommended next phase is Phase 5B.3 incremental
-synchronization, secondary Canvas resources, and recovery hardening; Canvas
-OAuth remains a future production authorization phase.
+place, Phase 5B.2 initial full academic graph synchronization is live
+validated, and Phase 5B.3A course recovery hardening is live validated. The
+recommended next phase is Phase 5B.3B incremental academic graph
+synchronization foundation; secondary Canvas resources and Canvas OAuth remain
+future phases.

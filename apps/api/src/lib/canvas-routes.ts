@@ -360,6 +360,7 @@ export function mapCanvasClientError(error: unknown): {
         code: "canvas_timeout",
         message: "Canvas did not respond in time.",
       };
+    case "canvas_network_error":
     case "canvas_unavailable":
       return {
         status: 503,
@@ -368,6 +369,7 @@ export function mapCanvasClientError(error: unknown): {
       };
     case "canvas_malformed_json":
     case "canvas_invalid_response":
+    case "canvas_not_found":
     case "canvas_redirect_rejected":
     case "canvas_pagination_rejected":
     case "canvas_request_failed":
@@ -596,9 +598,11 @@ function isCanvasClientErrorCode(
     value === "missing_access_token" ||
     value === "canvas_unauthorized" ||
     value === "canvas_forbidden" ||
+    value === "canvas_not_found" ||
     value === "canvas_rate_limited" ||
     value === "canvas_unavailable" ||
     value === "canvas_timeout" ||
+    value === "canvas_network_error" ||
     value === "canvas_malformed_json" ||
     value === "canvas_invalid_response" ||
     value === "canvas_redirect_rejected" ||

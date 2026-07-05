@@ -55,16 +55,24 @@ export const CANVAS_CAPABILITIES: readonly CanvasCapability[] = [
 export class CanvasClientError extends Error {
   public readonly code: CanvasClientErrorCode;
   public readonly status: number | null;
+  public readonly retryAfterMs: number | null;
+  public readonly attemptCount: number;
 
   public constructor(
     code: CanvasClientErrorCode,
     message: string,
-    options: { readonly status?: number } = {},
+    options: {
+      readonly status?: number;
+      readonly retryAfterMs?: number | null;
+      readonly attemptCount?: number;
+    } = {},
   ) {
     super(message);
     this.name = "CanvasClientError";
     this.code = code;
     this.status = options.status ?? null;
+    this.retryAfterMs = options.retryAfterMs ?? null;
+    this.attemptCount = options.attemptCount ?? 1;
   }
 }
 
@@ -403,7 +411,7 @@ export class CanvasClient {
         );
       }
       throw new CanvasClientError(
-        "canvas_request_failed",
+        "canvas_network_error",
         "Canvas request failed before receiving a response.",
       );
     } finally {
@@ -419,7 +427,7 @@ export class CanvasClient {
     }
 
     if (!response.ok) {
-      throw mapHttpError(response.status);
+      throw mapHttpError(response.status, response.headers, this.now());
     }
 
     const text = await response.text();
@@ -853,7 +861,11 @@ function readNextLink(linkHeader: string | null): string | null {
   return null;
 }
 
-function mapHttpError(status: number): CanvasClientError {
+function mapHttpError(
+  status: number,
+  headers: Headers,
+  now: Date,
+): CanvasClientError {
   if (status === 401) {
     return new CanvasClientError(
       "canvas_unauthorized",
@@ -870,7 +882,7 @@ function mapHttpError(status: number): CanvasClientError {
   }
   if (status === 404) {
     return new CanvasClientError(
-      "canvas_invalid_response",
+      "canvas_not_found",
       "Canvas resource was not found.",
       { status },
     );
@@ -879,14 +891,14 @@ function mapHttpError(status: number): CanvasClientError {
     return new CanvasClientError(
       "canvas_rate_limited",
       "Canvas rate limited the request.",
-      { status },
+      { retryAfterMs: parseRetryAfterMs(headers.get("retry-after"), now), status },
     );
   }
   if (status >= 500) {
     return new CanvasClientError(
       "canvas_unavailable",
       "Canvas is temporarily unavailable.",
-      { status },
+      { retryAfterMs: parseRetryAfterMs(headers.get("retry-after"), now), status },
     );
   }
   return new CanvasClientError(
@@ -900,6 +912,29 @@ function isRedirectStatus(status: number): boolean {
   return status >= 300 && status < 400;
 }
 
+function parseRetryAfterMs(value: string | null, now: Date): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const seconds = Number(trimmed);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000);
+  }
+
+  const retryAt = Date.parse(trimmed);
+  if (!Number.isFinite(retryAt)) {
+    return null;
+  }
+
+  return Math.max(0, retryAt - now.getTime());
+}
+
 function statusForProbeError(error: unknown): CanvasCapabilityStatus {
   if (!(error instanceof CanvasClientError)) {
     return "temporarily_failed";
@@ -907,13 +942,14 @@ function statusForProbeError(error: unknown): CanvasCapabilityStatus {
   if (error.code === "canvas_forbidden" || error.code === "canvas_unauthorized") {
     return "permission_denied";
   }
-  if (error.code === "canvas_invalid_response" && error.status === 404) {
+  if (error.code === "canvas_not_found") {
     return "not_supported";
   }
   if (
     error.code === "canvas_rate_limited" ||
     error.code === "canvas_timeout" ||
     error.code === "canvas_unavailable" ||
+    error.code === "canvas_network_error" ||
     error.code === "canvas_redirect_rejected" ||
     error.code === "canvas_request_failed"
   ) {
