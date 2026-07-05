@@ -5,14 +5,15 @@ Last refreshed: 2026-07-05, Asia/Manila.
 ## Repository Baseline
 
 - Branch: `main`
-- Phase 5A implementation baseline:
-  `a60e599 fix(library): complete live RLS validation`
+- Phase 5A secure Canvas foundation baseline:
+  `6ec6ee7 feat(canvas): begin secure sync foundation`
 - Phase 4 live-validation baseline before documentation and route-fix commit:
   `2e945cf feat(library): implement Phase 4 study library persistence`
 - Local baseline before Phase 3B: `6e91231 feat(ocr): add provider-agnostic OCR API boundary`
 - Upstream status at refresh: `main...origin/main`, ahead 0 and behind 0
-- Working tree before final Phase 4 validation contained the reviewer `[id]`
-  route typing fix plus unrelated generated/mobile files left untouched.
+- Working tree before Phase 5A.1 validation contained unrelated generated/mobile
+  files left untouched: `apps/api/next-env.d.ts`,
+  `apps/mobile/expo-env.d.ts`, and untracked `apps/mobile/.gitignore`.
 
 ## Working Vertical Slice
 
@@ -119,6 +120,17 @@ and permission-aware: profile, courses, enrollments, modules for one course,
 assignment groups for one course, and planner can be tested while most future
 capabilities remain `not_tested`.
 
+Phase 5A.1 direct live Canvas validation passed from a server-side Node script
+using existing local Canvas credential names without exposing values. Profile
+validation, course listing, and the small capability probes passed against the
+Canvas HTTPS host; 17 courses were returned. The live course count did not
+require a second pagination page, so live pagination was not exercised, while
+automated Canvas tests still cover ordered pagination and cross-origin
+pagination rejection. The Phase 5A Supabase migration is now applied remotely
+and verified for table presence, RLS, and no direct `anon`/`authenticated`
+access to encrypted credential columns. Protected API flow validation remains
+pending until a real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -177,6 +189,11 @@ capabilities remain `not_tested`.
 - Supabase Canvas connection/capability migration foundation with no plaintext
   Canvas token storage and no direct authenticated grants over encrypted
   credential fields.
+- Live remote Supabase application of the Canvas migration, with both Canvas
+  tables, RLS, and no direct `anon`/`authenticated` encrypted-column access
+  verified.
+- Server-side live Canvas validation with sanitized profile, course-count, and
+  capability-status reporting.
 - Protected `GET/PUT/DELETE /api/canvas/connection`,
   `GET /api/canvas/courses`, and `GET /api/canvas/capabilities` routes using
   Supabase bearer JWT authentication and safe response contracts.
@@ -185,7 +202,7 @@ capabilities remain `not_tested`.
 
 ## Current Verification Baselines
 
-Verified across the final Phase 4 live-validation pass:
+Verified across the latest Phase 4 and Phase 5A validation passes:
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -241,6 +258,17 @@ Verified across the final Phase 4 live-validation pass:
   were generated. A separate PDF with more than five pages was rejected safely
   with the expected UI messages. See
   `docs/ai/phase3d-pdf-ocr-validation-20260704.md`.
+- Phase 5A.1 direct live Canvas validation: passed from a server-side Node
+  script. Profile returned, Canvas IDs normalized to strings, 17 courses were
+  listed, and enrollments, modules, assignment groups, and planner probes were
+  available. No token values or raw Canvas JSON were written to committed docs.
+- Phase 5A.1 credential alias test: `node --test
+  scripts/phase5a-live-canvas-validation.test.mjs` passed; 5/5.
+- Phase 5A.1 Supabase migration validation: `npx supabase db push --dry-run`
+  listed only `202607050002_create_canvas_connections.sql`; the remote push
+  applied it; migration history then showed `202607050001` and `202607050002`;
+  read-only checks passed for both Canvas tables, RLS, encrypted columns, and no
+  direct `anon`/`authenticated` CRUD or encrypted-column select grants.
 
 Latest recorded unattended smokes during Phase 4 implementation:
 
@@ -292,9 +320,10 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
-- Canvas LMS Phase 5A is implemented locally for secure connection, course
-  discovery, disconnect, and capability discovery. Live Canvas validation and
-  remote Supabase migration application are pending.
+- Canvas LMS Phase 5A is implemented and partially live validated: direct
+  server-side Canvas validation and remote Supabase migration application have
+  passed. The full protected API flow is still pending because the local API
+  environment is missing a real `CANVAS_TOKEN_ENCRYPTION_KEY`.
 - Canvas content ingestion is not implemented yet. Modules, Pages, files,
   assignments, discussions, announcements, quiz metadata, grades, rubrics,
   background sync, and source snapshots remain Phase 5B through Phase 5F work.
@@ -305,9 +334,10 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Start Phase 5B Academic Graph Synchronization for modules, Pages, activities,
-dates, assignment groups, announcements, discussions, and quiz metadata.
-Repeated PDF header/footer cleanup remains a deferred OCR cleanup candidate.
+Complete the protected Phase 5A Canvas API validation after configuring a real
+32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. After that blocker is resolved,
+Phase 5B Academic Graph Synchronization can begin. Repeated PDF header/footer
+cleanup remains a deferred OCR cleanup candidate.
 
 ## Known Risks
 
@@ -331,11 +361,10 @@ Repeated PDF header/footer cleanup remains a deferred OCR cleanup candidate.
 - Reviewer persistence now has a live cross-user RLS validation baseline.
   Future persistence changes should preserve owner-scoped access, safe 404
   denial, and owner-only cleanup behavior.
-- Phase 5A Canvas migration is committed under `packages/db/migrations`, but
-  remote application is blocked in this session because the Supabase CLI is not
-  installed and no repository migration deployment script exists.
-- Phase 5A live Canvas validation is pending because no safely configured HTTPS
-  API deployment and real Canvas credentials were available in this session.
+- Phase 5A protected API validation remains pending because
+  `CANVAS_TOKEN_ENCRYPTION_KEY` is missing locally. Do not create a permanent
+  fallback key silently, and do not validate live database persistence with a
+  temporary test key.
 - Canvas permissions vary by school and course. Course access does not prove
   access to modules, files, grades, quizzes, captions, conversations, or
   external-tool content.

@@ -5,9 +5,10 @@ Last refreshed: 2026-07-05, Asia/Manila.
 ## Active Objective
 
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
-Secure Canvas Connection and Capability Discovery is implemented locally with
-mocked automated verification; live Canvas validation and remote migration
-application are pending.
+Secure Canvas Connection and Capability Discovery is implemented and partially
+live validated: direct server-side Canvas validation and remote Supabase
+migration application passed; protected API flow validation is pending until a
+real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 
 ## Completed Phase 3A Scope
 
@@ -290,10 +291,39 @@ application are pending.
   - Workspace tests with scripts: passed; API 110/110, mobile 70/70, Canvas
     20/20, OCR 14/14
   - `git diff --check`: passed with CRLF warnings only
-- Remote migration application is blocked because the Supabase CLI is not
-  installed and no repository migration deployment script exists.
-- Live Canvas validation is pending because no safe HTTPS API deployment and
-  real Canvas credentials were available.
+- Phase 5A.1 verification passed:
+  - `node --test scripts/phase5a-live-canvas-validation.test.mjs`: 5/5
+  - Direct live Canvas validation script: passed with sanitized output only
+  - `npx supabase migration list`: remote history includes `202607050001` and
+    `202607050002`
+  - `npx supabase db push --dry-run`: listed only
+    `202607050002_create_canvas_connections.sql` before application
+  - `npx supabase db push`: applied `202607050002_create_canvas_connections.sql`
+  - Remote schema check query: 13/13 Canvas migration checks passed
+  - Required workspace typechecks/build/tests: passed after Phase 5A.1 changes
+- Phase 5A.1 live Canvas validation passed through
+  `scripts/phase5a-live-canvas-validation.mjs` without printing credential
+  values or raw Canvas JSON:
+  - Existing ignored local variable names detected: `CANVAS_BASE_URL` and
+    `CANVAS_PERSONAL_ACCESS_TOKEN`
+  - Requested live aliases `CANVAS_LIVE_BASE_URL`,
+    `CANVAS_LIVE_PERSONAL_ACCESS_TOKEN`, and `CANVAS_ACCESS_TOKEN` were missing
+  - Profile returned and normalized successfully
+  - 17 courses were listed
+  - Enrollments, modules, assignment groups, and planner probes returned
+    `available`
+  - Live pagination was not exercised because the course count did not require
+    a second page
+- Phase 5A.1 migration deployment passed through `npx supabase` using the
+  ignored local Supabase CLI project:
+  - Dry-run listed only `202607050002_create_canvas_connections.sql`
+  - Remote migration history now includes `202607050001` and `202607050002`
+  - Read-only schema checks passed for both Canvas tables, RLS, encrypted
+    columns, and no direct `anon`/`authenticated` CRUD or encrypted-column
+    select grants
+- Protected API validation remains pending because
+  `CANVAS_TOKEN_ENCRYPTION_KEY` is missing locally. Do not use a temporary test
+  key for live database persistence.
 
 ## Phase 3C Completion Sequence
 
@@ -328,6 +358,6 @@ application are pending.
 
 ## Next Objective
 
-Phase 5B - Academic graph synchronization for modules, Pages, activities,
-dates, assignment groups, announcements, discussions, and quiz metadata. The
-deferred header/footer cleanup task remains separate.
+Complete the protected Phase 5A Canvas API validation after configuring a real
+32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. After that blocker is resolved,
+Phase 5B can begin. The deferred header/footer cleanup task remains separate.

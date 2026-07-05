@@ -208,9 +208,9 @@ complete.
 
 ## Phase 5 - Canvas Synchronization Foundation
 
-Status: In progress. Phase 5A is the first implementation slice; Phases 5B
-through 5F remain planned and must not be collapsed into a single generic
-Canvas integration task.
+Status: In progress. Phase 5A is partially live validated; Phases 5B through
+5F remain planned and must not be collapsed into a single generic Canvas
+integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -222,7 +222,9 @@ stable source-ingestion contract from Phase 3.
 
 ### Phase 5A - Secure Canvas Connection And Capability Discovery
 
-Status: Implemented locally; live Canvas validation pending.
+Status: Partially live validated. Direct server-side Canvas validation and
+remote Supabase migration application passed; protected API persistence flow is
+pending until a real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 
 Scope:
 
@@ -245,6 +247,24 @@ Completion criteria:
 - The token is never returned to mobile.
 - Courses can be listed.
 - Supported and unsupported Canvas capabilities are recorded honestly.
+
+Validation status as of 2026-07-05:
+
+- Direct Canvas HTTPS validation passed through the server-side validation
+  script using existing ignored local credential names.
+- Canvas profile returned and normalized successfully.
+- Course listing returned 17 courses.
+- Live pagination was not exercised because the account did not require a
+  second page; automated tests cover ordered pagination and cross-origin
+  rejection.
+- Enrollments, modules, assignment groups, and planner probes returned
+  `available`.
+- Supabase migration `202607050002_create_canvas_connections.sql` applied
+  remotely and read-only checks verified both tables, RLS, and no direct
+  `anon`/`authenticated` access to encrypted token columns.
+- Protected API connect/status/courses/capabilities/disconnect validation is
+  still pending because the local API environment is missing a real
+  `CANVAS_TOKEN_ENCRYPTION_KEY`.
 
 ### Phase 5B - Academic Graph Synchronization
 

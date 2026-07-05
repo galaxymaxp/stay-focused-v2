@@ -40,15 +40,24 @@ paths.
   the migration applied, schema/RLS/policies were verified, distinct users
   passed bidirectional owner isolation, safe `404 reviewer_not_found` denial
   passed, and fictional validation rows were cleaned up.
-- Phase 5A Secure Canvas Connection and Capability Discovery is implemented
-  locally with mocked automated verification. It adds the staged Phase 5
-  roadmap, Canvas capability matrix, four Canvas ADRs, a strict
-  `@stay-focused/canvas` client, AES-256-GCM encrypted token storage,
-  `canvas_connections` and `canvas_capabilities` migration foundation,
-  protected Canvas API routes, and a mobile Courses surface.
-- Phase 5A live Canvas validation is pending. Remote Supabase migration
-  application is also pending because the Supabase CLI is not installed in this
-  session and no repository migration deployment script exists.
+- Phase 5A Secure Canvas Connection and Capability Discovery is implemented and
+  partially live validated. It adds the staged Phase 5 roadmap, Canvas
+  capability matrix, four Canvas ADRs, a strict `@stay-focused/canvas` client,
+  AES-256-GCM encrypted token storage, `canvas_connections` and
+  `canvas_capabilities` migration foundation, protected Canvas API routes, and
+  a mobile Courses surface.
+- Phase 5A.1 direct server-side Canvas validation passed using existing ignored
+  local credential names without exposing values. Profile validation, course
+  listing, and the small capability probes passed over Canvas HTTPS; 17 courses
+  were returned. Live pagination was not exercised because the account did not
+  require a second course page.
+- Phase 5A.1 remote Supabase migration application passed through
+  `npx supabase` using the ignored local Supabase CLI project. Migration
+  history now includes `202607050002`, and read-only checks passed for both
+  Canvas tables, RLS, encrypted columns, and no direct
+  `anon`/`authenticated` encrypted-column access.
+- Phase 5A protected API flow validation is still pending because the local API
+  environment is missing a real `CANVAS_TOKEN_ENCRYPTION_KEY`.
 - Canvas academic graph sync, file/media ingestion, source snapshots, grades,
   background synchronization, task generation, and study schedule generation
   are still pending.
@@ -68,6 +77,10 @@ paths.
 - DB package typecheck after Canvas migration/types: passed.
 - API typecheck/tests including Canvas routes and encryption: passed; 110 tests
   passed, 0 failed.
+- Direct live Canvas validation: passed through
+  `scripts/phase5a-live-canvas-validation.mjs` with sanitized output only.
+- Remote Canvas migration verification: passed; both Canvas tables, RLS, and no
+  direct encrypted-column access were verified.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -98,8 +111,8 @@ paths.
 
 ## Immediate Next Task
 
-Phase 5B - Academic graph synchronization for modules, Pages, activities,
-dates, assignment groups, announcements, discussions, and quiz metadata.
+Complete protected Phase 5A Canvas API validation after configuring a real
+32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`; then Phase 5B can begin.
 Automatic repeated scanned-PDF header/footer detection remains a deferred OCR
 cleanup candidate.
 
@@ -127,6 +140,9 @@ cleanup candidate.
 - Phase 5A Canvas storage requires `CANVAS_TOKEN_ENCRYPTION_KEY`, which must
   decode to exactly 32 bytes. Do not generate a permanent fallback key and do
   not log the key or Canvas tokens.
+- Do not use a temporary test key for live Canvas database persistence. The
+  protected connect/status/courses/capabilities/disconnect flow remains pending
+  until the real key is available.
 - The Canvas personal access token is validated through the API, encrypted
   server-side, and never returned to mobile. Mobile uses secure text entry and
   clears the token after connect attempts; it does not store the Canvas token in

@@ -40,8 +40,11 @@
 - RLS: enabled on both tables.
 - Direct grants: revoked from `anon` and `authenticated` so encrypted Canvas
   credential fields remain server-only.
-- Remote application: blocked. The Supabase CLI is not installed and no
-  repository migration deployment script exists in this session.
+- Remote application: applied during Phase 5A.1 using `npx supabase` and the
+  ignored local Supabase CLI project. Remote migration history now includes
+  `202607050002`, and read-only verification passed for table presence, RLS,
+  encrypted columns, and no direct `anon`/`authenticated` access to encrypted
+  credential fields.
 
 ## Encryption Design
 
@@ -92,11 +95,46 @@ credential columns are not returned.
   service-role keys, OpenAI keys, or Google credential values found in changed
   files
 
+Phase 5A.1 verification:
+
+- `node --test scripts/phase5a-live-canvas-validation.test.mjs`: passed; 5/5
+- Direct live Canvas validation script: passed with sanitized output only
+- Supabase migration dry-run: passed; only
+  `202607050002_create_canvas_connections.sql` was pending
+- Supabase migration push: passed; remote migration history includes
+  `202607050001` and `202607050002`
+- Remote schema checks: passed; 13/13 checks for Canvas tables, RLS, encrypted
+  columns, and direct grant restrictions
+- Required package and workspace verification commands: passed after Phase 5A.1
+  changes
+
 ## Live Canvas Result
 
-- Live Canvas validation: pending.
-- Blocker: no safe HTTPS API deployment and real Canvas credentials were
-  available in this session.
+- Live Canvas validation: passed during Phase 5A.1 through the server-side
+  `scripts/phase5a-live-canvas-validation.mjs` harness.
+- Existing ignored local credential names detected: `CANVAS_BASE_URL` and
+  `CANVAS_PERSONAL_ACCESS_TOKEN`.
+- Requested aliases missing: `CANVAS_ACCESS_TOKEN`,
+  `CANVAS_LIVE_BASE_URL`, and `CANVAS_LIVE_PERSONAL_ACCESS_TOKEN`.
+- Profile: PASS; Canvas ID normalized to a string and only a sanitized hash was
+  recorded.
+- Courses: PASS; 17 courses returned, with no private course names committed.
+- Pagination: not exercised live because the course count did not require a
+  second page; automated Canvas tests cover pagination and cross-origin
+  rejection.
+- Capability probes: enrollments, modules, assignment groups, and planner all
+  returned `available`.
+- Token safety: PASS; only sanitized summaries and safe error codes were
+  printed or committed.
+
+## Protected API Result
+
+- Protected Canvas API flow: pending.
+- Blocker: `CANVAS_TOKEN_ENCRYPTION_KEY` is missing from the local API
+  environment. It must decode to exactly 32 bytes before live Canvas connection
+  persistence can be validated.
+- Do not create a permanent fallback key silently, and do not use a temporary
+  test key for live database persistence.
 
 ## Known Permission-Dependent Capabilities
 
@@ -106,5 +144,6 @@ credential columns are not returned.
 
 ## Next Phase 5B Task
 
-Phase 5B - Academic graph synchronization for modules, Pages, activities,
-dates, assignment groups, announcements, discussions, and quiz metadata.
+After protected Phase 5A API validation is complete, Phase 5B is academic graph
+synchronization for modules, Pages, activities, dates, assignment groups,
+announcements, discussions, and quiz metadata.
