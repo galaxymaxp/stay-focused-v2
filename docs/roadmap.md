@@ -208,9 +208,10 @@ complete.
 
 ## Phase 5 - Canvas Synchronization Foundation
 
-Status: In progress. Phase 5A is complete and live validated; Phases 5B through
-5F remain planned and must not be collapsed into a single generic Canvas
-integration task.
+Status: In progress. Phase 5A is complete and live validated; Phase 5B.1
+academic graph foundation is complete; Phase 5B.2 through Phase 5F remain
+planned and must not be collapsed into a single generic Canvas integration
+task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -341,6 +342,47 @@ Validation status as of 2026-07-05:
   direct grants.
 
 ### Phase 5B - Academic Graph Synchronization
+
+Status: In progress. Phase 5B.1 is complete as a database and typed Canvas API
+foundation only. Initial full synchronization has not been implemented yet.
+
+#### Phase 5B.1 - Academic Graph Foundation
+
+Status: Complete and remotely verified.
+
+Implemented:
+
+- Supabase migration `202607050004_create_canvas_academic_graph.sql`.
+- Tables: `canvas_courses`, `canvas_modules`, `canvas_module_items`,
+  `canvas_pages`, `canvas_assignment_groups`, and `canvas_assignments`.
+- Stable Canvas identity constraints for courses, modules, module items, Pages,
+  assignment groups, and assignments.
+- Composite ownership constraints across `user_id`, `canvas_connection_id`,
+  and `course_id`.
+- RLS on every academic graph table.
+- Direct `anon` and `authenticated` grants revoked to preserve the Phase 5A
+  service-role persistence boundary.
+- Typed Canvas client methods for courses, modules, module items, Pages, Page
+  detail, assignment groups, and assignments.
+- Pagination tests for all new collection methods, including later-page
+  failures, repeated-link loop protection, and cross-origin next-link
+  rejection.
+
+Deferred from Phase 5B.1:
+
+- Full synchronization orchestration
+- Scheduled jobs and background workers
+- Mobile course screens
+- Sync-start API routes
+- Announcements, discussions, planner data, quiz metadata, and files/media
+  ingestion
+- Incremental sync cursors and destructive stale cleanup
+- Reviewer generation from Canvas content
+
+Recommended next phase: Phase 5B.2 - Initial full academic graph
+synchronization.
+
+#### Phase 5B.2 - Initial Full Academic Graph Synchronization
 
 Status: Pending.
 

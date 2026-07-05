@@ -181,6 +181,20 @@ connection or capabilities. The Canvas client rejects HTTP redirects with
 `canvas_redirect_rejected` and uses `redirect: "manual"` for authenticated
 requests. Live second-user Canvas validation remains not run.
 
+Phase 5B.1 adds the academic graph foundation for future Canvas
+synchronization. The remote migration
+`202607050004_create_canvas_academic_graph.sql` is applied and verified. It
+creates `canvas_courses`, `canvas_modules`, `canvas_module_items`,
+`canvas_pages`, `canvas_assignment_groups`, and `canvas_assignments` with
+stable Canvas identities, synchronization metadata, composite ownership
+constraints across `user_id`, `canvas_connection_id`, and `course_id`, RLS, and
+revoked direct `anon`/`authenticated` grants. The `@stay-focused/canvas` client
+now has typed methods for courses, modules, module items, Pages, Page detail,
+assignment groups, and assignments. This phase does not implement full
+synchronization, scheduled jobs, background workers, mobile course screens,
+announcements, discussions, planner data, quiz metadata, files/media ingestion,
+incremental sync, or reviewer generation from Canvas content.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -253,10 +267,14 @@ requests. Live second-user Canvas validation remains not run.
   Supabase bearer JWT authentication and safe response contracts.
 - Mobile Courses surface for disconnected/connected Canvas states, course
   refresh, disconnect confirmation, and compact capability summary.
+- Phase 5B.1 academic graph foundation with Canvas course, module, module item,
+  Page, assignment-group, and assignment tables plus typed Canvas retrieval
+  contracts and pagination tests.
 
 ## Current Verification Baselines
 
-Verified across the latest Phase 4 and Phase 5A validation passes:
+Verified across the latest Phase 4, Phase 5A, and Phase 5B.1 validation
+passes:
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -338,6 +356,12 @@ Verified across the latest Phase 4 and Phase 5A validation passes:
   capability ownership, RLS, revoked direct table grants, and revoked encrypted
   column access. Automated two-user authorization validation: PASS. Live
   second-user authorization validation: not run.
+- Phase 5B.1 verification: `202607050004` applied remotely; rollback SQL
+  verification passed for fake User A/User B ownership, duplicate Canvas
+  identity rejection, cross-owner relationship rejection, cascade behavior,
+  RLS, grants, ownership constraints, and indexes. Canvas package tests passed
+  with 30/30 cases after adding all new collection endpoints and pagination
+  regression coverage.
 
 Latest recorded unattended smokes during Phase 4 implementation:
 
@@ -396,9 +420,10 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   persistence, redirect rejection, and automated two-user authorization tests
   have passed. There is no school-wide Canvas credential. The live validation
   test finished disconnected.
-- Canvas content ingestion is not implemented yet. Modules, Pages, files,
-  assignments, discussions, announcements, quiz metadata, grades, rubrics,
-  background sync, and source snapshots remain Phase 5B through Phase 5F work.
+- Phase 5B.1 academic graph foundation is complete, but full synchronization is
+  not implemented yet. Announcements, discussions, planner data, quiz metadata,
+  files/media ingestion, grades, rubrics, incremental sync, background sync,
+  source snapshots, and reviewer generation from Canvas content remain deferred.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -407,7 +432,8 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 ## Immediate Next Task
 
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
-Phase 5B Academic Graph Synchronization can begin when requested. Repeated PDF
+Phase 5B.1 academic graph foundation is complete. The recommended next task is
+Phase 5B.2 initial full academic graph synchronization. Repeated PDF
 header/footer cleanup remains a deferred OCR cleanup candidate.
 
 ## Known Risks

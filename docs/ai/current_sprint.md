@@ -14,8 +14,11 @@ connect/status/courses/capabilities/disconnect lifecycle passed after
 configuring a real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY`; and Phase 5A.2
 closed the audit conditions for strict Base64 validation, atomic persistence,
 two-user automated authorization evidence, redirect rejection, request
-validation coverage, README status, and ADR numbering. There is no school-wide
-Canvas token.
+validation coverage, README status, and ADR numbering. Phase 5B.1 Academic
+Graph Foundation is complete and remotely verified with academic graph tables,
+composite ownership constraints, RLS, revoked direct client grants, typed Canvas
+retrieval methods, and pagination tests. Full synchronization has not been
+implemented yet. There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
 
@@ -122,6 +125,39 @@ Canvas token.
   snapshots, and background sync out of Phase 5A.
 - Keep Canvas OAuth out of Phase 5A; OAuth remains the future broad-production
   authorization path and requires an institution-approved Canvas Developer Key.
+
+## Completed Phase 5B.1 Scope
+
+- Added `202607050004_create_canvas_academic_graph.sql`.
+- Created `canvas_courses`, `canvas_modules`, `canvas_module_items`,
+  `canvas_pages`, `canvas_assignment_groups`, and `canvas_assignments`.
+- Added stable Canvas identity constraints and synchronization metadata.
+- Enforced ownership with composite foreign keys across `user_id`,
+  `canvas_connection_id`, and `course_id`.
+- Enabled RLS on every new table and kept direct `anon`/`authenticated` grants
+  revoked for the Canvas academic graph.
+- Added `@stay-focused/canvas` types and methods for courses, modules, module
+  items, Pages, Page detail, assignment groups, and assignments.
+- Strengthened shared pagination behavior to reject repeated links and page
+  limits instead of returning partial prefixes.
+- Added Canvas pagination and redirect-security regression coverage for all new
+  collection methods.
+- Added `scripts/phase5b1-academic-graph-verification.sql` for remote rollback
+  verification with fake User A/User B data.
+- Applied and verified the remote migration; Phase 5A grants and RLS remained
+  unchanged.
+
+## Out Of Scope For Phase 5B.1
+
+- Full synchronization orchestration.
+- Scheduled jobs or background workers.
+- Mobile course screens.
+- API routes for starting synchronization.
+- Announcements, discussions, planner data, quiz metadata, and files/media
+  ingestion.
+- Incremental sync cursor logic beyond schema-ready metadata.
+- Destructive stale-record cleanup.
+- Reviewer generation from Canvas content.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -417,5 +453,6 @@ Canvas token.
 ## Next Objective
 
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
-Phase 5B can begin when requested. The deferred header/footer cleanup task
-remains separate.
+Phase 5B.1 academic graph foundation is complete. The recommended next phase is
+Phase 5B.2 initial full academic graph synchronization. The deferred
+header/footer cleanup task remains separate.

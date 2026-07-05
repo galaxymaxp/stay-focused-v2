@@ -2,9 +2,18 @@ import {
   type CanvasCapability,
   type CanvasCapabilityProbeResult,
   type CanvasCapabilityStatus,
+  type CanvasAssignment,
+  type CanvasAssignmentGroup,
+  type CanvasAssignmentSubmissionType,
   type CanvasClientErrorCode,
   type CanvasClientOptions,
   type CanvasCourse,
+  type CanvasJson,
+  type CanvasJsonObject,
+  type CanvasModule,
+  type CanvasModuleItem,
+  type CanvasPageDetail,
+  type CanvasPageSummary,
   type CanvasProfile,
 } from "./types";
 
@@ -131,6 +140,58 @@ export class CanvasClient {
     return parsed.map(normalizeCourse);
   }
 
+  public async listModules(courseId: string): Promise<readonly CanvasModule[]> {
+    const parsed = await this.requestPaginatedJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/modules?per_page=${DEFAULT_PER_PAGE}`,
+    );
+    return parsed.map(normalizeModule);
+  }
+
+  public async listModuleItems(
+    courseId: string,
+    moduleId: string,
+  ): Promise<readonly CanvasModuleItem[]> {
+    const parsed = await this.requestPaginatedJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items?per_page=${DEFAULT_PER_PAGE}`,
+    );
+    return parsed.map(normalizeModuleItem);
+  }
+
+  public async listPages(courseId: string): Promise<readonly CanvasPageSummary[]> {
+    const parsed = await this.requestPaginatedJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/pages?per_page=${DEFAULT_PER_PAGE}`,
+    );
+    return parsed.map(normalizePageSummary);
+  }
+
+  public async getPage(
+    courseId: string,
+    pageUrl: string,
+  ): Promise<CanvasPageDetail> {
+    const parsed = await this.requestJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/pages/${encodeCanvasPathSegment(pageUrl)}`,
+    );
+    return normalizePageDetail(parsed);
+  }
+
+  public async listAssignmentGroups(
+    courseId: string,
+  ): Promise<readonly CanvasAssignmentGroup[]> {
+    const parsed = await this.requestPaginatedJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/assignment_groups?per_page=${DEFAULT_PER_PAGE}`,
+    );
+    return parsed.map(normalizeAssignmentGroup);
+  }
+
+  public async listAssignments(
+    courseId: string,
+  ): Promise<readonly CanvasAssignment[]> {
+    const parsed = await this.requestPaginatedJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/assignments?per_page=${DEFAULT_PER_PAGE}`,
+    );
+    return parsed.map(normalizeAssignment);
+  }
+
   public async probeCapabilities(): Promise<readonly CanvasCapabilityProbeResult[]> {
     const results = new Map<CanvasCapability, CanvasCapabilityProbeResult>();
     for (const capability of CANVAS_CAPABILITIES) {
@@ -238,8 +299,17 @@ export class CanvasClient {
   private async requestPaginatedJson(pathAndQuery: string): Promise<readonly unknown[]> {
     let nextUrl = this.createApiUrl(pathAndQuery);
     const rows: unknown[] = [];
+    const seenUrls = new Set<string>();
 
     for (let page = 0; page < this.maxPages; page += 1) {
+      if (seenUrls.has(nextUrl.toString())) {
+        throw new CanvasClientError(
+          "canvas_pagination_rejected",
+          "Canvas pagination link repeated a previously fetched page.",
+        );
+      }
+      seenUrls.add(nextUrl.toString());
+
       const response = await this.fetchJson(nextUrl);
       if (!Array.isArray(response.parsed)) {
         throw new CanvasClientError(
@@ -258,7 +328,10 @@ export class CanvasClient {
       nextUrl = this.validatePaginationUrl(next);
     }
 
-    return rows;
+    throw new CanvasClientError(
+      "canvas_pagination_rejected",
+      "Canvas pagination exceeded the configured page limit.",
+    );
   }
 
   private async requestJson(pathAndQuery: string): Promise<unknown> {
@@ -486,9 +559,205 @@ function normalizeCourse(value: unknown): CanvasCourse {
     courseCode: stringOrNull(value.course_code),
     workflowState: stringOrNull(value.workflow_state),
     enrollmentTermId: normalizeId(value.enrollment_term_id),
+    accountId: normalizeId(value.account_id),
     startAt: stringOrNull(value.start_at),
     endAt: stringOrNull(value.end_at),
+    timeZone: stringOrNull(value.time_zone),
+    publicSyllabus: booleanOrNull(value.public_syllabus),
+    syllabusBody: stringOrNull(value.syllabus_body),
+    updatedAt: stringOrNull(value.updated_at),
   };
+}
+
+function normalizeModule(value: unknown): CanvasModule {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas module response was invalid.",
+    );
+  }
+
+  const id = normalizeId(value.id);
+  const name = stringOrNull(value.name);
+  if (!id || !name) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas module response was missing required fields.",
+    );
+  }
+
+  return {
+    id,
+    name,
+    position: integerOrNull(value.position),
+    unlockAt: stringOrNull(value.unlock_at),
+    itemCount: integerOrNull(value.items_count),
+    requireSequentialProgress: booleanOrNull(value.require_sequential_progress),
+    published: booleanOrNull(value.published),
+    prerequisiteModuleIds: idArray(value.prerequisite_module_ids),
+    state: stringOrNull(value.state),
+  };
+}
+
+function normalizeModuleItem(value: unknown): CanvasModuleItem {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas module item response was invalid.",
+    );
+  }
+
+  const id = normalizeId(value.id);
+  const title = stringOrNull(value.title);
+  const type = stringOrNull(value.type);
+  if (!id || !title || !type) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas module item response was missing required fields.",
+    );
+  }
+
+  return {
+    id,
+    title,
+    position: integerOrNull(value.position),
+    indent: integerOrNull(value.indent),
+    type,
+    contentId: normalizeId(value.content_id),
+    pageUrl: stringOrNull(value.page_url),
+    externalUrl: stringOrNull(value.external_url),
+    htmlUrl: stringOrNull(value.html_url),
+    newTab: booleanOrNull(value.new_tab),
+    published: booleanOrNull(value.published),
+    completionRequirement: jsonObjectOrNull(value.completion_requirement),
+    contentDetails: jsonObjectOrNull(value.content_details),
+  };
+}
+
+function normalizePageSummary(value: unknown): CanvasPageSummary {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas Page response was invalid.",
+    );
+  }
+
+  const url = stringOrNull(value.url);
+  const title = stringOrNull(value.title);
+  if (!url || !title) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas Page response was missing required fields.",
+    );
+  }
+
+  return {
+    pageId: normalizeId(value.page_id),
+    url,
+    title,
+    published: booleanOrNull(value.published),
+    frontPage: booleanOrNull(value.front_page),
+    editingRoles: stringOrNull(value.editing_roles),
+    lockInfo: jsonObjectOrNull(value.lock_info),
+    unlockAt: stringOrNull(value.unlock_at),
+    lockAt: stringOrNull(value.lock_at),
+    createdAt: stringOrNull(value.created_at),
+    updatedAt: stringOrNull(value.updated_at),
+  };
+}
+
+function normalizePageDetail(value: unknown): CanvasPageDetail {
+  const summary = normalizePageSummary(value);
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas Page detail response was invalid.",
+    );
+  }
+
+  return {
+    ...summary,
+    body: stringOrNull(value.body),
+  };
+}
+
+function normalizeAssignmentGroup(value: unknown): CanvasAssignmentGroup {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas assignment group response was invalid.",
+    );
+  }
+
+  const id = normalizeId(value.id);
+  const name = stringOrNull(value.name);
+  if (!id || !name) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas assignment group response was missing required fields.",
+    );
+  }
+
+  return {
+    id,
+    name,
+    position: integerOrNull(value.position),
+    groupWeight: numberOrNull(value.group_weight),
+    rules: jsonObjectOrNull(value.rules),
+    integrationData: jsonObjectOrNull(value.integration_data),
+  };
+}
+
+function normalizeAssignment(value: unknown): CanvasAssignment {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas assignment response was invalid.",
+    );
+  }
+
+  const id = normalizeId(value.id);
+  const name = stringOrNull(value.name);
+  if (!id || !name) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas assignment response was missing required fields.",
+    );
+  }
+
+  return {
+    id,
+    assignmentGroupId: normalizeId(value.assignment_group_id),
+    name,
+    description: stringOrNull(value.description),
+    position: integerOrNull(value.position),
+    pointsPossible: numberOrNull(value.points_possible),
+    gradingType: stringOrNull(value.grading_type),
+    submissionTypes: stringArray(value.submission_types),
+    dueAt: stringOrNull(value.due_at),
+    unlockAt: stringOrNull(value.unlock_at),
+    lockAt: stringOrNull(value.lock_at),
+    published: booleanOrNull(value.published),
+    muted: booleanOrNull(value.muted),
+    omitFromFinalGrade: booleanOrNull(value.omit_from_final_grade),
+    anonymousGrading: booleanOrNull(value.anonymous_grading),
+    htmlUrl: stringOrNull(value.html_url),
+    quizId: normalizeId(value.quiz_id),
+    discussionTopicId: normalizeId(value.discussion_topic_id),
+    createdAt: stringOrNull(value.created_at),
+    updatedAt: stringOrNull(value.updated_at),
+  };
+}
+
+function encodeCanvasPathSegment(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new CanvasClientError(
+      "canvas_request_failed",
+      "Canvas API path segment must not be blank.",
+    );
+  }
+  return encodeURIComponent(trimmed);
 }
 
 function normalizeId(value: unknown): string | null {
@@ -501,10 +770,72 @@ function normalizeId(value: unknown): string | null {
   return null;
 }
 
+function integerOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) ? value : null;
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function booleanOrNull(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : null;
+}
+
+function idArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map(normalizeId).filter((id): id is string => id !== null);
+}
+
+function stringArray(value: unknown): readonly CanvasAssignmentSubmissionType[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (entry): entry is CanvasAssignmentSubmissionType =>
+      typeof entry === "string" && entry.trim().length > 0,
+  );
+}
+
+function jsonObjectOrNull(value: unknown): CanvasJsonObject | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return isJsonObject(value) ? value : null;
+}
+
+function isJsonObject(value: Readonly<Record<string, unknown>>): value is CanvasJsonObject {
+  return Object.values(value).every(
+    (entry) => entry === undefined || isJsonValue(entry),
+  );
+}
+
+function isJsonValue(value: unknown): value is CanvasJson {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (Array.isArray(value)) {
+    return value.every(isJsonValue);
+  }
+  if (isRecord(value)) {
+    return isJsonObject(value);
+  }
+  return false;
 }
 
 function readNextLink(linkHeader: string | null): string | null {

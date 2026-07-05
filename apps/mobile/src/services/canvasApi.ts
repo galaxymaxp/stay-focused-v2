@@ -569,8 +569,14 @@ function isCanvasCourse(value: unknown): value is CanvasCourse {
       typeof value.workflowState === "string") &&
     (value.enrollmentTermId === null ||
       typeof value.enrollmentTermId === "string") &&
+    (value.accountId === null || typeof value.accountId === "string") &&
     (value.startAt === null || typeof value.startAt === "string") &&
-    (value.endAt === null || typeof value.endAt === "string")
+    (value.endAt === null || typeof value.endAt === "string") &&
+    (value.timeZone === null || typeof value.timeZone === "string") &&
+    (value.publicSyllabus === null ||
+      typeof value.publicSyllabus === "boolean") &&
+    (value.syllabusBody === null || typeof value.syllabusBody === "string") &&
+    (value.updatedAt === null || typeof value.updatedAt === "string")
   );
 }
 

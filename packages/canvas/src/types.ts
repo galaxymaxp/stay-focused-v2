@@ -12,9 +12,123 @@ export interface CanvasCourse {
   readonly courseCode: string | null;
   readonly workflowState: string | null;
   readonly enrollmentTermId: string | null;
+  readonly accountId: string | null;
   readonly startAt: string | null;
   readonly endAt: string | null;
+  readonly timeZone: string | null;
+  readonly publicSyllabus: boolean | null;
+  readonly syllabusBody: string | null;
+  readonly updatedAt: string | null;
 }
+
+export interface CanvasModule {
+  readonly id: string;
+  readonly name: string;
+  readonly position: number | null;
+  readonly unlockAt: string | null;
+  readonly itemCount: number | null;
+  readonly requireSequentialProgress: boolean | null;
+  readonly published: boolean | null;
+  readonly prerequisiteModuleIds: readonly string[];
+  readonly state: string | null;
+}
+
+export interface CanvasModuleItem {
+  readonly id: string;
+  readonly title: string;
+  readonly position: number | null;
+  readonly indent: number | null;
+  readonly type: string;
+  readonly contentId: string | null;
+  readonly pageUrl: string | null;
+  readonly externalUrl: string | null;
+  readonly htmlUrl: string | null;
+  readonly newTab: boolean | null;
+  readonly published: boolean | null;
+  readonly completionRequirement: CanvasCompletionRequirement | null;
+  readonly contentDetails: CanvasModuleContentDetails | null;
+}
+
+export interface CanvasPageSummary {
+  readonly pageId: string | null;
+  readonly url: string;
+  readonly title: string;
+  readonly published: boolean | null;
+  readonly frontPage: boolean | null;
+  readonly editingRoles: string | null;
+  readonly lockInfo: CanvasJsonObject | null;
+  readonly unlockAt: string | null;
+  readonly lockAt: string | null;
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+}
+
+export interface CanvasPageDetail extends CanvasPageSummary {
+  readonly body: string | null;
+}
+
+export interface CanvasAssignmentGroup {
+  readonly id: string;
+  readonly name: string;
+  readonly position: number | null;
+  readonly groupWeight: number | null;
+  readonly rules: CanvasJsonObject | null;
+  readonly integrationData: CanvasJsonObject | null;
+}
+
+export interface CanvasAssignment {
+  readonly id: string;
+  readonly assignmentGroupId: string | null;
+  readonly name: string;
+  readonly description: string | null;
+  readonly position: number | null;
+  readonly pointsPossible: number | null;
+  readonly gradingType: string | null;
+  readonly submissionTypes: readonly CanvasAssignmentSubmissionType[];
+  readonly dueAt: string | null;
+  readonly unlockAt: string | null;
+  readonly lockAt: string | null;
+  readonly published: boolean | null;
+  readonly muted: boolean | null;
+  readonly omitFromFinalGrade: boolean | null;
+  readonly anonymousGrading: boolean | null;
+  readonly htmlUrl: string | null;
+  readonly quizId: string | null;
+  readonly discussionTopicId: string | null;
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+}
+
+export type CanvasNullableDate = string | null;
+
+export type CanvasJson =
+  | string
+  | number
+  | boolean
+  | null
+  | CanvasJsonObject
+  | readonly CanvasJson[];
+
+export interface CanvasJsonObject {
+  readonly [key: string]: CanvasJson | undefined;
+}
+
+export type CanvasCompletionRequirement = CanvasJsonObject;
+
+export type CanvasModuleContentDetails = CanvasJsonObject;
+
+export type CanvasAssignmentSubmissionType =
+  | "discussion_topic"
+  | "online_quiz"
+  | "on_paper"
+  | "none"
+  | "external_tool"
+  | "online_text_entry"
+  | "online_url"
+  | "online_upload"
+  | "media_recording"
+  | "student_annotation"
+  | (string & {});
 
 export type CanvasCapability =
   | "profile"

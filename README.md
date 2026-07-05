@@ -5,7 +5,9 @@ turning school source material into useful study work. The current product is
 an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
 authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
 Google Cloud OCR-backed source intake. Canvas LMS Phase 5A is implemented,
-live validated, and hardened as a per-user connection foundation.
+live validated, and hardened as a per-user connection foundation. Phase 5B.1
+now adds the academic graph schema and typed Canvas retrieval contracts; full
+synchronization has not been implemented yet.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -70,6 +72,9 @@ Complete:
 - Phase 5A Canvas connection foundation with per-user personal access token
   entry, server-side validation, AES-256-GCM encrypted storage, course listing,
   capability probes, and disconnect
+- Phase 5B.1 Canvas academic graph foundation with course, module, module item,
+  Page, assignment-group, and assignment tables plus typed Canvas collection
+  methods
 
 Working locally:
 
@@ -99,11 +104,14 @@ Working locally:
   atomic connection/capability persistence, automated two-user authorization
   evidence, redirect rejection, request validation coverage, README status, and
   ADR numbering.
+- Phase 5B.1 remote migration verification passed for the academic graph
+  foundation, including composite ownership constraints, RLS, revoked direct
+  client grants, required indexes, and unchanged Phase 5A protections.
 
 Pending:
 
-- Canvas academic graph synchronization, content ingestion, grade sync, and
-  background sync
+- Initial full Canvas academic graph synchronization, content ingestion, grade
+  sync, and background sync
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -224,6 +232,8 @@ tests do not run that opt-in provider smoke.
   lifecycle. Per-user PAT connect, encrypted persistence, remote migration,
   course loading, capability status, invalid replacement preservation,
   disconnect, and final disconnected state passed.
+- Phase 5B.1 is complete as a foundation only. It adds academic graph storage
+  and Canvas client contracts, but it does not synchronize Canvas data yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
   prove access for every user, course, role, or institution.
@@ -231,6 +241,9 @@ tests do not run that opt-in provider smoke.
   Live second-user Canvas validation was not run.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
+- Announcements, discussions, planner data, quiz metadata, files/media
+  ingestion, incremental sync, and reviewer generation from Canvas content are
+  deferred.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
@@ -238,6 +251,6 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 5A hardening is complete. Phase 5B can begin academic graph
-synchronization when requested; Canvas OAuth remains a future production
-authorization phase.
+Phase 5A hardening is complete and Phase 5B.1 academic graph foundation is in
+place. The recommended next phase is Phase 5B.2 initial full academic graph
+synchronization; Canvas OAuth remains a future production authorization phase.

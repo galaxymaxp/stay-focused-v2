@@ -217,8 +217,13 @@ function course() {
     courseCode: "BIO101",
     workflowState: "available",
     enrollmentTermId: null,
+    accountId: null,
     startAt: null,
     endAt: null,
+    timeZone: null,
+    publicSyllabus: null,
+    syllabusBody: null,
+    updatedAt: null,
   };
 }
 

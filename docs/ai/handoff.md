@@ -86,15 +86,24 @@ paths.
   ownership constraint, RLS, revoked direct table grants, and revoked encrypted
   column access. The Supabase CLI again emitted a non-fatal Docker catalog-cache
   warning after push.
+- Phase 5B.1 Academic Graph Foundation is complete and remotely verified. It
+  adds `202607050004_create_canvas_academic_graph.sql`, the academic graph
+  tables for courses, modules, module items, Pages, assignment groups, and
+  assignments, composite ownership constraints across `user_id`,
+  `canvas_connection_id`, and `course_id`, RLS, revoked direct client grants,
+  service-role DML access, typed Canvas retrieval methods, and pagination
+  regression tests. It does not implement full synchronization.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- Canvas academic graph sync, file/media ingestion, source snapshots, grades,
-  background synchronization, task generation, and study schedule generation
-  are still pending.
+- Initial full Canvas academic graph synchronization, file/media ingestion,
+  source snapshots, grades, background synchronization, task generation, and
+  study schedule generation are still pending. Announcements, discussions,
+  planner data, quiz metadata, incremental sync, and reviewer generation from
+  Canvas content remain deferred.
 
 ## Current Test Baselines
 
@@ -107,7 +116,8 @@ paths.
 - Mobile typecheck: passed.
 - Mobile OCR client/picker/source-flow/library/Canvas service tests: 70 passed,
   0 failed.
-- Canvas package typecheck/build/tests: passed; 22 tests passed, 0 failed.
+- Canvas package typecheck/build/tests: passed; 30 tests passed, 0 failed after
+  Phase 5B.1 endpoint and pagination coverage.
 - DB package typecheck after Canvas migration/types: passed.
 - API typecheck/tests including Canvas routes and encryption: passed; 146 tests
   passed, 0 failed.
@@ -119,6 +129,11 @@ paths.
   direct encrypted-column access were verified.
 - Phase 5A.2 remote hardening migration verification: passed; RPC, grants,
   ownership constraint, RLS, and direct grant restrictions verified.
+- Phase 5B.1 remote migration verification: passed. Migration history includes
+  `202607050004`; rollback SQL verification passed with fake User A/User B
+  graph data; read-only checks confirmed new tables, RLS, composite ownership
+  constraints, required indexes, revoked direct client grants, service-role DML
+  grants, and unchanged Phase 5A protections.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -150,9 +165,9 @@ paths.
 ## Immediate Next Task
 
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
-Phase 5B Academic Graph Synchronization can begin when requested. Automatic
-repeated scanned-PDF header/footer detection remains a deferred OCR cleanup
-candidate.
+Phase 5B.1 academic graph foundation is complete. The recommended next phase is
+Phase 5B.2 initial full academic graph synchronization. Automatic repeated
+scanned-PDF header/footer detection remains a deferred OCR cleanup candidate.
 
 ## Known Blockers And Risks
 
