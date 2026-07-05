@@ -6,9 +6,12 @@ Last refreshed: 2026-07-05, Asia/Manila.
 
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
 Secure Canvas Connection and Capability Discovery is implemented and partially
-live validated: direct server-side Canvas validation and remote Supabase
-migration application passed; protected API flow validation is pending until a
-real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
+live validated: direct server-side Canvas validation used one developer-owned
+personal access token, returned 17 courses for that token, and proved only that
+user's available Canvas capabilities. Remote Supabase Canvas table and RLS
+validation passed. Protected API flow validation is pending until a real
+`CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally. There is no school-wide
+Canvas token.
 
 ## Completed Phase 3A Scope
 
@@ -84,9 +87,9 @@ real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 - Replace the broad Phase 5 roadmap with Phase 5A through Phase 5F, plus future
   Grade Goal Planner and Student Intelligence groups.
 - Add the Canvas source capability matrix under `docs/canvas`.
-- Add ADR-006 through ADR-009 for Canvas academic graph synchronization,
+- Add ADR-006 through ADR-010 for Canvas academic graph synchronization,
   capability-based integration, Canvas credential storage, and grade-data
-  separation.
+  separation, plus Canvas authentication phases.
 - Expand `@stay-focused/canvas` into the canonical typed Canvas client.
 - Add strict Canvas base-URL normalization, HTTPS enforcement, no credentials in
   URLs, bearer-token requests, timeout support, safe pagination, cross-origin
@@ -101,8 +104,13 @@ real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 - Add the mobile Courses surface with disconnected/connected states, secure
   token entry, course refresh, disconnect confirmation, and compact capability
   summary.
+- Use only per-user Canvas personal access tokens in Phase 5A. The existing
+  `CANVAS_PERSONAL_ACCESS_TOKEN` name is developer-owned live-validation input,
+  not a shared application credential.
 - Keep Canvas content ingestion, file parsing, grade synchronization, source
   snapshots, and background sync out of Phase 5A.
+- Keep Canvas OAuth out of Phase 5A; OAuth remains the future broad-production
+  authorization path and requires an institution-approved Canvas Developer Key.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -266,6 +274,9 @@ real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 
 - `docs/roadmap.md` now treats Canvas as a staged synchronization program, not
   a vague integration bucket.
+- The roadmap now states that Phase 5A uses per-user Canvas personal access
+  tokens, that there is no shared school-wide token, and that Canvas OAuth is
+  required before broad public production authorization.
 - `docs/canvas/canvas-source-capability-matrix.md` records connection, course,
   learning structure, activity, file/media, grades/performance, and
   communication/activity capabilities with permission-dependent limitations.
@@ -274,7 +285,8 @@ real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 - `packages/db/migrations/202607050002_create_canvas_connections.sql` creates
   the Phase 5A storage foundation.
 - `apps/api` encrypts Canvas personal access tokens before persistence and
-  returns only safe connection metadata.
+  returns only safe connection metadata. Stored Canvas connections are scoped to
+  the authenticated Stay Focused user.
 - `apps/mobile` adds a Courses surface; tokens are secure text entry only,
   cleared after submission, and not persisted separately from the Supabase auth
   session.
@@ -306,12 +318,16 @@ real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
   values or raw Canvas JSON:
   - Existing ignored local variable names detected: `CANVAS_BASE_URL` and
     `CANVAS_PERSONAL_ACCESS_TOKEN`
+  - The token was a developer-owned personal access token for direct validation
+    only, not a school-wide or application-wide credential
   - Requested live aliases `CANVAS_LIVE_BASE_URL`,
     `CANVAS_LIVE_PERSONAL_ACCESS_TOKEN`, and `CANVAS_ACCESS_TOKEN` were missing
   - Profile returned and normalized successfully
-  - 17 courses were listed
+  - 17 courses were listed for that token
   - Enrollments, modules, assignment groups, and planner probes returned
-    `available`
+    `available` for that user
+  - Results do not prove institution-wide access and may differ per user,
+    course, role, or institution
   - Live pagination was not exercised because the course count did not require
     a second page
 - Phase 5A.1 migration deployment passed through `npx supabase` using the
@@ -358,6 +374,7 @@ real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
 
 ## Next Objective
 
-Complete the protected Phase 5A Canvas API validation after configuring a real
-32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. After that blocker is resolved,
-Phase 5B can begin. The deferred header/footer cleanup task remains separate.
+Complete the protected Phase 5A Canvas API connection lifecycle validation after
+configuring a real 32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. After that
+blocker is resolved, Phase 5B can begin. The deferred header/footer cleanup task
+remains separate.

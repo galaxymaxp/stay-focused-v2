@@ -4,7 +4,8 @@ Stay Focused V2 is a mobile-first, schedule-first student productivity app for
 turning school source material into useful study work. The current product is
 an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
 authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
-Google Cloud OCR-backed source intake, with Canvas LMS still planned.
+Google Cloud OCR-backed source intake. Canvas LMS Phase 5A is implemented as a
+partially live-validated, per-user connection foundation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -66,6 +67,9 @@ Complete:
 - Live Supabase Study Library validation with distinct users, bidirectional
   owner isolation, safe `404 reviewer_not_found` denial, and cleanup
 - Reviewer detail route typing fix for Promise-based Next.js App Router params
+- Phase 5A Canvas connection foundation with per-user personal access token
+  entry, server-side validation, AES-256-GCM encrypted storage, course listing,
+  capability probes, and disconnect
 
 Working locally:
 
@@ -86,10 +90,18 @@ Working locally:
   with a mocked OCR response
 - API route tests, smoke-runner tests, engine evals, API typecheck, mobile
   typecheck, and engine build
+- Direct developer-owned Canvas live validation returned 17 courses for that
+  validating account only; this does not prove institution-wide access.
+- Remote Canvas migration/RLS validation passed. Protected Canvas API
+  persistence remains pending until `CANVAS_TOKEN_ENCRYPTION_KEY` is configured.
 
 Pending:
 
-- Canvas LMS integration
+- Canvas protected API connection lifecycle live validation
+- Canvas academic graph synchronization, content ingestion, grade sync, and
+  background sync
+- Canvas OAuth production authorization with an institution-approved Developer
+  Key before broad public multi-user deployment
 - Task generation and study scheduling
 - Completed mobile OAuth redirects, deployment validation, product polish, and
   capstone evidence
@@ -133,6 +145,18 @@ Google Cloud credentials must never be placed in mobile env files or committed.
 The OCR server factory supports `GOOGLE_CLOUD_PROJECT_ID`,
 `GOOGLE_CLOUD_CREDENTIALS_JSON`, and Application Default Credentials through
 `GOOGLE_APPLICATION_CREDENTIALS` or `GOOGLE_CLOUD_PROJECT`.
+
+Developer live Canvas validation can use `CANVAS_BASE_URL` and
+`CANVAS_PERSONAL_ACCESS_TOKEN` with a developer-owned Canvas test account.
+Compatibility aliases supported by the live-validation harness are
+`CANVAS_ACCESS_TOKEN`, `CANVAS_LIVE_BASE_URL`, and
+`CANVAS_LIVE_PERSONAL_ACCESS_TOKEN`. These variables are not shared application
+credentials for all users.
+
+`CANVAS_TOKEN_ENCRYPTION_KEY` is a required API-side application encryption
+secret before stored Canvas connections can be persisted. It is generated and
+owned by the Stay Focused deployment, not by Canvas, the school, or the student,
+and must decode to exactly 32 bytes.
 
 Node.js 20 or newer and npm 10 or newer are required.
 
@@ -192,7 +216,14 @@ tests do not run that opt-in provider smoke.
   editable extracted-text review.
 - Physical-device live OCR validation depends on local API, Supabase, and
   Google Cloud OCR credentials.
-- Canvas integration is not implemented beyond a thin package boundary.
+- Phase 5A Canvas is partial: direct developer-owned live validation and remote
+  migration/RLS validation passed, but protected API connection lifecycle live
+  validation is pending until `CANVAS_TOKEN_ENCRYPTION_KEY` is configured.
+- Phase 5A uses per-user Canvas personal access tokens. There is no
+  school-wide Canvas token, and successful validation for one user does not
+  prove access for every user, course, role, or institution.
+- Canvas OAuth is not implemented yet and is required before presenting the
+  integration as broadly deployable public production authorization.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
@@ -200,6 +231,6 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 5 Canvas Integration is the next milestone: bring Canvas LMS material
-into the same authenticated source-to-reviewer pipeline now that Phase 4 Study
-Library persistence is complete and live validated.
+Configure `CANVAS_TOKEN_ENCRYPTION_KEY` and complete the protected Phase 5A
+Canvas API connection lifecycle validation. After that, Phase 5B can begin
+academic graph synchronization.

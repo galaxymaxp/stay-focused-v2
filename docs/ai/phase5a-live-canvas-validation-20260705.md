@@ -25,22 +25,31 @@ Loaded ignored env files: `.env.local`, `apps/api/.env.local`, `.env.supabase.lo
 Credential sources used for validation: Canvas base URL from `CANVAS_BASE_URL`;
 Canvas token from `CANVAS_PERSONAL_ACCESS_TOKEN`.
 
+`CANVAS_PERSONAL_ACCESS_TOKEN` was a developer-owned personal access token used
+only for direct live validation. It is not a school-wide token, not an
+application-wide credential for all Stay Focused users, and not proof of
+institution-wide Canvas access.
+
 ## Direct Canvas Validation
 
 | Check | Result | Notes |
 | --- | --- | --- |
 | Profile | PASS | Profile returned; ID normalized to string: PASS; sanitized ID hash: `2adba202b8ab` |
-| Courses | PASS | Course listing returned 17 courses; IDs normalized to strings: PASS |
+| Courses | PASS | Course listing returned 17 courses for the developer-owned token; IDs normalized to strings: PASS |
 | Pagination | NOT_EXERCISED | Live course count did not require a second page; automated tests cover pagination and cross-origin rejection. |
-| Enrollments/grades capability | available | Probe completed. |
-| Modules capability | available | Probe completed. |
-| Assignment groups capability | available | Probe completed. |
-| Planner capability | available | Probe completed. |
+| Enrollments/grades capability | available | Probe completed for the validating user only. |
+| Modules capability | available | Probe completed for the validating user only. |
+| Assignment groups capability | available | Probe completed for the validating user only. |
+| Planner capability | available | Probe completed for the validating user only. |
 | Token absent from errors | PASS | Only sanitized status and safe error codes were printed. |
 
 Canvas host: `uc-bcf.instructure.com`.
 
 Elapsed duration: 3352 ms.
+
+Capability results may differ per user, course, role, or institution. The live
+result does not prove that Stay Focused can access every UC Canvas course or
+any locked, hidden, unpublished, or permission-restricted content.
 
 ## Migration Result
 
@@ -84,3 +93,5 @@ database persistence.
 | Cross-origin pagination rejected | PASS | Covered by `@stay-focused/canvas` automated tests. |
 | Capability failures isolated | PASS | Direct probes report independent capability statuses. |
 | Database operations user-scoped | PASS (automated) | API tests filter Canvas rows by authenticated user; live protected API validation is pending. |
+| No school-wide token exists | PASS | Phase 5A uses one user-generated personal access token per connected Canvas user. |
+| OAuth implemented | NOT_IMPLEMENTED | Canvas OAuth requires an institution-approved Developer Key and remains a future production authorization phase. |

@@ -220,6 +220,17 @@ generation path.
 Immediate dependency: completed Phase 4 persistence and source metadata, plus a
 stable source-ingestion contract from Phase 3.
 
+Credential-source boundary: Canvas client, synchronization, and capability
+logic must remain independent of whether credentials came from a manually
+entered personal access token or a later OAuth flow. The intended model remains
+conceptually similar to:
+
+```text
+CanvasCredentialProvider
+|-- PersonalAccessTokenCredential
+`-- OAuthCredential
+```
+
 ### Phase 5A - Secure Canvas Connection And Capability Discovery
 
 Status: Partially live validated. Direct server-side Canvas validation and
@@ -239,6 +250,33 @@ Scope:
 - Safe endpoint probes
 - User-visible connection and course states
 
+#### Phase 5A Authentication Model
+
+Phase 5A uses user-generated Canvas personal access tokens for development,
+capstone demonstrations, controlled testing, and initial user-controlled Canvas
+connections. Each Stay Focused user supplies their own personal access token.
+There is no shared school-wide token.
+
+Each token is scoped to the Canvas account that generated it and remains subject
+to the permissions configured by the institution and course. A token cannot
+access school-wide Canvas data, cannot bypass locked, hidden, unpublished, or
+permission-restricted content, and must never be shared between Stay Focused
+users.
+
+Personal access tokens must be:
+
+- validated before persistence
+- encrypted server-side with AES-256-GCM
+- stored per Stay Focused user
+- excluded from API responses
+- excluded from logs and errors
+- removable through disconnect
+- treated as revocable credentials
+
+Personal access token entry is acceptable for the capstone, development, and
+controlled initial deployment, but it is not the preferred permanent
+authorization flow for a broad public multi-user release.
+
 Completion criteria:
 
 - A signed-in Stay Focused user can connect Canvas.
@@ -251,14 +289,18 @@ Completion criteria:
 Validation status as of 2026-07-05:
 
 - Direct Canvas HTTPS validation passed through the server-side validation
-  script using existing ignored local credential names.
+  script using one developer-owned personal access token from existing ignored
+  local credential names.
 - Canvas profile returned and normalized successfully.
 - Course listing returned 17 courses.
+- These results prove only the validating user's available Canvas capabilities;
+  they do not prove institution-wide course or endpoint access.
 - Live pagination was not exercised because the account did not require a
   second page; automated tests cover ordered pagination and cross-origin
   rejection.
 - Enrollments, modules, assignment groups, and planner probes returned
-  `available`.
+  `available` for that user; capability availability may differ per user,
+  course, role, or institution.
 - Supabase migration `202607050002_create_canvas_connections.sql` applied
   remotely and read-only checks verified both tables, RLS, and no direct
   `anon`/`authenticated` access to encrypted token columns.
@@ -508,6 +550,38 @@ Exit criteria:
   about partial failures.
 - Users can see sync health without seeing raw Canvas errors or secret data.
 
+### Future Phase - Canvas OAuth Production Authorization
+
+Status: Future. Not implemented.
+
+Purpose: Replace or supplement manual personal access token entry with the
+intended production authorization path for broad multi-user Canvas deployment.
+
+Scope:
+
+- institution-approved Canvas Developer Key
+- OAuth authorization redirect
+- Canvas authorization-code exchange
+- per-user OAuth access tokens
+- refresh-token handling where supported
+- token refresh and expiration
+- encrypted server-side token storage
+- connection revocation
+- OAuth state validation
+- redirect URI validation
+- migration from manually entered PAT connections
+- institution-specific configuration
+- capability revalidation after OAuth connection
+
+Stay Focused does not currently possess a Canvas Developer Key. A Developer Key
+is controlled by the Canvas institution or administrator, so OAuth cannot be
+fully implemented for the school instance until such a key is approved.
+
+OAuth is required before presenting the Canvas integration as a broadly
+deployable public production authorization system. Phase 5A personal access
+token support remains useful as a capstone and controlled deployment path, but
+OAuth is not merely an optional hardening step.
+
 ### Future Phase - Grade Goal Planner
 
 Status: Future.
@@ -537,6 +611,11 @@ Future planner requirements:
 - Manual correction when Canvas data is incomplete
 - Confidence labels
 - Optional Canvas What-If Grades verification when supported
+
+Authorization relationship: the planner must consume only grade and assignment
+data visible through the connected user's own Canvas credentials, whether the
+credential source is the current per-user PAT model or the future OAuth model.
+It must not require or assume a school-wide Canvas credential.
 
 Required confidence states:
 

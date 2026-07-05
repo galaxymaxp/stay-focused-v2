@@ -151,7 +151,7 @@ export async function connectCanvas(
   if (!personalAccessToken) {
     return clientError(
       "missing_canvas_token",
-      "Enter a Canvas personal access token.",
+      "Enter a personal access token generated from your own Canvas account.",
     );
   }
 

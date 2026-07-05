@@ -25,6 +25,26 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_API_BASE_URL=
 ```
 
+Do not put Canvas personal access tokens, `CANVAS_TOKEN_ENCRYPTION_KEY`,
+service-role keys, or provider secrets in mobile env files.
+
+API/server Canvas env groups:
+
+```txt
+# Optional developer live validation only; use a developer-owned Canvas account.
+CANVAS_BASE_URL=
+CANVAS_PERSONAL_ACCESS_TOKEN=
+
+# Compatibility aliases supported only by the live-validation harness.
+CANVAS_ACCESS_TOKEN=
+CANVAS_LIVE_BASE_URL=
+CANVAS_LIVE_PERSONAL_ACCESS_TOKEN=
+
+# Required before stored per-user Canvas connections can be persisted.
+# Must decode to exactly 32 bytes and is owned by the Stay Focused deployment.
+CANVAS_TOKEN_ENCRYPTION_KEY=
+```
+
 For laptop browser / Expo Web:
 
 ```txt

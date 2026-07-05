@@ -320,8 +320,9 @@ function DisconnectedCanvasState({
     <Card style={styles.formCard} testID="canvas-disconnected-state">
       <Text style={styles.statusTitle}>Connect Canvas</Text>
       <Text style={styles.statusText}>
-        Stay Focused uses Canvas access to find your courses and check which
-        course features your school allows. Course content import comes later.
+        Enter a personal access token generated from your own Canvas account.
+        Stay Focused can access only Canvas information available to that
+        account.
       </Text>
       <TextField
         autoCapitalize="none"
@@ -354,8 +355,8 @@ function DisconnectedCanvasState({
         Connect Canvas
       </Button>
       <Text style={styles.statusText}>
-        Canvas access depends on school and course permissions. Some features
-        may stay unavailable even after connection.
+        The token stays yours, can be revoked in Canvas, and is stored encrypted
+        by Stay Focused. Access still depends on school and course permissions.
       </Text>
     </Card>
   );
