@@ -13,7 +13,7 @@ or private course names are included in this report.
 | CANVAS_ACCESS_TOKEN | missing |
 | CANVAS_LIVE_BASE_URL | missing |
 | CANVAS_LIVE_PERSONAL_ACCESS_TOKEN | missing |
-| CANVAS_TOKEN_ENCRYPTION_KEY | missing |
+| CANVAS_TOKEN_ENCRYPTION_KEY | present |
 | SUPABASE_PROJECT_REF | present |
 | SUPABASE_ACCESS_TOKEN | present |
 | SUPABASE_DB_PASSWORD | present |
@@ -69,29 +69,38 @@ any locked, hidden, unpublished, or permission-restricted content.
 
 ## Protected API Flow Result
 
-Pending. The migration is applied, but `CANVAS_TOKEN_ENCRYPTION_KEY` is missing
-from the local API environment. A temporary test key was not used for live
-database persistence.
+PASS. The migration is applied and a real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY`
+is configured in the ignored API-local environment file. The value is not
+printed, committed, or documented. The required format is Base64 encoded with a
+decoded length of exactly 32 bytes; the helper trims whitespace and validates
+the key only when encryption or decryption is used.
 
 | Operation | Result | Notes |
 | --- | --- | --- |
-| Connect | PENDING | Requires a real 32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. |
-| Connection status | PENDING | Requires a safely created test connection. |
-| Courses | PENDING | Requires an encrypted stored connection. |
-| Capabilities | PENDING | Requires an encrypted stored connection. |
-| Encrypted persistence | PENDING | Do not validate with a temporary test key. |
-| Disconnect | PENDING | Requires confirming the test connection belongs to the intended user. |
+| API health | PASS | `GET /api/health` returned 200 on localhost. |
+| Supabase bearer token | PASS | Acquired for the established smoke-test user; token value not printed or stored in docs. |
+| Connect | PASS | `PUT /api/canvas/connection` validated the Canvas profile before persistence and returned safe metadata, 17 courses, and 25 capability records. |
+| Encrypted persistence | PASS | One user-scoped row existed; ciphertext, IV, authentication tag, and encryption version were populated; no plaintext PAT column existed; ciphertext differed from the submitted PAT. |
+| Connection status | PASS | `GET /api/canvas/connection` returned safe metadata with last verified timestamp and no credential fields. |
+| Courses | PASS | `GET /api/canvas/courses` loaded 17 courses from the encrypted stored credential. |
+| Capabilities | PASS | `GET /api/canvas/capabilities` returned 25 records with statuses `available` and `not_tested`. |
+| Disconnect | PASS | `DELETE /api/canvas/connection` removed the selected user's connection and dependent capability rows; saved reviewers were unchanged. |
+| Final disconnected state | PASS | Follow-up connection status returned `connection: null`. |
+
+Live second-user validation was unavailable because no separate second test-user
+credentials were present. Automated route tests cover user scoping for
+connection, courses, capabilities, and disconnect behavior.
 
 ## Security Assertions
 
 | Secure assertion | Result | Notes |
 | --- | --- | --- |
-| No plaintext token stored | PASS (automated) | Encryption and route tests verify ciphertext-only persistence payloads; live persistence is pending until a real key exists. |
-| Canvas token absent from API responses | PASS (automated) | API and mobile tests verify safe response mapping; live protected API response validation is pending. |
+| No plaintext token stored | PASS | Live persistence and automated route tests verify ciphertext-only persistence payloads. |
+| Canvas token absent from API responses | PASS | Live protected API responses and automated tests verify safe response mapping. |
 | Canvas token absent from logs and errors | PASS | Direct validation script prints sanitized summaries only. |
 | Mobile does not persist Canvas token | PASS | Covered by Phase 5A automated mobile tests. |
 | Cross-origin pagination rejected | PASS | Covered by `@stay-focused/canvas` automated tests. |
 | Capability failures isolated | PASS | Direct probes report independent capability statuses. |
-| Database operations user-scoped | PASS (automated) | API tests filter Canvas rows by authenticated user; live protected API validation is pending. |
+| Database operations user-scoped | PASS | Live validation stored and deleted only the selected user's connection; automated tests filter Canvas rows by authenticated user. |
 | No school-wide token exists | PASS | Phase 5A uses one user-generated personal access token per connected Canvas user. |
 | OAuth implemented | NOT_IMPLEMENTED | Canvas OAuth requires an institution-approved Developer Key and remains a future production authorization phase. |

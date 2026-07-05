@@ -136,9 +136,37 @@ live course count did not require a second pagination page, so live pagination
 was not exercised, while automated Canvas tests still cover ordered pagination
 and cross-origin pagination rejection. The Phase 5A Supabase migration is now
 applied remotely and verified for table presence, RLS, and no direct
-`anon`/`authenticated` access to encrypted credential columns. Protected API
-flow validation remains pending until a real `CANVAS_TOKEN_ENCRYPTION_KEY` is
-configured locally.
+`anon`/`authenticated` access to encrypted credential columns. The protected
+Phase 5A API lifecycle is now complete and live validated after configuring a
+real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY` in the ignored API-local
+environment file. The key is Base64-encoded and must decode to exactly 32
+bytes; the encryption helper trims whitespace and validates the key only when
+encrypting or decrypting.
+
+Protected lifecycle validation passed on `http://localhost:3000` with the
+established smoke-test Stay Focused user and finished disconnected:
+
+```text
+API health
+-> Supabase bearer authentication
+-> PUT /api/canvas/connection with the user's submitted Canvas PAT
+-> encrypted per-user persistence
+-> GET /api/canvas/connection
+-> GET /api/canvas/courses from the stored credential
+-> GET /api/canvas/capabilities
+-> invalid replacement PAT preserves the valid connection
+-> DELETE /api/canvas/connection
+-> final disconnected state
+```
+
+The protected connect response returned 17 courses and 25 capability records
+without PAT, ciphertext, IV, authentication tag, or encryption-version fields.
+Server-side persistence checks confirmed one row for the selected user,
+populated ciphertext/IV/authentication-tag/encryption-version fields, no
+plaintext PAT column, ciphertext not equal to the submitted PAT, and capability
+rows scoped to the same user and connection. Disconnect removed the connection
+and dependent capability rows, left saved reviewers unchanged, and the final
+status returned `connection: null`.
 
 ## Completed Capabilities
 
@@ -280,6 +308,14 @@ Verified across the latest Phase 4 and Phase 5A validation passes:
   applied it; migration history then showed `202607050001` and `202607050002`;
   read-only checks passed for both Canvas tables, RLS, encrypted columns, and no
   direct `anon`/`authenticated` CRUD or encrypted-column select grants.
+- Phase 5A protected API lifecycle validation: passed against the local API.
+  API health passed, Supabase bearer authentication was acquired for an
+  established smoke-test user, connect/status/courses/capabilities/disconnect
+  passed, 17 courses were returned from the encrypted stored credential, 25
+  capability records were returned with statuses `available` and `not_tested`,
+  encrypted persistence checks passed, invalid replacement PAT preserved the
+  valid connection, saved reviewers were unchanged, and the test finished with
+  the user disconnected.
 
 Latest recorded unattended smokes during Phase 4 implementation:
 
@@ -331,12 +367,11 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
-- Canvas LMS Phase 5A is implemented and partially live validated: direct
-  server-side Canvas validation with one developer-owned personal access token
-  and remote Supabase migration/RLS validation have passed. There is no
-  school-wide Canvas credential. The full protected API connection lifecycle is
-  still pending because the local API environment is missing a real
-  `CANVAS_TOKEN_ENCRYPTION_KEY`.
+- Canvas LMS Phase 5A is complete and live validated: direct server-side Canvas
+  validation with one developer-owned personal access token, remote Supabase
+  migration/RLS validation, and the protected API connection lifecycle have
+  passed. There is no school-wide Canvas credential. The live validation test
+  finished disconnected.
 - Canvas content ingestion is not implemented yet. Modules, Pages, files,
   assignments, discussions, announcements, quiz metadata, grades, rubrics,
   background sync, and source snapshots remain Phase 5B through Phase 5F work.
@@ -347,10 +382,8 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Complete the protected Phase 5A Canvas API validation after configuring a real
-32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. After that blocker is resolved,
-Phase 5B Academic Graph Synchronization can begin. Repeated PDF header/footer
-cleanup remains a deferred OCR cleanup candidate.
+Phase 5B Academic Graph Synchronization can begin when requested. Repeated PDF
+header/footer cleanup remains a deferred OCR cleanup candidate.
 
 ## Known Risks
 
@@ -374,9 +407,9 @@ cleanup remains a deferred OCR cleanup candidate.
 - Reviewer persistence now has a live cross-user RLS validation baseline.
   Future persistence changes should preserve owner-scoped access, safe 404
   denial, and owner-only cleanup behavior.
-- Phase 5A protected API validation remains pending because
-  `CANVAS_TOKEN_ENCRYPTION_KEY` is missing locally. Do not create a permanent
-  fallback key silently, and do not validate live database persistence with a
+- Canvas credential encryption depends on `CANVAS_TOKEN_ENCRYPTION_KEY` being
+  present in deployed API environments. Do not create a fallback key silently.
+  The local Phase 5A validation used a real app-owned ignored local key, not a
   temporary test key.
 - Canvas permissions vary by user, role, school, and course. Course access for
   one personal access token does not prove access to modules, files, grades,

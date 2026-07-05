@@ -50,7 +50,8 @@
 ## Encryption Design
 
 - API environment variable: `CANVAS_TOKEN_ENCRYPTION_KEY`
-- Required key length: decoded key must be exactly 32 bytes.
+- Required key format: Base64-encoded value; decoded key must be exactly 32
+  bytes.
 - Ownership: application/deployment-owned Stay Focused secret, not supplied by
   Canvas, the school, or the student.
 - Algorithm: AES-256-GCM through Node `crypto`.
@@ -58,6 +59,9 @@
   version.
 - Decryption fails closed for corrupted ciphertext, corrupted authentication
   tag, unsupported version, and invalid key.
+- Whitespace is trimmed before Base64 decode.
+- The key is validated when encryption or decryption is used, not at process
+  startup.
 
 ## Authentication Model
 
@@ -116,6 +120,18 @@ credential columns are not returned.
 - Targeted secret scan: no real Canvas tokens, encryption keys, Supabase
   service-role keys, OpenAI keys, or Google credential values found in changed
   files
+- Protected API lifecycle verification:
+  - API health: passed
+  - Supabase bearer token: acquired for the established smoke-test user
+  - Connect: passed
+  - Encrypted persistence: passed
+  - Connection status: passed
+  - Courses from stored credential: passed; 17 courses
+  - Capabilities: passed; 25 records with statuses `available` and `not_tested`
+  - Disconnect: passed
+  - Final disconnected state: passed
+  - Cross-user live validation: unavailable because no second test-user
+    credentials were present; automated user-scoping tests passed
 
 Phase 5A.1 verification:
 
@@ -158,12 +174,40 @@ Phase 5A.1 verification:
 
 ## Protected API Result
 
-- Protected Canvas API flow: pending.
-- Blocker: `CANVAS_TOKEN_ENCRYPTION_KEY` is missing from the local API
-  environment. It must decode to exactly 32 bytes before live Canvas connection
-  persistence can be validated.
-- Do not create a permanent fallback key silently, and do not use a temporary
-  test key for live database persistence.
+- Protected Canvas API flow: PASS.
+- `CANVAS_TOKEN_ENCRYPTION_KEY`: configured in the ignored API-local
+  environment file. The value is not committed or documented.
+- Key format: Base64 encoded, decoded length exactly 32 bytes. The helper trims
+  whitespace and validates on encryption/decryption use.
+- Test user: established smoke-test user; no existing Canvas connection was
+  present before validation.
+- Connect: PASS. `PUT /api/canvas/connection` validated the Canvas profile
+  before persistence, returned safe connection metadata, 17 courses, and 25
+  capability records, and did not return PAT, ciphertext, IV, authentication
+  tag, or encryption-version fields.
+- Encrypted persistence: PASS. One connection row existed for the selected user;
+  ciphertext, IV, authentication tag, and encryption version were populated; no
+  plaintext PAT column existed; ciphertext differed from the submitted PAT; and
+  capability rows were scoped to the same user and connection.
+- Connection status: PASS. `GET /api/canvas/connection` returned safe
+  connection metadata with a last-verified timestamp and no credential fields.
+- Courses: PASS. `GET /api/canvas/courses` loaded 17 courses through the
+  encrypted stored credential. The developer environment PAT was not used as a
+  global fallback.
+- Capabilities: PASS. `GET /api/canvas/capabilities` returned 25 user-scoped
+  records with statuses `available` and `not_tested`, without raw upstream
+  Canvas responses.
+- Negative checks: PASS. Missing JWT returned 401, malformed Canvas URL
+  returned the stable validation error, invalid replacement PAT preserved the
+  existing valid connection, corrupted credentials fail closed in automated
+  tests, missing encryption key fails safely in automated tests, and error
+  bodies did not expose secrets.
+- Disconnect: PASS. `DELETE /api/canvas/connection` removed the selected user's
+  connection and dependent capability rows, saved reviewers were unchanged, and
+  the final connection status returned the disconnected state.
+- Cross-user validation: automated user-scoping tests passed. Live second-user
+  validation was unavailable because no separate second test-user credentials
+  were present.
 
 ## Known Permission-Dependent Capabilities
 
@@ -173,6 +217,6 @@ Phase 5A.1 verification:
 
 ## Next Phase 5B Task
 
-After protected Phase 5A API validation is complete, Phase 5B is academic graph
-synchronization for modules, Pages, activities, dates, assignment groups,
-announcements, discussions, and quiz metadata.
+Phase 5B is academic graph synchronization for modules, Pages, activities,
+dates, assignment groups, announcements, discussions, and quiz metadata. Do not
+begin Phase 5B unless explicitly requested.

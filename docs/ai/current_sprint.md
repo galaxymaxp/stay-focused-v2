@@ -5,13 +5,14 @@ Last refreshed: 2026-07-05, Asia/Manila.
 ## Active Objective
 
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
-Secure Canvas Connection and Capability Discovery is implemented and partially
-live validated: direct server-side Canvas validation used one developer-owned
+Secure Canvas Connection and Capability Discovery is complete and live
+validated: direct server-side Canvas validation used one developer-owned
 personal access token, returned 17 courses for that token, and proved only that
-user's available Canvas capabilities. Remote Supabase Canvas table and RLS
-validation passed. Protected API flow validation is pending until a real
-`CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally. There is no school-wide
-Canvas token.
+user's available Canvas capabilities; remote Supabase Canvas table and RLS
+validation passed; and the protected API
+connect/status/courses/capabilities/disconnect lifecycle passed after
+configuring a real app-owned `CANVAS_TOKEN_ENCRYPTION_KEY`. There is no
+school-wide Canvas token.
 
 ## Completed Phase 3A Scope
 
@@ -337,9 +338,28 @@ Canvas token.
   - Read-only schema checks passed for both Canvas tables, RLS, encrypted
     columns, and no direct `anon`/`authenticated` CRUD or encrypted-column
     select grants
-- Protected API validation remains pending because
-  `CANVAS_TOKEN_ENCRYPTION_KEY` is missing locally. Do not use a temporary test
-  key for live database persistence.
+- Protected API validation passed after configuring a real app-owned
+  `CANVAS_TOKEN_ENCRYPTION_KEY` in the ignored API-local environment file. The
+  key format is Base64 encoded and must decode to exactly 32 bytes.
+- Protected lifecycle result:
+  - API health: passed
+  - Supabase bearer authentication: acquired for the established smoke-test user
+  - Connect: passed; Canvas profile validated before persistence
+  - Encrypted persistence: passed; ciphertext, IV, authentication tag, and
+    encryption version populated; no plaintext PAT column; ciphertext differed
+    from the submitted PAT
+  - Connection status: passed with safe metadata and no credential fields
+  - Courses from stored credential: passed; 17 courses returned
+  - Capabilities: passed; 25 records returned with statuses `available` and
+    `not_tested`
+  - Invalid replacement PAT: returned the stable token error and preserved the
+    existing valid connection
+  - Disconnect: passed; connection and dependent capabilities deleted, saved
+    reviewers unchanged
+  - Final state: disconnected
+- Cross-user protection distinction: automated route tests passed for user
+  scoping. Live second-user validation was unavailable because no separate
+  second test-user credentials were present.
 
 ## Phase 3C Completion Sequence
 
@@ -374,7 +394,5 @@ Canvas token.
 
 ## Next Objective
 
-Complete the protected Phase 5A Canvas API connection lifecycle validation after
-configuring a real 32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`. After that
-blocker is resolved, Phase 5B can begin. The deferred header/footer cleanup task
+Phase 5B can begin when requested. The deferred header/footer cleanup task
 remains separate.

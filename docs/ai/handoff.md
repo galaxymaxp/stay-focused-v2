@@ -40,8 +40,8 @@ paths.
   the migration applied, schema/RLS/policies were verified, distinct users
   passed bidirectional owner isolation, safe `404 reviewer_not_found` denial
   passed, and fictional validation rows were cleaned up.
-- Phase 5A Secure Canvas Connection and Capability Discovery is implemented and
-  partially live validated. It adds the staged Phase 5 roadmap, Canvas
+- Phase 5A Secure Canvas Connection and Capability Discovery is complete and
+  live validated. It adds the staged Phase 5 roadmap, Canvas
   capability matrix, five Canvas ADRs, a strict `@stay-focused/canvas` client,
   per-user personal access token validation, AES-256-GCM encrypted token
   storage, `canvas_connections` and `canvas_capabilities` migration foundation,
@@ -61,8 +61,18 @@ paths.
   history now includes `202607050002`, and read-only checks passed for both
   Canvas tables, RLS, encrypted columns, and no direct
   `anon`/`authenticated` encrypted-column access.
-- Phase 5A protected API flow validation is still pending because the local API
-  environment is missing a real `CANVAS_TOKEN_ENCRYPTION_KEY`.
+- Phase 5A protected API flow validation passed after configuring a real
+  app-owned `CANVAS_TOKEN_ENCRYPTION_KEY` in the ignored API-local environment
+  file. The key is Base64 encoded and must decode to exactly 32 bytes.
+- Protected API validation passed on `http://localhost:3000`: API health,
+  Supabase bearer authentication for the established smoke-test user,
+  connect/status/courses/capabilities/disconnect, encrypted persistence checks,
+  invalid replacement PAT preservation, reviewer-count preservation, and final
+  disconnected state all passed. Course count was 17; capability count was 25
+  with statuses `available` and `not_tested`.
+- Live second-user validation was not run because no separate second test-user
+  credentials were available. Automated route tests cover user scoping for
+  connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
@@ -121,10 +131,9 @@ paths.
 
 ## Immediate Next Task
 
-Complete protected Phase 5A Canvas API connection lifecycle validation after
-configuring a real 32-byte decoded `CANVAS_TOKEN_ENCRYPTION_KEY`; then Phase 5B
-can begin. Automatic repeated scanned-PDF header/footer detection remains a
-deferred OCR cleanup candidate.
+Phase 5B Academic Graph Synchronization can begin when requested. Automatic
+repeated scanned-PDF header/footer detection remains a deferred OCR cleanup
+candidate.
 
 ## Known Blockers And Risks
 
@@ -147,12 +156,11 @@ deferred OCR cleanup candidate.
 - Reviewer persistence has a live cross-user RLS validation baseline. Future
   persistence changes should preserve owner-scoped access, safe 404 denial, and
   owner-only cleanup behavior.
-- Phase 5A Canvas storage requires `CANVAS_TOKEN_ENCRYPTION_KEY`, which must
-  decode to exactly 32 bytes. Do not generate a permanent fallback key and do
-  not log the key or Canvas tokens.
-- Do not use a temporary test key for live Canvas database persistence. The
-  protected connect/status/courses/capabilities/disconnect flow remains pending
-  until the real key is available.
+- Phase 5A Canvas storage requires `CANVAS_TOKEN_ENCRYPTION_KEY`, which must be
+  Base64 encoded and decode to exactly 32 bytes. Do not generate a permanent
+  fallback key and do not log the key or Canvas tokens.
+- The protected connect/status/courses/capabilities/disconnect flow has passed
+  locally with a real app-owned ignored local key, not a temporary test key.
 - Each Canvas personal access token is validated through the API, encrypted
   server-side, stored only for the authenticated Stay Focused user, and never
   returned to mobile. Mobile uses secure text entry and clears the token after

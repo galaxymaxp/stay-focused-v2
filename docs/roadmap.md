@@ -208,7 +208,7 @@ complete.
 
 ## Phase 5 - Canvas Synchronization Foundation
 
-Status: In progress. Phase 5A is partially live validated; Phases 5B through
+Status: In progress. Phase 5A is complete and live validated; Phases 5B through
 5F remain planned and must not be collapsed into a single generic Canvas
 integration task.
 
@@ -233,9 +233,9 @@ CanvasCredentialProvider
 
 ### Phase 5A - Secure Canvas Connection And Capability Discovery
 
-Status: Partially live validated. Direct server-side Canvas validation and
-remote Supabase migration application passed; protected API persistence flow is
-pending until a real `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally.
+Status: Complete and live validated. Direct server-side Canvas validation,
+remote Supabase migration/RLS validation, and the protected API
+connect/status/courses/capabilities/disconnect lifecycle have passed.
 
 Scope:
 
@@ -304,9 +304,30 @@ Validation status as of 2026-07-05:
 - Supabase migration `202607050002_create_canvas_connections.sql` applied
   remotely and read-only checks verified both tables, RLS, and no direct
   `anon`/`authenticated` access to encrypted token columns.
-- Protected API connect/status/courses/capabilities/disconnect validation is
-  still pending because the local API environment is missing a real
-  `CANVAS_TOKEN_ENCRYPTION_KEY`.
+- `CANVAS_TOKEN_ENCRYPTION_KEY` is configured locally as a Base64-encoded key
+  that decodes to exactly 32 bytes. The helper trims whitespace, decodes as
+  Base64, and validates only when encryption or decryption is used.
+- Protected API lifecycle validation passed against `http://localhost:3000`:
+  Supabase bearer authentication was acquired for an established smoke-test
+  user, `PUT /api/canvas/connection` validated the Canvas profile before
+  persistence, 17 courses were returned, 25 capability records were created,
+  and connection metadata responses excluded credential fields.
+- Encrypted persistence was verified through a server-side database query:
+  one connection row existed for the selected user, ciphertext, IV,
+  authentication tag, and encryption version were populated, no plaintext PAT
+  column was present, ciphertext differed from the submitted PAT, and capability
+  rows were scoped to the same user and connection.
+- `GET /api/canvas/connection`, `GET /api/canvas/courses`, and
+  `GET /api/canvas/capabilities` passed from the stored encrypted credential.
+  Capability statuses were `available` and `not_tested`.
+- Invalid replacement PAT validation returned the stable token error while
+  preserving the existing valid connection.
+- `DELETE /api/canvas/connection` removed the selected user's connection and
+  dependent capability rows, left saved reviewers unchanged, and final
+  connection status returned the disconnected state.
+- Automated route tests cover cross-user scoping for connection, courses,
+  capabilities, and disconnect behavior. A live second-user validation was not
+  run because no separate second test-user credentials were available.
 
 ### Phase 5B - Academic Graph Synchronization
 
