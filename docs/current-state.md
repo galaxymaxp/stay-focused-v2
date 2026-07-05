@@ -195,6 +195,44 @@ synchronization, scheduled jobs, background workers, mobile course screens,
 announcements, discussions, planner data, quiz metadata, files/media ingestion,
 incremental sync, or reviewer generation from Canvas content.
 
+Phase 5B.2 adds the first complete manually triggered academic graph
+synchronization path:
+
+```text
+POST /api/canvas/sync
+-> authenticated Supabase user
+-> user-owned encrypted Canvas connection
+-> API-only PAT decryption
+-> active Canvas courses
+-> complete per-course graph snapshot
+-> atomic per-course database replacement
+-> sanitized sync-run summary
+```
+
+The synchronization remains synchronous and manual. It has no scheduled job,
+background worker, cron, webhook, mobile screen, automatic app-launch call, or
+notification path. Persistence is atomic per course, not one transaction for
+the whole Canvas account. A partial account sync may commit successful courses
+while preserving failed courses. A successful complete course snapshot may
+prune stale child resources for that course only; incomplete snapshots do not
+prune anything. Courses missing from the active-course response are not
+deleted.
+
+Remote migrations `202607050005_add_canvas_academic_sync.sql` and
+`202607050006_fix_canvas_connection_rpc_ambiguity.sql` are applied and
+verified. The repair migration keeps the Phase 5A connection replacement RPC
+usable after live validation exposed an ambiguous `user_id` conflict target;
+the historical migration was not edited. Live validation recreated the
+encrypted stored Canvas connection through `PUT /api/canvas/connection` using
+the established smoke-test user and ignored local Canvas credentials, then ran
+`POST /api/canvas/sync` twice. Both sync calls returned HTTP 200 with a
+documented partial status: 17 courses discovered, 13 succeeded, 4 failed with
+sanitized `canvas_course_fetch_failed`, 27 modules, 311 module items, 459
+Pages, 18 assignment groups, and 25 assignments. The second run preserved
+internal identities, kept `first_synced_at` stable, advanced `last_synced_at`,
+introduced no duplicate identities, and left zero running sync rows. The
+encrypted Canvas connection remains stored for later Canvas phases.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -270,6 +308,10 @@ incremental sync, or reviewer generation from Canvas content.
 - Phase 5B.1 academic graph foundation with Canvas course, module, module item,
   Page, assignment-group, and assignment tables plus typed Canvas retrieval
   contracts and pagination tests.
+- Phase 5B.2 manually triggered synchronous initial full Canvas academic graph
+  synchronization with sync-run persistence, bounded concurrency, atomic
+  per-course replacement, stale-child cleanup after complete snapshots,
+  partial-run preservation, and mobile service support without UI.
 
 ## Current Verification Baselines
 
@@ -362,6 +404,14 @@ passes:
   RLS, grants, ownership constraints, and indexes. Canvas package tests passed
   with 30/30 cases after adding all new collection endpoints and pagination
   regression coverage.
+- Phase 5B.2 verification: `202607050005` and `202607050006` applied remotely;
+  rollback SQL verification passed for sync-run ownership constraints,
+  active-run protection, stale-run recovery, atomic course snapshot
+  replacement, duplicate prevention, stable row IDs across upsert, malformed
+  relationship rollback, RLS, grants, RPC execution posture, and unchanged
+  Phase 5A and Phase 5B.1 protections. Focused pre-live checks passed with
+  Canvas 30/30, API 158/158, and mobile 76/76 tests. Live validation passed
+  twice with sanitized aggregate-only output and a final stored connection.
 
 Latest recorded unattended smokes during Phase 4 implementation:
 
@@ -420,10 +470,12 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   persistence, redirect rejection, and automated two-user authorization tests
   have passed. There is no school-wide Canvas credential. The live validation
   test finished disconnected.
-- Phase 5B.1 academic graph foundation is complete, but full synchronization is
-  not implemented yet. Announcements, discussions, planner data, quiz metadata,
-  files/media ingestion, grades, rubrics, incremental sync, background sync,
-  source snapshots, and reviewer generation from Canvas content remain deferred.
+- Phase 5B.1 academic graph foundation is complete.
+- Phase 5B.2 initial full academic graph synchronization is complete as a
+  manual synchronous route. Announcements, discussions, planner data, files or
+  attachments, submissions, grades, rubrics, incremental sync, background sync,
+  source snapshots, automatic sync, mobile sync screens, notifications, and
+  reviewer generation from Canvas content remain deferred.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -431,10 +483,12 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
-Phase 5B.1 academic graph foundation is complete. The recommended next task is
-Phase 5B.2 initial full academic graph synchronization. Repeated PDF
-header/footer cleanup remains a deferred OCR cleanup candidate.
+Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
+5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
+academic graph synchronization is complete and live validated. The recommended
+next task is Phase 5B.3 incremental synchronization, secondary Canvas
+resources, and recovery hardening. Repeated PDF header/footer cleanup remains a
+deferred OCR cleanup candidate.
 
 ## Known Risks
 

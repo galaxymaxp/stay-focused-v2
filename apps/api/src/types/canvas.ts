@@ -44,6 +44,32 @@ export interface CanvasCapabilitiesResponse {
   readonly capabilities: readonly CanvasCapabilitySummary[];
 }
 
+export type CanvasSyncStatus = "succeeded" | "partial" | "failed";
+
+export interface CanvasSyncSummary {
+  readonly status: CanvasSyncStatus;
+  readonly courses: {
+    readonly discovered: number;
+    readonly succeeded: number;
+    readonly failed: number;
+  };
+  readonly resources: {
+    readonly modules: number;
+    readonly moduleItems: number;
+    readonly pages: number;
+    readonly assignmentGroups: number;
+    readonly assignments: number;
+  };
+  readonly failures?: readonly {
+    readonly code: string;
+    readonly count: number;
+  }[];
+}
+
+export interface CanvasSyncResponse extends CanvasSyncSummary {
+  readonly ok: true;
+}
+
 export interface CanvasDeleteResponse {
   readonly ok: true;
 }
@@ -54,6 +80,7 @@ export interface CanvasApiErrorResponse {
     readonly code: CanvasApiErrorCode;
     readonly message: string;
   };
+  readonly sync?: CanvasSyncSummary;
 }
 
 export type CanvasApiErrorCode =
@@ -69,6 +96,7 @@ export type CanvasApiErrorCode =
   | "canvas_timeout"
   | "canvas_connection_missing"
   | "canvas_connection_corrupt"
+  | "canvas_sync_in_progress"
   | "canvas_storage_not_configured"
   | "canvas_storage_failed";
 
@@ -76,5 +104,6 @@ export type CanvasApiResponse =
   | CanvasConnectionResponse
   | CanvasCoursesResponse
   | CanvasCapabilitiesResponse
+  | CanvasSyncResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;

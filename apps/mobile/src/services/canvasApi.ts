@@ -9,6 +9,7 @@ import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
 const CONNECTION_PATH = "/api/canvas/connection";
 const COURSES_PATH = "/api/canvas/courses";
 const CAPABILITIES_PATH = "/api/canvas/capabilities";
+const SYNC_PATH = "/api/canvas/sync";
 const MAX_ERROR_MESSAGE_CHARS = 300;
 
 export interface CanvasConnectionSummary {
@@ -32,6 +33,28 @@ export interface CanvasCapabilitySummary {
   readonly safeErrorCode: string | null;
   readonly courseId: string | null;
   readonly integrationVersion: string | null;
+}
+
+export type CanvasSyncStatus = "succeeded" | "partial" | "failed";
+
+export interface CanvasSyncSummary {
+  readonly status: CanvasSyncStatus;
+  readonly courses: {
+    readonly discovered: number;
+    readonly succeeded: number;
+    readonly failed: number;
+  };
+  readonly resources: {
+    readonly modules: number;
+    readonly moduleItems: number;
+    readonly pages: number;
+    readonly assignmentGroups: number;
+    readonly assignments: number;
+  };
+  readonly failures?: readonly {
+    readonly code: string;
+    readonly count: number;
+  }[];
 }
 
 export interface CanvasApiBaseInput {
@@ -77,6 +100,7 @@ export type CanvasApiClientErrorCode =
   | "canvas_timeout"
   | "missing_connection"
   | "corrupted_credentials"
+  | "sync_in_progress"
   | "storage_not_configured"
   | "storage_failed"
   | "unknown_api_error";
@@ -108,6 +132,10 @@ interface CoursesSuccessResponse {
 interface CapabilitiesSuccessResponse {
   readonly ok: true;
   readonly capabilities: readonly CanvasCapabilitySummary[];
+}
+
+interface SyncSuccessResponse extends CanvasSyncSummary {
+  readonly ok: true;
 }
 
 interface DeleteSuccessResponse {
@@ -206,6 +234,20 @@ export async function listCanvasCapabilities(
   });
 }
 
+export async function syncCanvasAcademicGraph(
+  input: CanvasApiBaseInput,
+): Promise<CanvasApiResult<CanvasSyncSummary>> {
+  const endpoint = createEndpoint(input.apiBaseUrl, SYNC_PATH);
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    parseSuccess: parseSyncResponse,
+  });
+}
+
 function createEndpoint(
   apiBaseUrl: string,
   path: string,
@@ -249,7 +291,7 @@ async function requestJson<TData>({
   readonly body?: unknown;
   readonly endpoint: string;
   readonly input: CanvasApiBaseInput;
-  readonly method: "GET" | "PUT" | "DELETE";
+  readonly method: "GET" | "PUT" | "POST" | "DELETE";
   readonly parseSuccess: (parsed: unknown) => CanvasApiResult<TData>;
 }): Promise<CanvasApiResult<TData>> {
   const accessToken = input.accessToken.trim();
@@ -359,6 +401,24 @@ function parseCapabilitiesResponse(
   );
 }
 
+function parseSyncResponse(parsed: unknown): CanvasApiResult<CanvasSyncSummary> {
+  if (isSyncSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        status: parsed.status,
+        courses: parsed.courses,
+        resources: parsed.resources,
+        ...(parsed.failures ? { failures: parsed.failures } : {}),
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid synchronization response.",
+  );
+}
+
 function parseDeleteResponse(parsed: unknown): CanvasApiResult<void> {
   if (isDeleteSuccessResponse(parsed)) {
     return { ok: true, data: undefined };
@@ -425,6 +485,8 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "missing_connection";
     case "canvas_connection_corrupt":
       return "corrupted_credentials";
+    case "canvas_sync_in_progress":
+      return "sync_in_progress";
     case "canvas_storage_not_configured":
       return "storage_not_configured";
     case "canvas_storage_failed":
@@ -523,6 +585,20 @@ function isCapabilitiesSuccessResponse(
     value.ok === true &&
     Array.isArray(value.capabilities) &&
     value.capabilities.every(isCanvasCapabilitySummary)
+  );
+}
+
+function isSyncSuccessResponse(value: unknown): value is SyncSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, ["ok", "status", "courses", "resources", "failures"]) &&
+    isCanvasSyncStatus(value.status) &&
+    isSyncCourseCounts(value.courses) &&
+    isSyncResourceCounts(value.resources) &&
+    (value.failures === undefined ||
+      (Array.isArray(value.failures) &&
+        value.failures.every(isSyncFailureSummary)))
   );
 }
 
@@ -637,6 +713,64 @@ function isCanvasCapabilityStatus(
     value === "temporarily_failed" ||
     value === "not_tested"
   );
+}
+
+function isCanvasSyncStatus(value: unknown): value is CanvasSyncStatus {
+  return value === "succeeded" || value === "partial" || value === "failed";
+}
+
+function isSyncCourseCounts(value: unknown): value is CanvasSyncSummary["courses"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["discovered", "succeeded", "failed"]) &&
+    isNonNegativeInteger(value.discovered) &&
+    isNonNegativeInteger(value.succeeded) &&
+    isNonNegativeInteger(value.failed)
+  );
+}
+
+function isSyncResourceCounts(
+  value: unknown,
+): value is CanvasSyncSummary["resources"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "modules",
+      "moduleItems",
+      "pages",
+      "assignmentGroups",
+      "assignments",
+    ]) &&
+    isNonNegativeInteger(value.modules) &&
+    isNonNegativeInteger(value.moduleItems) &&
+    isNonNegativeInteger(value.pages) &&
+    isNonNegativeInteger(value.assignmentGroups) &&
+    isNonNegativeInteger(value.assignments)
+  );
+}
+
+function isSyncFailureSummary(
+  value: unknown,
+): value is NonNullable<CanvasSyncSummary["failures"]>[number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["code", "count"]) &&
+    typeof value.code === "string" &&
+    value.code.trim().length > 0 &&
+    isNonNegativeInteger(value.count)
+  );
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function hasOnlyKeys(
+  value: Readonly<Record<string, unknown>>,
+  allowedKeys: readonly string[],
+): boolean {
+  const allowed = new Set(allowedKeys);
+  return Object.keys(value).every((key) => allowed.has(key));
 }
 
 function looksLikeStackTrace(value: string): boolean {

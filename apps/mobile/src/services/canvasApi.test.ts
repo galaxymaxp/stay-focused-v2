@@ -6,6 +6,7 @@ import {
   getCanvasConnection,
   listCanvasCapabilities,
   listCanvasCourses,
+  syncCanvasAcademicGraph,
 } from "./canvasApi";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -88,6 +89,143 @@ describe("Canvas mobile API client", () => {
         fetchImpl: createFetch({ ok: true }),
       }),
     ).resolves.toEqual({ ok: true, data: undefined });
+  });
+
+  it("runs academic graph sync with bearer auth and parses safe counts", async () => {
+    const fetchImpl = createFetch({
+      ok: true,
+      status: "partial",
+      courses: { discovered: 2, succeeded: 1, failed: 1 },
+      resources: {
+        modules: 3,
+        moduleItems: 8,
+        pages: 2,
+        assignmentGroups: 1,
+        assignments: 4,
+      },
+      failures: [{ code: "canvas_unavailable", count: 1 }],
+    });
+
+    const result = await syncCanvasAcademicGraph({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        status: "partial",
+        courses: { discovered: 2, succeeded: 1, failed: 1 },
+        resources: { moduleItems: 8, assignments: 4 },
+        failures: [{ code: "canvas_unavailable", count: 1 }],
+      },
+    });
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/sync`,
+      init: {
+        method: "POST",
+        headers: { Authorization: "Bearer session-token" },
+      },
+    });
+  });
+
+  it.each([
+    [
+      "invalid status",
+      {
+        ok: true,
+        status: "done",
+        courses: { discovered: 1, succeeded: 1, failed: 0 },
+        resources: {
+          modules: 0,
+          moduleItems: 0,
+          pages: 0,
+          assignmentGroups: 0,
+          assignments: 0,
+        },
+      },
+    ],
+    [
+      "negative count",
+      {
+        ok: true,
+        status: "succeeded",
+        courses: { discovered: -1, succeeded: 0, failed: 0 },
+        resources: {
+          modules: 0,
+          moduleItems: 0,
+          pages: 0,
+          assignmentGroups: 0,
+          assignments: 0,
+        },
+      },
+    ],
+    [
+      "academic content",
+      {
+        ok: true,
+        status: "succeeded",
+        courses: { discovered: 1, succeeded: 1, failed: 0 },
+        resources: {
+          modules: 0,
+          moduleItems: 0,
+          pages: 0,
+          assignmentGroups: 0,
+          assignments: 0,
+        },
+        courseNames: ["Private Course"],
+      },
+    ],
+    [
+      "extra resource field",
+      {
+        ok: true,
+        status: "succeeded",
+        courses: { discovered: 1, succeeded: 1, failed: 0 },
+        resources: {
+          modules: 0,
+          moduleItems: 0,
+          pages: 0,
+          assignmentGroups: 0,
+          assignments: 0,
+          pageTitles: ["Private Page"],
+        },
+      },
+    ],
+  ])("rejects malformed sync responses: %s", async (_name, body) => {
+    const result = await syncCanvasAcademicGraph({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl: createFetch(body),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "invalid_response" },
+    });
+  });
+
+  it("maps sync-in-progress responses safely", async () => {
+    const result = await syncCanvasAcademicGraph({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl: createFetch(
+        {
+          ok: false,
+          error: {
+            code: "canvas_sync_in_progress",
+            message: "A Canvas synchronization is already running.",
+          },
+        },
+        409,
+      ),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "sync_in_progress", status: 409 },
+    });
   });
 
   it("rejects missing setup and credentials before fetch", async () => {

@@ -17,8 +17,11 @@ two-user automated authorization evidence, redirect rejection, request
 validation coverage, README status, and ADR numbering. Phase 5B.1 Academic
 Graph Foundation is complete and remotely verified with academic graph tables,
 composite ownership constraints, RLS, revoked direct client grants, typed Canvas
-retrieval methods, and pagination tests. Full synchronization has not been
-implemented yet. There is no school-wide Canvas token.
+retrieval methods, and pagination tests. Phase 5B.2 Initial Full Academic Graph
+Synchronization is complete and live validated as a manual synchronous route
+with atomic per-course persistence, partial-run preservation, bounded
+concurrency, sync-run persistence, and no background worker. There is no
+school-wide Canvas token.
 
 ## Completed Phase 3A Scope
 
@@ -158,6 +161,63 @@ implemented yet. There is no school-wide Canvas token.
 - Incremental sync cursor logic beyond schema-ready metadata.
 - Destructive stale-record cleanup.
 - Reviewer generation from Canvas content.
+
+## Completed Phase 5B.2 Scope
+
+- Added `202607050005_add_canvas_academic_sync.sql`.
+- Added `canvas_sync_runs` with ownership, mode/status constraints, progress
+  counters, resource counts, sanitized failure fields, RLS, revoked direct
+  client grants, service-role grants, and non-stale active-run protection.
+- Added service-role RPCs for beginning, updating, and finishing sync runs.
+- Added `replace_canvas_course_academic_snapshot` for atomic per-course graph
+  replacement.
+- Added `202607050006_fix_canvas_connection_rpc_ambiguity.sql` after live
+  validation exposed an ambiguous Phase 5A connection replacement conflict
+  target. The repair was forward-only; the historical migration was not edited.
+- Added `POST /api/canvas/sync` using the existing bearer authentication
+  boundary.
+- Added `apps/api/src/lib/canvas-sync.ts` for orchestration outside the route.
+- Added `apps/api/src/lib/canvas-sync-normalize.ts` for explicit Canvas-to-DB
+  payload normalization.
+- Reused the existing encrypted Canvas connection loading and API-only PAT
+  decryption boundary.
+- Fetched active courses, modules, module items, Pages with detail bodies,
+  assignment groups, and assignments.
+- Limited concurrency to 2 courses, 3 module-item collections, and 3 Page-detail
+  requests.
+- Added route/orchestration tests for authentication, ownership, full sync,
+  pagination reaching persistence, atomicity, idempotency, partial runs,
+  overlap rejection, stale-run recovery, and error sanitization.
+- Added mobile `syncCanvasAcademicGraph()` service support without UI,
+  navigation, automatic calls, or screens.
+- Added `scripts/phase5b2-full-sync-verification.sql`.
+- Applied and verified the remote migrations.
+- Recreated the encrypted stored Canvas connection through
+  `PUT /api/canvas/connection` using ignored local credentials and the
+  established smoke-test user.
+- Ran two live syncs through `POST /api/canvas/sync`; both returned HTTP 200
+  with sanitized partial results.
+
+## Out Of Scope For Phase 5B.2
+
+- Scheduled synchronization.
+- Background queues or workers.
+- Cron jobs.
+- Incremental cursors.
+- Canvas webhooks.
+- Announcements.
+- Discussions.
+- Planner items.
+- Files or attachments.
+- Submissions.
+- Grades.
+- Reviewer generation from Canvas.
+- Source snapshots.
+- Mobile synchronization screens.
+- Automatic sync on app launch.
+- Synchronization notifications.
+- Cross-course planning.
+- Deletion of courses missing from the active-course response.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -419,6 +479,49 @@ implemented yet. There is no school-wide Canvas token.
   - Focused and full verification passed, including API 146/146, mobile 70/70,
     Canvas 22/22, and OCR 14/14 workspace tests.
 
+## Phase 5B.2 Results
+
+- Focused pre-live verification passed:
+  - Canvas package typecheck/build/tests: passed; 30/30 tests.
+  - DB package typecheck: passed.
+  - API typecheck/build/tests: passed; 158/158 tests.
+  - Mobile typecheck/tests: passed; 76/76 tests.
+- Remote migration history includes `202607050005` and `202607050006`.
+- Remote rollback SQL verification passed for sync-run ownership constraints,
+  active-run protection, stale-run recovery, atomic course replacement,
+  duplicate prevention, stable internal IDs, malformed relationship rollback,
+  cross-user mutation rejection, RLS, direct grants, public RPC revocation,
+  service-role execution, and unchanged Phase 5A/Phase 5B.1 protections.
+- Protected Canvas connection recreation passed through
+  `PUT /api/canvas/connection`.
+- The encrypted Canvas connection remains stored for future testing.
+- First live sync:
+  - HTTP 200
+  - Status `partial`
+  - Duration 57.576 seconds
+  - 17 courses discovered
+  - 13 courses succeeded
+  - 4 courses failed with sanitized `canvas_course_fetch_failed`
+  - 27 modules
+  - 311 module items
+  - 459 Pages
+  - 18 assignment groups
+  - 25 assignments
+  - 0 running sync rows after completion
+- Second live sync:
+  - HTTP 200
+  - Status `partial`
+  - Duration 52.403 seconds
+  - Resource counts stable
+  - Duplicate identities: 0
+  - Internal identities stable
+  - First-sync timestamps stable
+  - Last-sync timestamps advanced
+  - 0 running sync rows after completion
+- The live run finished inside the current 60-second synchronous route duration,
+  but the first run was close to the limit. Larger accounts may need resumable
+  or background synchronization in a later phase.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -452,7 +555,9 @@ implemented yet. There is no school-wide Canvas token.
 
 ## Next Objective
 
-Phase 5A hardening is complete, Phase 5A quality conditions are closed, and
-Phase 5B.1 academic graph foundation is complete. The recommended next phase is
-Phase 5B.2 initial full academic graph synchronization. The deferred
-header/footer cleanup task remains separate.
+Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
+5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
+academic graph synchronization is complete and live validated. The recommended
+next phase is Phase 5B.3 incremental synchronization, secondary Canvas
+resources, and recovery hardening. The deferred header/footer cleanup task
+remains separate.

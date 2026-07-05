@@ -209,9 +209,10 @@ complete.
 ## Phase 5 - Canvas Synchronization Foundation
 
 Status: In progress. Phase 5A is complete and live validated; Phase 5B.1
-academic graph foundation is complete; Phase 5B.2 through Phase 5F remain
-planned and must not be collapsed into a single generic Canvas integration
-task.
+academic graph foundation is complete; Phase 5B.2 initial full academic graph
+synchronization is complete and live validated; Phase 5B.3 through Phase 5F
+remain planned and must not be collapsed into a single generic Canvas
+integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -344,7 +345,9 @@ Validation status as of 2026-07-05:
 ### Phase 5B - Academic Graph Synchronization
 
 Status: In progress. Phase 5B.1 is complete as a database and typed Canvas API
-foundation only. Initial full synchronization has not been implemented yet.
+foundation. Phase 5B.2 initial full synchronization is complete as a manual,
+synchronous route with atomic per-course persistence. Incremental
+synchronization remains deferred.
 
 #### Phase 5B.1 - Academic Graph Foundation
 
@@ -379,62 +382,89 @@ Deferred from Phase 5B.1:
 - Incremental sync cursors and destructive stale cleanup
 - Reviewer generation from Canvas content
 
-Recommended next phase: Phase 5B.2 - Initial full academic graph
-synchronization.
+Recommended next phase: Phase 5B.3 - Incremental synchronization, secondary
+Canvas resources, and recovery hardening.
 
 #### Phase 5B.2 - Initial Full Academic Graph Synchronization
 
-Status: Pending.
+Status: Complete, remotely verified, and live validated.
 
 Scope:
 
 - Courses
-- Enrollment and terms
-- Syllabus
 - Modules
 - Ordered module items
-- Module prerequisites
-- Module requirements
-- Module progress
 - Canvas Pages
-- Assignments and activities
 - Assignment groups
-- Announcements
-- Discussions
-- Quiz metadata
-- Planner items
-- Calendar events
-- Effective student-specific dates
-- External URLs
-- External-tool references
+- Assignments
+- Page detail bodies
+- Existing assignment quiz metadata fields
+- Sync-run history
+- Bounded synchronous orchestration
+- Per-course atomic replacement
+- Stale-child cleanup after complete course snapshots only
+- Partial account-sync handling
+- Mobile service function without UI
 
 Required source relationships:
 
 ```text
 Course
-|-- Syllabus
 |-- Module
 |   `-- Module item
 |       |-- Page
-|       |-- File
 |       |-- Assignment
-|       |-- Discussion
-|       |-- Quiz
 |       |-- External URL
 |       `-- External tool
-|-- Announcement
 |-- Assignment group
-`-- Planner/calendar item
+`-- Assignment
 ```
 
 Exit criteria:
 
 - Canvas material is stored as related academic entities, not as a flat file
   list.
-- Module order, nesting, prerequisites, lock state, completion state, and
-  relationships are preserved.
-- Synchronized activities can later become reviewer sources, scheduling data,
-  or grade-planning inputs according to their capability classification.
+- Module order, Page relationships, assignment-group relationships, nullable
+  dates, HTML fields, and existing assignment quiz metadata are preserved.
+- The authenticated user can manually trigger synchronization through
+  `POST /api/canvas/sync`.
+- Persistence is atomic per course rather than for the whole Canvas account.
+- A partial account sync may commit successful courses while preserving failed
+  courses.
+- Empty complete snapshots remove stale child rows for that course only.
+- Incomplete course fetches and failed RPC calls do not prune existing graphs.
+- Repeated full synchronization is idempotent and preserves internal row IDs.
+- No background or scheduled synchronization exists yet.
+- No mobile synchronization screen exists yet.
+
+Validation:
+
+- Remote migrations `202607050005_add_canvas_academic_sync.sql` and
+  `202607050006_fix_canvas_connection_rpc_ambiguity.sql` are applied.
+- Remote rollback verification passed through
+  `scripts/phase5b2-full-sync-verification.sql`.
+- Live protected connection recreation passed through
+  `PUT /api/canvas/connection`.
+- Two live sync calls returned HTTP 200 with sanitized partial results:
+  17 courses discovered, 13 succeeded, 4 failed, 27 modules, 311 module items,
+  459 Pages, 18 assignment groups, and 25 assignments.
+- The second live sync introduced no duplicates, preserved internal
+  identities, kept first-sync timestamps stable, advanced last-sync timestamps,
+  and left zero running sync rows.
+
+#### Phase 5B.3 - Incremental Synchronization, Secondary Canvas Resources, And Recovery Hardening
+
+Status: Pending.
+
+Scope:
+
+- Incremental synchronization strategy
+- Secondary Canvas resources that remain deferred after Phase 5B.2
+- Better recovery paths for accounts near or beyond synchronous runtime limits
+- Retry and resume semantics
+- More detailed partial-failure health without private content
+- Continued preservation of the Phase 5A credential boundary and Phase 5B.2
+  per-course atomicity
 
 ### Phase 5C - File, Attachment, And Media Ingestion
 

@@ -381,7 +381,7 @@ export function mapCanvasClientError(error: unknown): {
 
 export function jsonResponse(
   body: CanvasApiResponse,
-  status: 200 | 400 | 401 | 403 | 404 | 413 | 429 | 500 | 502 | 503 | 504,
+  status: 200 | 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 | 502 | 503 | 504,
   request?: Request,
 ): Response {
   return NextResponse.json(body, {
@@ -394,7 +394,7 @@ export function jsonResponse(
 }
 
 export function errorResponse(
-  status: 400 | 401 | 403 | 404 | 413 | 429 | 500 | 502 | 503 | 504,
+  status: 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 | 502 | 503 | 504,
   code: CanvasApiErrorCode,
   message: string,
   request?: Request,
