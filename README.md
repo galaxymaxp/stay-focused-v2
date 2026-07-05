@@ -10,7 +10,9 @@ adds the academic graph schema and typed Canvas retrieval contracts. Phase 5B.2
 adds manually triggered synchronous initial full synchronization into that
 graph with atomic per-course persistence. Phase 5B.3A hardens that sync path
 with operation-specific course failure diagnostics and bounded transient
-retries.
+retries. Phase 5B.3B adds deterministic incremental persistence: unchanged
+courses still fetch complete Canvas snapshots, but skip database graph
+replacement when the versioned snapshot fingerprint is unchanged.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -85,6 +87,10 @@ Complete:
 - Phase 5B.3A Canvas sync recovery hardening with sanitized per-course
   diagnostics, non-retryable Page-listing failure classification, bounded
   transient retries, and diagnostic persistence through a service-role RPC
+- Phase 5B.3B Canvas incremental persistence foundation with a versioned
+  deterministic course-snapshot fingerprint, service-role-only sync state,
+  changed/unchanged/failed counts, and unchanged-course graph replacement
+  avoidance
 
 Working locally:
 
@@ -130,11 +136,19 @@ Working locally:
   Two hardened live syncs returned HTTP 200 partial results with 13 successful
   courses, 4 permanent Canvas limitations, stable identities, no duplicate
   graph identities, and no running sync rows left behind.
+- Phase 5B.3B remote migration verification and live validation passed. The
+  encrypted Canvas connection remains stored. A full baseline run persisted 13
+  changed courses and preserved 4 Page-listing failures; two immediate
+  incremental runs then reported 13 unchanged courses, 0 changed courses, 4
+  failed courses, 0 graph replacements for unchanged courses, stable
+  fingerprints, stable graph timestamps, no duplicate identities, and no
+  running sync rows left behind.
 
 Pending:
 
-- Incremental Canvas synchronization, secondary Canvas resources, content
-  ingestion, grade sync, and background/resumable sync for larger accounts
+- Network-level conditional Canvas fetching, secondary Canvas resources,
+  content ingestion, grade sync, and background/resumable sync for larger
+  accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -259,6 +273,10 @@ tests do not run that opt-in provider smoke.
   synchronous initial full sync. Persistence is atomic per course, not one
   transaction for the entire Canvas account; partial account syncs may commit
   successful courses while preserving failed courses.
+- Phase 5B.3A remains closed, and Phase 5B.3B is complete as deterministic
+  incremental database persistence. Incremental mode still fetches complete
+  Canvas snapshots, but unchanged courses avoid database graph replacement.
+  Network-level conditional fetching remains deferred.
 - No background or scheduled Canvas synchronization exists yet, and no mobile
   synchronization screen exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
@@ -269,8 +287,8 @@ tests do not run that opt-in provider smoke.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
 - Announcements, discussions, planner data, quiz metadata, files/media
-  ingestion, incremental sync, and reviewer generation from Canvas content are
-  deferred.
+  ingestion, endpoint validators, and reviewer generation from Canvas content
+  are deferred.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
@@ -281,6 +299,7 @@ tests do not run that opt-in provider smoke.
 Phase 5A hardening is complete, Phase 5B.1 academic graph foundation is in
 place, Phase 5B.2 initial full academic graph synchronization is live
 validated, and Phase 5B.3A course recovery hardening is live validated. The
-recommended next phase is Phase 5B.3B incremental academic graph
-synchronization foundation; secondary Canvas resources and Canvas OAuth remain
-future phases.
+Phase 5B.3B incremental academic graph synchronization foundation is complete
+and live validated. The recommended next phase is Phase 5B.3C conditional
+Canvas fetching and network-efficiency hardening; secondary Canvas resources
+and Canvas OAuth remain future phases.

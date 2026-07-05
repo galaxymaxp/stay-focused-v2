@@ -82,13 +82,13 @@ export type CanvasAssignmentInsert =
   Database["public"]["Tables"]["canvas_assignments"]["Insert"];
 export type CanvasAssignmentUpdate =
   Database["public"]["Tables"]["canvas_assignments"]["Update"];
-export type CanvasSyncMode = "full";
+export type CanvasSyncMode = "full" | "incremental";
 export type CanvasSyncRunStatus =
   | "running"
   | "succeeded"
   | "partial"
   | "failed";
-export type CanvasSyncCourseResultStatus = "succeeded" | "failed";
+export type CanvasSyncCourseResultStatus = "succeeded" | "unchanged" | "failed";
 export type CanvasSyncCourseFailureOperation =
   | "modules"
   | "module_items"
@@ -132,8 +132,16 @@ export type CanvasSyncCourseResultInsert =
   Database["public"]["Tables"]["canvas_sync_course_results"]["Insert"];
 export type CanvasSyncCourseResultUpdate =
   Database["public"]["Tables"]["canvas_sync_course_results"]["Update"];
+export type CanvasCourseSyncStateRow =
+  Database["public"]["Tables"]["canvas_course_sync_states"]["Row"];
+export type CanvasCourseSyncStateInsert =
+  Database["public"]["Tables"]["canvas_course_sync_states"]["Insert"];
+export type CanvasCourseSyncStateUpdate =
+  Database["public"]["Tables"]["canvas_course_sync_states"]["Update"];
 export type CanvasCourseAcademicSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_academic_snapshot"]["Returns"][number];
+export type CanvasCourseAcademicSnapshotWithSyncStateResult =
+  Database["public"]["Functions"]["replace_canvas_course_academic_snapshot_with_sync_state"]["Returns"][number];
 
 export interface Database {
   public: {
@@ -941,6 +949,89 @@ export interface Database {
           },
         ];
       };
+      canvas_course_sync_states: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          canvas_course_id: string;
+          course_id: string | null;
+          snapshot_fingerprint: string | null;
+          fingerprint_version: string | null;
+          last_checked_at: string;
+          last_changed_at: string | null;
+          last_successful_sync_at: string | null;
+          consecutive_failure_count: number;
+          last_failure_code: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          canvas_course_id: string;
+          course_id?: string | null;
+          snapshot_fingerprint?: string | null;
+          fingerprint_version?: string | null;
+          last_checked_at?: string;
+          last_changed_at?: string | null;
+          last_successful_sync_at?: string | null;
+          consecutive_failure_count?: number;
+          last_failure_code?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          canvas_course_id?: string;
+          course_id?: string | null;
+          snapshot_fingerprint?: string | null;
+          fingerprint_version?: string | null;
+          last_checked_at?: string;
+          last_changed_at?: string | null;
+          last_successful_sync_at?: string | null;
+          consecutive_failure_count?: number;
+          last_failure_code?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_course_sync_states_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_sync_states_course_owner_fkey";
+            columns: [
+              "course_id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_course_sync_states_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -989,6 +1080,32 @@ export interface Database {
         Args: {
           p_user_id: string;
           p_canvas_connection_id: string;
+          p_started_at: string;
+        };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          sync_mode: CanvasSyncMode;
+          status: CanvasSyncRunStatus;
+          started_at: string;
+          completed_at: string | null;
+          heartbeat_at: string;
+          discovered_course_count: number;
+          successful_course_count: number;
+          failed_course_count: number;
+          resource_counts: Json;
+          failure_code: string | null;
+          failure_summary: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+      begin_canvas_sync_run_with_mode: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_mode: CanvasSyncMode;
           p_started_at: string;
         };
         Returns: Array<{
@@ -1076,6 +1193,39 @@ export interface Database {
           updated_at: string;
         }>;
       };
+      record_canvas_course_snapshot_failed: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_canvas_course_id: string;
+          p_checked_at: string;
+          p_failure_code: string;
+        };
+        Returns: Array<{
+          sync_state_id: string;
+          sync_state_last_checked_at: string;
+          sync_state_consecutive_failure_count: number;
+          sync_state_last_failure_code: string | null;
+        }>;
+      };
+      record_canvas_course_snapshot_unchanged: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_canvas_course_id: string;
+          p_checked_at: string;
+          p_snapshot_fingerprint: string;
+          p_fingerprint_version: string;
+        };
+        Returns: Array<{
+          sync_state_id: string;
+          sync_state_last_checked_at: string;
+          sync_state_last_changed_at: string | null;
+          sync_state_consecutive_failure_count: number;
+        }>;
+      };
       replace_canvas_course_academic_snapshot: {
         Args: {
           p_user_id: string;
@@ -1107,6 +1257,45 @@ export interface Database {
           assignments_inserted: number;
           assignments_updated: number;
           assignments_deleted: number;
+        }>;
+      };
+      replace_canvas_course_academic_snapshot_with_sync_state: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_synced_at: string;
+          p_course: Json;
+          p_modules: Json;
+          p_module_items: Json;
+          p_pages: Json;
+          p_assignment_groups: Json;
+          p_assignments: Json;
+          p_snapshot_fingerprint: string;
+          p_fingerprint_version: string;
+        };
+        Returns: Array<{
+          course_inserted: number;
+          course_updated: number;
+          modules_inserted: number;
+          modules_updated: number;
+          modules_deleted: number;
+          module_items_inserted: number;
+          module_items_updated: number;
+          module_items_deleted: number;
+          pages_inserted: number;
+          pages_updated: number;
+          pages_deleted: number;
+          assignment_groups_inserted: number;
+          assignment_groups_updated: number;
+          assignment_groups_deleted: number;
+          assignments_inserted: number;
+          assignments_updated: number;
+          assignments_deleted: number;
+          sync_state_id: string;
+          sync_state_last_checked_at: string;
+          sync_state_last_changed_at: string | null;
+          sync_state_consecutive_failure_count: number;
         }>;
       };
       replace_canvas_connection_with_capabilities: {

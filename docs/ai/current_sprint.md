@@ -1,6 +1,6 @@
 # Current Sprint
 
-Last refreshed: 2026-07-05, Asia/Manila.
+Last refreshed: 2026-07-06, Asia/Manila.
 
 ## Active Objective
 
@@ -20,7 +20,11 @@ composite ownership constraints, RLS, revoked direct client grants, typed Canvas
 retrieval methods, and pagination tests. Phase 5B.2 Initial Full Academic Graph
 Synchronization is complete and live validated as a manual synchronous route
 with atomic per-course persistence, partial-run preservation, bounded
-concurrency, sync-run persistence, and no background worker. There is no
+concurrency, sync-run persistence, and no background worker. Phase 5B.3A
+course recovery hardening remains closed. Phase 5B.3B incremental academic
+graph synchronization foundation is complete and live validated: unchanged
+courses still fetch complete Canvas snapshots, but skip database graph
+replacement when deterministic versioned fingerprints match. There is no
 school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -218,6 +222,42 @@ school-wide Canvas token.
 - Synchronization notifications.
 - Cross-course planning.
 - Deletion of courses missing from the active-course response.
+
+## Completed Phase 5B.3B Scope
+
+- Added `202607050008_add_canvas_incremental_sync_state.sql`.
+- Added `canvas_course_sync_states` with one state row per user, Canvas
+  connection, and Canvas course identity.
+- Added `apps/api/src/lib/canvas-sync-fingerprint.ts` with deterministic
+  canonicalization and version `canvas-course-snapshot-v1`.
+- Added optional `POST /api/canvas/sync` mode parsing for `full` and
+  `incremental`, with `full` as the default and safe request validation.
+- Added changed/unchanged/failed course accounting where
+  `succeeded = changed + unchanged`.
+- Added service-role-only RPCs for mode-aware run creation, changed-course
+  graph replacement plus state advancement, unchanged-course recording, and
+  failed-course state metadata.
+- Updated API orchestration so incremental mode skips graph replacement for
+  unchanged courses and preserves prior graph/fingerprint state on fetch
+  failures.
+- Updated mobile Canvas service parsing and tests without adding UI.
+- Added remote rollback verification through
+  `scripts/phase5b3b-incremental-sync-verification.sql`.
+- Applied and verified the remote migration.
+- Ran one full live baseline and two immediate incremental live validations
+  with aggregate-only output.
+
+## Out Of Scope For Phase 5B.3B
+
+- Endpoint conditional requests.
+- ETag or Last-Modified support.
+- Canvas delta cursors.
+- Reduced Canvas request-count synchronization.
+- Secondary Canvas resources.
+- Scheduled synchronization, background workers, cron jobs, or webhooks.
+- Mobile synchronization screens.
+- Reviewer generation from Canvas.
+- Treating the four Page-listing failures as successful empty-Page courses.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -565,8 +605,67 @@ school-wide Canvas token.
 - The four previously generic failures are confirmed permanent Canvas/resource
   limitations for the required Page-listing operation. No incomplete course
   snapshots were persisted or pruned.
-- Next recommended Canvas phase: Phase 5B.3B incremental academic graph
-  synchronization foundation.
+- Next recommended Canvas phase after Phase 5B.3B: Phase 5B.3C conditional
+  Canvas fetching and network-efficiency hardening.
+
+## Phase 5B.3B Results
+
+- Added `202607050008_add_canvas_incremental_sync_state.sql` and updated
+  `packages/db/src/types.ts`.
+- Added private deterministic course-snapshot fingerprints from the normalized
+  persistence payload. Fingerprints include persisted course graph content and
+  exclude local sync timestamps, internal UUIDs, user IDs, connection IDs,
+  PATs, authorization data, Canvas URLs, and raw errors.
+- Added `begin_canvas_sync_run_with_mode`,
+  `replace_canvas_course_academic_snapshot_with_sync_state`,
+  `record_canvas_course_snapshot_unchanged`, and
+  `record_canvas_course_snapshot_failed` behind the service-role boundary.
+- Remote migration history includes `202607050008`.
+- Remote rollback SQL verification passed through
+  `scripts/phase5b3b-incremental-sync-verification.sql`.
+- Automated verification passed: Canvas typecheck/build/tests 33/33, DB
+  typecheck, API typecheck/build/tests 176/176, mobile typecheck/tests 79/79,
+  root typecheck 7/7 with 4 cached and 3 fresh, root build 7/7 with 4 cached
+  and 3 fresh, workspace tests API 176/176, mobile 79/79, Canvas 33/33, OCR
+  14/14, and `git diff --check` with line-ending warnings only.
+- Full live baseline:
+  - HTTP 200
+  - Status `partial`
+  - Duration 50.725 seconds
+  - 17 courses discovered
+  - 13 courses changed/succeeded
+  - 0 courses unchanged
+  - 4 courses failed with sanitized `canvas_course_pages_failed`
+  - 13 graph replacements
+  - 0 running sync rows after completion
+- First incremental live sync:
+  - HTTP 200
+  - Status `partial`
+  - Duration 47.502 seconds
+  - 17 courses discovered
+  - 13 courses unchanged
+  - 0 courses changed
+  - 4 courses failed with sanitized `canvas_course_pages_failed`
+  - 0 graph replacements for unchanged courses
+  - State checks advanced
+  - Failed fingerprints preserved
+  - Unchanged graph timestamps stable
+  - 0 running sync rows after completion
+- Second incremental live sync:
+  - HTTP 200
+  - Status `partial`
+  - Duration 46.750 seconds
+  - 13 courses unchanged
+  - 0 courses changed
+  - 4 courses failed with sanitized `canvas_course_pages_failed`
+  - Deterministic fingerprints confirmed
+  - Duplicate identities: 0
+  - Internal identities stable
+  - Failed graphs preserved
+  - 0 running sync rows after completion
+- Incremental mode reduced database graph replacement work for unchanged
+  courses but did not reduce Canvas request volume. Complete snapshots are
+  still fetched before fingerprint comparison.
 
 ## Phase 3C Completion Sequence
 
@@ -604,7 +703,8 @@ school-wide Canvas token.
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
 academic graph synchronization is complete and live validated. Phase 5B.3A
-course recovery hardening is complete and live validated. The recommended next
-phase is Phase 5B.3B incremental academic graph synchronization foundation.
-Secondary Canvas resources and the deferred header/footer cleanup task remain
-separate.
+course recovery hardening is complete and live validated. Phase 5B.3B
+incremental academic graph synchronization foundation is complete and live
+validated. The recommended next phase is Phase 5B.3C conditional Canvas
+fetching and network-efficiency hardening. Secondary Canvas resources and the
+deferred header/footer cleanup task remain separate.

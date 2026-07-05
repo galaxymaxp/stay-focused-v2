@@ -275,6 +275,70 @@ describe("POST /api/canvas/sync", () => {
     expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).toBeNull();
   });
 
+  it("defaults to full mode when the request has no body", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await syncRoute.POST(createRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      mode: "full",
+      courses: {
+        discovered: 1,
+        succeeded: 1,
+        changed: 1,
+        unchanged: 0,
+        failed: 0,
+      },
+    });
+  });
+
+  it("validates sync request JSON and mode without accepting ownership", async () => {
+    const malformedDb = createSyncDb({ connectionRows: [connectionRow()] });
+    mocks.createCanvasServiceClient.mockReturnValue(malformedDb);
+
+    const malformed = await syncRoute.POST(
+      createRequest({ rawBody: "{not json" }),
+    );
+    expect(malformed.status).toBe(400);
+    await expectError(malformed, "invalid_json");
+
+    const oversized = await syncRoute.POST(
+      createRequest({ rawBody: "x".repeat(1025) }),
+    );
+    expect(oversized.status).toBe(413);
+    await expectError(oversized, "payload_too_large");
+
+    const unsupported = await syncRoute.POST(
+      createRequest({ body: { mode: "delta" } }),
+    );
+    expect(unsupported.status).toBe(400);
+    await expectError(unsupported, "invalid_request");
+
+    const db = createSyncDb({
+      connectionRows: [connectionRow({ user_id: USER_A, id: CONNECTION_A })],
+    });
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+    mocks.verifyBearerToken.mockResolvedValue({ id: USER_B });
+
+    const ignoredOwnership = await syncRoute.POST(
+      createRequest({
+        body: {
+          mode: "incremental",
+          user_id: USER_A,
+          canvas_connection_id: CONNECTION_A,
+        },
+      }),
+    );
+
+    expect(ignoredOwnership.status).toBe(404);
+    await expectError(ignoredOwnership, "canvas_connection_missing");
+  });
+
   it("rejects an overlapping non-stale sync run", async () => {
     const db = createSyncDb({
       connectionRows: [connectionRow()],
@@ -680,12 +744,170 @@ describe("POST /api/canvas/sync", () => {
     expect(after?.moduleItems).toHaveLength(1);
     expect(db.duplicateIdentityCount(USER_A, CONNECTION_A, "course-1")).toBe(0);
   });
+
+  it("records incremental unchanged without replacing graph rows", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const full = await syncRoute.POST(createRequest());
+    const graphBefore = db.graphFor(USER_A, CONNECTION_A, "course-1");
+    const stateBefore = db.stateFor(USER_A, CONNECTION_A, "course-1");
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    const incremental = await syncRoute.POST(
+      createRequest({ body: { mode: "incremental" } }),
+    );
+    const body = await incremental.json();
+    const graphAfter = db.graphFor(USER_A, CONNECTION_A, "course-1");
+    const stateAfter = db.stateFor(USER_A, CONNECTION_A, "course-1");
+
+    expect(full.status).toBe(200);
+    expect(incremental.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      mode: "incremental",
+      status: "succeeded",
+      courses: {
+        discovered: 1,
+        succeeded: 1,
+        changed: 0,
+        unchanged: 1,
+        failed: 0,
+      },
+    });
+    expect(db.replacementCallCount()).toBe(1);
+    expect(graphAfter?.firstSyncedAt).toBe(graphBefore?.firstSyncedAt);
+    expect(graphAfter?.lastSyncedAt).toBe(graphBefore?.lastSyncedAt);
+    expect(stateAfter?.snapshotFingerprint).toBe(stateBefore?.snapshotFingerprint);
+    expect(stateAfter?.lastSuccessfulSyncAt).toBe(
+      stateBefore?.lastSuccessfulSyncAt,
+    );
+    expect(stateAfter?.lastCheckedAt).not.toBe(stateBefore?.lastCheckedAt);
+    expect(stateAfter?.consecutiveFailureCount).toBe(0);
+    expect(db.courseResults().at(-1)).toMatchObject({ status: "unchanged" });
+  });
+
+  it("persists incremental changed snapshots and fingerprint-version mismatches", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    await syncRoute.POST(createRequest());
+    const firstState = db.stateFor(USER_A, CONNECTION_A, "course-1");
+
+    setCanvasFixture(
+      [course("course-1")],
+      [
+        courseFixture("course-1", {
+          modules: [module("module-1", { name: "Changed module title" })],
+        }),
+      ],
+    );
+    const changed = await syncRoute.POST(
+      createRequest({ body: { mode: "incremental" } }),
+    );
+    const changedBody = await changed.json();
+    const secondState = db.stateFor(USER_A, CONNECTION_A, "course-1");
+
+    db.setStateVersion(
+      USER_A,
+      CONNECTION_A,
+      "course-1",
+      "canvas-course-snapshot-older",
+    );
+    const versionMismatch = await syncRoute.POST(
+      createRequest({ body: { mode: "incremental" } }),
+    );
+    const versionBody = await versionMismatch.json();
+
+    expect(changed.status).toBe(200);
+    expect(changedBody).toMatchObject({
+      courses: { changed: 1, unchanged: 0, failed: 0 },
+    });
+    expect(secondState?.snapshotFingerprint).not.toBe(
+      firstState?.snapshotFingerprint,
+    );
+    expect(versionMismatch.status).toBe(200);
+    expect(versionBody).toMatchObject({
+      courses: { changed: 1, unchanged: 0, failed: 0 },
+    });
+    expect(db.replacementCallCount()).toBe(3);
+  });
+
+  it("preserves fingerprint and graph when an incremental fetch fails", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    await syncRoute.POST(createRequest());
+    const graphBefore = db.graphFor(USER_A, CONNECTION_A, "course-1");
+    const stateBefore = db.stateFor(USER_A, CONNECTION_A, "course-1");
+    mocks.canvas.errors.set(
+      "pages:course-1",
+      new CanvasClientError("canvas_not_found", "Private Page list missing", {
+        status: 404,
+      }),
+    );
+
+    const failed = await syncRoute.POST(
+      createRequest({ body: { mode: "incremental" } }),
+    );
+    const body = await failed.json();
+    const graphAfter = db.graphFor(USER_A, CONNECTION_A, "course-1");
+    const stateAfter = db.stateFor(USER_A, CONNECTION_A, "course-1");
+
+    expect(failed.status).toBe(502);
+    expect(body).toMatchObject({
+      ok: false,
+      sync: {
+        mode: "incremental",
+        status: "failed",
+        courses: { changed: 0, unchanged: 0, failed: 1 },
+        failures: [{ code: "canvas_course_pages_failed", count: 1 }],
+      },
+    });
+    expect(db.replacementCallCount()).toBe(1);
+    expect(graphAfter).toEqual(graphBefore);
+    expect(stateAfter?.snapshotFingerprint).toBe(stateBefore?.snapshotFingerprint);
+    expect(stateAfter?.lastSuccessfulSyncAt).toBe(
+      stateBefore?.lastSuccessfulSyncAt,
+    );
+    expect(stateAfter?.consecutiveFailureCount).toBe(1);
+    expect(stateAfter?.lastFailureCode).toBe("canvas_course_pages_failed");
+    expect(db.courseResults().at(-1)).toMatchObject({
+      failureCategory: "resource_not_found",
+      retryable: false,
+      status: "failed",
+    });
+  });
+
+  it("rolls back graph replacement when state persistence fails", async () => {
+    const db = createSyncDb({
+      connectionRows: [connectionRow()],
+      stateWriteFailure: true,
+    });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await syncRoute.POST(createRequest());
+
+    expect(response.status).toBe(500);
+    expect(db.replacementCallCount()).toBe(1);
+    expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).toBeNull();
+    expect(db.stateFor(USER_A, CONNECTION_A, "course-1")).toMatchObject({
+      snapshotFingerprint: null,
+      consecutiveFailureCount: 1,
+      lastFailureCode: "canvas_course_persistence_failed",
+    });
+  });
 });
 
 function createRequest(
   options: {
     readonly auth?: string | null;
     readonly body?: unknown;
+    readonly rawBody?: string;
+    readonly contentLength?: string;
   } = {},
 ): Request {
   const headers = new Headers();
@@ -693,9 +915,13 @@ function createRequest(
     headers.set("authorization", options.auth ?? "Bearer stay-focused-token");
   }
   const body =
-    options.body === undefined ? undefined : JSON.stringify(options.body);
+    options.rawBody ??
+    (options.body === undefined ? undefined : JSON.stringify(options.body));
   if (body) {
     headers.set("content-type", "application/json");
+  }
+  if (options.contentLength) {
+    headers.set("content-length", options.contentLength);
   }
   return new Request("http://localhost/api/canvas/sync", {
     method: "POST",
@@ -731,6 +957,7 @@ function createSyncDb(options: {
   readonly activeRun?: boolean;
   readonly staleRun?: boolean;
   readonly rpcFailure?: boolean;
+  readonly stateWriteFailure?: boolean;
 } = {}) {
   const connections = new Map<string, Record<string, unknown>>();
   for (const row of options.connectionRows ?? [connectionRow()]) {
@@ -738,8 +965,10 @@ function createSyncDb(options: {
   }
 
   const graph = new Map<string, StoredGraph>();
+  const states = new Map<string, StoredSyncState>();
   const runs: StoredRun[] = [];
   const courseResults: StoredCourseResult[] = [];
+  let replacementCallCount = 0;
   let idSequence = 0;
   let syncSequence = 0;
 
@@ -748,6 +977,7 @@ function createSyncDb(options: {
       id: nextId("run"),
       userId: USER_A,
       connectionId: CONNECTION_A,
+      mode: "full",
       status: "running",
       heartbeatAt: options.staleRun
         ? "2026-07-05T00:00:00.000Z"
@@ -759,6 +989,24 @@ function createSyncDb(options: {
   const api = {
     courseResults() {
       return [...courseResults];
+    },
+    replacementCallCount() {
+      return replacementCallCount;
+    },
+    stateFor(userId: string, connectionId: string, courseId: string) {
+      return states.get(graphKey(userId, connectionId, courseId)) ?? null;
+    },
+    setStateVersion(
+      userId: string,
+      connectionId: string,
+      courseId: string,
+      fingerprintVersion: string,
+    ) {
+      const key = graphKey(userId, connectionId, courseId);
+      const state = states.get(key);
+      if (state) {
+        states.set(key, { ...state, fingerprintVersion });
+      }
     },
     duplicateIdentityCount(userId: string, connectionId: string, courseId: string) {
       const stored = graph.get(graphKey(userId, connectionId, courseId));
@@ -814,11 +1062,23 @@ function createSyncDb(options: {
     },
     rpc: vi.fn((name: string, payload: Record<string, unknown>) => ({
       single: vi.fn(async () => {
-        if (name === "begin_canvas_sync_run") {
+        if (
+          name === "begin_canvas_sync_run" ||
+          name === "begin_canvas_sync_run_with_mode"
+        ) {
           return beginRun(payload);
         }
         if (name === "replace_canvas_course_academic_snapshot") {
           return replaceSnapshot(payload, options.rpcFailure === true);
+        }
+        if (name === "replace_canvas_course_academic_snapshot_with_sync_state") {
+          return replaceSnapshotWithState(payload);
+        }
+        if (name === "record_canvas_course_snapshot_unchanged") {
+          return recordUnchanged(payload);
+        }
+        if (name === "record_canvas_course_snapshot_failed") {
+          return recordFailed(payload);
         }
         if (name === "record_canvas_sync_course_result") {
           return recordCourseResult(payload);
@@ -833,18 +1093,42 @@ function createSyncDb(options: {
       },
     })),
     from: vi.fn((table: string) => {
-      if (table !== "canvas_connections") {
+      if (table !== "canvas_connections" && table !== "canvas_course_sync_states") {
         throw new Error(`Unexpected table ${table}`);
       }
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn((_column: string, userId: string) => ({
-            maybeSingle: vi.fn(async () => ({
+      const filters = new Map<string, string>();
+      const query = {
+        eq: vi.fn((column: string, value: string) => {
+          filters.set(column, value);
+          return query;
+        }),
+        maybeSingle: vi.fn(async () => {
+          if (table === "canvas_connections") {
+            const userId = filters.get("user_id") ?? "";
+            return {
               data: connections.get(userId) ?? null,
               error: null,
-            })),
-          })),
-        })),
+            };
+          }
+
+          const userId = filters.get("user_id") ?? "";
+          const connectionId = filters.get("canvas_connection_id") ?? "";
+          const courseId = filters.get("canvas_course_id") ?? "";
+          const state = states.get(graphKey(userId, connectionId, courseId));
+          return {
+            data: state
+              ? {
+                  snapshot_fingerprint: state.snapshotFingerprint,
+                  fingerprint_version: state.fingerprintVersion,
+                  last_successful_sync_at: state.lastSuccessfulSyncAt,
+                }
+              : null,
+            error: null,
+          };
+        }),
+      };
+      return {
+        select: vi.fn(() => query),
       };
     }),
   };
@@ -873,6 +1157,7 @@ function createSyncDb(options: {
       id: nextId("run"),
       userId,
       connectionId,
+      mode: typeof payload.p_sync_mode === "string" ? payload.p_sync_mode : "full",
       status: "running",
       heartbeatAt: String(payload.p_started_at),
       recovered: false,
@@ -940,6 +1225,7 @@ function createSyncDb(options: {
     payload: Record<string, unknown>,
     shouldFail: boolean,
   ) {
+    replacementCallCount += 1;
     if (shouldFail) {
       return { data: null, error: { message: "rpc failed" } };
     }
@@ -1018,6 +1304,122 @@ function createSyncDb(options: {
     };
   }
 
+  function replaceSnapshotWithState(payload: Record<string, unknown>) {
+    const userId = String(payload.p_user_id);
+    const connectionId = String(payload.p_canvas_connection_id);
+    const coursePayload = asRecord(payload.p_course);
+    const courseId = String(coursePayload.canvas_course_id);
+    const key = graphKey(userId, connectionId, courseId);
+    const previousGraph = graph.get(key);
+    const result = replaceSnapshot(payload, options.rpcFailure === true);
+    if (result.error || !result.data) {
+      return result;
+    }
+    if (options.stateWriteFailure === true) {
+      if (previousGraph) {
+        graph.set(key, previousGraph);
+      } else {
+        graph.delete(key);
+      }
+      return { data: null, error: { message: "state failed" } };
+    }
+
+    const stored = graph.get(key);
+    const checkedAt = String(payload.p_synced_at);
+    states.set(key, {
+      canvasCourseId: courseId,
+      courseInternalId: stored?.courseInternalId ?? null,
+      snapshotFingerprint: String(payload.p_snapshot_fingerprint),
+      fingerprintVersion: String(payload.p_fingerprint_version),
+      lastCheckedAt: checkedAt,
+      lastChangedAt: checkedAt,
+      lastSuccessfulSyncAt: checkedAt,
+      consecutiveFailureCount: 0,
+      lastFailureCode: null,
+    });
+
+    return {
+      data: {
+        ...asRecord(result.data),
+        sync_state_id: nextId("state"),
+        sync_state_last_checked_at: checkedAt,
+        sync_state_last_changed_at: checkedAt,
+        sync_state_consecutive_failure_count: 0,
+      },
+      error: null,
+    };
+  }
+
+  function recordUnchanged(payload: Record<string, unknown>) {
+    if (options.stateWriteFailure === true) {
+      return { data: null, error: { message: "state failed" } };
+    }
+
+    const userId = String(payload.p_user_id);
+    const connectionId = String(payload.p_canvas_connection_id);
+    const courseId = String(payload.p_canvas_course_id);
+    const key = graphKey(userId, connectionId, courseId);
+    const state = states.get(key);
+    if (
+      !state ||
+      state.snapshotFingerprint !== String(payload.p_snapshot_fingerprint) ||
+      state.fingerprintVersion !== String(payload.p_fingerprint_version)
+    ) {
+      return { data: null, error: { message: "state missing" } };
+    }
+
+    const checkedAt = String(payload.p_checked_at);
+    const nextState: StoredSyncState = {
+      ...state,
+      lastCheckedAt: checkedAt,
+      consecutiveFailureCount: 0,
+      lastFailureCode: null,
+    };
+    states.set(key, nextState);
+    return {
+      data: {
+        sync_state_id: nextId("state"),
+        sync_state_last_checked_at: checkedAt,
+        sync_state_last_changed_at: nextState.lastChangedAt,
+        sync_state_consecutive_failure_count: 0,
+      },
+      error: null,
+    };
+  }
+
+  function recordFailed(payload: Record<string, unknown>) {
+    const userId = String(payload.p_user_id);
+    const connectionId = String(payload.p_canvas_connection_id);
+    const courseId = String(payload.p_canvas_course_id);
+    const key = graphKey(userId, connectionId, courseId);
+    const existing = states.get(key);
+    const checkedAt = String(payload.p_checked_at);
+    const nextState: StoredSyncState = {
+      canvasCourseId: courseId,
+      courseInternalId:
+        existing?.courseInternalId ??
+        graph.get(key)?.courseInternalId ??
+        null,
+      snapshotFingerprint: existing?.snapshotFingerprint ?? null,
+      fingerprintVersion: existing?.fingerprintVersion ?? null,
+      lastCheckedAt: checkedAt,
+      lastChangedAt: existing?.lastChangedAt ?? null,
+      lastSuccessfulSyncAt: existing?.lastSuccessfulSyncAt ?? null,
+      consecutiveFailureCount: (existing?.consecutiveFailureCount ?? 0) + 1,
+      lastFailureCode: String(payload.p_failure_code),
+    };
+    states.set(key, nextState);
+    return {
+      data: {
+        sync_state_id: nextId("state"),
+        sync_state_last_checked_at: checkedAt,
+        sync_state_consecutive_failure_count: nextState.consecutiveFailureCount,
+        sync_state_last_failure_code: nextState.lastFailureCode,
+      },
+      error: null,
+    };
+  }
+
   function nextId(prefix: string): string {
     idSequence += 1;
     return `${prefix}-${idSequence}`;
@@ -1031,7 +1433,7 @@ function runRow(run: StoredRun) {
     id: run.id,
     user_id: run.userId,
     canvas_connection_id: run.connectionId,
-    sync_mode: "full",
+    sync_mode: run.mode,
     status: run.status,
     started_at: run.heartbeatAt,
     completed_at: run.status === "running" ? null : run.heartbeatAt,
@@ -1104,7 +1506,10 @@ function courseFixture(
   };
 }
 
-function module(id: string): CanvasModuleFixture {
+function module(
+  id: string,
+  overrides: Partial<CanvasModuleFixture> = {},
+): CanvasModuleFixture {
   return {
     id,
     name: `Fictional Module ${id}`,
@@ -1115,6 +1520,7 @@ function module(id: string): CanvasModuleFixture {
     published: true,
     prerequisiteModuleIds: [],
     state: "active",
+    ...overrides,
   };
 }
 
@@ -1251,9 +1657,22 @@ interface StoredRun {
   id: string;
   userId: string;
   connectionId: string;
+  mode: string;
   status: string;
   heartbeatAt: string;
   recovered: boolean;
+}
+
+interface StoredSyncState {
+  readonly canvasCourseId: string;
+  readonly courseInternalId: string | null;
+  readonly snapshotFingerprint: string | null;
+  readonly fingerprintVersion: string | null;
+  readonly lastCheckedAt: string;
+  readonly lastChangedAt: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+  readonly consecutiveFailureCount: number;
+  readonly lastFailureCode: string | null;
 }
 
 interface StoredCourseResult {

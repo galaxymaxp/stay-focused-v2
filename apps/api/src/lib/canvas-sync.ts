@@ -10,13 +10,15 @@ import type {
 import { CanvasClientError } from "@stay-focused/canvas";
 import { createHmac } from "node:crypto";
 import type {
-  CanvasCourseAcademicSnapshotResult,
+  CanvasCourseAcademicSnapshotWithSyncStateResult,
   CanvasConnectionRow,
+  CanvasCourseSyncStateRow,
   CanvasSyncRunRow,
   Database,
 } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { fingerprintCanvasCourseSnapshot } from "@/lib/canvas-sync-fingerprint";
 import {
   CONNECTION_SECRET_COLUMNS,
   createCanvasClient,
@@ -43,8 +45,9 @@ const DEFAULT_RETRY_BASE_DELAY_MS = 250;
 const DEFAULT_RETRY_DELAY_CAP_MS = 2_000;
 
 export type CanvasAcademicSyncStatus = "succeeded" | "partial" | "failed";
+export type CanvasAcademicSyncMode = "full" | "incremental";
 
-type CanvasCourseResultStatus = "succeeded" | "failed";
+type CanvasCourseResultStatus = "succeeded" | "unchanged" | "failed";
 type CanvasCourseFailedOperation =
   | "modules"
   | "module_items"
@@ -87,9 +90,12 @@ interface CanvasSyncRetryPolicyInput {
 
 export interface CanvasAcademicSyncSummary {
   readonly status: CanvasAcademicSyncStatus;
+  readonly mode: CanvasAcademicSyncMode;
   readonly courses: {
     readonly discovered: number;
     readonly succeeded: number;
+    readonly changed: number;
+    readonly unchanged: number;
     readonly failed: number;
   };
   readonly resources: CanvasSyncResourceCounts;
@@ -152,9 +158,12 @@ interface CourseResultDiagnostics {
 
 interface CourseSyncSuccess {
   readonly ok: true;
+  readonly changed: boolean;
   readonly counts: CanvasSyncResourceCounts;
   readonly diagnostics: CourseResultDiagnostics;
-  readonly persistence: CanvasCourseAcademicSnapshotResult;
+  readonly persistence:
+    | CanvasCourseAcademicSnapshotWithSyncStateResult
+    | null;
 }
 
 interface CourseSyncFailure {
@@ -222,10 +231,12 @@ export function getCanvasSyncConcurrencyLimits(): {
 
 export async function syncCanvasAcademicGraph({
   client,
+  mode = "full",
   retryPolicy: retryPolicyInput,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
+  readonly mode?: CanvasAcademicSyncMode;
   readonly retryPolicy?: CanvasSyncRetryPolicyInput;
   readonly userId: string;
 }): Promise<CanvasAcademicSyncResult> {
@@ -253,6 +264,7 @@ export async function syncCanvasAcademicGraph({
   const run = await beginSyncRun({
     client,
     connectionId: connectionRow.id,
+    mode,
     startedAt,
     userId,
   });
@@ -273,9 +285,11 @@ export async function syncCanvasAcademicGraph({
       runId: run.row.id,
       status: "failed",
       totals: {
+        changed: 0,
         discovered: 0,
         failed: 0,
         succeeded: 0,
+        unchanged: 0,
       },
       userId,
     });
@@ -287,8 +301,15 @@ export async function syncCanvasAcademicGraph({
       summary: createSummary({
         failures: [{ code: "canvas_connection_corrupt", count: 1 }],
         resourceCounts: emptyResourceCounts(),
+        mode,
         status: "failed",
-        totals: { discovered: 0, failed: 0, succeeded: 0 },
+        totals: {
+          changed: 0,
+          discovered: 0,
+          failed: 0,
+          succeeded: 0,
+          unchanged: 0,
+        },
       }),
     };
   }
@@ -301,7 +322,13 @@ export async function syncCanvasAcademicGraph({
     const mapped = mapCanvasClientError(error);
     const failureCode = syncFailureCodeForCanvasError(error);
     const resourceCounts = emptyResourceCounts();
-    const totals = { discovered: 0, failed: 0, succeeded: 0 };
+    const totals = {
+      changed: 0,
+      discovered: 0,
+      failed: 0,
+      succeeded: 0,
+      unchanged: 0,
+    };
     await finishSyncRun({
       client,
       connectionId: connectionRow.id,
@@ -320,6 +347,7 @@ export async function syncCanvasAcademicGraph({
       message: mapped.message,
       summary: createSummary({
         failures: [{ code: failureCode, count: 1 }],
+        mode,
         resourceCounts,
         status: "failed",
         totals,
@@ -328,9 +356,11 @@ export async function syncCanvasAcademicGraph({
   }
 
   const totals = {
+    changed: 0,
     discovered: courses.length,
     failed: 0,
     succeeded: 0,
+    unchanged: 0,
   };
   let resourceCounts = emptyResourceCounts();
   const failures = new Map<CanvasSyncFailureCode, number>();
@@ -350,13 +380,19 @@ export async function syncCanvasAcademicGraph({
         connection: connectionRow,
         course,
         limiters,
+        mode,
         retryPolicy,
         runId: run.row.id,
         userId,
       });
 
       if (result.ok) {
-        totals.succeeded += 1;
+        if (result.changed) {
+          totals.changed += 1;
+        } else {
+          totals.unchanged += 1;
+        }
+        totals.succeeded = totals.changed + totals.unchanged;
         resourceCounts = addResourceCounts(resourceCounts, result.counts);
       } else {
         totals.failed += 1;
@@ -386,6 +422,7 @@ export async function syncCanvasAcademicGraph({
   const failureSummaries = summarizeFailures(failures);
   const summary = createSummary({
     failures: failureSummaries,
+    mode,
     resourceCounts,
     status,
     totals,
@@ -434,6 +471,7 @@ async function syncOneCourse({
   connection,
   course,
   limiters,
+  mode,
   retryPolicy,
   runId,
   userId,
@@ -443,6 +481,7 @@ async function syncOneCourse({
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourse;
   readonly limiters: CanvasSyncLimiters;
+  readonly mode: CanvasAcademicSyncMode;
   readonly retryPolicy: CanvasSyncRetryPolicy;
   readonly runId: string;
   readonly userId: string;
@@ -477,6 +516,15 @@ async function syncOneCourse({
       runId,
       userId,
     });
+    await recordCourseSnapshotFailed({
+      canvasCourseId: course.id,
+      checkedAt: new Date().toISOString(),
+      client,
+      connectionId: connection.id,
+      failureCode: diagnostics.failureCode ?? "canvas_course_fetch_failed",
+      runId,
+      userId,
+    });
     return {
       ok: false,
       code: diagnostics.failureCode ?? "canvas_course_fetch_failed",
@@ -506,6 +554,15 @@ async function syncOneCourse({
       runId,
       userId,
     });
+    await recordCourseSnapshotFailed({
+      canvasCourseId: course.id,
+      checkedAt: new Date().toISOString(),
+      client,
+      connectionId: connection.id,
+      failureCode: "canvas_course_response_invalid",
+      runId,
+      userId,
+    });
     return {
       ok: false,
       code: "canvas_course_response_invalid",
@@ -513,9 +570,134 @@ async function syncOneCourse({
     };
   }
 
-  const persistence = await persistCourseSnapshot({
+  const snapshotFingerprint = fingerprintCanvasCourseSnapshot(payload);
+  if (mode === "incremental") {
+    const state = await readCourseSyncState({
+      canvasCourseId: payload.course.canvas_course_id,
+      client,
+      connectionId: connection.id,
+      userId,
+    });
+    if (!state.ok) {
+      const diagnostics: CourseResultDiagnostics = {
+        courseFingerprint,
+        durationMs: elapsedMs(startedAt),
+        failedOperation: "persistence",
+        failureCategory: "persistence_failure",
+        failureCode: "canvas_course_persistence_failed",
+        httpStatusClass: "none",
+        retryable: false,
+        retryCount: snapshotResult.retryCount,
+        status: "failed",
+      };
+      await recordCourseResult({
+        client,
+        connectionId: connection.id,
+        diagnostics,
+        runId,
+        userId,
+      });
+      await recordCourseSnapshotFailed({
+        canvasCourseId: payload.course.canvas_course_id,
+        checkedAt: new Date().toISOString(),
+        client,
+        connectionId: connection.id,
+        failureCode: "canvas_course_persistence_failed",
+        runId,
+        userId,
+      });
+      return {
+        ok: false,
+        code: "canvas_course_persistence_failed",
+        diagnostics,
+      };
+    }
+
+    if (
+      state.row?.snapshot_fingerprint === snapshotFingerprint.value &&
+      state.row.fingerprint_version === snapshotFingerprint.version
+    ) {
+      const checkedAt = new Date().toISOString();
+      const unchanged = await recordCourseSnapshotUnchanged({
+        canvasCourseId: payload.course.canvas_course_id,
+        checkedAt,
+        client,
+        connectionId: connection.id,
+        fingerprint: snapshotFingerprint.value,
+        fingerprintVersion: snapshotFingerprint.version,
+        runId,
+        userId,
+      });
+
+      if (!unchanged.ok) {
+        const diagnostics: CourseResultDiagnostics = {
+          courseFingerprint,
+          durationMs: elapsedMs(startedAt),
+          failedOperation: "persistence",
+          failureCategory: "persistence_failure",
+          failureCode: "canvas_course_persistence_failed",
+          httpStatusClass: "none",
+          retryable: false,
+          retryCount: snapshotResult.retryCount,
+          status: "failed",
+        };
+        await recordCourseResult({
+          client,
+          connectionId: connection.id,
+          diagnostics,
+          runId,
+          userId,
+        });
+        await recordCourseSnapshotFailed({
+          canvasCourseId: payload.course.canvas_course_id,
+          checkedAt,
+          client,
+          connectionId: connection.id,
+          failureCode: "canvas_course_persistence_failed",
+          runId,
+          userId,
+        });
+        return {
+          ok: false,
+          code: "canvas_course_persistence_failed",
+          diagnostics,
+        };
+      }
+
+      const diagnostics: CourseResultDiagnostics = {
+        courseFingerprint,
+        durationMs: elapsedMs(startedAt),
+        failedOperation: null,
+        failureCategory: null,
+        failureCode: null,
+        httpStatusClass: null,
+        retryable: null,
+        retryCount: snapshotResult.retryCount,
+        status: "unchanged",
+      };
+      await recordCourseResult({
+        client,
+        connectionId: connection.id,
+        diagnostics,
+        runId,
+        userId,
+      });
+
+      return {
+        ok: true,
+        changed: false,
+        counts: resourceCountsForSnapshot(payload),
+        diagnostics,
+        persistence: null,
+      };
+    }
+  }
+
+  const persistence = await persistCourseSnapshotWithSyncState({
     client,
     connectionId: connection.id,
+    fingerprint: snapshotFingerprint.value,
+    fingerprintVersion: snapshotFingerprint.version,
     payload,
     runId,
     syncedAt: new Date().toISOString(),
@@ -537,6 +719,15 @@ async function syncOneCourse({
       client,
       connectionId: connection.id,
       diagnostics,
+      runId,
+      userId,
+    });
+    await recordCourseSnapshotFailed({
+      canvasCourseId: payload.course.canvas_course_id,
+      checkedAt: new Date().toISOString(),
+      client,
+      connectionId: connection.id,
+      failureCode: "canvas_course_persistence_failed",
       runId,
       userId,
     });
@@ -568,6 +759,7 @@ async function syncOneCourse({
 
   return {
     ok: true,
+    changed: true,
     counts: resourceCountsForSnapshot(payload),
     diagnostics,
     persistence: persistence.row,
@@ -935,9 +1127,53 @@ function createCourseFailureDiagnostics({
   };
 }
 
-async function persistCourseSnapshot({
+async function readCourseSyncState({
+  canvasCourseId,
   client,
   connectionId,
+  userId,
+}: {
+  readonly canvasCourseId: string;
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly userId: string;
+}): Promise<
+  | {
+      readonly ok: true;
+      readonly row: Pick<
+        CanvasCourseSyncStateRow,
+        | "snapshot_fingerprint"
+        | "fingerprint_version"
+        | "last_successful_sync_at"
+      > | null;
+    }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_course_sync_states")
+    .select("snapshot_fingerprint,fingerprint_version,last_successful_sync_at")
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("canvas_course_id", canvasCourseId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false };
+  }
+  return {
+    ok: true,
+    row: data as Pick<
+      CanvasCourseSyncStateRow,
+      "snapshot_fingerprint" | "fingerprint_version" | "last_successful_sync_at"
+    > | null,
+  };
+}
+
+async function persistCourseSnapshotWithSyncState({
+  client,
+  connectionId,
+  fingerprint,
+  fingerprintVersion,
   payload,
   runId,
   syncedAt,
@@ -945,23 +1181,30 @@ async function persistCourseSnapshot({
 }: {
   readonly client: SupabaseClient<Database>;
   readonly connectionId: string;
+  readonly fingerprint: string;
+  readonly fingerprintVersion: string;
   readonly payload: CanvasCourseSnapshotPayload;
   readonly runId: string;
   readonly syncedAt: string;
   readonly userId: string;
 }): Promise<
-  | { readonly ok: true; readonly row: CanvasCourseAcademicSnapshotResult }
+  | {
+      readonly ok: true;
+      readonly row: CanvasCourseAcademicSnapshotWithSyncStateResult;
+    }
   | { readonly ok: false }
 > {
   const { data, error } = await client
-    .rpc("replace_canvas_course_academic_snapshot", {
+    .rpc("replace_canvas_course_academic_snapshot_with_sync_state", {
       p_assignments: payload.assignments,
       p_assignment_groups: payload.assignmentGroups,
       p_canvas_connection_id: connectionId,
       p_course: payload.course,
+      p_fingerprint_version: fingerprintVersion,
       p_module_items: payload.moduleItems,
       p_modules: payload.modules,
       p_pages: payload.pages,
+      p_snapshot_fingerprint: fingerprint,
       p_sync_run_id: runId,
       p_synced_at: syncedAt,
       p_user_id: userId,
@@ -972,6 +1215,76 @@ async function persistCourseSnapshot({
     return { ok: false };
   }
   return { ok: true, row: data };
+}
+
+async function recordCourseSnapshotUnchanged({
+  canvasCourseId,
+  checkedAt,
+  client,
+  connectionId,
+  fingerprint,
+  fingerprintVersion,
+  runId,
+  userId,
+}: {
+  readonly canvasCourseId: string;
+  readonly checkedAt: string;
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly fingerprint: string;
+  readonly fingerprintVersion: string;
+  readonly runId: string;
+  readonly userId: string;
+}): Promise<{ readonly ok: true } | { readonly ok: false }> {
+  const { data, error } = await client
+    .rpc("record_canvas_course_snapshot_unchanged", {
+      p_canvas_connection_id: connectionId,
+      p_canvas_course_id: canvasCourseId,
+      p_checked_at: checkedAt,
+      p_fingerprint_version: fingerprintVersion,
+      p_snapshot_fingerprint: fingerprint,
+      p_sync_run_id: runId,
+      p_user_id: userId,
+    })
+    .single();
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true };
+}
+
+async function recordCourseSnapshotFailed({
+  canvasCourseId,
+  checkedAt,
+  client,
+  connectionId,
+  failureCode,
+  runId,
+  userId,
+}: {
+  readonly canvasCourseId: string;
+  readonly checkedAt: string;
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly failureCode: CanvasSyncFailureCode;
+  readonly runId: string;
+  readonly userId: string;
+}): Promise<void> {
+  try {
+    await client
+      .rpc("record_canvas_course_snapshot_failed", {
+        p_canvas_connection_id: connectionId,
+        p_canvas_course_id: canvasCourseId,
+        p_checked_at: checkedAt,
+        p_failure_code: failureCode,
+        p_sync_run_id: runId,
+        p_user_id: userId,
+      })
+      .single();
+  } catch {
+    return;
+  }
 }
 
 async function recordCourseResult({
@@ -1012,11 +1325,13 @@ async function recordCourseResult({
 async function beginSyncRun({
   client,
   connectionId,
+  mode,
   startedAt,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly connectionId: string;
+  readonly mode: CanvasAcademicSyncMode;
   readonly startedAt: string;
   readonly userId: string;
 }): Promise<
@@ -1031,8 +1346,9 @@ async function beginSyncRun({
     }
 > {
   const { data, error } = await client
-    .rpc("begin_canvas_sync_run", {
+    .rpc("begin_canvas_sync_run_with_mode", {
       p_canvas_connection_id: connectionId,
+      p_sync_mode: mode,
       p_started_at: startedAt,
       p_user_id: userId,
     })
@@ -1075,9 +1391,11 @@ async function updateSyncRunProgress({
   readonly resourceCounts: CanvasSyncResourceCounts;
   readonly runId: string;
   readonly totals: {
+    readonly changed: number;
     readonly discovered: number;
     readonly failed: number;
     readonly succeeded: number;
+    readonly unchanged: number;
   };
   readonly userId: string;
 }): Promise<void> {
@@ -1112,9 +1430,11 @@ async function finishSyncRun({
   readonly runId: string;
   readonly status: CanvasAcademicSyncStatus;
   readonly totals: {
+    readonly changed: number;
     readonly discovered: number;
     readonly failed: number;
     readonly succeeded: number;
+    readonly unchanged: number;
   };
   readonly userId: string;
 }): Promise<void> {
@@ -1282,9 +1602,11 @@ function httpStatusClassForStatus(
 }
 
 function statusForTotals(totals: {
+  readonly changed: number;
   readonly discovered: number;
   readonly failed: number;
   readonly succeeded: number;
+  readonly unchanged: number;
 }): CanvasAcademicSyncStatus {
   if (totals.failed === 0) {
     return "succeeded";
@@ -1297,24 +1619,31 @@ function statusForTotals(totals: {
 
 function createSummary({
   failures,
+  mode,
   resourceCounts,
   status,
   totals,
 }: {
   readonly failures: readonly CanvasAcademicSyncFailureSummary[];
+  readonly mode: CanvasAcademicSyncMode;
   readonly resourceCounts: CanvasSyncResourceCounts;
   readonly status: CanvasAcademicSyncStatus;
   readonly totals: {
+    readonly changed: number;
     readonly discovered: number;
     readonly failed: number;
     readonly succeeded: number;
+    readonly unchanged: number;
   };
 }): CanvasAcademicSyncSummary {
   return {
     status,
+    mode,
     courses: {
       discovered: totals.discovered,
       succeeded: totals.succeeded,
+      changed: totals.changed,
+      unchanged: totals.unchanged,
       failed: totals.failed,
     },
     resources: resourceCounts,

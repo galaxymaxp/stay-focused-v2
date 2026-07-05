@@ -114,17 +114,27 @@ paths.
   internal identities, kept first-sync timestamps stable, advanced last-sync
   timestamps, introduced no duplicate identities, and left zero running sync
   rows.
+- Phase 5B.3A Course Recovery Hardening remains closed. The four permanent
+  Page-listing failures are classified as sanitized
+  `canvas_course_pages_failed` results, non-retryable, and not treated as
+  successful empty-Page courses.
+- Phase 5B.3B Incremental Academic Graph Synchronization Foundation is
+  complete and live validated. It adds deterministic versioned course-snapshot
+  fingerprints, `canvas_course_sync_states`, `full` and `incremental` route
+  modes, changed/unchanged/failed counts, and service-role-only state RPCs.
+  Incremental mode still fetches complete Canvas snapshots, but unchanged
+  courses skip database graph replacement.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- Incremental Canvas synchronization, secondary Canvas resources, file/media
-  ingestion, source snapshots, grades, background synchronization, task
-  generation, and study schedule generation are still pending. Announcements,
-  discussions, planner data, incremental sync, and reviewer generation from
-  Canvas content remain deferred.
+- Network-level conditional Canvas fetching, secondary Canvas resources,
+  file/media ingestion, source snapshots, grades, background synchronization,
+  task generation, and study schedule generation are still pending.
+  Announcements, discussions, planner data, endpoint validators, and reviewer
+  generation from Canvas content remain deferred.
 
 ## Current Test Baselines
 
@@ -167,6 +177,13 @@ paths.
   identities were absent, internal identities were stable, first-sync
   timestamps were stable, last-sync timestamps advanced, and no sync run
   remained running.
+- Phase 5B.3B verification: Canvas typecheck/build/tests passed with 33/33
+  tests; DB typecheck passed; API typecheck/build/tests passed with 176/176
+  tests; mobile typecheck/tests passed with 79/79 tests; root typecheck passed
+  across 7/7 workspaces with 4 cached and 3 fresh; root build passed across
+  7/7 workspaces with 4 cached and 3 fresh; workspace tests passed with API
+  176/176, mobile 79/79, Canvas 33/33, and OCR 14/14; `git diff --check`
+  passed with line-ending warnings only.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -200,10 +217,12 @@ paths.
 Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 5B.1 academic graph foundation is complete, and Phase 5B.2 initial full
 academic graph synchronization is complete and live validated. Phase 5B.3A
-course recovery hardening is complete and live validated. The recommended next
-phase is Phase 5B.3B incremental academic graph synchronization foundation.
-Secondary Canvas resources and automatic repeated scanned-PDF header/footer
-detection remain deferred candidates.
+course recovery hardening is complete and live validated. Phase 5B.3B
+incremental academic graph synchronization foundation is complete and live
+validated. The recommended next phase is Phase 5B.3C conditional Canvas
+fetching and network-efficiency hardening. Secondary Canvas resources and
+automatic repeated scanned-PDF header/footer detection remain deferred
+candidates.
 
 ## Known Blockers And Risks
 
@@ -500,6 +519,63 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-06 Phase 5B.3B incremental academic graph synchronization foundation
+
+- Starting baseline: `main` at `289f636`, matching `origin/main` with ahead 0
+  and behind 0. Known unrelated dirty files remained untouched:
+  `apps/api/next-env.d.ts`, `apps/mobile/expo-env.d.ts`, and
+  `apps/mobile/.gitignore`.
+- Added `202607050008_add_canvas_incremental_sync_state.sql` and updated
+  `packages/db/src/types.ts`.
+- Added `canvas_course_sync_states`, expanded sync modes to `full` and
+  `incremental`, expanded course-result statuses to include `unchanged`, and
+  kept the new table and RPCs behind the service-role boundary.
+- Added deterministic versioned fingerprints over normalized persistence
+  payloads in `apps/api/src/lib/canvas-sync-fingerprint.ts`. Fingerprints are
+  private change-detection values, are not returned publicly, are not logged,
+  and are not authorization controls.
+- Updated `POST /api/canvas/sync` so missing bodies default to `full` and
+  `{ "mode": "incremental" }` enables changed/unchanged comparison after the
+  complete Canvas course snapshot has been fetched.
+- Changed-course persistence uses
+  `replace_canvas_course_academic_snapshot_with_sync_state` so graph
+  replacement and fingerprint advancement happen atomically.
+- Matching fingerprints call `record_canvas_course_snapshot_unchanged`, skip
+  graph replacement, leave graph timestamps stable, and advance only safe
+  sync-state metadata.
+- Fetch failures call `record_canvas_course_snapshot_failed` best-effort,
+  preserve previous graph rows, preserve the last successful fingerprint, and
+  retain the Phase 5B.3A sanitized failure code.
+- Remote migration push applied only `202607050008`; migration history includes
+  `202607050008`.
+- Remote rollback SQL verification passed through
+  `scripts/phase5b3b-incremental-sync-verification.sql`.
+- Automated verification passed: Canvas typecheck/build/tests 33/33, DB
+  typecheck, API typecheck/build/tests 176/176, mobile typecheck/tests 79/79,
+  root typecheck 7/7 with 4 cached and 3 fresh, root build 7/7 with 4 cached
+  and 3 fresh, workspace tests API 176/176, mobile 79/79, Canvas 33/33, OCR
+  14/14, and `git diff --check` with line-ending warnings only.
+- Live validation used the existing encrypted Canvas connection and protected
+  `POST /api/canvas/sync` flow. No PATs, bearer tokens, Canvas URLs, Canvas
+  IDs, course names, Page titles/bodies, assignment names/descriptions, raw
+  responses, internal UUIDs, or real fingerprint values were committed.
+- Full live baseline: HTTP 200, `partial`, 50.725 seconds, 17 courses
+  discovered, 13 changed/succeeded, 0 unchanged, 4 failed with sanitized
+  `canvas_course_pages_failed`, 13 graph replacements, 0 running rows.
+- First incremental live sync: HTTP 200, `partial`, 47.502 seconds, 17 courses
+  discovered, 13 unchanged, 0 changed, 4 failed, 0 graph replacements, state
+  checks advanced, failed fingerprints preserved, unchanged graph timestamps
+  stable, 0 running rows.
+- Second incremental live sync: HTTP 200, `partial`, 46.750 seconds, 13
+  unchanged, 0 changed, 4 failed, deterministic fingerprints, duplicate
+  identities 0, internal identities stable, failed graphs preserved, 0 running
+  rows.
+- Incremental mode reduced database replacement and pruning work for unchanged
+  courses. It does not reduce Canvas request volume yet because complete
+  snapshots are still fetched before comparison.
+- Next recommended phase: Phase 5B.3C conditional Canvas fetching and
+  network-efficiency hardening.
 
 ### 2026-07-06 Phase 5B.3A Canvas course recovery hardening
 

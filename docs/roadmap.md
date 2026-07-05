@@ -211,9 +211,9 @@ complete.
 Status: In progress. Phase 5A is complete and live validated; Phase 5B.1
 academic graph foundation is complete; Phase 5B.2 initial full academic graph
 synchronization is complete and live validated; Phase 5B.3A course recovery
-hardening is complete and live validated; Phase 5B.3B through Phase 5F remain
-planned and must not be collapsed into a single generic Canvas integration
-task.
+hardening is complete and live validated; Phase 5B.3B incremental persistence
+is complete and live validated; Phase 5B.3C through Phase 5F remain planned
+and must not be collapsed into a single generic Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -347,8 +347,9 @@ Validation status as of 2026-07-05:
 
 Status: In progress. Phase 5B.1 is complete as a database and typed Canvas API
 foundation. Phase 5B.2 initial full synchronization is complete as a manual,
-synchronous route with atomic per-course persistence. Incremental
-synchronization remains deferred.
+synchronous route with atomic per-course persistence. Phase 5B.3A recovery
+hardening and Phase 5B.3B deterministic incremental persistence are complete.
+Network-level conditional fetching remains deferred.
 
 #### Phase 5B.1 - Academic Graph Foundation
 
@@ -383,8 +384,8 @@ Deferred from Phase 5B.1:
 - Incremental sync cursors and destructive stale cleanup
 - Reviewer generation from Canvas content
 
-Recommended next phase: Phase 5B.3B - Incremental academic graph
-synchronization foundation.
+Recommended next phase after Phase 5B.3B: Phase 5B.3C - Conditional Canvas
+fetching and network-efficiency hardening.
 
 #### Phase 5B.2 - Initial Full Academic Graph Synchronization
 
@@ -485,17 +486,57 @@ Validation:
 
 #### Phase 5B.3B - Incremental Synchronization Foundation
 
+Status: Complete, remotely verified, and live validated.
+
+Scope:
+
+- Added migration `202607050008_add_canvas_incremental_sync_state.sql`.
+- Added `canvas_course_sync_states` with one row per user, Canvas connection,
+  and Canvas course identity.
+- Added deterministic course-snapshot fingerprints from the normalized
+  persistence payload, with version `canvas-course-snapshot-v1`.
+- Added `full` and `incremental` sync modes and `unchanged` course results.
+- Added service-role-only RPCs for mode-aware run creation, changed-course
+  graph replacement plus state advancement, unchanged-course recording, and
+  failed-course metadata.
+- Preserved the Phase 5A credential boundary and Phase 5B.2 per-course
+  atomicity.
+
+Validation:
+
+- Remote migration history includes `202607050008`.
+- Remote rollback verification passed through
+  `scripts/phase5b3b-incremental-sync-verification.sql`.
+- A full live baseline returned HTTP 200 partial with 17 courses discovered,
+  13 changed/succeeded, 0 unchanged, 4 Page-listing failures, 13 graph
+  replacements, and zero running sync rows.
+- Two immediate incremental live runs returned HTTP 200 partial with 13
+  unchanged courses, 0 changed courses, 4 Page-listing failures, 0 graph
+  replacements for unchanged courses, deterministic fingerprints, stable graph
+  timestamps, no duplicate identities, and zero running sync rows.
+
+Deferred from Phase 5B.3B:
+
+- Endpoint-level conditional requests
+- ETag and Last-Modified support
+- Secondary Canvas resources
+- Scheduled/background synchronization
+- Mobile synchronization UI
+- Reviewer generation from Canvas content
+
+#### Phase 5B.3C - Conditional Canvas Fetching And Network-Efficiency Hardening
+
 Status: Pending.
 
 Scope:
 
-- Incremental synchronization strategy
-- Secondary Canvas resources that remain deferred after Phase 5B.2
-- Better recovery paths for accounts near or beyond synchronous runtime limits
-- Retry and resume semantics
-- More detailed partial-failure health without private content
-- Continued preservation of the Phase 5A credential boundary and Phase 5B.2
-  per-course atomicity
+- Investigate Canvas endpoint support for conditional requests.
+- Add ETag or Last-Modified handling only where reliable per endpoint.
+- Measure whether request count, bandwidth, or duration improves.
+- Preserve deterministic persistence and safe failure behavior from Phase
+  5B.3B.
+- Avoid claiming delta synchronization where Canvas cannot provide a reliable
+  cursor.
 
 ### Phase 5C - File, Attachment, And Media Ingestion
 

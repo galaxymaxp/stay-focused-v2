@@ -45,12 +45,16 @@ export interface CanvasCapabilitiesResponse {
 }
 
 export type CanvasSyncStatus = "succeeded" | "partial" | "failed";
+export type CanvasSyncMode = "full" | "incremental";
 
 export interface CanvasSyncSummary {
   readonly status: CanvasSyncStatus;
+  readonly mode: CanvasSyncMode;
   readonly courses: {
     readonly discovered: number;
     readonly succeeded: number;
+    readonly changed: number;
+    readonly unchanged: number;
     readonly failed: number;
   };
   readonly resources: {

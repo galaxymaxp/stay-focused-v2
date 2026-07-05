@@ -36,12 +36,16 @@ export interface CanvasCapabilitySummary {
 }
 
 export type CanvasSyncStatus = "succeeded" | "partial" | "failed";
+export type CanvasSyncMode = "full" | "incremental";
 
 export interface CanvasSyncSummary {
   readonly status: CanvasSyncStatus;
+  readonly mode: CanvasSyncMode;
   readonly courses: {
     readonly discovered: number;
     readonly succeeded: number;
+    readonly changed: number;
+    readonly unchanged: number;
     readonly failed: number;
   };
   readonly resources: {
@@ -62,6 +66,10 @@ export interface CanvasApiBaseInput {
   readonly accessToken: string;
   readonly signal?: AbortSignal;
   readonly fetchImpl?: typeof fetch;
+}
+
+export interface SyncCanvasAcademicGraphInput extends CanvasApiBaseInput {
+  readonly mode?: CanvasSyncMode;
 }
 
 export interface ConnectCanvasInput extends CanvasApiBaseInput {
@@ -235,7 +243,7 @@ export async function listCanvasCapabilities(
 }
 
 export async function syncCanvasAcademicGraph(
-  input: CanvasApiBaseInput,
+  input: SyncCanvasAcademicGraphInput,
 ): Promise<CanvasApiResult<CanvasSyncSummary>> {
   const endpoint = createEndpoint(input.apiBaseUrl, SYNC_PATH);
   if (!endpoint.ok) return endpoint;
@@ -244,6 +252,7 @@ export async function syncCanvasAcademicGraph(
     endpoint: endpoint.url,
     input,
     method: "POST",
+    ...(input.mode ? { body: { mode: input.mode } } : {}),
     parseSuccess: parseSyncResponse,
   });
 }
@@ -407,6 +416,7 @@ function parseSyncResponse(parsed: unknown): CanvasApiResult<CanvasSyncSummary> 
       ok: true,
       data: {
         status: parsed.status,
+        mode: parsed.mode,
         courses: parsed.courses,
         resources: parsed.resources,
         ...(parsed.failures ? { failures: parsed.failures } : {}),
@@ -592,8 +602,16 @@ function isSyncSuccessResponse(value: unknown): value is SyncSuccessResponse {
   return (
     isRecord(value) &&
     value.ok === true &&
-    hasOnlyKeys(value, ["ok", "status", "courses", "resources", "failures"]) &&
+    hasOnlyKeys(value, [
+      "ok",
+      "status",
+      "mode",
+      "courses",
+      "resources",
+      "failures",
+    ]) &&
     isCanvasSyncStatus(value.status) &&
+    isCanvasSyncMode(value.mode) &&
     isSyncCourseCounts(value.courses) &&
     isSyncResourceCounts(value.resources) &&
     (value.failures === undefined ||
@@ -719,12 +737,25 @@ function isCanvasSyncStatus(value: unknown): value is CanvasSyncStatus {
   return value === "succeeded" || value === "partial" || value === "failed";
 }
 
+function isCanvasSyncMode(value: unknown): value is CanvasSyncMode {
+  return value === "full" || value === "incremental";
+}
+
 function isSyncCourseCounts(value: unknown): value is CanvasSyncSummary["courses"] {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["discovered", "succeeded", "failed"]) &&
+    hasOnlyKeys(value, [
+      "discovered",
+      "succeeded",
+      "changed",
+      "unchanged",
+      "failed",
+    ]) &&
     isNonNegativeInteger(value.discovered) &&
     isNonNegativeInteger(value.succeeded) &&
+    isNonNegativeInteger(value.changed) &&
+    isNonNegativeInteger(value.unchanged) &&
+    value.succeeded === value.changed + value.unchanged &&
     isNonNegativeInteger(value.failed)
   );
 }

@@ -95,7 +95,14 @@ describe("Canvas mobile API client", () => {
     const fetchImpl = createFetch({
       ok: true,
       status: "partial",
-      courses: { discovered: 2, succeeded: 1, failed: 1 },
+      mode: "full",
+      courses: {
+        discovered: 2,
+        succeeded: 1,
+        changed: 1,
+        unchanged: 0,
+        failed: 1,
+      },
       resources: {
         modules: 3,
         moduleItems: 8,
@@ -116,7 +123,14 @@ describe("Canvas mobile API client", () => {
       ok: true,
       data: {
         status: "partial",
-        courses: { discovered: 2, succeeded: 1, failed: 1 },
+        mode: "full",
+        courses: {
+          discovered: 2,
+          succeeded: 1,
+          changed: 1,
+          unchanged: 0,
+          failed: 1,
+        },
         resources: { moduleItems: 8, assignments: 4 },
         failures: [{ code: "canvas_unavailable", count: 1 }],
       },
@@ -130,13 +144,60 @@ describe("Canvas mobile API client", () => {
     });
   });
 
+  it("runs incremental academic graph sync with a strict mode body", async () => {
+    const fetchImpl = createFetch({
+      ok: true,
+      status: "succeeded",
+      mode: "incremental",
+      courses: {
+        discovered: 2,
+        succeeded: 2,
+        changed: 0,
+        unchanged: 2,
+        failed: 0,
+      },
+      resources: {
+        modules: 3,
+        moduleItems: 8,
+        pages: 2,
+        assignmentGroups: 1,
+        assignments: 4,
+      },
+    });
+
+    const result = await syncCanvasAcademicGraph({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl,
+      mode: "incremental",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        mode: "incremental",
+        courses: { changed: 0, unchanged: 2 },
+      },
+    });
+    expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
+      mode: "incremental",
+    });
+  });
+
   it.each([
     [
       "invalid status",
       {
         ok: true,
         status: "done",
-        courses: { discovered: 1, succeeded: 1, failed: 0 },
+        mode: "full",
+        courses: {
+          discovered: 1,
+          succeeded: 1,
+          changed: 1,
+          unchanged: 0,
+          failed: 0,
+        },
         resources: {
           modules: 0,
           moduleItems: 0,
@@ -151,7 +212,14 @@ describe("Canvas mobile API client", () => {
       {
         ok: true,
         status: "succeeded",
-        courses: { discovered: -1, succeeded: 0, failed: 0 },
+        mode: "full",
+        courses: {
+          discovered: -1,
+          succeeded: 0,
+          changed: 0,
+          unchanged: 0,
+          failed: 0,
+        },
         resources: {
           modules: 0,
           moduleItems: 0,
@@ -166,7 +234,14 @@ describe("Canvas mobile API client", () => {
       {
         ok: true,
         status: "succeeded",
-        courses: { discovered: 1, succeeded: 1, failed: 0 },
+        mode: "full",
+        courses: {
+          discovered: 1,
+          succeeded: 1,
+          changed: 1,
+          unchanged: 0,
+          failed: 0,
+        },
         resources: {
           modules: 0,
           moduleItems: 0,
@@ -182,7 +257,14 @@ describe("Canvas mobile API client", () => {
       {
         ok: true,
         status: "succeeded",
-        courses: { discovered: 1, succeeded: 1, failed: 0 },
+        mode: "full",
+        courses: {
+          discovered: 1,
+          succeeded: 1,
+          changed: 1,
+          unchanged: 0,
+          failed: 0,
+        },
         resources: {
           modules: 0,
           moduleItems: 0,
@@ -190,6 +272,50 @@ describe("Canvas mobile API client", () => {
           assignmentGroups: 0,
           assignments: 0,
           pageTitles: ["Private Page"],
+        },
+      },
+    ],
+    [
+      "invalid mode",
+      {
+        ok: true,
+        status: "succeeded",
+        mode: "delta",
+        courses: {
+          discovered: 1,
+          succeeded: 1,
+          changed: 1,
+          unchanged: 0,
+          failed: 0,
+        },
+        resources: {
+          modules: 0,
+          moduleItems: 0,
+          pages: 0,
+          assignmentGroups: 0,
+          assignments: 0,
+        },
+      },
+    ],
+    [
+      "succeeded mismatch",
+      {
+        ok: true,
+        status: "succeeded",
+        mode: "incremental",
+        courses: {
+          discovered: 1,
+          succeeded: 1,
+          changed: 0,
+          unchanged: 0,
+          failed: 0,
+        },
+        resources: {
+          modules: 0,
+          moduleItems: 0,
+          pages: 0,
+          assignmentGroups: 0,
+          assignments: 0,
         },
       },
     ],
