@@ -40,8 +40,18 @@ paths.
   the migration applied, schema/RLS/policies were verified, distinct users
   passed bidirectional owner isolation, safe `404 reviewer_not_found` denial
   passed, and fictional validation rows were cleaned up.
-- Canvas integration, task generation, and study schedule generation are still
-  pending.
+- Phase 5A Secure Canvas Connection and Capability Discovery is implemented
+  locally with mocked automated verification. It adds the staged Phase 5
+  roadmap, Canvas capability matrix, four Canvas ADRs, a strict
+  `@stay-focused/canvas` client, AES-256-GCM encrypted token storage,
+  `canvas_connections` and `canvas_capabilities` migration foundation,
+  protected Canvas API routes, and a mobile Courses surface.
+- Phase 5A live Canvas validation is pending. Remote Supabase migration
+  application is also pending because the Supabase CLI is not installed in this
+  session and no repository migration deployment script exists.
+- Canvas academic graph sync, file/media ingestion, source snapshots, grades,
+  background synchronization, task generation, and study schedule generation
+  are still pending.
 
 ## Current Test Baselines
 
@@ -52,7 +62,12 @@ paths.
 - Engine build: passed.
 - Engine evaluations: 266 passed, 0 failed.
 - Mobile typecheck: passed.
-- Mobile OCR client/picker/source-flow/library tests: 66 passed, 0 failed.
+- Mobile OCR client/picker/source-flow/library/Canvas service tests: 70 passed,
+  0 failed.
+- Canvas package typecheck/build/tests: passed; 20 tests passed, 0 failed.
+- DB package typecheck after Canvas migration/types: passed.
+- API typecheck/tests including Canvas routes and encryption: passed; 110 tests
+  passed, 0 failed.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -83,8 +98,10 @@ paths.
 
 ## Immediate Next Task
 
-Begin the next scoped Phase 5 Canvas Integration task. Automatic repeated
-scanned-PDF header/footer detection remains a deferred OCR cleanup candidate.
+Phase 5B - Academic graph synchronization for modules, Pages, activities,
+dates, assignment groups, announcements, discussions, and quiz metadata.
+Automatic repeated scanned-PDF header/footer detection remains a deferred OCR
+cleanup candidate.
 
 ## Known Blockers And Risks
 
@@ -107,6 +124,16 @@ scanned-PDF header/footer detection remains a deferred OCR cleanup candidate.
 - Reviewer persistence has a live cross-user RLS validation baseline. Future
   persistence changes should preserve owner-scoped access, safe 404 denial, and
   owner-only cleanup behavior.
+- Phase 5A Canvas storage requires `CANVAS_TOKEN_ENCRYPTION_KEY`, which must
+  decode to exactly 32 bytes. Do not generate a permanent fallback key and do
+  not log the key or Canvas tokens.
+- The Canvas personal access token is validated through the API, encrypted
+  server-side, and never returned to mobile. Mobile uses secure text entry and
+  clears the token after connect attempts; it does not store the Canvas token in
+  AsyncStorage or SecureStore.
+- Canvas permissions vary by institution and course. Course access does not
+  imply module, file, grade, quiz, caption, conversation, or external-tool
+  access.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
   committed files.

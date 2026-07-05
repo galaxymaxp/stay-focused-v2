@@ -56,6 +56,7 @@ const DEFAULT_SOURCE_TEXT_HEIGHT = 180;
 const OCR_SMOKE_FIXTURE_ENABLED = isOcrSmokeFixtureEnabled();
 
 interface ReviewerGenerateScreenProps {
+  readonly onOpenCourses?: () => void;
   readonly onOpenLibrary?: () => void;
 }
 
@@ -66,6 +67,7 @@ interface GenerationDisplayError {
 }
 
 export function ReviewerGenerateScreen({
+  onOpenCourses,
   onOpenLibrary,
 }: ReviewerGenerateScreenProps) {
   const { isSigningOut, session, signOut } = useAuth();
@@ -618,6 +620,17 @@ export function ReviewerGenerateScreen({
               variant="secondary"
             >
               Study Library
+            </Button>
+          ) : null}
+
+          {onOpenCourses ? (
+            <Button
+              fullWidth
+              onPress={onOpenCourses}
+              testID="courses-open-button"
+              variant="secondary"
+            >
+              Courses
             </Button>
           ) : null}
         </Card>

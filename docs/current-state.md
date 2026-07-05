@@ -5,6 +5,8 @@ Last refreshed: 2026-07-05, Asia/Manila.
 ## Repository Baseline
 
 - Branch: `main`
+- Phase 5A implementation baseline:
+  `a60e599 fix(library): complete live RLS validation`
 - Phase 4 live-validation baseline before documentation and route-fix commit:
   `2e945cf feat(library): implement Phase 4 study library persistence`
 - Local baseline before Phase 3B: `6e91231 feat(ocr): add provider-agnostic OCR API boundary`
@@ -95,6 +97,28 @@ cross-user list/open/rename/delete denial returned safe
 `404 reviewer_not_found` responses, reverse isolation passed, and both
 fictional validation rows were deleted by their owners.
 
+Phase 5A adds the first Canvas foundation slice:
+
+```text
+Courses surface
+-> Canvas URL and personal access token entry
+-> protected Canvas connection API
+-> Canvas profile validation
+-> AES-256-GCM encrypted token storage
+-> safe connection metadata
+-> course discovery
+-> initial capability registry
+-> disconnect
+```
+
+The Canvas token is submitted only to the protected API, encrypted before
+persistence, and never returned to mobile. The mobile token field uses secure
+text entry, is not written to AsyncStorage or SecureStore, and is cleared from
+component state after a connect attempt. The Phase 5A capability probe is small
+and permission-aware: profile, courses, enrollments, modules for one course,
+assignment groups for one course, and planner can be tested while most future
+capabilities remain `not_tested`.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -139,6 +163,25 @@ fictional validation rows were deleted by their owners.
   save-after-generation flows.
 - Save-to-library flow preserves editable OCR-before-reviewer behavior and
   does not persist raw source text or OCR/upload bytes.
+- Structured Phase 5 Canvas roadmap covering Phase 5A through Phase 5F, the
+  future Grade Goal Planner, and later student intelligence features.
+- Canvas source capability matrix documenting permission-dependent Canvas
+  capabilities and external-integration limitations.
+- ADR-006 through ADR-009 for Canvas academic graph synchronization,
+  capability-based integration, Canvas credential storage, and grade-data
+  separation.
+- `@stay-focused/canvas` client with strict URL normalization, bearer auth,
+  safe pagination, timeout support, cross-origin pagination rejection,
+  normalized typed errors, course discovery, current-profile validation, and
+  independent capability probes.
+- Supabase Canvas connection/capability migration foundation with no plaintext
+  Canvas token storage and no direct authenticated grants over encrypted
+  credential fields.
+- Protected `GET/PUT/DELETE /api/canvas/connection`,
+  `GET /api/canvas/courses`, and `GET /api/canvas/capabilities` routes using
+  Supabase bearer JWT authentication and safe response contracts.
+- Mobile Courses surface for disconnected/connected Canvas states, course
+  refresh, disconnect confirmation, and compact capability summary.
 
 ## Current Verification Baselines
 
@@ -157,6 +200,18 @@ Verified across the final Phase 4 live-validation pass:
 - Mobile typecheck: passed
 - Mobile OCR client, picker, source-flow, and Study Library API tests: 66
   passed, 0 failed
+- Canvas package typecheck/build/tests: passed; 20 tests passed, 0 failed
+- API Canvas route/encryption tests: included in API tests; 110 passed, 0
+  failed
+- Mobile Canvas API service tests: included in mobile tests; 70 passed, 0
+  failed
+- DB package typecheck after Canvas migration/types: passed
+- Root workspace typecheck: passed after broad build regenerated Next
+  `.next/types`
+- Root workspace build: passed
+- Workspace tests with scripts: passed; API 110/110, mobile 70/70, Canvas 20/20,
+  OCR 14/14
+- `git diff --check`: passed with CRLF warnings only
 - Live Supabase schema verification: migration already applied; table, RLS,
   and owner policies verified
 - Live Supabase Study Library validation: passed with distinct users,
@@ -237,7 +292,12 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
-- Canvas LMS integration is not implemented beyond the package boundary.
+- Canvas LMS Phase 5A is implemented locally for secure connection, course
+  discovery, disconnect, and capability discovery. Live Canvas validation and
+  remote Supabase migration application are pending.
+- Canvas content ingestion is not implemented yet. Modules, Pages, files,
+  assignments, discussions, announcements, quiz metadata, grades, rubrics,
+  background sync, and source snapshots remain Phase 5B through Phase 5F work.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -245,8 +305,9 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Start the next scoped Phase 5 Canvas Integration task. Repeated PDF
-header/footer cleanup remains a deferred OCR cleanup candidate.
+Start Phase 5B Academic Graph Synchronization for modules, Pages, activities,
+dates, assignment groups, announcements, discussions, and quiz metadata.
+Repeated PDF header/footer cleanup remains a deferred OCR cleanup candidate.
 
 ## Known Risks
 
@@ -270,6 +331,16 @@ header/footer cleanup remains a deferred OCR cleanup candidate.
 - Reviewer persistence now has a live cross-user RLS validation baseline.
   Future persistence changes should preserve owner-scoped access, safe 404
   denial, and owner-only cleanup behavior.
+- Phase 5A Canvas migration is committed under `packages/db/migrations`, but
+  remote application is blocked in this session because the Supabase CLI is not
+  installed and no repository migration deployment script exists.
+- Phase 5A live Canvas validation is pending because no safely configured HTTPS
+  API deployment and real Canvas credentials were available in this session.
+- Canvas permissions vary by school and course. Course access does not prove
+  access to modules, files, grades, quizzes, captions, conversations, or
+  external-tool content.
+- `CANVAS_TOKEN_ENCRYPTION_KEY` must decode to exactly 32 bytes in the API
+  environment before Canvas connections can be saved.
 - Mobile OAuth redirect completion still needs validation before it is claimed
   as complete.
 - Secrets must remain server-only; mobile env files may contain only public

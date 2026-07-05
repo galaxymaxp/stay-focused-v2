@@ -206,32 +206,355 @@ Immediate dependency: Phase 3 source-ingestion contracts are stable enough to
 store source metadata consistently. All Phase 4 external validation gates are
 complete.
 
-## Phase 5 - Canvas Integration
+## Phase 5 - Canvas Synchronization Foundation
 
-Status: Pending
+Status: In progress. Phase 5A is the first implementation slice; Phases 5B
+through 5F remain planned and must not be collapsed into a single generic
+Canvas integration task.
 
-Purpose: Bring Canvas LMS material into the same reviewer pipeline without
-creating a parallel generation path.
-
-Major deliverables:
-
-- Canvas authentication or token handling
-- Courses
-- Modules
-- Assignments
-- Announcements
-- Files and source selection
-- Sending Canvas material through the same reviewer pipeline
-
-Exit criteria:
-
-- A user can select Canvas material and generate a reviewer through the existing
-  protected API and engine pipeline.
-- Canvas credentials and server-only tokens are not exposed to mobile bundles.
-- Canvas source metadata can be stored with reviewers when persistence exists.
+Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
+graph that can feed the existing OCR, normalization, provenance, reviewer, and
+future schedule/grade-planning boundaries without creating a parallel
+generation path.
 
 Immediate dependency: completed Phase 4 persistence and source metadata, plus a
 stable source-ingestion contract from Phase 3.
+
+### Phase 5A - Secure Canvas Connection And Capability Discovery
+
+Status: Implemented locally; live Canvas validation pending.
+
+Scope:
+
+- Canvas instance URL
+- Canvas personal access token
+- API-side credential validation
+- AES-256-GCM encrypted credential storage
+- Protected connection-status API
+- Disconnect support
+- Course discovery
+- Initial capability registry
+- Safe endpoint probes
+- User-visible connection and course states
+
+Completion criteria:
+
+- A signed-in Stay Focused user can connect Canvas.
+- The Canvas profile is validated.
+- The token is encrypted before persistence.
+- The token is never returned to mobile.
+- Courses can be listed.
+- Supported and unsupported Canvas capabilities are recorded honestly.
+
+### Phase 5B - Academic Graph Synchronization
+
+Status: Pending.
+
+Scope:
+
+- Courses
+- Enrollment and terms
+- Syllabus
+- Modules
+- Ordered module items
+- Module prerequisites
+- Module requirements
+- Module progress
+- Canvas Pages
+- Assignments and activities
+- Assignment groups
+- Announcements
+- Discussions
+- Quiz metadata
+- Planner items
+- Calendar events
+- Effective student-specific dates
+- External URLs
+- External-tool references
+
+Required source relationships:
+
+```text
+Course
+|-- Syllabus
+|-- Module
+|   `-- Module item
+|       |-- Page
+|       |-- File
+|       |-- Assignment
+|       |-- Discussion
+|       |-- Quiz
+|       |-- External URL
+|       `-- External tool
+|-- Announcement
+|-- Assignment group
+`-- Planner/calendar item
+```
+
+Exit criteria:
+
+- Canvas material is stored as related academic entities, not as a flat file
+  list.
+- Module order, nesting, prerequisites, lock state, completion state, and
+  relationships are preserved.
+- Synchronized activities can later become reviewer sources, scheduling data,
+  or grade-planning inputs according to their capability classification.
+
+### Phase 5C - File, Attachment, And Media Ingestion
+
+Status: Pending.
+
+Scope:
+
+- PDF with embedded text
+- Scanned PDF through the existing OCR boundary
+- PowerPoint `.ppt` and `.pptx`
+- Word `.doc` and `.docx`
+- Images
+- Plain text
+- HTML
+- Supported spreadsheet text
+- Assignment attachments
+- Discussion attachments
+- Announcement attachments
+- Canvas-hosted media captions when available
+- Unsupported format handling
+- File-size and page-count limits
+- Parser registry
+- Partial-failure reporting
+
+Required ingestion flow:
+
+```text
+Canvas discovery
+-> metadata record
+-> authorized file download
+-> MIME and extension detection
+-> parser or OCR selection
+-> structured text extraction
+-> normalized source blocks
+-> editable preview
+-> confirmed import
+-> reviewer generation
+```
+
+Exit criteria:
+
+- Canvas file discovery does not bypass the existing OCR, normalization,
+  grounding, or reviewer validation boundaries.
+- Unsupported files and partial failures are visible without blocking unrelated
+  synchronized records.
+
+### Phase 5D - Source Normalization, Provenance, And Selective Import
+
+Status: Pending.
+
+Scope:
+
+- Structure preservation
+- Headings
+- Bullet hierarchy
+- Tables
+- Pages
+- Slide numbers
+- Module order
+- Source snapshots
+- Source versions
+- Content hashes
+- Parser versions
+- OCR versions
+- Selective import
+- Editable source preview
+- Deduplication
+- Repeated-source relationships
+- Stale-source handling
+- Deleted-source handling
+- Unsupported-source reporting
+
+Every normalized source must preserve provenance such as:
+
+```text
+Stay Focused user ID
+Canvas connection ID
+Canvas course ID
+Canvas module ID
+Canvas module-item ID
+Canvas source-object ID
+source type
+source title
+file name
+MIME type
+page or slide number
+Canvas URL
+Canvas updated timestamp
+local synchronized timestamp
+content hash
+parser version
+OCR version
+```
+
+Exit criteria:
+
+- A reviewer remains linked to the exact source snapshot used during
+  generation.
+- Users can preview and selectively import source material before it reaches the
+  reviewer engine.
+
+### Phase 5E - Grades, Submissions, Rubrics, And Feedback Foundation
+
+Status: Pending.
+
+Scope:
+
+- Visible current course score
+- Visible final course score
+- Displayed grades
+- Assignment groups
+- Assignment-group weights
+- Drop rules
+- Grading periods
+- Assignments
+- Points possible
+- Grading type
+- Submission scores
+- Submission state
+- Attempt number
+- Missing state
+- Late state
+- Excused state
+- Omitted-from-final-grade state
+- Rubric definitions
+- Rubric assessments
+- Instructor comments
+- Feedback attachments
+- Learning outcomes when permitted
+- Grade snapshots
+- Canvas hidden-grade behavior
+
+Exit criteria:
+
+- Grade and submission records remain separate from reviewer source content.
+- Grades never automatically enter reviewer-generation prompts.
+- Hidden or incomplete Canvas grading information is represented honestly.
+
+### Phase 5F - Incremental And Resilient Synchronization
+
+Status: Pending.
+
+Scope:
+
+- Incremental updates
+- Canvas `updated_at` handling
+- Content hashing
+- Idempotent upserts
+- Per-course checkpoints
+- Per-item sync status
+- Resumable synchronization
+- Pagination
+- Low-concurrency queues
+- Retry behavior
+- `429` handling
+- Retry-after handling
+- Stale records
+- Deleted Canvas objects
+- Locked or unpublished objects
+- Partial failures
+- Synchronization history
+- Background synchronization
+- User-visible sync health
+
+Supported item states:
+
+```text
+discovered
+synced
+metadata_only
+locked
+unpublished
+permission_denied
+external
+unsupported_format
+download_failed
+parse_failed
+ocr_failed
+stale
+deleted_from_canvas
+temporarily_failed
+```
+
+Exit criteria:
+
+- Synchronization is idempotent, resumable, low-concurrency, and transparent
+  about partial failures.
+- Users can see sync health without seeing raw Canvas errors or secret data.
+
+### Future Phase - Grade Goal Planner
+
+Status: Future.
+
+Grade Goal Planner - Allow students to set a desired course grade, such as
+90%, and calculate what scores they need on remaining activities using
+synchronized Canvas grades, assignment weights, points, submissions, grading
+rules, and editable manual assumptions.
+
+Future planner requirements:
+
+- Target-grade input
+- Total-points courses
+- Weighted assignment-group courses
+- Grading periods
+- Dropped-score rules
+- Excused assignments
+- Omitted assignments
+- Extra credit
+- Hypothetical scores
+- Minimum required score
+- Feasibility detection
+- Best-case projection
+- Worst-case projection
+- "What happens if" scenarios
+- Highest-impact remaining activity
+- Manual correction when Canvas data is incomplete
+- Confidence labels
+- Optional Canvas What-If Grades verification when supported
+
+Required confidence states:
+
+```ts
+type GradeProjectionConfidence =
+  | "exact_from_visible_canvas_rules"
+  | "verified_with_canvas_what_if"
+  | "estimated_from_visible_data"
+  | "manual_configuration_required"
+  | "insufficient_data";
+```
+
+Future grade projections must not be described as exact when grading
+information is incomplete or hidden.
+
+### Future Phase - Student Intelligence Features
+
+Status: Future.
+
+Later roadmap group:
+
+- Missing-work recovery plans
+- Announcement digests
+- Deadline-conflict detection
+- Professor-feedback summaries
+- Rubric weakness detection
+- Outcome-based study planning
+- Course-progress dashboards
+- Transcript-based reviewers
+- Searchable lecture captions
+- Offline course packs
+- Course-wide semantic search
+- Recently viewed material
+- "Continue where you left off"
+
+Permission-dependent features must be marked honestly. Successful Canvas course
+access does not imply access to inbox messages, recent history, captions,
+quiz questions, grades, outcomes, or external-tool content.
 
 ## Phase 6 - Tasks And Study Schedules
 

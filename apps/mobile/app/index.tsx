@@ -14,6 +14,7 @@ import { Card } from "../src/components/Card";
 import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { colors, spacing, typography } from "../src/design/tokens";
+import { CoursesScreen } from "../src/features/courses/CoursesScreen";
 import { StudyLibraryScreen } from "../src/features/library/StudyLibraryScreen";
 import { ReviewerGenerateScreen } from "../src/features/reviewer/ReviewerGenerateScreen";
 
@@ -32,14 +33,29 @@ export default function IndexScreen() {
 }
 
 function AuthenticatedApp() {
-  const [activeView, setActiveView] = useState<"generate" | "library">(
-    "generate",
-  );
+  const [activeView, setActiveView] =
+    useState<"generate" | "library" | "courses">("generate");
 
-  return activeView === "library" ? (
-    <StudyLibraryScreen onCreateReviewer={() => setActiveView("generate")} />
-  ) : (
-    <ReviewerGenerateScreen onOpenLibrary={() => setActiveView("library")} />
+  if (activeView === "library") {
+    return (
+      <StudyLibraryScreen onCreateReviewer={() => setActiveView("generate")} />
+    );
+  }
+
+  if (activeView === "courses") {
+    return (
+      <CoursesScreen
+        onCreateReviewer={() => setActiveView("generate")}
+        onOpenLibrary={() => setActiveView("library")}
+      />
+    );
+  }
+
+  return (
+    <ReviewerGenerateScreen
+      onOpenCourses={() => setActiveView("courses")}
+      onOpenLibrary={() => setActiveView("library")}
+    />
   );
 }
 

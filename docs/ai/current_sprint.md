@@ -4,10 +4,10 @@ Last refreshed: 2026-07-05, Asia/Manila.
 
 ## Active Objective
 
-Phase 4 Study Library and Persistence is complete and live validated. The
-`reviewers` migration is already applied in the target Supabase project, live
-RLS-backed persistence passed with distinct users, and the next scoped product
-objective is Phase 5 Canvas Integration.
+Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
+Secure Canvas Connection and Capability Discovery is implemented locally with
+mocked automated verification; live Canvas validation and remote migration
+application are pending.
 
 ## Completed Phase 3A Scope
 
@@ -78,6 +78,31 @@ objective is Phase 5 Canvas Integration.
   progress wait while the smoke still verifies the OCR POST shape and editable
   text.
 
+## Completed Phase 5A Scope
+
+- Replace the broad Phase 5 roadmap with Phase 5A through Phase 5F, plus future
+  Grade Goal Planner and Student Intelligence groups.
+- Add the Canvas source capability matrix under `docs/canvas`.
+- Add ADR-006 through ADR-009 for Canvas academic graph synchronization,
+  capability-based integration, Canvas credential storage, and grade-data
+  separation.
+- Expand `@stay-focused/canvas` into the canonical typed Canvas client.
+- Add strict Canvas base-URL normalization, HTTPS enforcement, no credentials in
+  URLs, bearer-token requests, timeout support, safe pagination, cross-origin
+  pagination rejection, normalized errors, profile validation, course discovery,
+  and Phase 5A capability probes.
+- Add AES-256-GCM Canvas token encryption using
+  `CANVAS_TOKEN_ENCRYPTION_KEY`.
+- Add the `canvas_connections` and `canvas_capabilities` migration foundation
+  with RLS enabled and no direct authenticated grants over encrypted credential
+  fields.
+- Add protected Canvas connection, courses, and capabilities API routes.
+- Add the mobile Courses surface with disconnected/connected states, secure
+  token entry, course refresh, disconnect confirmation, and compact capability
+  summary.
+- Keep Canvas content ingestion, file parsing, grade synchronization, source
+  snapshots, and background sync out of Phase 5A.
+
 ## Out Of Scope For Phase 3D Validation Documentation
 
 - Automatic repeated header/footer detection or cleanup.
@@ -95,6 +120,17 @@ objective is Phase 5 Canvas Integration.
 - Study schedule generation.
 - Background storage of uploads, OCR text, images, or PDFs.
 - Service-role reviewer CRUD for user library operations.
+
+## Out Of Scope For Phase 5A
+
+- Full Canvas academic graph synchronization.
+- Module-item, Page, file, announcement, discussion, quiz, grade, rubric, and
+  submission persistence.
+- Authorized Canvas file downloads.
+- Parser/OCR selection for Canvas files.
+- Reviewer generation from Canvas sources.
+- Background synchronization.
+- Grade goal planning.
 
 ## Phase 3A Results
 
@@ -225,6 +261,40 @@ objective is Phase 5 Canvas Integration.
   - Reviewer, image OCR, and PDF OCR web smokes retain latest recorded passes;
     the final route fix was typing-only, so reviewer web smoke was not rerun.
 
+## Phase 5A Results
+
+- `docs/roadmap.md` now treats Canvas as a staged synchronization program, not
+  a vague integration bucket.
+- `docs/canvas/canvas-source-capability-matrix.md` records connection, course,
+  learning structure, activity, file/media, grades/performance, and
+  communication/activity capabilities with permission-dependent limitations.
+- `packages/canvas` exposes `getCurrentUser`, `listCourses`, and
+  `probeCapabilities` through one strict client.
+- `packages/db/migrations/202607050002_create_canvas_connections.sql` creates
+  the Phase 5A storage foundation.
+- `apps/api` encrypts Canvas personal access tokens before persistence and
+  returns only safe connection metadata.
+- `apps/mobile` adds a Courses surface; tokens are secure text entry only,
+  cleared after submission, and not persisted separately from the Supabase auth
+  session.
+- Automated verification passed:
+  - Canvas package typecheck: passed
+  - Canvas package build: passed
+  - Canvas package tests: 20/20
+  - DB package typecheck: passed
+  - API typecheck/tests: passed; 110/110
+  - Mobile typecheck/tests: passed; 70/70
+  - Root workspace typecheck: passed after broad build regenerated Next
+    `.next/types`
+  - Root workspace build: passed
+  - Workspace tests with scripts: passed; API 110/110, mobile 70/70, Canvas
+    20/20, OCR 14/14
+  - `git diff --check`: passed with CRLF warnings only
+- Remote migration application is blocked because the Supabase CLI is not
+  installed and no repository migration deployment script exists.
+- Live Canvas validation is pending because no safe HTTPS API deployment and
+  real Canvas credentials were available.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -258,5 +328,6 @@ objective is Phase 5 Canvas Integration.
 
 ## Next Objective
 
-Begin the next scoped Phase 5 Canvas Integration task. The deferred
-header/footer cleanup task remains separate.
+Phase 5B - Academic graph synchronization for modules, Pages, activities,
+dates, assignment groups, announcements, discussions, and quiz metadata. The
+deferred header/footer cleanup task remains separate.
