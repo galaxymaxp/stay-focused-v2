@@ -36,6 +36,10 @@ paths.
   allowlisted metadata only; raw source text, OCR text, uploads, file paths,
   credentials, tokens, and private OCR artifacts are not persisted by the save
   flow.
+- Phase 4 is now complete and live validated. The target Supabase project has
+  the migration applied, schema/RLS/policies were verified, distinct users
+  passed bidirectional owner isolation, safe `404 reviewer_not_found` denial
+  passed, and fictional validation rows were cleaned up.
 - Canvas integration, task generation, and study schedule generation are still
   pending.
 
@@ -69,16 +73,18 @@ paths.
 - Current unattended smoke command: `npm run smoke:reviewer:web`.
 - Current OCR browser smoke commands: `npm run smoke:ocr:web` and
   `npm run smoke:ocr-pdf:web`.
-- Live Study Library validation: pending until the Phase 4 migration is applied
-  to the target Supabase project.
+- Live Study Library validation: passed with distinct users, bidirectional RLS
+  isolation, safe item-operation 404s, owner cleanup, and no validation rows
+  remaining.
+- Final Phase 4 regression pass: DB typecheck, API typecheck/tests, mobile
+  typecheck/tests, engine build/evals, OCR tests, and `git diff --check`
+  passed. The reviewer `[id]` route typing fix changed App Router type shape
+  only; runtime behavior was unchanged.
 
 ## Immediate Next Task
 
-Apply the Phase 4 `reviewers` migration to the target Supabase project and run
-minimal live Study Library validation: save, list, open, rename, delete, and
-cross-user denial. After live validation passes, mark Phase 4 complete and move
-to the next scoped Phase 5 Canvas task. Automatic repeated scanned-PDF
-header/footer detection remains a deferred OCR cleanup candidate.
+Begin the next scoped Phase 5 Canvas Integration task. Automatic repeated
+scanned-PDF header/footer detection remains a deferred OCR cleanup candidate.
 
 ## Known Blockers And Risks
 
@@ -98,9 +104,9 @@ header/footer detection remains a deferred OCR cleanup candidate.
   MVP. Visible repeated headers and footers in scanned PDFs may be extracted as
   source text and become reviewer sections until a later cleanup task adds
   automatic repeated header/footer detection.
-- Reviewer persistence depends on the migrated live Supabase `reviewers` table
-  and RLS policies. Mocked API tests do not replace live cross-user RLS
-  validation.
+- Reviewer persistence has a live cross-user RLS validation baseline. Future
+  persistence changes should preserve owner-scoped access, safe 404 denial, and
+  owner-only cleanup behavior.
 - Mobile OAuth redirect completion is not yet validated as complete.
 - Server secrets must stay out of mobile env files, browser bundles, logs, and
   committed files.
@@ -344,6 +350,55 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-05 Phase 4 live Study Library RLS validation
+
+- Starting baseline: `main` at `2e945cf`, matching `origin/main` with ahead 0
+  and behind 0.
+- Preserved the existing reviewer `[id]` route typing fix and test update.
+  Root cause: Next.js App Router dynamic route params are Promise-based in the
+  route context. Runtime behavior did not change.
+- Reloaded `.env.smoke.local`, `.env.supabase.local`, `apps/api/.env.local`,
+  and `apps/mobile/.env.local` in the validation process without printing
+  credential values, emails, tokens, full user IDs, connection strings, or
+  reviewer payloads.
+- Confirmed the two live test accounts authenticated, their normalized emails
+  differed, and their Supabase user IDs differed.
+- Confirmed the target Supabase project already had migration
+  `202607050001_create_reviewers.sql` applied.
+- Verified `public.reviewers` exists, RLS remains enabled, and the owner
+  SELECT, INSERT, UPDATE, and DELETE policies use `auth.uid() = user_id`.
+- Started the local API on `http://localhost:3000` because no API was already
+  listening there; `GET /api/health` returned 200.
+- User A generated and saved one fictional reviewer through the authenticated
+  API with allowlisted metadata and no client-supplied ownership, then listed
+  and opened it successfully.
+- User B's list excluded User A's reviewer. User B open, rename, and delete
+  attempts returned safe `404 reviewer_not_found` responses without exposing
+  owner identity, title, metadata, reviewer content, ownership, or row
+  existence. User A retained access after User B's delete attempt.
+- Reverse isolation passed: User B generated and saved one fictional reviewer,
+  User B could list it, User A could not list or open it, and User B deleted
+  it.
+- Cleanup passed: User A deleted User A's validation reviewer; deleted rows no
+  longer appeared in owner lists; opening either deleted reviewer returned safe
+  `404 reviewer_not_found`; no fictional validation rows remained.
+- Service-role reviewer CRUD was not used. Service/management access was used
+  only for read-only schema, policy, and migration verification.
+- Regression pass:
+  `npm run typecheck --workspace @stay-focused/db`;
+  `npm run typecheck --workspace apps/api`;
+  `npm run test --workspace apps/api` (94/94);
+  `npm run typecheck --workspace apps/mobile`;
+  `npm run test --workspace apps/mobile` (66/66);
+  `npm run build --workspace @stay-focused/engine`;
+  `npm run eval --workspace @stay-focused/engine` (266/266);
+  `npm run test --workspace @stay-focused/ocr` (14/14);
+  `git diff --check` passed with line-ending warnings only.
+- Reviewer web smoke was not rerun because the route fix was typing-only and
+  runtime behavior did not change.
+- Verdict: Phase 4 Study Library and Persistence completed and live validated.
+  Next product phase: Phase 5 Canvas Integration.
 
 ### 2026-07-05 Phase 3D live iPhone PDF OCR validation
 

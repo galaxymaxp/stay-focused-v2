@@ -63,6 +63,9 @@ Complete:
 - Expo PDF import with editable OCR text review before reviewer generation
 - Supabase reviewer persistence migration and authenticated reviewer CRUD API
 - Expo Study Library for saved reviewer list, open, rename, and delete
+- Live Supabase Study Library validation with distinct users, bidirectional
+  owner isolation, safe `404 reviewer_not_found` denial, and cleanup
+- Reviewer detail route typing fix for Promise-based Next.js App Router params
 
 Working locally:
 
@@ -72,6 +75,10 @@ Working locally:
   mobile client
 - Save, list, open, rename, and delete flows against the reviewer library API
   contract
+- Live `reviewers` schema, RLS, policy, and migration-history verification
+- Live cross-user Study Library validation against `http://localhost:3000`
+- Final Phase 4 regression pass: DB/API/mobile typechecks, API/mobile/OCR
+  tests, engine build/evals, and `git diff --check`
 - `npm run smoke:reviewer:web` for laptop-browser regression coverage
 - `npm run smoke:ocr:web` for deterministic Expo Web OCR UI coverage with a
   mocked OCR response
@@ -80,14 +87,8 @@ Working locally:
 - API route tests, smoke-runner tests, engine evals, API typecheck, mobile
   typecheck, and engine build
 
-Next:
-
-- Apply the Phase 4 `reviewers` migration to the target Supabase project and
-  validate live Study Library persistence/RLS
-
 Pending:
 
-- Live migrated Supabase validation for Study Library persistence
 - Canvas LMS integration
 - Task generation and study scheduling
 - Completed mobile OAuth redirects, deployment validation, product polish, and
@@ -191,8 +192,6 @@ tests do not run that opt-in provider smoke.
   editable extracted-text review.
 - Physical-device live OCR validation depends on local API, Supabase, and
   Google Cloud OCR credentials.
-- Study Library persistence is implemented locally, but the live Supabase
-  project still needs the Phase 4 migration applied and RLS validated.
 - Canvas integration is not implemented beyond a thin package boundary.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
@@ -201,6 +200,6 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 4 live validation is the active milestone: apply the reviewer persistence
-migration to Supabase, then prove save, list, open, rename, delete, and
-cross-user denial against the live project.
+Phase 5 Canvas Integration is the next milestone: bring Canvas LMS material
+into the same authenticated source-to-reviewer pipeline now that Phase 4 Study
+Library persistence is complete and live validated.

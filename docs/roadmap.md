@@ -146,12 +146,12 @@ the editable OCR text field. Automatic repeated header/footer detection is
 deferred to a later OCR cleanup task.
 
 Immediate next task after Phase 3D: Phase 4 Study Library and Persistence.
-Phase 4 implementation now exists in code; live migrated Supabase validation is
-still required before marking that phase complete.
+Phase 4 is complete and live validated; the next product phase is Phase 5
+Canvas Integration.
 
 ## Phase 4 - Study Library And Persistence
 
-Status: Implemented in code; live migrated Supabase validation pending
+Status: Complete
 
 Purpose: Save generated study content to a user-owned library so reviewers can
 be reopened, renamed, and managed across sessions.
@@ -177,6 +177,19 @@ Implemented foundations:
 - Save-to-library action after reviewer generation, preserving editable
   OCR-before-reviewer behavior and storing only safe source metadata.
 - Regression-hardened PDF OCR web smoke wait for fast mocked OCR completion.
+- Live Supabase verification confirmed the migration is already applied, the
+  `public.reviewers` table exists, RLS remains enabled, and owner SELECT,
+  INSERT, UPDATE, and DELETE policies use `auth.uid() = user_id`.
+- Live cross-user validation used two distinct Supabase auth users. User A
+  created, listed, and opened a reviewer; User B's list excluded it and open,
+  rename, and delete attempts returned safe `404 reviewer_not_found` responses.
+- Reverse isolation was also validated: User B created and listed a reviewer;
+  User A could not list or open it; User B deleted it.
+- Cleanup removed both fictional validation reviewers through their owning
+  users, and follow-up owner-list/open checks confirmed no validation rows
+  remained.
+- The Next.js reviewer detail route typing fix aligns `[id]` route params with
+  the Promise-based App Router context without changing runtime behavior.
 
 Exit criteria:
 
@@ -190,8 +203,8 @@ Exit criteria:
   and cross-user denial against the deployed `reviewers` table.
 
 Immediate dependency: Phase 3 source-ingestion contracts are stable enough to
-store source metadata consistently. Remaining external dependency: apply the
-Phase 4 migration to the target Supabase project and validate live RLS.
+store source metadata consistently. All Phase 4 external validation gates are
+complete.
 
 ## Phase 5 - Canvas Integration
 
@@ -217,8 +230,8 @@ Exit criteria:
 - Canvas credentials and server-only tokens are not exposed to mobile bundles.
 - Canvas source metadata can be stored with reviewers when persistence exists.
 
-Immediate dependency: Phase 4 persistence and source metadata, plus a stable
-source-ingestion contract from Phase 3.
+Immediate dependency: completed Phase 4 persistence and source metadata, plus a
+stable source-ingestion contract from Phase 3.
 
 ## Phase 6 - Tasks And Study Schedules
 

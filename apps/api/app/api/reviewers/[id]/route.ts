@@ -35,7 +35,7 @@ interface ReviewerAuthContext {
 }
 
 interface ReviewerRouteContext {
-  readonly params: Promise<{ readonly id: string }> | { readonly id: string };
+  readonly params: Promise<{ readonly id: string }>;
 }
 
 export async function GET(

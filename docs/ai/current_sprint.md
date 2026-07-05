@@ -4,11 +4,10 @@ Last refreshed: 2026-07-05, Asia/Manila.
 
 ## Active Objective
 
-Phase 4 Study Library and Persistence is implemented in code. Automated API,
-mobile, DB, engine, OCR, and browser-smoke regressions pass. The remaining
-external step is applying the `reviewers` migration to the target Supabase
-project and validating live RLS-backed persistence before marking Phase 4
-complete.
+Phase 4 Study Library and Persistence is complete and live validated. The
+`reviewers` migration is already applied in the target Supabase project, live
+RLS-backed persistence passed with distinct users, and the next scoped product
+objective is Phase 5 Canvas Integration.
 
 ## Completed Phase 3A Scope
 
@@ -91,8 +90,6 @@ complete.
 
 ## Out Of Scope For Phase 4
 
-- Applying the migration to the live Supabase project from this local agent.
-- Live cross-user RLS validation until the migrated table is available.
 - Canvas LMS integration.
 - Task generation.
 - Study schedule generation.
@@ -189,6 +186,7 @@ complete.
 - `packages/db/migrations/202607050001_create_reviewers.sql` creates the
   `reviewers` table, update timestamp trigger, list index, and owner-scoped RLS
   policies.
+- The target Supabase project already has the Phase 4 migration applied.
 - `apps/api` exposes save, list, open, rename, and delete routes for saved
   reviewers.
 - Reviewer list responses return summaries only; full reviewer output is
@@ -201,17 +199,31 @@ complete.
   opens them without regeneration.
 - Save metadata is limited to source mode, source character count, optional PDF
   page count, and optional source label.
+- Live schema verification confirmed `public.reviewers` exists, RLS remains
+  enabled, and the owner SELECT, INSERT, UPDATE, and DELETE policies use
+  `auth.uid() = user_id`.
+- Live cross-user validation used distinct authenticated users and no
+  service-role reviewer CRUD. User A could create, list, and open a reviewer;
+  User B's list excluded it and open, rename, and delete attempts returned safe
+  `404 reviewer_not_found` responses without revealing owner data or row
+  existence.
+- Reverse isolation passed: User B could create and list a reviewer, User A
+  could not list or open it, and User B could delete it.
+- Cleanup passed: both fictional validation rows were deleted by their owning
+  users, opening deleted rows returned safe `404 reviewer_not_found`, and no
+  validation rows remained in owner lists.
+- The reviewer `[id]` route typing fix updates the App Router context to
+  Promise-based params and changes tests to match; runtime behavior is
+  unchanged.
 - Automated verification passed:
   - DB typecheck: passed
   - API typecheck/tests: passed; 94/94 tests
   - Mobile typecheck/tests: passed; 66/66 tests
   - OCR package tests: 14/14
-  - Smoke-runner tests: 51/51
   - Engine build/evals: passed; 266/266 eval cases
-  - Reviewer, image OCR, and PDF OCR web smokes passed with mocked OCR where
-    applicable.
-- Live Study Library validation was not run because the target Supabase project
-  still needs the Phase 4 migration applied.
+  - `git diff --check`: passed with line-ending warnings only
+  - Reviewer, image OCR, and PDF OCR web smokes retain latest recorded passes;
+    the final route fix was typing-only, so reviewer web smoke was not rerun.
 
 ## Phase 3C Completion Sequence
 
@@ -240,14 +252,11 @@ complete.
   image-only scanned PDF.
 - Authenticated users can save, list, open, rename, and delete their own saved
   reviewers.
-- RLS denies cross-user saved-reviewer access after the migration is applied to
-  a live Supabase project.
+- RLS denies cross-user saved-reviewer access in the live Supabase project.
 - Saved reviewer metadata avoids raw source text, OCR output, uploads, file
   paths, and credentials.
 
 ## Next Objective
 
-Apply the Phase 4 migration to the target Supabase project and run minimal live
-Study Library validation. After save, list, open, rename, delete, and cross-user
-denial are proven live, mark Phase 4 complete and begin the next scoped Phase 5
-Canvas task. The deferred header/footer cleanup task remains separate.
+Begin the next scoped Phase 5 Canvas Integration task. The deferred
+header/footer cleanup task remains separate.

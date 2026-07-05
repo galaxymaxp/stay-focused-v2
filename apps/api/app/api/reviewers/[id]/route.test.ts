@@ -164,7 +164,7 @@ function createRequest(
 }
 
 function routeContext(id: string) {
-  return { params: { id } };
+  return { params: Promise.resolve({ id }) };
 }
 
 function createReadClient(options: { readonly row: unknown }) {

@@ -5,9 +5,12 @@ Last refreshed: 2026-07-05, Asia/Manila.
 ## Repository Baseline
 
 - Branch: `main`
+- Phase 4 live-validation baseline before documentation and route-fix commit:
+  `2e945cf feat(library): implement Phase 4 study library persistence`
 - Local baseline before Phase 3B: `6e91231 feat(ocr): add provider-agnostic OCR API boundary`
-- Upstream status at refresh: `main...origin/main`, with no reported ahead or behind count
-- Working tree before Phase 3A edits: clean
+- Upstream status at refresh: `main...origin/main`, ahead 0 and behind 0
+- Working tree before final Phase 4 validation contained the reviewer `[id]`
+  route typing fix plus unrelated generated/mobile files left untouched.
 
 ## Working Vertical Slice
 
@@ -83,6 +86,15 @@ allowlisted source-metadata object; raw pasted source text, OCR text, uploaded
 images, PDFs, file paths, credentials, and private OCR artifacts are not stored
 by the save flow.
 
+Live Phase 4 validation is complete. The Supabase migration was already
+applied, the `public.reviewers` table exists, RLS remains enabled, and the
+owner SELECT, INSERT, UPDATE, and DELETE policies were verified to use
+`auth.uid() = user_id`. Two distinct authenticated users were validated through
+the local API without service-role reviewer CRUD: owner create/list/open worked,
+cross-user list/open/rename/delete denial returned safe
+`404 reviewer_not_found` responses, reverse isolation passed, and both
+fictional validation rows were deleted by their owners.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -121,6 +133,8 @@ by the save flow.
   `GET /api/reviewers/[id]`, `PATCH /api/reviewers/[id]`, and
   `DELETE /api/reviewers/[id]` routes using verified bearer auth and
   user-scoped Supabase access.
+- Next.js App Router typing for reviewer `[id]` route params now matches the
+  Promise-based context expected by route handlers.
 - Mobile Study Library list, open, rename, delete, refresh, create-new, and
   save-after-generation flows.
 - Save-to-library flow preserves editable OCR-before-reviewer behavior and
@@ -128,7 +142,7 @@ by the save flow.
 
 ## Current Verification Baselines
 
-Verified across the Phase 4 implementation pass:
+Verified across the final Phase 4 live-validation pass:
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -143,13 +157,20 @@ Verified across the Phase 4 implementation pass:
 - Mobile typecheck: passed
 - Mobile OCR client, picker, source-flow, and Study Library API tests: 66
   passed, 0 failed
-- Reviewer web smoke: passed with real reviewer generation
-- Deterministic OCR web smoke: passed with mocked OCR response and real
-  reviewer generation
-- Deterministic PDF OCR web smoke: passed with a fictional PDF fixture, mocked
-  OCR response, editable extracted text, and real reviewer generation
-- Live Supabase Study Library validation: pending until the Phase 4 migration
-  is applied to the target Supabase project.
+- Live Supabase schema verification: migration already applied; table, RLS,
+  and owner policies verified
+- Live Supabase Study Library validation: passed with distinct users,
+  bidirectional isolation, safe 404 item denial, owner cleanup, and no
+  validation rows remaining
+- Reviewer detail route typing fix: API typecheck and route tests passed; no
+  runtime behavior changed
+- `git diff --check`: passed with line-ending warnings only
+- Reviewer web smoke: not rerun for this final typing-only route fix
+- Deterministic OCR web smoke: latest recorded pass used mocked OCR response
+  and real reviewer generation
+- Deterministic PDF OCR web smoke: latest recorded pass used a fictional PDF
+  fixture, mocked OCR response, editable extracted text, and real reviewer
+  generation
 - Phase 3C live iPhone camera/image OCR validation: passed with local Expo Go
   -> Next.js API over LAN -> server-only Google Cloud Vision -> editable OCR
   text review -> reviewer generation. Reviewer Ready appeared, source-faithful,
@@ -216,9 +237,6 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   deferred to a later OCR cleanup task.
 - Google OCR credential paths are machine-specific local configuration and
   must remain server-only.
-- Study Library implementation is code-complete locally, but the Phase 4
-  migration still needs to be applied and validated against the target live
-  Supabase project before the roadmap phase is marked complete.
 - Canvas LMS integration is not implemented beyond the package boundary.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
@@ -227,11 +245,8 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
 
 ## Immediate Next Task
 
-Apply the Phase 4 `reviewers` migration to the target Supabase project and run
-minimal live Study Library validation: save, list, open, rename, delete, and
-cross-user denial. After that, mark Phase 4 complete and choose the next scoped
-Phase 5 Canvas task. Repeated PDF header/footer cleanup remains a deferred OCR
-cleanup candidate.
+Start the next scoped Phase 5 Canvas Integration task. Repeated PDF
+header/footer cleanup remains a deferred OCR cleanup candidate.
 
 ## Known Risks
 
@@ -252,9 +267,9 @@ cleanup candidate.
 - Scanned-PDF support is implemented as a synchronous 1-5 page MVP. Visible
   repeated headers and footers may still need manual removal before generation
   until a later cleanup task adds automatic repeated header/footer detection.
-- Reviewer persistence depends on the live Supabase `reviewers` migration and
-  RLS policies being present. API tests use mocked clients and do not replace a
-  live cross-user RLS validation.
+- Reviewer persistence now has a live cross-user RLS validation baseline.
+  Future persistence changes should preserve owner-scoped access, safe 404
+  denial, and owner-only cleanup behavior.
 - Mobile OAuth redirect completion still needs validation before it is claimed
   as complete.
 - Secrets must remain server-only; mobile env files may contain only public
