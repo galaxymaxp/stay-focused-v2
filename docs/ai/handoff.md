@@ -124,17 +124,23 @@ paths.
   modes, changed/unchanged/failed counts, and service-role-only state RPCs.
   Incremental mode still fetches complete Canvas snapshots, but unchanged
   courses skip database graph replacement.
+- Phase 5B.3C1 Conditional Request Capability Audit is complete as live
+  validation only. Production sync behavior was not changed. The audit found
+  stable ETags on the currently synchronized endpoint families, no
+  `Last-Modified`, no 304 responses, and 0% body-byte reduction. Continue
+  ordinary GET behavior for courses, modules, module items, Pages, Page
+  details, assignment groups, and assignments.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- Network-level conditional Canvas fetching, secondary Canvas resources,
-  file/media ingestion, source snapshots, grades, background synchronization,
-  task generation, and study schedule generation are still pending.
-  Announcements, discussions, planner data, endpoint validators, and reviewer
-  generation from Canvas content remain deferred.
+- Secondary Canvas resources, file/media ingestion, source snapshots, grades,
+  background synchronization, task generation, and study schedule generation
+  are still pending. Production endpoint validators remain unsupported for the
+  audited endpoint families. Announcements, discussions, planner data, and
+  reviewer generation from Canvas content remain deferred.
 
 ## Current Test Baselines
 
@@ -184,6 +190,13 @@ paths.
   7/7 workspaces with 4 cached and 3 fresh; workspace tests passed with API
   176/176, mobile 79/79, Canvas 33/33, and OCR 14/14; `git diff --check`
   passed with line-ending warnings only.
+- Phase 5B.3C1 live audit: stored encrypted Canvas connection loaded and
+  decrypted through the API-side boundary; 10 baseline GET requests and 10
+  primary conditional requests were audited; all primary conditional requests
+  returned HTTP 200 with full bodies, 0 returned 304, and body-byte reduction
+  was 0%. No sync run remained running.
+- Phase 5B.3C1 focused verification: Canvas typecheck/build/tests 33/33, API
+  typecheck/build/tests 176/176, and mobile typecheck/tests 79/79 passed.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -219,10 +232,11 @@ Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 academic graph synchronization is complete and live validated. Phase 5B.3A
 course recovery hardening is complete and live validated. Phase 5B.3B
 incremental academic graph synchronization foundation is complete and live
-validated. The recommended next phase is Phase 5B.3C conditional Canvas
-fetching and network-efficiency hardening. Secondary Canvas resources and
-automatic repeated scanned-PDF header/footer detection remain deferred
-candidates.
+validated. Phase 5B.3C1 conditional-request capability audit is complete and
+does not support Phase 5B.3C2 implementation for the audited endpoints. The
+recommended next phase is Phase 5B.4 secondary Canvas resource
+synchronization. Automatic repeated scanned-PDF header/footer detection remains
+a deferred candidate.
 
 ## Known Blockers And Risks
 
@@ -520,6 +534,49 @@ Latest full verification through pipeline integration on 2026-06-15:
 
 ## Session Log
 
+### 2026-07-06 Phase 5B.3C1 Canvas conditional-request capability audit
+
+- Starting baseline: `main` at `6401ee9`, matching `origin/main` with ahead 0
+  and behind 0. Known unrelated dirty files remained untouched:
+  `apps/api/next-env.d.ts`, `apps/mobile/expo-env.d.ts`, and
+  `apps/mobile/.gitignore`.
+- Created an ignored `.local` audit harness and kept all raw live artifacts out
+  of git.
+- Loaded the existing stored encrypted Canvas connection through the API-side
+  service-role and token-decryption boundary. Connection availability,
+  decryption success, and audit-client initialization passed.
+- Production Canvas synchronization behavior was not changed. No migrations,
+  sync runs, graph writes, validator persistence, raw response caching, or
+  secondary Canvas resources were added.
+- Audited active course listing, modules, module items, Pages, Page details,
+  assignment groups, and assignments with 3 local course sample labels and no
+  real course identity output.
+- Baseline requests: 10; primary conditional requests: 10; controlled
+  conditional subtests: 20.
+- ETags were present and stable across all audited endpoint families.
+- `Last-Modified` was absent across all audited endpoint families.
+- If-None-Match requests returned HTTP 200 with full bodies for every audited
+  endpoint. No 304 responses were observed.
+- Baseline body bytes and conditional body bytes were both 154,503, so
+  observed body-byte reduction was 0%.
+- Baseline duration was 3.467 seconds; primary conditional duration was 3.993
+  seconds.
+- One paginated Page collection included a later page, proving future
+  conditional design would require per-page validator and pagination state if
+  useful 304 behavior is ever observed.
+- Page-list validators cannot prove Page-detail body stability. Module-item
+  lists, assignment groups, and assignments require separate state from
+  neighboring collection families.
+- The four known Page-listing failures remained
+  `canvas_course_pages_failed`, `resource_not_found`, non-retryable, not 304,
+  and did not advance graph or fingerprint state.
+- Focused verification passed because production source was not changed:
+  Canvas typecheck/build/tests 33/33, API typecheck/build/tests 176/176, and
+  mobile typecheck/tests 79/79.
+- Decision: Outcome C. Continue ordinary GET behavior for all currently
+  synchronized endpoint families. Recommended next Canvas phase: Phase 5B.4
+  secondary Canvas resource synchronization.
+
 ### 2026-07-06 Phase 5B.3B incremental academic graph synchronization foundation
 
 - Starting baseline: `main` at `289f636`, matching `origin/main` with ahead 0
@@ -574,8 +631,9 @@ Latest full verification through pipeline integration on 2026-06-15:
 - Incremental mode reduced database replacement and pruning work for unchanged
   courses. It does not reduce Canvas request volume yet because complete
   snapshots are still fetched before comparison.
-- Next recommended phase: Phase 5B.3C conditional Canvas fetching and
-  network-efficiency hardening.
+- At that time, the next recommended phase was Phase 5B.3C conditional Canvas
+  fetching and network-efficiency hardening; Phase 5B.3C1 has since completed
+  that audit and recommends moving to Phase 5B.4 instead.
 
 ### 2026-07-06 Phase 5B.3A Canvas course recovery hardening
 

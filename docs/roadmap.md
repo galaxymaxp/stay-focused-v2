@@ -212,8 +212,9 @@ Status: In progress. Phase 5A is complete and live validated; Phase 5B.1
 academic graph foundation is complete; Phase 5B.2 initial full academic graph
 synchronization is complete and live validated; Phase 5B.3A course recovery
 hardening is complete and live validated; Phase 5B.3B incremental persistence
-is complete and live validated; Phase 5B.3C through Phase 5F remain planned
-and must not be collapsed into a single generic Canvas integration task.
+is complete and live validated; Phase 5B.3C1 conditional-request capability
+audit is complete; Phase 5B.4 through Phase 5F remain planned and must not be
+collapsed into a single generic Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -349,7 +350,8 @@ Status: In progress. Phase 5B.1 is complete as a database and typed Canvas API
 foundation. Phase 5B.2 initial full synchronization is complete as a manual,
 synchronous route with atomic per-course persistence. Phase 5B.3A recovery
 hardening and Phase 5B.3B deterministic incremental persistence are complete.
-Network-level conditional fetching remains deferred.
+Phase 5B.3C1 found no useful 304 support for the currently synchronized
+endpoint families, so production conditional fetching remains unsupported.
 
 #### Phase 5B.1 - Academic Graph Foundation
 
@@ -526,7 +528,8 @@ Deferred from Phase 5B.3B:
 
 #### Phase 5B.3C - Conditional Canvas Fetching And Network-Efficiency Hardening
 
-Status: Pending.
+Status: Audit complete for Phase 5B.3C1. Production conditional fetching is
+not implemented.
 
 Scope:
 
@@ -537,6 +540,56 @@ Scope:
   5B.3B.
 - Avoid claiming delta synchronization where Canvas cannot provide a reliable
   cursor.
+
+Phase 5B.3C1 audit result:
+
+- A local ignored harness audited active course listing, modules, module items,
+  Pages, Page details, assignment groups, and assignments using the stored
+  encrypted Canvas connection.
+- Production sync behavior was unchanged; no sync runs, graph writes,
+  validator persistence, raw response caching, or migrations were added.
+- ETags were present and stable across all audited endpoint families.
+- `Last-Modified` was absent across all audited endpoint families.
+- If-None-Match primary conditional requests returned HTTP 200 with full
+  bodies for every audited endpoint; no 304 responses were observed.
+- Baseline and conditional body bytes were both 154,503, so observed body-byte
+  reduction was 0%.
+- One paginated Page collection included a later page, confirming that any
+  future conditional design would need independent per-page validator and
+  pagination state.
+- Page-list validators cannot be treated as proof that Page-detail bodies are
+  unchanged.
+- Module lists, module-item lists, assignment groups, and assignments require
+  separate state if future evidence ever supports conditional requests.
+- The four known Page-listing failures remained
+  `canvas_course_pages_failed`, `resource_not_found`, non-retryable, not 304,
+  and did not advance graph or fingerprint state.
+
+Decision:
+
+- Outcome C: no useful validator support was observed.
+- Do not implement Phase 5B.3C2 for the currently synchronized endpoint
+  families.
+- Continue ordinary GET behavior for courses, modules, module items, Pages,
+  Page details, assignment groups, and assignments.
+- Do not invent validators and do not skip requests based only on
+  course-level fingerprint state.
+
+#### Phase 5B.4 - Secondary Canvas Resource Synchronization
+
+Status: Pending.
+
+Scope:
+
+- Select the next Canvas resource family only after explicit product and
+  security review.
+- Continue using the per-user credential boundary, service-role persistence,
+  sanitized diagnostics, and failure-preservation rules established in Phase
+  5A through Phase 5B.3C1.
+- Keep production conditional fetching out unless future evidence shows
+  reliable 304 behavior.
+- Continue not treating Page-listing 404 failures as successful empty-Page
+  collections.
 
 ### Phase 5C - File, Attachment, And Media Ingestion
 

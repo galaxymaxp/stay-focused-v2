@@ -12,7 +12,9 @@ graph with atomic per-course persistence. Phase 5B.3A hardens that sync path
 with operation-specific course failure diagnostics and bounded transient
 retries. Phase 5B.3B adds deterministic incremental persistence: unchanged
 courses still fetch complete Canvas snapshots, but skip database graph
-replacement when the versioned snapshot fingerprint is unchanged.
+replacement when the versioned snapshot fingerprint is unchanged. Phase 5B.3C1
+audited conditional-request support and found no useful 304 behavior for the
+currently synchronized Canvas endpoint families.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -91,6 +93,9 @@ Complete:
   deterministic course-snapshot fingerprint, service-role-only sync state,
   changed/unchanged/failed counts, and unchanged-course graph replacement
   avoidance
+- Phase 5B.3C1 Canvas conditional-request capability audit, with no production
+  sync behavior change and no 304/body-byte reduction observed for current sync
+  endpoint families
 
 Working locally:
 
@@ -143,12 +148,15 @@ Working locally:
   failed courses, 0 graph replacements for unchanged courses, stable
   fingerprints, stable graph timestamps, no duplicate identities, and no
   running sync rows left behind.
+- Phase 5B.3C1 live conditional-request audit passed as validation only. ETags
+  were present, `Last-Modified` was absent, primary conditional requests
+  returned HTTP 200 with full bodies, no 304 responses were observed, body-byte
+  reduction was 0%, and no sync runs or graph writes were created.
 
 Pending:
 
-- Network-level conditional Canvas fetching, secondary Canvas resources,
-  content ingestion, grade sync, and background/resumable sync for larger
-  accounts
+- Secondary Canvas resources, content ingestion, grade sync, and
+  background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -276,7 +284,9 @@ tests do not run that opt-in provider smoke.
 - Phase 5B.3A remains closed, and Phase 5B.3B is complete as deterministic
   incremental database persistence. Incremental mode still fetches complete
   Canvas snapshots, but unchanged courses avoid database graph replacement.
-  Network-level conditional fetching remains deferred.
+- Phase 5B.3C1 is complete as a capability audit only. Production conditional
+  fetching remains unsupported for the current Canvas sync endpoint families
+  because no 304 behavior or body-byte reduction was observed.
 - No background or scheduled Canvas synchronization exists yet, and no mobile
   synchronization screen exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
@@ -300,6 +310,7 @@ Phase 5A hardening is complete, Phase 5B.1 academic graph foundation is in
 place, Phase 5B.2 initial full academic graph synchronization is live
 validated, and Phase 5B.3A course recovery hardening is live validated. The
 Phase 5B.3B incremental academic graph synchronization foundation is complete
-and live validated. The recommended next phase is Phase 5B.3C conditional
-Canvas fetching and network-efficiency hardening; secondary Canvas resources
-and Canvas OAuth remain future phases.
+and live validated. Phase 5B.3C1 conditional-request capability audit is
+complete and does not support Phase 5B.3C2 for the audited endpoints. The
+recommended next phase is Phase 5B.4 secondary Canvas resource
+synchronization; Canvas OAuth remains a future phase.

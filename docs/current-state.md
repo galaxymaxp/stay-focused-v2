@@ -278,6 +278,23 @@ and 0 running sync rows. Incremental mode does not yet reduce Canvas network
 requests because it still fetches complete snapshots before comparison.
 Secondary Canvas resources remain deferred.
 
+Phase 5B.3C1 is complete as a live capability audit only. A local ignored
+harness used the stored encrypted Canvas connection through the API-side
+service-role/decryption boundary and audited active courses, modules, module
+items, Pages, Page details, assignment groups, and assignments. Production
+synchronization behavior was not changed, no sync runs were created, and no
+graph state was modified. ETags were present and stable on all audited
+endpoint families, but `Last-Modified` was absent and every primary
+conditional request returned HTTP 200 with a full body rather than 304. The
+baseline and conditional passes both transferred 154,503 response-body bytes,
+so observed body-byte reduction was 0%. One paginated Page collection included
+a later page, confirming that any future pagination-safe strategy would need
+independent per-page validator and pagination state. The four known
+Page-listing failures remained `canvas_course_pages_failed`,
+`resource_not_found`, non-retryable, not 304, and did not advance graph or
+fingerprint state. Phase 5B.3C1 recommends no production conditional-fetch
+support for the currently synchronized endpoint families.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -544,6 +561,10 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   unchanged courses still fetch complete Canvas snapshots, but avoid database
   graph replacement. The four Page-listing failures remain safely classified
   permanent limitations. Secondary Canvas resources remain deferred.
+- Phase 5B.3C1 conditional-request capability audit is complete. It did not
+  change production sync. ETags were present, `Last-Modified` was absent, no
+  304 responses were observed, and conditional requests produced no body-byte
+  reduction. Continue ordinary GET behavior for the current endpoint families.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -556,9 +577,10 @@ Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 academic graph synchronization is complete and live validated. Phase 5B.3A
 course recovery hardening is complete and live validated. Phase 5B.3B
 incremental academic graph synchronization foundation is complete and live
-validated. The recommended next task is Phase 5B.3C conditional Canvas
-fetching and network-efficiency hardening. Secondary Canvas resources and
-repeated PDF header/footer cleanup remain deferred candidates.
+validated. Phase 5B.3C1 conditional-request capability audit is complete and
+does not support Phase 5B.3C2 implementation for the audited endpoints. The
+recommended next task is Phase 5B.4 secondary Canvas resource synchronization.
+Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks
 

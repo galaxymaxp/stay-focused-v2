@@ -24,8 +24,11 @@ concurrency, sync-run persistence, and no background worker. Phase 5B.3A
 course recovery hardening remains closed. Phase 5B.3B incremental academic
 graph synchronization foundation is complete and live validated: unchanged
 courses still fetch complete Canvas snapshots, but skip database graph
-replacement when deterministic versioned fingerprints match. There is no
-school-wide Canvas token.
+replacement when deterministic versioned fingerprints match. Phase 5B.3C1
+conditional-request capability audit is complete as validation only: ETags were
+present, `Last-Modified` was absent, no 304 responses were observed, and
+ordinary GET behavior remains recommended for current Canvas sync endpoints.
+There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
 
@@ -667,6 +670,45 @@ school-wide Canvas token.
   courses but did not reduce Canvas request volume. Complete snapshots are
   still fetched before fingerprint comparison.
 
+## Phase 5B.3C1 Results
+
+- Completed Canvas conditional-request capability audit as live validation
+  only. Production synchronization behavior was not changed.
+- Used an ignored local harness under `.local/` with the stored encrypted
+  Canvas connection loaded through the API-side service-role and decryption
+  boundary.
+- Audited active course listing, modules, module items, Pages, Page details,
+  assignment groups, and assignments.
+- Successful course samples: 3 local labels; real course identities were not
+  printed or committed.
+- Baseline ordinary GET requests: 10.
+- Primary conditional requests: 10.
+- Controlled conditional subtests: 20.
+- ETags were present and stable on every audited endpoint family.
+- `Last-Modified` was absent on every audited endpoint family.
+- Primary If-None-Match requests returned HTTP 200 with full bodies on every
+  audited endpoint; no 304 responses were observed.
+- Baseline body bytes: 154,503.
+- Conditional body bytes: 154,503.
+- Body-byte reduction: 0%.
+- Baseline duration: 3.467 seconds.
+- Conditional duration: 3.993 seconds.
+- One paginated Page collection included a later page; any future conditional
+  design would need per-page validator and pagination state.
+- Page-list validators cannot prove Page-detail body stability.
+- Module-item lists, assignment groups, and assignments require separate state
+  from their neighboring collection families.
+- Four Page-listing failures remained `canvas_course_pages_failed`,
+  `resource_not_found`, non-retryable, not 304, and did not advance graph or
+  fingerprint state.
+- Focused verification passed because production source was not changed:
+  Canvas typecheck/build/tests 33/33, API typecheck/build/tests 176/176, and
+  mobile typecheck/tests 79/79.
+- Decision: Outcome C, no useful validator support observed. Continue ordinary
+  GET behavior for all currently synchronized endpoint families.
+- Recommended next Canvas phase: Phase 5B.4 secondary Canvas resource
+  synchronization.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -705,6 +747,7 @@ Phase 5A hardening is complete, Phase 5A quality conditions are closed, Phase
 academic graph synchronization is complete and live validated. Phase 5B.3A
 course recovery hardening is complete and live validated. Phase 5B.3B
 incremental academic graph synchronization foundation is complete and live
-validated. The recommended next phase is Phase 5B.3C conditional Canvas
-fetching and network-efficiency hardening. Secondary Canvas resources and the
-deferred header/footer cleanup task remain separate.
+validated. Phase 5B.3C1 conditional-request capability audit is complete and
+does not support Phase 5B.3C2 implementation for the audited endpoints. The
+recommended next phase is Phase 5B.4 secondary Canvas resource
+synchronization. The deferred header/footer cleanup task remains separate.
