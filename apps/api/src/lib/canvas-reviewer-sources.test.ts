@@ -1,7 +1,11 @@
 import type { Database } from "@stay-focused/db";
+import type { OcrInput, OcrProvider, OcrResult } from "@stay-focused/ocr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PDFDocument } from "pdf-lib";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
+import { safeObjectKeyForCanvasFile } from "@/lib/canvas-file-policy";
 import {
   CANVAS_REVIEWER_MAX_COMBINED_CHARS,
   CANVAS_REVIEWER_MAX_SOURCES,
@@ -26,6 +30,7 @@ const OTHER_PAGE_ID = "11111111-1111-4111-8111-111111111112";
 const ASSIGNMENT_ID = "22222222-2222-4222-8222-222222222222";
 const ANNOUNCEMENT_ID = "33333333-3333-4333-8333-333333333333";
 const FILE_ID = "44444444-4444-4444-8444-444444444444";
+const OTHER_FILE_ID = "44444444-4444-4444-8444-444444444445";
 const NOW = "2026-07-07T00:00:00.000Z";
 
 describe("Canvas reviewer source normalization", () => {
@@ -118,6 +123,7 @@ describe("Canvas reviewer source normalization", () => {
 describe("Canvas reviewer source service", () => {
   it("lists only selected-course descriptors without source bodies", async () => {
     const fake = createFakeCanvasClient();
+    const provider = createFakeOcrProvider("unused");
 
     const result = await listCanvasReviewerSources({
       client: fake.client,
@@ -144,7 +150,12 @@ describe("Canvas reviewer source service", () => {
     ]);
     expect(result.value.sources.find((entry) => entry.type === "file")).toMatchObject({
       availability: "unavailable",
-      unavailableReason: "Text extraction for this file type is not available yet.",
+      file: {
+        canPrepare: true,
+        kind: "pdf",
+        preparationStatus: "not_prepared",
+      },
+      unavailableReason: "Prepare this file before using it.",
     });
     expect(JSON.stringify(result.value)).not.toContain("body_html");
     expect(JSON.stringify(result.value)).not.toContain("description_html");
@@ -152,6 +163,139 @@ describe("Canvas reviewer source service", () => {
     expect(fake.selectedColumnsFor("canvas_connections").join(",")).not.toContain(
       "token_ciphertext",
     );
+    expect(fake.storageCalls).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it("lists ready PDF and image descriptors as selectable without private fields", async () => {
+    const pdfBytes = await createPdfBytes(1);
+    const imageBytes = createPngBytes();
+    const pdfFile = readyFileRow({
+      bytes: pdfBytes,
+      contentType: "application/pdf",
+      fileId: FILE_ID,
+      title: "Fictional handout.pdf",
+    });
+    const imageFile = readyFileRow({
+      bytes: imageBytes,
+      contentType: "image/png",
+      fileId: OTHER_FILE_ID,
+      title: "Fictional diagram.png",
+    });
+    const fake = createFakeCanvasClient({
+      canvas_files: [pdfFile, imageFile],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.sources.filter((entry) => entry.type === "file")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          availability: "available",
+          file: {
+            canPrepare: false,
+            kind: "pdf",
+            preparationStatus: "ready",
+          },
+          id: `file:${FILE_ID}`,
+          unavailableReason: null,
+        }),
+        expect.objectContaining({
+          availability: "available",
+          file: {
+            canPrepare: false,
+            kind: "image",
+            preparationStatus: "ready",
+          },
+          id: `file:${OTHER_FILE_ID}`,
+          unavailableReason: null,
+        }),
+      ]),
+    );
+    const serialized = JSON.stringify(result.value);
+    expect(serialized).not.toContain("storage_object_key");
+    expect(serialized).not.toContain("current_sha256");
+  });
+
+  it.each([
+    [
+      "failed but retryable",
+      {
+        content_type: "image/jpeg",
+        display_name: "Fictional retry.jpg",
+        filename: "fictional-retry.jpg",
+        ingestion_eligibility: "eligible_image",
+        ingestion_status: "failed",
+      },
+      {
+        file: {
+          canPrepare: true,
+          kind: "image",
+          preparationStatus: "failed",
+        },
+        reason: "Preparation failed. Try preparing this file again.",
+      },
+    ],
+    [
+      "blocked by size",
+      {
+        ingestion_eligibility: "blocked_size",
+        size_bytes: 100_000_000,
+      },
+      {
+        file: {
+          canPrepare: false,
+          kind: "pdf",
+          preparationStatus: "blocked",
+        },
+        reason: "This file exceeds the supported size.",
+      },
+    ],
+    [
+      "unsupported plain text",
+      {
+        content_type: "text/plain",
+        display_name: "Fictional notes.txt",
+        filename: "fictional-notes.txt",
+        ingestion_eligibility: "metadata_only_unsupported",
+        ingestion_status: "metadata_only",
+      },
+      {
+        file: {
+          canPrepare: false,
+          kind: "unsupported",
+          preparationStatus: "unsupported",
+        },
+        reason: "This file type is not supported yet.",
+      },
+    ],
+  ])("lists %s file descriptors with safe state", async (_name, overrides, expected) => {
+    const fake = createFakeCanvasClient({
+      canvas_files: [{ ...baseFileRow(), ...overrides }],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const descriptor = result.value.sources.find((entry) => entry.type === "file");
+    expect(descriptor).toMatchObject({
+      availability: "unavailable",
+      file: expected.file,
+      unavailableReason: expected.reason,
+    });
   });
 
   it("preserves submitted preview order after same-course ownership lookup", async () => {
@@ -217,9 +361,181 @@ describe("Canvas reviewer source service", () => {
     });
     expect(file).toMatchObject({
       ok: false,
-      code: "canvas_source_unavailable",
+      code: "canvas_source_file_preparation_required",
     });
   });
+
+  it("preserves mixed Page/PDF/Announcement order through Storage-backed OCR", async () => {
+    const pdfBytes = await createPdfBytes(2);
+    const file = readyFileRow({
+      bytes: pdfBytes,
+      contentType: "application/pdf",
+      fileId: FILE_ID,
+      title: "Fictional handout.pdf",
+    });
+    const fake = createFakeCanvasClient(
+      {
+        canvas_files: [file],
+      },
+      [[String(file.storage_object_key), pdfBytes]],
+    );
+    const provider = createFakeOcrProvider((input) =>
+      input.kind === "pdf"
+        ? input.requestedPages.map((page) => `PDF page ${page} text.`).join("\n\n")
+        : "unused",
+    );
+
+    const result = await previewCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      ocrProvider: provider,
+      sourceIds: [`page:${PAGE_ID}`, `file:${FILE_ID}`, `announcement:${ANNOUNCEMENT_ID}`],
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.sources).toEqual([
+      expect.objectContaining({ id: `page:${PAGE_ID}`, type: "page" }),
+      expect.objectContaining({
+        fileKind: "pdf",
+        id: `file:${FILE_ID}`,
+        pageCount: 2,
+        type: "file",
+      }),
+      expect.objectContaining({
+        id: `announcement:${ANNOUNCEMENT_ID}`,
+        type: "announcement",
+      }),
+    ]);
+    expect(result.value.sourceText.indexOf("SOURCE 1 - PAGE")).toBeLessThan(
+      result.value.sourceText.indexOf("SOURCE 2 - PDF"),
+    );
+    expect(result.value.sourceText.indexOf("SOURCE 2 - PDF")).toBeLessThan(
+      result.value.sourceText.indexOf("SOURCE 3 - ANNOUNCEMENT"),
+    );
+    expect(result.value.sourceText).toContain("PDF page 1 text.\n\nPDF page 2 text.");
+    expect(fake.storageCalls).toHaveLength(1);
+    expect(provider.calls).toHaveLength(1);
+    expect(JSON.stringify(result.value)).not.toContain("storage_object_key");
+    expect(JSON.stringify(result.value)).not.toContain("current_sha256");
+  });
+
+  it("rejects two file sources before reading Storage or invoking OCR", async () => {
+    const fake = createFakeCanvasClient();
+    const provider = createFakeOcrProvider("unused");
+
+    const result = await previewCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      ocrProvider: provider,
+      sourceIds: [`file:${FILE_ID}`, `file:${OTHER_FILE_ID}`],
+      userId: USER_ID,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "canvas_source_ocr_file_limit_exceeded",
+    });
+    expect(fake.calls).toHaveLength(0);
+    expect(fake.storageCalls).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it("rejects an unprepared file without returning partial preview text", async () => {
+    const fake = createFakeCanvasClient();
+    const provider = createFakeOcrProvider("unused");
+
+    const result = await previewCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      ocrProvider: provider,
+      sourceIds: [`page:${PAGE_ID}`, `file:${FILE_ID}`],
+      userId: USER_ID,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "canvas_source_file_preparation_required",
+    });
+    expect(JSON.stringify(result)).not.toContain("Readable page text");
+    expect(fake.storageCalls).toHaveLength(0);
+    expect(provider.calls).toHaveLength(0);
+  });
+
+  it("enforces the per-source limit after file OCR", async () => {
+    const imageBytes = createPngBytes();
+    const file = readyFileRow({
+      bytes: imageBytes,
+      contentType: "image/png",
+      fileId: FILE_ID,
+      title: "Fictional diagram.png",
+    });
+    const fake = createFakeCanvasClient(
+      { canvas_files: [file] },
+      [[String(file.storage_object_key), imageBytes]],
+    );
+
+    const result = await previewCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      ocrProvider: createFakeOcrProvider("A".repeat(CANVAS_REVIEWER_MAX_SOURCE_CHARS + 1)),
+      sourceIds: [`file:${FILE_ID}`],
+      userId: USER_ID,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "canvas_source_preview_too_large",
+      details: {
+        allowedMaximum: CANVAS_REVIEWER_MAX_SOURCE_CHARS,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("AAAAA");
+  });
+
+  it("enforces the combined limit after file OCR assembly", async () => {
+    const pageRows = Array.from({ length: 7 }, (_, index) =>
+      pageRow({
+        bodyText: "P".repeat(11_500),
+        id: pageId(index),
+        title: `Fictional Page ${index + 1}`,
+      }),
+    );
+    const imageBytes = createPngBytes();
+    const file = readyFileRow({
+      bytes: imageBytes,
+      contentType: "image/png",
+      fileId: FILE_ID,
+      title: "Fictional diagram.png",
+    });
+    const fake = createFakeCanvasClient(
+      {
+        canvas_files: [file],
+        canvas_pages: pageRows,
+      },
+      [[String(file.storage_object_key), imageBytes]],
+    );
+
+    const result = await previewCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      ocrProvider: createFakeOcrProvider("I".repeat(10_000)),
+      sourceIds: [...pageRows.map((row) => `page:${row.id}`), `file:${FILE_ID}`],
+      userId: USER_ID,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "canvas_source_preview_too_large",
+      details: {
+        allowedMaximum: CANVAS_REVIEWER_MAX_COMBINED_CHARS,
+        selectedSourceCount: 8,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("IIIII");
+   });
 
   it("returns safe size details without silently truncating large sources", async () => {
     const largePageBody = `<p>${"Large fictional paragraph. ".repeat(900)}</p>`;
@@ -260,6 +576,7 @@ function source(
     descriptor: {
       availability: "available",
       estimatedCharacters: 20,
+      file: null,
       id,
       title,
       type,
@@ -275,6 +592,11 @@ type FakeRecord = Readonly<Record<string, unknown>>;
 interface FakeCall {
   readonly table: string;
   readonly selectedColumns: string;
+}
+
+interface FakeStorageCall {
+  readonly bucket: string;
+  readonly key: string;
 }
 
 interface FakeQueryResult {
@@ -413,12 +735,16 @@ function compareFakeValues(
 
 function createFakeCanvasClient(
   overrides: Partial<Record<string, readonly FakeRecord[]>> = {},
+  storageEntries: readonly (readonly [string, Uint8Array])[] = [],
 ): {
   readonly calls: readonly FakeCall[];
   readonly client: SupabaseClient<Database>;
   readonly selectedColumnsFor: (table: string) => readonly string[];
+  readonly storageCalls: readonly FakeStorageCall[];
 } {
   const calls: FakeCall[] = [];
+  const storageCalls: FakeStorageCall[] = [];
+  const storageObjects = new Map(storageEntries);
   const tables = {
     ...baseCanvasTables(),
     ...overrides,
@@ -426,6 +752,28 @@ function createFakeCanvasClient(
   const client = {
     from: (tableName: string) =>
       new FakeSupabaseQuery(tableName, tables[tableName] ?? [], calls),
+    storage: {
+      from: (bucket: string) => ({
+        download: async (key: string) => {
+          storageCalls.push({ bucket, key });
+          const bytes = storageObjects.get(key);
+          if (!bytes) {
+            return {
+              data: null,
+              error: {
+                message: "Object not found",
+                name: "StorageApiError",
+                status: 404,
+              },
+            };
+          }
+          return {
+            data: new Blob([arrayBufferFromBytes(bytes)]),
+            error: null,
+          };
+        },
+      }),
+    },
   } as unknown as SupabaseClient<Database>;
 
   return {
@@ -435,6 +783,7 @@ function createFakeCanvasClient(
       calls
         .filter((call) => call.table === table)
         .map((call) => call.selectedColumns),
+    storageCalls,
   };
 }
 
@@ -629,11 +978,141 @@ function baseFileRow(): FakeRecord {
     user_id: USER_ID,
     canvas_connection_id: CONNECTION_ID,
     course_id: COURSE_ID,
+    canvas_course_id: "101",
     canvas_file_id: "file-1",
+    content_type: "application/pdf",
     display_name: "Fictional handout.pdf",
+    filename: "fictional-handout.pdf",
+    ingestion_eligibility: "eligible_document",
+    ingestion_status: "not_requested",
+    availability_status: "available",
+    size_bytes: 4096,
+    stored_content_type: null,
+    stored_byte_count: null,
+    storage_bucket: null,
+    storage_object_key: null,
+    current_sha256: null,
+    hidden: false,
+    hidden_for_user: false,
+    locked: false,
+    lock_at: null,
+    unlock_at: null,
+    media_class: null,
+    media_entry_id: null,
     canvas_modified_at: NOW,
     canvas_updated_at: NOW,
     last_synced_at: NOW,
     updated_at: NOW,
   };
+}
+
+function readyFileRow({
+  bytes,
+  contentType,
+  fileId,
+  title,
+}: {
+  readonly bytes: Uint8Array;
+  readonly contentType: "application/pdf" | "image/png" | "image/jpeg";
+  readonly fileId: string;
+  readonly title: string;
+}): FakeRecord {
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  const extension =
+    contentType === "application/pdf" ? "pdf" : contentType === "image/png" ? "png" : "jpg";
+  return {
+    ...baseFileRow(),
+    id: fileId,
+    content_type: contentType,
+    current_sha256: hash,
+    display_name: title,
+    filename: `fictional-${fileId.slice(-4)}.${extension}`,
+    ingestion_eligibility:
+      contentType === "application/pdf" ? "eligible_document" : "eligible_image",
+    ingestion_status: "stored",
+    last_successful_ingestion_at: NOW,
+    storage_bucket: "canvas-source-files",
+    storage_object_key: safeObjectKeyForCanvasFile({
+      contentHash: hash,
+      fileId,
+      userId: USER_ID,
+    }),
+    stored_byte_count: bytes.byteLength,
+    stored_content_type: contentType,
+  };
+}
+
+function pageRow({
+  bodyText,
+  id,
+  title,
+}: {
+  readonly bodyText: string;
+  readonly id: string;
+  readonly title: string;
+}): FakeRecord {
+  return {
+    ...basePageRow(),
+    body_html: `<p>${bodyText}</p>`,
+    canvas_page_id: `page-${id.slice(-2)}`,
+    id,
+    title,
+  };
+}
+
+function pageId(index: number): string {
+  return `55555555-5555-4555-8555-55555555555${index}`;
+}
+
+function createFakeOcrProvider(
+  textOrFactory: string | ((input: OcrInput) => string),
+): OcrProvider & { readonly calls: OcrInput[] } {
+  const calls: OcrInput[] = [];
+  return {
+    calls,
+    id: "fake-ocr",
+    async extract(input) {
+      calls.push(input);
+      const text =
+        typeof textOrFactory === "function" ? textOrFactory(input) : textOrFactory;
+      return ocrResult(input, text);
+    },
+  };
+}
+
+function ocrResult(input: OcrInput, text: string): OcrResult {
+  return {
+    mimeType: input.mimeType,
+    pages:
+      input.kind === "pdf"
+        ? input.requestedPages.map((pageNumber) => ({
+            blocks: [],
+            pageNumber,
+            text,
+          }))
+        : [{ blocks: [], pageNumber: 1, text }],
+    provider: "fake-ocr",
+    text,
+    warnings: [],
+  };
+}
+
+function createPngBytes(): Uint8Array {
+  return new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x66, 0x69, 0x78,
+  ]);
+}
+
+function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
+async function createPdfBytes(pageCount: number): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  for (let index = 0; index < pageCount; index += 1) {
+    pdf.addPage([200, 200]);
+  }
+  return pdf.save({ updateFieldAppearances: false });
 }

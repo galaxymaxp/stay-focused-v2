@@ -11,17 +11,39 @@ import type {
   CanvasSyncRunRow,
   Database,
 } from "@stay-focused/db";
+import type { OcrProvider } from "@stay-focused/ocr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   parseFragment,
   type DefaultTreeAdapterMap,
 } from "parse5";
 
+import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
+import {
+  CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST,
+  normalizeMimeType,
+} from "@/lib/canvas-file-policy";
 import { readConnection } from "@/lib/canvas-routes";
+import {
+  classifyStoredCanvasFileKind,
+  extractPreparedCanvasFileText,
+  isPreparedCanvasFileReadyForOcr,
+  type CanvasStoredFileKind,
+} from "@/lib/canvas-stored-file-extraction";
+import {
+  sanitizeCanvasPreviewText,
+  sanitizeCanvasTitleText,
+} from "@/lib/canvas-source-safety";
+import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
+import { OCR_MAX_IMAGE_BYTES, OCR_MAX_PDF_BYTES } from "@/lib/ocr/upload-policy";
 import { REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS } from "@/lib/reviewer-generation-limits";
-import type { CanvasApiErrorCode } from "@/types/canvas";
+import type {
+  CanvasApiErrorCode,
+  CanvasFileIngestionResultStatus,
+} from "@/types/canvas";
 
 export const CANVAS_REVIEWER_MAX_SOURCES = 8;
+export const CANVAS_REVIEWER_MAX_OCR_FILES = 1;
 export const CANVAS_REVIEWER_MAX_SOURCE_CHARS = 20_000;
 export const CANVAS_REVIEWER_MAX_COMBINED_CHARS = 90_000;
 export const CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS = 120;
@@ -37,8 +59,6 @@ const SOURCE_TYPE_ORDER = new Map<CanvasReviewerSourceType, number>([
   ["announcement", 2],
   ["file", 3],
 ]);
-const AVAILABLE_REASON_FILE =
-  "Text extraction for this file type is not available yet.";
 const COURSE_COLUMNS =
   "id,user_id,canvas_connection_id,canvas_course_id,name,course_code,workflow_state,enrollment_term_id,account_id,start_at,end_at,time_zone,public_syllabus,syllabus_body,canvas_updated_at,first_synced_at,last_synced_at,created_at,updated_at";
 const PREFERENCE_COLUMNS =
@@ -62,6 +82,20 @@ export type CanvasReviewerSourceType =
 
 export type CanvasReviewerSourceAvailability = "available" | "unavailable";
 
+export type CanvasReviewerFilePreparationStatus =
+  | "ready"
+  | "not_prepared"
+  | "failed"
+  | "blocked"
+  | "unsupported"
+  | "unavailable";
+
+export interface CanvasReviewerFileState {
+  readonly kind: CanvasStoredFileKind;
+  readonly preparationStatus: CanvasReviewerFilePreparationStatus;
+  readonly canPrepare: boolean;
+}
+
 export interface CanvasReviewerSourceDescriptor {
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
@@ -70,6 +104,7 @@ export interface CanvasReviewerSourceDescriptor {
   readonly unavailableReason: string | null;
   readonly updatedAt: string | null;
   readonly estimatedCharacters: number | null;
+  readonly file: CanvasReviewerFileState | null;
 }
 
 export interface CanvasReviewerCourseSyncSummary {
@@ -103,8 +138,10 @@ export interface CanvasReviewerSourcePreview {
   readonly characterCount: number;
   readonly sources: readonly {
     readonly id: string;
-    readonly type: Exclude<CanvasReviewerSourceType, "file">;
+    readonly type: CanvasReviewerSourceType;
     readonly updatedAt: string | null;
+    readonly fileKind?: Exclude<CanvasStoredFileKind, "unsupported">;
+    readonly pageCount?: number;
   }[];
   readonly courseSync: {
     readonly status: "success" | "partial" | "failed" | "never";
@@ -117,8 +154,20 @@ export interface CanvasReviewerSourceLimits {
   readonly maximumSources: number;
   readonly maximumCharactersPerSource: number;
   readonly maximumCombinedPreviewCharacters: number;
+  readonly maximumOcrFilesPerPreview: number;
   readonly existingReviewerRequestLimit: number;
   readonly suggestedTitleLimit: number;
+}
+
+export interface CanvasReviewerSourcePrepare {
+  readonly requested: number;
+  readonly results: readonly {
+    readonly id: string;
+    readonly status: "ready" | "failed" | "blocked" | "unsupported" | "unavailable";
+    readonly code: string;
+    readonly retryable: boolean;
+  }[];
+  readonly sources: readonly CanvasReviewerSourceDescriptor[];
 }
 
 export interface CanvasReviewerSourceListOptions {
@@ -130,7 +179,7 @@ export type CanvasReviewerSourceResult<TValue> =
   | { readonly ok: true; readonly value: TValue }
   | {
       readonly ok: false;
-      readonly status: 400 | 401 | 403 | 404 | 413 | 500;
+      readonly status: 400 | 401 | 403 | 404 | 409 | 413 | 422 | 500 | 502;
       readonly code: CanvasApiErrorCode;
       readonly message: string;
       readonly details?: {
@@ -158,6 +207,10 @@ interface NormalizedSourceRecord {
 export interface PreviewSourceRecord {
   readonly descriptor: CanvasReviewerSourceDescriptor;
   readonly text: string;
+  readonly fileMetadata?: {
+    readonly fileKind: Exclude<CanvasStoredFileKind, "unsupported">;
+    readonly pageCount?: number;
+  };
 }
 
 export function getCanvasReviewerSourceLimits(): CanvasReviewerSourceLimits {
@@ -165,6 +218,7 @@ export function getCanvasReviewerSourceLimits(): CanvasReviewerSourceLimits {
     existingReviewerRequestLimit: CANVAS_REVIEWER_EXISTING_GENERATE_LIMIT,
     maximumCharactersPerSource: CANVAS_REVIEWER_MAX_SOURCE_CHARS,
     maximumCombinedPreviewCharacters: CANVAS_REVIEWER_MAX_COMBINED_CHARS,
+    maximumOcrFilesPerPreview: CANVAS_REVIEWER_MAX_OCR_FILES,
     maximumSources: CANVAS_REVIEWER_MAX_SOURCES,
     suggestedTitleLimit: CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS,
   };
@@ -236,17 +290,34 @@ export async function listCanvasReviewerSources({
 export async function previewCanvasReviewerSources({
   client,
   courseId,
+  ocrProvider,
   sourceIds,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
+  readonly ocrProvider?: OcrProvider;
   readonly sourceIds: readonly string[];
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<CanvasReviewerSourcePreview>> {
   const normalizedIds = normalizeSourceIds(sourceIds);
   if (!normalizedIds.ok) {
     return normalizedIds;
+  }
+  const ocrFileCount = normalizedIds.value.filter(
+    (source) => source.type === "file",
+  ).length;
+  if (ocrFileCount > CANVAS_REVIEWER_MAX_OCR_FILES) {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_source_ocr_file_limit_exceeded",
+      details: {
+        maximumSourceCount: CANVAS_REVIEWER_MAX_OCR_FILES,
+        selectedSourceCount: ocrFileCount,
+      },
+      message: "You can use one PDF or image per reviewer preview.",
+    };
   }
 
   const course = await loadStoredSelectedCanvasCourse({
@@ -262,6 +333,7 @@ export async function previewCanvasReviewerSources({
     client,
     course: course.value.course,
     connection: course.value.connection,
+    ocrProvider,
     parsedIds: normalizedIds.value,
     userId,
   });
@@ -333,11 +405,142 @@ export async function previewCanvasReviewerSources({
       sourceCount: previewSources.length,
       sources: previewSources.map((source) => ({
         id: source.descriptor.id,
-        type: source.descriptor.type as Exclude<CanvasReviewerSourceType, "file">,
+        ...(source.fileMetadata?.fileKind
+          ? { fileKind: source.fileMetadata.fileKind }
+          : {}),
+        ...(typeof source.fileMetadata?.pageCount === "number"
+          ? { pageCount: source.fileMetadata.pageCount }
+          : {}),
+        type: source.descriptor.type,
         updatedAt: source.descriptor.updatedAt,
       })),
       sourceText,
       suggestedTitle: buildSuggestedCanvasReviewerTitle(course.value.course.name),
+    },
+  };
+}
+
+export async function prepareCanvasReviewerSources({
+  client,
+  courseId,
+  sourceIds,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly courseId: string;
+  readonly sourceIds: readonly string[];
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<CanvasReviewerSourcePrepare>> {
+  const normalizedIds = normalizeSourceIds(sourceIds);
+  if (!normalizedIds.ok) {
+    return normalizedIds;
+  }
+  if (normalizedIds.value.length > CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST) {
+    return {
+      ok: false,
+      status: 413,
+      code: "payload_too_large",
+      message: `Prepare 1 to ${CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST} Canvas files at a time.`,
+    };
+  }
+  if (normalizedIds.value.some((source) => source.type !== "file")) {
+    return {
+      ok: false,
+      status: 400,
+      code: "invalid_request",
+      message: "Only Canvas file source IDs can be prepared.",
+    };
+  }
+
+  const course = await loadStoredSelectedCanvasCourse({
+    client,
+    courseId,
+    userId,
+  });
+  if (!course.ok) {
+    return course;
+  }
+
+  const fileIds = normalizedIds.value.map((source) => source.rowId);
+  const files = await readFilesByIds({
+    client,
+    connectionId: course.value.connection.id,
+    courseId: course.value.course.id,
+    ids: fileIds,
+    userId,
+  });
+  if (!files.ok) {
+    return storageFailure("Canvas files could not be loaded for preparation.");
+  }
+  if (files.value.length !== fileIds.length) {
+    return {
+      ok: false,
+      status: 404,
+      code: "canvas_file_not_found",
+      message: "One or more Canvas files were not found for this course.",
+    };
+  }
+
+  const unsupported = files.value.find(
+    (file) => !isSupportedFileForSourcePreparation(file),
+  );
+  if (unsupported) {
+    const descriptor = mapFileSource(unsupported).descriptor;
+    return {
+      ok: false,
+      status: 400,
+      code:
+        descriptor.file?.preparationStatus === "unavailable"
+          ? "canvas_source_unavailable"
+          : "canvas_source_unsupported_file_type",
+      message:
+        descriptor.unavailableReason ??
+        "This Canvas file type is not supported yet.",
+    };
+  }
+
+  const ingestion = await ingestCanvasFiles({
+    client,
+    fileIds,
+    userId,
+  });
+  if (!ingestion.ok) {
+    return {
+      ok: false,
+      status: ingestion.status,
+      code: ingestion.code,
+      message: ingestion.message,
+    };
+  }
+
+  const refreshed = await readFilesByIds({
+    client,
+    connectionId: course.value.connection.id,
+    courseId: course.value.course.id,
+    ids: fileIds,
+    userId,
+  });
+  if (!refreshed.ok) {
+    return storageFailure("Prepared Canvas file descriptors could not be loaded.");
+  }
+
+  const descriptorsById = new Map(
+    refreshed.value.map((file) => [formatSourceId("file", file.id), mapFileSource(file).descriptor]),
+  );
+
+  return {
+    ok: true,
+    value: {
+      requested: normalizedIds.value.length,
+      results: ingestion.response.results.map((result) => ({
+        code: safePreparationResultCode(result.code),
+        id: formatSourceId("file", result.fileId),
+        retryable: result.retryable,
+        status: preparationResultStatus(result.status),
+      })),
+      sources: normalizedIds.value
+        .map((source) => descriptorsById.get(source.original))
+        .filter(isDefined),
     },
   };
 }
@@ -350,7 +553,7 @@ export function normalizeCanvasHtmlToText(html: string | null): string {
   const fragment = parseFragment(html);
   const writer = createTextWriter();
   walkHtmlChildren(fragment.childNodes, writer, { orderedListStack: [] });
-  return sanitizePreviewText(writer.toString());
+  return sanitizeCanvasPreviewText(writer.toString());
 }
 
 export function assembleCanvasSourcePreview(
@@ -359,7 +562,7 @@ export function assembleCanvasSourcePreview(
   return sources
     .map((source, index) => {
       const sourceNumber = index + 1;
-      const label = formatSourceType(source.descriptor.type).toUpperCase();
+      const label = formatPreviewSourceLabel(source).toUpperCase();
       return [
         `SOURCE ${sourceNumber} - ${label} - ${source.descriptor.title}`,
         "",
@@ -369,8 +572,21 @@ export function assembleCanvasSourcePreview(
     .join("\n\n");
 }
 
+function formatPreviewSourceLabel(source: PreviewSourceRecord): string {
+  if (source.descriptor.type === "file") {
+    const kind = source.fileMetadata?.fileKind ?? source.descriptor.file?.kind;
+    if (kind === "pdf") {
+      return "PDF";
+    }
+    if (kind === "image") {
+      return "Image";
+    }
+  }
+  return formatSourceType(source.descriptor.type);
+}
+
 export function buildSuggestedCanvasReviewerTitle(courseName: string): string {
-  const safeCourseName = sanitizeTitleText(courseName);
+  const safeCourseName = sanitizeCanvasTitleText(courseName);
   if (!safeCourseName) {
     return "Canvas Reviewer";
   }
@@ -575,24 +791,17 @@ async function loadPreviewSourceRecords({
   client,
   connection,
   course,
+  ocrProvider,
   parsedIds,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourseRow;
+  readonly ocrProvider?: OcrProvider;
   readonly parsedIds: readonly ParsedCanvasSourceId[];
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<readonly PreviewSourceRecord[]>> {
-  if (parsedIds.some((source) => source.type === "file")) {
-    return {
-      ok: false,
-      status: 400,
-      code: "canvas_source_unavailable",
-      message: "Canvas files do not have extracted text available yet.",
-    };
-  }
-
   const pageIds = parsedIds
     .filter((source) => source.type === "page")
     .map((source) => source.rowId);
@@ -602,8 +811,11 @@ async function loadPreviewSourceRecords({
   const announcementIds = parsedIds
     .filter((source) => source.type === "announcement")
     .map((source) => source.rowId);
+  const fileIds = parsedIds
+    .filter((source) => source.type === "file")
+    .map((source) => source.rowId);
 
-  const [pages, assignments, announcements] = await Promise.all([
+  const [pages, assignments, announcements, files] = await Promise.all([
     readPagesByIds({
       client,
       connectionId: connection.id,
@@ -625,8 +837,15 @@ async function loadPreviewSourceRecords({
       ids: announcementIds,
       userId,
     }),
+    readFilesByIds({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      ids: fileIds,
+      userId,
+    }),
   ]);
-  if (!pages.ok || !assignments.ok || !announcements.ok) {
+  if (!pages.ok || !assignments.ok || !announcements.ok || !files.ok) {
     return storageFailure("Canvas source preview could not be loaded.");
   }
 
@@ -634,11 +853,27 @@ async function loadPreviewSourceRecords({
     ...pages.value.map(mapPageSource),
     ...assignments.value.map(mapAssignmentSource),
     ...announcements.value.map(mapAnnouncementSource),
+    ...files.value.map(mapFileSource),
   ];
+  const loadedIds = new Set(normalized.map((source) => source.descriptor.id));
+  if (parsedIds.some((source) => !loadedIds.has(source.original))) {
+    return {
+      ok: false,
+      status: 404,
+      code: "canvas_source_not_found",
+      message: "One or more selected Canvas sources were not found for this course.",
+    };
+  }
+
   const unavailable = normalized.find(
-    (source) => source.descriptor.availability !== "available" || source.text === null,
+    (source) =>
+      source.descriptor.availability !== "available" ||
+      (source.descriptor.type !== "file" && source.text === null),
   );
   if (unavailable) {
+    if (unavailable.descriptor.type === "file") {
+      return fileUnavailablePreviewResult(unavailable.descriptor);
+    }
     return {
       ok: false,
       status: 400,
@@ -647,12 +882,132 @@ async function loadPreviewSourceRecords({
     };
   }
 
+  const selectedFile = files.value[0] ?? null;
+  const filePreviewRecord = selectedFile
+    ? await extractFilePreviewRecord({
+        client,
+        connection,
+        course,
+        file: selectedFile,
+        ocrProvider,
+        userId,
+      })
+    : null;
+  if (filePreviewRecord && !filePreviewRecord.ok) {
+    return filePreviewRecord;
+  }
+
+  const fileRecordById = new Map(
+    filePreviewRecord?.value
+      ? [[filePreviewRecord.value.descriptor.id, filePreviewRecord.value]]
+      : [],
+  );
+
   return {
     ok: true,
-    value: normalized.map((source) => ({
-      descriptor: source.descriptor,
-      text: source.text ?? "",
-    })),
+    value: normalized.map((source) => {
+      if (source.descriptor.type === "file") {
+        const fileRecord = fileRecordById.get(source.descriptor.id);
+        if (fileRecord) {
+          return fileRecord;
+        }
+      }
+      return {
+        descriptor: source.descriptor,
+        text: source.text ?? "",
+      };
+    }),
+  };
+}
+
+async function extractFilePreviewRecord({
+  client,
+  connection,
+  course,
+  file,
+  ocrProvider,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connection: CanvasConnectionRow;
+  readonly course: CanvasCourseRow;
+  readonly file: CanvasFileRow;
+  readonly ocrProvider?: OcrProvider;
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<PreviewSourceRecord>> {
+  const descriptor = mapFileSource(file).descriptor;
+  const provider = ocrProvider
+    ? ({ ok: true, value: ocrProvider } as const)
+    : createOcrProviderForCanvasPreview();
+  if (!provider.ok) {
+    return provider;
+  }
+
+  const extraction = await extractPreparedCanvasFileText({
+    client,
+    connectionId: connection.id,
+    courseId: course.id,
+    fileRow: file,
+    ocrProvider: provider.value,
+    userId,
+  });
+  if (!extraction.ok) {
+    return extraction;
+  }
+
+  return {
+    ok: true,
+    value: {
+      descriptor,
+      fileMetadata: {
+        fileKind: extraction.value.fileKind,
+        ...(typeof extraction.value.pageCount === "number"
+          ? { pageCount: extraction.value.pageCount }
+          : {}),
+      },
+      text: extraction.value.text,
+    },
+  };
+}
+
+function createOcrProviderForCanvasPreview(): CanvasReviewerSourceResult<OcrProvider> {
+  try {
+    return { ok: true, value: createServerOcrProvider() };
+  } catch {
+    return {
+      ok: false,
+      status: 500,
+      code: "canvas_source_ocr_not_configured",
+      message: "OCR provider is not configured.",
+    };
+  }
+}
+
+function fileUnavailablePreviewResult(
+  descriptor: CanvasReviewerSourceDescriptor,
+): CanvasReviewerSourceResult<never> {
+  const status = descriptor.file?.preparationStatus;
+  if (status === "not_prepared" || status === "failed") {
+    return {
+      ok: false,
+      status: 409,
+      code: "canvas_source_file_preparation_required",
+      message: "Prepare this Canvas file before previewing it.",
+    };
+  }
+  if (status === "unsupported") {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_source_unsupported_file_type",
+      message: "This Canvas file type is not supported yet.",
+    };
+  }
+  return {
+    ok: false,
+    status: 400,
+    code: "canvas_source_unavailable",
+    message: descriptor.unavailableReason ?? "This Canvas file is unavailable.",
   };
 }
 
@@ -662,8 +1017,9 @@ function mapPageSource(row: CanvasPageRow): NormalizedSourceRecord {
     descriptor: {
       availability: text.length > 0 ? "available" : "unavailable",
       estimatedCharacters: text.length > 0 ? text.length : null,
+      file: null,
       id: formatSourceId("page", row.id),
-      title: sanitizeTitleText(row.title) || "Untitled Page",
+      title: sanitizeCanvasTitleText(row.title) || "Untitled Page",
       type: "page",
       unavailableReason:
         text.length > 0 ? null : "This Page does not have readable body text.",
@@ -679,8 +1035,9 @@ function mapAssignmentSource(row: CanvasAssignmentRow): NormalizedSourceRecord {
     descriptor: {
       availability: text.length > 0 ? "available" : "unavailable",
       estimatedCharacters: text.length > 0 ? text.length : null,
+      file: null,
       id: formatSourceId("assignment", row.id),
-      title: sanitizeTitleText(row.name) || "Untitled Assignment",
+      title: sanitizeCanvasTitleText(row.name) || "Untitled Assignment",
       type: "assignment",
       unavailableReason:
         text.length > 0
@@ -698,8 +1055,9 @@ function mapAnnouncementSource(row: CanvasAnnouncementRow): NormalizedSourceReco
     descriptor: {
       availability: text.length > 0 ? "available" : "unavailable",
       estimatedCharacters: text.length > 0 ? text.length : null,
+      file: null,
       id: formatSourceId("announcement", row.id),
-      title: sanitizeTitleText(row.title) || "Untitled Announcement",
+      title: sanitizeCanvasTitleText(row.title) || "Untitled Announcement",
       type: "announcement",
       unavailableReason:
         text.length > 0
@@ -712,14 +1070,17 @@ function mapAnnouncementSource(row: CanvasAnnouncementRow): NormalizedSourceReco
 }
 
 function mapFileSource(row: CanvasFileRow): NormalizedSourceRecord {
+  const file = buildCanvasReviewerFileState(row);
+  const isReady = file.preparationStatus === "ready";
   return {
     descriptor: {
-      availability: "unavailable",
+      availability: isReady ? "available" : "unavailable",
       estimatedCharacters: null,
+      file,
       id: formatSourceId("file", row.id),
-      title: sanitizeTitleText(row.display_name) || "Canvas file",
+      title: sanitizeCanvasTitleText(row.display_name) || "Canvas file",
       type: "file",
-      unavailableReason: AVAILABLE_REASON_FILE,
+      unavailableReason: isReady ? null : unavailableReasonForFile(row, file),
       updatedAt:
         row.canvas_modified_at ??
         row.canvas_updated_at ??
@@ -728,6 +1089,189 @@ function mapFileSource(row: CanvasFileRow): NormalizedSourceRecord {
     },
     text: null,
   };
+}
+
+function buildCanvasReviewerFileState(row: CanvasFileRow): CanvasReviewerFileState {
+  const kind = classifyStoredCanvasFileKind(row);
+  if (kind === "unsupported") {
+    return {
+      canPrepare: false,
+      kind,
+      preparationStatus: statusForUnsupportedFile(row),
+    };
+  }
+
+  if (isPreparedCanvasFileReadyForOcr(row)) {
+    return {
+      canPrepare: false,
+      kind,
+      preparationStatus: "ready",
+    };
+  }
+
+  if (!isFileMetadataAvailable(row)) {
+    return {
+      canPrepare: false,
+      kind,
+      preparationStatus: "unavailable",
+    };
+  }
+
+  if (!isDeclaredByteCountWithinKindLimit(row, kind)) {
+    return {
+      canPrepare: false,
+      kind,
+      preparationStatus: "blocked",
+    };
+  }
+
+  if (row.ingestion_eligibility !== fileEligibilityForKind(kind)) {
+    return {
+      canPrepare: false,
+      kind,
+      preparationStatus: "blocked",
+    };
+  }
+
+  if (row.ingestion_status === "failed") {
+    return {
+      canPrepare: true,
+      kind,
+      preparationStatus: "failed",
+    };
+  }
+
+  if (
+    row.ingestion_status === "not_requested" ||
+    row.ingestion_status === "stored" ||
+    row.ingestion_status === "unchanged"
+  ) {
+    return {
+      canPrepare: true,
+      kind,
+      preparationStatus: "not_prepared",
+    };
+  }
+
+  return {
+    canPrepare: false,
+    kind,
+    preparationStatus: "blocked",
+  };
+}
+
+function statusForUnsupportedFile(
+  row: CanvasFileRow,
+): CanvasReviewerFilePreparationStatus {
+  if (!isFileMetadataAvailable(row)) {
+    return "unavailable";
+  }
+  if (
+    row.ingestion_eligibility === "blocked_locked" ||
+    row.ingestion_eligibility === "blocked_security" ||
+    row.ingestion_eligibility === "blocked_size"
+  ) {
+    return "blocked";
+  }
+  return "unsupported";
+}
+
+function unavailableReasonForFile(
+  row: CanvasFileRow,
+  file: CanvasReviewerFileState,
+): string {
+  if (file.preparationStatus === "not_prepared") {
+    return "Prepare this file before using it.";
+  }
+  if (file.preparationStatus === "failed") {
+    return "Preparation failed. Try preparing this file again.";
+  }
+  if (!isFileMetadataAvailable(row)) {
+    return "This file is unavailable in Canvas.";
+  }
+  if (row.ingestion_eligibility === "blocked_locked") {
+    return "This file is locked.";
+  }
+  if (row.ingestion_eligibility === "blocked_size") {
+    return "This file exceeds the supported size.";
+  }
+  if (isMediaCanvasFile(row)) {
+    return "Audio and video files are not supported yet.";
+  }
+  if (file.preparationStatus === "blocked") {
+    return "This file cannot be prepared safely.";
+  }
+  return "This file type is not supported yet.";
+}
+
+function isFileMetadataAvailable(row: CanvasFileRow): boolean {
+  return (
+    row.availability_status === "available" &&
+    row.hidden !== true &&
+    row.hidden_for_user !== true &&
+    row.ingestion_eligibility !== "blocked_unavailable"
+  );
+}
+
+function isMediaCanvasFile(row: CanvasFileRow): boolean {
+  const contentType = normalizeMimeType(row.content_type);
+  return Boolean(
+    row.media_class ||
+      row.media_entry_id ||
+      contentType?.startsWith("audio/") ||
+      contentType?.startsWith("video/"),
+  );
+}
+
+function isDeclaredByteCountWithinKindLimit(
+  row: CanvasFileRow,
+  kind: Exclude<CanvasStoredFileKind, "unsupported">,
+): boolean {
+  if (typeof row.size_bytes !== "number" || row.size_bytes < 0) {
+    return true;
+  }
+  return kind === "image"
+    ? row.size_bytes <= OCR_MAX_IMAGE_BYTES
+    : row.size_bytes <= OCR_MAX_PDF_BYTES;
+}
+
+function fileEligibilityForKind(
+  kind: Exclude<CanvasStoredFileKind, "unsupported">,
+): "eligible_document" | "eligible_image" {
+  return kind === "pdf" ? "eligible_document" : "eligible_image";
+}
+
+function isSupportedFileForSourcePreparation(file: CanvasFileRow): boolean {
+  const state = buildCanvasReviewerFileState(file);
+  return (
+    state.kind !== "unsupported" &&
+    (state.canPrepare || state.preparationStatus === "ready")
+  );
+}
+
+function preparationResultStatus(
+  status: CanvasFileIngestionResultStatus,
+): CanvasReviewerSourcePrepare["results"][number]["status"] {
+  switch (status) {
+    case "stored":
+    case "unchanged":
+      return "ready";
+    case "failed":
+      return "failed";
+    case "blocked":
+      return "blocked";
+    case "unavailable":
+      return "unavailable";
+    case "metadata_only":
+      return "unsupported";
+  }
+}
+
+function safePreparationResultCode(code: string): string {
+  if (!/^[a-z0-9_:-]{1,80}$/i.test(code)) {
+    return "canvas_file_preparation_result";
+  }
+  return code;
 }
 
 async function readCourseRow({
@@ -1011,6 +1555,27 @@ async function readAnnouncementsByIds(query: SourceIdsQuery): Promise<
     return { ok: false };
   }
   return { ok: true, value: data as readonly CanvasAnnouncementRow[] };
+}
+
+async function readFilesByIds(query: SourceIdsQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasFileRow[] }
+  | { readonly ok: false }
+> {
+  if (query.ids.length === 0) {
+    return { ok: true, value: [] };
+  }
+  const { data, error } = await query.client
+    .from("canvas_files")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .in("id", [...query.ids]);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasFileRow[] };
 }
 
 interface SourceQuery {
@@ -1300,22 +1865,6 @@ function createTextWriter(): TextWriter {
         .replace(/\n{3,}/g, "\n\n")
         .trim(),
   };
-}
-
-function sanitizePreviewText(value: string): string {
-  return value
-    .replace(/https?:\/\/[^\s)>\]]+/gi, "[link removed]")
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
-    .replace(/\bsk-[A-Za-z0-9_-]{10,}\b/g, "[redacted]")
-    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted]")
-    .replace(/\b(verifier|access_token|token|signature|expires)=\S+/gi, "$1=[redacted]")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function sanitizeTitleText(value: string): string {
-  return sanitizePreviewText(value).replace(/\s+/g, " ").trim();
 }
 
 function truncateAtWordBoundary(value: string, maximum: number): string {

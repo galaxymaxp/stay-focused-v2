@@ -1,18 +1,16 @@
 import {
   OCR_PDF_MIME_TYPE,
-  OcrProviderError,
   type OcrProvider,
-  type OcrResult,
 } from "@stay-focused/ocr";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import {
-  createRequestedPdfPages,
-  hasPdfSignature,
-  readPdfPageCount,
-} from "@/lib/ocr/pdf-validation";
+  extractWithOcrProvider,
+  validatePdfOcrBytes,
+  type OcrProviderFailure,
+} from "@/lib/ocr/extraction-service";
 import {
   OCR_MAX_PDF_BYTES,
   OCR_MAX_PDF_PAGES,
@@ -114,19 +112,18 @@ async function handlePost(request: Request): Promise<Response> {
     );
   }
 
-  let result: OcrResult;
-  try {
-    result = await provider.value.extract({
-      kind: "pdf",
-      mimeType: OCR_PDF_MIME_TYPE,
-      bytes: upload.value.bytes,
-      requestedPages: upload.value.requestedPages,
-      ...(upload.value.fileName ? { fileName: upload.value.fileName } : {}),
-    });
-  } catch (error) {
-    const mapped = mapOcrError(error);
+  const extraction = await extractWithOcrProvider(provider.value, {
+    kind: "pdf",
+    mimeType: OCR_PDF_MIME_TYPE,
+    bytes: upload.value.bytes,
+    requestedPages: upload.value.requestedPages,
+    ...(upload.value.fileName ? { fileName: upload.value.fileName } : {}),
+  });
+  if (!extraction.ok) {
+    const mapped = mapOcrError(extraction.failure);
     return errorResponse(mapped.status, mapped.code, mapped.message, request);
   }
+  const result = extraction.result;
 
   if (result.text.trim().length === 0) {
     return errorResponse(
@@ -213,48 +210,71 @@ async function readAndValidateUpload(
     return fileTooLarge();
   }
 
-  if (!hasPdfSignature(bytes)) {
-    return invalidPdf("The uploaded file is not a valid PDF.");
-  }
-
-  const pageCount = await readPdfPageCount(bytes);
-  if (!pageCount.ok) {
-    if (pageCount.code === "pdf_encrypted") {
-      return {
-        ok: false,
-        status: 422,
-        code: "pdf_encrypted",
-        message: "Password-protected PDFs cannot be read.",
-      };
-    }
-
-    return invalidPdf("The uploaded PDF could not be parsed.");
-  }
-
-  if (pageCount.pageCount < 1) {
-    return invalidPdf("The uploaded PDF must contain at least one page.");
-  }
-
-  if (pageCount.pageCount > OCR_MAX_PDF_PAGES) {
-    return {
-      ok: false,
-      status: 422,
-      code: "pdf_page_limit_exceeded",
-      message: `PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per request.`,
-    };
+  const validation = await validatePdfOcrBytes({
+    bytes,
+    ...(file.name.trim()
+      ? { fileName: sanitizeDisplayFileName(file.name) }
+      : {}),
+    mimeType,
+  });
+  if (!validation.ok) {
+    return pdfValidationError(validation.code);
   }
 
   return {
     ok: true,
     value: {
       bytes,
-      ...(file.name.trim()
-        ? { fileName: sanitizeDisplayFileName(file.name) }
-        : {}),
-      pageCount: pageCount.pageCount,
-      requestedPages: createRequestedPdfPages(pageCount.pageCount),
+      ...(validation.input.fileName ? { fileName: validation.input.fileName } : {}),
+      pageCount: validation.pageCount,
+      requestedPages: validation.requestedPages,
     },
   };
+}
+
+function pdfValidationError(
+  code:
+    | "empty_file"
+    | "file_too_large"
+    | "invalid_pdf"
+    | "pdf_encrypted"
+    | "pdf_page_limit_exceeded"
+    | "unsupported_file_type",
+): {
+  readonly ok: false;
+  readonly status: 400 | 413 | 415 | 422;
+  readonly code: OcrExtractErrorCode;
+  readonly message: string;
+} {
+  switch (code) {
+    case "empty_file":
+      return emptyFile();
+    case "file_too_large":
+      return fileTooLarge();
+    case "unsupported_file_type":
+      return {
+        ok: false,
+        status: 415,
+        code: "unsupported_file_type",
+        message: "Choose a PDF file.",
+      };
+    case "pdf_encrypted":
+      return {
+        ok: false,
+        status: 422,
+        code: "pdf_encrypted",
+        message: "Password-protected PDFs cannot be read.",
+      };
+    case "pdf_page_limit_exceeded":
+      return {
+        ok: false,
+        status: 422,
+        code: "pdf_page_limit_exceeded",
+        message: `PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per request.`,
+      };
+    case "invalid_pdf":
+      return invalidPdf("The uploaded PDF could not be parsed.");
+  }
 }
 
 function invalidPdf(message: string): {
@@ -357,34 +377,33 @@ function createProvider():
   }
 }
 
-function mapOcrError(error: unknown): MappedOcrError {
-  if (error instanceof OcrProviderError) {
-    if (error.code === "ocr_not_configured") {
+function mapOcrError(error: OcrProviderFailure): MappedOcrError {
+  switch (error.code) {
+    case "ocr_not_configured":
       return {
         status: 500,
         code: "ocr_not_configured",
         message: "OCR provider is not configured.",
       };
-    }
-    if (error.code === "ocr_empty_result") {
+    case "ocr_empty_result":
       return {
         status: 422,
         code: "no_text_detected",
         message: "No readable text was detected in this PDF.",
       };
-    }
+    case "ocr_provider_failed":
+      return {
+        status: 502,
+        code: "ocr_provider_failed",
+        message: "OCR provider failed.",
+      };
+    case "internal_error":
     return {
-      status: 502,
-      code: "ocr_provider_failed",
-      message: "OCR provider failed.",
+      status: 500,
+      code: "internal_error",
+      message: "PDF OCR extraction failed.",
     };
   }
-
-  return {
-    status: 500,
-    code: "internal_error",
-    message: "PDF OCR extraction failed.",
-  };
 }
 
 function errorResponse(

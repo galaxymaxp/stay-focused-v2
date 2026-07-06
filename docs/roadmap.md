@@ -219,9 +219,12 @@ inventory and bounded ingestion is remotely and live validated with a
 documented account-wide synchronous route-duration limitation; Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
 production-build validation; Phase 5C.2A2 Canvas source selection and reviewer
-handoff is complete and live validated. Next: Phase 5C.2B - Canvas PDF and
-image extraction/OCR integration. Phase 5D through Phase 5F remain planned and must not be
-collapsed into a single generic Canvas integration task.
+handoff is complete and live validated; Phase 5C.2B Canvas PDF/image OCR
+sources are complete and live validated for preparation, private Storage OCR
+preview, edited reviewer handoff, and Study Library cleanup. Next: Phase 5D -
+Source Normalization, Provenance, And Selective Import. Phase 5D through Phase
+5F remain planned and must not be collapsed into a single generic Canvas
+integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -666,8 +669,11 @@ measurement, so deployed production-runtime readiness is not claimed for that
 diagnostic route. Phase 5C.2A1 selected-course synchronization is complete,
 uses independent course-scoped requests, and stayed within the 60-second
 per-course budget in protected live validation. Phase 5C.2A2 Canvas source
-selection and reviewer handoff is complete and live validated. Next:
-Phase 5C.2B - Canvas PDF and image extraction/OCR integration.
+selection and reviewer handoff is complete and live validated. Phase 5C.2B
+Canvas PDF/image OCR sources are complete and live validated for preparation,
+private Storage OCR preview, edited reviewer handoff, and Study Library
+cleanup. Next: Phase 5D - Source Normalization, Provenance, And Selective
+Import.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -849,10 +855,13 @@ Validation:
   text and title, returned to source selection with selection preserved, and
   reloaded preview.
 
-Still deferred from Phase 5C.2A2:
+Still deferred from Phase 5C.2A2 and completed by Phase 5C.2B:
 
 - Canvas PDF extraction.
 - Canvas image OCR.
+
+Still deferred after Phase 5C.2B:
+
 - Office parsing.
 - audio/video transcription.
 - full persistent Canvas source provenance.
@@ -863,18 +872,49 @@ Still deferred from Phase 5C.2A2:
 
 #### Phase 5C.2B - Canvas PDF And Image Extraction/OCR Integration
 
-Status: Next.
+Status: Complete and protected-live validated.
 
-Scope:
+Implemented:
 
-- Use stored, owned Canvas file metadata and private file bytes where already
-  available.
-- Add bounded extraction/OCR for selected Canvas PDFs and images through the
-  existing OCR/source-ingestion boundaries.
-- Keep unsupported files disabled and honest.
-- Preserve editable preview before reviewer generation.
-- Do not broaden into Office, media transcription, background queues, or full
-  provenance unless required by this narrow PDF/image extraction slice.
+- Safe Canvas file-state descriptors for ready, not prepared, failed,
+  blocked, unsupported, and unavailable files without returning Storage fields,
+  Canvas URLs, hashes, raw MIME internals, or credentials.
+- Course-scoped `POST /api/canvas/courses/:courseId/sources/prepare` that
+  accepts only owned `file:<internal-row-id>` descriptors and delegates to the
+  existing `ingestCanvasFiles` boundary.
+- Shared API-side OCR validation/extraction helpers reused by manual image/PDF
+  OCR routes and Canvas stored-file extraction.
+- Stored-file extraction from server-resolved owned rows only, with private
+  bucket, object-key shape, byte count, SHA-256, MIME/signature, PDF
+  parseability, encrypted-PDF, and page-limit validation before OCR.
+- Source preview support for one OCR-backed PDF/image file mixed with Pages,
+  assignment descriptions, and announcements while preserving submitted picker
+  order.
+- Mobile source-picker prepare/ready/failed/unsupported states, one-file
+  selection guard, and honest extraction loading copy.
+- No extracted-text persistence, no Canvas call or PAT decryption during
+  preview, no signed URLs or raw bytes returned to mobile, and no Canvas
+  metadata sent to OpenAI.
+
+Validation:
+
+- Canvas package typecheck/build/tests: 52/52.
+- DB package typecheck: passed.
+- OCR package typecheck/build/tests: 14/14.
+- API typecheck/build/tests: 269/269.
+- Mobile typecheck/tests: 92/92.
+- Engine typecheck/build/evals: 266/266.
+- Root Turbo typecheck/build: 7/7 tasks, 5 cached and 2 fresh.
+- Workspace tests: API 269/269, mobile 92/92, Canvas 52/52, OCR 14/14.
+- Protected live validation checked 2 selected synchronized courses, found 0
+  eligible PDFs and 2 eligible images, prepared opaque `live-file-1`, reran
+  preparation idempotently, previewed Page -> Image -> Announcement with 1
+  OCR-backed source and 62 extracted image characters, returned no private
+  Storage or credential fields, generated and saved a reviewer from harmless
+  edited text, verified Study Library visibility, and deleted the validation
+  reviewer. An exploratory generation attempt including the very short/noisy
+  live OCR preview text returned the existing `reviewer_validation_failed`
+  response.
 
 #### Later Phase 5C Parser And Source Import Work
 

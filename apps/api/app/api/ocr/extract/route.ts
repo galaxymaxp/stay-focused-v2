@@ -1,14 +1,17 @@
 import {
   OCR_SUPPORTED_IMAGE_MIME_TYPES,
-  OcrProviderError,
   type OcrImageMimeType,
   type OcrProvider,
-  type OcrResult,
 } from "@stay-focused/ocr";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
+import {
+  extractWithOcrProvider,
+  validateImageOcrBytes,
+  type OcrProviderFailure,
+} from "@/lib/ocr/extraction-service";
 import {
   OCR_IMAGE_FORM_FIELD,
   OCR_MAX_IMAGE_BYTES,
@@ -108,18 +111,17 @@ async function handlePost(request: Request): Promise<Response> {
     );
   }
 
-  let result: OcrResult;
-  try {
-    result = await provider.value.extract({
-      kind: "image",
-      mimeType: upload.value.mimeType,
-      bytes: upload.value.bytes,
-      ...(upload.value.fileName ? { fileName: upload.value.fileName } : {}),
-    });
-  } catch (error) {
-    const mapped = mapOcrError(error);
+  const extraction = await extractWithOcrProvider(provider.value, {
+    kind: "image",
+    mimeType: upload.value.mimeType,
+    bytes: upload.value.bytes,
+    ...(upload.value.fileName ? { fileName: upload.value.fileName } : {}),
+  });
+  if (!extraction.ok) {
+    const mapped = mapOcrError(extraction.failure);
     return errorResponse(mapped.status, mapped.code, mapped.message, request);
   }
+  const result = extraction.result;
 
   if (result.text.trim().length === 0) {
     return errorResponse(
@@ -197,33 +199,56 @@ async function readAndValidateUpload(
     };
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes.byteLength === 0) {
-    return {
-      ok: false,
-      status: 400,
-      code: "empty_image",
-      message: "Image file must not be empty.",
-    };
-  }
-
-  if (bytes.byteLength > OCR_MAX_IMAGE_BYTES) {
-    return {
-      ok: false,
-      status: 413,
-      code: "image_too_large",
-      message: `Image file must be at most ${OCR_MAX_IMAGE_BYTES} bytes.`,
-    };
+  const validation = validateImageOcrBytes({
+    bytes: new Uint8Array(await file.arrayBuffer()),
+    ...(file.name.trim() ? { fileName: file.name.trim() } : {}),
+    mimeType,
+  });
+  if (!validation.ok) {
+    return imageValidationError(validation.code);
   }
 
   return {
     ok: true,
     value: {
+      bytes: validation.input.bytes,
+      ...(validation.input.fileName ? { fileName: validation.input.fileName } : {}),
       mimeType,
-      bytes,
-      ...(file.name.trim() ? { fileName: file.name.trim() } : {}),
     },
   };
+}
+
+function imageValidationError(
+  code: "empty_image" | "image_too_large" | "unsupported_media_type",
+): {
+  readonly ok: false;
+  readonly status: 400 | 413 | 415;
+  readonly code: OcrExtractErrorCode;
+  readonly message: string;
+} {
+  switch (code) {
+    case "empty_image":
+      return {
+        ok: false,
+        status: 400,
+        code: "empty_image",
+        message: "Image file must not be empty.",
+      };
+    case "image_too_large":
+      return {
+        ok: false,
+        status: 413,
+        code: "image_too_large",
+        message: `Image file must be at most ${OCR_MAX_IMAGE_BYTES} bytes.`,
+      };
+    case "unsupported_media_type":
+      return {
+        ok: false,
+        status: 415,
+        code: "unsupported_media_type",
+        message: `Supported image types are ${OCR_SUPPORTED_IMAGE_MIME_TYPES.join(", ")}.`,
+      };
+  }
 }
 
 function invalidImage(message: string): {
@@ -298,34 +323,33 @@ function createProvider():
   }
 }
 
-function mapOcrError(error: unknown): MappedOcrError {
-  if (error instanceof OcrProviderError) {
-    if (error.code === "ocr_not_configured") {
+function mapOcrError(error: OcrProviderFailure): MappedOcrError {
+  switch (error.code) {
+    case "ocr_not_configured":
       return {
         status: 500,
         code: "ocr_not_configured",
         message: "OCR provider is not configured.",
       };
-    }
-    if (error.code === "ocr_empty_result") {
+    case "ocr_empty_result":
       return {
         status: 422,
         code: "ocr_empty_result",
         message: "OCR provider returned no extracted text.",
       };
-    }
+    case "ocr_provider_failed":
+      return {
+        status: 502,
+        code: "ocr_provider_failed",
+        message: "OCR provider failed.",
+      };
+    case "internal_error":
     return {
-      status: 502,
-      code: "ocr_provider_failed",
-      message: "OCR provider failed.",
+      status: 500,
+      code: "internal_error",
+      message: "OCR extraction failed.",
     };
   }
-
-  return {
-    status: 500,
-    code: "internal_error",
-    message: "OCR extraction failed.",
-  };
 }
 
 function errorResponse(

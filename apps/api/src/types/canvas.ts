@@ -207,6 +207,22 @@ export type CanvasReviewerSourceType =
   | "announcement"
   | "file";
 
+export type CanvasReviewerFileKind = "pdf" | "image" | "unsupported";
+
+export type CanvasReviewerFilePreparationStatus =
+  | "ready"
+  | "not_prepared"
+  | "failed"
+  | "blocked"
+  | "unsupported"
+  | "unavailable";
+
+export interface CanvasReviewerFileState {
+  readonly kind: CanvasReviewerFileKind;
+  readonly preparationStatus: CanvasReviewerFilePreparationStatus;
+  readonly canPrepare: boolean;
+}
+
 export interface CanvasReviewerCourseSyncSummary {
   readonly status: "success" | "partial" | "failed" | "never";
   readonly completedAt: string | null;
@@ -224,6 +240,7 @@ export interface CanvasReviewerSourceDescriptor {
   readonly unavailableReason: string | null;
   readonly updatedAt: string | null;
   readonly estimatedCharacters: number | null;
+  readonly file: CanvasReviewerFileState | null;
 }
 
 export interface CanvasReviewerSourceListResponse {
@@ -250,8 +267,10 @@ export interface CanvasReviewerSourcePreviewResponse {
   readonly characterCount: number;
   readonly sources: readonly {
     readonly id: string;
-    readonly type: Exclude<CanvasReviewerSourceType, "file">;
+    readonly type: CanvasReviewerSourceType;
     readonly updatedAt: string | null;
+    readonly fileKind?: Exclude<CanvasReviewerFileKind, "unsupported">;
+    readonly pageCount?: number;
   }[];
   readonly courseSync: {
     readonly status: "success" | "partial" | "failed" | "never";
@@ -261,9 +280,22 @@ export interface CanvasReviewerSourcePreviewResponse {
     readonly maximumSources: number;
     readonly maximumCharactersPerSource: number;
     readonly maximumCombinedPreviewCharacters: number;
+    readonly maximumOcrFilesPerPreview: number;
     readonly existingReviewerRequestLimit: number;
     readonly suggestedTitleLimit: number;
   };
+}
+
+export interface CanvasReviewerSourcePrepareResponse {
+  readonly ok: true;
+  readonly requested: number;
+  readonly results: readonly {
+    readonly id: string;
+    readonly status: "ready" | "failed" | "blocked" | "unsupported" | "unavailable";
+    readonly code: string;
+    readonly retryable: boolean;
+  }[];
+  readonly sources: readonly CanvasReviewerSourceDescriptor[];
 }
 
 export type CanvasFileIngestionResultStatus =
@@ -336,6 +368,19 @@ export type CanvasApiErrorCode =
   | "canvas_source_count_exceeded"
   | "canvas_source_duplicate"
   | "canvas_source_not_found"
+  | "canvas_source_file_preparation_required"
+  | "canvas_source_ocr_file_limit_exceeded"
+  | "canvas_source_stored_file_missing"
+  | "canvas_source_stored_file_corrupt"
+  | "canvas_source_unsupported_file_type"
+  | "canvas_source_image_ocr_empty"
+  | "canvas_source_pdf_ocr_empty"
+  | "canvas_source_ocr_empty"
+  | "canvas_source_pdf_encrypted"
+  | "canvas_source_pdf_page_limit_exceeded"
+  | "canvas_source_ocr_not_configured"
+  | "canvas_source_ocr_failed"
+  | "canvas_source_storage_read_failed"
   | "canvas_source_preview_too_large"
   | "canvas_source_unavailable"
   | "canvas_storage_failed";
@@ -350,6 +395,7 @@ export type CanvasApiResponse =
   | CanvasCourseScopedSyncResponse
   | CanvasReviewerSourceListResponse
   | CanvasReviewerSourcePreviewResponse
+  | CanvasReviewerSourcePrepareResponse
   | CanvasFileIngestionResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;

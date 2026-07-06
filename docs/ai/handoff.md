@@ -171,22 +171,25 @@ paths.
   assignment descriptions, and announcements. The preview endpoint reads only
   existing database rows and does not call Canvas, decrypt the Canvas token,
   call Storage, invoke OCR, or call OpenAI.
-- Canvas files remain metadata-only for reviewer selection in Phase 5C.2A2.
-  File descriptors may be listed as unavailable with a text-extraction message,
-  but PDFs, images, Office files, audio, video, and other binary resources are
-  not selectable or previewed until a later extraction/OCR phase.
+- Phase 5C.2B Canvas PDF/Image OCR Sources is complete, automated-verification
+  passed, and protected-live validated for preparation, private Storage-backed
+  OCR preview, edited reviewer handoff, and Study Library cleanup. It adds safe
+  Canvas file-state descriptors, course-scoped preparation through the existing
+  ingestion service, private byte/hash/signature revalidation, one OCR-backed
+  file per preview, ordered mixed-source assembly, mobile prepare/ready states,
+  no extracted-text persistence, and no Canvas/OpenAI calls during preview.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- File parsing/OCR, remaining secondary Canvas resources, source snapshots,
-  grades, background synchronization, task generation, and study schedule
-  generation are still pending. Production endpoint validators remain
-  unsupported for the audited endpoint families. Discussions, quiz metadata,
-  announcement attachment content import, and broader Canvas resource support
-  remain deferred.
+- Remaining secondary Canvas resources, broader parser families, source
+  snapshots/provenance, grades, background synchronization, task generation,
+  and study schedule generation are still pending. Production endpoint
+  validators remain unsupported for the audited endpoint families. Discussions,
+  quiz metadata, announcement attachment content import, and broader Canvas
+  resource support remain deferred.
 
 ## Current Test Baselines
 
@@ -288,6 +291,19 @@ paths.
   Storage, OCR, or OpenAI preview calls, the existing reviewer API returned HTTP
   200, a two-section reviewer was saved to Study Library, and the smoke item
   was cleaned up.
+- Phase 5C.2B verification: Canvas package typecheck/build/tests 52/52; DB
+  typecheck passed; OCR typecheck/build/tests 14/14; API typecheck/build/tests
+  269/269; mobile typecheck/tests 92/92; engine typecheck/build/evals 266/266;
+  root Turbo typecheck/build 7/7 with 5 cached and 2 fresh tasks; workspace
+  tests API 269/269, mobile 92/92, Canvas 52/52, OCR 14/14. Protected live
+  validation checked 2 selected synchronized courses, found 0 eligible PDFs and
+  2 eligible images, prepared opaque `live-file-1`, reran preparation
+  idempotently, previewed Page -> Image -> Announcement with 1 OCR-backed
+  source and 62 extracted image characters, returned no private Storage or
+  credential fields, generated and saved a reviewer from harmless edited text,
+  verified Study Library visibility, and deleted the validation reviewer. An
+  exploratory generation attempt including the very short/noisy live OCR
+  preview text returned the existing `reviewer_validation_failed` response.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -332,7 +348,7 @@ account-wide synchronous route-duration limitation. Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
 production validation. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated. The recommended next roadmap task is
-Phase 5C.2B - Canvas PDF and image extraction/OCR integration. Automatic
+Phase 5D - Source Normalization, Provenance, And Selective Import. Automatic
 repeated scanned-PDF header/footer detection remains a deferred candidate.
 
 ## Known Blockers And Risks

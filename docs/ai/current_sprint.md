@@ -53,8 +53,13 @@ course-scoped requests. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and protected-live validated: students can choose
 supported synchronized Canvas source rows from a selected course, preview and
 edit combined source text/title, generate through the existing reviewer API,
-and save through the existing Study Library. The next roadmap task is Phase
-5C.2B - Canvas PDF and image extraction/OCR integration.
+and save through the existing Study Library. Phase 5C.2B Canvas PDF/image OCR
+sources are complete and protected-live validated: students can prepare
+eligible Canvas PDFs/images through the existing ingestion boundary, select one
+ready OCR-backed file with stored text sources, preview private Storage-backed
+OCR text, edit before generation, and save through the existing Study Library.
+The next roadmap task is Phase 5D - Source Normalization, Provenance, And
+Selective Import.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -434,14 +439,51 @@ There is no school-wide Canvas token.
 
 ## Out Of Scope For Phase 5C.2A2
 
-- Canvas PDF extraction.
-- Canvas image OCR.
 - Office parsing.
 - audio/video transcription.
 - full persistent Canvas source provenance.
 - background, queued, scheduled, or resumable synchronization.
 - Canvas OAuth, submissions, grades, rubrics, feedback, task generation, and
   schedule generation.
+
+## Completed Phase 5C.2B Scope
+
+- Added safe file-state descriptors for Canvas PDFs, PNGs, JPEGs, unsupported
+  files, blocked files, unprepared files, failed files, and unavailable files.
+- Added course-scoped
+  `POST /api/canvas/courses/:courseId/sources/prepare`, accepting only owned
+  `file:<internal-row-id>` descriptors and delegating to `ingestCanvasFiles`.
+- Added shared OCR validation/extraction helpers reused by manual image/PDF
+  OCR routes and Canvas stored-file preview.
+- Added stored-file extraction that validates owner, connection, selected
+  course, private bucket, object-key ownership shape, byte count, SHA-256,
+  MIME/signature, PDF parseability, PDF encryption, and PDF page limit before
+  OCR.
+- Extended source preview to support ordered mixtures of Pages, assignment
+  descriptions, announcements, and one ready OCR-backed file.
+- Added `maximumOcrFilesPerPreview: 1` and rejected two file sources before
+  Storage/OCR work.
+- Updated mobile Canvas source picker states for Prepare, Preparing, Ready,
+  Preparation failed, Unsupported, Unavailable, one-file selection blocking,
+  and extraction loading copy.
+- Preserved the existing reviewer-generation and Study Library contracts with
+  only edited `sourceText`, edited `sourceTitle`, and minimal
+  `sourceMode: "canvas"` metadata.
+- Added no migration, no extracted-text cache, no signed URL return, no raw
+  file-byte return, no direct mobile-to-Canvas/Storage download, and no
+  persistent OCR output.
+
+## Out Of Scope After Phase 5C.2B
+
+- Office parsing.
+- Spreadsheet parsing.
+- Plain text/Markdown Canvas-file parsing.
+- Audio/video transcription.
+- Canvas Studio support.
+- Discussions, quizzes, submissions, grades, rubrics, and feedback.
+- Full persistent Canvas source provenance.
+- Background, queued, scheduled, or resumable synchronization.
+- Canvas OAuth, task generation, and schedule generation.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -1048,6 +1090,42 @@ There is no school-wide Canvas token.
   200, generated 2 sections, saved to Study Library, verified list visibility,
   and deleted the smoke reviewer.
 
+## Phase 5C.2B Results
+
+- Added `apps/api/src/lib/ocr/extraction-service.ts`,
+  `apps/api/src/lib/canvas-source-safety.ts`,
+  `apps/api/src/lib/canvas-stored-file-extraction.ts`, and
+  `apps/api/app/api/canvas/courses/[courseId]/sources/prepare/route.ts`.
+- Extended `apps/api/src/lib/canvas-reviewer-sources.ts`,
+  `apps/api/src/types/canvas.ts`, the manual OCR routes, the mobile Canvas API
+  service, and `CanvasSourceReviewerScreen` for PDF/image file source
+  preparation and OCR preview.
+- Added stored-file extraction, preparation-service, prepare-route,
+  source-service, mobile API, and route regression coverage.
+- Automated verification passed:
+  - Canvas package typecheck/build/tests: 52/52.
+  - DB package typecheck: passed.
+  - OCR package typecheck/build/tests: 14/14.
+  - API typecheck/build/tests: 269/269.
+  - Mobile typecheck/tests: 92/92.
+  - Engine typecheck/build/evals: 266/266.
+  - Root Turbo typecheck/build: 7/7 tasks, 5 cached and 2 fresh.
+  - Workspace tests: API 269/269, mobile 92/92, Canvas 52/52, OCR 14/14.
+- Protected live validation used aggregate-only output. Two selected
+  synchronized courses were checked; the inventory had 0 eligible PDFs and 2
+  eligible images. Opaque `live-file-1` was prepared, rerun idempotently,
+  refreshed to ready, previewed with Page -> Image -> Announcement order, and
+  returned 1 OCR-backed source with 62 extracted image characters.
+- Live preparation and preview responses returned no Storage object keys,
+  signed URLs, file bytes, hashes, Canvas URLs, Canvas credentials, or provider
+  internals. Preview called private Storage and OCR, but did not call Canvas,
+  decrypt the PAT, or call OpenAI.
+- Reviewer generation and Study Library cleanup passed with harmless edited
+  source text: reviewer API HTTP 200, 1 section, saved to Study Library,
+  visible in the list, and deleted. An exploratory generation attempt including
+  the very short/noisy live OCR preview text returned the existing
+  `reviewer_validation_failed` response.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -1095,5 +1173,5 @@ account-wide synchronous route-duration limitation. Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
 production validation. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated. The recommended next roadmap task is
-Phase 5C.2B - Canvas PDF and image extraction/OCR integration. The deferred
+Phase 5D - Source Normalization, Provenance, And Selective Import. The deferred
 header/footer cleanup task remains separate.

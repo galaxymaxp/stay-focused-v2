@@ -192,6 +192,7 @@ function preview() {
       maximumSources: 8,
       maximumCharactersPerSource: 20000,
       maximumCombinedPreviewCharacters: 90000,
+      maximumOcrFilesPerPreview: 1,
       existingReviewerRequestLimit: 100000,
       suggestedTitleLimit: 120,
     },

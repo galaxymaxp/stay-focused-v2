@@ -8,6 +8,7 @@ import {
   listCanvasReviewerSources,
   listCanvasCapabilities,
   listCanvasCourses,
+  prepareCanvasReviewerSources,
   previewCanvasReviewerSources,
   saveCanvasCoursePreferences,
   syncCanvasAcademicGraph,
@@ -391,7 +392,15 @@ describe("Canvas mobile API client", () => {
         unavailableSourceCount: 1,
         sources: [
           { type: "page", availability: "available" },
-          { type: "file", availability: "unavailable" },
+          {
+            type: "file",
+            availability: "unavailable",
+            file: {
+              kind: "pdf",
+              preparationStatus: "not_prepared",
+              canPrepare: true,
+            },
+          },
         ],
       },
     });
@@ -404,11 +413,108 @@ describe("Canvas mobile API client", () => {
     });
   });
 
+  it("prepares Canvas file sources with descriptor IDs only", async () => {
+    const fetchImpl = createFetch(sourcePrepareResponse());
+    const sourceIds = ["file:22222222-2222-4222-8222-222222222222"];
+
+    const result = await prepareCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+      sourceIds,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        requested: 1,
+        results: [{ id: sourceIds[0], status: "ready" }],
+        sources: [
+          {
+            id: sourceIds[0],
+            availability: "available",
+            file: {
+              kind: "pdf",
+              preparationStatus: "ready",
+              canPrepare: false,
+            },
+          },
+        ],
+      },
+    });
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/courses/33333333-3333-4333-8333-333333333333/sources/prepare`,
+      init: {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+      },
+    });
+    expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
+      sourceIds,
+    });
+    expect(String(lastRequest(fetchImpl).init.body)).not.toContain("storage");
+    expect(String(lastRequest(fetchImpl).init.body)).not.toContain("canvas_file_id");
+  });
+
+  it("blocks duplicate Canvas source preparation before fetch", async () => {
+    const fetchImpl = vi.fn();
+
+    await expect(
+      prepareCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl,
+        sourceIds: [
+          "file:22222222-2222-4222-8222-222222222222",
+          "file:22222222-2222-4222-8222-222222222222",
+        ],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "duplicate_source_submission" },
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("maps Canvas source preparation failures safely", async () => {
+    await expect(
+      prepareCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_source_stored_file_corrupt",
+              message: "private storage path detail",
+            },
+          },
+          409,
+        ),
+        sourceIds: ["file:22222222-2222-4222-8222-222222222222"],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: "stored_file_corrupt",
+        message: "Prepare this Canvas file again before previewing it.",
+        status: 409,
+      },
+    });
+  });
+
   it("submits ordered Canvas reviewer source IDs and parses preview limits", async () => {
     const fetchImpl = createFetch(sourcePreviewResponse());
     const sourceIds = [
       "page:11111111-1111-4111-8111-111111111111",
-      "assignment:22222222-2222-4222-8222-222222222222",
+      "file:22222222-2222-4222-8222-222222222222",
+      "announcement:33333333-3333-4333-8333-333333333333",
     ];
 
     const result = await previewCanvasReviewerSources({
@@ -422,14 +528,20 @@ describe("Canvas mobile API client", () => {
     expect(result).toMatchObject({
       ok: true,
       data: {
-        sourceText: "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.",
+        sourceText: expect.stringContaining("SOURCE 2 - PDF - Fictional File"),
         suggestedTitle: "Fictional Course - Canvas Reviewer",
-        sourceCount: 2,
+        sourceCount: 3,
         limits: {
           maximumSources: 8,
+          maximumOcrFilesPerPreview: 1,
           maximumCombinedPreviewCharacters: 90000,
           existingReviewerRequestLimit: 100000,
         },
+        sources: [
+          { type: "page" },
+          { type: "file", fileKind: "pdf", pageCount: 2 },
+          { type: "announcement" },
+        ],
       },
     });
     expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
@@ -480,6 +592,34 @@ describe("Canvas mobile API client", () => {
     ).resolves.toMatchObject({
       ok: false,
       error: { code: "source_preview_too_large", status: 413 },
+    });
+  });
+
+  it("maps Canvas OCR preview failures to safe client errors", async () => {
+    await expect(
+      previewCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_source_ocr_failed",
+              message: "raw provider stack",
+            },
+          },
+          502,
+        ),
+        sourceIds: ["file:22222222-2222-4222-8222-222222222222"],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: "ocr_failed",
+        message: "OCR failed. Try again in a moment.",
+        status: 502,
+      },
     });
   });
 
@@ -1021,15 +1161,21 @@ function sourceListResponse() {
         unavailableReason: null,
         updatedAt: "2026-07-07T01:00:00.000Z",
         estimatedCharacters: 120,
+        file: null,
       },
       {
         id: "file:22222222-2222-4222-8222-222222222222",
         type: "file",
         title: "Fictional File",
         availability: "unavailable",
-        unavailableReason: "Text extraction for this file type is not available yet.",
+        unavailableReason: "Prepare this file before using it.",
         updatedAt: "2026-07-07T01:00:00.000Z",
         estimatedCharacters: null,
+        file: {
+          kind: "pdf",
+          preparationStatus: "not_prepared",
+          canPrepare: true,
+        },
       },
     ],
     pagination: {
@@ -1045,10 +1191,11 @@ function sourceListResponse() {
 function sourcePreviewResponse() {
   return {
     ok: true,
-    sourceText: "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.",
+    sourceText:
+      "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.\n\nSOURCE 2 - PDF - Fictional File\n\nExtracted text.\n\nSOURCE 3 - ANNOUNCEMENT - Fictional Announcement\n\nAnnouncement text.",
     suggestedTitle: "Fictional Course - Canvas Reviewer",
-    sourceCount: 2,
-    characterCount: 52,
+    sourceCount: 3,
+    characterCount: 168,
     sources: [
       {
         id: "page:11111111-1111-4111-8111-111111111111",
@@ -1056,8 +1203,15 @@ function sourcePreviewResponse() {
         updatedAt: "2026-07-07T01:00:00.000Z",
       },
       {
-        id: "assignment:22222222-2222-4222-8222-222222222222",
-        type: "assignment",
+        id: "file:22222222-2222-4222-8222-222222222222",
+        type: "file",
+        fileKind: "pdf",
+        pageCount: 2,
+        updatedAt: "2026-07-07T01:00:00.000Z",
+      },
+      {
+        id: "announcement:33333333-3333-4333-8333-333333333333",
+        type: "announcement",
         updatedAt: "2026-07-07T01:00:00.000Z",
       },
     ],
@@ -1069,9 +1223,41 @@ function sourcePreviewResponse() {
       maximumSources: 8,
       maximumCharactersPerSource: 20000,
       maximumCombinedPreviewCharacters: 90000,
+      maximumOcrFilesPerPreview: 1,
       existingReviewerRequestLimit: 100000,
       suggestedTitleLimit: 120,
     },
+  };
+}
+
+function sourcePrepareResponse() {
+  return {
+    ok: true,
+    requested: 1,
+    results: [
+      {
+        id: "file:22222222-2222-4222-8222-222222222222",
+        status: "ready",
+        code: "stored",
+        retryable: false,
+      },
+    ],
+    sources: [
+      {
+        id: "file:22222222-2222-4222-8222-222222222222",
+        type: "file",
+        title: "Fictional File",
+        availability: "available",
+        unavailableReason: null,
+        updatedAt: "2026-07-07T01:00:00.000Z",
+        estimatedCharacters: null,
+        file: {
+          kind: "pdf",
+          preparationStatus: "ready",
+          canPrepare: false,
+        },
+      },
+    ],
   };
 }
 

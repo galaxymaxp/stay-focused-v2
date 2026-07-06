@@ -212,6 +212,16 @@ export type CanvasReviewerSourceType =
   | "announcement"
   | "file";
 
+export type CanvasReviewerFileKind = "pdf" | "image" | "unsupported";
+
+export type CanvasReviewerFilePreparationStatus =
+  | "ready"
+  | "not_prepared"
+  | "failed"
+  | "blocked"
+  | "unsupported"
+  | "unavailable";
+
 export interface CanvasReviewerCourseSyncSummary {
   readonly status: "success" | "partial" | "failed" | "never";
   readonly completedAt: string | null;
@@ -229,6 +239,11 @@ export interface CanvasReviewerSourceDescriptor {
   readonly unavailableReason: string | null;
   readonly updatedAt: string | null;
   readonly estimatedCharacters: number | null;
+  readonly file: {
+    readonly kind: CanvasReviewerFileKind;
+    readonly preparationStatus: CanvasReviewerFilePreparationStatus;
+    readonly canPrepare: boolean;
+  } | null;
 }
 
 export interface CanvasReviewerSourceListPayload {
@@ -253,8 +268,10 @@ export interface CanvasReviewerSourcePreviewPayload {
   readonly characterCount: number;
   readonly sources: readonly {
     readonly id: string;
-    readonly type: Exclude<CanvasReviewerSourceType, "file">;
+    readonly type: CanvasReviewerSourceType;
     readonly updatedAt: string | null;
+    readonly fileKind?: Exclude<CanvasReviewerFileKind, "unsupported">;
+    readonly pageCount?: number;
   }[];
   readonly courseSync: {
     readonly status: "success" | "partial" | "failed" | "never";
@@ -264,9 +281,21 @@ export interface CanvasReviewerSourcePreviewPayload {
     readonly maximumSources: number;
     readonly maximumCharactersPerSource: number;
     readonly maximumCombinedPreviewCharacters: number;
+    readonly maximumOcrFilesPerPreview: number;
     readonly existingReviewerRequestLimit: number;
     readonly suggestedTitleLimit: number;
   };
+}
+
+export interface CanvasReviewerSourcePreparePayload {
+  readonly requested: number;
+  readonly results: readonly {
+    readonly id: string;
+    readonly status: "ready" | "failed" | "blocked" | "unsupported" | "unavailable";
+    readonly code: string;
+    readonly retryable: boolean;
+  }[];
+  readonly sources: readonly CanvasReviewerSourceDescriptor[];
 }
 
 export interface CanvasApiBaseInput {
@@ -323,7 +352,18 @@ export type CanvasApiClientErrorCode =
   | "duplicate_course_submission"
   | "duplicate_source_submission"
   | "source_count_exceeded"
+  | "ocr_file_limit_exceeded"
   | "source_not_found"
+  | "source_preparation_required"
+  | "stored_file_missing"
+  | "stored_file_corrupt"
+  | "unsupported_file_type"
+  | "ocr_empty"
+  | "pdf_encrypted"
+  | "pdf_page_limit_exceeded"
+  | "ocr_not_configured"
+  | "ocr_failed"
+  | "storage_read_failed"
   | "source_preview_too_large"
   | "source_unavailable"
   | "storage_not_configured"
@@ -376,6 +416,11 @@ interface CanvasReviewerSourceListSuccessResponse
 
 interface CanvasReviewerSourcePreviewSuccessResponse
   extends CanvasReviewerSourcePreviewPayload {
+  readonly ok: true;
+}
+
+interface CanvasReviewerSourcePrepareSuccessResponse
+  extends CanvasReviewerSourcePreparePayload {
   readonly ok: true;
 }
 
@@ -572,6 +617,48 @@ export async function listCanvasReviewerSources(
     input,
     method: "GET",
     parseSuccess: parseCanvasReviewerSourceListResponse,
+  });
+}
+
+export async function prepareCanvasReviewerSources(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly sourceIds: readonly string[];
+  },
+): Promise<CanvasApiResult<CanvasReviewerSourcePreparePayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before preparing files.",
+    );
+  }
+  const normalizedIds = input.sourceIds.map((sourceId) => sourceId.trim());
+  if (new Set(normalizedIds).size !== normalizedIds.length) {
+    return clientError(
+      "duplicate_source_submission",
+      "A Canvas source can only be prepared once.",
+    );
+  }
+  if (normalizedIds.length === 0 || normalizedIds.length > 3) {
+    return clientError(
+      "source_count_exceeded",
+      "Prepare 1 to 3 Canvas files at a time.",
+    );
+  }
+
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources/prepare`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    body: { sourceIds: normalizedIds },
+    parseSuccess: parseCanvasReviewerSourcePrepareResponse,
   });
 }
 
@@ -964,6 +1051,25 @@ function parseCanvasReviewerSourcePreviewResponse(
   );
 }
 
+function parseCanvasReviewerSourcePrepareResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasReviewerSourcePreparePayload> {
+  if (isCanvasReviewerSourcePrepareSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        requested: parsed.requested,
+        results: parsed.results,
+        sources: parsed.sources,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid file preparation response.",
+  );
+}
+
 function parseDeleteResponse(parsed: unknown): CanvasApiResult<void> {
   if (isDeleteSuccessResponse(parsed)) {
     return { ok: true, data: undefined };
@@ -1040,10 +1146,34 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "course_unavailable";
     case "canvas_source_count_exceeded":
       return "source_count_exceeded";
+    case "canvas_source_ocr_file_limit_exceeded":
+      return "ocr_file_limit_exceeded";
     case "canvas_source_duplicate":
       return "duplicate_source_submission";
     case "canvas_source_not_found":
       return "source_not_found";
+    case "canvas_source_file_preparation_required":
+      return "source_preparation_required";
+    case "canvas_source_stored_file_missing":
+      return "stored_file_missing";
+    case "canvas_source_stored_file_corrupt":
+      return "stored_file_corrupt";
+    case "canvas_source_unsupported_file_type":
+      return "unsupported_file_type";
+    case "canvas_source_image_ocr_empty":
+    case "canvas_source_pdf_ocr_empty":
+    case "canvas_source_ocr_empty":
+      return "ocr_empty";
+    case "canvas_source_pdf_encrypted":
+      return "pdf_encrypted";
+    case "canvas_source_pdf_page_limit_exceeded":
+      return "pdf_page_limit_exceeded";
+    case "canvas_source_ocr_not_configured":
+      return "ocr_not_configured";
+    case "canvas_source_ocr_failed":
+      return "ocr_failed";
+    case "canvas_source_storage_read_failed":
+      return "storage_read_failed";
     case "canvas_source_preview_too_large":
       return "source_preview_too_large";
     case "canvas_source_unavailable":
@@ -1102,6 +1232,39 @@ function safeApiErrorMessage(
   }
   if (code === "corrupted_credentials") {
     return "Reconnect Canvas before loading courses.";
+  }
+  if (code === "ocr_file_limit_exceeded") {
+    return "You can use one PDF or image per reviewer preview.";
+  }
+  if (code === "source_preparation_required") {
+    return "Prepare this Canvas file before previewing it.";
+  }
+  if (code === "stored_file_missing" || code === "stored_file_corrupt") {
+    return "Prepare this Canvas file again before previewing it.";
+  }
+  if (code === "unsupported_file_type") {
+    return "This Canvas file type is not supported yet.";
+  }
+  if (code === "ocr_empty") {
+    return "No readable text was detected in this Canvas file.";
+  }
+  if (code === "pdf_encrypted") {
+    return "Password-protected Canvas PDFs cannot be read.";
+  }
+  if (code === "pdf_page_limit_exceeded") {
+    return "Canvas PDF OCR supports up to five pages per preview.";
+  }
+  if (code === "ocr_not_configured") {
+    return "OCR is not configured yet.";
+  }
+  if (code === "ocr_failed") {
+    return "OCR failed. Try again in a moment.";
+  }
+  if (code === "storage_read_failed") {
+    return "Canvas file storage could not be read. Try again later.";
+  }
+  if (code === "source_preview_too_large") {
+    return "Selected Canvas sources are too large. Select fewer or smaller sources.";
   }
 
   const normalized = sanitizeDiagnosticText(message)
@@ -1317,6 +1480,38 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
   );
 }
 
+function isCanvasReviewerSourcePrepareSuccessResponse(
+  value: unknown,
+): value is CanvasReviewerSourcePrepareSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, ["ok", "requested", "results", "sources"]) &&
+    isNonNegativeInteger(value.requested) &&
+    Array.isArray(value.results) &&
+    value.results.every(isCanvasPrepareResult) &&
+    Array.isArray(value.sources) &&
+    value.sources.every(isCanvasReviewerSourceDescriptor)
+  );
+}
+
+function isCanvasPrepareResult(
+  value: unknown,
+): value is CanvasReviewerSourcePreparePayload["results"][number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["id", "status", "code", "retryable"]) &&
+    typeof value.id === "string" &&
+    (value.status === "ready" ||
+      value.status === "failed" ||
+      value.status === "blocked" ||
+      value.status === "unsupported" ||
+      value.status === "unavailable") &&
+    typeof value.code === "string" &&
+    typeof value.retryable === "boolean"
+  );
+}
+
 function isDeleteSuccessResponse(value: unknown): value is DeleteSuccessResponse {
   return isRecord(value) && value.ok === true;
 }
@@ -1482,6 +1677,7 @@ function isCanvasReviewerSourceDescriptor(
       "unavailableReason",
       "updatedAt",
       "estimatedCharacters",
+      "file",
     ]) &&
     typeof value.id === "string" &&
     isCanvasReviewerSourceType(value.type) &&
@@ -1492,7 +1688,20 @@ function isCanvasReviewerSourceDescriptor(
       typeof value.unavailableReason === "string") &&
     (value.updatedAt === null || typeof value.updatedAt === "string") &&
     (value.estimatedCharacters === null ||
-      isNonNegativeInteger(value.estimatedCharacters))
+      isNonNegativeInteger(value.estimatedCharacters)) &&
+    (value.file === null || isCanvasReviewerFileState(value.file))
+  );
+}
+
+function isCanvasReviewerFileState(
+  value: unknown,
+): value is NonNullable<CanvasReviewerSourceDescriptor["file"]> {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["kind", "preparationStatus", "canPrepare"]) &&
+    isCanvasReviewerFileKind(value.kind) &&
+    isCanvasReviewerFilePreparationStatus(value.preparationStatus) &&
+    typeof value.canPrepare === "boolean"
   );
 }
 
@@ -1515,12 +1724,14 @@ function isCanvasPreviewSourceSummary(
 ): value is CanvasReviewerSourcePreviewPayload["sources"][number] {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["id", "type", "updatedAt"]) &&
+    hasOnlyKeys(value, ["id", "type", "updatedAt", "fileKind", "pageCount"]) &&
     typeof value.id === "string" &&
-    (value.type === "page" ||
-      value.type === "assignment" ||
-      value.type === "announcement") &&
-    (value.updatedAt === null || typeof value.updatedAt === "string")
+    isCanvasReviewerSourceType(value.type) &&
+    (value.updatedAt === null || typeof value.updatedAt === "string") &&
+    (value.fileKind === undefined ||
+      value.fileKind === "pdf" ||
+      value.fileKind === "image") &&
+    (value.pageCount === undefined || isNonNegativeInteger(value.pageCount))
   );
 }
 
@@ -1544,12 +1755,14 @@ function isCanvasPreviewLimits(
       "maximumSources",
       "maximumCharactersPerSource",
       "maximumCombinedPreviewCharacters",
+      "maximumOcrFilesPerPreview",
       "existingReviewerRequestLimit",
       "suggestedTitleLimit",
     ]) &&
     isNonNegativeInteger(value.maximumSources) &&
     isNonNegativeInteger(value.maximumCharactersPerSource) &&
     isNonNegativeInteger(value.maximumCombinedPreviewCharacters) &&
+    isNonNegativeInteger(value.maximumOcrFilesPerPreview) &&
     isNonNegativeInteger(value.existingReviewerRequestLimit) &&
     isNonNegativeInteger(value.suggestedTitleLimit) &&
     value.maximumCombinedPreviewCharacters < value.existingReviewerRequestLimit
@@ -1564,6 +1777,25 @@ function isCanvasReviewerSourceType(
     value === "assignment" ||
     value === "announcement" ||
     value === "file"
+  );
+}
+
+function isCanvasReviewerFileKind(
+  value: unknown,
+): value is CanvasReviewerFileKind {
+  return value === "pdf" || value === "image" || value === "unsupported";
+}
+
+function isCanvasReviewerFilePreparationStatus(
+  value: unknown,
+): value is CanvasReviewerFilePreparationStatus {
+  return (
+    value === "ready" ||
+    value === "not_prepared" ||
+    value === "failed" ||
+    value === "blocked" ||
+    value === "unsupported" ||
+    value === "unavailable"
   );
 }
 

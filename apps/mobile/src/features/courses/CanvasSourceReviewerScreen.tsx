@@ -17,6 +17,7 @@ import { colors, spacing, typography } from "../../design/tokens";
 import {
   CANVAS_REVIEWER_MAX_SELECTED_SOURCES,
   listCanvasReviewerSources,
+  prepareCanvasReviewerSources,
   previewCanvasReviewerSources,
   type CanvasApiClientError,
   type CanvasReviewerSourceDescriptor,
@@ -71,16 +72,36 @@ export function CanvasSourceReviewerScreen({
   const [saveError, setSaveError] = useState<CanvasSourceDisplayError | null>(null);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [preparingSourceIds, setPreparingSourceIds] = useState<readonly string[]>(
+    [],
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const selectedIdsInDisplayOrder = useMemo(
+  const selectedIdsInPreviewOrder = useMemo(
     () =>
-      sourceList?.sources
-        .filter((source) => selectedSourceIds.includes(source.id))
-        .map((source) => source.id) ?? [],
+      selectedSourceIds.filter((sourceId) =>
+        sourceList?.sources.some(
+          (source) =>
+            source.id === sourceId && source.availability === "available",
+        ),
+      ),
     [selectedSourceIds, sourceList?.sources],
+  );
+  const selectedFileCount = useMemo(
+    () =>
+      selectedSourceIds.filter((sourceId) =>
+        sourceList?.sources.some(
+          (source) => source.id === sourceId && source.type === "file",
+        ),
+      ).length,
+    [selectedSourceIds, sourceList?.sources],
+  );
+  const previewIncludesFile = selectedIdsInPreviewOrder.some((sourceId) =>
+    sourceList?.sources.some(
+      (source) => source.id === sourceId && source.type === "file",
+    ),
   );
   const groupedSources = useMemo(
     () => groupSourcesByType(sourceList?.sources ?? []),
@@ -150,6 +171,20 @@ export function CanvasSourceReviewerScreen({
       if (current.includes(source.id)) {
         return current.filter((sourceId) => sourceId !== source.id);
       }
+      if (
+        source.type === "file" &&
+        current.some((sourceId) =>
+          sourceList?.sources.some(
+            (candidate) => candidate.id === sourceId && candidate.type === "file",
+          ),
+        )
+      ) {
+        setError({
+          title: "One file per preview",
+          message: "You can use one PDF or image per reviewer preview.",
+        });
+        return current;
+      }
       if (current.length >= CANVAS_REVIEWER_MAX_SELECTED_SOURCES) {
         setError({
           title: "Too many sources",
@@ -161,6 +196,39 @@ export function CanvasSourceReviewerScreen({
     });
   };
 
+  const handlePrepareSource = async (source: CanvasReviewerSourceDescriptor) => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+    if (source.type !== "file" || source.file?.canPrepare !== true) {
+      return;
+    }
+    if (preparingSourceIds.includes(source.id)) {
+      return;
+    }
+
+    setPreparingSourceIds((current) => [...current, source.id]);
+    setError(null);
+    try {
+      const result = await prepareCanvasReviewerSources({
+        ...context.value,
+        courseId,
+        sourceIds: [source.id],
+      });
+      if (result.ok) {
+        await loadSources();
+      } else {
+        setError(formatCanvasSourceError(result.error));
+      }
+    } finally {
+      setPreparingSourceIds((current) =>
+        current.filter((sourceId) => sourceId !== source.id),
+      );
+    }
+  };
+
   const handlePreviewSources = async () => {
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
@@ -168,7 +236,7 @@ export function CanvasSourceReviewerScreen({
       return;
     }
 
-    if (selectedIdsInDisplayOrder.length === 0) {
+    if (selectedIdsInPreviewOrder.length === 0) {
       setError({
         title: "Choose a source",
         message: "Choose at least one available Canvas source.",
@@ -185,7 +253,7 @@ export function CanvasSourceReviewerScreen({
       const result = await previewCanvasReviewerSources({
         ...context.value,
         courseId,
-        sourceIds: selectedIdsInDisplayOrder,
+        sourceIds: selectedIdsInPreviewOrder,
       });
 
       if (result.ok) {
@@ -339,24 +407,32 @@ export function CanvasSourceReviewerScreen({
             <>
               <SourceSection
                 onToggleSource={handleToggleSource}
+                onPrepareSource={handlePrepareSource}
+                preparingSourceIds={preparingSourceIds}
                 selectedSourceIds={selectedSourceIds}
                 sources={groupedSources.pages}
                 title="Pages"
               />
               <SourceSection
                 onToggleSource={handleToggleSource}
+                onPrepareSource={handlePrepareSource}
+                preparingSourceIds={preparingSourceIds}
                 selectedSourceIds={selectedSourceIds}
                 sources={groupedSources.assignments}
                 title="Assignments"
               />
               <SourceSection
                 onToggleSource={handleToggleSource}
+                onPrepareSource={handlePrepareSource}
+                preparingSourceIds={preparingSourceIds}
                 selectedSourceIds={selectedSourceIds}
                 sources={groupedSources.announcements}
                 title="Announcements"
               />
               <SourceSection
                 onToggleSource={handleToggleSource}
+                onPrepareSource={handlePrepareSource}
+                preparingSourceIds={preparingSourceIds}
                 selectedSourceIds={selectedSourceIds}
                 sources={groupedSources.files}
                 title="Files"
@@ -366,17 +442,20 @@ export function CanvasSourceReviewerScreen({
 
           <Card style={styles.actionCard}>
             <Text style={styles.statusText} testID="canvas-selected-source-count">
-              {selectedIdsInDisplayOrder.length} selected
+              {selectedIdsInPreviewOrder.length} selected
+              {selectedFileCount > 0 ? " - 1 file" : ""}
             </Text>
             <Button
-              disabled={selectedIdsInDisplayOrder.length === 0}
+              disabled={selectedIdsInPreviewOrder.length === 0}
               fullWidth
               loading={isPreviewing}
               onPress={() => void handlePreviewSources()}
               testID="canvas-preview-sources-button"
               variant="primary"
             >
-              Preview selected content
+              {isPreviewing && previewIncludesFile
+                ? "Extracting source text..."
+                : "Preview selected content"}
             </Button>
           </Card>
         </View>
@@ -519,11 +598,15 @@ function CourseFreshnessCard({
 
 function SourceSection({
   onToggleSource,
+  onPrepareSource,
+  preparingSourceIds,
   selectedSourceIds,
   sources,
   title,
 }: {
   readonly onToggleSource: (source: CanvasReviewerSourceDescriptor) => void;
+  readonly onPrepareSource: (source: CanvasReviewerSourceDescriptor) => void;
+  readonly preparingSourceIds: readonly string[];
   readonly selectedSourceIds: readonly string[];
   readonly sources: readonly CanvasReviewerSourceDescriptor[];
   readonly title: string;
@@ -539,7 +622,9 @@ function SourceSection({
         {sources.map((source) => (
           <SourceRow
             isSelected={selectedSourceIds.includes(source.id)}
+            isPreparing={preparingSourceIds.includes(source.id)}
             key={source.id}
+            onPrepareSource={onPrepareSource}
             onToggleSource={onToggleSource}
             source={source}
           />
@@ -551,10 +636,14 @@ function SourceSection({
 
 function SourceRow({
   isSelected,
+  isPreparing,
+  onPrepareSource,
   onToggleSource,
   source,
 }: {
   readonly isSelected: boolean;
+  readonly isPreparing: boolean;
+  readonly onPrepareSource: (source: CanvasReviewerSourceDescriptor) => void;
   readonly onToggleSource: (source: CanvasReviewerSourceDescriptor) => void;
   readonly source: CanvasReviewerSourceDescriptor;
 }) {
@@ -564,8 +653,12 @@ function SourceRow({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked: isSelected, disabled }}
-      disabled={disabled}
-      onPress={() => onToggleSource(source)}
+      disabled={disabled && source.file?.canPrepare !== true}
+      onPress={() => {
+        if (!disabled) {
+          onToggleSource(source);
+        }
+      }}
       style={[styles.sourceRow, disabled ? styles.sourceRowDisabled : null]}
       testID={`canvas-source-row-${source.id}`}
     >
@@ -576,6 +669,7 @@ function SourceRow({
         <Text style={styles.sourceTitle}>{source.title}</Text>
         <Text style={styles.sourceMeta}>
           {formatSourceType(source.type)}
+          {source.file ? ` - ${formatFileState(source.file, isPreparing)}` : ""}
           {source.estimatedCharacters !== null
             ? ` - ${source.estimatedCharacters} characters`
             : ""}
@@ -583,6 +677,19 @@ function SourceRow({
         </Text>
         {source.unavailableReason ? (
           <Text style={styles.warningText}>{source.unavailableReason}</Text>
+        ) : null}
+        {source.file?.canPrepare ? (
+          <View style={styles.inlineAction}>
+            <Button
+              disabled={isPreparing}
+              loading={isPreparing}
+              onPress={() => onPrepareSource(source)}
+              testID={`canvas-prepare-source-${source.id}`}
+              variant="secondary"
+            >
+              Prepare file
+            </Button>
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -723,10 +830,61 @@ function formatCanvasSourceError(
         message: error.message,
         detail,
       };
+    case "ocr_file_limit_exceeded":
+      return {
+        title: "One file per preview",
+        message: "You can use one PDF or image per reviewer preview.",
+        detail,
+      };
     case "source_preview_too_large":
       return {
         title: "Source preview is too large",
         message: error.message,
+        detail,
+      };
+    case "source_preparation_required":
+      return {
+        title: "Prepare file first",
+        message: "Prepare this file before using it as reviewer source text.",
+        detail,
+      };
+    case "stored_file_missing":
+    case "stored_file_corrupt":
+      return {
+        title: "Prepare file again",
+        message: "The prepared file needs to be refreshed before previewing.",
+        detail,
+      };
+    case "unsupported_file_type":
+      return {
+        title: "Unsupported file",
+        message: "This Canvas file type is not supported yet.",
+        detail,
+      };
+    case "ocr_empty":
+      return {
+        title: "No readable text",
+        message: "OCR did not find readable text in this file.",
+        detail,
+      };
+    case "pdf_encrypted":
+      return {
+        title: "PDF is locked",
+        message: "Password-protected PDFs cannot be read.",
+        detail,
+      };
+    case "pdf_page_limit_exceeded":
+      return {
+        title: "PDF has too many pages",
+        message: "Canvas PDF OCR supports up to five pages per preview.",
+        detail,
+      };
+    case "ocr_not_configured":
+    case "ocr_failed":
+    case "storage_read_failed":
+      return {
+        title: "Text extraction failed",
+        message: "The file could not be extracted right now. Try again later.",
         detail,
       };
     case "source_not_found":
@@ -835,6 +993,29 @@ function formatSourceType(type: CanvasReviewerSourceType): string {
       return "Announcement";
     case "file":
       return "File";
+  }
+}
+
+function formatFileState(
+  file: NonNullable<CanvasReviewerSourceDescriptor["file"]>,
+  isPreparing = false,
+): string {
+  if (isPreparing) {
+    return "Preparing...";
+  }
+  switch (file.preparationStatus) {
+    case "ready":
+      return "Ready";
+    case "not_prepared":
+      return "Prepare";
+    case "failed":
+      return "Preparation failed";
+    case "blocked":
+      return "Unavailable";
+    case "unsupported":
+      return "Unsupported";
+    case "unavailable":
+      return "Unavailable";
   }
 }
 
@@ -947,6 +1128,10 @@ const styles = StyleSheet.create({
   sourceBody: {
     flex: 1,
     gap: spacing[1],
+  },
+  inlineAction: {
+    alignSelf: "flex-start",
+    marginTop: spacing[1],
   },
   sourceTitle: {
     color: colors.textPrimary,
