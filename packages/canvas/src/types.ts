@@ -99,6 +99,70 @@ export interface CanvasAssignment {
   readonly updatedAt: string | null;
 }
 
+export interface CanvasPlannerOverrideSummary {
+  readonly id: string | null;
+  readonly plannableType: string | null;
+  readonly plannableId: string | null;
+  readonly workflowState: string | null;
+  readonly markedComplete: boolean | null;
+  readonly dismissed: boolean | null;
+  readonly deletedAt: string | null;
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+}
+
+export interface CanvasPlannerSubmissionState {
+  readonly excused: boolean | null;
+  readonly graded: boolean | null;
+  readonly late: boolean | null;
+  readonly missing: boolean | null;
+  readonly needsGrading: boolean | null;
+  readonly withFeedback: boolean | null;
+}
+
+export interface CanvasPlannerItem {
+  readonly contextType: string | null;
+  readonly contextCode: string | null;
+  readonly courseId: string | null;
+  readonly plannableId: string;
+  readonly plannableType: string;
+  readonly title: string | null;
+  readonly plannerDate: string | null;
+  readonly dueAt: string | null;
+  readonly todoDate: string | null;
+  readonly htmlUrl: string | null;
+  readonly workflowState: string | null;
+  readonly plannerOverride: CanvasPlannerOverrideSummary | null;
+  readonly submission: CanvasPlannerSubmissionState | null;
+}
+
+export interface CanvasPlannerItemsListOptions {
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly contextCodes: readonly string[];
+}
+
+export interface CanvasAnnouncement {
+  readonly id: string;
+  readonly contextCode: string | null;
+  readonly title: string;
+  readonly message: string | null;
+  readonly postedAt: string | null;
+  readonly delayedPostAt: string | null;
+  readonly lockAt: string | null;
+  readonly todoDate: string | null;
+  readonly workflowState: string | null;
+  readonly published: boolean | null;
+  readonly locked: boolean | null;
+  readonly htmlUrl: string | null;
+}
+
+export interface CanvasAnnouncementsListOptions {
+  readonly courseId: string;
+  readonly startDate: string;
+  readonly endDate: string;
+}
+
 export type CanvasNullableDate = string | null;
 
 export type CanvasJson =

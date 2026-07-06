@@ -138,10 +138,26 @@ export type CanvasCourseSyncStateInsert =
   Database["public"]["Tables"]["canvas_course_sync_states"]["Insert"];
 export type CanvasCourseSyncStateUpdate =
   Database["public"]["Tables"]["canvas_course_sync_states"]["Update"];
+export type CanvasPlannerItemRow =
+  Database["public"]["Tables"]["canvas_planner_items"]["Row"];
+export type CanvasPlannerItemInsert =
+  Database["public"]["Tables"]["canvas_planner_items"]["Insert"];
+export type CanvasPlannerItemUpdate =
+  Database["public"]["Tables"]["canvas_planner_items"]["Update"];
+export type CanvasAnnouncementRow =
+  Database["public"]["Tables"]["canvas_announcements"]["Row"];
+export type CanvasAnnouncementInsert =
+  Database["public"]["Tables"]["canvas_announcements"]["Insert"];
+export type CanvasAnnouncementUpdate =
+  Database["public"]["Tables"]["canvas_announcements"]["Update"];
 export type CanvasCourseAcademicSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_academic_snapshot"]["Returns"][number];
 export type CanvasCourseAcademicSnapshotWithSyncStateResult =
   Database["public"]["Functions"]["replace_canvas_course_academic_snapshot_with_sync_state"]["Returns"][number];
+export type CanvasPlannerItemsSnapshotResult =
+  Database["public"]["Functions"]["replace_canvas_planner_items_snapshot"]["Returns"][number];
+export type CanvasAnnouncementsSnapshotResult =
+  Database["public"]["Functions"]["replace_canvas_course_announcements_snapshot"]["Returns"][number];
 
 export interface Database {
   public: {
@@ -1032,6 +1048,235 @@ export interface Database {
           },
         ];
       };
+      canvas_planner_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string | null;
+          canvas_course_id: string | null;
+          canvas_planner_item_id: string;
+          context_code: string | null;
+          plannable_type: string;
+          plannable_id: string;
+          title: string | null;
+          planner_date: string | null;
+          due_at: string | null;
+          todo_date: string | null;
+          html_url: string | null;
+          workflow_state: string | null;
+          marked_complete: boolean | null;
+          dismissed: boolean | null;
+          submission_excused: boolean | null;
+          submission_graded: boolean | null;
+          submission_late: boolean | null;
+          submission_missing: boolean | null;
+          submission_needs_grading: boolean | null;
+          submission_with_feedback: boolean | null;
+          source_fingerprint: string;
+          first_synced_at: string;
+          last_synced_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id?: string | null;
+          canvas_course_id?: string | null;
+          canvas_planner_item_id: string;
+          context_code?: string | null;
+          plannable_type: string;
+          plannable_id: string;
+          title?: string | null;
+          planner_date?: string | null;
+          due_at?: string | null;
+          todo_date?: string | null;
+          html_url?: string | null;
+          workflow_state?: string | null;
+          marked_complete?: boolean | null;
+          dismissed?: boolean | null;
+          submission_excused?: boolean | null;
+          submission_graded?: boolean | null;
+          submission_late?: boolean | null;
+          submission_missing?: boolean | null;
+          submission_needs_grading?: boolean | null;
+          submission_with_feedback?: boolean | null;
+          source_fingerprint: string;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string | null;
+          canvas_course_id?: string | null;
+          canvas_planner_item_id?: string;
+          context_code?: string | null;
+          plannable_type?: string;
+          plannable_id?: string;
+          title?: string | null;
+          planner_date?: string | null;
+          due_at?: string | null;
+          todo_date?: string | null;
+          html_url?: string | null;
+          workflow_state?: string | null;
+          marked_complete?: boolean | null;
+          dismissed?: boolean | null;
+          submission_excused?: boolean | null;
+          submission_graded?: boolean | null;
+          submission_late?: boolean | null;
+          submission_missing?: boolean | null;
+          submission_needs_grading?: boolean | null;
+          submission_with_feedback?: boolean | null;
+          source_fingerprint?: string;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_planner_items_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_planner_items_course_owner_fkey";
+            columns: [
+              "course_id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_planner_items_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_announcements: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          canvas_course_id: string;
+          canvas_announcement_id: string;
+          title: string;
+          message_html: string | null;
+          posted_at: string | null;
+          delayed_post_at: string | null;
+          lock_at: string | null;
+          todo_date: string | null;
+          workflow_state: string | null;
+          published: boolean | null;
+          locked: boolean | null;
+          html_url: string | null;
+          source_fingerprint: string;
+          first_synced_at: string;
+          last_synced_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          canvas_course_id: string;
+          canvas_announcement_id: string;
+          title: string;
+          message_html?: string | null;
+          posted_at?: string | null;
+          delayed_post_at?: string | null;
+          lock_at?: string | null;
+          todo_date?: string | null;
+          workflow_state?: string | null;
+          published?: boolean | null;
+          locked?: boolean | null;
+          html_url?: string | null;
+          source_fingerprint: string;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          canvas_course_id?: string;
+          canvas_announcement_id?: string;
+          title?: string;
+          message_html?: string | null;
+          posted_at?: string | null;
+          delayed_post_at?: string | null;
+          lock_at?: string | null;
+          todo_date?: string | null;
+          workflow_state?: string | null;
+          published?: boolean | null;
+          locked?: boolean | null;
+          html_url?: string | null;
+          source_fingerprint?: string;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_announcements_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_announcements_course_owner_fkey";
+            columns: [
+              "course_id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_announcements_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -1296,6 +1541,42 @@ export interface Database {
           sync_state_last_checked_at: string;
           sync_state_last_changed_at: string | null;
           sync_state_consecutive_failure_count: number;
+        }>;
+      };
+      replace_canvas_planner_items_snapshot: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_synced_at: string;
+          p_window_start_at: string;
+          p_window_end_at: string;
+          p_context_codes: string[];
+          p_items: Json;
+        };
+        Returns: Array<{
+          planner_items_inserted: number;
+          planner_items_updated: number;
+          planner_items_unchanged: number;
+          planner_items_pruned: number;
+        }>;
+      };
+      replace_canvas_course_announcements_snapshot: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_synced_at: string;
+          p_window_start_at: string;
+          p_window_end_at: string;
+          p_canvas_course_id: string;
+          p_announcements: Json;
+        };
+        Returns: Array<{
+          announcements_inserted: number;
+          announcements_updated: number;
+          announcements_unchanged: number;
+          announcements_pruned: number;
         }>;
       };
       replace_canvas_connection_with_capabilities: {

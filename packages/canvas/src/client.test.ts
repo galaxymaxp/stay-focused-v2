@@ -361,6 +361,181 @@ describe("CanvasClient", () => {
     ]);
   });
 
+  it("lists planner items with repeated course context codes and deterministic dates", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          context_type: "Course",
+          course_id: 7,
+          planner_override: {
+            id: 99,
+            plannable_type: "Assignment",
+            plannable_id: 50,
+            workflow_state: "active",
+            marked_complete: true,
+            dismissed: false,
+          },
+          submissions: {
+            excused: false,
+            graded: false,
+            late: true,
+            missing: true,
+            needs_grading: false,
+            with_feedback: false,
+          },
+          plannable_id: "50",
+          plannable_type: "assignment",
+          plannable: {
+            title: "Private Assignment Title",
+            due_at: "2026-07-20T00:00:00.000Z",
+            workflow_state: "published",
+          },
+          html_url: "/courses/7/assignments/50",
+        },
+      ], {
+        link: '<https://canvas.test/api/v1/planner/items?page=2>; rel="next"',
+      }),
+      jsonResponse([
+        {
+          planner_override: null,
+          submissions: false,
+          plannable_id: "note-1",
+          plannable_type: "planner_note",
+          plannable: {
+            title: "Private Note Title",
+            todo_date: "2026-07-21T00:00:00.000Z",
+            course_id: null,
+            workflow_state: "active",
+          },
+          html_url: "/api/v1/planner_notes/note-1",
+        },
+      ]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(
+      client.listPlannerItems({
+        contextCodes: ["course_7", "course_8"],
+        endDate: "2026-11-03T12:00:00.000Z",
+        startDate: "2026-06-06T12:00:00.000Z",
+      }),
+    ).resolves.toEqual([
+      {
+        contextType: "Course",
+        contextCode: "course_7",
+        courseId: "7",
+        plannableId: "50",
+        plannableType: "assignment",
+        title: "Private Assignment Title",
+        plannerDate: "2026-07-20T00:00:00.000Z",
+        dueAt: "2026-07-20T00:00:00.000Z",
+        todoDate: null,
+        htmlUrl: "/courses/7/assignments/50",
+        workflowState: "published",
+        plannerOverride: {
+          id: "99",
+          plannableType: "Assignment",
+          plannableId: "50",
+          workflowState: "active",
+          markedComplete: true,
+          dismissed: false,
+          deletedAt: null,
+          createdAt: null,
+          updatedAt: null,
+        },
+        submission: {
+          excused: false,
+          graded: false,
+          late: true,
+          missing: true,
+          needsGrading: false,
+          withFeedback: false,
+        },
+      },
+      {
+        contextType: null,
+        contextCode: null,
+        courseId: null,
+        plannableId: "note-1",
+        plannableType: "planner_note",
+        title: "Private Note Title",
+        plannerDate: "2026-07-21T00:00:00.000Z",
+        dueAt: null,
+        todoDate: "2026-07-21T00:00:00.000Z",
+        htmlUrl: "/api/v1/planner_notes/note-1",
+        workflowState: "active",
+        plannerOverride: null,
+        submission: null,
+      },
+    ]);
+
+    const firstUrl = new URL(String(fetchImpl.mock.calls[0]?.[0]));
+    expect(firstUrl.pathname).toBe("/api/v1/planner/items");
+    expect(firstUrl.searchParams.get("start_date")).toBe(
+      "2026-06-06T12:00:00.000Z",
+    );
+    expect(firstUrl.searchParams.get("end_date")).toBe(
+      "2026-11-03T12:00:00.000Z",
+    );
+    expect(firstUrl.searchParams.getAll("context_codes[]")).toEqual([
+      "course_7",
+      "course_8",
+    ]);
+  });
+
+  it("lists announcements one course at a time", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          id: 1,
+          title: "Private Announcement Title",
+          message: "<p>Private announcement body.</p>",
+          posted_at: "2026-07-01T00:00:00Z",
+          delayed_post_at: null,
+          lock_at: "2026-08-01T00:00:00Z",
+          workflow_state: "active",
+          published: true,
+          locked: false,
+          html_url: "https://canvas.test/courses/7/discussion_topics/1",
+          context_code: "course_7",
+        },
+      ], {
+        link: '<https://canvas.test/api/v1/announcements?page=2>; rel="next"',
+      }),
+      jsonResponse([]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(
+      client.listAnnouncements({
+        courseId: "7",
+        endDate: "2026-11-03T12:00:00.000Z",
+        startDate: "2026-06-06T12:00:00.000Z",
+      }),
+    ).resolves.toEqual([
+      {
+        id: "1",
+        contextCode: "course_7",
+        title: "Private Announcement Title",
+        message: "<p>Private announcement body.</p>",
+        postedAt: "2026-07-01T00:00:00Z",
+        delayedPostAt: null,
+        lockAt: "2026-08-01T00:00:00Z",
+        todoDate: null,
+        workflowState: "active",
+        published: true,
+        locked: false,
+        htmlUrl: "https://canvas.test/courses/7/discussion_topics/1",
+      },
+    ]);
+
+    const firstUrl = new URL(String(fetchImpl.mock.calls[0]?.[0]));
+    expect(firstUrl.pathname).toBe("/api/v1/announcements");
+    expect(firstUrl.searchParams.getAll("context_codes[]")).toEqual([
+      "course_7",
+    ]);
+  });
+
   it("propagates later-page failures without returning successful prefixes", async () => {
     const fetchImpl = createFetch([
       jsonResponse([{ id: 1, name: "One" }], {

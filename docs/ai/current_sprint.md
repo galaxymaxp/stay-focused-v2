@@ -28,6 +28,11 @@ replacement when deterministic versioned fingerprints match. Phase 5B.3C1
 conditional-request capability audit is complete as validation only: ETags were
 present, `Last-Modified` was absent, no 304 responses were observed, and
 ordinary GET behavior remains recommended for current Canvas sync endpoints.
+Phase 5B.4A planner-item and announcement synchronization is complete as a
+backend-only slice with documented live Canvas limitations. It uses ordinary
+GET requests, a 30-day past and 120-day future sync window, service-role-only
+persistence, safe scoped pruning, deterministic fingerprints, and
+aggregate-only route diagnostics.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -256,11 +261,44 @@ There is no school-wide Canvas token.
 - ETag or Last-Modified support.
 - Canvas delta cursors.
 - Reduced Canvas request-count synchronization.
-- Secondary Canvas resources.
+- Secondary Canvas resources beyond the Phase 5B.4A planner-item and
+  announcement slice.
 - Scheduled synchronization, background workers, cron jobs, or webhooks.
 - Mobile synchronization screens.
 - Reviewer generation from Canvas.
 - Treating the four Page-listing failures as successful empty-Page courses.
+
+## Completed Phase 5B.4A Scope
+
+- Added typed Canvas client support for planner items and announcements.
+- Used ordinary authenticated GET requests, deterministic date serialization,
+  repeated `context_codes[]`, trusted pagination, redirect rejection, and the
+  existing timeout/retry protections.
+- Retrieved planner items for the synchronized user's course contexts only.
+- Retrieved announcements one course at a time with bounded course-level
+  failure isolation.
+- Added `canvas_planner_items` and `canvas_announcements` plus indexes,
+  uniqueness, RLS, restricted grants, and service-role-only snapshot RPCs.
+- Added deterministic normalized planner and announcement fingerprints.
+- Added insert/update/unchanged/pruned accounting and safe scoped pruning only
+  after complete authoritative snapshots.
+- Extended protected `POST /api/canvas/sync` with aggregate planner and
+  announcement counts and stable sanitized failure codes.
+- Extended mobile Canvas sync response parsing and tests without adding UI.
+- Added remote rollback verification through
+  `scripts/phase5b4a-planner-announcements-verification.sql`.
+
+## Out Of Scope For Phase 5B.4A
+
+- Discussion entries, discussion replies, and general discussion-topic
+  synchronization.
+- Quiz details and quiz-question metadata.
+- Planner-note creation, planner-note editing, and planner-override mutation.
+- Submission, grade, rubric, and feedback synchronization.
+- File, attachment, announcement-attachment, and media ingestion.
+- Canvas webhooks, scheduled synchronization, background jobs, resumable jobs,
+  queues, mobile synchronization UI, source-selection UI, notifications, and
+  reviewer generation from Canvas data.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -706,8 +744,66 @@ There is no school-wide Canvas token.
   mobile typecheck/tests 79/79.
 - Decision: Outcome C, no useful validator support observed. Continue ordinary
   GET behavior for all currently synchronized endpoint families.
-- Recommended next Canvas phase: Phase 5B.4 secondary Canvas resource
-  synchronization.
+- The next implemented Canvas slice was Phase 5B.4A planner-item and
+  announcement synchronization.
+
+## Phase 5B.4A Results
+
+- Added `202607060001_add_canvas_planner_announcements.sql`,
+  `202607060002_harden_canvas_planner_announcement_triggers.sql`, and updated
+  `packages/db/src/types.ts`.
+- Added `canvas_planner_items` and `canvas_announcements`, with service-role
+  snapshot RPCs that validate ownership and use controlled search paths.
+- Added planner and announcement Canvas client methods, route orchestration,
+  normalization tests, route tests, and mobile response parser updates.
+- Remote migration history includes `202607060001` and `202607060002`.
+- Remote rollback SQL verification passed through
+  `scripts/phase5b4a-planner-announcements-verification.sql`.
+- Automated verification passed: Canvas typecheck/build/tests 35/35, DB
+  typecheck, API typecheck/build/tests 183/183, mobile typecheck/tests 79/79,
+  root typecheck 7/7, root build 7/7 after clearing a generated API `.next`
+  artifact from the known OneDrive/Next issue, workspace tests API 183/183,
+  mobile 79/79, Canvas 35/35, OCR 14/14, and `git diff --check` with CRLF
+  warnings only.
+- First protected live run:
+  - HTTP 200
+  - Status `partial`
+  - Duration 72.370 seconds
+  - 17 courses discovered
+  - 13 existing graph courses succeeded
+  - 4 existing graph courses failed with sanitized `canvas_course_pages_failed`
+  - 37 planner items discovered and inserted
+  - 27 announcements discovered
+  - 13 announcement courses succeeded
+  - 4 announcement courses failed
+  - 19 announcements inserted
+  - 0 retry attempts
+  - 0 running sync rows after completion
+- Second protected live run:
+  - HTTP 200
+  - Status `partial`
+  - Duration 63.048 seconds
+  - 37 planner items unchanged
+  - 19 announcements unchanged
+  - Stable planner and announcement identities
+  - Duplicate planner identities: 0
+  - Duplicate announcement identities: 0
+  - Unnecessary planner updates: 0
+  - Unnecessary announcement updates: 0
+  - Unexpected planner pruning: 0
+  - Unexpected announcement pruning: 0
+  - Existing failed course graphs preserved
+  - Failure categories stable
+  - 0 running sync rows after completion
+- Sanitized live failure counts remained
+  `canvas_course_pages_failed: 4` and
+  `canvas_announcement_persistence_failed: 4`.
+- A final response-shape revalidation after hiding internal diagnostic fields
+  repeated the protected sync twice and confirmed strict aggregate output,
+  stable identities, zero duplicates, zero unnecessary updates, zero
+  unexpected pruning, and zero running sync rows.
+- Verdict: partial due documented permanent live Canvas limitations. The
+  implementation preserved data and completed the safe independent scopes.
 
 ## Phase 3C Completion Sequence
 
@@ -749,5 +845,7 @@ course recovery hardening is complete and live validated. Phase 5B.3B
 incremental academic graph synchronization foundation is complete and live
 validated. Phase 5B.3C1 conditional-request capability audit is complete and
 does not support Phase 5B.3C2 implementation for the audited endpoints. The
-recommended next phase is Phase 5B.4 secondary Canvas resource
-synchronization. The deferred header/footer cleanup task remains separate.
+Phase 5B.4A planner-item and announcement synchronization slice is complete
+with documented live Canvas limitations. The recommended next roadmap task is
+Phase 5C file, attachment, and media ingestion. The deferred header/footer
+cleanup task remains separate.

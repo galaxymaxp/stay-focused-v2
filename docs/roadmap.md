@@ -213,8 +213,10 @@ academic graph foundation is complete; Phase 5B.2 initial full academic graph
 synchronization is complete and live validated; Phase 5B.3A course recovery
 hardening is complete and live validated; Phase 5B.3B incremental persistence
 is complete and live validated; Phase 5B.3C1 conditional-request capability
-audit is complete; Phase 5B.4 through Phase 5F remain planned and must not be
-collapsed into a single generic Canvas integration task.
+audit is complete; Phase 5B.4A planner-item and announcement synchronization
+is complete with documented live Canvas limitations; Phase 5C through Phase 5F
+remain planned and must not be collapsed into a single generic Canvas
+integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -352,6 +354,8 @@ synchronous route with atomic per-course persistence. Phase 5B.3A recovery
 hardening and Phase 5B.3B deterministic incremental persistence are complete.
 Phase 5B.3C1 found no useful 304 support for the currently synchronized
 endpoint families, so production conditional fetching remains unsupported.
+Phase 5B.4A planner-item and announcement synchronization is complete as a
+backend-only extension.
 
 #### Phase 5B.1 - Academic Graph Foundation
 
@@ -577,11 +581,12 @@ Decision:
 
 #### Phase 5B.4 - Secondary Canvas Resource Synchronization
 
-Status: Pending.
+Status: Phase 5B.4A complete, remotely verified, and live validated with
+documented permanent Canvas limitations.
 
 Scope:
 
-- Select the next Canvas resource family only after explicit product and
+- Select each secondary Canvas resource family only after explicit product and
   security review.
 - Continue using the per-user credential boundary, service-role persistence,
   sanitized diagnostics, and failure-preservation rules established in Phase
@@ -590,6 +595,61 @@ Scope:
   reliable 304 behavior.
 - Continue not treating Page-listing 404 failures as successful empty-Page
   collections.
+
+##### Phase 5B.4A - Planner Items And Announcements
+
+Status: Complete, remotely verified, and live validated with a documented
+partial result.
+
+Scope:
+
+- Canvas planner-item retrieval through `GET /api/v1/planner/items`.
+- Canvas announcement retrieval through per-course
+  `GET /api/v1/announcements` calls.
+- A deterministic rolling sync window: 30 days in the past and 120 days in the
+  future, captured from one run timestamp.
+- Typed Canvas client methods, repeated `context_codes[]` query serialization,
+  ordinary authenticated GET behavior, trusted pagination, redirect rejection,
+  and bounded transient retry behavior.
+- Normalized planner and announcement payloads with deterministic source
+  fingerprints and without unrestricted nested Canvas payload retention.
+- Tables `canvas_planner_items` and `canvas_announcements`.
+- Service-role-only snapshot RPCs for planner and per-course announcement
+  persistence.
+- Insert/update/unchanged/pruned accounting and safe scoped pruning only after
+  a complete authoritative snapshot is fetched.
+- Aggregate-only route summaries and mobile service parsing without UI.
+
+Validation:
+
+- Remote migrations `202607060001` and `202607060002` are applied.
+- Remote rollback verification passed through
+  `scripts/phase5b4a-planner-announcements-verification.sql`.
+- Protected live validation used the existing encrypted Canvas connection.
+  The first run returned HTTP 200 `partial`, discovered 37 planner items and
+  27 announcements, inserted 37 planner items and 19 announcements, preserved
+  four known Page-listing limitations, and left zero running sync rows.
+- The second run returned HTTP 200 `partial`, classified 37 planner items and
+  19 announcements as unchanged, preserved stable identities, produced zero
+  duplicates, zero unnecessary updates, zero unexpected pruning, stable failure
+  categories, and zero running sync rows.
+- The four known Page-listing failures remain non-retryable
+  `canvas_course_pages_failed` `resource_not_found` 4xx limitations.
+- Four announcement persistence scopes remain partial for the same unavailable
+  course graphs and are reported as sanitized
+  `canvas_announcement_persistence_failed` diagnostics without pruning.
+
+Deferred from Phase 5B.4A:
+
+- Discussion entries, discussion replies, and general discussion-topic
+  synchronization.
+- Quiz details and quiz-question metadata.
+- Planner-note creation, planner-note editing, and planner-override mutation.
+- Submission, grade, rubric, and feedback synchronization.
+- File, attachment, announcement-attachment, and media ingestion.
+- Canvas webhooks, scheduled synchronization, background jobs, resumable jobs,
+  queues, mobile synchronization UI, source-selection UI, notifications, and
+  reviewer generation from Canvas data.
 
 ### Phase 5C - File, Attachment, And Media Ingestion
 

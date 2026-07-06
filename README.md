@@ -14,7 +14,9 @@ retries. Phase 5B.3B adds deterministic incremental persistence: unchanged
 courses still fetch complete Canvas snapshots, but skip database graph
 replacement when the versioned snapshot fingerprint is unchanged. Phase 5B.3C1
 audited conditional-request support and found no useful 304 behavior for the
-currently synchronized Canvas endpoint families.
+currently synchronized Canvas endpoint families. Phase 5B.4A adds backend
+Canvas planner-item and course-announcement synchronization over a bounded
+30-day past and 120-day future window, with no mobile UI yet.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -96,6 +98,9 @@ Complete:
 - Phase 5B.3C1 Canvas conditional-request capability audit, with no production
   sync behavior change and no 304/body-byte reduction observed for current sync
   endpoint families
+- Phase 5B.4A Canvas planner-item and announcement synchronization with typed
+  client methods, service-role-only persistence, deterministic fingerprints,
+  safe scoped pruning, aggregate diagnostics, and mobile service parsing
 
 Working locally:
 
@@ -152,10 +157,17 @@ Working locally:
   were present, `Last-Modified` was absent, primary conditional requests
   returned HTTP 200 with full bodies, no 304 responses were observed, body-byte
   reduction was 0%, and no sync runs or graph writes were created.
+- Phase 5B.4A remote migration verification and protected live validation
+  passed with a documented partial result. The first run inserted 37 planner
+  items and 19 announcements; the second run classified them as unchanged with
+  stable identities, zero duplicates, zero unexpected pruning, and zero running
+  sync rows. Four known Page-listing limitations remained non-retryable, and
+  four announcement persistence scopes were preserved with sanitized failures
+  for the same unavailable course graphs.
 
 Pending:
 
-- Secondary Canvas resources, content ingestion, grade sync, and
+- Remaining secondary Canvas resources, content ingestion, grade sync, and
   background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
@@ -287,6 +299,12 @@ tests do not run that opt-in provider smoke.
 - Phase 5B.3C1 is complete as a capability audit only. Production conditional
   fetching remains unsupported for the current Canvas sync endpoint families
   because no 304 behavior or body-byte reduction was observed.
+- Phase 5B.4A is complete for backend planner-item and announcement
+  synchronization. It uses ordinary GET requests, a 30-day past and 120-day
+  future sync window, service-role-only persistence, and aggregate-only
+  diagnostics. The protected live account returned a documented partial result
+  because four Page-listing limitations and their dependent announcement
+  persistence scopes remain unavailable.
 - No background or scheduled Canvas synchronization exists yet, and no mobile
   synchronization screen exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
@@ -296,9 +314,9 @@ tests do not run that opt-in provider smoke.
   Live second-user Canvas validation was not run.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
-- Announcements, discussions, planner data, quiz metadata, files/media
-  ingestion, endpoint validators, and reviewer generation from Canvas content
-  are deferred.
+- Discussions, quiz metadata, files/media ingestion, endpoint validators,
+  grade/submission/rubric data, announcement attachments, and reviewer
+  generation from Canvas content are deferred.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
@@ -312,5 +330,7 @@ validated, and Phase 5B.3A course recovery hardening is live validated. The
 Phase 5B.3B incremental academic graph synchronization foundation is complete
 and live validated. Phase 5B.3C1 conditional-request capability audit is
 complete and does not support Phase 5B.3C2 for the audited endpoints. The
-recommended next phase is Phase 5B.4 secondary Canvas resource
-synchronization; Canvas OAuth remains a future phase.
+Phase 5B.4A planner-item and announcement synchronization slice is complete
+with documented live Canvas limitations. The recommended next roadmap task is
+Phase 5C file, attachment, and media ingestion. Canvas OAuth remains a future
+phase.

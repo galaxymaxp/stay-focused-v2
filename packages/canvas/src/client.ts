@@ -5,6 +5,8 @@ import {
   type CanvasAssignment,
   type CanvasAssignmentGroup,
   type CanvasAssignmentSubmissionType,
+  type CanvasAnnouncement,
+  type CanvasAnnouncementsListOptions,
   type CanvasClientErrorCode,
   type CanvasClientOptions,
   type CanvasCourse,
@@ -14,6 +16,10 @@ import {
   type CanvasModuleItem,
   type CanvasPageDetail,
   type CanvasPageSummary,
+  type CanvasPlannerItem,
+  type CanvasPlannerItemsListOptions,
+  type CanvasPlannerOverrideSummary,
+  type CanvasPlannerSubmissionState,
   type CanvasProfile,
 } from "./types";
 
@@ -198,6 +204,41 @@ export class CanvasClient {
       `/courses/${encodeCanvasPathSegment(courseId)}/assignments?per_page=${DEFAULT_PER_PAGE}`,
     );
     return parsed.map(normalizeAssignment);
+  }
+
+  public async listPlannerItems({
+    contextCodes,
+    endDate,
+    startDate,
+  }: CanvasPlannerItemsListOptions): Promise<readonly CanvasPlannerItem[]> {
+    const parsed = await this.requestPaginatedJson(
+      createPathWithQuery("/planner/items", [
+        ["per_page", String(DEFAULT_PER_PAGE)],
+        ["start_date", normalizeQueryDate(startDate, "start_date")],
+        ["end_date", normalizeQueryDate(endDate, "end_date")],
+        ...normalizeContextCodes(contextCodes).map(
+          (contextCode) => ["context_codes[]", contextCode] as const,
+        ),
+      ]),
+    );
+    return parsed.map(normalizePlannerItem);
+  }
+
+  public async listAnnouncements({
+    courseId,
+    endDate,
+    startDate,
+  }: CanvasAnnouncementsListOptions): Promise<readonly CanvasAnnouncement[]> {
+    const contextCode = `course_${encodeCanvasContextCodeId(courseId)}`;
+    const parsed = await this.requestPaginatedJson(
+      createPathWithQuery("/announcements", [
+        ["per_page", String(DEFAULT_PER_PAGE)],
+        ["context_codes[]", contextCode],
+        ["start_date", normalizeQueryDate(startDate, "start_date")],
+        ["end_date", normalizeQueryDate(endDate, "end_date")],
+      ]),
+    );
+    return parsed.map(normalizeAnnouncement);
   }
 
   public async probeCapabilities(): Promise<readonly CanvasCapabilityProbeResult[]> {
@@ -757,6 +798,130 @@ function normalizeAssignment(value: unknown): CanvasAssignment {
   };
 }
 
+function normalizePlannerItem(value: unknown): CanvasPlannerItem {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas planner item response was invalid.",
+    );
+  }
+
+  const plannableId = normalizeId(value.plannable_id);
+  const plannableType = stringOrNull(value.plannable_type);
+  if (!plannableId || !plannableType) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas planner item response was missing required fields.",
+    );
+  }
+
+  const plannable = isRecord(value.plannable) ? value.plannable : null;
+  const courseId =
+    normalizeId(value.course_id) ?? normalizeId(plannable?.course_id);
+  const contextType = stringOrNull(value.context_type);
+  const explicitContextCode = stringOrNull(value.context_code);
+
+  return {
+    contextType,
+    contextCode:
+      explicitContextCode ??
+      (courseId && (!contextType || contextType.toLowerCase() === "course")
+        ? `course_${courseId}`
+        : null),
+    courseId,
+    plannableId,
+    plannableType,
+    title:
+      stringOrNull(value.title) ??
+      stringOrNull(plannable?.title) ??
+      stringOrNull(plannable?.name),
+    plannerDate:
+      stringOrNull(value.plannable_date) ??
+      stringOrNull(plannable?.plannable_date) ??
+      stringOrNull(plannable?.due_at) ??
+      stringOrNull(plannable?.todo_date) ??
+      stringOrNull(plannable?.start_at),
+    dueAt: stringOrNull(plannable?.due_at),
+    todoDate: stringOrNull(plannable?.todo_date),
+    htmlUrl: stringOrNull(value.html_url) ?? stringOrNull(plannable?.html_url),
+    workflowState:
+      stringOrNull(value.workflow_state) ??
+      stringOrNull(plannable?.workflow_state),
+    plannerOverride: normalizePlannerOverride(value.planner_override),
+    submission: normalizePlannerSubmission(value.submissions),
+  };
+}
+
+function normalizePlannerOverride(
+  value: unknown,
+): CanvasPlannerOverrideSummary | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    id: normalizeId(value.id),
+    plannableType: stringOrNull(value.plannable_type),
+    plannableId: normalizeId(value.plannable_id),
+    workflowState: stringOrNull(value.workflow_state),
+    markedComplete: booleanOrNull(value.marked_complete),
+    dismissed: booleanOrNull(value.dismissed),
+    deletedAt: stringOrNull(value.deleted_at),
+    createdAt: stringOrNull(value.created_at),
+    updatedAt: stringOrNull(value.updated_at),
+  };
+}
+
+function normalizePlannerSubmission(
+  value: unknown,
+): CanvasPlannerSubmissionState | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    excused: booleanOrNull(value.excused),
+    graded: booleanOrNull(value.graded),
+    late: booleanOrNull(value.late),
+    missing: booleanOrNull(value.missing),
+    needsGrading: booleanOrNull(value.needs_grading),
+    withFeedback: booleanOrNull(value.with_feedback),
+  };
+}
+
+function normalizeAnnouncement(value: unknown): CanvasAnnouncement {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas announcement response was invalid.",
+    );
+  }
+
+  const id = normalizeId(value.id);
+  const title = stringOrNull(value.title);
+  if (!id || !title) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas announcement response was missing required fields.",
+    );
+  }
+
+  return {
+    id,
+    contextCode: stringOrNull(value.context_code),
+    title,
+    message: stringOrNull(value.message),
+    postedAt: stringOrNull(value.posted_at),
+    delayedPostAt: stringOrNull(value.delayed_post_at),
+    lockAt: stringOrNull(value.lock_at),
+    todoDate: stringOrNull(value.todo_date),
+    workflowState: stringOrNull(value.workflow_state),
+    published: booleanOrNull(value.published),
+    locked: booleanOrNull(value.locked),
+    htmlUrl: stringOrNull(value.html_url),
+  };
+}
+
 function encodeCanvasPathSegment(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -766,6 +931,56 @@ function encodeCanvasPathSegment(value: string): string {
     );
   }
   return encodeURIComponent(trimmed);
+}
+
+function encodeCanvasContextCodeId(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new CanvasClientError(
+      "canvas_request_failed",
+      "Canvas context code identifier must not be blank.",
+    );
+  }
+  return trimmed;
+}
+
+function createPathWithQuery(
+  path: string,
+  entries: readonly (readonly [string, string])[],
+): string {
+  if (!path.startsWith("/")) {
+    throw new CanvasClientError(
+      "canvas_request_failed",
+      "Canvas API path must start with a slash.",
+    );
+  }
+  const params = new URLSearchParams();
+  for (const [key, value] of entries) {
+    params.append(key, value);
+  }
+  return `${path}?${params.toString()}`;
+}
+
+function normalizeQueryDate(value: string, label: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || !Number.isFinite(Date.parse(trimmed))) {
+    throw new CanvasClientError(
+      "canvas_request_failed",
+      `Canvas ${label} must be a valid date string.`,
+    );
+  }
+  return trimmed;
+}
+
+function normalizeContextCodes(values: readonly string[]): readonly string[] {
+  const normalized = values.map((value) => value.trim()).filter(Boolean);
+  if (normalized.length === 0) {
+    throw new CanvasClientError(
+      "canvas_request_failed",
+      "At least one Canvas context code is required.",
+    );
+  }
+  return normalized;
 }
 
 function normalizeId(value: unknown): string | null {

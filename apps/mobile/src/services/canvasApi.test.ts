@@ -96,6 +96,10 @@ describe("Canvas mobile API client", () => {
       ok: true,
       status: "partial",
       mode: "full",
+      syncWindow: {
+        startDate: "2026-06-06T00:00:00.000Z",
+        endDate: "2026-11-03T00:00:00.000Z",
+      },
       courses: {
         discovered: 2,
         succeeded: 1,
@@ -103,13 +107,33 @@ describe("Canvas mobile API client", () => {
         unchanged: 0,
         failed: 1,
       },
+      plannerItems: {
+        discovered: 2,
+        inserted: 1,
+        updated: 0,
+        unchanged: 1,
+        pruned: 0,
+        failed: 0,
+      },
+      announcements: {
+        discovered: 1,
+        inserted: 1,
+        updated: 0,
+        unchanged: 0,
+        pruned: 0,
+        coursesSucceeded: 1,
+        coursesFailed: 1,
+      },
       resources: {
         modules: 3,
         moduleItems: 8,
         pages: 2,
         assignmentGroups: 1,
         assignments: 4,
+        plannerItems: 2,
+        announcements: 1,
       },
+      retryAttempts: 2,
       failures: [{ code: "canvas_unavailable", count: 1 }],
     });
 
@@ -131,7 +155,10 @@ describe("Canvas mobile API client", () => {
           unchanged: 0,
           failed: 1,
         },
+        plannerItems: { discovered: 2, inserted: 1 },
+        announcements: { discovered: 1, coursesFailed: 1 },
         resources: { moduleItems: 8, assignments: 4 },
+        retryAttempts: 2,
         failures: [{ code: "canvas_unavailable", count: 1 }],
       },
     });
@@ -149,6 +176,10 @@ describe("Canvas mobile API client", () => {
       ok: true,
       status: "succeeded",
       mode: "incremental",
+      syncWindow: {
+        startDate: "2026-06-06T00:00:00.000Z",
+        endDate: "2026-11-03T00:00:00.000Z",
+      },
       courses: {
         discovered: 2,
         succeeded: 2,
@@ -156,13 +187,33 @@ describe("Canvas mobile API client", () => {
         unchanged: 2,
         failed: 0,
       },
+      plannerItems: {
+        discovered: 0,
+        inserted: 0,
+        updated: 0,
+        unchanged: 0,
+        pruned: 0,
+        failed: 0,
+      },
+      announcements: {
+        discovered: 0,
+        inserted: 0,
+        updated: 0,
+        unchanged: 0,
+        pruned: 0,
+        coursesSucceeded: 2,
+        coursesFailed: 0,
+      },
       resources: {
         modules: 3,
         moduleItems: 8,
         pages: 2,
         assignmentGroups: 1,
         assignments: 4,
+        plannerItems: 0,
+        announcements: 0,
       },
+      retryAttempts: 0,
     });
 
     const result = await syncCanvasAcademicGraph({

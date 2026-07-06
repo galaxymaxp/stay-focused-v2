@@ -41,6 +41,10 @@ export type CanvasSyncMode = "full" | "incremental";
 export interface CanvasSyncSummary {
   readonly status: CanvasSyncStatus;
   readonly mode: CanvasSyncMode;
+  readonly syncWindow: {
+    readonly startDate: string;
+    readonly endDate: string;
+  };
   readonly courses: {
     readonly discovered: number;
     readonly succeeded: number;
@@ -48,13 +52,33 @@ export interface CanvasSyncSummary {
     readonly unchanged: number;
     readonly failed: number;
   };
+  readonly plannerItems: {
+    readonly discovered: number;
+    readonly inserted: number;
+    readonly updated: number;
+    readonly unchanged: number;
+    readonly pruned: number;
+    readonly failed: number;
+  };
+  readonly announcements: {
+    readonly discovered: number;
+    readonly inserted: number;
+    readonly updated: number;
+    readonly unchanged: number;
+    readonly pruned: number;
+    readonly coursesSucceeded: number;
+    readonly coursesFailed: number;
+  };
   readonly resources: {
     readonly modules: number;
     readonly moduleItems: number;
     readonly pages: number;
     readonly assignmentGroups: number;
     readonly assignments: number;
+    readonly plannerItems: number;
+    readonly announcements: number;
   };
+  readonly retryAttempts: number;
   readonly failures?: readonly {
     readonly code: string;
     readonly count: number;
@@ -417,8 +441,12 @@ function parseSyncResponse(parsed: unknown): CanvasApiResult<CanvasSyncSummary> 
       data: {
         status: parsed.status,
         mode: parsed.mode,
+        syncWindow: parsed.syncWindow,
         courses: parsed.courses,
+        plannerItems: parsed.plannerItems,
+        announcements: parsed.announcements,
         resources: parsed.resources,
+        retryAttempts: parsed.retryAttempts,
         ...(parsed.failures ? { failures: parsed.failures } : {}),
       },
     };
@@ -606,14 +634,22 @@ function isSyncSuccessResponse(value: unknown): value is SyncSuccessResponse {
       "ok",
       "status",
       "mode",
+      "syncWindow",
       "courses",
+      "plannerItems",
+      "announcements",
       "resources",
+      "retryAttempts",
       "failures",
     ]) &&
     isCanvasSyncStatus(value.status) &&
     isCanvasSyncMode(value.mode) &&
+    isSyncWindow(value.syncWindow) &&
     isSyncCourseCounts(value.courses) &&
+    isPlannerSyncCounts(value.plannerItems) &&
+    isAnnouncementSyncCounts(value.announcements) &&
     isSyncResourceCounts(value.resources) &&
+    isNonNegativeInteger(value.retryAttempts) &&
     (value.failures === undefined ||
       (Array.isArray(value.failures) &&
         value.failures.every(isSyncFailureSummary)))
@@ -760,6 +796,65 @@ function isSyncCourseCounts(value: unknown): value is CanvasSyncSummary["courses
   );
 }
 
+function isSyncWindow(
+  value: unknown,
+): value is CanvasSyncSummary["syncWindow"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["startDate", "endDate"]) &&
+    typeof value.startDate === "string" &&
+    typeof value.endDate === "string" &&
+    Number.isFinite(Date.parse(value.startDate)) &&
+    Number.isFinite(Date.parse(value.endDate))
+  );
+}
+
+function isPlannerSyncCounts(
+  value: unknown,
+): value is CanvasSyncSummary["plannerItems"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "discovered",
+      "inserted",
+      "updated",
+      "unchanged",
+      "pruned",
+      "failed",
+    ]) &&
+    isNonNegativeInteger(value.discovered) &&
+    isNonNegativeInteger(value.inserted) &&
+    isNonNegativeInteger(value.updated) &&
+    isNonNegativeInteger(value.unchanged) &&
+    isNonNegativeInteger(value.pruned) &&
+    isNonNegativeInteger(value.failed)
+  );
+}
+
+function isAnnouncementSyncCounts(
+  value: unknown,
+): value is CanvasSyncSummary["announcements"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "discovered",
+      "inserted",
+      "updated",
+      "unchanged",
+      "pruned",
+      "coursesSucceeded",
+      "coursesFailed",
+    ]) &&
+    isNonNegativeInteger(value.discovered) &&
+    isNonNegativeInteger(value.inserted) &&
+    isNonNegativeInteger(value.updated) &&
+    isNonNegativeInteger(value.unchanged) &&
+    isNonNegativeInteger(value.pruned) &&
+    isNonNegativeInteger(value.coursesSucceeded) &&
+    isNonNegativeInteger(value.coursesFailed)
+  );
+}
+
 function isSyncResourceCounts(
   value: unknown,
 ): value is CanvasSyncSummary["resources"] {
@@ -771,12 +866,16 @@ function isSyncResourceCounts(
       "pages",
       "assignmentGroups",
       "assignments",
+      "plannerItems",
+      "announcements",
     ]) &&
     isNonNegativeInteger(value.modules) &&
     isNonNegativeInteger(value.moduleItems) &&
     isNonNegativeInteger(value.pages) &&
     isNonNegativeInteger(value.assignmentGroups) &&
-    isNonNegativeInteger(value.assignments)
+    isNonNegativeInteger(value.assignments) &&
+    isNonNegativeInteger(value.plannerItems) &&
+    isNonNegativeInteger(value.announcements)
   );
 }
 

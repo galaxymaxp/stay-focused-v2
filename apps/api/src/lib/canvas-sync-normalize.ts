@@ -1,4 +1,5 @@
 import type {
+  CanvasAnnouncement,
   CanvasAssignment,
   CanvasAssignmentGroup,
   CanvasCourse,
@@ -6,8 +7,10 @@ import type {
   CanvasModule,
   CanvasModuleItem,
   CanvasPageDetail,
+  CanvasPlannerItem,
 } from "@stay-focused/canvas";
 import type { Json } from "@stay-focused/db";
+import { createHash } from "node:crypto";
 
 export type CanvasSyncFailureCode =
   | "canvas_sync_normalization_failed"
@@ -21,6 +24,10 @@ export type CanvasSyncFailureCode =
   | "canvas_course_response_invalid"
   | "canvas_course_persist_failed"
   | "canvas_course_persistence_failed"
+  | "canvas_planner_items_failed"
+  | "canvas_planner_persistence_failed"
+  | "canvas_course_announcements_failed"
+  | "canvas_announcement_persistence_failed"
   | "canvas_connection_corrupt"
   | "canvas_storage_failed"
   | "canvas_sync_in_progress"
@@ -33,6 +40,8 @@ export interface CanvasSyncResourceCounts {
   readonly pages: number;
   readonly assignmentGroups: number;
   readonly assignments: number;
+  readonly plannerItems: number;
+  readonly announcements: number;
 }
 
 interface SyncJsonObject {
@@ -130,6 +139,45 @@ export interface CanvasSyncAssignmentPayload extends SyncJsonObject {
   readonly canvas_updated_at: string | null;
 }
 
+export interface CanvasSyncPlannerItemPayload extends SyncJsonObject {
+  readonly canvas_planner_item_id: string;
+  readonly context_code: string | null;
+  readonly canvas_course_id: string | null;
+  readonly plannable_type: string;
+  readonly plannable_id: string;
+  readonly title: string | null;
+  readonly planner_date: string | null;
+  readonly due_at: string | null;
+  readonly todo_date: string | null;
+  readonly html_url: string | null;
+  readonly workflow_state: string | null;
+  readonly marked_complete: boolean | null;
+  readonly dismissed: boolean | null;
+  readonly submission_excused: boolean | null;
+  readonly submission_graded: boolean | null;
+  readonly submission_late: boolean | null;
+  readonly submission_missing: boolean | null;
+  readonly submission_needs_grading: boolean | null;
+  readonly submission_with_feedback: boolean | null;
+  readonly source_fingerprint: string;
+}
+
+export interface CanvasSyncAnnouncementPayload extends SyncJsonObject {
+  readonly canvas_announcement_id: string;
+  readonly canvas_course_id: string;
+  readonly title: string;
+  readonly message_html: string | null;
+  readonly posted_at: string | null;
+  readonly delayed_post_at: string | null;
+  readonly lock_at: string | null;
+  readonly todo_date: string | null;
+  readonly workflow_state: string | null;
+  readonly published: boolean | null;
+  readonly locked: boolean | null;
+  readonly html_url: string | null;
+  readonly source_fingerprint: string;
+}
+
 export interface CanvasCourseSnapshotPayload {
   readonly course: CanvasSyncCoursePayload;
   readonly modules: readonly CanvasSyncModulePayload[];
@@ -178,6 +226,29 @@ export function createCanvasCourseSnapshotPayload({
   };
 }
 
+export function createCanvasPlannerItemsSnapshotPayload(
+  items: readonly CanvasPlannerItem[],
+): readonly CanvasSyncPlannerItemPayload[] {
+  const payloads = items.flatMap((item) => {
+    const mapped = mapPlannerItem(item);
+    return mapped ? [mapped] : [];
+  });
+  return dedupeByIdentity(payloads, (item) => item.canvas_planner_item_id);
+}
+
+export function createCanvasAnnouncementsSnapshotPayload({
+  announcements,
+  canvasCourseId,
+}: {
+  readonly announcements: readonly CanvasAnnouncement[];
+  readonly canvasCourseId: string;
+}): readonly CanvasSyncAnnouncementPayload[] {
+  return dedupeByIdentity(
+    announcements.map((announcement) => mapAnnouncement(canvasCourseId, announcement)),
+    (announcement) => announcement.canvas_announcement_id,
+  );
+}
+
 export function resourceCountsForSnapshot(
   snapshot: CanvasCourseSnapshotPayload,
 ): CanvasSyncResourceCounts {
@@ -187,6 +258,8 @@ export function resourceCountsForSnapshot(
     pages: snapshot.pages.length,
     assignmentGroups: snapshot.assignmentGroups.length,
     assignments: snapshot.assignments.length,
+    plannerItems: 0,
+    announcements: 0,
   };
 }
 
@@ -200,6 +273,8 @@ export function addResourceCounts(
     pages: left.pages + right.pages,
     assignmentGroups: left.assignmentGroups + right.assignmentGroups,
     assignments: left.assignments + right.assignments,
+    plannerItems: left.plannerItems + right.plannerItems,
+    announcements: left.announcements + right.announcements,
   };
 }
 
@@ -210,6 +285,8 @@ export function emptyResourceCounts(): CanvasSyncResourceCounts {
     pages: 0,
     assignmentGroups: 0,
     assignments: 0,
+    plannerItems: 0,
+    announcements: 0,
   };
 }
 
@@ -325,6 +402,93 @@ function mapAssignment(assignment: CanvasAssignment): CanvasSyncAssignmentPayloa
   };
 }
 
+function mapPlannerItem(
+  item: CanvasPlannerItem,
+): CanvasSyncPlannerItemPayload | null {
+  const contextCode = nullableText(item.contextCode);
+  if (contextCode !== null && !isCourseContextCode(contextCode)) {
+    return null;
+  }
+  if (item.contextType !== null && item.contextType.toLowerCase() === "group") {
+    return null;
+  }
+
+  const canvasCourseId = nullableIdentifier(item.courseId);
+  const plannableType = normalizeCanvasTypeName(item.plannableType);
+  const plannableId = requiredIdentifier(item.plannableId, "planner plannable");
+  const identity = `${contextCode ?? "no_context"}:${plannableType}:${plannableId}`;
+  const payloadWithoutFingerprint = {
+    canvas_planner_item_id: identity,
+    context_code: contextCode,
+    canvas_course_id: canvasCourseId,
+    plannable_type: plannableType,
+    plannable_id: plannableId,
+    title: nullableText(item.title),
+    planner_date: nullableDate(item.plannerDate),
+    due_at: nullableDate(item.dueAt),
+    todo_date: nullableDate(item.todoDate),
+    html_url: nullableText(item.htmlUrl),
+    workflow_state:
+      nullableText(item.workflowState) ??
+      nullableText(item.plannerOverride?.workflowState ?? null),
+    marked_complete: item.plannerOverride?.markedComplete ?? null,
+    dismissed: item.plannerOverride?.dismissed ?? null,
+    submission_excused: item.submission?.excused ?? null,
+    submission_graded: item.submission?.graded ?? null,
+    submission_late: item.submission?.late ?? null,
+    submission_missing: item.submission?.missing ?? null,
+    submission_needs_grading: item.submission?.needsGrading ?? null,
+    submission_with_feedback: item.submission?.withFeedback ?? null,
+  } satisfies Omit<CanvasSyncPlannerItemPayload, "source_fingerprint">;
+
+  return {
+    ...payloadWithoutFingerprint,
+    source_fingerprint: fingerprintNormalizedPayload(
+      "canvas-planner-item-v1",
+      payloadWithoutFingerprint,
+    ),
+  };
+}
+
+function mapAnnouncement(
+  canvasCourseId: string,
+  announcement: CanvasAnnouncement,
+): CanvasSyncAnnouncementPayload {
+  const normalizedCourseId = requiredIdentifier(canvasCourseId, "course");
+  const contextCode = nullableText(announcement.contextCode);
+  if (contextCode !== null && contextCode !== `course_${normalizedCourseId}`) {
+    throw new CanvasSyncNormalizationError(
+      "announcement context code does not match course.",
+    );
+  }
+
+  const payloadWithoutFingerprint = {
+    canvas_announcement_id: requiredIdentifier(
+      announcement.id,
+      "announcement",
+    ),
+    canvas_course_id: normalizedCourseId,
+    title: requiredText(announcement.title, "announcement title"),
+    message_html: announcement.message,
+    posted_at: nullableDate(announcement.postedAt),
+    delayed_post_at: nullableDate(announcement.delayedPostAt),
+    lock_at: nullableDate(announcement.lockAt),
+    todo_date: nullableDate(announcement.todoDate),
+    workflow_state: nullableText(announcement.workflowState),
+    published: announcement.published,
+    locked: announcement.locked,
+    html_url: nullableText(announcement.htmlUrl),
+  } satisfies Omit<CanvasSyncAnnouncementPayload, "source_fingerprint">;
+
+  return {
+    ...payloadWithoutFingerprint,
+    source_fingerprint: fingerprintNormalizedPayload(
+      "canvas-announcement-v1",
+      payloadWithoutFingerprint,
+    ),
+  };
+}
+
 function requiredIdentifier(value: string, label: string): string {
   const normalized = nullableIdentifier(value);
   if (!normalized) {
@@ -353,6 +517,103 @@ function nullableText(value: string | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function nullableDate(value: string | null): string | null {
+  const text = nullableText(value);
+  if (text === null) {
+    return null;
+  }
+  const parsed = Date.parse(text);
+  if (!Number.isFinite(parsed)) {
+    throw new CanvasSyncNormalizationError("Canvas date value is invalid.");
+  }
+  return new Date(parsed).toISOString();
+}
+
 function jsonObjectOrNull(value: CanvasJsonObject | null): Json | null {
   return value;
+}
+
+function normalizeCanvasTypeName(value: string): string {
+  const normalized = requiredText(value, "Canvas type")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[\s-]+/g, "_")
+    .toLowerCase();
+  if (!/^[a-z0-9_]+$/.test(normalized)) {
+    throw new CanvasSyncNormalizationError("Canvas type is invalid.");
+  }
+  return normalized;
+}
+
+function isCourseContextCode(value: string): boolean {
+  return /^course_[^_\s]+$/.test(value);
+}
+
+function dedupeByIdentity<TItem>(
+  items: readonly TItem[],
+  identityForItem: (item: TItem) => string,
+): readonly TItem[] {
+  const sorted = [...items].sort((left, right) => {
+    const leftIdentity = identityForItem(left);
+    const rightIdentity = identityForItem(right);
+    if (leftIdentity !== rightIdentity) {
+      return leftIdentity.localeCompare(rightIdentity);
+    }
+    return JSON.stringify(left).localeCompare(JSON.stringify(right));
+  });
+  const seen = new Set<string>();
+  const deduped: TItem[] = [];
+  for (const item of sorted) {
+    const identity = identityForItem(item);
+    if (!seen.has(identity)) {
+      seen.add(identity);
+      deduped.push(item);
+    }
+  }
+  return deduped;
+}
+
+function fingerprintNormalizedPayload(
+  version: string,
+  payload: Readonly<Record<string, Json | undefined>>,
+): string {
+  return createHash("sha256")
+    .update(version)
+    .update("\n")
+    .update(canonicalSerialize(payload))
+    .digest("hex");
+}
+
+function canonicalSerialize(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
+}
+
+function canonicalize(value: unknown): unknown {
+  if (value === undefined) {
+    return ["undefined"];
+  }
+  if (value === null) {
+    return ["null"];
+  }
+  if (typeof value === "string") {
+    return ["string", value];
+  }
+  if (typeof value === "number") {
+    return ["number", value];
+  }
+  if (typeof value === "boolean") {
+    return ["boolean", value];
+  }
+  if (Array.isArray(value)) {
+    return ["array", value.map(canonicalize)];
+  }
+  if (typeof value === "object" && value !== null) {
+    const record = value as Readonly<Record<string, unknown>>;
+    return [
+      "object",
+      Object.keys(record)
+        .sort((left, right) => left.localeCompare(right))
+        .map((key) => [key, canonicalize(record[key])]),
+    ];
+  }
+  return ["unsupported", String(value)];
 }

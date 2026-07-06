@@ -50,6 +50,10 @@ export type CanvasSyncMode = "full" | "incremental";
 export interface CanvasSyncSummary {
   readonly status: CanvasSyncStatus;
   readonly mode: CanvasSyncMode;
+  readonly syncWindow: {
+    readonly startDate: string;
+    readonly endDate: string;
+  };
   readonly courses: {
     readonly discovered: number;
     readonly succeeded: number;
@@ -57,13 +61,33 @@ export interface CanvasSyncSummary {
     readonly unchanged: number;
     readonly failed: number;
   };
+  readonly plannerItems: {
+    readonly discovered: number;
+    readonly inserted: number;
+    readonly updated: number;
+    readonly unchanged: number;
+    readonly pruned: number;
+    readonly failed: number;
+  };
+  readonly announcements: {
+    readonly discovered: number;
+    readonly inserted: number;
+    readonly updated: number;
+    readonly unchanged: number;
+    readonly pruned: number;
+    readonly coursesSucceeded: number;
+    readonly coursesFailed: number;
+  };
   readonly resources: {
     readonly modules: number;
     readonly moduleItems: number;
     readonly pages: number;
     readonly assignmentGroups: number;
     readonly assignments: number;
+    readonly plannerItems: number;
+    readonly announcements: number;
   };
+  readonly retryAttempts: number;
   readonly failures?: readonly {
     readonly code: string;
     readonly count: number;

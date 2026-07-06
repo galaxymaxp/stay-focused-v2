@@ -14,13 +14,17 @@ const mocks = vi.hoisted(() => ({
   canvas: {
     courses: [] as readonly CanvasCourseFixture[],
     fixtures: new Map<string, CourseFixture>(),
+    plannerItems: [] as readonly CanvasPlannerItemFixture[],
+    announcements: new Map<string, readonly CanvasAnnouncementFixture[]>(),
     errors: new Map<string, unknown>(),
     inFlightCourses: 0,
     inFlightModuleItems: 0,
     inFlightPageDetails: 0,
+    inFlightAnnouncements: 0,
     maxInFlightCourses: 0,
     maxInFlightModuleItems: 0,
     maxInFlightPageDetails: 0,
+    maxInFlightAnnouncements: 0,
   },
 }));
 
@@ -117,6 +121,20 @@ vi.mock("@stay-focused/canvas", () => {
       throwIfConfigured(`assignments:${courseId}`);
       return getFixture(courseId).assignments;
     }
+
+    public async listPlannerItems(): Promise<readonly CanvasPlannerItemFixture[]> {
+      throwIfConfigured("plannerItems");
+      return mocks.canvas.plannerItems;
+    }
+
+    public async listAnnouncements(
+      options: { readonly courseId: string },
+    ): Promise<readonly CanvasAnnouncementFixture[]> {
+      throwIfConfigured(`announcements:${options.courseId}`);
+      return withAnnouncementConcurrency(async () =>
+        mocks.canvas.announcements.get(options.courseId) ?? [],
+      );
+    }
   }
 
   function getFixture(courseId: string): CourseFixture {
@@ -192,6 +210,22 @@ vi.mock("@stay-focused/canvas", () => {
     }
   }
 
+  async function withAnnouncementConcurrency<T>(
+    action: () => Promise<T>,
+  ): Promise<T> {
+    mocks.canvas.inFlightAnnouncements += 1;
+    mocks.canvas.maxInFlightAnnouncements = Math.max(
+      mocks.canvas.maxInFlightAnnouncements,
+      mocks.canvas.inFlightAnnouncements,
+    );
+    await Promise.resolve();
+    try {
+      return await action();
+    } finally {
+      mocks.canvas.inFlightAnnouncements -= 1;
+    }
+  }
+
   return {
     CanvasClient,
     CanvasClientError,
@@ -215,13 +249,17 @@ describe("POST /api/canvas/sync", () => {
     mocks.verifyBearerToken.mockResolvedValue({ id: USER_A });
     mocks.canvas.courses = [];
     mocks.canvas.fixtures = new Map<string, CourseFixture>();
+    mocks.canvas.plannerItems = [];
+    mocks.canvas.announcements = new Map<string, readonly CanvasAnnouncementFixture[]>();
     mocks.canvas.errors = new Map<string, unknown>();
     mocks.canvas.inFlightCourses = 0;
     mocks.canvas.inFlightModuleItems = 0;
     mocks.canvas.inFlightPageDetails = 0;
+    mocks.canvas.inFlightAnnouncements = 0;
     mocks.canvas.maxInFlightCourses = 0;
     mocks.canvas.maxInFlightModuleItems = 0;
     mocks.canvas.maxInFlightPageDetails = 0;
+    mocks.canvas.maxInFlightAnnouncements = 0;
   });
 
   it("requires bearer authentication", async () => {
@@ -421,6 +459,28 @@ describe("POST /api/canvas/sync", () => {
         }),
       ],
     );
+    mocks.canvas.plannerItems = [
+      plannerItem("assignment-1", {
+        title: "Private Planner Assignment Title",
+      }),
+      plannerItem("announcement-1", {
+        plannableId: "announcement-1",
+        plannableType: "announcement",
+        title: "Private Planner Announcement Title",
+      }),
+    ];
+    mocks.canvas.announcements = new Map([
+      [
+        "course-1",
+        [
+          announcement("announcement-1", "course-1", {
+            message: "<p>Private announcement body.</p>",
+            title: "Private Announcement Title",
+          }),
+        ],
+      ],
+      ["course-2", []],
+    ]);
     mocks.createCanvasServiceClient.mockReturnValue(db);
 
     const response = await syncRoute.POST(createRequest());
@@ -432,12 +492,31 @@ describe("POST /api/canvas/sync", () => {
       ok: true,
       status: "succeeded",
       courses: { discovered: 2, succeeded: 2, failed: 0 },
+      plannerItems: {
+        discovered: 2,
+        inserted: 2,
+        updated: 0,
+        unchanged: 0,
+        pruned: 0,
+        failed: 0,
+      },
+      announcements: {
+        discovered: 1,
+        inserted: 1,
+        updated: 0,
+        unchanged: 0,
+        pruned: 0,
+        coursesSucceeded: 2,
+        coursesFailed: 0,
+      },
       resources: {
         modules: 2,
         moduleItems: 2,
         pages: 1,
         assignmentGroups: 1,
         assignments: 1,
+        plannerItems: 2,
+        announcements: 1,
       },
     });
     expect(text).not.toContain("Private");
@@ -448,6 +527,8 @@ describe("POST /api/canvas/sync", () => {
         expect.objectContaining({ canvasId: "module-1" }),
       ]),
     });
+    expect(db.plannerRows()).toHaveLength(2);
+    expect(db.announcementRows()).toHaveLength(1);
   });
 
   it("keeps bounded request concurrency while preserving complete persistence", async () => {
@@ -555,6 +636,79 @@ describe("POST /api/canvas/sync", () => {
     expect(text).not.toContain("stored-secret-token");
   });
 
+  it("preserves existing planner rows when planner retrieval fails", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
+    mocks.canvas.plannerItems = [plannerItem("assignment-1")];
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const first = await syncRoute.POST(createRequest());
+    const before = db.plannerRows();
+    mocks.canvas.errors.set(
+      "plannerItems",
+      new CanvasClientError("canvas_unavailable", "Private planner payload", {
+        status: 503,
+      }),
+    );
+
+    const second = await syncRoute.POST(createRequest());
+    const text = await second.text();
+    const body = JSON.parse(text) as unknown;
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      status: "partial",
+      plannerItems: {
+        discovered: 0,
+        failed: 1,
+      },
+      failures: [{ code: "canvas_planner_items_failed", count: 1 }],
+    });
+    expect(db.plannerRows()).toEqual(before);
+    expect(text).not.toContain("Private planner payload");
+  });
+
+  it("isolates announcement course failures and persists successful course snapshots", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture(
+      [course("course-1"), course("course-2")],
+      [courseFixture("course-1"), courseFixture("course-2")],
+    );
+    mocks.canvas.announcements = new Map([
+      ["course-1", [announcement("announcement-1", "course-1")]],
+      ["course-2", [announcement("announcement-2", "course-2")]],
+    ]);
+    mocks.canvas.errors.set(
+      "announcements:course-2",
+      new CanvasClientError("canvas_forbidden", "Private announcement body", {
+        status: 403,
+      }),
+    );
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+
+    const response = await syncRoute.POST(createRequest());
+    const text = await response.text();
+    const body = JSON.parse(text) as unknown;
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      status: "partial",
+      announcements: {
+        discovered: 1,
+        inserted: 1,
+        coursesSucceeded: 1,
+        coursesFailed: 1,
+      },
+      failures: [{ code: "canvas_course_announcements_failed", count: 1 }],
+    });
+    expect(db.announcementRows()).toHaveLength(1);
+    expect(db.announcementRows()[0]).toMatchObject({ courseId: "course-1" });
+    expect(text).not.toContain("Private announcement body");
+  });
+
   it("preserves the previous graph when module-item, assignment, or RPC persistence fails", async () => {
     for (const failure of ["module-item", "assignment", "rpc"] as const) {
       mocks.canvas.errors = new Map<string, unknown>();
@@ -596,7 +750,7 @@ describe("POST /api/canvas/sync", () => {
             ? "assignments"
             : "persistence";
 
-      expect(response.status).toBe(failure === "rpc" ? 500 : 502);
+      expect(response.status).toBe(200);
       expect(db.courseResults()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -664,7 +818,7 @@ describe("POST /api/canvas/sync", () => {
 
     const response = await syncRoute.POST(createRequest());
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(200);
     expect(db.courseResults()).toEqual([
       expect.objectContaining({
         failedOperation: "page_detail",
@@ -856,15 +1010,13 @@ describe("POST /api/canvas/sync", () => {
     const graphAfter = db.graphFor(USER_A, CONNECTION_A, "course-1");
     const stateAfter = db.stateFor(USER_A, CONNECTION_A, "course-1");
 
-    expect(failed.status).toBe(502);
+    expect(failed.status).toBe(200);
     expect(body).toMatchObject({
-      ok: false,
-      sync: {
-        mode: "incremental",
-        status: "failed",
-        courses: { changed: 0, unchanged: 0, failed: 1 },
-        failures: [{ code: "canvas_course_pages_failed", count: 1 }],
-      },
+      ok: true,
+      mode: "incremental",
+      status: "partial",
+      courses: { changed: 0, unchanged: 0, failed: 1 },
+      failures: [{ code: "canvas_course_pages_failed", count: 1 }],
     });
     expect(db.replacementCallCount()).toBe(1);
     expect(graphAfter).toEqual(graphBefore);
@@ -965,6 +1117,8 @@ function createSyncDb(options: {
   }
 
   const graph = new Map<string, StoredGraph>();
+  const plannerItems = new Map<string, StoredSecondaryIdentity>();
+  const announcements = new Map<string, StoredSecondaryIdentity>();
   const states = new Map<string, StoredSyncState>();
   const runs: StoredRun[] = [];
   const courseResults: StoredCourseResult[] = [];
@@ -989,6 +1143,26 @@ function createSyncDb(options: {
   const api = {
     courseResults() {
       return [...courseResults];
+    },
+    plannerRows() {
+      return [...plannerItems.values()];
+    },
+    announcementRows() {
+      return [...announcements.values()];
+    },
+    duplicatePlannerIdentityCount(userId: string, connectionId: string) {
+      return duplicateCount(
+        [...plannerItems.values()]
+          .filter((entry) => entry.userId === userId && entry.connectionId === connectionId)
+          .map((entry) => entry.canvasId),
+      );
+    },
+    duplicateAnnouncementIdentityCount(userId: string, connectionId: string) {
+      return duplicateCount(
+        [...announcements.values()]
+          .filter((entry) => entry.userId === userId && entry.connectionId === connectionId)
+          .map((entry) => `${entry.courseId}:${entry.canvasId}`),
+      );
     },
     replacementCallCount() {
       return replacementCallCount;
@@ -1073,6 +1247,12 @@ function createSyncDb(options: {
         }
         if (name === "replace_canvas_course_academic_snapshot_with_sync_state") {
           return replaceSnapshotWithState(payload);
+        }
+        if (name === "replace_canvas_planner_items_snapshot") {
+          return replacePlannerSnapshot(payload);
+        }
+        if (name === "replace_canvas_course_announcements_snapshot") {
+          return replaceAnnouncementsSnapshot(payload);
         }
         if (name === "record_canvas_course_snapshot_unchanged") {
           return recordUnchanged(payload);
@@ -1350,6 +1530,146 @@ function createSyncDb(options: {
     };
   }
 
+  function replacePlannerSnapshot(payload: Record<string, unknown>) {
+    const userId = String(payload.p_user_id);
+    const connectionId = String(payload.p_canvas_connection_id);
+    const contextCodes = new Set(readStringArray(payload.p_context_codes));
+    const windowStart = String(payload.p_window_start_at);
+    const windowEnd = String(payload.p_window_end_at);
+    const incoming = readPayloadArray(payload.p_items).map(asRecord);
+    const incomingIds = new Set(
+      incoming.map((entry) => String(entry.canvas_planner_item_id)),
+    );
+
+    let plannerItemsInserted = 0;
+    let plannerItemsUpdated = 0;
+    let plannerItemsUnchanged = 0;
+    let plannerItemsPruned = 0;
+
+    for (const item of incoming) {
+      const canvasId = String(item.canvas_planner_item_id);
+      const key = plannerKey(userId, connectionId, canvasId);
+      const sourceFingerprint = String(item.source_fingerprint);
+      const existing = plannerItems.get(key);
+      if (!existing) {
+        plannerItemsInserted += 1;
+      } else if (existing.sourceFingerprint === sourceFingerprint) {
+        plannerItemsUnchanged += 1;
+      } else {
+        plannerItemsUpdated += 1;
+      }
+      plannerItems.set(key, {
+        canvasId,
+        connectionId,
+        contextCode:
+          typeof item.context_code === "string" ? item.context_code : null,
+        courseId:
+          typeof item.canvas_course_id === "string" ? item.canvas_course_id : null,
+        date: typeof item.planner_date === "string" ? item.planner_date : null,
+        internalId: existing?.internalId ?? nextId("planner"),
+        sourceFingerprint,
+        userId,
+      });
+    }
+
+    for (const [key, item] of [...plannerItems.entries()]) {
+      if (
+        item.userId === userId &&
+        item.connectionId === connectionId &&
+        item.contextCode !== null &&
+        contextCodes.has(item.contextCode) &&
+        isDateInWindow(item.date, windowStart, windowEnd) &&
+        !incomingIds.has(item.canvasId)
+      ) {
+        plannerItemsPruned += 1;
+        plannerItems.delete(key);
+      }
+    }
+
+    return {
+      data: {
+        planner_items_inserted: plannerItemsInserted,
+        planner_items_updated: plannerItemsUpdated,
+        planner_items_unchanged: plannerItemsUnchanged,
+        planner_items_pruned: plannerItemsPruned,
+      },
+      error: null,
+    };
+  }
+
+  function replaceAnnouncementsSnapshot(payload: Record<string, unknown>) {
+    const userId = String(payload.p_user_id);
+    const connectionId = String(payload.p_canvas_connection_id);
+    const courseId = String(payload.p_canvas_course_id);
+    const graphEntry = graph.get(graphKey(userId, connectionId, courseId));
+    if (!graphEntry) {
+      return { data: null, error: { message: "canvas_course_missing" } };
+    }
+
+    const windowStart = String(payload.p_window_start_at);
+    const windowEnd = String(payload.p_window_end_at);
+    const incoming = readPayloadArray(payload.p_announcements).map(asRecord);
+    const incomingIds = new Set(
+      incoming.map((entry) => String(entry.canvas_announcement_id)),
+    );
+
+    let announcementsInserted = 0;
+    let announcementsUpdated = 0;
+    let announcementsUnchanged = 0;
+    let announcementsPruned = 0;
+
+    for (const announcement of incoming) {
+      const canvasId = String(announcement.canvas_announcement_id);
+      const key = announcementKey(userId, connectionId, courseId, canvasId);
+      const sourceFingerprint = String(announcement.source_fingerprint);
+      const existing = announcements.get(key);
+      if (!existing) {
+        announcementsInserted += 1;
+      } else if (existing.sourceFingerprint === sourceFingerprint) {
+        announcementsUnchanged += 1;
+      } else {
+        announcementsUpdated += 1;
+      }
+      announcements.set(key, {
+        canvasId,
+        connectionId,
+        contextCode: `course_${courseId}`,
+        courseId,
+        date: firstString(
+          announcement.posted_at,
+          announcement.delayed_post_at,
+          announcement.todo_date,
+        ),
+        internalId: existing?.internalId ?? nextId("announcement"),
+        sourceFingerprint,
+        userId,
+      });
+    }
+
+    for (const [key, announcement] of [...announcements.entries()]) {
+      if (
+        announcement.userId === userId &&
+        announcement.connectionId === connectionId &&
+        announcement.courseId === courseId &&
+        isDateInWindow(announcement.date, windowStart, windowEnd) &&
+        !incomingIds.has(announcement.canvasId)
+      ) {
+        announcementsPruned += 1;
+        announcements.delete(key);
+      }
+    }
+
+    return {
+      data: {
+        announcements_inserted: announcementsInserted,
+        announcements_updated: announcementsUpdated,
+        announcements_unchanged: announcementsUnchanged,
+        announcements_pruned: announcementsPruned,
+      },
+      error: null,
+    };
+  }
+
   function recordUnchanged(payload: Record<string, unknown>) {
     if (options.stateWriteFailure === true) {
       return { data: null, error: { message: "state failed" } };
@@ -1613,8 +1933,69 @@ function assignment(
   };
 }
 
+function plannerItem(
+  id: string,
+  overrides: Partial<CanvasPlannerItemFixture> = {},
+): CanvasPlannerItemFixture {
+  return {
+    contextType: "Course",
+    contextCode: "course_course-1",
+    courseId: "course-1",
+    plannableId: id,
+    plannableType: "assignment",
+    title: `Fictional Planner ${id}`,
+    plannerDate: "2026-07-10T00:00:00.000Z",
+    dueAt: "2026-07-10T00:00:00.000Z",
+    todoDate: null,
+    htmlUrl: "https://canvas.example.invalid/planner",
+    workflowState: "published",
+    plannerOverride: null,
+    submission: null,
+    ...overrides,
+  };
+}
+
+function announcement(
+  id: string,
+  courseId = "course-1",
+  overrides: Partial<CanvasAnnouncementFixture> = {},
+): CanvasAnnouncementFixture {
+  return {
+    id,
+    contextCode: `course_${courseId}`,
+    title: `Fictional Announcement ${id}`,
+    message: "<p>Fictional announcement.</p>",
+    postedAt: "2026-07-10T00:00:00.000Z",
+    delayedPostAt: null,
+    lockAt: null,
+    todoDate: null,
+    workflowState: "active",
+    published: true,
+    locked: false,
+    htmlUrl: "https://canvas.example.invalid/announcement",
+    ...overrides,
+  };
+}
+
 function graphKey(userId: string, connectionId: string, courseId: string): string {
   return `${userId}:${connectionId}:${courseId}`;
+}
+
+function plannerKey(
+  userId: string,
+  connectionId: string,
+  plannerItemId: string,
+): string {
+  return `${userId}:${connectionId}:${plannerItemId}`;
+}
+
+function announcementKey(
+  userId: string,
+  connectionId: string,
+  courseId: string,
+  announcementId: string,
+): string {
+  return `${userId}:${connectionId}:${courseId}:${announcementId}`;
 }
 
 function storedIdentity(canvasId: string, internalId: string): StoredIdentity {
@@ -1634,6 +2015,32 @@ function duplicateCount(values: readonly string[]): number {
 
 function readPayloadArray(value: unknown): readonly unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function readStringArray(value: unknown): readonly string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+function isDateInWindow(
+  value: string | null,
+  windowStart: string,
+  windowEnd: string,
+): boolean {
+  if (value === null) {
+    return false;
+  }
+  const time = Date.parse(value);
+  return (
+    Number.isFinite(time) &&
+    time >= Date.parse(windowStart) &&
+    time <= Date.parse(windowEnd)
+  );
+}
+
+function firstString(...values: readonly unknown[]): string | null {
+  return values.find((value): value is string => typeof value === "string") ?? null;
 }
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> {
@@ -1690,6 +2097,15 @@ interface StoredCourseResult {
 interface StoredIdentity {
   readonly canvasId: string;
   readonly internalId: string;
+}
+
+interface StoredSecondaryIdentity extends StoredIdentity {
+  readonly userId: string;
+  readonly connectionId: string;
+  readonly courseId: string | null;
+  readonly contextCode: string | null;
+  readonly date: string | null;
+  readonly sourceFingerprint: string;
 }
 
 interface StoredGraph {
@@ -1803,4 +2219,52 @@ interface CanvasAssignmentFixture {
   readonly discussionTopicId: string | null;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
+}
+
+interface CanvasPlannerItemFixture {
+  readonly contextType: string | null;
+  readonly contextCode: string | null;
+  readonly courseId: string | null;
+  readonly plannableId: string;
+  readonly plannableType: string;
+  readonly title: string | null;
+  readonly plannerDate: string | null;
+  readonly dueAt: string | null;
+  readonly todoDate: string | null;
+  readonly htmlUrl: string | null;
+  readonly workflowState: string | null;
+  readonly plannerOverride: {
+    readonly id: string | null;
+    readonly plannableType: string | null;
+    readonly plannableId: string | null;
+    readonly workflowState: string | null;
+    readonly markedComplete: boolean | null;
+    readonly dismissed: boolean | null;
+    readonly deletedAt: string | null;
+    readonly createdAt: string | null;
+    readonly updatedAt: string | null;
+  } | null;
+  readonly submission: {
+    readonly excused: boolean | null;
+    readonly graded: boolean | null;
+    readonly late: boolean | null;
+    readonly missing: boolean | null;
+    readonly needsGrading: boolean | null;
+    readonly withFeedback: boolean | null;
+  } | null;
+}
+
+interface CanvasAnnouncementFixture {
+  readonly id: string;
+  readonly contextCode: string | null;
+  readonly title: string;
+  readonly message: string | null;
+  readonly postedAt: string | null;
+  readonly delayedPostAt: string | null;
+  readonly lockAt: string | null;
+  readonly todoDate: string | null;
+  readonly workflowState: string | null;
+  readonly published: boolean | null;
+  readonly locked: boolean | null;
+  readonly htmlUrl: string | null;
 }
