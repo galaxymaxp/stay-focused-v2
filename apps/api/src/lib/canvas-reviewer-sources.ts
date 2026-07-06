@@ -1,0 +1,1476 @@
+import type {
+  CanvasAnnouncementRow,
+  CanvasAssignmentRow,
+  CanvasConnectionRow,
+  CanvasCourseRow,
+  CanvasCourseSyncPreferenceRow,
+  CanvasCourseSyncStateRow,
+  CanvasFileRow,
+  CanvasPageRow,
+  CanvasSyncCourseResultRow,
+  CanvasSyncRunRow,
+  Database,
+} from "@stay-focused/db";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  parseFragment,
+  type DefaultTreeAdapterMap,
+} from "parse5";
+
+import { readConnection } from "@/lib/canvas-routes";
+import { REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS } from "@/lib/reviewer-generation-limits";
+import type { CanvasApiErrorCode } from "@/types/canvas";
+
+export const CANVAS_REVIEWER_MAX_SOURCES = 8;
+export const CANVAS_REVIEWER_MAX_SOURCE_CHARS = 20_000;
+export const CANVAS_REVIEWER_MAX_COMBINED_CHARS = 90_000;
+export const CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS = 120;
+export const CANVAS_REVIEWER_SOURCE_LIST_LIMIT = 100;
+export const CANVAS_REVIEWER_SOURCE_LIST_MAX_OFFSET = 1_000;
+export const CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE = 150;
+export const CANVAS_REVIEWER_EXISTING_GENERATE_LIMIT =
+  REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS;
+
+const SOURCE_TYPE_ORDER = new Map<CanvasReviewerSourceType, number>([
+  ["page", 0],
+  ["assignment", 1],
+  ["announcement", 2],
+  ["file", 3],
+]);
+const AVAILABLE_REASON_FILE =
+  "Text extraction for this file type is not available yet.";
+const COURSE_COLUMNS =
+  "id,user_id,canvas_connection_id,canvas_course_id,name,course_code,workflow_state,enrollment_term_id,account_id,start_at,end_at,time_zone,public_syllabus,syllabus_body,canvas_updated_at,first_synced_at,last_synced_at,created_at,updated_at";
+const PREFERENCE_COLUMNS =
+  "id,user_id,canvas_connection_id,course_id,selected,display_order,selected_at,created_at,updated_at";
+const SYNC_RUN_COLUMNS =
+  "id,user_id,canvas_connection_id,scope_course_id,sync_mode,status,started_at,completed_at,heartbeat_at,discovered_course_count,successful_course_count,failed_course_count,resource_counts,failure_code,failure_summary,created_at,updated_at";
+const SYNC_STATE_COLUMNS =
+  "id,user_id,canvas_connection_id,canvas_course_id,course_id,snapshot_fingerprint,fingerprint_version,last_checked_at,last_changed_at,last_successful_sync_at,consecutive_failure_count,last_failure_code,created_at,updated_at";
+const COURSE_RESULT_COLUMNS =
+  "id,sync_run_id,user_id,canvas_connection_id,course_fingerprint,status,failure_code,failed_operation,failure_category,http_status_class,retryable,retry_count,duration_ms,created_at,updated_at";
+
+type HtmlNode = DefaultTreeAdapterMap["node"];
+type HtmlElement = DefaultTreeAdapterMap["element"];
+type HtmlTextNode = DefaultTreeAdapterMap["textNode"];
+
+export type CanvasReviewerSourceType =
+  | "page"
+  | "assignment"
+  | "announcement"
+  | "file";
+
+export type CanvasReviewerSourceAvailability = "available" | "unavailable";
+
+export interface CanvasReviewerSourceDescriptor {
+  readonly id: string;
+  readonly type: CanvasReviewerSourceType;
+  readonly title: string;
+  readonly availability: CanvasReviewerSourceAvailability;
+  readonly unavailableReason: string | null;
+  readonly updatedAt: string | null;
+  readonly estimatedCharacters: number | null;
+}
+
+export interface CanvasReviewerCourseSyncSummary {
+  readonly status: "success" | "partial" | "failed" | "never";
+  readonly completedAt: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+  readonly latestResultWasPartial: boolean;
+  readonly synchronizedSourcesAvailable: boolean;
+  readonly failureCategories: readonly string[];
+}
+
+export interface CanvasReviewerSourceList {
+  readonly courseId: string;
+  readonly courseSync: CanvasReviewerCourseSyncSummary;
+  readonly availableSourceCount: number;
+  readonly unavailableSourceCount: number;
+  readonly sources: readonly CanvasReviewerSourceDescriptor[];
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+    readonly totalKnown: number;
+  };
+}
+
+export interface CanvasReviewerSourcePreview {
+  readonly sourceText: string;
+  readonly suggestedTitle: string;
+  readonly sourceCount: number;
+  readonly characterCount: number;
+  readonly sources: readonly {
+    readonly id: string;
+    readonly type: Exclude<CanvasReviewerSourceType, "file">;
+    readonly updatedAt: string | null;
+  }[];
+  readonly courseSync: {
+    readonly status: "success" | "partial" | "failed" | "never";
+    readonly completedAt: string | null;
+  };
+  readonly limits: CanvasReviewerSourceLimits;
+}
+
+export interface CanvasReviewerSourceLimits {
+  readonly maximumSources: number;
+  readonly maximumCharactersPerSource: number;
+  readonly maximumCombinedPreviewCharacters: number;
+  readonly existingReviewerRequestLimit: number;
+  readonly suggestedTitleLimit: number;
+}
+
+export interface CanvasReviewerSourceListOptions {
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export type CanvasReviewerSourceResult<TValue> =
+  | { readonly ok: true; readonly value: TValue }
+  | {
+      readonly ok: false;
+      readonly status: 400 | 401 | 403 | 404 | 413 | 500;
+      readonly code: CanvasApiErrorCode;
+      readonly message: string;
+      readonly details?: {
+        readonly selectedSourceCount?: number;
+        readonly maximumSourceCount?: number;
+        readonly combinedCharacterCount?: number;
+        readonly allowedMaximum?: number;
+      };
+    };
+
+interface StoredSelectedCanvasCourse {
+  readonly connection: CanvasConnectionRow;
+  readonly course: CanvasCourseRow;
+  readonly preference: CanvasCourseSyncPreferenceRow;
+  readonly latestRun: CanvasSyncRunRow | null;
+  readonly latestCourseResult: CanvasSyncCourseResultRow | null;
+  readonly syncState: CanvasCourseSyncStateRow | null;
+}
+
+interface NormalizedSourceRecord {
+  readonly descriptor: CanvasReviewerSourceDescriptor;
+  readonly text: string | null;
+}
+
+export interface PreviewSourceRecord {
+  readonly descriptor: CanvasReviewerSourceDescriptor;
+  readonly text: string;
+}
+
+export function getCanvasReviewerSourceLimits(): CanvasReviewerSourceLimits {
+  return {
+    existingReviewerRequestLimit: CANVAS_REVIEWER_EXISTING_GENERATE_LIMIT,
+    maximumCharactersPerSource: CANVAS_REVIEWER_MAX_SOURCE_CHARS,
+    maximumCombinedPreviewCharacters: CANVAS_REVIEWER_MAX_COMBINED_CHARS,
+    maximumSources: CANVAS_REVIEWER_MAX_SOURCES,
+    suggestedTitleLimit: CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS,
+  };
+}
+
+export async function listCanvasReviewerSources({
+  client,
+  courseId,
+  limit,
+  offset,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly courseId: string;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<CanvasReviewerSourceList>> {
+  const course = await loadStoredSelectedCanvasCourse({
+    client,
+    courseId,
+    userId,
+  });
+  if (!course.ok) {
+    return course;
+  }
+
+  const sources = await loadCourseSourceDescriptors({
+    client,
+    course: course.value.course,
+    connection: course.value.connection,
+    userId,
+  });
+  if (!sources.ok) {
+    return sources;
+  }
+
+  const ordered = sources.value.map((source) => source.descriptor).sort(compareSources);
+  const normalizedLimit = normalizeListLimit(limit);
+  const normalizedOffset = normalizeListOffset(offset);
+  const page = ordered.slice(normalizedOffset, normalizedOffset + normalizedLimit);
+  const availableSourceCount = ordered.filter(
+    (source) => source.availability === "available",
+  ).length;
+  const unavailableSourceCount = ordered.length - availableSourceCount;
+
+  return {
+    ok: true,
+    value: {
+      availableSourceCount,
+      courseId: course.value.course.id,
+      courseSync: createCourseSyncSummary({
+        ...course.value,
+        synchronizedSourcesAvailable: availableSourceCount > 0,
+      }),
+      pagination: {
+        hasMore: normalizedOffset + normalizedLimit < ordered.length,
+        limit: normalizedLimit,
+        offset: normalizedOffset,
+        returned: page.length,
+        totalKnown: ordered.length,
+      },
+      sources: page,
+      unavailableSourceCount,
+    },
+  };
+}
+
+export async function previewCanvasReviewerSources({
+  client,
+  courseId,
+  sourceIds,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly courseId: string;
+  readonly sourceIds: readonly string[];
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<CanvasReviewerSourcePreview>> {
+  const normalizedIds = normalizeSourceIds(sourceIds);
+  if (!normalizedIds.ok) {
+    return normalizedIds;
+  }
+
+  const course = await loadStoredSelectedCanvasCourse({
+    client,
+    courseId,
+    userId,
+  });
+  if (!course.ok) {
+    return course;
+  }
+
+  const sources = await loadPreviewSourceRecords({
+    client,
+    course: course.value.course,
+    connection: course.value.connection,
+    parsedIds: normalizedIds.value,
+    userId,
+  });
+  if (!sources.ok) {
+    return sources;
+  }
+
+  const byId = new Map(sources.value.map((source) => [source.descriptor.id, source]));
+  const ordered = normalizedIds.value.map((sourceId) => byId.get(sourceId.original));
+
+  if (ordered.some((source) => source === undefined)) {
+    return {
+      ok: false,
+      status: 404,
+      code: "canvas_source_not_found",
+      message: "One or more selected Canvas sources were not found for this course.",
+    };
+  }
+
+  const previewSources = ordered.filter(isDefined);
+  const overPerSource = previewSources.find(
+    (source) => source.text.length > CANVAS_REVIEWER_MAX_SOURCE_CHARS,
+  );
+  if (overPerSource) {
+    return {
+      ok: false,
+      status: 413,
+      code: "canvas_source_preview_too_large",
+      details: {
+        allowedMaximum: CANVAS_REVIEWER_MAX_SOURCE_CHARS,
+        combinedCharacterCount: overPerSource.text.length,
+        selectedSourceCount: previewSources.length,
+      },
+      message:
+        "One selected Canvas source is too large. Select fewer or smaller sources.",
+    };
+  }
+
+  const sourceText = assembleCanvasSourcePreview(previewSources);
+  if (sourceText.length > CANVAS_REVIEWER_MAX_COMBINED_CHARS) {
+    return {
+      ok: false,
+      status: 413,
+      code: "canvas_source_preview_too_large",
+      details: {
+        allowedMaximum: CANVAS_REVIEWER_MAX_COMBINED_CHARS,
+        combinedCharacterCount: sourceText.length,
+        selectedSourceCount: previewSources.length,
+      },
+      message:
+        "Selected Canvas sources are too large together. Select fewer or smaller sources.",
+    };
+  }
+
+  const courseSync = createCourseSyncSummary({
+    ...course.value,
+    synchronizedSourcesAvailable: true,
+  });
+
+  return {
+    ok: true,
+    value: {
+      characterCount: sourceText.length,
+      courseSync: {
+        completedAt: courseSync.completedAt,
+        status: courseSync.status,
+      },
+      limits: getCanvasReviewerSourceLimits(),
+      sourceCount: previewSources.length,
+      sources: previewSources.map((source) => ({
+        id: source.descriptor.id,
+        type: source.descriptor.type as Exclude<CanvasReviewerSourceType, "file">,
+        updatedAt: source.descriptor.updatedAt,
+      })),
+      sourceText,
+      suggestedTitle: buildSuggestedCanvasReviewerTitle(course.value.course.name),
+    },
+  };
+}
+
+export function normalizeCanvasHtmlToText(html: string | null): string {
+  if (!html?.trim()) {
+    return "";
+  }
+
+  const fragment = parseFragment(html);
+  const writer = createTextWriter();
+  walkHtmlChildren(fragment.childNodes, writer, { orderedListStack: [] });
+  return sanitizePreviewText(writer.toString());
+}
+
+export function assembleCanvasSourcePreview(
+  sources: readonly PreviewSourceRecord[],
+): string {
+  return sources
+    .map((source, index) => {
+      const sourceNumber = index + 1;
+      const label = formatSourceType(source.descriptor.type).toUpperCase();
+      return [
+        `SOURCE ${sourceNumber} - ${label} - ${source.descriptor.title}`,
+        "",
+        source.text,
+      ].join("\n");
+    })
+    .join("\n\n");
+}
+
+export function buildSuggestedCanvasReviewerTitle(courseName: string): string {
+  const safeCourseName = sanitizeTitleText(courseName);
+  if (!safeCourseName) {
+    return "Canvas Reviewer";
+  }
+
+  const suffix = " - Canvas Reviewer";
+  const maximumCourseNameLength =
+    CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS - suffix.length;
+  return `${truncateAtWordBoundary(safeCourseName, maximumCourseNameLength)}${suffix}`;
+}
+
+function createCourseSyncSummary({
+  latestCourseResult,
+  latestRun,
+  syncState,
+  synchronizedSourcesAvailable,
+}: StoredSelectedCanvasCourse & {
+  readonly synchronizedSourcesAvailable: boolean;
+}): CanvasReviewerCourseSyncSummary {
+  const runStatus =
+    latestRun?.status === "succeeded"
+      ? "success"
+      : latestRun?.status === "partial" || latestRun?.status === "failed"
+        ? latestRun.status
+        : null;
+  const stateStatus =
+    syncState === null
+      ? null
+      : syncState.consecutive_failure_count > 0 && syncState.last_failure_code
+        ? "failed"
+        : "success";
+  const status = runStatus ?? stateStatus ?? "never";
+  const failureCategories = collectFailureCategories({
+    latestCourseResult,
+    latestRun,
+    syncState,
+  });
+
+  return {
+    completedAt: latestRun?.completed_at ?? syncState?.last_checked_at ?? null,
+    failureCategories,
+    latestResultWasPartial: status === "partial",
+    lastSuccessfulSyncAt: syncState?.last_successful_sync_at ?? null,
+    status,
+    synchronizedSourcesAvailable,
+  };
+}
+
+async function loadStoredSelectedCanvasCourse({
+  client,
+  courseId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly courseId: string;
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<StoredSelectedCanvasCourse>> {
+  if (!isUuid(courseId.trim())) {
+    return {
+      ok: false,
+      status: 404,
+      code: "canvas_course_not_found",
+      message: "Canvas course was not found for this connection.",
+    };
+  }
+
+  const connection = await readConnection(client, userId);
+  if (!connection.ok) {
+    return storageFailure("Canvas connection could not be loaded.");
+  }
+  if (!connection.row) {
+    return {
+      ok: false,
+      status: 404,
+      code: "canvas_connection_missing",
+      message: "Connect Canvas before selecting Canvas sources.",
+    };
+  }
+
+  const course = await readCourseRow({
+    client,
+    connectionId: connection.row.id,
+    courseId: courseId.trim(),
+    userId,
+  });
+  if (!course.ok) {
+    return storageFailure("Canvas course could not be loaded.");
+  }
+  if (!course.value) {
+    return {
+      ok: false,
+      status: 404,
+      code: "canvas_course_not_found",
+      message: "Canvas course was not found for this connection.",
+    };
+  }
+
+  const preference = await readSelectedCoursePreference({
+    client,
+    connectionId: connection.row.id,
+    courseId: course.value.id,
+    userId,
+  });
+  if (!preference.ok) {
+    return storageFailure("Canvas course selection could not be loaded.");
+  }
+  if (!preference.value) {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_course_not_selected",
+      message: "Select this Canvas course before selecting sources.",
+    };
+  }
+
+  const [latestRun, syncState] = await Promise.all([
+    readLatestCourseSyncRun({
+      client,
+      connectionId: connection.row.id,
+      courseId: course.value.id,
+      userId,
+    }),
+    readCourseSyncState({
+      client,
+      connectionId: connection.row.id,
+      course: course.value,
+      userId,
+    }),
+  ]);
+  if (!latestRun.ok || !syncState.ok) {
+    return storageFailure("Canvas course synchronization state could not be loaded.");
+  }
+
+  const latestCourseResult = latestRun.value
+    ? await readLatestCourseResult({
+        client,
+        connectionId: connection.row.id,
+        syncRunId: latestRun.value.id,
+        userId,
+      })
+    : ({ ok: true, value: null } as const);
+  if (!latestCourseResult.ok) {
+    return storageFailure("Canvas course synchronization state could not be loaded.");
+  }
+
+  return {
+    ok: true,
+    value: {
+      connection: connection.row,
+      course: course.value,
+      latestCourseResult: latestCourseResult.value,
+      latestRun: latestRun.value,
+      preference: preference.value,
+      syncState: syncState.value,
+    },
+  };
+}
+
+async function loadCourseSourceDescriptors({
+  client,
+  connection,
+  course,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connection: CanvasConnectionRow;
+  readonly course: CanvasCourseRow;
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<readonly NormalizedSourceRecord[]>> {
+  const [pages, assignments, announcements, files] = await Promise.all([
+    readPages({ client, connectionId: connection.id, courseId: course.id, userId }),
+    readAssignments({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      userId,
+    }),
+    readAnnouncements({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      userId,
+    }),
+    readFiles({ client, connectionId: connection.id, courseId: course.id, userId }),
+  ]);
+
+  if (!pages.ok || !assignments.ok || !announcements.ok || !files.ok) {
+    return storageFailure("Canvas sources could not be loaded.");
+  }
+
+  return {
+    ok: true,
+    value: [
+      ...pages.value.map(mapPageSource),
+      ...assignments.value.map(mapAssignmentSource),
+      ...announcements.value.map(mapAnnouncementSource),
+      ...files.value.map(mapFileSource),
+    ],
+  };
+}
+
+async function loadPreviewSourceRecords({
+  client,
+  connection,
+  course,
+  parsedIds,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connection: CanvasConnectionRow;
+  readonly course: CanvasCourseRow;
+  readonly parsedIds: readonly ParsedCanvasSourceId[];
+  readonly userId: string;
+}): Promise<CanvasReviewerSourceResult<readonly PreviewSourceRecord[]>> {
+  if (parsedIds.some((source) => source.type === "file")) {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_source_unavailable",
+      message: "Canvas files do not have extracted text available yet.",
+    };
+  }
+
+  const pageIds = parsedIds
+    .filter((source) => source.type === "page")
+    .map((source) => source.rowId);
+  const assignmentIds = parsedIds
+    .filter((source) => source.type === "assignment")
+    .map((source) => source.rowId);
+  const announcementIds = parsedIds
+    .filter((source) => source.type === "announcement")
+    .map((source) => source.rowId);
+
+  const [pages, assignments, announcements] = await Promise.all([
+    readPagesByIds({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      ids: pageIds,
+      userId,
+    }),
+    readAssignmentsByIds({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      ids: assignmentIds,
+      userId,
+    }),
+    readAnnouncementsByIds({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      ids: announcementIds,
+      userId,
+    }),
+  ]);
+  if (!pages.ok || !assignments.ok || !announcements.ok) {
+    return storageFailure("Canvas source preview could not be loaded.");
+  }
+
+  const normalized = [
+    ...pages.value.map(mapPageSource),
+    ...assignments.value.map(mapAssignmentSource),
+    ...announcements.value.map(mapAnnouncementSource),
+  ];
+  const unavailable = normalized.find(
+    (source) => source.descriptor.availability !== "available" || source.text === null,
+  );
+  if (unavailable) {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_source_unavailable",
+      message: "One or more selected Canvas sources do not have readable text.",
+    };
+  }
+
+  return {
+    ok: true,
+    value: normalized.map((source) => ({
+      descriptor: source.descriptor,
+      text: source.text ?? "",
+    })),
+  };
+}
+
+function mapPageSource(row: CanvasPageRow): NormalizedSourceRecord {
+  const text = normalizeCanvasHtmlToText(row.body_html);
+  return {
+    descriptor: {
+      availability: text.length > 0 ? "available" : "unavailable",
+      estimatedCharacters: text.length > 0 ? text.length : null,
+      id: formatSourceId("page", row.id),
+      title: sanitizeTitleText(row.title) || "Untitled Page",
+      type: "page",
+      unavailableReason:
+        text.length > 0 ? null : "This Page does not have readable body text.",
+      updatedAt: row.canvas_updated_at ?? row.last_synced_at ?? row.updated_at,
+    },
+    text: text.length > 0 ? text : null,
+  };
+}
+
+function mapAssignmentSource(row: CanvasAssignmentRow): NormalizedSourceRecord {
+  const text = normalizeCanvasHtmlToText(row.description_html);
+  return {
+    descriptor: {
+      availability: text.length > 0 ? "available" : "unavailable",
+      estimatedCharacters: text.length > 0 ? text.length : null,
+      id: formatSourceId("assignment", row.id),
+      title: sanitizeTitleText(row.name) || "Untitled Assignment",
+      type: "assignment",
+      unavailableReason:
+        text.length > 0
+          ? null
+          : "This assignment does not have readable description text.",
+      updatedAt: row.canvas_updated_at ?? row.last_synced_at ?? row.updated_at,
+    },
+    text: text.length > 0 ? text : null,
+  };
+}
+
+function mapAnnouncementSource(row: CanvasAnnouncementRow): NormalizedSourceRecord {
+  const text = normalizeCanvasHtmlToText(row.message_html);
+  return {
+    descriptor: {
+      availability: text.length > 0 ? "available" : "unavailable",
+      estimatedCharacters: text.length > 0 ? text.length : null,
+      id: formatSourceId("announcement", row.id),
+      title: sanitizeTitleText(row.title) || "Untitled Announcement",
+      type: "announcement",
+      unavailableReason:
+        text.length > 0
+          ? null
+          : "This announcement does not have readable message text.",
+      updatedAt: row.posted_at ?? row.last_synced_at ?? row.updated_at,
+    },
+    text: text.length > 0 ? text : null,
+  };
+}
+
+function mapFileSource(row: CanvasFileRow): NormalizedSourceRecord {
+  return {
+    descriptor: {
+      availability: "unavailable",
+      estimatedCharacters: null,
+      id: formatSourceId("file", row.id),
+      title: sanitizeTitleText(row.display_name) || "Canvas file",
+      type: "file",
+      unavailableReason: AVAILABLE_REASON_FILE,
+      updatedAt:
+        row.canvas_modified_at ??
+        row.canvas_updated_at ??
+        row.last_synced_at ??
+        row.updated_at,
+    },
+    text: null,
+  };
+}
+
+async function readCourseRow({
+  client,
+  connectionId,
+  courseId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: CanvasCourseRow | null }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_courses")
+    .select(COURSE_COLUMNS)
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as CanvasCourseRow | null };
+}
+
+async function readSelectedCoursePreference({
+  client,
+  connectionId,
+  courseId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: CanvasCourseSyncPreferenceRow | null }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_course_sync_preferences")
+    .select(PREFERENCE_COLUMNS)
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("course_id", courseId)
+    .eq("selected", true)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as CanvasCourseSyncPreferenceRow | null };
+}
+
+async function readLatestCourseSyncRun({
+  client,
+  connectionId,
+  courseId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: CanvasSyncRunRow | null }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_sync_runs")
+    .select(SYNC_RUN_COLUMNS)
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("scope_course_id", courseId)
+    .eq("sync_mode", "course")
+    .neq("status", "running")
+    .order("completed_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as CanvasSyncRunRow | null };
+}
+
+async function readLatestCourseResult({
+  client,
+  connectionId,
+  syncRunId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly syncRunId: string;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: CanvasSyncCourseResultRow | null }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_sync_course_results")
+    .select(COURSE_RESULT_COLUMNS)
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("sync_run_id", syncRunId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as CanvasSyncCourseResultRow | null };
+}
+
+async function readCourseSyncState({
+  client,
+  connectionId,
+  course,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly course: CanvasCourseRow;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: CanvasCourseSyncStateRow | null }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_course_sync_states")
+    .select(SYNC_STATE_COLUMNS)
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("canvas_course_id", course.canvas_course_id)
+    .eq("course_id", course.id)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as CanvasCourseSyncStateRow | null };
+}
+
+async function readPages(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasPageRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await query.client
+    .from("canvas_pages")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .limit(CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasPageRow[] };
+}
+
+async function readAssignments(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasAssignmentRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await query.client
+    .from("canvas_assignments")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .limit(CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasAssignmentRow[] };
+}
+
+async function readAnnouncements(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasAnnouncementRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await query.client
+    .from("canvas_announcements")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .limit(CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasAnnouncementRow[] };
+}
+
+async function readFiles(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasFileRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await query.client
+    .from("canvas_files")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .limit(CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasFileRow[] };
+}
+
+async function readPagesByIds(query: SourceIdsQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasPageRow[] }
+  | { readonly ok: false }
+> {
+  if (query.ids.length === 0) {
+    return { ok: true, value: [] };
+  }
+  const { data, error } = await query.client
+    .from("canvas_pages")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .in("id", [...query.ids]);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasPageRow[] };
+}
+
+async function readAssignmentsByIds(query: SourceIdsQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasAssignmentRow[] }
+  | { readonly ok: false }
+> {
+  if (query.ids.length === 0) {
+    return { ok: true, value: [] };
+  }
+  const { data, error } = await query.client
+    .from("canvas_assignments")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .in("id", [...query.ids]);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasAssignmentRow[] };
+}
+
+async function readAnnouncementsByIds(query: SourceIdsQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasAnnouncementRow[] }
+  | { readonly ok: false }
+> {
+  if (query.ids.length === 0) {
+    return { ok: true, value: [] };
+  }
+  const { data, error } = await query.client
+    .from("canvas_announcements")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .in("id", [...query.ids]);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasAnnouncementRow[] };
+}
+
+interface SourceQuery {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly userId: string;
+}
+
+interface SourceIdsQuery extends SourceQuery {
+  readonly ids: readonly string[];
+}
+
+interface ParsedCanvasSourceId {
+  readonly original: string;
+  readonly rowId: string;
+  readonly type: CanvasReviewerSourceType;
+}
+
+function normalizeSourceIds(
+  sourceIds: readonly string[],
+): CanvasReviewerSourceResult<readonly ParsedCanvasSourceId[]> {
+  if (!Array.isArray(sourceIds)) {
+    return {
+      ok: false,
+      status: 400,
+      code: "invalid_request",
+      message: "sourceIds must be an array.",
+    };
+  }
+  if (sourceIds.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      code: "invalid_request",
+      message: "Choose at least one Canvas source.",
+    };
+  }
+  if (sourceIds.length > CANVAS_REVIEWER_MAX_SOURCES) {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_source_count_exceeded",
+      details: {
+        maximumSourceCount: CANVAS_REVIEWER_MAX_SOURCES,
+        selectedSourceCount: sourceIds.length,
+      },
+      message: `Select at most ${CANVAS_REVIEWER_MAX_SOURCES} Canvas sources.`,
+    };
+  }
+
+  const parsed = sourceIds.map(parseSourceId);
+  if (parsed.some((source) => source === null)) {
+    return {
+      ok: false,
+      status: 400,
+      code: "invalid_request",
+      message: "sourceIds must contain Canvas source descriptor IDs.",
+    };
+  }
+
+  const normalized = parsed.filter(isNonNull);
+  const distinct = new Set(normalized.map((source) => source.original));
+  if (distinct.size !== normalized.length) {
+    return {
+      ok: false,
+      status: 400,
+      code: "canvas_source_duplicate",
+      message: "Selected Canvas sources must not contain duplicates.",
+    };
+  }
+
+  return { ok: true, value: normalized };
+}
+
+function parseSourceId(value: string): ParsedCanvasSourceId | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const [type, rowId, extra] = value.trim().split(":");
+  if (extra !== undefined || !isCanvasReviewerSourceType(type) || !isUuid(rowId)) {
+    return null;
+  }
+
+  return {
+    original: formatSourceId(type, rowId),
+    rowId,
+    type,
+  };
+}
+
+function formatSourceId(type: CanvasReviewerSourceType, rowId: string): string {
+  return `${type}:${rowId}`;
+}
+
+function compareSources(
+  left: CanvasReviewerSourceDescriptor,
+  right: CanvasReviewerSourceDescriptor,
+): number {
+  if (left.availability !== right.availability) {
+    return left.availability === "available" ? -1 : 1;
+  }
+
+  const leftType = SOURCE_TYPE_ORDER.get(left.type) ?? Number.MAX_SAFE_INTEGER;
+  const rightType = SOURCE_TYPE_ORDER.get(right.type) ?? Number.MAX_SAFE_INTEGER;
+  if (leftType !== rightType) {
+    return leftType - rightType;
+  }
+
+  const titleComparison = compareAsciiCaseInsensitive(left.title, right.title);
+  if (titleComparison !== 0) {
+    return titleComparison;
+  }
+
+  return compareAsciiCaseInsensitive(left.id, right.id);
+}
+
+function compareAsciiCaseInsensitive(left: string, right: string): number {
+  const leftNormalized = left.toLowerCase();
+  const rightNormalized = right.toLowerCase();
+  if (leftNormalized < rightNormalized) {
+    return -1;
+  }
+  if (leftNormalized > rightNormalized) {
+    return 1;
+  }
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
+function collectFailureCategories({
+  latestCourseResult,
+  latestRun,
+  syncState,
+}: {
+  readonly latestCourseResult: CanvasSyncCourseResultRow | null;
+  readonly latestRun: CanvasSyncRunRow | null;
+  readonly syncState: CanvasCourseSyncStateRow | null;
+}): readonly string[] {
+  const categories = [
+    latestRun?.failure_code,
+    latestCourseResult?.failure_code,
+    latestCourseResult?.failed_operation,
+    latestCourseResult?.failure_category,
+    syncState?.last_failure_code,
+  ]
+    .filter((entry): entry is string => Boolean(entry?.trim()))
+    .map((entry) => entry.trim());
+  return [...new Set(categories)].sort(compareAsciiCaseInsensitive);
+}
+
+function walkHtmlChildren(
+  nodes: readonly HtmlNode[],
+  writer: TextWriter,
+  context: HtmlWalkContext,
+): void {
+  for (const node of nodes) {
+    walkHtmlNode(node, writer, context);
+  }
+}
+
+interface HtmlWalkContext {
+  readonly orderedListStack: readonly number[];
+}
+
+function walkHtmlNode(
+  node: HtmlNode,
+  writer: TextWriter,
+  context: HtmlWalkContext,
+): void {
+  if (isTextNode(node)) {
+    writer.text(node.value);
+    return;
+  }
+
+  if (!isElementNode(node) || shouldSkipElement(node)) {
+    return;
+  }
+
+  const tag = node.tagName.toLowerCase();
+  if (tag === "br") {
+    writer.lineBreak();
+    return;
+  }
+
+  if (tag === "li") {
+    const itemNumber = context.orderedListStack.at(-1);
+    writer.blockBreak();
+    writer.text(itemNumber === undefined ? "- " : `${itemNumber}. `);
+    walkHtmlChildren(node.childNodes, writer, context);
+    writer.lineBreak();
+    return;
+  }
+
+  if (tag === "ol") {
+    writer.blockBreak();
+    let listIndex = 0;
+    node.childNodes.forEach((child) => {
+      if (isElementNode(child) && child.tagName.toLowerCase() === "li") {
+        listIndex += 1;
+      }
+      walkHtmlNode(child, writer, {
+        orderedListStack: [...context.orderedListStack, listIndex],
+      });
+    });
+    writer.blockBreak();
+    return;
+  }
+
+  if (tag === "ul") {
+    writer.blockBreak();
+    walkHtmlChildren(node.childNodes, writer, context);
+    writer.blockBreak();
+    return;
+  }
+
+  if (tag === "tr") {
+    writer.blockBreak();
+    walkHtmlChildren(node.childNodes, writer, context);
+    writer.lineBreak();
+    return;
+  }
+
+  if (tag === "td" || tag === "th") {
+    walkHtmlChildren(node.childNodes, writer, context);
+    writer.text(" | ");
+    return;
+  }
+
+  if (isBlockTag(tag)) {
+    writer.blockBreak();
+    walkHtmlChildren(node.childNodes, writer, context);
+    writer.blockBreak();
+    return;
+  }
+
+  walkHtmlChildren(node.childNodes, writer, context);
+}
+
+interface TextWriter {
+  readonly blockBreak: () => void;
+  readonly lineBreak: () => void;
+  readonly text: (value: string) => void;
+  readonly toString: () => string;
+}
+
+function createTextWriter(): TextWriter {
+  const parts: string[] = [];
+
+  function appendBreak(count: 1 | 2): void {
+    const current = parts.join("");
+    const trimmedEnd = current.replace(/[ \t]+$/g, "");
+    parts.length = 0;
+    parts.push(trimmedEnd);
+    const existingBreaks = /\n*$/.exec(trimmedEnd)?.[0].length ?? 0;
+    const needed = Math.max(0, count - existingBreaks);
+    if (needed > 0 && trimmedEnd.length > 0) {
+      parts.push("\n".repeat(needed));
+    }
+  }
+
+  return {
+    blockBreak: () => appendBreak(2),
+    lineBreak: () => appendBreak(1),
+    text: (value: string) => {
+      const normalized = value.replace(/\s+/g, " ");
+      if (!normalized.trim()) {
+        return;
+      }
+      const current = parts.join("");
+      const needsSpace =
+        current.length > 0 &&
+        !/[\s(]$/.test(current) &&
+        !/^[,.;:!?)]/.test(normalized);
+      parts.push(`${needsSpace ? " " : ""}${normalized.trim()}`);
+    },
+    toString: () =>
+      parts
+        .join("")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim(),
+  };
+}
+
+function sanitizePreviewText(value: string): string {
+  return value
+    .replace(/https?:\/\/[^\s)>\]]+/gi, "[link removed]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
+    .replace(/\bsk-[A-Za-z0-9_-]{10,}\b/g, "[redacted]")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted]")
+    .replace(/\b(verifier|access_token|token|signature|expires)=\S+/gi, "$1=[redacted]")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function sanitizeTitleText(value: string): string {
+  return sanitizePreviewText(value).replace(/\s+/g, " ").trim();
+}
+
+function truncateAtWordBoundary(value: string, maximum: number): string {
+  if (value.length <= maximum) {
+    return value;
+  }
+  const truncated = value.slice(0, maximum).trimEnd();
+  const lastSpace = truncated.lastIndexOf(" ");
+  if (lastSpace >= Math.floor(maximum * 0.65)) {
+    return truncated.slice(0, lastSpace).trimEnd();
+  }
+  return truncated;
+}
+
+function shouldSkipElement(node: HtmlElement): boolean {
+  const tag = node.tagName.toLowerCase();
+  if (
+    tag === "script" ||
+    tag === "style" ||
+    tag === "form" ||
+    tag === "input" ||
+    tag === "button" ||
+    tag === "select" ||
+    tag === "textarea" ||
+    tag === "iframe" ||
+    tag === "object" ||
+    tag === "embed" ||
+    tag === "svg" ||
+    tag === "canvas"
+  ) {
+    return true;
+  }
+
+  const hidden = getAttribute(node, "hidden");
+  const ariaHidden = getAttribute(node, "aria-hidden");
+  const style = (getAttribute(node, "style")?.toLowerCase() ?? "").replace(
+    /\s+/g,
+    "",
+  );
+  return (
+    hidden !== null ||
+    ariaHidden === "true" ||
+    style.includes("display:none") ||
+    style.includes("visibility:hidden")
+  );
+}
+
+function getAttribute(node: HtmlElement, name: string): string | null {
+  const attribute = node.attrs.find(
+    (entry) => entry.name.toLowerCase() === name.toLowerCase(),
+  );
+  return attribute?.value ?? null;
+}
+
+function isBlockTag(tag: string): boolean {
+  return (
+    tag === "address" ||
+    tag === "article" ||
+    tag === "aside" ||
+    tag === "blockquote" ||
+    tag === "div" ||
+    tag === "dl" ||
+    tag === "fieldset" ||
+    tag === "figcaption" ||
+    tag === "figure" ||
+    tag === "footer" ||
+    tag === "h1" ||
+    tag === "h2" ||
+    tag === "h3" ||
+    tag === "h4" ||
+    tag === "h5" ||
+    tag === "h6" ||
+    tag === "header" ||
+    tag === "hr" ||
+    tag === "main" ||
+    tag === "nav" ||
+    tag === "p" ||
+    tag === "pre" ||
+    tag === "section" ||
+    tag === "table"
+  );
+}
+
+function isTextNode(node: HtmlNode): node is HtmlTextNode {
+  return node.nodeName === "#text" && "value" in node;
+}
+
+function isElementNode(node: HtmlNode): node is HtmlElement {
+  return "tagName" in node && Array.isArray(node.childNodes);
+}
+
+function formatSourceType(type: CanvasReviewerSourceType): string {
+  switch (type) {
+    case "page":
+      return "Page";
+    case "assignment":
+      return "Assignment";
+    case "announcement":
+      return "Announcement";
+    case "file":
+      return "File";
+  }
+}
+
+function normalizeListLimit(limit: number | undefined): number {
+  if (typeof limit !== "number" || !Number.isSafeInteger(limit) || limit <= 0) {
+    return CANVAS_REVIEWER_SOURCE_LIST_LIMIT;
+  }
+  return Math.min(limit, CANVAS_REVIEWER_SOURCE_LIST_LIMIT);
+}
+
+function normalizeListOffset(offset: number | undefined): number {
+  if (
+    typeof offset !== "number" ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0
+  ) {
+    return 0;
+  }
+  return Math.min(offset, CANVAS_REVIEWER_SOURCE_LIST_MAX_OFFSET);
+}
+
+function storageFailure(message: string): CanvasReviewerSourceResult<never> {
+  return {
+    ok: false,
+    status: 500,
+    code: "canvas_storage_failed",
+    message,
+  };
+}
+
+function isCanvasReviewerSourceType(
+  value: string | undefined,
+): value is CanvasReviewerSourceType {
+  return (
+    value === "page" ||
+    value === "assignment" ||
+    value === "announcement" ||
+    value === "file"
+  );
+}
+
+function isUuid(value: string | undefined): value is string {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
+}
+
+function isDefined<TValue>(value: TValue | undefined): value is TValue {
+  return value !== undefined;
+}
+
+function isNonNull<TValue>(value: TValue | null): value is TValue {
+  return value !== null;
+}

@@ -543,6 +543,8 @@ function formatSourceMode(sourceMode: SavedReviewerSourceMode): string {
       return "Camera OCR";
     case "pdf":
       return "PDF OCR";
+    case "canvas":
+      return "Canvas source";
   }
 }
 

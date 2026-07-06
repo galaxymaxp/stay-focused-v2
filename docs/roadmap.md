@@ -218,8 +218,9 @@ is complete with documented live Canvas limitations; Phase 5C.1 secure file
 inventory and bounded ingestion is remotely and live validated with a
 documented account-wide synchronous route-duration limitation; Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
-production-build validation. Next: Phase 5C.2A2 — Canvas source selection and
-reviewer handoff. Phase 5D through Phase 5F remain planned and must not be
+production-build validation; Phase 5C.2A2 Canvas source selection and reviewer
+handoff is complete and live validated. Next: Phase 5C.2B - Canvas PDF and
+image extraction/OCR integration. Phase 5D through Phase 5F remain planned and must not be
 collapsed into a single generic Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
@@ -664,8 +665,9 @@ remains over its configured runtime budget in local production-build
 measurement, so deployed production-runtime readiness is not claimed for that
 diagnostic route. Phase 5C.2A1 selected-course synchronization is complete,
 uses independent course-scoped requests, and stayed within the 60-second
-per-course budget in protected live validation. Next: Phase 5C.2A2 — Canvas
-source selection and reviewer handoff.
+per-course budget in protected live validation. Phase 5C.2A2 Canvas source
+selection and reviewer handoff is complete and live validated. Next:
+Phase 5C.2B - Canvas PDF and image extraction/OCR integration.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -776,23 +778,46 @@ Validation:
   flow.
 
 Still deferred from Phase 5C.2A1:
-
-- Canvas source selection and source preview.
-- Canvas-to-reviewer handoff.
 - Parser/OCR expansion for Canvas file contents.
 - Background, scheduled, resumable, or queued synchronization.
 - Canvas OAuth and broader Canvas resource families.
 
 #### Phase 5C.2A2 - Canvas Source Selection And Reviewer Handoff
 
-Status: Next.
+Status: Complete and protected-live validated.
 
-Scope:
+Implemented:
 
-- Narrow Canvas source-selection preview from synchronized selected courses.
-- Editable source text before reviewer generation.
-- Parser or OCR work only where required to make this narrow source-selection
-  flow work.
+- Protected `GET /api/canvas/courses/:courseId/sources` for selected,
+  synchronized, owned internal course rows.
+- Source descriptors over existing synchronized Canvas tables for Pages,
+  assignment descriptions, announcements, and unavailable file metadata.
+- Safe course freshness summary with terminal sync status, completed timestamp,
+  partial flag, sanitized failure categories, and synchronized-source
+  availability.
+- Deterministic descriptor ordering: available first, then Page, Assignment,
+  Announcement, File, then sanitized title and internal id.
+- Bounded source listing with pagination-ready metadata.
+- Protected `POST /api/canvas/courses/:courseId/sources/preview` that validates
+  ordered internal source ids, rejects duplicates, cross-course ids, unknown
+  ids, unavailable files, unsupported types, and over-limit selections.
+- Server-side `parse5` HTML-to-text normalization preserving readable
+  structure while removing hidden/executable content, URLs, signed parameters,
+  bearer tokens, and token-like strings.
+- Preview limits that fit inside the existing reviewer request limit:
+  8 sources, 20,000 characters per source, 90,000 combined preview characters,
+  120-character suggested title, and 100,000-character reviewer request limit.
+- Mobile `Create reviewer from Canvas` entry point for saved selected courses
+  with terminal sync history.
+- Mobile source picker sections for Pages, Assignments, Announcements, and
+  Files, with unavailable files disabled.
+- Editable Canvas preview text and title before generation.
+- Existing reviewer-generation API reuse with only `sourceText` and
+  `sourceTitle`.
+- Existing Study Library save flow reuse with minimal `sourceMode: "canvas"`
+  metadata.
+- No migration, no new reviewer engine, no file parsing/OCR, no automatic sync,
+  and no full persistent provenance table.
 
 Exit criteria:
 
@@ -802,6 +827,54 @@ Exit criteria:
   course names, filenames, URLs, object keys, hashes, or private content.
 - Reviewer generation still receives user-reviewed source text through the
   existing generation boundary.
+
+Validation:
+
+- API source service tests passed with 11/11 cases, covering normalization,
+  limits, selected-course lookup, unavailable files, duplicate rejection,
+  cross-course rejection, and no token-column selection.
+- API route tests for source list and preview passed with 10/10 cases.
+- Mobile Canvas API service tests passed with 22/22 Canvas source cases.
+- Package verification passed for Canvas, DB, API, mobile, engine, and OCR.
+- Protected live validation used opaque `live-course-1` and aggregate-only
+  output: 49 descriptors, 36 available Pages, 2 unavailable Pages, 11 available
+  announcements, 0 available assignments, no source bodies in listing, ordered
+  two-source preview with 3,467 characters, deterministic assembly, empty-source
+  rejection, cross-course rejection, no URLs or credentials, and no
+  Canvas/Storage/OCR/OpenAI calls during preview.
+- Reviewer-generation smoke reused the existing reviewer API, returned HTTP
+  200, generated 2 sections, saved to Study Library, verified list visibility,
+  and deleted the smoke reviewer.
+- Expo Web UI smoke selected two Canvas sources, loaded preview, edited source
+  text and title, returned to source selection with selection preserved, and
+  reloaded preview.
+
+Still deferred from Phase 5C.2A2:
+
+- Canvas PDF extraction.
+- Canvas image OCR.
+- Office parsing.
+- audio/video transcription.
+- full persistent Canvas source provenance.
+- background, scheduled, resumable, or queued synchronization.
+- tasks and schedule generation.
+- Canvas OAuth.
+- broader Canvas resource support.
+
+#### Phase 5C.2B - Canvas PDF And Image Extraction/OCR Integration
+
+Status: Next.
+
+Scope:
+
+- Use stored, owned Canvas file metadata and private file bytes where already
+  available.
+- Add bounded extraction/OCR for selected Canvas PDFs and images through the
+  existing OCR/source-ingestion boundaries.
+- Keep unsupported files disabled and honest.
+- Preserve editable preview before reviewer generation.
+- Do not broaden into Office, media transcription, background queues, or full
+  provenance unless required by this narrow PDF/image extraction slice.
 
 #### Later Phase 5C Parser And Source Import Work
 

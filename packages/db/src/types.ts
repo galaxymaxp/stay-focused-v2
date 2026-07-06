@@ -6,7 +6,12 @@ export type Json =
   | { readonly [key: string]: Json | undefined }
   | readonly Json[];
 
-export type SavedReviewerSourceMode = "paste" | "gallery" | "camera" | "pdf";
+export type SavedReviewerSourceMode =
+  | "paste"
+  | "gallery"
+  | "camera"
+  | "pdf"
+  | "canvas";
 
 export interface SavedReviewerSourceMetadata {
   readonly sourceMode: SavedReviewerSourceMode;

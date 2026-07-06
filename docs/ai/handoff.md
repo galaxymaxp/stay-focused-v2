@@ -163,18 +163,30 @@ paths.
   metadata, excludes user-wide planner synchronization, preserves synchronized
   data on deselection, and keeps the account-wide route as a diagnostic and
   future maintenance foundation. Academic-unit synchronization limit: none.
+- Phase 5C.2A2 Canvas Source Selection and Reviewer Handoff is complete,
+  automated-verification passed, and protected-live validated. It adds selected
+  synchronized course source listing, source preview, safe HTML-to-text
+  normalization, editable mobile source preview, reuse of the existing reviewer
+  generation API, and save-to-Study-Library handoff for stored Canvas Pages,
+  assignment descriptions, and announcements. The preview endpoint reads only
+  existing database rows and does not call Canvas, decrypt the Canvas token,
+  call Storage, invoke OCR, or call OpenAI.
+- Canvas files remain metadata-only for reviewer selection in Phase 5C.2A2.
+  File descriptors may be listed as unavailable with a text-extraction message,
+  but PDFs, images, Office files, audio, video, and other binary resources are
+  not selectable or previewed until a later extraction/OCR phase.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- File parsing/OCR/source preview, remaining secondary Canvas resources,
-  source snapshots, grades, background synchronization, task generation, and
-  study schedule generation are still pending. Production endpoint validators
-  remain unsupported for the audited endpoint families. Discussions, quiz
-  metadata, announcement attachment content import, and reviewer generation
-  from Canvas content remain deferred.
+- File parsing/OCR, remaining secondary Canvas resources, source snapshots,
+  grades, background synchronization, task generation, and study schedule
+  generation are still pending. Production endpoint validators remain
+  unsupported for the audited endpoint families. Discussions, quiz metadata,
+  announcement attachment content import, and broader Canvas resource support
+  remain deferred.
 
 ## Current Test Baselines
 
@@ -264,6 +276,18 @@ paths.
   7.849 seconds, deselect/reselect preserved data and identities, zero running
   rows remained, and the normal selected-course flow did not call the
   account-wide route.
+- Phase 5C.2A2 verification: Canvas package typecheck/build/tests passed with
+  52/52 tests; DB package typecheck passed; API typecheck/build/tests passed
+  with Canvas source-list, preview, reviewer, and route coverage; mobile
+  typecheck/tests passed with Canvas source API coverage; engine
+  typecheck/build/eval passed with 266/266 evaluations; OCR typecheck/build/tests
+  passed with 14/14 tests; root typecheck/build/workspace tests and
+  `git diff --check` passed. Protected live validation used aggregate-only
+  output: one opaque selected course exposed 49 descriptors, a two-source
+  preview assembled 3,467 characters deterministically without Canvas,
+  Storage, OCR, or OpenAI preview calls, the existing reviewer API returned HTTP
+  200, a two-section reviewer was saved to Study Library, and the smoke item
+  was cleaned up.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -306,10 +330,10 @@ with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
 ingestion foundation is remotely and live validated with a documented
 account-wide synchronous route-duration limitation. Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
-production validation. The recommended next roadmap task is Phase 5C.2A2 —
-Canvas source selection and reviewer handoff. Parser/OCR work should be added
-only as required for that narrow source-selection handoff. Automatic repeated
-scanned-PDF header/footer detection remains a deferred candidate.
+production validation. Phase 5C.2A2 Canvas source selection and reviewer
+handoff is complete and live validated. The recommended next roadmap task is
+Phase 5C.2B - Canvas PDF and image extraction/OCR integration. Automatic
+repeated scanned-PDF header/footer detection remains a deferred candidate.
 
 ## Known Blockers And Risks
 

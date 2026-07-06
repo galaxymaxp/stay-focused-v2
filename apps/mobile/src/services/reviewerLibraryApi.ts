@@ -5,7 +5,12 @@ import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
 const REVIEWERS_PATH = "/api/reviewers";
 const MAX_ERROR_MESSAGE_CHARS = 300;
 
-export type SavedReviewerSourceMode = "paste" | "gallery" | "camera" | "pdf";
+export type SavedReviewerSourceMode =
+  | "paste"
+  | "gallery"
+  | "camera"
+  | "pdf"
+  | "canvas";
 
 export interface SavedReviewerSourceMetadata {
   readonly sourceMode: SavedReviewerSourceMode;
@@ -546,7 +551,8 @@ function isSourceMode(value: unknown): value is SavedReviewerSourceMode {
     value === "paste" ||
     value === "gallery" ||
     value === "camera" ||
-    value === "pdf"
+    value === "pdf" ||
+    value === "canvas"
   );
 }
 

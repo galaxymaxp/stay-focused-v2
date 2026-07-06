@@ -13,6 +13,7 @@ const CAPABILITIES_PATH = "/api/canvas/capabilities";
 const SYNC_PATH = "/api/canvas/sync";
 const MAX_ERROR_MESSAGE_CHARS = 300;
 const SELECTED_COURSE_SYNC_CONCURRENCY = 2;
+export const CANVAS_REVIEWER_MAX_SELECTED_SOURCES = 8;
 
 export interface CanvasConnectionSummary {
   readonly id: string;
@@ -205,6 +206,69 @@ export interface CanvasSelectedCourseSyncSummary {
   readonly results: readonly CanvasSelectedCourseSyncItemResult[];
 }
 
+export type CanvasReviewerSourceType =
+  | "page"
+  | "assignment"
+  | "announcement"
+  | "file";
+
+export interface CanvasReviewerCourseSyncSummary {
+  readonly status: "success" | "partial" | "failed" | "never";
+  readonly completedAt: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+  readonly latestResultWasPartial: boolean;
+  readonly synchronizedSourcesAvailable: boolean;
+  readonly failureCategories: readonly string[];
+}
+
+export interface CanvasReviewerSourceDescriptor {
+  readonly id: string;
+  readonly type: CanvasReviewerSourceType;
+  readonly title: string;
+  readonly availability: "available" | "unavailable";
+  readonly unavailableReason: string | null;
+  readonly updatedAt: string | null;
+  readonly estimatedCharacters: number | null;
+}
+
+export interface CanvasReviewerSourceListPayload {
+  readonly courseId: string;
+  readonly courseSync: CanvasReviewerCourseSyncSummary;
+  readonly availableSourceCount: number;
+  readonly unavailableSourceCount: number;
+  readonly sources: readonly CanvasReviewerSourceDescriptor[];
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+    readonly totalKnown: number;
+  };
+}
+
+export interface CanvasReviewerSourcePreviewPayload {
+  readonly sourceText: string;
+  readonly suggestedTitle: string;
+  readonly sourceCount: number;
+  readonly characterCount: number;
+  readonly sources: readonly {
+    readonly id: string;
+    readonly type: Exclude<CanvasReviewerSourceType, "file">;
+    readonly updatedAt: string | null;
+  }[];
+  readonly courseSync: {
+    readonly status: "success" | "partial" | "failed" | "never";
+    readonly completedAt: string | null;
+  };
+  readonly limits: {
+    readonly maximumSources: number;
+    readonly maximumCharactersPerSource: number;
+    readonly maximumCombinedPreviewCharacters: number;
+    readonly existingReviewerRequestLimit: number;
+    readonly suggestedTitleLimit: number;
+  };
+}
+
 export interface CanvasApiBaseInput {
   readonly apiBaseUrl: string;
   readonly accessToken: string;
@@ -257,6 +321,11 @@ export type CanvasApiClientErrorCode =
   | "course_not_selected"
   | "course_unavailable"
   | "duplicate_course_submission"
+  | "duplicate_source_submission"
+  | "source_count_exceeded"
+  | "source_not_found"
+  | "source_preview_too_large"
+  | "source_unavailable"
   | "storage_not_configured"
   | "storage_failed"
   | "unknown_api_error";
@@ -297,6 +366,16 @@ interface SyncSuccessResponse extends CanvasSyncSummary {
 }
 
 interface CourseSyncSuccessResponse extends CanvasCourseSyncSummary {
+  readonly ok: true;
+}
+
+interface CanvasReviewerSourceListSuccessResponse
+  extends CanvasReviewerSourceListPayload {
+  readonly ok: true;
+}
+
+interface CanvasReviewerSourcePreviewSuccessResponse
+  extends CanvasReviewerSourcePreviewPayload {
   readonly ok: true;
 }
 
@@ -469,6 +548,66 @@ export async function syncCanvasCourse(
     input,
     method: "POST",
     parseSuccess: parseCourseSyncResponse,
+  });
+}
+
+export async function listCanvasReviewerSources(
+  input: CanvasApiBaseInput & { readonly courseId: string },
+): Promise<CanvasApiResult<CanvasReviewerSourceListPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before loading sources.",
+    );
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCanvasReviewerSourceListResponse,
+  });
+}
+
+export async function previewCanvasReviewerSources(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly sourceIds: readonly string[];
+  },
+): Promise<CanvasApiResult<CanvasReviewerSourcePreviewPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before previewing sources.",
+    );
+  }
+  const normalizedIds = input.sourceIds.map((sourceId) => sourceId.trim());
+  if (new Set(normalizedIds).size !== normalizedIds.length) {
+    return clientError(
+      "duplicate_source_submission",
+      "A Canvas source can only be selected once.",
+    );
+  }
+
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources/preview`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    body: { sourceIds: normalizedIds },
+    parseSuccess: parseCanvasReviewerSourcePreviewResponse,
   });
 }
 
@@ -780,6 +919,51 @@ function parseCourseSyncResponse(
   );
 }
 
+function parseCanvasReviewerSourceListResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasReviewerSourceListPayload> {
+  if (isCanvasReviewerSourceListSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        availableSourceCount: parsed.availableSourceCount,
+        courseId: parsed.courseId,
+        courseSync: parsed.courseSync,
+        pagination: parsed.pagination,
+        sources: parsed.sources,
+        unavailableSourceCount: parsed.unavailableSourceCount,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid source list response.",
+  );
+}
+
+function parseCanvasReviewerSourcePreviewResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasReviewerSourcePreviewPayload> {
+  if (isCanvasReviewerSourcePreviewSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        characterCount: parsed.characterCount,
+        courseSync: parsed.courseSync,
+        limits: parsed.limits,
+        sourceCount: parsed.sourceCount,
+        sources: parsed.sources,
+        sourceText: parsed.sourceText,
+        suggestedTitle: parsed.suggestedTitle,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid source preview response.",
+  );
+}
+
 function parseDeleteResponse(parsed: unknown): CanvasApiResult<void> {
   if (isDeleteSuccessResponse(parsed)) {
     return { ok: true, data: undefined };
@@ -854,6 +1038,16 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "course_not_selected";
     case "canvas_course_unavailable":
       return "course_unavailable";
+    case "canvas_source_count_exceeded":
+      return "source_count_exceeded";
+    case "canvas_source_duplicate":
+      return "duplicate_source_submission";
+    case "canvas_source_not_found":
+      return "source_not_found";
+    case "canvas_source_preview_too_large":
+      return "source_preview_too_large";
+    case "canvas_source_unavailable":
+      return "source_unavailable";
     case "canvas_storage_not_configured":
       return "storage_not_configured";
     case "canvas_storage_failed":
@@ -1071,6 +1265,58 @@ function isCourseSyncSuccessResponse(
   );
 }
 
+function isCanvasReviewerSourceListSuccessResponse(
+  value: unknown,
+): value is CanvasReviewerSourceListSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, [
+      "ok",
+      "courseId",
+      "courseSync",
+      "availableSourceCount",
+      "unavailableSourceCount",
+      "sources",
+      "pagination",
+    ]) &&
+    typeof value.courseId === "string" &&
+    isCanvasReviewerCourseSyncSummary(value.courseSync) &&
+    isNonNegativeInteger(value.availableSourceCount) &&
+    isNonNegativeInteger(value.unavailableSourceCount) &&
+    Array.isArray(value.sources) &&
+    value.sources.every(isCanvasReviewerSourceDescriptor) &&
+    isCanvasSourcePagination(value.pagination)
+  );
+}
+
+function isCanvasReviewerSourcePreviewSuccessResponse(
+  value: unknown,
+): value is CanvasReviewerSourcePreviewSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, [
+      "ok",
+      "sourceText",
+      "suggestedTitle",
+      "sourceCount",
+      "characterCount",
+      "sources",
+      "courseSync",
+      "limits",
+    ]) &&
+    typeof value.sourceText === "string" &&
+    typeof value.suggestedTitle === "string" &&
+    isNonNegativeInteger(value.sourceCount) &&
+    isNonNegativeInteger(value.characterCount) &&
+    Array.isArray(value.sources) &&
+    value.sources.every(isCanvasPreviewSourceSummary) &&
+    isCanvasPreviewCourseSync(value.courseSync) &&
+    isCanvasPreviewLimits(value.limits)
+  );
+}
+
 function isDeleteSuccessResponse(value: unknown): value is DeleteSuccessResponse {
   return isRecord(value) && value.ok === true;
 }
@@ -1186,6 +1432,139 @@ function isCanvasCourseSyncStatus(
   value: unknown,
 ): value is CanvasCourseSyncStatus {
   return value === "success" || value === "partial" || value === "failed";
+}
+
+function isCanvasReviewerCourseSyncStatus(
+  value: unknown,
+): value is CanvasReviewerCourseSyncSummary["status"] {
+  return (
+    value === "success" ||
+    value === "partial" ||
+    value === "failed" ||
+    value === "never"
+  );
+}
+
+function isCanvasReviewerCourseSyncSummary(
+  value: unknown,
+): value is CanvasReviewerCourseSyncSummary {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "status",
+      "completedAt",
+      "lastSuccessfulSyncAt",
+      "latestResultWasPartial",
+      "synchronizedSourcesAvailable",
+      "failureCategories",
+    ]) &&
+    isCanvasReviewerCourseSyncStatus(value.status) &&
+    (value.completedAt === null || typeof value.completedAt === "string") &&
+    (value.lastSuccessfulSyncAt === null ||
+      typeof value.lastSuccessfulSyncAt === "string") &&
+    typeof value.latestResultWasPartial === "boolean" &&
+    typeof value.synchronizedSourcesAvailable === "boolean" &&
+    Array.isArray(value.failureCategories) &&
+    value.failureCategories.every((entry) => typeof entry === "string")
+  );
+}
+
+function isCanvasReviewerSourceDescriptor(
+  value: unknown,
+): value is CanvasReviewerSourceDescriptor {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "id",
+      "type",
+      "title",
+      "availability",
+      "unavailableReason",
+      "updatedAt",
+      "estimatedCharacters",
+    ]) &&
+    typeof value.id === "string" &&
+    isCanvasReviewerSourceType(value.type) &&
+    typeof value.title === "string" &&
+    (value.availability === "available" ||
+      value.availability === "unavailable") &&
+    (value.unavailableReason === null ||
+      typeof value.unavailableReason === "string") &&
+    (value.updatedAt === null || typeof value.updatedAt === "string") &&
+    (value.estimatedCharacters === null ||
+      isNonNegativeInteger(value.estimatedCharacters))
+  );
+}
+
+function isCanvasSourcePagination(
+  value: unknown,
+): value is CanvasReviewerSourceListPayload["pagination"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["limit", "offset", "returned", "hasMore", "totalKnown"]) &&
+    isNonNegativeInteger(value.limit) &&
+    isNonNegativeInteger(value.offset) &&
+    isNonNegativeInteger(value.returned) &&
+    typeof value.hasMore === "boolean" &&
+    isNonNegativeInteger(value.totalKnown)
+  );
+}
+
+function isCanvasPreviewSourceSummary(
+  value: unknown,
+): value is CanvasReviewerSourcePreviewPayload["sources"][number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["id", "type", "updatedAt"]) &&
+    typeof value.id === "string" &&
+    (value.type === "page" ||
+      value.type === "assignment" ||
+      value.type === "announcement") &&
+    (value.updatedAt === null || typeof value.updatedAt === "string")
+  );
+}
+
+function isCanvasPreviewCourseSync(
+  value: unknown,
+): value is CanvasReviewerSourcePreviewPayload["courseSync"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["status", "completedAt"]) &&
+    isCanvasReviewerCourseSyncStatus(value.status) &&
+    (value.completedAt === null || typeof value.completedAt === "string")
+  );
+}
+
+function isCanvasPreviewLimits(
+  value: unknown,
+): value is CanvasReviewerSourcePreviewPayload["limits"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "maximumSources",
+      "maximumCharactersPerSource",
+      "maximumCombinedPreviewCharacters",
+      "existingReviewerRequestLimit",
+      "suggestedTitleLimit",
+    ]) &&
+    isNonNegativeInteger(value.maximumSources) &&
+    isNonNegativeInteger(value.maximumCharactersPerSource) &&
+    isNonNegativeInteger(value.maximumCombinedPreviewCharacters) &&
+    isNonNegativeInteger(value.existingReviewerRequestLimit) &&
+    isNonNegativeInteger(value.suggestedTitleLimit) &&
+    value.maximumCombinedPreviewCharacters < value.existingReviewerRequestLimit
+  );
+}
+
+function isCanvasReviewerSourceType(
+  value: unknown,
+): value is CanvasReviewerSourceType {
+  return (
+    value === "page" ||
+    value === "assignment" ||
+    value === "announcement" ||
+    value === "file"
+  );
 }
 
 function isCourseInventoryCounts(

@@ -378,7 +378,6 @@ function logReviewerApiSuccessSummary(
   console.info("reviewer_api.success_summary", {
     status: response.status,
     durationMs: Date.now() - startedAt,
-    reviewerTitle: parsed.reviewer.title,
     sectionCount: parsed.reviewer.sections.length,
     topLevelKeys: getTopLevelKeys(parsed),
   });

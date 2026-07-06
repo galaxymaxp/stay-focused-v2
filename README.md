@@ -27,7 +27,11 @@ and runtime-safe selected-course synchronization: students explicitly select
 eligible courses, preferences persist separately from course inventory, normal
 mobile sync calls independent course-scoped requests with maximum concurrency
 two, and the account-wide route stays available only for diagnostics and future
-background-sync foundations.
+background-sync foundations. Phase 5C.2A2 adds the first student-facing
+Canvas source-selection reviewer flow: selected synchronized courses can list
+Pages, assignment descriptions, announcements, and unavailable file metadata;
+students can preview and edit selected source text; generation reuses the
+existing reviewer API; and saving reuses the existing Study Library.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -57,6 +61,19 @@ Sign in
 -> reviewer preview
 -> save to Study Library
 -> list, open, rename, or delete saved reviewers
+```
+
+The completed Canvas reviewer flow is:
+
+```text
+Sign in
+-> Courses
+-> selected synchronized Canvas course
+-> choose supported Canvas sources
+-> preview and edit combined source text/title
+-> existing reviewer API
+-> reviewer preview
+-> save to Study Library
 ```
 
 This slice uses Supabase email/password authentication in the Expo app. The
@@ -122,6 +139,11 @@ Complete:
   persistence, course-scoped sync runs, mobile per-course status, planner
   exclusion from course-scoped requests, and no academic-unit synchronization
   limit
+- Phase 5C.2A2 Canvas source selection and reviewer handoff with protected
+  course source listing, ordered source preview, safe HTML-to-text
+  normalization, editable mobile preview, existing reviewer-generation reuse,
+  existing Study Library save, minimal `canvas` source metadata, and no Canvas
+  file parsing/OCR
 
 Working locally:
 
@@ -202,11 +224,22 @@ Working locally:
   seconds and 7.849 seconds with zero unnecessary updates, zero unexpected
   pruning, zero duplicate identities, and zero running course sync rows. The
   account-wide route was not called by the normal selected-course flow.
+- Phase 5C.2A2 automated and protected live validation passed for Canvas source
+  selection and reviewer handoff. Live source listing for opaque
+  `live-course-1` returned 49 descriptors with 36 available Pages, 2
+  unavailable Pages, 11 available announcements, and no source bodies in the
+  list response. Ordered preview used two sources, produced 3,467 characters,
+  rejected empty input, rejected cross-course mixing, contained no URLs or
+  credentials, and did not call Canvas, Storage, OCR, or OpenAI. Expo Web smoke
+  selected two sources, edited source text/title, navigated back with selection
+  preserved, and reloaded preview. Reviewer generation returned HTTP 200,
+  saved to Study Library, verified list visibility, and deleted the smoke
+  reviewer.
 
 Pending:
 
-- Remaining secondary Canvas resources, content ingestion, grade sync, and
-  background/resumable sync for larger accounts
+- Canvas PDF/image extraction and OCR integration, remaining secondary Canvas
+  resources, grade sync, and background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -353,6 +386,11 @@ tests do not run that opt-in provider smoke.
   user-wide planner items for now. One live selected course remained `partial`
   because file metadata listing failed safely with sanitized
   `canvas_course_files_failed`; previous graph data was preserved.
+- Phase 5C.2A2 adds Canvas source selection only for synchronized selected
+  courses. Pages, assignment descriptions, and announcements are selectable
+  when they have readable synchronized text. Canvas files remain listed only as
+  unavailable metadata until parser/OCR work begins. Preview is bounded and
+  editable, but full persistent source provenance is still deferred.
 - No background or scheduled Canvas synchronization exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
@@ -362,9 +400,8 @@ tests do not run that opt-in provider smoke.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
 - Discussions, quiz metadata, file parsing/OCR, endpoint validators,
-  grade/submission/rubric data, mobile Canvas source selection, announcement
-  attachment content import, and reviewer generation from Canvas content are
-  deferred.
+  grade/submission/rubric data, announcement attachment content import, and
+  broader Canvas source support are deferred.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
@@ -383,6 +420,6 @@ with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
 ingestion foundation is remotely and live validated with a documented
 synchronous route-duration limitation. Phase 5C.2A1 selected-course
 synchronization is complete and runtime-safe in local production validation.
-The next roadmap task is Phase 5C.2A2 - Canvas source selection and reviewer
-handoff. Parser/OCR work should be added only as required for that narrow
-source-selection handoff. Canvas OAuth remains a future phase.
+Phase 5C.2A2 Canvas source selection and reviewer handoff is complete and live
+validated. The next roadmap task is Phase 5C.2B - Canvas PDF and image
+extraction/OCR integration. Canvas OAuth remains a future phase.

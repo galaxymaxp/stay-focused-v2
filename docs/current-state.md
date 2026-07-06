@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-07-06, Asia/Manila.
+Last refreshed: 2026-07-07, Asia/Manila.
 
 ## Repository Baseline
 
@@ -37,6 +37,19 @@ route verifies that token with Supabase, validates the pasted-text request,
 creates the server-only OpenAI provider, runs the Stage 0 through Stage 6 engine
 pipeline, and returns a reviewer preview payload. Expo Web is the fast
 laptop-browser regression surface for this mobile flow.
+
+The Canvas reviewer slice is also complete for already synchronized selected
+courses:
+
+```text
+Courses
+-> selected synchronized Canvas course
+-> choose supported Page, assignment-description, or announcement sources
+-> preview and edit combined source text/title
+-> existing reviewer API
+-> reviewer preview
+-> save to Study Library
+```
 
 Phase 3A also adds a protected server OCR route:
 
@@ -376,6 +389,28 @@ sync rows. The partial course reported sanitized `canvas_course_files_failed`
 while preserving previous data. The account-wide route was not called by the
 normal selected-course flow.
 
+Phase 5C.2A2 is complete. Selected synchronized courses can expose a protected
+source list made from existing synchronized Page bodies, assignment
+descriptions, announcement messages, and unavailable file metadata. The source
+list verifies the active owned Canvas connection, internal course ownership,
+selected-course preference, and course synchronization state, then returns only
+bounded descriptors without source bodies, raw HTML, Canvas URLs, signed URLs,
+Storage object keys, raw Canvas IDs, or credential fields.
+
+The protected preview route accepts ordered internal source descriptor ids,
+rejects duplicates, unknown ids, cross-course ids, unavailable files, and
+over-limit selections, and assembles editable plain text with deterministic
+source boundaries. HTML normalization uses `parse5`, removes executable and
+hidden content, strips URL/token-shaped strings, and preserves useful block,
+list, and table boundaries. Preview does not call Canvas, decrypt the PAT, call
+Storage, run OCR, call OpenAI, or generate a reviewer. Mobile now adds
+`Create reviewer from Canvas` for saved selected synchronized courses,
+sections sources into Pages, Assignments, Announcements, and Files, preserves
+selected order, lets students edit the preview text/title, calls the existing
+reviewer-generation service with only `sourceText` and `sourceTitle`, and saves
+through the existing Study Library with minimal `sourceMode: "canvas"`
+metadata. No migration or persistent Canvas provenance table was added.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -475,6 +510,10 @@ normal selected-course flow.
   mobile status, deselection retention, planner exclusion from course-scoped
   requests, protected live validation under 60 seconds per course, and no
   academic-unit synchronization limit.
+- Phase 5C.2A2 Canvas source selection and reviewer handoff with protected
+  source listing, ordered preview, safe HTML normalization, editable mobile
+  preview, existing reviewer API reuse, existing Study Library save, minimal
+  Canvas source metadata, and no file parsing/OCR.
 
 ## Current Verification Baselines
 
@@ -527,6 +566,19 @@ Historical and latest verification include:
   seconds and 7.849 seconds, zero duplicate identities, zero unexpected
   pruning, zero running rows, server-authoritative terminal status restoration,
   and no account-wide route call from the normal flow.
+- Phase 5C.2A2 verification: API typecheck/build/tests passed with 220/220
+  tests; mobile typecheck/tests passed with 88/88 tests; Canvas package
+  typecheck/build/tests passed with 52/52 tests; DB typecheck passed; OCR
+  typecheck/build/tests passed with 14/14 tests; engine typecheck/build/evals
+  passed with 266/266 evals. Protected live validation used opaque
+  `live-course-1`: 49 source descriptors, 36 available Pages, 2 unavailable
+  Pages, 11 available announcements, 0 available assignments, no source bodies
+  in listing, ordered two-source preview with 3,467 characters, deterministic
+  assembly, empty-source rejection, cross-course rejection, no URLs or
+  credentials, no Canvas/Storage/OCR/OpenAI calls during preview, reviewer
+  generation HTTP 200, Study Library save/list visibility, and smoke-reviewer
+  cleanup. Expo Web smoke selected two sources, edited source text/title,
+  preserved selection after back navigation, and reloaded preview.
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -707,6 +759,12 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   excludes planner items and still depends on Canvas endpoint availability per
   selected course. One live selected course remained partial because file
   metadata listing failed safely.
+- Phase 5C.2A2 source selection is limited to one selected synchronized course
+  at a time and only Pages, assignment descriptions, and announcements with
+  readable synchronized text are selectable. Canvas files remain unavailable
+  metadata until parser/OCR work begins. Full persistent source provenance,
+  source recommendations, cross-course bundles, background sync, and automatic
+  reviewer generation remain deferred.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -725,9 +783,10 @@ does not support Phase 5B.3C2 implementation for the audited endpoints. Phase
 live Canvas limitations. Phase 5C.1 file inventory and bounded ingestion is
 remotely and live validated with a documented synchronous route-duration
 limitation. Phase 5C.2A1 selected-course synchronization is complete and
-runtime-safe in local production validation. The recommended next roadmap task
-is Phase 5C.2A2 - Canvas source selection and reviewer handoff. Parser/OCR work
-should be added only as required for that narrow source-selection handoff.
+runtime-safe in local production validation. Phase 5C.2A2 Canvas source
+selection and reviewer handoff is complete and live validated. The recommended
+next roadmap task is Phase 5C.2B - Canvas PDF and image extraction/OCR
+integration.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks

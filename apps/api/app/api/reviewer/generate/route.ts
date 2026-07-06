@@ -2,6 +2,10 @@ import { PipelineAssemblyError, runPipeline } from "@stay-focused/engine";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
+import {
+  REVIEWER_GENERATE_MAX_JSON_BODY_BYTES,
+  REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS,
+} from "@/lib/reviewer-generation-limits";
 import { createServerOpenAIProvider } from "@/providers";
 import type {
   ReviewerGenerateErrorResponse,
@@ -12,11 +16,6 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-// Temporary Phase 2 cap for plain text input before upload, OCR, and chunking
-// are introduced. 100k characters bounds request cost while still allowing
-// long notes or pasted reading material.
-const MAX_SOURCE_TEXT_CHARS = 100_000;
-const MAX_JSON_BODY_BYTES = 512 * 1024;
 const MAX_DIAGNOSTIC_TEXT_CHARS = 4_000;
 const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
 const REVIEWER_VALIDATION_FAILED_CODE = "reviewer_validation_failed";
@@ -77,7 +76,7 @@ async function handlePost(
     return errorResponse(
       413,
       "payload_too_large",
-      `Request body must be at most ${MAX_JSON_BODY_BYTES} bytes.`,
+      `Request body must be at most ${REVIEWER_GENERATE_MAX_JSON_BODY_BYTES} bytes.`,
       request,
     );
   }
@@ -172,7 +171,7 @@ function isOversizedContentLength(contentLength: string | null): boolean {
   }
 
   const parsed = Number(contentLength);
-  return Number.isFinite(parsed) && parsed > MAX_JSON_BODY_BYTES;
+  return Number.isFinite(parsed) && parsed > REVIEWER_GENERATE_MAX_JSON_BODY_BYTES;
 }
 
 async function readJson(
@@ -198,12 +197,12 @@ function validateRequestBody(body: unknown): ValidationResult {
     return invalidRequest("sourceText is required and must be a string.");
   }
 
-  if (sourceText.length > MAX_SOURCE_TEXT_CHARS) {
+  if (sourceText.length > REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS) {
     return {
       ok: false,
       status: 413,
       code: "source_text_too_large",
-      message: `sourceText must be at most ${MAX_SOURCE_TEXT_CHARS} characters.`,
+      message: `sourceText must be at most ${REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS} characters.`,
     };
   }
 

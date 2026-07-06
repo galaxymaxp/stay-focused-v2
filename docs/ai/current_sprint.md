@@ -1,6 +1,6 @@
 # Current Sprint
 
-Last refreshed: 2026-07-06, Asia/Manila.
+Last refreshed: 2026-07-07, Asia/Manila.
 
 ## Active Objective
 
@@ -49,8 +49,12 @@ students now choose eligible Canvas course shells, selections persist behind
 ownership-protected preferences, normal mobile sync uses independent
 course-scoped requests with maximum concurrency two, deselection preserves
 existing synchronized data, and planner synchronization remains excluded from
-course-scoped requests. The next roadmap task is Phase 5C.2A2 — Canvas source
-selection and reviewer handoff.
+course-scoped requests. Phase 5C.2A2 Canvas source selection and reviewer
+handoff is complete and protected-live validated: students can choose
+supported synchronized Canvas source rows from a selected course, preview and
+edit combined source text/title, generate through the existing reviewer API,
+and save through the existing Study Library. The next roadmap task is Phase
+5C.2B - Canvas PDF and image extraction/OCR integration.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -393,6 +397,49 @@ There is no school-wide Canvas token.
 - Canvas source selection, source preview, or Canvas-to-reviewer handoff.
 - Parser or OCR expansion for Canvas file contents.
 - Background, queued, scheduled, or resumable synchronization.
+- Canvas OAuth, submissions, grades, rubrics, feedback, task generation, and
+  schedule generation.
+
+## Completed Phase 5C.2A2 Scope
+
+- Added protected course source listing at
+  `GET /api/canvas/courses/:courseId/sources`.
+- Added protected ordered source preview at
+  `POST /api/canvas/courses/:courseId/sources/preview`.
+- Built a strict server-side Canvas reviewer source descriptor over existing
+  `canvas_pages`, `canvas_assignments`, `canvas_announcements`, and
+  `canvas_files` rows.
+- Kept Pages, assignment descriptions, and announcements selectable only when
+  normalized synchronized text is non-empty.
+- Listed Canvas files as unavailable metadata with text extraction deferred.
+- Added `parse5` HTML-to-text normalization for Canvas source bodies, with
+  hidden/executable content, forms, URLs, signed parameters, bearer tokens, and
+  token-like strings removed.
+- Preserved source-picker order in preview assembly and rejected duplicate,
+  unknown, cross-course, unsupported, unavailable, and over-limit source ids.
+- Added centralized preview/source limits that fit under the existing reviewer
+  request limit.
+- Added mobile `Create reviewer from Canvas` entry for saved selected courses
+  with terminal sync history.
+- Added a mobile Canvas source picker with Pages, Assignments, Announcements,
+  and Files sections, unavailable item disabling, selected count, retry loading,
+  partial-sync warnings, and sync-required state.
+- Added editable Canvas preview text/title before generation.
+- Reused the existing reviewer-generation API with only `sourceText` and
+  `sourceTitle`.
+- Reused the existing Study Library save flow with minimal
+  `sourceMode: "canvas"` metadata.
+- Added no migration, no separate reviewer engine, no automatic sync, no file
+  parsing/OCR, and no full persistent provenance table.
+
+## Out Of Scope For Phase 5C.2A2
+
+- Canvas PDF extraction.
+- Canvas image OCR.
+- Office parsing.
+- audio/video transcription.
+- full persistent Canvas source provenance.
+- background, queued, scheduled, or resumable synchronization.
 - Canvas OAuth, submissions, grades, rubrics, feedback, task generation, and
   schedule generation.
 
@@ -971,6 +1018,36 @@ There is no school-wide Canvas token.
   duplicate records. The account-wide route was not called by the normal
   selected-course flow.
 
+## Phase 5C.2A2 Results
+
+- Added `apps/api/src/lib/canvas-reviewer-sources.ts`,
+  `apps/api/src/lib/reviewer-generation-limits.ts`,
+  `apps/api/app/api/canvas/courses/[courseId]/sources/route.ts`, and
+  `apps/api/app/api/canvas/courses/[courseId]/sources/preview/route.ts`.
+- Added `apps/mobile/src/features/courses/CanvasSourceReviewerScreen.tsx` and
+  wired Courses -> Canvas reviewer -> Study Library navigation.
+- Extended mobile Canvas API parsing for source lists, preview responses,
+  freshness summaries, new validation errors, and duplicate source rejection.
+- Extended saved reviewer source metadata to accept `canvas`.
+- Automated verification passed for API source service tests, API route tests,
+  mobile Canvas API tests, Canvas package checks, DB typecheck, API
+  typecheck/build/tests, mobile typecheck/tests, engine typecheck/build/evals,
+  and OCR typecheck/build/tests.
+- Protected live source listing used opaque `live-course-1` and aggregate-only
+  output: 49 descriptors, 36 available Pages, 2 unavailable Pages, 11 available
+  announcements, 0 available assignments, no source bodies in listing, and no
+  account-wide route call.
+- Protected live preview selected two sources, preserved order, produced 3,467
+  characters, produced a 55-character suggested title, rejected empty sources,
+  rejected cross-course mixing, contained no URLs or credentials, and did not
+  call Canvas, Storage, OCR, or OpenAI.
+- Expo Web UI smoke signed in, opened Courses, opened Canvas reviewer, saw 49
+  source rows, selected two sources, loaded preview, edited source text/title,
+  returned to sources with selection preserved, and reloaded preview.
+- Reviewer-generation smoke reused the existing reviewer API, returned HTTP
+  200, generated 2 sections, saved to Study Library, verified list visibility,
+  and deleted the smoke reviewer.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -1016,7 +1093,7 @@ with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
 ingestion foundation is remotely and live validated with a documented
 account-wide synchronous route-duration limitation. Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
-production validation. The recommended next roadmap task is Phase 5C.2A2 —
-Canvas source selection and reviewer handoff. Parser/OCR work should be added
-only as required for that narrow source-selection handoff. The deferred
+production validation. Phase 5C.2A2 Canvas source selection and reviewer
+handoff is complete and live validated. The recommended next roadmap task is
+Phase 5C.2B - Canvas PDF and image extraction/OCR integration. The deferred
 header/footer cleanup task remains separate.

@@ -5,8 +5,10 @@ import {
   disconnectCanvas,
   getCanvasCoursePreferences,
   getCanvasConnection,
+  listCanvasReviewerSources,
   listCanvasCapabilities,
   listCanvasCourses,
+  previewCanvasReviewerSources,
   saveCanvasCoursePreferences,
   syncCanvasAcademicGraph,
   syncCanvasCourse,
@@ -365,6 +367,186 @@ describe("Canvas mobile API client", () => {
         headers: { Authorization: "Bearer session-token" },
       },
     });
+  });
+
+  it("loads Canvas reviewer sources with freshness and unavailable files", async () => {
+    const fetchImpl = createFetch(sourceListResponse());
+
+    const result = await listCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "11111111-1111-4111-8111-111111111111",
+      fetchImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        courseSync: {
+          status: "partial",
+          latestResultWasPartial: true,
+          failureCategories: ["canvas_course_files_failed"],
+        },
+        availableSourceCount: 1,
+        unavailableSourceCount: 1,
+        sources: [
+          { type: "page", availability: "available" },
+          { type: "file", availability: "unavailable" },
+        ],
+      },
+    });
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sources`,
+      init: {
+        method: "GET",
+        headers: { Authorization: "Bearer session-token" },
+      },
+    });
+  });
+
+  it("submits ordered Canvas reviewer source IDs and parses preview limits", async () => {
+    const fetchImpl = createFetch(sourcePreviewResponse());
+    const sourceIds = [
+      "page:11111111-1111-4111-8111-111111111111",
+      "assignment:22222222-2222-4222-8222-222222222222",
+    ];
+
+    const result = await previewCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+      sourceIds,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        sourceText: "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.",
+        suggestedTitle: "Fictional Course - Canvas Reviewer",
+        sourceCount: 2,
+        limits: {
+          maximumSources: 8,
+          maximumCombinedPreviewCharacters: 90000,
+          existingReviewerRequestLimit: 100000,
+        },
+      },
+    });
+    expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
+      sourceIds,
+    });
+  });
+
+  it("handles Canvas source count and size validation errors", async () => {
+    await expect(
+      previewCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_source_count_exceeded",
+              message: "Select at most 8 Canvas sources.",
+            },
+          },
+          400,
+        ),
+        sourceIds: ["page:11111111-1111-4111-8111-111111111111"],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "source_count_exceeded", status: 400 },
+    });
+
+    await expect(
+      previewCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_source_preview_too_large",
+              message: "Selected Canvas sources are too large together.",
+            },
+          },
+          413,
+        ),
+        sourceIds: ["page:11111111-1111-4111-8111-111111111111"],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "source_preview_too_large", status: 413 },
+    });
+  });
+
+  it("handles deselected courses and unavailable Canvas sources", async () => {
+    await expect(
+      listCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "11111111-1111-4111-8111-111111111111",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_course_not_selected",
+              message: "Select this Canvas course before selecting sources.",
+            },
+          },
+          400,
+        ),
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "course_not_selected" },
+    });
+
+    await expect(
+      previewCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_source_unavailable",
+              message: "Canvas files do not have extracted text available yet.",
+            },
+          },
+          400,
+        ),
+        sourceIds: ["file:22222222-2222-4222-8222-222222222222"],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "source_unavailable" },
+    });
+  });
+
+  it("blocks duplicate Canvas source preview submissions before fetch", async () => {
+    const fetchImpl = vi.fn();
+
+    await expect(
+      previewCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl,
+        sourceIds: [
+          "page:11111111-1111-4111-8111-111111111111",
+          "page:11111111-1111-4111-8111-111111111111",
+        ],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "duplicate_source_submission" },
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("syncs selected courses with max concurrency two and preserves failures", async () => {
@@ -813,6 +995,83 @@ function courseSyncSummary({
     ...(status === "partial"
       ? { sanitizedFailures: [{ code: "canvas_course_files_failed", count: 1 }] }
       : {}),
+  };
+}
+
+function sourceListResponse() {
+  return {
+    ok: true,
+    courseId: "11111111-1111-4111-8111-111111111111",
+    courseSync: {
+      status: "partial",
+      completedAt: "2026-07-07T01:00:00.000Z",
+      lastSuccessfulSyncAt: "2026-07-07T01:00:00.000Z",
+      latestResultWasPartial: true,
+      synchronizedSourcesAvailable: true,
+      failureCategories: ["canvas_course_files_failed"],
+    },
+    availableSourceCount: 1,
+    unavailableSourceCount: 1,
+    sources: [
+      {
+        id: "page:11111111-1111-4111-8111-111111111111",
+        type: "page",
+        title: "Fictional Page",
+        availability: "available",
+        unavailableReason: null,
+        updatedAt: "2026-07-07T01:00:00.000Z",
+        estimatedCharacters: 120,
+      },
+      {
+        id: "file:22222222-2222-4222-8222-222222222222",
+        type: "file",
+        title: "Fictional File",
+        availability: "unavailable",
+        unavailableReason: "Text extraction for this file type is not available yet.",
+        updatedAt: "2026-07-07T01:00:00.000Z",
+        estimatedCharacters: null,
+      },
+    ],
+    pagination: {
+      limit: 100,
+      offset: 0,
+      returned: 2,
+      hasMore: false,
+      totalKnown: 2,
+    },
+  };
+}
+
+function sourcePreviewResponse() {
+  return {
+    ok: true,
+    sourceText: "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.",
+    suggestedTitle: "Fictional Course - Canvas Reviewer",
+    sourceCount: 2,
+    characterCount: 52,
+    sources: [
+      {
+        id: "page:11111111-1111-4111-8111-111111111111",
+        type: "page",
+        updatedAt: "2026-07-07T01:00:00.000Z",
+      },
+      {
+        id: "assignment:22222222-2222-4222-8222-222222222222",
+        type: "assignment",
+        updatedAt: "2026-07-07T01:00:00.000Z",
+      },
+    ],
+    courseSync: {
+      status: "success",
+      completedAt: "2026-07-07T01:00:00.000Z",
+    },
+    limits: {
+      maximumSources: 8,
+      maximumCharactersPerSource: 20000,
+      maximumCombinedPreviewCharacters: 90000,
+      existingReviewerRequestLimit: 100000,
+      suggestedTitleLimit: 120,
+    },
   };
 }
 

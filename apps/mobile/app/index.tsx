@@ -14,6 +14,7 @@ import { Card } from "../src/components/Card";
 import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { colors, spacing, typography } from "../src/design/tokens";
+import { CanvasSourceReviewerScreen } from "../src/features/courses/CanvasSourceReviewerScreen";
 import { CoursesScreen } from "../src/features/courses/CoursesScreen";
 import { StudyLibraryScreen } from "../src/features/library/StudyLibraryScreen";
 import { ReviewerGenerateScreen } from "../src/features/reviewer/ReviewerGenerateScreen";
@@ -33,28 +34,45 @@ export default function IndexScreen() {
 }
 
 function AuthenticatedApp() {
-  const [activeView, setActiveView] =
-    useState<"generate" | "library" | "courses">("generate");
+  const [activeView, setActiveView] = useState<
+    | { readonly name: "generate" }
+    | { readonly name: "library" }
+    | { readonly name: "courses" }
+    | { readonly name: "canvas-reviewer"; readonly courseId: string }
+  >({ name: "generate" });
 
-  if (activeView === "library") {
+  if (activeView.name === "library") {
     return (
-      <StudyLibraryScreen onCreateReviewer={() => setActiveView("generate")} />
+      <StudyLibraryScreen onCreateReviewer={() => setActiveView({ name: "generate" })} />
     );
   }
 
-  if (activeView === "courses") {
+  if (activeView.name === "courses") {
     return (
       <CoursesScreen
-        onCreateReviewer={() => setActiveView("generate")}
-        onOpenLibrary={() => setActiveView("library")}
+        onCreateReviewer={() => setActiveView({ name: "generate" })}
+        onCreateReviewerFromCanvas={(courseId) =>
+          setActiveView({ name: "canvas-reviewer", courseId })
+        }
+        onOpenLibrary={() => setActiveView({ name: "library" })}
+      />
+    );
+  }
+
+  if (activeView.name === "canvas-reviewer") {
+    return (
+      <CanvasSourceReviewerScreen
+        courseId={activeView.courseId}
+        onBackToCourses={() => setActiveView({ name: "courses" })}
+        onOpenLibrary={() => setActiveView({ name: "library" })}
       />
     );
   }
 
   return (
     <ReviewerGenerateScreen
-      onOpenCourses={() => setActiveView("courses")}
-      onOpenLibrary={() => setActiveView("library")}
+      onOpenCourses={() => setActiveView({ name: "courses" })}
+      onOpenLibrary={() => setActiveView({ name: "library" })}
     />
   );
 }

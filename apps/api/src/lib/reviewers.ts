@@ -17,6 +17,7 @@ const SOURCE_MODES: readonly SavedReviewerSourceMode[] = [
   "gallery",
   "camera",
   "pdf",
+  "canvas",
 ];
 const SOURCE_METADATA_KEYS = new Set([
   "sourceMode",

@@ -201,6 +201,71 @@ export interface CanvasCourseScopedSyncResponse
   readonly ok: true;
 }
 
+export type CanvasReviewerSourceType =
+  | "page"
+  | "assignment"
+  | "announcement"
+  | "file";
+
+export interface CanvasReviewerCourseSyncSummary {
+  readonly status: "success" | "partial" | "failed" | "never";
+  readonly completedAt: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+  readonly latestResultWasPartial: boolean;
+  readonly synchronizedSourcesAvailable: boolean;
+  readonly failureCategories: readonly string[];
+}
+
+export interface CanvasReviewerSourceDescriptor {
+  readonly id: string;
+  readonly type: CanvasReviewerSourceType;
+  readonly title: string;
+  readonly availability: "available" | "unavailable";
+  readonly unavailableReason: string | null;
+  readonly updatedAt: string | null;
+  readonly estimatedCharacters: number | null;
+}
+
+export interface CanvasReviewerSourceListResponse {
+  readonly ok: true;
+  readonly courseId: string;
+  readonly courseSync: CanvasReviewerCourseSyncSummary;
+  readonly availableSourceCount: number;
+  readonly unavailableSourceCount: number;
+  readonly sources: readonly CanvasReviewerSourceDescriptor[];
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+    readonly totalKnown: number;
+  };
+}
+
+export interface CanvasReviewerSourcePreviewResponse {
+  readonly ok: true;
+  readonly sourceText: string;
+  readonly suggestedTitle: string;
+  readonly sourceCount: number;
+  readonly characterCount: number;
+  readonly sources: readonly {
+    readonly id: string;
+    readonly type: Exclude<CanvasReviewerSourceType, "file">;
+    readonly updatedAt: string | null;
+  }[];
+  readonly courseSync: {
+    readonly status: "success" | "partial" | "failed" | "never";
+    readonly completedAt: string | null;
+  };
+  readonly limits: {
+    readonly maximumSources: number;
+    readonly maximumCharactersPerSource: number;
+    readonly maximumCombinedPreviewCharacters: number;
+    readonly existingReviewerRequestLimit: number;
+    readonly suggestedTitleLimit: number;
+  };
+}
+
 export type CanvasFileIngestionResultStatus =
   | "stored"
   | "unchanged"
@@ -239,6 +304,12 @@ export interface CanvasApiErrorResponse {
   readonly error: {
     readonly code: CanvasApiErrorCode;
     readonly message: string;
+    readonly details?: {
+      readonly selectedSourceCount?: number;
+      readonly maximumSourceCount?: number;
+      readonly combinedCharacterCount?: number;
+      readonly allowedMaximum?: number;
+    };
   };
   readonly sync?: CanvasSyncSummary | CanvasCourseScopedSyncSummary;
 }
@@ -262,6 +333,11 @@ export type CanvasApiErrorCode =
   | "canvas_course_unavailable"
   | "canvas_storage_not_configured"
   | "canvas_file_not_found"
+  | "canvas_source_count_exceeded"
+  | "canvas_source_duplicate"
+  | "canvas_source_not_found"
+  | "canvas_source_preview_too_large"
+  | "canvas_source_unavailable"
   | "canvas_storage_failed";
 
 export type CanvasApiResponse =
@@ -272,6 +348,8 @@ export type CanvasApiResponse =
   | CanvasCapabilitiesResponse
   | CanvasSyncResponse
   | CanvasCourseScopedSyncResponse
+  | CanvasReviewerSourceListResponse
+  | CanvasReviewerSourcePreviewResponse
   | CanvasFileIngestionResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;
