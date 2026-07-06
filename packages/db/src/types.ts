@@ -82,7 +82,7 @@ export type CanvasAssignmentInsert =
   Database["public"]["Tables"]["canvas_assignments"]["Insert"];
 export type CanvasAssignmentUpdate =
   Database["public"]["Tables"]["canvas_assignments"]["Update"];
-export type CanvasSyncMode = "full" | "incremental";
+export type CanvasSyncMode = "full" | "incremental" | "course";
 export type CanvasSyncRunStatus =
   | "running"
   | "succeeded"
@@ -138,6 +138,12 @@ export type CanvasCourseSyncStateInsert =
   Database["public"]["Tables"]["canvas_course_sync_states"]["Insert"];
 export type CanvasCourseSyncStateUpdate =
   Database["public"]["Tables"]["canvas_course_sync_states"]["Update"];
+export type CanvasCourseSyncPreferenceRow =
+  Database["public"]["Tables"]["canvas_course_sync_preferences"]["Row"];
+export type CanvasCourseSyncPreferenceInsert =
+  Database["public"]["Tables"]["canvas_course_sync_preferences"]["Insert"];
+export type CanvasCourseSyncPreferenceUpdate =
+  Database["public"]["Tables"]["canvas_course_sync_preferences"]["Update"];
 export type CanvasPlannerItemRow =
   Database["public"]["Tables"]["canvas_planner_items"]["Row"];
 export type CanvasPlannerItemInsert =
@@ -178,6 +184,8 @@ export type CanvasAnnouncementsSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_announcements_snapshot"]["Returns"][number];
 export type CanvasFilesInventorySnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_files_inventory"]["Returns"][number];
+export type CanvasCourseSyncPreferencesReplacementResult =
+  Database["public"]["Functions"]["replace_canvas_course_sync_preferences"]["Returns"][number];
 
 export interface Database {
   public: {
@@ -842,6 +850,7 @@ export interface Database {
           id: string;
           user_id: string;
           canvas_connection_id: string;
+          scope_course_id?: string | null;
           sync_mode: CanvasSyncMode;
           status: CanvasSyncRunStatus;
           started_at: string;
@@ -860,6 +869,7 @@ export interface Database {
           id?: string;
           user_id: string;
           canvas_connection_id: string;
+          scope_course_id?: string | null;
           sync_mode?: CanvasSyncMode;
           status?: CanvasSyncRunStatus;
           started_at?: string;
@@ -878,6 +888,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           canvas_connection_id?: string;
+          scope_course_id?: string | null;
           sync_mode?: CanvasSyncMode;
           status?: CanvasSyncRunStatus;
           started_at?: string;
@@ -899,6 +910,13 @@ export interface Database {
             isOneToOne: false;
             referencedRelation: "canvas_connections";
             referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_sync_runs_scope_course_owner_fkey";
+            columns: ["scope_course_id", "user_id", "canvas_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: ["id", "user_id", "canvas_connection_id"];
           },
           {
             foreignKeyName: "canvas_sync_runs_user_id_fkey";
@@ -1061,6 +1079,64 @@ export interface Database {
           },
           {
             foreignKeyName: "canvas_course_sync_states_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_course_sync_preferences: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          selected: boolean;
+          display_order: number | null;
+          selected_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          selected?: boolean;
+          display_order?: number | null;
+          selected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          selected?: boolean;
+          display_order?: number | null;
+          selected_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_course_sync_preferences_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_sync_preferences_course_owner_fkey";
+            columns: ["course_id", "user_id", "canvas_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: ["id", "user_id", "canvas_connection_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_sync_preferences_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
@@ -1696,6 +1772,32 @@ export interface Database {
           updated_at: string;
         }>;
       };
+      begin_canvas_course_sync_run: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_scope_course_id: string;
+          p_started_at: string;
+        };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          sync_mode: CanvasSyncMode;
+          status: CanvasSyncRunStatus;
+          started_at: string;
+          completed_at: string | null;
+          heartbeat_at: string;
+          discovered_course_count: number;
+          successful_course_count: number;
+          failed_course_count: number;
+          resource_counts: Json;
+          failure_code: string | null;
+          failure_summary: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
       finish_canvas_sync_run: {
         Args: {
           p_user_id: string;
@@ -1793,6 +1895,18 @@ export interface Database {
           sync_state_last_checked_at: string;
           sync_state_last_changed_at: string | null;
           sync_state_consecutive_failure_count: number;
+        }>;
+      };
+      replace_canvas_course_sync_preferences: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_selected_course_ids: string[];
+          p_selected_at?: string;
+        };
+        Returns: Array<{
+          selected_count: number;
+          deselected_count: number;
         }>;
       };
       replace_canvas_course_academic_snapshot: {

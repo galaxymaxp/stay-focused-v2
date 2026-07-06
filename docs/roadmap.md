@@ -216,10 +216,11 @@ is complete and live validated; Phase 5B.3C1 conditional-request capability
 audit is complete; Phase 5B.4A planner-item and announcement synchronization
 is complete with documented live Canvas limitations; Phase 5C.1 secure file
 inventory and bounded ingestion is remotely and live validated with a
-documented synchronous route-duration limitation; the next Canvas task is the
-smallest user-facing sync/source-selection loop before broad parser/OCR
-expansion. Phase 5D through Phase 5F remain planned and must not be collapsed
-into a single generic Canvas integration task.
+documented account-wide synchronous route-duration limitation; Phase 5C.2A1
+selected-course synchronization is complete and runtime-safe in local
+production-build validation. Next: Phase 5C.2A2 — Canvas source selection and
+reviewer handoff. Phase 5D through Phase 5F remain planned and must not be
+collapsed into a single generic Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -658,9 +659,13 @@ Deferred from Phase 5B.4A:
 
 Status: In progress. Phase 5C.1 secure file inventory and bounded selected-file
 ingestion is remotely and live validated for backend behavior, private Storage,
-and second-run stability. The synchronous metadata sync route remains over its
-configured runtime budget in local production-build measurement, so deployed
-production-runtime readiness is not claimed.
+and second-run stability. The account-wide synchronous metadata sync route
+remains over its configured runtime budget in local production-build
+measurement, so deployed production-runtime readiness is not claimed for that
+diagnostic route. Phase 5C.2A1 selected-course synchronization is complete,
+uses independent course-scoped requests, and stayed within the 60-second
+per-course budget in protected live validation. Next: Phase 5C.2A2 — Canvas
+source selection and reviewer handoff.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -727,16 +732,64 @@ Verification:
 - OCR tests: 14/14.
 - Root typecheck/build/tests: 7/7 workspaces.
 
-#### Phase 5C.2A - User-Facing Canvas Sync And Source-Selection Loop
+#### Phase 5C.2A1 - Course Selection And Runtime-Safe Canvas Synchronization
+
+Status: Complete. Remotely verified and protected-live validated.
+
+Implemented:
+
+- `GET /api/canvas/courses` now returns a Canvas course inventory with
+  metadata-based presentation categories: likely current, past or concluded,
+  other or uncertain, and unavailable.
+- Course names are display data only, not authoritative exclusion rules.
+- `canvas_course_sync_preferences` stores selected-course choices separately
+  from the course inventory with stable identities, composite ownership,
+  RLS, revoked direct client grants, and service-role-only RPCs.
+- Deselecting a course disables future normal selected-course synchronization
+  but does not delete synchronized graph data, file metadata, stored objects,
+  or sync history.
+- `POST /api/canvas/courses/:courseId/sync` synchronizes one selected internal
+  course row through the existing shared course synchronization path.
+- Course-scoped sync covers course-owned graph data, announcements, file
+  metadata, and file references, but intentionally excludes user-wide planner
+  synchronization.
+- Normal mobile synchronization uses selected course IDs and a maximum
+  concurrency of two independent course-scoped requests.
+- Per-course mobile status distinguishes unsaved selection changes, running,
+  success, partial, failed, deselected, and unavailable states.
+- Academic-unit synchronization limit: none.
+
+Validation:
+
+- Remote migration `20260706113150` is applied and rollback-safe SQL
+  verification passed.
+- Supabase security and performance advisors produced no new Phase 5C.2A1
+  findings.
+- Protected live inventory returned 76 course shells: 15 likely current,
+  59 past or concluded, 2 other or uncertain, and 0 unavailable.
+- Two likely-current courses were selected, persisted, restored after reload,
+  synchronized independently, deselected, and reselected without duplicate
+  identities or destructive cleanup.
+- First selected-course sync durations were 6.052 seconds and 8.492 seconds.
+  Second selected-course sync durations were 5.833 seconds and 7.849 seconds.
+- The account-wide route was not called by the normal selected-course mobile
+  flow.
+
+Still deferred from Phase 5C.2A1:
+
+- Canvas source selection and source preview.
+- Canvas-to-reviewer handoff.
+- Parser/OCR expansion for Canvas file contents.
+- Background, scheduled, resumable, or queued synchronization.
+- Canvas OAuth and broader Canvas resource families.
+
+#### Phase 5C.2A2 - Canvas Source Selection And Reviewer Handoff
 
 Status: Next.
 
 Scope:
 
-- Manual mobile Canvas sync action.
-- Last-sync status and safe aggregate counts.
-- Clear partial-failure messaging.
-- Narrow Canvas source-selection preview.
+- Narrow Canvas source-selection preview from synchronized selected courses.
 - Editable source text before reviewer generation.
 - Parser or OCR work only where required to make this narrow source-selection
   flow work.

@@ -102,6 +102,13 @@ vi.mock("@stay-focused/canvas", () => {
       return mocks.courses;
     }
 
+    public async listCourseInventory(): Promise<unknown> {
+      if (mocks.listCoursesError) {
+        throw mocks.listCoursesError;
+      }
+      return mocks.courses;
+    }
+
     public async probeCapabilities(): Promise<unknown> {
       return mocks.probeCapabilities;
     }
@@ -429,7 +436,16 @@ describe("/api/canvas", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       ok: true,
-      courses: [{ id: "course-1", name: "Biology 101" }],
+      courses: [
+        {
+          id: "internal-course-1",
+          displayName: "Biology 101",
+          classification: "likely_current",
+          selected: false,
+        },
+      ],
+      counts: { total: 1, likelyCurrent: 1 },
+      selectedCourseIds: [],
     });
     expect(mocks.constructorCalls.at(-1)).toMatchObject({
       baseUrl: "https://canvas.test",
@@ -709,6 +725,10 @@ function createDbClient(options: {
   } = {};
   const connections = new Map<string, Record<string, unknown>>();
   const capabilities: Array<Record<string, unknown>> = [];
+  const courses = new Map<string, Record<string, unknown>>();
+  const preferences: Array<Record<string, unknown>> = [];
+  const syncStates: Array<Record<string, unknown>> = [];
+  const syncRuns: Array<Record<string, unknown>> = [];
 
   if (options.connectionRows) {
     for (const row of options.connectionRows) {
@@ -842,6 +862,110 @@ function createDbClient(options: {
               maybeSingle: vi.fn(async () => ({
                 data: connections.get(value) ?? null,
                 error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "canvas_courses") {
+        return {
+          upsert: vi.fn((payload: readonly Record<string, unknown>[]) => ({
+            select: vi.fn(async () => {
+              const saved = payload.map((row) => {
+                const key = `${row.user_id}:${row.canvas_connection_id}:${row.canvas_course_id}`;
+                const previous = courses.get(key);
+                const savedRow = {
+                  id: previous?.id ?? `internal-${row.canvas_course_id}`,
+                  first_synced_at:
+                    previous?.first_synced_at ?? "2026-07-06T01:00:00.000Z",
+                  last_synced_at:
+                    previous?.last_synced_at ?? "2026-07-06T01:00:00.000Z",
+                  created_at:
+                    previous?.created_at ?? "2026-07-06T01:00:00.000Z",
+                  updated_at: "2026-07-06T01:00:00.000Z",
+                  ...previous,
+                  ...row,
+                };
+                courses.set(key, savedRow);
+                return savedRow;
+              });
+              return { data: saved, error: null };
+            }),
+          })),
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                in: vi.fn(async () => ({ data: [], error: null })),
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: null,
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "canvas_course_sync_preferences") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn((_userColumn: string, userId: string) => ({
+              eq: vi.fn((_connectionColumn: string, connectionId: string) => ({
+                order: vi.fn(() => ({
+                  order: vi.fn(async () => ({
+                    data: preferences.filter(
+                      (row) =>
+                        row.user_id === userId &&
+                        row.canvas_connection_id === connectionId,
+                    ),
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "canvas_course_sync_states") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn((_userColumn: string, userId: string) => ({
+              eq: vi.fn(async (_connectionColumn: string, connectionId: string) => ({
+                data: syncStates.filter(
+                  (row) =>
+                    row.user_id === userId &&
+                    row.canvas_connection_id === connectionId,
+                ),
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "canvas_sync_runs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn((_userColumn: string, userId: string) => ({
+              eq: vi.fn((_connectionColumn: string, connectionId: string) => ({
+                eq: vi.fn((_modeColumn: string, syncMode: string) => ({
+                  in: vi.fn((_courseColumn: string, courseIds: readonly string[]) => ({
+                    order: vi.fn(async () => ({
+                      data: syncRuns.filter(
+                        (row) =>
+                          row.user_id === userId &&
+                          row.canvas_connection_id === connectionId &&
+                          row.sync_mode === syncMode &&
+                          courseIds.includes(String(row.scope_course_id)),
+                      ),
+                      error: null,
+                    })),
+                  })),
+                })),
               })),
             })),
           })),

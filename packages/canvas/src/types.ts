@@ -19,6 +19,35 @@ export interface CanvasCourse {
   readonly publicSyllabus: boolean | null;
   readonly syllabusBody: string | null;
   readonly updatedAt: string | null;
+  readonly concluded?: boolean | null;
+  readonly term?: CanvasCourseTerm | null;
+  readonly enrollments?: readonly CanvasCourseEnrollment[];
+  readonly sections?: readonly CanvasCourseSection[];
+}
+
+export interface CanvasCourseTerm {
+  readonly id: string | null;
+  readonly name: string | null;
+  readonly startAt: string | null;
+  readonly endAt: string | null;
+}
+
+export interface CanvasCourseEnrollment {
+  readonly id: string | null;
+  readonly type: string | null;
+  readonly role: string | null;
+  readonly roleId: string | null;
+  readonly enrollmentState: string | null;
+  readonly workflowState: string | null;
+  readonly limitPrivilegesToCourseSection: boolean | null;
+}
+
+export interface CanvasCourseSection {
+  readonly id: string | null;
+  readonly name: string | null;
+  readonly startAt: string | null;
+  readonly endAt: string | null;
+  readonly enrollmentRole: string | null;
 }
 
 export interface CanvasModule {

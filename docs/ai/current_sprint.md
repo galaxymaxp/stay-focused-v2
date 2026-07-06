@@ -43,7 +43,14 @@ stable object pointers with zero additional bytes stored. It does not parse,
 OCR, preview, or generate reviewers from Canvas file contents. The synchronous
 metadata sync route remains over its configured 60-second runtime budget in
 local production-build validation, so production-runtime readiness is not
-claimed.
+claimed for the account-wide diagnostic route. Phase 5C.2A1 selected-course
+synchronization is complete and runtime-safe in local production validation:
+students now choose eligible Canvas course shells, selections persist behind
+ownership-protected preferences, normal mobile sync uses independent
+course-scoped requests with maximum concurrency two, deselection preserves
+existing synchronized data, and planner synchronization remains excluded from
+course-scoped requests. The next roadmap task is Phase 5C.2A2 — Canvas source
+selection and reviewer handoff.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -352,6 +359,42 @@ There is no school-wide Canvas token.
 - Mobile file-selection/source-selection UI.
 - Reviewer generation from Canvas file contents.
 - Background or resumable ingestion jobs.
+
+## Completed Phase 5C.2A1 Scope
+
+- Added Canvas course inventory loading for presentation as selectable course
+  shells rather than as an instruction to sync every visible course.
+- Classified courses as likely current, past or concluded, other or uncertain,
+  or unavailable using Canvas metadata instead of course-name keywords.
+- Added `canvas_course_sync_preferences` with stable preference identities,
+  composite ownership, RLS, revoked direct client grants, and
+  service-role-only RPCs.
+- Added protected course preference API routes for loading and atomically
+  saving selected internal course IDs.
+- Added protected course-scoped sync route
+  `POST /api/canvas/courses/:courseId/sync` with selected-course, connection,
+  and owner verification.
+- Reused the shared single-course synchronization path for course-owned
+  modules, module items, Pages, assignment groups, assignments, announcements,
+  file metadata, and file references.
+- Excluded user-wide planner synchronization from the course-scoped route.
+- Updated the mobile Courses surface to show course categories, persist
+  selections, run selected course syncs with maximum concurrency two, and show
+  independent success, partial, failed, running, deselected, and unavailable
+  states.
+- Preserved synchronized graph data, file metadata, stored objects, and sync
+  history when a course is deselected.
+- Verified that the normal mobile selected-course flow does not call the
+  account-wide sync route.
+- Academic-unit synchronization limit: none.
+
+## Out Of Scope For Phase 5C.2A1
+
+- Canvas source selection, source preview, or Canvas-to-reviewer handoff.
+- Parser or OCR expansion for Canvas file contents.
+- Background, queued, scheduled, or resumable synchronization.
+- Canvas OAuth, submissions, grades, rubrics, feedback, task generation, and
+  schedule generation.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -895,6 +938,39 @@ There is no school-wide Canvas token.
   second ingestion returned 2 unchanged and 1 metadata-only, stored 0 bytes,
   produced no duplicate object versions, and left zero running sync rows.
 
+## Phase 5C.2A1 Results
+
+- Added migration
+  `20260706113150_add_canvas_course_sync_preferences.sql` and updated DB types.
+- Added `apps/api/src/lib/canvas-course-selection.ts`,
+  `apps/api/app/api/canvas/course-preferences/route.ts`, and
+  `apps/api/app/api/canvas/courses/[courseId]/sync/route.ts`.
+- Extended the Canvas client with course-inventory metadata while preserving
+  the active-course list used by existing account-wide diagnostics.
+- Extended the shared sync engine with a course-scoped run mode that starts and
+  finishes terminal course sync runs, preserves incomplete snapshots, and
+  returns safe per-course aggregate summaries.
+- Automated verification passed for Canvas client tests, API route tests,
+  mobile service tests, workspace typechecks, production builds, and workspace
+  tests.
+- Remote migration history includes `20260706113150`; rollback-safe SQL
+  verification passed for preference ownership, RLS, grants, service-role RPCs,
+  selected-course run constraints, stale-run recovery, duplicate prevention,
+  cross-user denial, and previous Canvas protections.
+- Supabase security and performance advisors produced no new Phase 5C.2A1
+  findings.
+- Protected live inventory returned 76 course shells: 15 likely current,
+  59 past or concluded, 2 other or uncertain, and 0 unavailable.
+- Protected live selected-course sync used two opaque selected-course
+  references, maximum concurrency two, and aggregate-only output. First-run
+  durations were 6.052 seconds and 8.492 seconds; second-run durations were
+  5.833 seconds and 7.849 seconds. All individual requests were under the
+  60-second budget.
+- Deselect and reselect validation preserved graph data, file metadata, stored
+  objects, sync history, preference identity, and graph identities without
+  duplicate records. The account-wide route was not called by the normal
+  selected-course flow.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -938,10 +1014,9 @@ does not support Phase 5B.3C2 implementation for the audited endpoints. The
 Phase 5B.4A planner-item and announcement synchronization slice is complete
 with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
 ingestion foundation is remotely and live validated with a documented
-synchronous route-duration limitation. The recommended next roadmap task is
-Phase 5C.2A - User-Facing Canvas Sync And Source-Selection Loop: manual mobile
-Canvas sync action, last-sync status and safe aggregate counts, clear
-partial-failure messaging, narrow Canvas source-selection preview, and editable
-source text before reviewer generation. Parser/OCR work should be added only
-as required for that narrow loop. The deferred header/footer cleanup task
-remains separate.
+account-wide synchronous route-duration limitation. Phase 5C.2A1
+selected-course synchronization is complete and runtime-safe in local
+production validation. The recommended next roadmap task is Phase 5C.2A2 —
+Canvas source selection and reviewer handoff. Parser/OCR work should be added
+only as required for that narrow source-selection handoff. The deferred
+header/footer cleanup task remains separate.

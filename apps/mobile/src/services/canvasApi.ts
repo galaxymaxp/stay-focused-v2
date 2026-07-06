@@ -8,9 +8,11 @@ import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
 
 const CONNECTION_PATH = "/api/canvas/connection";
 const COURSES_PATH = "/api/canvas/courses";
+const COURSE_PREFERENCES_PATH = "/api/canvas/course-preferences";
 const CAPABILITIES_PATH = "/api/canvas/capabilities";
 const SYNC_PATH = "/api/canvas/sync";
 const MAX_ERROR_MESSAGE_CHARS = 300;
+const SELECTED_COURSE_SYNC_CONCURRENCY = 2;
 
 export interface CanvasConnectionSummary {
   readonly id: string;
@@ -37,6 +39,51 @@ export interface CanvasCapabilitySummary {
 
 export type CanvasSyncStatus = "succeeded" | "partial" | "failed";
 export type CanvasSyncMode = "full" | "incremental";
+export type CanvasCourseClassification =
+  | "likely_current"
+  | "past_or_concluded"
+  | "other_or_uncertain"
+  | "unavailable";
+export type CanvasCourseSyncStatus = "success" | "partial" | "failed";
+
+export interface CanvasCourseInventoryItem {
+  readonly id: string;
+  readonly displayName: string;
+  readonly courseCode: string | null;
+  readonly workflowState: string | null;
+  readonly startAt: string | null;
+  readonly endAt: string | null;
+  readonly term: {
+    readonly id: string | null;
+    readonly name: string | null;
+    readonly startAt: string | null;
+    readonly endAt: string | null;
+  } | null;
+  readonly classification: CanvasCourseClassification;
+  readonly selectable: boolean;
+  readonly unavailableReason: string | null;
+  readonly selected: boolean;
+  readonly lastSync: {
+    readonly status: "running" | CanvasCourseSyncStatus;
+    readonly startedAt: string | null;
+    readonly completedAt: string | null;
+    readonly lastCheckedAt: string | null;
+    readonly lastSuccessfulSyncAt: string | null;
+    readonly failureCode: string | null;
+  } | null;
+}
+
+export interface CanvasCourseInventoryPayload {
+  readonly courses: readonly CanvasCourseInventoryItem[];
+  readonly selectedCourseIds: readonly string[];
+  readonly counts: {
+    readonly total: number;
+    readonly likelyCurrent: number;
+    readonly pastOrConcluded: number;
+    readonly otherOrUncertain: number;
+    readonly unavailable: number;
+  };
+}
 
 export interface CanvasSyncSummary {
   readonly status: CanvasSyncStatus;
@@ -103,6 +150,61 @@ export interface CanvasSyncSummary {
   }[];
 }
 
+export interface CanvasCourseSyncSummary {
+  readonly status: CanvasCourseSyncStatus;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly durationMs: number;
+  readonly resources: CanvasSyncSummary["resources"];
+  readonly modules: number;
+  readonly moduleItems: number;
+  readonly pages: number;
+  readonly assignmentGroups: number;
+  readonly assignments: number;
+  readonly announcements: number;
+  readonly files: number;
+  readonly fileReferences: number;
+  readonly inserted: number;
+  readonly updated: number;
+  readonly unchanged: number;
+  readonly pruned: number;
+  readonly retryAttempts: number;
+  readonly sanitizedFailures?: readonly {
+    readonly code: string;
+    readonly count: number;
+  }[];
+}
+
+export interface CanvasCoursePreferencesPayload {
+  readonly selectedCourseIds: readonly string[];
+}
+
+export interface UpdateCanvasCoursePreferencesPayload {
+  readonly selectedCourseIds: readonly string[];
+  readonly selectedCount: number;
+  readonly deselectedCount: number;
+}
+
+export interface SyncSelectedCanvasCoursesInput extends CanvasApiBaseInput {
+  readonly selectedCourseIds: readonly string[];
+  readonly maxConcurrency?: number;
+}
+
+export interface CanvasSelectedCourseSyncItemResult {
+  readonly courseId: string;
+  readonly ok: boolean;
+  readonly summary?: CanvasCourseSyncSummary;
+  readonly error?: CanvasApiClientError;
+}
+
+export interface CanvasSelectedCourseSyncSummary {
+  readonly attempted: number;
+  readonly successful: number;
+  readonly partial: number;
+  readonly failed: number;
+  readonly results: readonly CanvasSelectedCourseSyncItemResult[];
+}
+
 export interface CanvasApiBaseInput {
   readonly apiBaseUrl: string;
   readonly accessToken: string;
@@ -151,6 +253,10 @@ export type CanvasApiClientErrorCode =
   | "missing_connection"
   | "corrupted_credentials"
   | "sync_in_progress"
+  | "course_not_found"
+  | "course_not_selected"
+  | "course_unavailable"
+  | "duplicate_course_submission"
   | "storage_not_configured"
   | "storage_failed"
   | "unknown_api_error";
@@ -176,7 +282,9 @@ interface ConnectSuccessResponse {
 
 interface CoursesSuccessResponse {
   readonly ok: true;
-  readonly courses: readonly CanvasCourse[];
+  readonly courses: readonly CanvasCourseInventoryItem[];
+  readonly selectedCourseIds: readonly string[];
+  readonly counts: CanvasCourseInventoryPayload["counts"];
 }
 
 interface CapabilitiesSuccessResponse {
@@ -186,6 +294,21 @@ interface CapabilitiesSuccessResponse {
 
 interface SyncSuccessResponse extends CanvasSyncSummary {
   readonly ok: true;
+}
+
+interface CourseSyncSuccessResponse extends CanvasCourseSyncSummary {
+  readonly ok: true;
+}
+
+interface CoursePreferencesSuccessResponse {
+  readonly ok: true;
+  readonly selectedCourseIds: readonly string[];
+}
+
+interface CoursePreferencesUpdateSuccessResponse
+  extends CoursePreferencesSuccessResponse {
+  readonly selectedCount: number;
+  readonly deselectedCount: number;
 }
 
 interface DeleteSuccessResponse {
@@ -258,7 +381,7 @@ export async function disconnectCanvas(
 
 export async function listCanvasCourses(
   input: CanvasApiBaseInput,
-): Promise<CanvasApiResult<readonly CanvasCourse[]>> {
+): Promise<CanvasApiResult<CanvasCourseInventoryPayload>> {
   const endpoint = createEndpoint(input.apiBaseUrl, COURSES_PATH);
   if (!endpoint.ok) return endpoint;
 
@@ -267,6 +390,35 @@ export async function listCanvasCourses(
     input,
     method: "GET",
     parseSuccess: parseCoursesResponse,
+  });
+}
+
+export async function getCanvasCoursePreferences(
+  input: CanvasApiBaseInput,
+): Promise<CanvasApiResult<CanvasCoursePreferencesPayload>> {
+  const endpoint = createEndpoint(input.apiBaseUrl, COURSE_PREFERENCES_PATH);
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCoursePreferencesResponse,
+  });
+}
+
+export async function saveCanvasCoursePreferences(
+  input: CanvasApiBaseInput & { readonly selectedCourseIds: readonly string[] },
+): Promise<CanvasApiResult<UpdateCanvasCoursePreferencesPayload>> {
+  const endpoint = createEndpoint(input.apiBaseUrl, COURSE_PREFERENCES_PATH);
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "PUT",
+    body: { selectedCourseIds: input.selectedCourseIds },
+    parseSuccess: parseCoursePreferencesUpdateResponse,
   });
 }
 
@@ -297,6 +449,80 @@ export async function syncCanvasAcademicGraph(
     ...(input.mode ? { body: { mode: input.mode } } : {}),
     parseSuccess: parseSyncResponse,
   });
+}
+
+export async function syncCanvasCourse(
+  input: CanvasApiBaseInput & { readonly courseId: string },
+): Promise<CanvasApiResult<CanvasCourseSyncSummary>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError("course_not_found", "Choose a Canvas course to sync.");
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sync`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    parseSuccess: parseCourseSyncResponse,
+  });
+}
+
+export async function syncSelectedCanvasCourses(
+  input: SyncSelectedCanvasCoursesInput,
+): Promise<CanvasApiResult<CanvasSelectedCourseSyncSummary>> {
+  const normalizedIds = input.selectedCourseIds.map((id) => id.trim());
+  if (new Set(normalizedIds).size !== normalizedIds.length) {
+    return clientError(
+      "duplicate_course_submission",
+      "A selected course can only be submitted once.",
+    );
+  }
+  const maxConcurrency = normalizeCourseSyncConcurrency(input.maxConcurrency);
+  const results: CanvasSelectedCourseSyncItemResult[] = [];
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < normalizedIds.length) {
+      const courseId = normalizedIds[nextIndex] ?? "";
+      nextIndex += 1;
+      const result = await syncCanvasCourse({ ...input, courseId });
+      if (result.ok) {
+        results.push({ courseId, ok: true, summary: result.data });
+      } else {
+        results.push({ courseId, ok: false, error: result.error });
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(maxConcurrency, normalizedIds.length) }, () =>
+      worker(),
+    ),
+  );
+
+  results.sort(
+    (left, right) =>
+      normalizedIds.indexOf(left.courseId) - normalizedIds.indexOf(right.courseId),
+  );
+
+  return {
+    ok: true,
+    data: {
+      attempted: normalizedIds.length,
+      failed: results.filter(
+        (result) => !result.ok || result.summary?.status === "failed",
+      ).length,
+      partial: results.filter((result) => result.summary?.status === "partial").length,
+      results,
+      successful: results.filter((result) => result.summary?.status === "success")
+        .length,
+    },
+  };
 }
 
 function createEndpoint(
@@ -430,13 +656,54 @@ function parseConnectResponse(
 
 function parseCoursesResponse(
   parsed: unknown,
-): CanvasApiResult<readonly CanvasCourse[]> {
+): CanvasApiResult<CanvasCourseInventoryPayload> {
   if (isCoursesSuccessResponse(parsed)) {
-    return { ok: true, data: parsed.courses };
+    return {
+      ok: true,
+      data: {
+        courses: parsed.courses,
+        counts: parsed.counts,
+        selectedCourseIds: parsed.selectedCourseIds,
+      },
+    };
   }
   return clientError(
     "invalid_response",
     "Canvas returned an invalid course response.",
+  );
+}
+
+function parseCoursePreferencesResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasCoursePreferencesPayload> {
+  if (isCoursePreferencesSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: { selectedCourseIds: parsed.selectedCourseIds },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid course preference response.",
+  );
+}
+
+function parseCoursePreferencesUpdateResponse(
+  parsed: unknown,
+): CanvasApiResult<UpdateCanvasCoursePreferencesPayload> {
+  if (isCoursePreferencesUpdateSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        deselectedCount: parsed.deselectedCount,
+        selectedCount: parsed.selectedCount,
+        selectedCourseIds: parsed.selectedCourseIds,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid course preference response.",
   );
 }
 
@@ -473,6 +740,43 @@ function parseSyncResponse(parsed: unknown): CanvasApiResult<CanvasSyncSummary> 
   return clientError(
     "invalid_response",
     "Canvas returned an invalid synchronization response.",
+  );
+}
+
+function parseCourseSyncResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasCourseSyncSummary> {
+  if (isCourseSyncSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        announcements: parsed.announcements,
+        assignmentGroups: parsed.assignmentGroups,
+        assignments: parsed.assignments,
+        completedAt: parsed.completedAt,
+        durationMs: parsed.durationMs,
+        fileReferences: parsed.fileReferences,
+        files: parsed.files,
+        inserted: parsed.inserted,
+        moduleItems: parsed.moduleItems,
+        modules: parsed.modules,
+        pages: parsed.pages,
+        pruned: parsed.pruned,
+        resources: parsed.resources,
+        retryAttempts: parsed.retryAttempts,
+        ...(parsed.sanitizedFailures
+          ? { sanitizedFailures: parsed.sanitizedFailures }
+          : {}),
+        startedAt: parsed.startedAt,
+        status: parsed.status,
+        unchanged: parsed.unchanged,
+        updated: parsed.updated,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid course synchronization response.",
   );
 }
 
@@ -544,6 +848,12 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "corrupted_credentials";
     case "canvas_sync_in_progress":
       return "sync_in_progress";
+    case "canvas_course_not_found":
+      return "course_not_found";
+    case "canvas_course_not_selected":
+      return "course_not_selected";
+    case "canvas_course_unavailable":
+      return "course_unavailable";
     case "canvas_storage_not_configured":
       return "storage_not_configured";
     case "canvas_storage_failed":
@@ -575,6 +885,13 @@ function statusToClientErrorMessage(status: number): string {
   if (status === 504) return "Canvas did not respond in time.";
   if (status >= 500) return "Canvas is temporarily unavailable.";
   return "Canvas returned an unexpected response.";
+}
+
+function normalizeCourseSyncConcurrency(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    return SELECTED_COURSE_SYNC_CONCURRENCY;
+  }
+  return Math.min(value, SELECTED_COURSE_SYNC_CONCURRENCY);
 }
 
 function safeApiErrorMessage(
@@ -630,7 +947,32 @@ function isCoursesSuccessResponse(value: unknown): value is CoursesSuccessRespon
     isRecord(value) &&
     value.ok === true &&
     Array.isArray(value.courses) &&
-    value.courses.every(isCanvasCourse)
+    value.courses.every(isCanvasCourseInventoryItem) &&
+    Array.isArray(value.selectedCourseIds) &&
+    value.selectedCourseIds.every((entry) => typeof entry === "string") &&
+    isCourseInventoryCounts(value.counts)
+  );
+}
+
+function isCoursePreferencesSuccessResponse(
+  value: unknown,
+): value is CoursePreferencesSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    Array.isArray(value.selectedCourseIds) &&
+    value.selectedCourseIds.every((entry) => typeof entry === "string")
+  );
+}
+
+function isCoursePreferencesUpdateSuccessResponse(
+  value: unknown,
+): value is CoursePreferencesUpdateSuccessResponse {
+  return (
+    isCoursePreferencesSuccessResponse(value) &&
+    isRecord(value) &&
+    isNonNegativeInteger(value.selectedCount) &&
+    isNonNegativeInteger(value.deselectedCount)
   );
 }
 
@@ -674,6 +1016,58 @@ function isSyncSuccessResponse(value: unknown): value is SyncSuccessResponse {
     (value.failures === undefined ||
       (Array.isArray(value.failures) &&
         value.failures.every(isSyncFailureSummary)))
+  );
+}
+
+function isCourseSyncSuccessResponse(
+  value: unknown,
+): value is CourseSyncSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, [
+      "ok",
+      "status",
+      "startedAt",
+      "completedAt",
+      "durationMs",
+      "resources",
+      "modules",
+      "moduleItems",
+      "pages",
+      "assignmentGroups",
+      "assignments",
+      "announcements",
+      "files",
+      "fileReferences",
+      "inserted",
+      "updated",
+      "unchanged",
+      "pruned",
+      "retryAttempts",
+      "sanitizedFailures",
+    ]) &&
+    isCanvasCourseSyncStatus(value.status) &&
+    typeof value.startedAt === "string" &&
+    typeof value.completedAt === "string" &&
+    isNonNegativeInteger(value.durationMs) &&
+    isSyncResourceCounts(value.resources) &&
+    isNonNegativeInteger(value.modules) &&
+    isNonNegativeInteger(value.moduleItems) &&
+    isNonNegativeInteger(value.pages) &&
+    isNonNegativeInteger(value.assignmentGroups) &&
+    isNonNegativeInteger(value.assignments) &&
+    isNonNegativeInteger(value.announcements) &&
+    isNonNegativeInteger(value.files) &&
+    isNonNegativeInteger(value.fileReferences) &&
+    isNonNegativeInteger(value.inserted) &&
+    isNonNegativeInteger(value.updated) &&
+    isNonNegativeInteger(value.unchanged) &&
+    isNonNegativeInteger(value.pruned) &&
+    isNonNegativeInteger(value.retryAttempts) &&
+    (value.sanitizedFailures === undefined ||
+      (Array.isArray(value.sanitizedFailures) &&
+        value.sanitizedFailures.every(isSyncFailureSummary)))
   );
 }
 
@@ -728,6 +1122,89 @@ function isCanvasCourse(value: unknown): value is CanvasCourse {
       typeof value.publicSyllabus === "boolean") &&
     (value.syllabusBody === null || typeof value.syllabusBody === "string") &&
     (value.updatedAt === null || typeof value.updatedAt === "string")
+  );
+}
+
+function isCanvasCourseInventoryItem(
+  value: unknown,
+): value is CanvasCourseInventoryItem {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.displayName === "string" &&
+    (value.courseCode === null || typeof value.courseCode === "string") &&
+    (value.workflowState === null || typeof value.workflowState === "string") &&
+    (value.startAt === null || typeof value.startAt === "string") &&
+    (value.endAt === null || typeof value.endAt === "string") &&
+    (value.term === null || isCanvasCourseInventoryTerm(value.term)) &&
+    isCanvasCourseClassification(value.classification) &&
+    typeof value.selectable === "boolean" &&
+    (value.unavailableReason === null ||
+      typeof value.unavailableReason === "string") &&
+    typeof value.selected === "boolean" &&
+    (value.lastSync === null || isCanvasCourseLastSync(value.lastSync))
+  );
+}
+
+function isCanvasCourseInventoryTerm(value: unknown): value is NonNullable<CanvasCourseInventoryItem["term"]> {
+  return (
+    isRecord(value) &&
+    (value.id === null || typeof value.id === "string") &&
+    (value.name === null || typeof value.name === "string") &&
+    (value.startAt === null || typeof value.startAt === "string") &&
+    (value.endAt === null || typeof value.endAt === "string")
+  );
+}
+
+function isCanvasCourseLastSync(
+  value: unknown,
+): value is NonNullable<CanvasCourseInventoryItem["lastSync"]> {
+  return (
+    isRecord(value) &&
+    (value.status === "running" || isCanvasCourseSyncStatus(value.status)) &&
+    (value.startedAt === null || typeof value.startedAt === "string") &&
+    (value.completedAt === null || typeof value.completedAt === "string") &&
+    (value.lastCheckedAt === null || typeof value.lastCheckedAt === "string") &&
+    (value.lastSuccessfulSyncAt === null ||
+      typeof value.lastSuccessfulSyncAt === "string") &&
+    (value.failureCode === null || typeof value.failureCode === "string")
+  );
+}
+
+function isCanvasCourseClassification(
+  value: unknown,
+): value is CanvasCourseClassification {
+  return (
+    value === "likely_current" ||
+    value === "past_or_concluded" ||
+    value === "other_or_uncertain" ||
+    value === "unavailable"
+  );
+}
+
+function isCanvasCourseSyncStatus(
+  value: unknown,
+): value is CanvasCourseSyncStatus {
+  return value === "success" || value === "partial" || value === "failed";
+}
+
+function isCourseInventoryCounts(
+  value: unknown,
+): value is CanvasCourseInventoryPayload["counts"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "total",
+      "likelyCurrent",
+      "pastOrConcluded",
+      "otherOrUncertain",
+      "unavailable",
+    ]) &&
+    isNonNegativeInteger(value.total) &&
+    isNonNegativeInteger(value.likelyCurrent) &&
+    isNonNegativeInteger(value.pastOrConcluded) &&
+    isNonNegativeInteger(value.otherOrUncertain) &&
+    isNonNegativeInteger(value.unavailable)
   );
 }
 

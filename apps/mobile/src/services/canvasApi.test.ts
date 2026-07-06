@@ -3,10 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   connectCanvas,
   disconnectCanvas,
+  getCanvasCoursePreferences,
   getCanvasConnection,
   listCanvasCapabilities,
   listCanvasCourses,
+  saveCanvasCoursePreferences,
   syncCanvasAcademicGraph,
+  syncCanvasCourse,
+  syncSelectedCanvasCourses,
 } from "./canvasApi";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -64,9 +68,26 @@ describe("Canvas mobile API client", () => {
       listCanvasCourses({
         accessToken: "session-token",
         apiBaseUrl: API_BASE_URL,
-        fetchImpl: createFetch({ ok: true, courses: [course()] }),
+        fetchImpl: createFetch({
+          ok: true,
+          courses: [inventoryCourse()],
+          counts: {
+            total: 1,
+            likelyCurrent: 1,
+            pastOrConcluded: 0,
+            otherOrUncertain: 0,
+            unavailable: 0,
+          },
+          selectedCourseIds: ["11111111-1111-4111-8111-111111111111"],
+        }),
       }),
-    ).resolves.toMatchObject({ ok: true, data: [{ id: "course-1" }] });
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        courses: [{ displayName: "Biology 101", classification: "likely_current" }],
+        selectedCourseIds: ["11111111-1111-4111-8111-111111111111"],
+      },
+    });
 
     await expect(
       listCanvasCapabilities({
@@ -270,6 +291,152 @@ describe("Canvas mobile API client", () => {
     expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
       mode: "incremental",
     });
+  });
+
+  it("loads and saves selected course preferences with internal IDs", async () => {
+    const selectedCourseIds = ["11111111-1111-4111-8111-111111111111"];
+
+    await expect(
+      getCanvasCoursePreferences({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl: createFetch({ ok: true, selectedCourseIds }),
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { selectedCourseIds },
+    });
+
+    const fetchImpl = createFetch({
+      ok: true,
+      selectedCourseIds,
+      selectedCount: 1,
+      deselectedCount: 2,
+    });
+    await expect(
+      saveCanvasCoursePreferences({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl,
+        selectedCourseIds,
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { selectedCount: 1, deselectedCount: 2 },
+    });
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/course-preferences`,
+      init: {
+        method: "PUT",
+        headers: {
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+      },
+    });
+    expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
+      selectedCourseIds,
+    });
+  });
+
+  it("syncs one selected course through the course-scoped route", async () => {
+    const fetchImpl = createFetch(courseSyncSummary({ status: "partial" }));
+
+    const result = await syncCanvasCourse({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "11111111-1111-4111-8111-111111111111",
+      fetchImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        status: "partial",
+        modules: 1,
+        files: 3,
+        sanitizedFailures: [{ code: "canvas_course_files_failed", count: 1 }],
+      },
+    });
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sync`,
+      init: {
+        method: "POST",
+        headers: { Authorization: "Bearer session-token" },
+      },
+    });
+  });
+
+  it("syncs selected courses with max concurrency two and preserves failures", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetchImpl = vi.fn(
+      async (url: RequestInfo | URL): Promise<Response> => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        const serialized = String(url);
+        if (serialized.includes("22222222")) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error: {
+                code: "canvas_course_unavailable",
+                message: "Unavailable.",
+              },
+            }),
+            { status: 400, headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify(courseSyncSummary({ status: "success" })),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    ) as FetchMock;
+
+    const result = await syncSelectedCanvasCourses({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl,
+      selectedCourseIds: [
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        "33333333-3333-4333-8333-333333333333",
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        attempted: 3,
+        successful: 2,
+        failed: 1,
+      },
+    });
+    expect(maxInFlight).toBeLessThanOrEqual(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("blocks duplicate selected-course sync submissions before fetch", async () => {
+    const fetchImpl = vi.fn();
+
+    await expect(
+      syncSelectedCanvasCourses({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl,
+        selectedCourseIds: [
+          "11111111-1111-4111-8111-111111111111",
+          "11111111-1111-4111-8111-111111111111",
+        ],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "duplicate_course_submission" },
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -576,6 +743,76 @@ function course() {
     publicSyllabus: null,
     syllabusBody: null,
     updatedAt: null,
+  };
+}
+
+function inventoryCourse() {
+  return {
+    id: "11111111-1111-4111-8111-111111111111",
+    displayName: "Biology 101",
+    courseCode: "BIO101",
+    workflowState: "available",
+    startAt: null,
+    endAt: null,
+    term: {
+      id: "term-1",
+      name: "First Term",
+      startAt: null,
+      endAt: null,
+    },
+    classification: "likely_current",
+    selectable: true,
+    unavailableReason: null,
+    selected: true,
+    lastSync: {
+      status: "success",
+      startedAt: null,
+      completedAt: "2026-07-06T01:00:00.000Z",
+      lastCheckedAt: "2026-07-06T01:00:00.000Z",
+      lastSuccessfulSyncAt: "2026-07-06T01:00:00.000Z",
+      failureCode: null,
+    },
+  };
+}
+
+function courseSyncSummary({
+  status,
+}: {
+  readonly status: "success" | "partial" | "failed";
+}) {
+  return {
+    ok: true,
+    status,
+    startedAt: "2026-07-06T01:00:00.000Z",
+    completedAt: "2026-07-06T01:00:03.000Z",
+    durationMs: 3000,
+    resources: {
+      modules: 1,
+      moduleItems: 2,
+      pages: 1,
+      assignmentGroups: 1,
+      assignments: 2,
+      plannerItems: 0,
+      announcements: 1,
+      files: 3,
+      fileReferences: 4,
+    },
+    modules: 1,
+    moduleItems: 2,
+    pages: 1,
+    assignmentGroups: 1,
+    assignments: 2,
+    announcements: 1,
+    files: 3,
+    fileReferences: 4,
+    inserted: 5,
+    updated: 0,
+    unchanged: 1,
+    pruned: 0,
+    retryAttempts: 1,
+    ...(status === "partial"
+      ? { sanitizedFailures: [{ code: "canvas_course_files_failed", count: 1 }] }
+      : {}),
   };
 }
 

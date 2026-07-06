@@ -2,15 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import type {
-  CanvasCapability,
-  CanvasCapabilityStatus,
-  CanvasCourse,
-} from "@stay-focused/canvas";
+import type { CanvasCapability, CanvasCapabilityStatus } from "@stay-focused/canvas";
 
 import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
@@ -27,8 +24,13 @@ import {
   getCanvasConnection,
   listCanvasCapabilities,
   listCanvasCourses,
+  saveCanvasCoursePreferences,
+  syncSelectedCanvasCourses,
   type CanvasApiClientError,
   type CanvasCapabilitySummary,
+  type CanvasCourseInventoryItem,
+  type CanvasSelectedCourseSyncSummary,
+  type CanvasCourseSyncSummary,
   type CanvasConnectionSummary,
 } from "../../services/canvasApi";
 
@@ -51,6 +53,12 @@ const SUMMARY_CAPABILITIES: readonly CanvasCapability[] = [
   "new_quizzes",
 ];
 
+interface CourseSyncDisplayState {
+  readonly status: "running" | "success" | "partial" | "failed";
+  readonly summary?: CanvasCourseSyncSummary;
+  readonly error?: CanvasApiClientError;
+}
+
 export function CoursesScreen({
   onCreateReviewer,
   onOpenLibrary,
@@ -61,14 +69,21 @@ export function CoursesScreen({
   const [connection, setConnection] = useState<CanvasConnectionSummary | null>(
     null,
   );
-  const [courses, setCourses] = useState<readonly CanvasCourse[]>([]);
+  const [courses, setCourses] = useState<readonly CanvasCourseInventoryItem[]>([]);
+  const [selectedCourseIds, setSelectedCourseIds] = useState<readonly string[]>([]);
+  const [savedSelectedCourseIds, setSavedSelectedCourseIds] = useState<readonly string[]>([]);
   const [capabilities, setCapabilities] =
     useState<readonly CanvasCapabilitySummary[]>([]);
+  const [courseSyncStates, setCourseSyncStates] = useState<
+    Readonly<Record<string, CourseSyncDisplayState>>
+  >({});
   const [error, setError] = useState<CoursesDisplayError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSavingSelection, setIsSavingSelection] = useState(false);
+  const [isSyncingSelected, setIsSyncingSelected] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -100,6 +115,9 @@ export function CoursesScreen({
       setConnection(result.data.connection);
       if (!result.data.connection) {
         setCourses([]);
+        setSelectedCourseIds([]);
+        setSavedSelectedCourseIds([]);
+        setCourseSyncStates({});
         setCapabilities([]);
         return;
       }
@@ -141,9 +159,9 @@ export function CoursesScreen({
 
       if (result.ok) {
         setConnection(result.data.connection);
-        setCourses(result.data.courses);
         setCapabilities(result.data.capabilities);
         setBaseUrl(result.data.connection.baseUrl);
+        await refreshConnectedCanvas(context.value);
         setSuccessMessage("Canvas connected.");
       } else {
         setError(formatCanvasError(result.error));
@@ -206,6 +224,9 @@ export function CoursesScreen({
       if (result.ok) {
         setConnection(null);
         setCourses([]);
+        setSelectedCourseIds([]);
+        setSavedSelectedCourseIds([]);
+        setCourseSyncStates({});
         setCapabilities([]);
         setPersonalAccessToken("");
         setSuccessMessage("Canvas disconnected.");
@@ -227,7 +248,9 @@ export function CoursesScreen({
     ]);
 
     if (courseResult.ok) {
-      setCourses(courseResult.data);
+      setCourses(courseResult.data.courses);
+      setSelectedCourseIds(courseResult.data.selectedCourseIds);
+      setSavedSelectedCourseIds(courseResult.data.selectedCourseIds);
     } else {
       setError(formatCanvasError(courseResult.error));
     }
@@ -238,6 +261,103 @@ export function CoursesScreen({
       setCapabilities([]);
     } else {
       setError(formatCanvasError(capabilityResult.error));
+    }
+  };
+
+  const handleToggleCourse = (courseId: string) => {
+    setSelectedCourseIds((current) =>
+      current.includes(courseId)
+        ? current.filter((id) => id !== courseId)
+        : [...current, courseId],
+    );
+    setSuccessMessage(null);
+  };
+
+  const handleSaveSelection = async () => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+
+    setIsSavingSelection(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await saveCanvasCoursePreferences({
+        ...context.value,
+        selectedCourseIds,
+      });
+      if (result.ok) {
+        setSavedSelectedCourseIds(result.data.selectedCourseIds);
+        setSelectedCourseIds(result.data.selectedCourseIds);
+        setCourses((current) =>
+          current.map((course) => ({
+            ...course,
+            selected: result.data.selectedCourseIds.includes(course.id),
+          })),
+        );
+        setSuccessMessage("Course selection saved.");
+      } else {
+        setError(formatCanvasError(result.error));
+      }
+    } finally {
+      setIsSavingSelection(false);
+    }
+  };
+
+  const handleSyncSelected = async () => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+
+    setIsSyncingSelected(true);
+    setError(null);
+    setSuccessMessage(null);
+    setCourseSyncStates((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        savedSelectedCourseIds.map((courseId) => [
+          courseId,
+          { status: "running" as const },
+        ]),
+      ),
+    }));
+
+    try {
+      const result = await syncSelectedCanvasCourses({
+        ...context.value,
+        selectedCourseIds: savedSelectedCourseIds,
+      });
+      if (!result.ok) {
+        setError(formatCanvasError(result.error));
+        return;
+      }
+
+      setCourseSyncStates((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          result.data.results.map((courseResult) => [
+            courseResult.courseId,
+            courseResult.ok && courseResult.summary
+              ? {
+                  status: courseResult.summary.status,
+                  summary: courseResult.summary,
+                }
+              : {
+                  status: "failed" as const,
+                  error: courseResult.error,
+                },
+          ]),
+        ),
+      }));
+      setSuccessMessage(formatSelectedSyncMessage(result.data));
+      await refreshConnectedCanvas(context.value);
+    } finally {
+      setIsSyncingSelected(false);
     }
   };
 
@@ -275,11 +395,19 @@ export function CoursesScreen({
         <ConnectedCanvasState
           capabilities={capabilities}
           connection={connection}
+          courseSyncStates={courseSyncStates}
           courses={courses}
           isDisconnecting={isDisconnecting}
           isRefreshing={isRefreshing}
+          isSavingSelection={isSavingSelection}
+          isSyncingSelected={isSyncingSelected}
+          onSaveSelection={handleSaveSelection}
           onDisconnect={handleDisconnectRequest}
           onRefresh={handleRefresh}
+          onSyncSelected={handleSyncSelected}
+          onToggleCourse={handleToggleCourse}
+          savedSelectedCourseIds={savedSelectedCourseIds}
+          selectedCourseIds={selectedCourseIds}
         />
       ) : (
         <DisconnectedCanvasState
@@ -365,20 +493,53 @@ function DisconnectedCanvasState({
 function ConnectedCanvasState({
   capabilities,
   connection,
+  courseSyncStates,
   courses,
   isDisconnecting,
   isRefreshing,
+  isSavingSelection,
+  isSyncingSelected,
   onDisconnect,
   onRefresh,
+  onSaveSelection,
+  onSyncSelected,
+  onToggleCourse,
+  savedSelectedCourseIds,
+  selectedCourseIds,
 }: {
   readonly capabilities: readonly CanvasCapabilitySummary[];
   readonly connection: CanvasConnectionSummary;
-  readonly courses: readonly CanvasCourse[];
+  readonly courseSyncStates: Readonly<Record<string, CourseSyncDisplayState>>;
+  readonly courses: readonly CanvasCourseInventoryItem[];
   readonly isDisconnecting: boolean;
   readonly isRefreshing: boolean;
+  readonly isSavingSelection: boolean;
+  readonly isSyncingSelected: boolean;
   readonly onDisconnect: () => void;
   readonly onRefresh: () => void;
+  readonly onSaveSelection: () => void;
+  readonly onSyncSelected: () => void;
+  readonly onToggleCourse: (courseId: string) => void;
+  readonly savedSelectedCourseIds: readonly string[];
+  readonly selectedCourseIds: readonly string[];
 }) {
+  const selectedChanged = !sameStringSet(selectedCourseIds, savedSelectedCourseIds);
+  const selectedCourses = courses.filter((course) =>
+    selectedCourseIds.includes(course.id),
+  );
+  const likelyCurrent = courses.filter(
+    (course) => course.classification === "likely_current",
+  );
+  const past = courses.filter(
+    (course) => course.classification === "past_or_concluded",
+  );
+  const uncertain = courses.filter(
+    (course) => course.classification === "other_or_uncertain",
+  );
+  const unavailable = courses.filter(
+    (course) => course.classification === "unavailable",
+  );
+
   return (
     <View style={styles.connectedStack} testID="canvas-connected-state">
       <Card style={styles.summaryCard} accent>
@@ -392,6 +553,25 @@ function ConnectedCanvasState({
         <View style={styles.actions}>
           <Button loading={isRefreshing} onPress={onRefresh} variant="primary">
             Refresh
+          </Button>
+          <Button
+            loading={isSavingSelection}
+            onPress={onSaveSelection}
+            variant="secondary"
+          >
+            Save
+          </Button>
+          <Button
+            disabled={
+              savedSelectedCourseIds.length === 0 ||
+              selectedChanged ||
+              isSyncingSelected
+            }
+            loading={isSyncingSelected}
+            onPress={onSyncSelected}
+            variant="primary"
+          >
+            Sync selected
           </Button>
           <Button
             loading={isDisconnecting}
@@ -417,25 +597,131 @@ function ConnectedCanvasState({
       </Card>
 
       <Card style={styles.summaryCard}>
-        <Text style={styles.statusTitle}>Available courses</Text>
-        {courses.length === 0 ? (
+        <Text style={styles.statusTitle}>Selected courses</Text>
+        {selectedCourses.length === 0 ? (
           <Text style={styles.statusText}>
-            Canvas did not return available courses for this token.
+            No courses selected.
           </Text>
         ) : (
           <View style={styles.courseList}>
-            {courses.map((course) => (
-              <View key={course.id} style={styles.courseRow}>
-                <Text style={styles.courseTitle}>{course.name}</Text>
-                <Text style={styles.summaryMeta}>
-                  {course.courseCode ?? "No course code"}
-                </Text>
-              </View>
+            {selectedCourses.map((course) => (
+              <CourseSelectionRow
+                course={course}
+                isSelected={selectedCourseIds.includes(course.id)}
+                key={course.id}
+                onToggle={onToggleCourse}
+                syncState={courseSyncStates[course.id]}
+              />
             ))}
           </View>
         )}
+        {selectedChanged ? (
+          <Text style={styles.statusText}>Save selection before syncing.</Text>
+        ) : null}
       </Card>
+
+      <CourseSection
+        courses={likelyCurrent}
+        courseSyncStates={courseSyncStates}
+        onToggleCourse={onToggleCourse}
+        selectedCourseIds={selectedCourseIds}
+        title="Likely current"
+      />
+      <CourseSection
+        courses={past}
+        courseSyncStates={courseSyncStates}
+        onToggleCourse={onToggleCourse}
+        selectedCourseIds={selectedCourseIds}
+        title="Past or concluded"
+      />
+      <CourseSection
+        courses={uncertain}
+        courseSyncStates={courseSyncStates}
+        onToggleCourse={onToggleCourse}
+        selectedCourseIds={selectedCourseIds}
+        title="Other or uncertain"
+      />
+      <CourseSection
+        courses={unavailable}
+        courseSyncStates={courseSyncStates}
+        onToggleCourse={onToggleCourse}
+        selectedCourseIds={selectedCourseIds}
+        title="Unavailable"
+      />
     </View>
+  );
+}
+
+function CourseSection({
+  courses,
+  courseSyncStates,
+  onToggleCourse,
+  selectedCourseIds,
+  title,
+}: {
+  readonly courses: readonly CanvasCourseInventoryItem[];
+  readonly courseSyncStates: Readonly<Record<string, CourseSyncDisplayState>>;
+  readonly onToggleCourse: (courseId: string) => void;
+  readonly selectedCourseIds: readonly string[];
+  readonly title: string;
+}) {
+  if (courses.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card style={styles.summaryCard}>
+      <Text style={styles.statusTitle}>{title}</Text>
+      <View style={styles.courseList}>
+        {courses.map((course) => (
+          <CourseSelectionRow
+            course={course}
+            isSelected={selectedCourseIds.includes(course.id)}
+            key={course.id}
+            onToggle={onToggleCourse}
+            syncState={courseSyncStates[course.id]}
+          />
+        ))}
+      </View>
+    </Card>
+  );
+}
+
+function CourseSelectionRow({
+  course,
+  isSelected,
+  onToggle,
+  syncState,
+}: {
+  readonly course: CanvasCourseInventoryItem;
+  readonly isSelected: boolean;
+  readonly onToggle: (courseId: string) => void;
+  readonly syncState: CourseSyncDisplayState | undefined;
+}) {
+  const disabled = !course.selectable;
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: isSelected, disabled }}
+      disabled={disabled}
+      onPress={() => onToggle(course.id)}
+      style={[styles.courseRow, disabled ? styles.courseRowDisabled : null]}
+      testID={`canvas-course-row-${course.id}`}
+    >
+      <View style={[styles.checkBox, isSelected ? styles.checkBoxSelected : null]}>
+        <Text style={styles.checkMark}>{isSelected ? "x" : ""}</Text>
+      </View>
+      <View style={styles.courseBody}>
+        <Text style={styles.courseTitle}>{course.displayName}</Text>
+        <Text style={styles.summaryMeta}>{formatCourseMeta(course)}</Text>
+        {course.unavailableReason ? (
+          <Text style={styles.courseWarning}>{course.unavailableReason}</Text>
+        ) : null}
+        <Text style={styles.summaryMeta}>
+          {formatCourseSyncState(syncState, course)}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -561,6 +847,30 @@ function formatCanvasError(error: CanvasApiClientError): CoursesDisplayError {
         message: "Connect Canvas before loading courses.",
         detail,
       };
+    case "course_not_found":
+      return {
+        title: "Course unavailable",
+        message: "Canvas did not return that course for this connection.",
+        detail,
+      };
+    case "course_not_selected":
+      return {
+        title: "Select the course",
+        message: "Save the course selection before syncing it.",
+        detail,
+      };
+    case "course_unavailable":
+      return {
+        title: "Course unavailable",
+        message: "That course cannot currently be synchronized.",
+        detail,
+      };
+    case "duplicate_course_submission":
+      return {
+        title: "Duplicate course",
+        message: "Each selected course can be synced once per run.",
+        detail,
+      };
     case "corrupted_credentials":
       return {
         title: "Reconnect Canvas",
@@ -623,6 +933,80 @@ function capabilityStatusStyle(status: CanvasCapabilityStatus) {
     return styles.capabilityMuted;
   }
   return styles.capabilityWarning;
+}
+
+function formatCourseMeta(course: CanvasCourseInventoryItem): string {
+  const parts = [
+    course.courseCode,
+    course.term?.name,
+    formatCourseClassification(course.classification),
+  ].filter((part): part is string => Boolean(part));
+  return parts.join(" | ");
+}
+
+function formatCourseClassification(
+  classification: CanvasCourseInventoryItem["classification"],
+): string {
+  switch (classification) {
+    case "likely_current":
+      return "Likely current";
+    case "past_or_concluded":
+      return "Past or concluded";
+    case "other_or_uncertain":
+      return "Other or uncertain";
+    case "unavailable":
+      return "Unavailable";
+  }
+}
+
+function formatCourseSyncState(
+  syncState: CourseSyncDisplayState | undefined,
+  course: CanvasCourseInventoryItem,
+): string {
+  if (syncState?.status === "running") {
+    return "Sync running";
+  }
+  if (syncState?.summary) {
+    return `Sync ${syncState.summary.status} | ${formatDuration(syncState.summary.durationMs)}`;
+  }
+  if (syncState?.error) {
+    return `Sync failed | ${syncState.error.code}`;
+  }
+  if (!course.lastSync) {
+    return "Not synced yet";
+  }
+  if (course.lastSync.status === "running") {
+    return "Sync running";
+  }
+  const date = course.lastSync.completedAt ?? course.lastSync.lastCheckedAt;
+  return `Last sync ${course.lastSync.status}${date ? ` | ${formatDateTime(date)}` : ""}`;
+}
+
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+  return `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatSelectedSyncMessage(
+  summary: CanvasSelectedCourseSyncSummary,
+): string {
+  if (summary.attempted === 0) {
+    return "No selected courses to sync.";
+  }
+  return `${summary.successful} synced, ${summary.partial} partial, ${summary.failed} failed.`;
+}
+
+function sameStringSet(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
 }
 
 function formatCanvasHost(baseUrl: string): string {
@@ -754,10 +1138,42 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   courseRow: {
+    alignItems: "flex-start",
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
+    flexDirection: "row",
     gap: spacing[1],
     paddingBottom: spacing[3],
+  },
+  courseRowDisabled: {
+    opacity: 0.58,
+  },
+  checkBox: {
+    alignItems: "center",
+    borderColor: colors.borderStrong,
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 22,
+    justifyContent: "center",
+    marginRight: spacing[2],
+    marginTop: 1,
+    width: 22,
+  },
+  checkBoxSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accentPressed,
+  },
+  checkMark: {
+    color: colors.accentText,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    fontWeight: "900",
+    lineHeight: 15,
+    textAlign: "center",
+  },
+  courseBody: {
+    flex: 1,
+    gap: spacing[1],
   },
   courseTitle: {
     color: colors.textPrimary,
@@ -765,6 +1181,12 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: "800",
     lineHeight: 21,
+  },
+  courseWarning: {
+    color: colors.error,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 17,
   },
   errorBox: {
     backgroundColor: colors.errorSurface,

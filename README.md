@@ -22,7 +22,12 @@ selected eligible files. Its migration, private Storage posture, protected live
 ingestion, and second-run stability are validated, but the synchronous sync
 route still exceeds its configured runtime budget in local production-build
 measurement. It does not yet parse, OCR, preview, or generate reviewers from
-Canvas file contents.
+Canvas file contents. Phase 5C.2A1 adds user-facing Canvas course selection
+and runtime-safe selected-course synchronization: students explicitly select
+eligible courses, preferences persist separately from course inventory, normal
+mobile sync calls independent course-scoped requests with maximum concurrency
+two, and the account-wide route stays available only for diagnostics and future
+background-sync foundations.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -112,6 +117,11 @@ Complete:
   files, strict redirect/download limits, sanitized per-file results, remote
   Supabase validation, protected live ingestion validation, and a documented
   synchronous route-duration limitation
+- Phase 5C.2A1 Canvas course selection and selected-course synchronization with
+  metadata-based inventory classification, service-role-only preference
+  persistence, course-scoped sync runs, mobile per-course status, planner
+  exclusion from course-scoped requests, and no academic-unit synchronization
+  limit
 
 Working locally:
 
@@ -183,6 +193,15 @@ Working locally:
   seconds in local production-build validation against a configured
   `maxDuration = 60`, so this backend foundation is locally functional and
   data-safe but not production-runtime safe yet.
+- Phase 5C.2A1 automated, remote, and protected live validation passed for
+  selected-course synchronization. The live inventory returned 76 course
+  shells: 15 likely current, 59 past or concluded, 2 other or uncertain, and 0
+  unavailable. Two likely-current courses were selected and restored after
+  reload. First selected-course sync returned one `success` and one `partial`
+  result in 6.052 seconds and 8.492 seconds; the second run completed in 5.833
+  seconds and 7.849 seconds with zero unnecessary updates, zero unexpected
+  pruning, zero duplicate identities, and zero running course sync rows. The
+  account-wide route was not called by the normal selected-course flow.
 
 Pending:
 
@@ -329,8 +348,12 @@ tests do not run that opt-in provider smoke.
   no OCR, adds no mobile UI, and does not make Canvas files available to
   reviewer generation yet. The synchronous sync route remains over its
   configured runtime budget, so deployed production readiness is not claimed.
-- No background or scheduled Canvas synchronization exists yet, and no mobile
-  synchronization screen exists yet.
+- Phase 5C.2A1 adds the mobile selected-course synchronization screen and keeps
+  the normal flow off the account-wide route. Course-scoped sync excludes
+  user-wide planner items for now. One live selected course remained `partial`
+  because file metadata listing failed safely with sanitized
+  `canvas_course_files_failed`; previous graph data was preserved.
+- No background or scheduled Canvas synchronization exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
   prove access for every user, course, role, or institution.
@@ -358,9 +381,8 @@ complete and does not support Phase 5B.3C2 for the audited endpoints. The
 Phase 5B.4A planner-item and announcement synchronization slice is complete
 with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
 ingestion foundation is remotely and live validated with a documented
-synchronous route-duration limitation. The next roadmap task is Phase 5C.2A -
-User-Facing Canvas Sync And Source-Selection Loop: manual mobile Canvas sync,
-last-sync status and safe aggregate counts, clear partial-failure messaging,
-narrow source-selection preview, and editable source text before reviewer
-generation. Parser/OCR work should be added only as required for that narrow
-loop. Canvas OAuth remains a future phase.
+synchronous route-duration limitation. Phase 5C.2A1 selected-course
+synchronization is complete and runtime-safe in local production validation.
+The next roadmap task is Phase 5C.2A2 - Canvas source selection and reviewer
+handoff. Parser/OCR work should be added only as required for that narrow
+source-selection handoff. Canvas OAuth remains a future phase.

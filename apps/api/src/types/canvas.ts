@@ -34,9 +34,64 @@ export interface CanvasConnectionResponse {
   readonly courses?: readonly CanvasCourse[];
 }
 
+export type CanvasCourseClassification =
+  | "likely_current"
+  | "past_or_concluded"
+  | "other_or_uncertain"
+  | "unavailable";
+
+export interface CanvasCourseInventoryItem {
+  readonly id: string;
+  readonly displayName: string;
+  readonly courseCode: string | null;
+  readonly workflowState: string | null;
+  readonly startAt: string | null;
+  readonly endAt: string | null;
+  readonly term: {
+    readonly id: string | null;
+    readonly name: string | null;
+    readonly startAt: string | null;
+    readonly endAt: string | null;
+  } | null;
+  readonly classification: CanvasCourseClassification;
+  readonly selectable: boolean;
+  readonly unavailableReason: string | null;
+  readonly selected: boolean;
+  readonly lastSync: {
+    readonly status: "running" | "success" | "partial" | "failed";
+    readonly startedAt: string | null;
+    readonly completedAt: string | null;
+    readonly lastCheckedAt: string | null;
+    readonly lastSuccessfulSyncAt: string | null;
+    readonly failureCode: string | null;
+  } | null;
+}
+
+export interface CanvasCourseInventoryCounts {
+  readonly total: number;
+  readonly likelyCurrent: number;
+  readonly pastOrConcluded: number;
+  readonly otherOrUncertain: number;
+  readonly unavailable: number;
+}
+
 export interface CanvasCoursesResponse {
   readonly ok: true;
-  readonly courses: readonly CanvasCourse[];
+  readonly courses: readonly CanvasCourseInventoryItem[];
+  readonly selectedCourseIds: readonly string[];
+  readonly counts: CanvasCourseInventoryCounts;
+}
+
+export interface CanvasCoursePreferencesResponse {
+  readonly ok: true;
+  readonly selectedCourseIds: readonly string[];
+}
+
+export interface CanvasCoursePreferencesUpdateResponse {
+  readonly ok: true;
+  readonly selectedCourseIds: readonly string[];
+  readonly selectedCount: number;
+  readonly deselectedCount: number;
 }
 
 export interface CanvasCapabilitiesResponse {
@@ -116,6 +171,36 @@ export interface CanvasSyncResponse extends CanvasSyncSummary {
   readonly ok: true;
 }
 
+export interface CanvasCourseScopedSyncSummary {
+  readonly status: "success" | "partial" | "failed";
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly durationMs: number;
+  readonly resources: CanvasSyncSummary["resources"];
+  readonly modules: number;
+  readonly moduleItems: number;
+  readonly pages: number;
+  readonly assignmentGroups: number;
+  readonly assignments: number;
+  readonly announcements: number;
+  readonly files: number;
+  readonly fileReferences: number;
+  readonly inserted: number;
+  readonly updated: number;
+  readonly unchanged: number;
+  readonly pruned: number;
+  readonly retryAttempts: number;
+  readonly sanitizedFailures?: readonly {
+    readonly code: string;
+    readonly count: number;
+  }[];
+}
+
+export interface CanvasCourseScopedSyncResponse
+  extends CanvasCourseScopedSyncSummary {
+  readonly ok: true;
+}
+
 export type CanvasFileIngestionResultStatus =
   | "stored"
   | "unchanged"
@@ -155,7 +240,7 @@ export interface CanvasApiErrorResponse {
     readonly code: CanvasApiErrorCode;
     readonly message: string;
   };
-  readonly sync?: CanvasSyncSummary;
+  readonly sync?: CanvasSyncSummary | CanvasCourseScopedSyncSummary;
 }
 
 export type CanvasApiErrorCode =
@@ -172,6 +257,9 @@ export type CanvasApiErrorCode =
   | "canvas_connection_missing"
   | "canvas_connection_corrupt"
   | "canvas_sync_in_progress"
+  | "canvas_course_not_found"
+  | "canvas_course_not_selected"
+  | "canvas_course_unavailable"
   | "canvas_storage_not_configured"
   | "canvas_file_not_found"
   | "canvas_storage_failed";
@@ -179,8 +267,11 @@ export type CanvasApiErrorCode =
 export type CanvasApiResponse =
   | CanvasConnectionResponse
   | CanvasCoursesResponse
+  | CanvasCoursePreferencesResponse
+  | CanvasCoursePreferencesUpdateResponse
   | CanvasCapabilitiesResponse
   | CanvasSyncResponse
+  | CanvasCourseScopedSyncResponse
   | CanvasFileIngestionResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;

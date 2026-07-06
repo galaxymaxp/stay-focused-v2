@@ -10,6 +10,9 @@ import {
   type CanvasClientErrorCode,
   type CanvasClientOptions,
   type CanvasCourse,
+  type CanvasCourseEnrollment,
+  type CanvasCourseSection,
+  type CanvasCourseTerm,
   type CanvasDownloadedFile,
   type CanvasFile,
   type CanvasFileDownloadOptions,
@@ -167,6 +170,21 @@ export class CanvasClient {
   public async listCourses(): Promise<readonly CanvasCourse[]> {
     const parsed = await this.requestPaginatedJson(
       `/courses?per_page=${DEFAULT_PER_PAGE}&enrollment_state=active`,
+    );
+    return parsed.map(normalizeCourse);
+  }
+
+  public async listCourseInventory(): Promise<readonly CanvasCourse[]> {
+    const parsed = await this.requestPaginatedJson(
+      createPathWithQuery("/courses", [
+        ["per_page", String(DEFAULT_PER_PAGE)],
+        ["state[]", "unpublished"],
+        ["state[]", "available"],
+        ["state[]", "completed"],
+        ["include[]", "term"],
+        ["include[]", "concluded"],
+        ["include[]", "sections"],
+      ]),
     );
     return parsed.map(normalizeCourse);
   }
@@ -1052,8 +1070,12 @@ function normalizeCourse(value: unknown): CanvasCourse {
   }
 
   const id = normalizeId(value.id);
-  const name = stringOrNull(value.name);
-  if (!id || !name) {
+  const name =
+    stringOrNull(value.name) ??
+    stringOrNull(value.friendly_name) ??
+    stringOrNull(value.course_code) ??
+    "Untitled Canvas course";
+  if (!id) {
     throw new CanvasClientError(
       "canvas_invalid_response",
       "Canvas course response was missing required fields.",
@@ -1073,7 +1095,60 @@ function normalizeCourse(value: unknown): CanvasCourse {
     publicSyllabus: booleanOrNull(value.public_syllabus),
     syllabusBody: stringOrNull(value.syllabus_body),
     updatedAt: stringOrNull(value.updated_at),
+    concluded: booleanOrNull(value.concluded),
+    term: normalizeCourseTerm(value.term),
+    enrollments: normalizeCourseEnrollments(value.enrollments),
+    sections: normalizeCourseSections(value.sections),
   };
+}
+
+function normalizeCourseTerm(value: unknown): CanvasCourseTerm | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    id: normalizeId(value.id),
+    name: stringOrNull(value.name),
+    startAt: stringOrNull(value.start_at),
+    endAt: stringOrNull(value.end_at),
+  };
+}
+
+function normalizeCourseEnrollments(
+  value: unknown,
+): readonly CanvasCourseEnrollment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecord).map((enrollment) => ({
+    id: normalizeId(enrollment.id),
+    type: stringOrNull(enrollment.type),
+    role: stringOrNull(enrollment.role),
+    roleId: normalizeId(enrollment.role_id),
+    enrollmentState: stringOrNull(enrollment.enrollment_state),
+    workflowState: stringOrNull(enrollment.workflow_state),
+    limitPrivilegesToCourseSection: booleanOrNull(
+      enrollment.limit_privileges_to_course_section,
+    ),
+  }));
+}
+
+function normalizeCourseSections(
+  value: unknown,
+): readonly CanvasCourseSection[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecord).map((section) => ({
+    id: normalizeId(section.id),
+    name: stringOrNull(section.name),
+    startAt: stringOrNull(section.start_at),
+    endAt: stringOrNull(section.end_at),
+    enrollmentRole: stringOrNull(section.enrollment_role),
+  }));
 }
 
 function normalizeModule(value: unknown): CanvasModule {

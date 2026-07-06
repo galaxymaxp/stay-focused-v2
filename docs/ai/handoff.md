@@ -150,6 +150,19 @@ paths.
   from Canvas file contents. The synchronous metadata sync route remains over
   its configured 60-second runtime budget in local production-build
   measurement, so production-runtime readiness is not claimed.
+- Phase 5C.2A1 Course Selection and Runtime-Safe Canvas Synchronization is
+  complete, remotely verified, and protected-live validated. It changes the
+  normal mobile Canvas flow from account-wide synchronization to explicit
+  selected-course synchronization. Course inventory is classified for
+  presentation using Canvas metadata, preferences are stored in
+  `canvas_course_sync_preferences` behind ownership-protected service-role
+  RPCs, and the mobile Courses surface saves selected internal course IDs then
+  syncs them through independent `POST /api/canvas/courses/:courseId/sync`
+  requests with maximum concurrency two. Course-scoped sync reuses the shared
+  single-course graph path, includes course-owned announcements and file
+  metadata, excludes user-wide planner synchronization, preserves synchronized
+  data on deselection, and keeps the account-wide route as a diagnostic and
+  future maintenance foundation. Academic-unit synchronization limit: none.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
@@ -240,6 +253,17 @@ paths.
   index warnings were fixed. Protected live ingestion stored two eligible files
   and one metadata-only result, then a second ingestion stored zero additional
   bytes with stable object pointers.
+- Phase 5C.2A1 verification: migration `20260706113150` is applied remotely;
+  rollback-safe SQL verification passed; Supabase security/performance
+  advisors produced no new Phase 5C.2A1 findings; Canvas package tests,
+  API route tests, mobile service tests, workspace typechecks, production
+  builds, and workspace tests passed. Protected live validation used aggregate
+  output only: inventory returned 76 course shells, two likely-current courses
+  were selected, first selected-course sync durations were 6.052 seconds and
+  8.492 seconds, second selected-course sync durations were 5.833 seconds and
+  7.849 seconds, deselect/reselect preserved data and identities, zero running
+  rows remained, and the normal selected-course flow did not call the
+  account-wide route.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -280,13 +304,12 @@ does not support Phase 5B.3C2 implementation for the audited endpoints. The
 Phase 5B.4A planner-item and announcement synchronization slice is complete
 with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
 ingestion foundation is remotely and live validated with a documented
-synchronous route-duration limitation. The recommended next roadmap task is
-Phase 5C.2A - User-Facing Canvas Sync And Source-Selection Loop: manual mobile
-Canvas sync action, last-sync status and safe aggregate counts, clear
-partial-failure messaging, narrow Canvas source-selection preview, and editable
-source text before reviewer generation. Parser/OCR work should be added only
-as required for that narrow loop. Automatic repeated scanned-PDF header/footer
-detection remains a deferred candidate.
+account-wide synchronous route-duration limitation. Phase 5C.2A1
+selected-course synchronization is complete and runtime-safe in local
+production validation. The recommended next roadmap task is Phase 5C.2A2 —
+Canvas source selection and reviewer handoff. Parser/OCR work should be added
+only as required for that narrow source-selection handoff. Automatic repeated
+scanned-PDF header/footer detection remains a deferred candidate.
 
 ## Known Blockers And Risks
 

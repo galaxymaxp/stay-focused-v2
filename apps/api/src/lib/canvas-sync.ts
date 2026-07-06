@@ -16,6 +16,7 @@ import type {
   CanvasAnnouncementsSnapshotResult,
   CanvasCourseAcademicSnapshotWithSyncStateResult,
   CanvasConnectionRow,
+  CanvasCourseRow,
   CanvasCourseSyncStateRow,
   CanvasFilesInventorySnapshotResult,
   CanvasPlannerItemsSnapshotResult,
@@ -66,6 +67,7 @@ const DEFAULT_RETRY_DELAY_CAP_MS = 2_000;
 
 export type CanvasAcademicSyncStatus = "succeeded" | "partial" | "failed";
 export type CanvasAcademicSyncMode = "full" | "incremental";
+type CanvasSyncRunMode = CanvasAcademicSyncMode | "course";
 
 type CanvasCourseResultStatus = "succeeded" | "unchanged" | "failed";
 type CanvasCourseFailedOperation =
@@ -143,6 +145,41 @@ export type CanvasAcademicSyncResult =
       readonly code: CanvasApiErrorCode;
       readonly message: string;
       readonly summary?: CanvasAcademicSyncSummary;
+    };
+
+export interface CanvasCourseScopedSyncSummary {
+  readonly status: "success" | "partial" | "failed";
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly durationMs: number;
+  readonly resources: CanvasSyncResourceCounts;
+  readonly modules: number;
+  readonly moduleItems: number;
+  readonly pages: number;
+  readonly assignmentGroups: number;
+  readonly assignments: number;
+  readonly announcements: number;
+  readonly files: number;
+  readonly fileReferences: number;
+  readonly inserted: number;
+  readonly updated: number;
+  readonly unchanged: number;
+  readonly pruned: number;
+  readonly retryAttempts: number;
+  readonly sanitizedFailures?: readonly CanvasAcademicSyncFailureSummary[];
+}
+
+export type CanvasCourseScopedSyncResult =
+  | {
+      readonly ok: true;
+      readonly summary: CanvasCourseScopedSyncSummary;
+    }
+  | {
+      readonly ok: false;
+      readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 502 | 503 | 504;
+      readonly code: CanvasApiErrorCode;
+      readonly message: string;
+      readonly summary?: CanvasCourseScopedSyncSummary;
     };
 
 interface CourseSnapshot {
@@ -711,6 +748,217 @@ export async function syncCanvasAcademicGraph({
       : "Canvas academic data could not be synchronized.",
     summary,
   };
+}
+
+export async function syncSelectedCanvasCourse({
+  client,
+  connection,
+  course,
+  courseRow,
+  retryPolicy: retryPolicyInput,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connection: CanvasConnectionRow;
+  readonly course: CanvasCourse;
+  readonly courseRow: CanvasCourseRow;
+  readonly retryPolicy?: CanvasSyncRetryPolicyInput;
+  readonly userId: string;
+}): Promise<CanvasCourseScopedSyncResult> {
+  const retryPolicy = normalizeRetryPolicy(retryPolicyInput);
+  const startedAtDate = new Date();
+  const startedAt = startedAtDate.toISOString();
+  const syncWindow = createSecondarySyncWindow(startedAtDate);
+  const run = await beginCourseSyncRun({
+    client,
+    connectionId: connection.id,
+    courseId: courseRow.id,
+    startedAt,
+    userId,
+  });
+  if (!run.ok) {
+    return { ok: false, ...run.error };
+  }
+
+  let token: string;
+  try {
+    token = decryptConnectionToken(connection);
+  } catch {
+    const resourceCounts = emptyResourceCounts();
+    const summary = createCourseScopedSummary({
+      announcements: emptyAnnouncementsSyncSummary(),
+      completedAt: new Date().toISOString(),
+      coreResult: null,
+      failures: [{ code: "canvas_connection_corrupt", count: 1 }],
+      files: emptyFilesSyncSummary(),
+      resourceCounts,
+      retryAttempts: 0,
+      startedAt,
+      status: "failed",
+    });
+    await finishSyncRun({
+      client,
+      connectionId: connection.id,
+      failureCode: "canvas_connection_corrupt",
+      failureSummary: "Canvas connection credentials could not be used.",
+      resourceCounts,
+      runId: run.row.id,
+      status: "failed",
+      totals: {
+        changed: 0,
+        discovered: 1,
+        failed: 1,
+        succeeded: 0,
+        unchanged: 0,
+      },
+      userId,
+    });
+    return {
+      ok: false,
+      status: 500,
+      code: "canvas_connection_corrupt",
+      message: "Canvas connection credentials could not be used.",
+      summary,
+    };
+  }
+
+  const canvas = createCanvasClient(connection.base_url, token);
+  const limiters: CanvasSyncLimiters = {
+    moduleItems: createConcurrencyLimiter(MODULE_ITEM_CONCURRENCY_LIMIT),
+    pageDetails: createConcurrencyLimiter(PAGE_DETAIL_CONCURRENCY_LIMIT),
+  };
+  const failures = new Map<CanvasSyncFailureCode, number>();
+  let retryAttempts = 0;
+  let resourceCounts = emptyResourceCounts();
+  const totals = {
+    changed: 0,
+    discovered: 1,
+    failed: 0,
+    succeeded: 0,
+    unchanged: 0,
+  };
+
+  const coreResult = await syncOneCourse({
+    canvas,
+    client,
+    connection,
+    course,
+    limiters,
+    mode: "incremental",
+    retryPolicy,
+    runId: run.row.id,
+    userId,
+  });
+  retryAttempts += coreResult.diagnostics.retryCount;
+
+  if (coreResult.ok) {
+    if (coreResult.changed) {
+      totals.changed = 1;
+    } else {
+      totals.unchanged = 1;
+    }
+    totals.succeeded = 1;
+    resourceCounts = addResourceCounts(resourceCounts, coreResult.counts);
+  } else {
+    totals.failed = 1;
+    failures.set(coreResult.code, 1);
+  }
+
+  await updateSyncRunProgress({
+    client,
+    connectionId: connection.id,
+    resourceCounts,
+    runId: run.row.id,
+    totals,
+    userId,
+  }).catch(() => undefined);
+
+  let announcements = emptyAnnouncementsSyncSummary() as CanvasAnnouncementsSyncResult;
+  let files = emptyFilesSyncSummary() as CanvasFilesSyncResult;
+
+  if (coreResult.ok) {
+    announcements = await syncAnnouncements({
+      canvas,
+      client,
+      connection,
+      courses: [course],
+      retryPolicy,
+      runId: run.row.id,
+      syncedAt: startedAt,
+      syncWindow,
+      userId,
+    });
+    retryAttempts += announcements.retryCount;
+    for (const failureCode of announcements.failureCodes) {
+      failures.set(failureCode, (failures.get(failureCode) ?? 0) + 1);
+    }
+    resourceCounts = addResourceCounts(resourceCounts, {
+      ...emptyResourceCounts(),
+      announcements: announcements.discovered,
+    });
+
+    files = await syncCourseFiles({
+      announcementsByCourse: new Map(
+        announcements.announcementsByCourse.map((courseAnnouncements) => [
+          courseAnnouncements.canvasCourseId,
+          courseAnnouncements.announcements,
+        ]),
+      ),
+      canvas,
+      client,
+      connection,
+      courseResults: [coreResult],
+      retryPolicy,
+      runId: run.row.id,
+      syncedAt: startedAt,
+      userId,
+    });
+    retryAttempts += files.retryCount;
+    for (const failureCode of files.failureCodes) {
+      failures.set(failureCode, (failures.get(failureCode) ?? 0) + 1);
+    }
+    resourceCounts = addResourceCounts(resourceCounts, {
+      ...emptyResourceCounts(),
+      fileReferences: files.references,
+      files: files.discovered,
+    });
+  }
+
+  const failureSummaries = summarizeFailures(failures);
+  const status = courseScopedStatus({
+    announcements,
+    coreResult,
+    files,
+  });
+  const completedAt = new Date().toISOString();
+  const summary = createCourseScopedSummary({
+    announcements,
+    completedAt,
+    coreResult: coreResult.ok ? coreResult : null,
+    failures: failureSummaries,
+    files,
+    resourceCounts,
+    retryAttempts,
+    startedAt,
+    status,
+  });
+
+  await finishSyncRun({
+    client,
+    connectionId: connection.id,
+    failureCode: failureSummaries[0]?.code ?? null,
+    failureSummary:
+      status === "failed" || status === "partial"
+        ? "One or more Canvas course synchronization scopes could not be synchronized."
+        : null,
+    resourceCounts,
+    runId: run.row.id,
+    status: status === "success" ? "succeeded" : status,
+    totals,
+    userId,
+  });
+
+  return { ok: true, summary };
 }
 
 async function syncOneCourse({
@@ -2307,7 +2555,7 @@ async function beginSyncRun({
 }: {
   readonly client: SupabaseClient<Database>;
   readonly connectionId: string;
-  readonly mode: CanvasAcademicSyncMode;
+  readonly mode: CanvasSyncRunMode;
   readonly startedAt: string;
   readonly userId: string;
 }): Promise<
@@ -2347,6 +2595,62 @@ async function beginSyncRun({
         status: 500,
         code: "canvas_storage_failed",
         message: "Canvas synchronization could not be started.",
+      },
+    };
+  }
+
+  return { ok: true, row: data };
+}
+
+async function beginCourseSyncRun({
+  client,
+  connectionId,
+  courseId,
+  startedAt,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly startedAt: string;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly row: CanvasSyncRunRow }
+  | {
+      readonly ok: false;
+      readonly error: {
+        readonly status: 409 | 500;
+        readonly code: CanvasApiErrorCode;
+        readonly message: string;
+      };
+    }
+> {
+  const { data, error } = await client
+    .rpc("begin_canvas_course_sync_run", {
+      p_canvas_connection_id: connectionId,
+      p_scope_course_id: courseId,
+      p_started_at: startedAt,
+      p_user_id: userId,
+    })
+    .single();
+
+  if (error || !data) {
+    if (isRpcMessage(error, "canvas_sync_in_progress")) {
+      return {
+        ok: false,
+        error: {
+          status: 409,
+          code: "canvas_sync_in_progress",
+          message: "A Canvas course synchronization is already running.",
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        status: 500,
+        code: "canvas_storage_failed",
+        message: "Canvas course synchronization could not be started.",
       },
     };
   }
@@ -2786,6 +3090,106 @@ function createSummary({
     resources: resourceCounts,
     retryAttempts,
     ...(failures.length > 0 ? { failures } : {}),
+  };
+}
+
+function courseScopedStatus({
+  announcements,
+  coreResult,
+  files,
+}: {
+  readonly announcements: CanvasAnnouncementsSyncSummary;
+  readonly coreResult: CourseSyncResult;
+  readonly files: CanvasFilesSyncSummary;
+}): CanvasCourseScopedSyncSummary["status"] {
+  if (!coreResult.ok) {
+    return "failed";
+  }
+  if (announcements.coursesFailed > 0 || files.coursesFailed > 0) {
+    return "partial";
+  }
+  return "success";
+}
+
+function createCourseScopedSummary({
+  announcements,
+  completedAt,
+  coreResult,
+  failures,
+  files,
+  resourceCounts,
+  retryAttempts,
+  startedAt,
+  status,
+}: {
+  readonly announcements: CanvasAnnouncementsSyncSummary;
+  readonly completedAt: string;
+  readonly coreResult: CourseSyncSuccess | null;
+  readonly failures: readonly CanvasAcademicSyncFailureSummary[];
+  readonly files: CanvasFilesSyncSummary;
+  readonly resourceCounts: CanvasSyncResourceCounts;
+  readonly retryAttempts: number;
+  readonly startedAt: string;
+  readonly status: CanvasCourseScopedSyncSummary["status"];
+}): CanvasCourseScopedSyncSummary {
+  const persistence = coreResult?.persistence ?? null;
+  const inserted =
+    (persistence?.modules_inserted ?? 0) +
+    (persistence?.module_items_inserted ?? 0) +
+    (persistence?.pages_inserted ?? 0) +
+    (persistence?.assignment_groups_inserted ?? 0) +
+    (persistence?.assignments_inserted ?? 0) +
+    announcements.inserted +
+    files.inserted;
+  const updated =
+    (persistence?.course_updated ?? 0) +
+    (persistence?.modules_updated ?? 0) +
+    (persistence?.module_items_updated ?? 0) +
+    (persistence?.pages_updated ?? 0) +
+    (persistence?.assignment_groups_updated ?? 0) +
+    (persistence?.assignments_updated ?? 0) +
+    announcements.updated +
+    files.updated;
+  const pruned =
+    (persistence?.modules_deleted ?? 0) +
+    (persistence?.module_items_deleted ?? 0) +
+    (persistence?.pages_deleted ?? 0) +
+    (persistence?.assignment_groups_deleted ?? 0) +
+    (persistence?.assignments_deleted ?? 0) +
+    announcements.pruned +
+    files.deactivated +
+    files.referencesDeleted;
+  const unchanged =
+    (coreResult && !coreResult.changed
+      ? resourceCounts.modules +
+        resourceCounts.moduleItems +
+        resourceCounts.pages +
+        resourceCounts.assignmentGroups +
+        resourceCounts.assignments
+      : 0) +
+    announcements.unchanged +
+    files.unchanged;
+
+  return {
+    status,
+    startedAt,
+    completedAt,
+    durationMs: Math.max(0, Date.parse(completedAt) - Date.parse(startedAt)),
+    resources: resourceCounts,
+    modules: resourceCounts.modules,
+    moduleItems: resourceCounts.moduleItems,
+    pages: resourceCounts.pages,
+    assignmentGroups: resourceCounts.assignmentGroups,
+    assignments: resourceCounts.assignments,
+    announcements: announcements.discovered,
+    files: files.discovered,
+    fileReferences: files.references,
+    inserted,
+    updated,
+    unchanged,
+    pruned,
+    retryAttempts,
+    ...(failures.length > 0 ? { sanitizedFailures: failures } : {}),
   };
 }
 

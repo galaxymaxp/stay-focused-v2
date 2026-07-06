@@ -78,7 +78,89 @@ describe("CanvasClient", () => {
         publicSyllabus: null,
         syllabusBody: null,
         updatedAt: null,
+        concluded: null,
+        term: null,
+        enrollments: [],
+        sections: [],
       },
+    ]);
+  });
+
+  it("lists course inventory with presentation metadata", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          id: 7,
+          name: "Biology 101",
+          course_code: "BIO101",
+          workflow_state: "available",
+          concluded: false,
+          term: {
+            id: 3,
+            name: "First Term",
+            start_at: "2026-06-01T00:00:00Z",
+            end_at: "2026-10-01T00:00:00Z",
+          },
+          enrollments: [
+            {
+              id: 9,
+              type: "StudentEnrollment",
+              enrollment_state: "active",
+            },
+          ],
+          sections: [
+            {
+              id: 4,
+              name: "A",
+              enrollment_role: "StudentEnrollment",
+            },
+          ],
+        },
+      ]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(client.listCourseInventory()).resolves.toMatchObject([
+      {
+        id: "7",
+        term: { id: "3", name: "First Term" },
+        concluded: false,
+        enrollments: [{ id: "9", enrollmentState: "active" }],
+        sections: [{ id: "4", enrollmentRole: "StudentEnrollment" }],
+      },
+    ]);
+
+    const request = lastRequest(fetchImpl);
+    expect(request.url).toContain("/api/v1/courses?");
+    expect(request.url).toContain("state%5B%5D=available");
+    expect(request.url).toContain("include%5B%5D=term");
+    expect(request.url).toContain("include%5B%5D=concluded");
+  });
+
+  it("uses safe presentation fallbacks when inventory courses omit names", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          id: 7,
+          name: null,
+          friendly_name: null,
+          course_code: "BIO101",
+          workflow_state: "available",
+        },
+        {
+          id: 8,
+          name: null,
+          friendly_name: null,
+          course_code: null,
+          workflow_state: "available",
+        },
+      ]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(client.listCourseInventory()).resolves.toMatchObject([
+      { id: "7", name: "BIO101" },
+      { id: "8", name: "Untitled Canvas course" },
     ]);
   });
 
