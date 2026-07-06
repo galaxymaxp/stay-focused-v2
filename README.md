@@ -16,7 +16,13 @@ replacement when the versioned snapshot fingerprint is unchanged. Phase 5B.3C1
 audited conditional-request support and found no useful 304 behavior for the
 currently synchronized Canvas endpoint families. Phase 5B.4A adds backend
 Canvas planner-item and course-announcement synchronization over a bounded
-30-day past and 120-day future window, with no mobile UI yet.
+30-day past and 120-day future window, with no mobile UI yet. Phase 5C.1 adds
+secure Canvas file metadata inventory and a bounded backend ingestion route for
+selected eligible files. Its migration, private Storage posture, protected live
+ingestion, and second-run stability are validated, but the synchronous sync
+route still exceeds its configured runtime budget in local production-build
+measurement. It does not yet parse, OCR, preview, or generate reviewers from
+Canvas file contents.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -101,6 +107,11 @@ Complete:
 - Phase 5B.4A Canvas planner-item and announcement synchronization with typed
   client methods, service-role-only persistence, deterministic fingerprints,
   safe scoped pruning, aggregate diagnostics, and mobile service parsing
+- Phase 5C.1 Canvas file inventory and bounded ingestion foundation with
+  service-role-only metadata persistence, private storage for eligible selected
+  files, strict redirect/download limits, sanitized per-file results, remote
+  Supabase validation, protected live ingestion validation, and a documented
+  synchronous route-duration limitation
 
 Working locally:
 
@@ -164,6 +175,14 @@ Working locally:
   sync rows. Four known Page-listing limitations remained non-retryable, and
   four announcement persistence scopes were preserved with sanitized failures
   for the same unavailable course graphs.
+- Phase 5C.1 automated, remote, and protected live validation passed for Canvas
+  file metadata/download tests, API inventory/ingestion contracts, mobile sync
+  parsing, Supabase migrations `202607060003` and `202607060004`, private
+  Storage access controls, protected ingestion, and second-run stability. The
+  synchronous `POST /api/canvas/sync` route measured 72.294 seconds and 65.355
+  seconds in local production-build validation against a configured
+  `maxDuration = 60`, so this backend foundation is locally functional and
+  data-safe but not production-runtime safe yet.
 
 Pending:
 
@@ -305,6 +324,11 @@ tests do not run that opt-in provider smoke.
   diagnostics. The protected live account returned a documented partial result
   because four Page-listing limitations and their dependent announcement
   persistence scopes remain unavailable.
+- Phase 5C.1 is remotely and live validated for backend Canvas file metadata
+  inventory and bounded selected-file ingestion. It stores no parsed text, runs
+  no OCR, adds no mobile UI, and does not make Canvas files available to
+  reviewer generation yet. The synchronous sync route remains over its
+  configured runtime budget, so deployed production readiness is not claimed.
 - No background or scheduled Canvas synchronization exists yet, and no mobile
   synchronization screen exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
@@ -314,9 +338,10 @@ tests do not run that opt-in provider smoke.
   Live second-user Canvas validation was not run.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
-- Discussions, quiz metadata, files/media ingestion, endpoint validators,
-  grade/submission/rubric data, announcement attachments, and reviewer
-  generation from Canvas content are deferred.
+- Discussions, quiz metadata, file parsing/OCR, endpoint validators,
+  grade/submission/rubric data, mobile Canvas source selection, announcement
+  attachment content import, and reviewer generation from Canvas content are
+  deferred.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
@@ -331,6 +356,11 @@ Phase 5B.3B incremental academic graph synchronization foundation is complete
 and live validated. Phase 5B.3C1 conditional-request capability audit is
 complete and does not support Phase 5B.3C2 for the audited endpoints. The
 Phase 5B.4A planner-item and announcement synchronization slice is complete
-with documented live Canvas limitations. The recommended next roadmap task is
-Phase 5C file, attachment, and media ingestion. Canvas OAuth remains a future
-phase.
+with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
+ingestion foundation is remotely and live validated with a documented
+synchronous route-duration limitation. The next roadmap task is Phase 5C.2A -
+User-Facing Canvas Sync And Source-Selection Loop: manual mobile Canvas sync,
+last-sync status and safe aggregate counts, clear partial-failure messaging,
+narrow source-selection preview, and editable source text before reviewer
+generation. Parser/OCR work should be added only as required for that narrow
+loop. Canvas OAuth remains a future phase.

@@ -150,6 +150,24 @@ export type CanvasAnnouncementInsert =
   Database["public"]["Tables"]["canvas_announcements"]["Insert"];
 export type CanvasAnnouncementUpdate =
   Database["public"]["Tables"]["canvas_announcements"]["Update"];
+export type CanvasFileRow =
+  Database["public"]["Tables"]["canvas_files"]["Row"];
+export type CanvasFileInsert =
+  Database["public"]["Tables"]["canvas_files"]["Insert"];
+export type CanvasFileUpdate =
+  Database["public"]["Tables"]["canvas_files"]["Update"];
+export type CanvasFileReferenceRow =
+  Database["public"]["Tables"]["canvas_file_references"]["Row"];
+export type CanvasFileReferenceInsert =
+  Database["public"]["Tables"]["canvas_file_references"]["Insert"];
+export type CanvasFileReferenceUpdate =
+  Database["public"]["Tables"]["canvas_file_references"]["Update"];
+export type CanvasFileIngestionResultRow =
+  Database["public"]["Tables"]["canvas_file_ingestion_results"]["Row"];
+export type CanvasFileIngestionResultInsert =
+  Database["public"]["Tables"]["canvas_file_ingestion_results"]["Insert"];
+export type CanvasFileIngestionResultUpdate =
+  Database["public"]["Tables"]["canvas_file_ingestion_results"]["Update"];
 export type CanvasCourseAcademicSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_academic_snapshot"]["Returns"][number];
 export type CanvasCourseAcademicSnapshotWithSyncStateResult =
@@ -158,6 +176,8 @@ export type CanvasPlannerItemsSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_planner_items_snapshot"]["Returns"][number];
 export type CanvasAnnouncementsSnapshotResult =
   Database["public"]["Functions"]["replace_canvas_course_announcements_snapshot"]["Returns"][number];
+export type CanvasFilesInventorySnapshotResult =
+  Database["public"]["Functions"]["replace_canvas_course_files_inventory"]["Returns"][number];
 
 export interface Database {
   public: {
@@ -1277,6 +1297,310 @@ export interface Database {
           },
         ];
       };
+      canvas_files: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          canvas_course_id: string;
+          canvas_file_id: string;
+          folder_id: string | null;
+          display_name: string;
+          filename: string | null;
+          content_type: string | null;
+          size_bytes: number | null;
+          locked: boolean | null;
+          hidden: boolean | null;
+          hidden_for_user: boolean | null;
+          visibility_level: string | null;
+          media_class: string | null;
+          media_entry_id: string | null;
+          canvas_created_at: string | null;
+          canvas_updated_at: string | null;
+          canvas_modified_at: string | null;
+          lock_at: string | null;
+          unlock_at: string | null;
+          metadata_fingerprint: string;
+          content_version_fingerprint: string;
+          ingestion_eligibility: string;
+          ingestion_status: string;
+          current_sha256: string | null;
+          stored_content_type: string | null;
+          stored_byte_count: number | null;
+          storage_bucket: string | null;
+          storage_object_key: string | null;
+          availability_status: string;
+          first_synced_at: string;
+          last_synced_at: string;
+          last_successful_inventory_at: string | null;
+          last_successful_ingestion_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          canvas_course_id: string;
+          canvas_file_id: string;
+          folder_id?: string | null;
+          display_name: string;
+          filename?: string | null;
+          content_type?: string | null;
+          size_bytes?: number | null;
+          locked?: boolean | null;
+          hidden?: boolean | null;
+          hidden_for_user?: boolean | null;
+          visibility_level?: string | null;
+          media_class?: string | null;
+          media_entry_id?: string | null;
+          canvas_created_at?: string | null;
+          canvas_updated_at?: string | null;
+          canvas_modified_at?: string | null;
+          lock_at?: string | null;
+          unlock_at?: string | null;
+          metadata_fingerprint: string;
+          content_version_fingerprint: string;
+          ingestion_eligibility: string;
+          ingestion_status?: string;
+          current_sha256?: string | null;
+          stored_content_type?: string | null;
+          stored_byte_count?: number | null;
+          storage_bucket?: string | null;
+          storage_object_key?: string | null;
+          availability_status?: string;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          last_successful_inventory_at?: string | null;
+          last_successful_ingestion_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          canvas_course_id?: string;
+          canvas_file_id?: string;
+          folder_id?: string | null;
+          display_name?: string;
+          filename?: string | null;
+          content_type?: string | null;
+          size_bytes?: number | null;
+          locked?: boolean | null;
+          hidden?: boolean | null;
+          hidden_for_user?: boolean | null;
+          visibility_level?: string | null;
+          media_class?: string | null;
+          media_entry_id?: string | null;
+          canvas_created_at?: string | null;
+          canvas_updated_at?: string | null;
+          canvas_modified_at?: string | null;
+          lock_at?: string | null;
+          unlock_at?: string | null;
+          metadata_fingerprint?: string;
+          content_version_fingerprint?: string;
+          ingestion_eligibility?: string;
+          ingestion_status?: string;
+          current_sha256?: string | null;
+          stored_content_type?: string | null;
+          stored_byte_count?: number | null;
+          storage_bucket?: string | null;
+          storage_object_key?: string | null;
+          availability_status?: string;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          last_successful_inventory_at?: string | null;
+          last_successful_ingestion_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_files_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_files_course_owner_fkey";
+            columns: [
+              "course_id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "canvas_course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_files_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_file_references: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          file_id: string;
+          reference_type: string;
+          reference_identity: string;
+          referenced_row_id: string | null;
+          canvas_module_id: string | null;
+          canvas_module_item_id: string | null;
+          canvas_page_url: string | null;
+          canvas_assignment_id: string | null;
+          canvas_announcement_id: string | null;
+          first_seen_at: string;
+          last_seen_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          file_id: string;
+          reference_type: string;
+          reference_identity: string;
+          referenced_row_id?: string | null;
+          canvas_module_id?: string | null;
+          canvas_module_item_id?: string | null;
+          canvas_page_url?: string | null;
+          canvas_assignment_id?: string | null;
+          canvas_announcement_id?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          file_id?: string;
+          reference_type?: string;
+          reference_identity?: string;
+          referenced_row_id?: string | null;
+          canvas_module_id?: string | null;
+          canvas_module_item_id?: string | null;
+          canvas_page_url?: string | null;
+          canvas_assignment_id?: string | null;
+          canvas_announcement_id?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_file_references_file_owner_fkey";
+            columns: [
+              "file_id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_files";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_file_references_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_file_ingestion_results: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          file_id: string;
+          status: string;
+          result_code: string;
+          retryable: boolean;
+          bytes_stored: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          file_id: string;
+          status: string;
+          result_code: string;
+          retryable?: boolean;
+          bytes_stored?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          file_id?: string;
+          status?: string;
+          result_code?: string;
+          retryable?: boolean;
+          bytes_stored?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_file_ingestion_results_file_owner_fkey";
+            columns: [
+              "file_id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_files";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_file_ingestion_results_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -1577,6 +1901,52 @@ export interface Database {
           announcements_updated: number;
           announcements_unchanged: number;
           announcements_pruned: number;
+        }>;
+      };
+      replace_canvas_course_files_inventory: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_sync_run_id: string;
+          p_synced_at: string;
+          p_canvas_course_id: string;
+          p_files: Json;
+          p_references: Json;
+        };
+        Returns: Array<{
+          files_inserted: number;
+          files_updated: number;
+          files_unchanged: number;
+          files_deactivated: number;
+          references_inserted: number;
+          references_deleted: number;
+          module_file_references: number;
+          html_file_references: number;
+          metadata_only_files: number;
+          blocked_files: number;
+        }>;
+      };
+      record_canvas_file_ingestion_result: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_file_id: string;
+          p_status: string;
+          p_result_code: string;
+          p_retryable: boolean;
+          p_bytes_stored: number | null;
+        };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          file_id: string;
+          status: string;
+          result_code: string;
+          retryable: boolean;
+          bytes_stored: number | null;
+          created_at: string;
         }>;
       };
       replace_canvas_connection_with_capabilities: {

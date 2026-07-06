@@ -21,10 +21,12 @@ const mocks = vi.hoisted(() => ({
     inFlightModuleItems: 0,
     inFlightPageDetails: 0,
     inFlightAnnouncements: 0,
+    inFlightFiles: 0,
     maxInFlightCourses: 0,
     maxInFlightModuleItems: 0,
     maxInFlightPageDetails: 0,
     maxInFlightAnnouncements: 0,
+    maxInFlightFiles: 0,
   },
 }));
 
@@ -135,6 +137,13 @@ vi.mock("@stay-focused/canvas", () => {
         mocks.canvas.announcements.get(options.courseId) ?? [],
       );
     }
+
+    public async listCourseFiles(
+      courseId: string,
+    ): Promise<readonly CanvasFileFixture[]> {
+      throwIfConfigured(`files:${courseId}`);
+      return withFileConcurrency(async () => getFixture(courseId).files);
+    }
   }
 
   function getFixture(courseId: string): CourseFixture {
@@ -226,6 +235,20 @@ vi.mock("@stay-focused/canvas", () => {
     }
   }
 
+  async function withFileConcurrency<T>(action: () => Promise<T>): Promise<T> {
+    mocks.canvas.inFlightFiles += 1;
+    mocks.canvas.maxInFlightFiles = Math.max(
+      mocks.canvas.maxInFlightFiles,
+      mocks.canvas.inFlightFiles,
+    );
+    await Promise.resolve();
+    try {
+      return await action();
+    } finally {
+      mocks.canvas.inFlightFiles -= 1;
+    }
+  }
+
   return {
     CanvasClient,
     CanvasClientError,
@@ -256,10 +279,12 @@ describe("POST /api/canvas/sync", () => {
     mocks.canvas.inFlightModuleItems = 0;
     mocks.canvas.inFlightPageDetails = 0;
     mocks.canvas.inFlightAnnouncements = 0;
+    mocks.canvas.inFlightFiles = 0;
     mocks.canvas.maxInFlightCourses = 0;
     mocks.canvas.maxInFlightModuleItems = 0;
     mocks.canvas.maxInFlightPageDetails = 0;
     mocks.canvas.maxInFlightAnnouncements = 0;
+    mocks.canvas.maxInFlightFiles = 0;
   });
 
   it("requires bearer authentication", async () => {
@@ -1254,6 +1279,9 @@ function createSyncDb(options: {
         if (name === "replace_canvas_course_announcements_snapshot") {
           return replaceAnnouncementsSnapshot(payload);
         }
+        if (name === "replace_canvas_course_files_inventory") {
+          return replaceFilesInventory(payload);
+        }
         if (name === "record_canvas_course_snapshot_unchanged") {
           return recordUnchanged(payload);
         }
@@ -1670,6 +1698,37 @@ function createSyncDb(options: {
     };
   }
 
+  function replaceFilesInventory(payload: Record<string, unknown>) {
+    const incomingFiles = readPayloadArray(payload.p_files).map(asRecord);
+    const references = readPayloadArray(payload.p_references).map(asRecord);
+    const metadataOnlyFiles = incomingFiles.filter((file) =>
+      String(file.ingestion_status) === "metadata_only",
+    ).length;
+    const blockedFiles = incomingFiles.filter((file) =>
+      String(file.ingestion_status) === "blocked" ||
+      String(file.ingestion_status) === "unavailable",
+    ).length;
+    return {
+      data: {
+        blocked_files: blockedFiles,
+        files_deactivated: 0,
+        files_inserted: incomingFiles.length,
+        files_unchanged: 0,
+        files_updated: 0,
+        html_file_references: references.filter((reference) =>
+          String(reference.reference_type) !== "module_item",
+        ).length,
+        metadata_only_files: metadataOnlyFiles,
+        module_file_references: references.filter((reference) =>
+          String(reference.reference_type) === "module_item",
+        ).length,
+        references_deleted: 0,
+        references_inserted: references.length,
+      },
+      error: null,
+    };
+  }
+
   function recordUnchanged(payload: Record<string, unknown>) {
     if (options.stateWriteFailure === true) {
       return { data: null, error: { message: "state failed" } };
@@ -1816,6 +1875,7 @@ function courseFixture(
     assignmentGroups: [assignmentGroup("group-1")],
     assignments: [assignment("assignment-1", { assignmentGroupId: "group-1" })],
     courseId,
+    files: [],
     moduleItems: new Map([
       ["module-1", [moduleItem("item-1", { type: "Page" })]],
     ]),
@@ -2058,6 +2118,7 @@ interface CourseFixture {
   readonly pageDetails: ReadonlyMap<string, CanvasPageDetailFixture>;
   readonly assignmentGroups: readonly CanvasAssignmentGroupFixture[];
   readonly assignments: readonly CanvasAssignmentFixture[];
+  readonly files: readonly CanvasFileFixture[];
 }
 
 interface StoredRun {
@@ -2267,4 +2328,25 @@ interface CanvasAnnouncementFixture {
   readonly published: boolean | null;
   readonly locked: boolean | null;
   readonly htmlUrl: string | null;
+}
+
+interface CanvasFileFixture {
+  readonly id: string;
+  readonly folderId: string | null;
+  readonly displayName: string | null;
+  readonly filename: string | null;
+  readonly contentType: string | null;
+  readonly size: number | null;
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+  readonly modifiedAt: string | null;
+  readonly lockAt: string | null;
+  readonly unlockAt: string | null;
+  readonly locked: boolean | null;
+  readonly hidden: boolean | null;
+  readonly hiddenForUser: boolean | null;
+  readonly visibilityLevel: string | null;
+  readonly mediaClass: string | null;
+  readonly mediaEntryId: string | null;
+  readonly downloadUrl: string | null;
 }

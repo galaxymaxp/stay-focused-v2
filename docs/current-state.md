@@ -325,6 +325,24 @@ the same unavailable course graphs and are reported with sanitized
 `canvas_announcement_persistence_failed` diagnostics while preserving stored
 data.
 
+Phase 5C.1 is remotely and live validated as a backend-only secure Canvas file
+inventory and bounded ingestion foundation. The Canvas sync route now
+inventories course file metadata for successful course graphs and records file
+references from module items, Page HTML, assignment HTML, and announcement
+HTML. The protected `POST /api/canvas/files/ingest` route accepts selected
+owned `canvas_files` row ids, re-fetches Canvas file metadata, downloads only
+eligible files within strict byte and redirect limits, validates basic content
+signatures, writes eligible bytes to the private `canvas-source-files` bucket,
+and records sanitized per-file terminal results. Remote migrations
+`202607060003` and `202607060004` are applied; the follow-up migration fixed
+new Phase 5C.1 foreign-key index advisor findings. Private Storage, direct
+grant denial, RPC ownership rejection, protected live ingestion, and second-run
+object stability passed. This phase does not parse, OCR, transcribe, preview,
+or generate reviewers from Canvas file contents. The synchronous
+`POST /api/canvas/sync` route measured 72.294 seconds and 65.355 seconds in
+local production-build validation against `maxDuration = 60`, so Phase 5C.1 is
+not claimed production-runtime safe yet.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -413,6 +431,12 @@ data.
   with a bounded sync window, deterministic fingerprints, service-role-only
   persistence, safe scoped pruning, aggregate diagnostics, and mobile service
   parsing without UI.
+- Phase 5C.1 backend Canvas file metadata inventory and bounded selected-file
+  ingestion foundation with service-role-only metadata persistence, private
+  storage, safe redirect handling, byte caps, content signature checks,
+  aggregate mobile sync parsing without UI, remote Supabase validation,
+  protected live ingestion validation, and a documented synchronous
+  route-duration limitation.
 
 ## Current Verification Baselines
 
@@ -448,6 +472,15 @@ Historical and latest verification include:
   unchanged with stable identities, zero duplicates, zero unnecessary updates,
   zero unexpected pruning, stable failure categories, preserved failed course
   graphs, and zero running sync rows.
+- Phase 5C.1 verification: Canvas tests passed with 50/50 after adding
+  download-security edge coverage; API tests passed with 184/184; mobile tests
+  passed with 79/79; OCR tests passed with 14/14; root typecheck/build/tests
+  passed across 7/7 workspaces. Remote migrations `202607060003` and
+  `202607060004` are applied. Supabase security/performance advisors were
+  reviewed, new Phase 5C.1 foreign-key index warnings were fixed, private
+  Storage access controls passed, protected live ingestion stored two eligible
+  files and one metadata-only result, and second-run ingestion stored zero
+  additional bytes with stable object pointers.
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -617,9 +650,12 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   304 responses were observed, and conditional requests produced no body-byte
   reduction. Continue ordinary GET behavior for the current endpoint families.
 - Phase 5B.4A planner-item and announcement synchronization is complete for
-  backend sync only. No mobile sync screen, source-selection UI, announcement
-  attachment ingestion, discussion synchronization, grade/submission sync,
-  background sync, or reviewer generation from Canvas data exists yet.
+  backend sync only. Phase 5C.1 file metadata inventory and bounded selected
+  ingestion are remotely and live validated for backend routes only, with the
+  synchronous route still over its configured runtime budget. No mobile sync
+  screen, source-selection UI, file parsing/OCR, discussion synchronization,
+  grade/submission sync, background sync, or reviewer generation from Canvas
+  data exists yet.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -635,9 +671,15 @@ incremental academic graph synchronization foundation is complete and live
 validated. Phase 5B.3C1 conditional-request capability audit is complete and
 does not support Phase 5B.3C2 implementation for the audited endpoints. Phase
 5B.4A planner-item and announcement synchronization is complete with documented
-live Canvas limitations. The recommended next roadmap task is Phase 5C file,
-attachment, and media ingestion. Repeated PDF header/footer cleanup remains a
-separate deferred candidate.
+live Canvas limitations. Phase 5C.1 file inventory and bounded ingestion is
+remotely and live validated with a documented synchronous route-duration
+limitation. The recommended next roadmap task is Phase 5C.2A - User-Facing
+Canvas Sync And Source-Selection Loop: manual mobile Canvas sync action,
+last-sync status and safe aggregate counts, clear partial-failure messaging,
+narrow Canvas source-selection preview, and editable source text before
+reviewer generation. Parser/OCR work should be added only as required for that
+narrow loop. Repeated PDF header/footer cleanup remains a separate deferred
+candidate.
 
 ## Known Risks
 

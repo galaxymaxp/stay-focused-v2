@@ -18,6 +18,7 @@ import type {
 } from "@stay-focused/db";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { lookup } from "node:dns/promises";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createCanvasServiceClient } from "@/lib/canvas-db";
@@ -210,7 +211,18 @@ export function createCanvasClient(
   return new CanvasClient({
     baseUrl,
     personalAccessToken,
+    resolveHostname: resolveCanvasDownloadHostname,
   });
+}
+
+async function resolveCanvasDownloadHostname(
+  hostname: string,
+): Promise<readonly string[]> {
+  const records = await lookup(hostname, {
+    all: true,
+    verbatim: true,
+  });
+  return records.map((record) => record.address);
 }
 
 export function normalizeCanvasUrlForApi(baseUrl: string): string {
@@ -372,11 +384,20 @@ export function mapCanvasClientError(error: unknown): {
     case "canvas_not_found":
     case "canvas_redirect_rejected":
     case "canvas_pagination_rejected":
+    case "canvas_file_download_failed":
+    case "canvas_file_redirect_rejected":
+    case "canvas_file_too_large":
     case "canvas_request_failed":
       return {
         status: 502,
         code: "canvas_unavailable",
         message: "Canvas returned an unexpected response.",
+      };
+    case "canvas_file_download_timeout":
+      return {
+        status: 504,
+        code: "canvas_timeout",
+        message: "Canvas did not respond in time.",
       };
   }
 }
@@ -607,6 +628,10 @@ function isCanvasClientErrorCode(
     value === "canvas_invalid_response" ||
     value === "canvas_redirect_rejected" ||
     value === "canvas_pagination_rejected" ||
+    value === "canvas_file_download_failed" ||
+    value === "canvas_file_download_timeout" ||
+    value === "canvas_file_redirect_rejected" ||
+    value === "canvas_file_too_large" ||
     value === "canvas_request_failed"
   );
 }

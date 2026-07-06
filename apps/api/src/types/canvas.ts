@@ -78,6 +78,22 @@ export interface CanvasSyncSummary {
     readonly coursesSucceeded: number;
     readonly coursesFailed: number;
   };
+  readonly files: {
+    readonly coursesSucceeded: number;
+    readonly coursesFailed: number;
+    readonly discovered: number;
+    readonly inserted: number;
+    readonly updated: number;
+    readonly unchanged: number;
+    readonly deactivated: number;
+    readonly references: number;
+    readonly referencesInserted: number;
+    readonly referencesDeleted: number;
+    readonly moduleFileReferences: number;
+    readonly htmlFileReferences: number;
+    readonly metadataOnly: number;
+    readonly blocked: number;
+  };
   readonly resources: {
     readonly modules: number;
     readonly moduleItems: number;
@@ -86,6 +102,8 @@ export interface CanvasSyncSummary {
     readonly assignments: number;
     readonly plannerItems: number;
     readonly announcements: number;
+    readonly files: number;
+    readonly fileReferences: number;
   };
   readonly retryAttempts: number;
   readonly failures?: readonly {
@@ -96,6 +114,35 @@ export interface CanvasSyncSummary {
 
 export interface CanvasSyncResponse extends CanvasSyncSummary {
   readonly ok: true;
+}
+
+export type CanvasFileIngestionResultStatus =
+  | "stored"
+  | "unchanged"
+  | "metadata_only"
+  | "blocked"
+  | "failed"
+  | "unavailable";
+
+export interface CanvasFileIngestionItemResult {
+  readonly fileId: string;
+  readonly status: CanvasFileIngestionResultStatus;
+  readonly code: string;
+  readonly retryable: boolean;
+  readonly bytesStored: number | null;
+}
+
+export interface CanvasFileIngestionResponse {
+  readonly ok: true;
+  readonly requested: number;
+  readonly succeeded: number;
+  readonly unchanged: number;
+  readonly metadataOnly: number;
+  readonly blocked: number;
+  readonly failed: number;
+  readonly unavailable: number;
+  readonly totalBytesStored: number;
+  readonly results: readonly CanvasFileIngestionItemResult[];
 }
 
 export interface CanvasDeleteResponse {
@@ -126,6 +173,7 @@ export type CanvasApiErrorCode =
   | "canvas_connection_corrupt"
   | "canvas_sync_in_progress"
   | "canvas_storage_not_configured"
+  | "canvas_file_not_found"
   | "canvas_storage_failed";
 
 export type CanvasApiResponse =
@@ -133,5 +181,6 @@ export type CanvasApiResponse =
   | CanvasCoursesResponse
   | CanvasCapabilitiesResponse
   | CanvasSyncResponse
+  | CanvasFileIngestionResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;

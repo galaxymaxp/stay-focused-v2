@@ -28,6 +28,9 @@ export type CanvasSyncFailureCode =
   | "canvas_planner_persistence_failed"
   | "canvas_course_announcements_failed"
   | "canvas_announcement_persistence_failed"
+  | "canvas_course_files_failed"
+  | "canvas_file_metadata_invalid"
+  | "canvas_file_persistence_failed"
   | "canvas_connection_corrupt"
   | "canvas_storage_failed"
   | "canvas_sync_in_progress"
@@ -42,6 +45,8 @@ export interface CanvasSyncResourceCounts {
   readonly assignments: number;
   readonly plannerItems: number;
   readonly announcements: number;
+  readonly files: number;
+  readonly fileReferences: number;
 }
 
 interface SyncJsonObject {
@@ -260,6 +265,8 @@ export function resourceCountsForSnapshot(
     assignments: snapshot.assignments.length,
     plannerItems: 0,
     announcements: 0,
+    files: 0,
+    fileReferences: 0,
   };
 }
 
@@ -275,6 +282,8 @@ export function addResourceCounts(
     assignments: left.assignments + right.assignments,
     plannerItems: left.plannerItems + right.plannerItems,
     announcements: left.announcements + right.announcements,
+    files: left.files + right.files,
+    fileReferences: left.fileReferences + right.fileReferences,
   };
 }
 
@@ -287,6 +296,8 @@ export function emptyResourceCounts(): CanvasSyncResourceCounts {
     assignments: 0,
     plannerItems: 0,
     announcements: 0,
+    files: 0,
+    fileReferences: 0,
   };
 }
 

@@ -69,6 +69,22 @@ export interface CanvasSyncSummary {
     readonly coursesSucceeded: number;
     readonly coursesFailed: number;
   };
+  readonly files: {
+    readonly coursesSucceeded: number;
+    readonly coursesFailed: number;
+    readonly discovered: number;
+    readonly inserted: number;
+    readonly updated: number;
+    readonly unchanged: number;
+    readonly deactivated: number;
+    readonly references: number;
+    readonly referencesInserted: number;
+    readonly referencesDeleted: number;
+    readonly moduleFileReferences: number;
+    readonly htmlFileReferences: number;
+    readonly metadataOnly: number;
+    readonly blocked: number;
+  };
   readonly resources: {
     readonly modules: number;
     readonly moduleItems: number;
@@ -77,6 +93,8 @@ export interface CanvasSyncSummary {
     readonly assignments: number;
     readonly plannerItems: number;
     readonly announcements: number;
+    readonly files: number;
+    readonly fileReferences: number;
   };
   readonly retryAttempts: number;
   readonly failures?: readonly {
@@ -445,6 +463,7 @@ function parseSyncResponse(parsed: unknown): CanvasApiResult<CanvasSyncSummary> 
         courses: parsed.courses,
         plannerItems: parsed.plannerItems,
         announcements: parsed.announcements,
+        files: parsed.files,
         resources: parsed.resources,
         retryAttempts: parsed.retryAttempts,
         ...(parsed.failures ? { failures: parsed.failures } : {}),
@@ -638,6 +657,7 @@ function isSyncSuccessResponse(value: unknown): value is SyncSuccessResponse {
       "courses",
       "plannerItems",
       "announcements",
+      "files",
       "resources",
       "retryAttempts",
       "failures",
@@ -648,6 +668,7 @@ function isSyncSuccessResponse(value: unknown): value is SyncSuccessResponse {
     isSyncCourseCounts(value.courses) &&
     isPlannerSyncCounts(value.plannerItems) &&
     isAnnouncementSyncCounts(value.announcements) &&
+    isFileSyncCounts(value.files) &&
     isSyncResourceCounts(value.resources) &&
     isNonNegativeInteger(value.retryAttempts) &&
     (value.failures === undefined ||
@@ -855,6 +876,44 @@ function isAnnouncementSyncCounts(
   );
 }
 
+function isFileSyncCounts(
+  value: unknown,
+): value is CanvasSyncSummary["files"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "coursesSucceeded",
+      "coursesFailed",
+      "discovered",
+      "inserted",
+      "updated",
+      "unchanged",
+      "deactivated",
+      "references",
+      "referencesInserted",
+      "referencesDeleted",
+      "moduleFileReferences",
+      "htmlFileReferences",
+      "metadataOnly",
+      "blocked",
+    ]) &&
+    isNonNegativeInteger(value.coursesSucceeded) &&
+    isNonNegativeInteger(value.coursesFailed) &&
+    isNonNegativeInteger(value.discovered) &&
+    isNonNegativeInteger(value.inserted) &&
+    isNonNegativeInteger(value.updated) &&
+    isNonNegativeInteger(value.unchanged) &&
+    isNonNegativeInteger(value.deactivated) &&
+    isNonNegativeInteger(value.references) &&
+    isNonNegativeInteger(value.referencesInserted) &&
+    isNonNegativeInteger(value.referencesDeleted) &&
+    isNonNegativeInteger(value.moduleFileReferences) &&
+    isNonNegativeInteger(value.htmlFileReferences) &&
+    isNonNegativeInteger(value.metadataOnly) &&
+    isNonNegativeInteger(value.blocked)
+  );
+}
+
 function isSyncResourceCounts(
   value: unknown,
 ): value is CanvasSyncSummary["resources"] {
@@ -868,6 +927,8 @@ function isSyncResourceCounts(
       "assignments",
       "plannerItems",
       "announcements",
+      "files",
+      "fileReferences",
     ]) &&
     isNonNegativeInteger(value.modules) &&
     isNonNegativeInteger(value.moduleItems) &&
@@ -875,7 +936,9 @@ function isSyncResourceCounts(
     isNonNegativeInteger(value.assignmentGroups) &&
     isNonNegativeInteger(value.assignments) &&
     isNonNegativeInteger(value.plannerItems) &&
-    isNonNegativeInteger(value.announcements)
+    isNonNegativeInteger(value.announcements) &&
+    isNonNegativeInteger(value.files) &&
+    isNonNegativeInteger(value.fileReferences)
   );
 }
 

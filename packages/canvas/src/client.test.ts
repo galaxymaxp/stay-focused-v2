@@ -5,6 +5,7 @@ import {
   CanvasClientError,
   normalizeCanvasBaseUrl,
 } from "./client";
+import type { CanvasFile, CanvasHostnameResolver } from "./types";
 
 type FetchMock = ReturnType<typeof vi.fn> & typeof fetch;
 
@@ -536,6 +537,305 @@ describe("CanvasClient", () => {
     ]);
   });
 
+  it("lists and reads course file metadata without exposing download bodies", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          id: 10,
+          display_name: "Lecture Notes.pdf",
+          filename: "lecture-notes.pdf",
+          "content-type": "application/pdf",
+          size: 1024,
+          folder_id: 2,
+          url: "https://canvas.test/files/10/download",
+          hidden_for_user: false,
+        },
+      ]),
+      jsonResponse({
+        id: 10,
+        display_name: "Lecture Notes.pdf",
+        filename: "lecture-notes.pdf",
+        content_type: "application/pdf",
+        size: 1024,
+        folder_id: 2,
+        url: "https://canvas.test/files/10/download",
+        hidden_for_user: false,
+      }),
+    ]);
+    const client = createClient(fetchImpl, "file-token");
+
+    await expect(client.listCourseFiles("course/7")).resolves.toEqual([
+      {
+        id: "10",
+        folderId: "2",
+        displayName: "Lecture Notes.pdf",
+        filename: "lecture-notes.pdf",
+        contentType: "application/pdf",
+        size: 1024,
+        createdAt: null,
+        updatedAt: null,
+        modifiedAt: null,
+        lockAt: null,
+        unlockAt: null,
+        locked: null,
+        hidden: null,
+        hiddenForUser: false,
+        visibilityLevel: null,
+        mediaClass: null,
+        mediaEntryId: null,
+        downloadUrl: "https://canvas.test/files/10/download",
+      },
+    ]);
+    await expect(client.getCourseFile("course/7", "10")).resolves.toMatchObject({
+      id: "10",
+      contentType: "application/pdf",
+      downloadUrl: "https://canvas.test/files/10/download",
+    });
+
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe(
+      "https://canvas.test/api/v1/courses/course%2F7/files?per_page=50",
+    );
+    expect(fetchImpl.mock.calls[1]?.[0]).toBe(
+      "https://canvas.test/api/v1/courses/course%2F7/files/10",
+    );
+    expect(fetchImpl.mock.calls[0]?.[1]).toMatchObject({
+      headers: { Authorization: "Bearer file-token" },
+    });
+  });
+
+  it("downloads same-origin Canvas files with bounded binary reads", async () => {
+    const fetchImpl = createFetch([
+      new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), {
+        headers: {
+          "content-length": "5",
+          "content-type": "application/pdf",
+        },
+      }),
+    ]);
+    const client = createClient(fetchImpl, "download-token");
+
+    await expect(
+      client.downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 2,
+        timeoutMs: 1000,
+      }),
+    ).resolves.toMatchObject({
+      byteLength: 5,
+      contentType: "application/pdf",
+    });
+
+    const request = lastRequest(fetchImpl);
+    expect(request.url).toBe("https://canvas.test/files/10/download");
+    expect(request.init.redirect).toBe("manual");
+    expect(authorizationHeader(request.init)).toBe("Bearer download-token");
+  });
+
+  it("strips bearer auth when following HTTPS file redirects off Canvas", async () => {
+    const fetchImpl = vi.fn(
+      async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        if (String(url) === "https://canvas.test/files/10/download") {
+          expect(authorizationHeader(init)).toBe("Bearer secret-token");
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: "https://canvas-files.example.test/signed/file.pdf",
+            },
+          });
+        }
+        expect(String(url)).toBe(
+          "https://canvas-files.example.test/signed/file.pdf",
+        );
+        expect(authorizationHeader(init)).toBeNull();
+        return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]), {
+          headers: { "content-type": "application/pdf" },
+        });
+      },
+    ) as FetchMock;
+    const client = createClient(fetchImpl, "secret-token");
+
+    await expect(
+      client.downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 2,
+        timeoutMs: 1000,
+      }),
+    ).resolves.toMatchObject({ byteLength: 5 });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects file redirects whose hostname resolves to a private address", async () => {
+    const fetchImpl = vi.fn(async (): Promise<Response> => {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: "https://canvas-files.example.test/signed/file.pdf",
+        },
+      });
+    }) as FetchMock;
+    const resolveHostname = vi.fn(async (hostname: string): Promise<readonly string[]> => {
+      if (hostname === "canvas-files.example.test") {
+        return ["10.0.0.8"];
+      }
+      return ["203.0.113.10"];
+    });
+    const client = createClient(
+      fetchImpl,
+      "secret-token",
+      10,
+      resolveHostname,
+    );
+
+    await expect(
+      client.downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 2,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ code: "canvas_file_redirect_rejected" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(resolveHostname).toHaveBeenCalledWith("canvas-files.example.test");
+  });
+
+  it("rejects unsafe file redirects and over-limit bodies", async () => {
+    const redirectFetch = vi.fn(async (): Promise<Response> => {
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://127.0.0.1/internal.pdf" },
+      });
+    }) as FetchMock;
+    const redirectClient = createClient(redirectFetch);
+
+    await expect(
+      redirectClient.downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 2,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ code: "canvas_file_redirect_rejected" });
+    expect(redirectFetch).toHaveBeenCalledTimes(1);
+
+    const largeFetch = createFetch([
+      new Response(new Uint8Array([1, 2, 3]), {
+        headers: { "content-length": "3" },
+      }),
+    ]);
+    const largeClient = createClient(largeFetch);
+
+    await expect(
+      largeClient.downloadFile(fileFixture(), {
+        maxBytes: 2,
+        maxRedirects: 0,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ code: "canvas_file_too_large" });
+  });
+
+  it.each([
+    "http://canvas-files.example.test/signed/file.pdf",
+    "https://user:pass@canvas-files.example.test/signed/file.pdf",
+    "https://192.168.1.10/internal.pdf",
+    "https://169.254.1.10/internal.pdf",
+    "https://[::1]/internal.pdf",
+    "https://[fe80::1]/internal.pdf",
+    "https://[fd00::1]/internal.pdf",
+  ])("rejects unsafe file redirect target %s without retrying it", async (location) => {
+    const fetchImpl = vi.fn(async (): Promise<Response> => {
+      return new Response(null, {
+        status: 302,
+        headers: { location },
+      });
+    }) as FetchMock;
+    const client = createClient(fetchImpl, "secret-token");
+
+    const error = await client
+      .downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 2,
+        timeoutMs: 1000,
+      })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: "canvas_file_redirect_rejected" });
+    expect(String((error as Error).message)).not.toMatch(/secret-token/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects file redirect loops before refetching the same target", async () => {
+    const fetchImpl = vi.fn(async (): Promise<Response> => {
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://canvas.test/files/10/download" },
+      });
+    }) as FetchMock;
+    const client = createClient(fetchImpl);
+
+    await expect(
+      client.downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 2,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ code: "canvas_file_redirect_rejected" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds streaming bodies when content-length is missing or understated", async () => {
+    const missingLength = createFetch([
+      streamResponse([[1, 2], [3]]),
+    ]);
+    const missingLengthClient = createClient(missingLength);
+
+    await expect(
+      missingLengthClient.downloadFile(fileFixture(), {
+        maxBytes: 2,
+        maxRedirects: 0,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ code: "canvas_file_too_large" });
+
+    const understatedLength = createFetch([
+      streamResponse([[1, 2], [3]], { "content-length": "2" }),
+    ]);
+    const understatedLengthClient = createClient(understatedLength);
+
+    await expect(
+      understatedLengthClient.downloadFile(fileFixture(), {
+        maxBytes: 2,
+        maxRedirects: 0,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toMatchObject({ code: "canvas_file_too_large" });
+  });
+
+  it("aborts stalled file body reads without exposing private error details", async () => {
+    const fetchImpl = vi.fn(
+      async (_url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            init?.signal?.addEventListener("abort", () => {
+              controller.error(
+                new DOMException("aborted secret-token", "AbortError"),
+              );
+            });
+          },
+        }));
+      },
+    ) as FetchMock;
+    const client = createClient(fetchImpl, "secret-token");
+
+    const error = await client
+      .downloadFile(fileFixture(), {
+        maxBytes: 10,
+        maxRedirects: 0,
+        timeoutMs: 1,
+      })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: "canvas_file_download_timeout" });
+    expect(String((error as Error).message)).not.toMatch(/secret-token/);
+  });
+
   it("propagates later-page failures without returning successful prefixes", async () => {
     const fetchImpl = createFetch([
       jsonResponse([{ id: 1, name: "One" }], {
@@ -748,6 +1048,7 @@ function createClient(
   fetchImpl: typeof fetch,
   token = "token",
   maxPages = 10,
+  resolveHostname?: CanvasHostnameResolver,
 ): CanvasClient {
   return new CanvasClient({
     allowHttpForTesting: true,
@@ -755,6 +1056,7 @@ function createClient(
     fetchImpl,
     maxPages,
     personalAccessToken: token,
+    resolveHostname,
   });
 }
 
@@ -799,6 +1101,50 @@ function jsonResponse(
       ...headers,
     },
   });
+}
+
+function streamResponse(
+  chunks: readonly (readonly number[])[],
+  headers: Record<string, string> = {},
+): Response {
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(new Uint8Array(chunk));
+      }
+      controller.close();
+    },
+  }), {
+    headers,
+  });
+}
+
+function fileFixture(overrides: Partial<CanvasFile> = {}): CanvasFile {
+  return {
+    id: "10",
+    folderId: "2",
+    displayName: "Lecture Notes.pdf",
+    filename: "lecture-notes.pdf",
+    contentType: "application/pdf",
+    size: 5,
+    createdAt: null,
+    updatedAt: null,
+    modifiedAt: null,
+    lockAt: null,
+    unlockAt: null,
+    locked: false,
+    hidden: false,
+    hiddenForUser: false,
+    visibilityLevel: null,
+    mediaClass: null,
+    mediaEntryId: null,
+    downloadUrl: "https://canvas.test/files/10/download",
+    ...overrides,
+  };
+}
+
+function authorizationHeader(init: RequestInit | undefined): string | null {
+  return new Headers(init?.headers).get("authorization");
 }
 
 function lastRequest(fetchImpl: FetchMock): {

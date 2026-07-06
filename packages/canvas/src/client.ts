@@ -10,6 +10,10 @@ import {
   type CanvasClientErrorCode,
   type CanvasClientOptions,
   type CanvasCourse,
+  type CanvasDownloadedFile,
+  type CanvasFile,
+  type CanvasFileDownloadOptions,
+  type CanvasHostnameResolver,
   type CanvasJson,
   type CanvasJsonObject,
   type CanvasModule,
@@ -29,6 +33,7 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PER_PAGE = 50;
 const PROBE_PER_PAGE = 1;
 const INTEGRATION_VERSION = "phase5a";
+const MAX_RETRY_AFTER_MS = 30_000;
 
 export const CANVAS_CAPABILITIES: readonly CanvasCapability[] = [
   "profile",
@@ -90,6 +95,7 @@ export class CanvasClient {
   private readonly timeoutMs: number;
   private readonly maxPages: number;
   private readonly now: () => Date;
+  private readonly resolveHostname: CanvasHostnameResolver | null;
 
   public constructor({
     allowHttpForTesting = false,
@@ -98,6 +104,7 @@ export class CanvasClient {
     maxPages = DEFAULT_MAX_PAGES,
     now = () => new Date(),
     personalAccessToken,
+    resolveHostname,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   }: CanvasClientOptions) {
     const normalizedBaseUrl = normalizeCanvasBaseUrl(baseUrl, {
@@ -114,6 +121,15 @@ export class CanvasClient {
       throw new CanvasClientError(
         "canvas_request_failed",
         "A fetch implementation is required.",
+      );
+    }
+    if (
+      resolveHostname !== undefined &&
+      typeof resolveHostname !== "function"
+    ) {
+      throw new CanvasClientError(
+        "canvas_request_failed",
+        "A Canvas hostname resolver must be a function.",
       );
     }
     if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 50) {
@@ -135,6 +151,7 @@ export class CanvasClient {
     this.fetchImpl = fetchImpl;
     this.maxPages = maxPages;
     this.now = now;
+    this.resolveHostname = resolveHostname ?? null;
     this.timeoutMs = timeoutMs;
   }
 
@@ -239,6 +256,59 @@ export class CanvasClient {
       ]),
     );
     return parsed.map(normalizeAnnouncement);
+  }
+
+  public async listCourseFiles(courseId: string): Promise<readonly CanvasFile[]> {
+    const parsed = await this.requestPaginatedJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/files?per_page=${DEFAULT_PER_PAGE}`,
+    );
+    return parsed.map(normalizeFile);
+  }
+
+  public async getCourseFile(
+    courseId: string,
+    fileId: string,
+  ): Promise<CanvasFile> {
+    const parsed = await this.requestJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/files/${encodeCanvasPathSegment(fileId)}`,
+    );
+    return normalizeFile(parsed);
+  }
+
+  public async downloadFile(
+    file: CanvasFile,
+    options: CanvasFileDownloadOptions,
+  ): Promise<CanvasDownloadedFile> {
+    const downloadUrl = normalizeDownloadStartUrl({
+      apiBaseUrl: this.apiBaseUrl,
+      baseUrl: this.baseUrl,
+      file,
+    });
+    const maxBytes = normalizePositiveInteger(
+      options.maxBytes,
+      "Canvas file download byte limit",
+    );
+    const timeoutMs = normalizePositiveInteger(
+      options.timeoutMs,
+      "Canvas file download timeout",
+    );
+    const maxRedirects = normalizeBoundedInteger(
+      options.maxRedirects,
+      "Canvas file download redirect limit",
+      0,
+      10,
+    );
+
+    return downloadCanvasFile({
+      canvasOrigin: new URL(this.baseUrl).origin,
+      fetchImpl: this.fetchImpl,
+      maxBytes,
+      maxRedirects,
+      personalAccessToken: this.personalAccessToken,
+      resolveHostname: this.resolveHostname,
+      startUrl: downloadUrl,
+      timeoutMs,
+    });
   }
 
   public async probeCapabilities(): Promise<readonly CanvasCapabilityProbeResult[]> {
@@ -490,6 +560,394 @@ export class CanvasClient {
       );
     }
   }
+}
+
+async function downloadCanvasFile({
+  canvasOrigin,
+  fetchImpl,
+  maxBytes,
+  maxRedirects,
+  personalAccessToken,
+  resolveHostname,
+  startUrl,
+  timeoutMs,
+}: {
+  readonly canvasOrigin: string;
+  readonly fetchImpl: typeof fetch;
+  readonly maxBytes: number;
+  readonly maxRedirects: number;
+  readonly personalAccessToken: string;
+  readonly resolveHostname: CanvasHostnameResolver | null;
+  readonly startUrl: URL;
+  readonly timeoutMs: number;
+}): Promise<CanvasDownloadedFile> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const seenUrls = new Set<string>();
+  let currentUrl = startUrl;
+
+  try {
+    for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+      await validateDownloadTarget({
+        canvasOrigin,
+        resolveHostname,
+        url: currentUrl,
+      });
+      const serializedUrl = currentUrl.toString();
+      if (seenUrls.has(serializedUrl)) {
+        throw new CanvasClientError(
+          "canvas_file_redirect_rejected",
+          "Canvas file download redirect loop was rejected.",
+        );
+      }
+      seenUrls.add(serializedUrl);
+
+      const headers: Record<string, string> = {
+        Accept: "application/octet-stream",
+      };
+      if (currentUrl.origin === canvasOrigin) {
+        headers.Authorization = `Bearer ${personalAccessToken}`;
+      }
+
+      let response: Response;
+      try {
+        response = await fetchImpl(serializedUrl, {
+          method: "GET",
+          headers,
+          redirect: "manual",
+          signal: controller.signal,
+        });
+      } catch (error) {
+        throw downloadFetchError(error, controller.signal.aborted);
+      }
+
+      if (isRedirectStatus(response.status)) {
+        if (redirectCount >= maxRedirects) {
+          throw new CanvasClientError(
+            "canvas_file_redirect_rejected",
+            "Canvas file download exceeded the redirect limit.",
+            { status: response.status },
+          );
+        }
+        currentUrl = resolveRedirectLocation(
+          response.headers.get("location"),
+          currentUrl,
+          canvasOrigin,
+        );
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new CanvasClientError(
+          "canvas_file_download_failed",
+          "Canvas file download returned an unsuccessful response.",
+          { status: response.status },
+        );
+      }
+
+      const contentLength = parseContentLength(response.headers.get("content-length"));
+      if (contentLength !== null && contentLength > maxBytes) {
+        throw new CanvasClientError(
+          "canvas_file_too_large",
+          "Canvas file download exceeds the configured byte limit.",
+          { status: response.status },
+        );
+      }
+
+      const bytes = await readBoundedResponseBody({
+        maxBytes,
+        response,
+        signal: controller.signal,
+      });
+      return {
+        bytes,
+        byteLength: bytes.byteLength,
+        contentType: stringOrNull(response.headers.get("content-type")),
+      };
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  throw new CanvasClientError(
+    "canvas_file_redirect_rejected",
+    "Canvas file download exceeded the redirect limit.",
+  );
+}
+
+function normalizeDownloadStartUrl({
+  apiBaseUrl,
+  baseUrl,
+  file,
+}: {
+  readonly apiBaseUrl: string;
+  readonly baseUrl: string;
+  readonly file: CanvasFile;
+}): URL {
+  if (!file.id.trim()) {
+    throw new CanvasClientError(
+      "canvas_file_download_failed",
+      "Canvas file metadata was missing an identifier.",
+    );
+  }
+
+  let parsed: URL;
+  if (file.downloadUrl) {
+    try {
+      parsed = new URL(file.downloadUrl, baseUrl);
+    } catch {
+      throw new CanvasClientError(
+        "canvas_file_download_failed",
+        "Canvas file download URL was invalid.",
+      );
+    }
+  } else {
+    parsed = new URL(`${apiBaseUrl}/files/${encodeCanvasPathSegment(file.id)}`);
+  }
+
+  if (parsed.origin !== new URL(baseUrl).origin) {
+    throw new CanvasClientError(
+      "canvas_file_download_failed",
+      "Canvas file download must start from the connected Canvas origin.",
+    );
+  }
+  return parsed;
+}
+
+function resolveRedirectLocation(
+  location: string | null,
+  currentUrl: URL,
+  canvasOrigin: string,
+): URL {
+  if (!location?.trim()) {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download redirect was missing a target.",
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(location, currentUrl);
+  } catch {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download redirect was invalid.",
+    );
+  }
+  validateDownloadTargetSyntax(parsed, canvasOrigin);
+  return parsed;
+}
+
+async function validateDownloadTarget({
+  canvasOrigin,
+  resolveHostname,
+  url,
+}: {
+  readonly canvasOrigin: string;
+  readonly resolveHostname: CanvasHostnameResolver | null;
+  readonly url: URL;
+}): Promise<void> {
+  validateDownloadTargetSyntax(url, canvasOrigin);
+  if (!resolveHostname) {
+    return;
+  }
+
+  let addresses: readonly string[];
+  try {
+    addresses = await resolveHostname(url.hostname);
+  } catch {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download target could not be safely resolved.",
+    );
+  }
+  if (
+    addresses.length === 0 ||
+    addresses.some((address) => isUnsafeDownloadHostname(address))
+  ) {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download target resolved to a rejected address.",
+    );
+  }
+}
+
+function validateDownloadTargetSyntax(url: URL, canvasOrigin: string): void {
+  if (url.username || url.password) {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download redirect included embedded credentials.",
+    );
+  }
+
+  if (url.protocol !== "https:" && !(url.origin === canvasOrigin && url.protocol === "http:")) {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download redirect used an unsupported scheme.",
+    );
+  }
+
+  if (isUnsafeDownloadHostname(url.hostname)) {
+    throw new CanvasClientError(
+      "canvas_file_redirect_rejected",
+      "Canvas file download redirect target was rejected.",
+    );
+  }
+}
+
+async function readBoundedResponseBody({
+  maxBytes,
+  response,
+  signal,
+}: {
+  readonly maxBytes: number;
+  readonly response: Response;
+  readonly signal: AbortSignal;
+}): Promise<Uint8Array> {
+  if (!response.body) {
+    return new Uint8Array();
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      let read: ReadableStreamReadResult<Uint8Array>;
+      try {
+        read = await reader.read();
+      } catch (error) {
+        throw downloadFetchError(error, signal.aborted);
+      }
+      if (read.done) {
+        break;
+      }
+      const chunk = read.value;
+      totalBytes += chunk.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new CanvasClientError(
+          "canvas_file_too_large",
+          "Canvas file download exceeded the configured byte limit.",
+          { status: response.status },
+        );
+      }
+      chunks.push(chunk);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+function downloadFetchError(error: unknown, aborted: boolean): CanvasClientError {
+  if (aborted || isAbortError(error)) {
+    return new CanvasClientError(
+      "canvas_file_download_timeout",
+      "Canvas file download timed out.",
+    );
+  }
+  return new CanvasClientError(
+    "canvas_file_download_failed",
+    "Canvas file download failed before completion.",
+  );
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (!value?.trim()) {
+    return null;
+  }
+  const parsed = Number(value.trim());
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function normalizePositiveInteger(value: number, label: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new CanvasClientError("canvas_request_failed", `${label} is invalid.`);
+  }
+  return value;
+}
+
+function normalizeBoundedInteger(
+  value: number,
+  label: string,
+  min: number,
+  max: number,
+): number {
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new CanvasClientError("canvas_request_failed", `${label} is invalid.`);
+  }
+  return value;
+}
+
+function isUnsafeDownloadHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const mappedIpv4 = normalized.startsWith("::ffff:")
+    ? parseIpv4Address(normalized.slice("::ffff:".length))
+    : null;
+  if (mappedIpv4) {
+    return isUnsafeIpv4Address(mappedIpv4);
+  }
+  if (
+    normalized === "localhost" ||
+    normalized === "0.0.0.0" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local")
+  ) {
+    return true;
+  }
+
+  const ipv4 = parseIpv4Address(normalized);
+  if (ipv4) {
+    return isUnsafeIpv4Address(ipv4);
+  }
+
+  return (
+    normalized === "::1" ||
+    normalized === "::" ||
+    normalized.startsWith("fe80:") ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd")
+  );
+}
+
+function isUnsafeIpv4Address(
+  ipv4: readonly [number, number, number, number],
+): boolean {
+  const [first, second] = ipv4;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    first === 0
+  );
+}
+
+function parseIpv4Address(value: string): readonly [number, number, number, number] | null {
+  const parts = value.split(".");
+  if (parts.length !== 4) {
+    return null;
+  }
+  const octets = parts.map((part) => Number(part));
+  if (
+    octets.every(
+      (octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255,
+    )
+  ) {
+    return octets as [number, number, number, number];
+  }
+  return null;
 }
 
 export function normalizeCanvasBaseUrl(
@@ -922,6 +1380,45 @@ function normalizeAnnouncement(value: unknown): CanvasAnnouncement {
   };
 }
 
+function normalizeFile(value: unknown): CanvasFile {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas File response was invalid.",
+    );
+  }
+
+  const id = normalizeId(value.id);
+  if (!id) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas File response was missing required fields.",
+    );
+  }
+
+  return {
+    id,
+    folderId: normalizeId(value.folder_id),
+    displayName: stringOrNull(value.display_name),
+    filename: stringOrNull(value.filename),
+    contentType:
+      stringOrNull(value["content-type"]) ?? stringOrNull(value.content_type),
+    size: integerOrNull(value.size),
+    createdAt: stringOrNull(value.created_at),
+    updatedAt: stringOrNull(value.updated_at),
+    modifiedAt: stringOrNull(value.modified_at),
+    lockAt: stringOrNull(value.lock_at),
+    unlockAt: stringOrNull(value.unlock_at),
+    locked: booleanOrNull(value.locked),
+    hidden: booleanOrNull(value.hidden),
+    hiddenForUser: booleanOrNull(value.hidden_for_user),
+    visibilityLevel: stringOrNull(value.visibility_level),
+    mediaClass: stringOrNull(value.media_class),
+    mediaEntryId: normalizeId(value.media_entry_id),
+    downloadUrl: stringOrNull(value.url),
+  };
+}
+
 function encodeCanvasPathSegment(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -1139,7 +1636,7 @@ function parseRetryAfterMs(value: string | null, now: Date): number | null {
 
   const seconds = Number(trimmed);
   if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.round(seconds * 1000);
+    return Math.min(Math.round(seconds * 1000), MAX_RETRY_AFTER_MS);
   }
 
   const retryAt = Date.parse(trimmed);
@@ -1147,7 +1644,7 @@ function parseRetryAfterMs(value: string | null, now: Date): number | null {
     return null;
   }
 
-  return Math.max(0, retryAt - now.getTime());
+  return Math.min(Math.max(0, retryAt - now.getTime()), MAX_RETRY_AFTER_MS);
 }
 
 function statusForProbeError(error: unknown): CanvasCapabilityStatus {

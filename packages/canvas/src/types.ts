@@ -163,6 +163,43 @@ export interface CanvasAnnouncementsListOptions {
   readonly endDate: string;
 }
 
+export interface CanvasFile {
+  readonly id: string;
+  readonly folderId: string | null;
+  readonly displayName: string | null;
+  readonly filename: string | null;
+  readonly contentType: string | null;
+  readonly size: number | null;
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+  readonly modifiedAt: string | null;
+  readonly lockAt: string | null;
+  readonly unlockAt: string | null;
+  readonly locked: boolean | null;
+  readonly hidden: boolean | null;
+  readonly hiddenForUser: boolean | null;
+  readonly visibilityLevel: string | null;
+  readonly mediaClass: string | null;
+  readonly mediaEntryId: string | null;
+  readonly downloadUrl: string | null;
+}
+
+export interface CanvasFileDownloadOptions {
+  readonly maxBytes: number;
+  readonly timeoutMs: number;
+  readonly maxRedirects: number;
+}
+
+export interface CanvasDownloadedFile {
+  readonly bytes: Uint8Array;
+  readonly byteLength: number;
+  readonly contentType: string | null;
+}
+
+export type CanvasHostnameResolver = (
+  hostname: string,
+) => Promise<readonly string[]>;
+
 export type CanvasNullableDate = string | null;
 
 export type CanvasJson =
@@ -252,12 +289,17 @@ export type CanvasClientErrorCode =
   | "canvas_invalid_response"
   | "canvas_redirect_rejected"
   | "canvas_pagination_rejected"
+  | "canvas_file_download_failed"
+  | "canvas_file_download_timeout"
+  | "canvas_file_redirect_rejected"
+  | "canvas_file_too_large"
   | "canvas_request_failed";
 
 export interface CanvasClientOptions {
   readonly baseUrl: string;
   readonly personalAccessToken: string;
   readonly fetchImpl?: typeof fetch;
+  readonly resolveHostname?: CanvasHostnameResolver;
   readonly timeoutMs?: number;
   readonly maxPages?: number;
   readonly allowHttpForTesting?: boolean;

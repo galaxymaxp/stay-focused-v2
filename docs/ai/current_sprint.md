@@ -32,7 +32,18 @@ Phase 5B.4A planner-item and announcement synchronization is complete as a
 backend-only slice with documented live Canvas limitations. It uses ordinary
 GET requests, a 30-day past and 120-day future sync window, service-role-only
 persistence, safe scoped pruning, deterministic fingerprints, and
-aggregate-only route diagnostics.
+aggregate-only route diagnostics. Phase 5C.1 secure Canvas file inventory and
+bounded selected-file ingestion is remotely and live validated for backend
+behavior: sync inventories Canvas file metadata and bounded references, and the
+protected ingestion route stores only eligible selected files in a private
+bucket after fresh metadata, redirect, byte-limit, and signature checks. Remote
+migrations `202607060003` and `202607060004` are applied, Supabase advisors
+were reviewed, private Storage controls passed, and second-run ingestion kept
+stable object pointers with zero additional bytes stored. It does not parse,
+OCR, preview, or generate reviewers from Canvas file contents. The synchronous
+metadata sync route remains over its configured 60-second runtime budget in
+local production-build validation, so production-runtime readiness is not
+claimed.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -299,6 +310,48 @@ There is no school-wide Canvas token.
 - Canvas webhooks, scheduled synchronization, background jobs, resumable jobs,
   queues, mobile synchronization UI, source-selection UI, notifications, and
   reviewer generation from Canvas data.
+
+## Completed Phase 5C.1 Scope
+
+- Added typed Canvas file metadata listing and single-file metadata lookup.
+- Added bounded Canvas file download support with manual redirects,
+  off-origin bearer stripping, unsafe target rejection, content-length checks,
+  stream byte caps, and timeouts.
+- Added centralized Canvas file ingestion policy using existing OCR limits:
+  10 MiB per file, 3 files per request, and 15 MiB aggregate stored bytes.
+- Added `canvas_files`, `canvas_file_references`, and
+  `canvas_file_ingestion_results` plus service-role-only inventory/result RPCs.
+- Added private `canvas-source-files` storage bucket configuration and
+  restrictive policies denying direct `anon`/`authenticated` object access.
+- Extended `POST /api/canvas/sync` with file metadata inventory and module,
+  Page, assignment, and announcement reference discovery.
+- Added protected `POST /api/canvas/files/ingest` for selected owned file-row
+  ids with fresh metadata lookup, bounded download, content validation,
+  private storage upload, stale object cleanup, and sanitized terminal results.
+- Extended mobile sync response parsing for file aggregate counts without UI.
+- Added focused Canvas client, API normalizer, API route-harness, and mobile
+  service tests.
+- Applied and remotely verified migrations `202607060003` and `202607060004`.
+- Reviewed Supabase security and performance advisors; fixed new Phase 5C.1
+  foreign-key index warnings with `202607060004`.
+- Validated private `canvas-source-files` Storage behavior: public,
+  anonymous, authenticated arbitrary, and cross-user object access denied;
+  trusted server access worked.
+- Validated protected live ingestion with two stored eligible files, one
+  metadata-only result, and second-run stability with zero additional bytes
+  stored.
+- Measured the synchronous sync route at 72.294 seconds and 65.355 seconds
+  against `maxDuration = 60`; no route-duration increase was made because
+  deployment support was not verified.
+
+## Out Of Scope For Phase 5C.1
+
+- Text extraction, parsing, OCR, transcription, or summarization from Canvas
+  file bytes.
+- PowerPoint, Word, spreadsheet, HTML, caption, and media parsers.
+- Mobile file-selection/source-selection UI.
+- Reviewer generation from Canvas file contents.
+- Background or resumable ingestion jobs.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -805,6 +858,43 @@ There is no school-wide Canvas token.
 - Verdict: partial due documented permanent live Canvas limitations. The
   implementation preserved data and completed the safe independent scopes.
 
+## Phase 5C.1 Results
+
+- Added migration
+  `202607060003_add_canvas_file_ingestion_foundation.sql` and updated DB types.
+- Added `apps/api/src/lib/canvas-file-policy.ts`,
+  `apps/api/src/lib/canvas-file-normalize.ts`,
+  `apps/api/src/lib/canvas-file-ingestion.ts`, and
+  `apps/api/app/api/canvas/files/ingest/route.ts`.
+- Added `parse5` to the API workspace for structured bounded HTML reference
+  parsing instead of ad hoc string matching.
+- Automated verification passed:
+  - Canvas tests: 50/50
+  - Canvas typecheck: passed
+  - API tests: 184/184
+  - API typecheck: passed
+  - Mobile tests: 79/79
+  - Mobile typecheck: passed
+  - OCR tests: 14/14
+  - Root typecheck/build/tests: 7/7 workspaces
+- Remote migration history includes `202607060003` and `202607060004`.
+- Remote schema/RLS/RPC/grant/storage verification passed for the Phase 5C.1
+  objects and private bucket.
+- Supabase security advisors produced no unresolved new Phase 5C.1 security
+  finding. Supabase performance advisors identified new Phase 5C.1 foreign-key
+  index warnings, fixed by `202607060004`; remaining warnings were pre-existing
+  or fresh unused-index noise.
+- Protected live metadata sync returned HTTP 200 `partial` twice. File
+  inventory discovered 52 files, inserted 52 on the first run, classified 52 as
+  unchanged on the second run, recorded 15 references, and left zero running
+  sync rows. The route exceeded the configured 60-second budget in both
+  local-production-build measurements.
+- Protected live ingestion requested 3 selected rows, stored 2 eligible files,
+  recorded 1 metadata-only result, stored 92,950 aggregate bytes, verified
+  private objects, denied public access, and invoked no OCR/extraction. The
+  second ingestion returned 2 unchanged and 1 metadata-only, stored 0 bytes,
+  produced no duplicate object versions, and left zero running sync rows.
+
 ## Phase 3C Completion Sequence
 
 1. Add a camera capture source option beside gallery import. Done.
@@ -846,6 +936,12 @@ incremental academic graph synchronization foundation is complete and live
 validated. Phase 5B.3C1 conditional-request capability audit is complete and
 does not support Phase 5B.3C2 implementation for the audited endpoints. The
 Phase 5B.4A planner-item and announcement synchronization slice is complete
-with documented live Canvas limitations. The recommended next roadmap task is
-Phase 5C file, attachment, and media ingestion. The deferred header/footer
-cleanup task remains separate.
+with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
+ingestion foundation is remotely and live validated with a documented
+synchronous route-duration limitation. The recommended next roadmap task is
+Phase 5C.2A - User-Facing Canvas Sync And Source-Selection Loop: manual mobile
+Canvas sync action, last-sync status and safe aggregate counts, clear
+partial-failure messaging, narrow Canvas source-selection preview, and editable
+source text before reviewer generation. Parser/OCR work should be added only
+as required for that narrow loop. The deferred header/footer cleanup task
+remains separate.

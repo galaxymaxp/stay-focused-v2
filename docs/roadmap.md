@@ -1,6 +1,6 @@
 # Roadmap
 
-Last refreshed: 2026-07-05, Asia/Manila.
+Last refreshed: 2026-07-06, Asia/Manila.
 
 ## Phase 1 - Foundation And Reviewer Engine
 
@@ -214,9 +214,12 @@ synchronization is complete and live validated; Phase 5B.3A course recovery
 hardening is complete and live validated; Phase 5B.3B incremental persistence
 is complete and live validated; Phase 5B.3C1 conditional-request capability
 audit is complete; Phase 5B.4A planner-item and announcement synchronization
-is complete with documented live Canvas limitations; Phase 5C through Phase 5F
-remain planned and must not be collapsed into a single generic Canvas
-integration task.
+is complete with documented live Canvas limitations; Phase 5C.1 secure file
+inventory and bounded ingestion is remotely and live validated with a
+documented synchronous route-duration limitation; the next Canvas task is the
+smallest user-facing sync/source-selection loop before broad parser/OCR
+expansion. Phase 5D through Phase 5F remain planned and must not be collapsed
+into a single generic Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -653,7 +656,101 @@ Deferred from Phase 5B.4A:
 
 ### Phase 5C - File, Attachment, And Media Ingestion
 
-Status: Pending.
+Status: In progress. Phase 5C.1 secure file inventory and bounded selected-file
+ingestion is remotely and live validated for backend behavior, private Storage,
+and second-run stability. The synchronous metadata sync route remains over its
+configured runtime budget in local production-build measurement, so deployed
+production-runtime readiness is not claimed.
+
+#### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
+
+Status: Remotely and live validated for backend behavior; production-runtime
+safe status is partial because the synchronous sync route exceeds its
+configured 60-second budget.
+
+Implemented:
+
+- Canvas file metadata listing and single-file metadata lookup in
+  `@stay-focused/canvas`.
+- Bounded Canvas file download support with manual redirect handling,
+  off-origin bearer stripping, unsafe host rejection, timeout enforcement, and
+  content-length/stream byte caps.
+- Central file policy shared with existing OCR limits: 10 MiB per file, 3 files
+  per ingestion request, and 15 MiB aggregate stored bytes per ingestion
+  request.
+- Metadata-only or blocked classification for media, unsupported formats,
+  dangerous MIME/extension combinations, archives/containers, locked files,
+  hidden files, unavailable files, and oversized files.
+- `canvas_files`, `canvas_file_references`, and
+  `canvas_file_ingestion_results` migration foundation.
+- Private Supabase Storage bucket `canvas-source-files` with restrictive
+  policies denying direct `anon` and `authenticated` object access.
+- Service-role-only RPCs for file inventory replacement and sanitized ingestion
+  result recording.
+- `POST /api/canvas/sync` file inventory for successful course graphs, with
+  module-item references and Canvas file links discovered from Page,
+  assignment, and announcement HTML.
+- `POST /api/canvas/files/ingest` for authenticated selected file-row ids,
+  fresh metadata lookup before download, content signature validation, private
+  storage upload, stale-object cleanup, and sanitized per-file terminal
+  results.
+- Mobile sync response parsing for aggregate `files` and `fileReferences`
+  counts without adding UI.
+- Remote migrations `202607060003` and `202607060004` are applied.
+- Supabase security and performance advisors were reviewed; new Phase 5C.1
+  foreign-key index warnings were fixed by `202607060004`.
+- Private Storage access controls passed: public, anonymous, authenticated
+  arbitrary, and cross-user object access were denied while trusted server
+  access worked.
+- Protected live ingestion stored two eligible selected files, recorded one
+  metadata-only result, and preserved stable object pointers on the second
+  ingestion with zero additional bytes stored.
+- Protected live metadata sync remained aggregate-only and metadata-only for
+  files, but measured 72.294 seconds and 65.355 seconds in local
+  production-build validation against `maxDuration = 60`.
+
+Still deferred from Phase 5C.1:
+
+- Text extraction from Canvas files.
+- OCR over Canvas files.
+- Parser registry and parser-version tracking.
+- PowerPoint, Word, spreadsheet, HTML, caption, and media parsers.
+- Mobile file-selection, source-preview, and selective-import UI.
+- Reviewer generation from Canvas file contents.
+- Background/resumable ingestion jobs.
+
+Verification:
+
+- Canvas package tests: 50/50.
+- API tests: 184/184.
+- Mobile tests: 79/79.
+- OCR tests: 14/14.
+- Root typecheck/build/tests: 7/7 workspaces.
+
+#### Phase 5C.2A - User-Facing Canvas Sync And Source-Selection Loop
+
+Status: Next.
+
+Scope:
+
+- Manual mobile Canvas sync action.
+- Last-sync status and safe aggregate counts.
+- Clear partial-failure messaging.
+- Narrow Canvas source-selection preview.
+- Editable source text before reviewer generation.
+- Parser or OCR work only where required to make this narrow source-selection
+  flow work.
+
+Exit criteria:
+
+- Canvas provides visible student value in mobile before more Canvas resource
+  families are added.
+- Partial sync failures are understandable without exposing raw Canvas errors,
+  course names, filenames, URLs, object keys, hashes, or private content.
+- Reviewer generation still receives user-reviewed source text through the
+  existing generation boundary.
+
+#### Later Phase 5C Parser And Source Import Work
 
 Scope:
 
