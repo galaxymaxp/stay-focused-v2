@@ -19,9 +19,13 @@ import {
 import {
   deleteReviewer,
   getReviewer,
+  getReviewerSourceStatus,
   listReviewers,
   renameReviewer,
   type ReviewerLibraryError,
+  type ReviewerSourceStatusAction,
+  type ReviewerSourceStatusItem,
+  type ReviewerSourceStatusPayload,
   type SavedReviewerDetail,
   type SavedReviewerSummary,
   type SavedReviewerSourceProvenanceSummary,
@@ -44,6 +48,11 @@ interface RenameState {
   readonly title: string;
 }
 
+interface SourceStatusState {
+  readonly reviewerId: string;
+  readonly status: ReviewerSourceStatusPayload;
+}
+
 export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps) {
   const { isSigningOut, session, signOut } = useAuth();
   const [reviewers, setReviewers] = useState<readonly SavedReviewerSummary[]>([]);
@@ -52,9 +61,12 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
   const [error, setError] = useState<LibraryDisplayError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [renameState, setRenameState] = useState<RenameState | null>(null);
+  const [sourceStatusState, setSourceStatusState] =
+    useState<SourceStatusState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOpening, setIsOpening] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isCheckingSourceStatus, setIsCheckingSourceStatus] = useState(false);
   const [deletingReviewerId, setDeletingReviewerId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -118,11 +130,44 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
 
       if (result.ok) {
         setOpenedReviewer(result.data);
+        setSourceStatusState(null);
       } else {
         setError(formatLibraryError(result.error));
       }
     } finally {
       setIsOpening(false);
+    }
+  };
+
+  const handleCheckSourceStatus = async () => {
+    if (!openedReviewer?.sourceProvenance) {
+      return;
+    }
+
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+
+    const reviewerId = openedReviewer.id;
+    setIsCheckingSourceStatus(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await getReviewerSourceStatus({
+        ...context.value,
+        reviewerId,
+      });
+
+      if (result.ok) {
+        setSourceStatusState({ reviewerId, status: result.data });
+      } else {
+        setError(formatLibraryError(result.error));
+      }
+    } finally {
+      setIsCheckingSourceStatus(false);
     }
   };
 
@@ -285,7 +330,16 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
         {successMessage ? <SuccessCard message={successMessage} /> : null}
 
         {openedReviewer.sourceProvenance ? (
-          <SourceProvenanceCard summary={openedReviewer.sourceProvenance} />
+          <SourceProvenanceCard
+            isCheckingStatus={isCheckingSourceStatus}
+            onRefreshStatus={handleCheckSourceStatus}
+            status={
+              sourceStatusState?.reviewerId === openedReviewer.id
+                ? sourceStatusState.status
+                : null
+            }
+            summary={openedReviewer.sourceProvenance}
+          />
         ) : null}
 
         <ReviewerPreview reviewer={openedReviewer.reviewerOutput} />
@@ -460,8 +514,14 @@ function SuccessCard({ message }: { readonly message: string }) {
 }
 
 function SourceProvenanceCard({
+  isCheckingStatus,
+  onRefreshStatus,
+  status,
   summary,
 }: {
+  readonly isCheckingStatus: boolean;
+  readonly onRefreshStatus: () => void;
+  readonly status: ReviewerSourceStatusPayload | null;
   readonly summary: SavedReviewerSourceProvenanceSummary;
 }) {
   return (
@@ -479,6 +539,56 @@ function SourceProvenanceCard({
       <Text style={styles.statusText}>
         OCR: {formatVersionList(summary.ocrVersions)}
       </Text>
+      <View style={styles.statusDivider} />
+      <View style={styles.sourceStatusHeader}>
+        <View style={styles.sourceStatusText}>
+          <Text style={styles.statusTitle}>Source health</Text>
+          <Text
+            style={styles.statusText}
+            testID="study-library-source-status-summary"
+          >
+            {status
+              ? formatSourceStatusCounts(status)
+              : "Source status not checked"}
+          </Text>
+        </View>
+        <Button
+          loading={isCheckingStatus}
+          onPress={onRefreshStatus}
+          variant="secondary"
+        >
+          {status ? "Refresh status" : "Check status"}
+        </Button>
+      </View>
+      {isCheckingStatus ? (
+        <Text style={styles.statusText} testID="study-library-source-status-loading">
+          Checking synchronized sources...
+        </Text>
+      ) : null}
+      {status ? (
+        <>
+          <Text style={styles.statusText} testID="study-library-source-readiness">
+            {formatReadiness(status.regenerationReadiness)}
+          </Text>
+          {status.actions.length > 0 ? (
+            <Text style={styles.statusText}>
+              {formatStatusActions(status.actions)}
+            </Text>
+          ) : null}
+          <View style={styles.sourceStatusList}>
+            {status.items.map((item) => (
+              <View key={item.ordinal} style={styles.sourceStatusItem}>
+                <Text style={styles.sourceStatusItemTitle}>
+                  {item.ordinal}. {item.title}
+                </Text>
+                <Text style={styles.statusText}>
+                  {formatSourceItemStatus(item)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
     </Card>
   );
 }
@@ -585,6 +695,116 @@ function formatVersionList(values: readonly string[]): string {
   return values.length > 0 ? values.join(", ") : "none";
 }
 
+function formatSourceStatusCounts(status: ReviewerSourceStatusPayload): string {
+  const parts = [
+    `${status.counts.current} current`,
+    `${status.counts.changed} changed`,
+    `${status.counts.unavailable} unavailable`,
+    `${status.counts.unsupported} unsupported`,
+    `${status.counts.missingAfterSync} missing`,
+    `${status.counts.unknown} unknown`,
+  ];
+  return `${formatOverallStatus(status.overallStatus)} - ${parts.join(", ")}`;
+}
+
+function formatOverallStatus(
+  status: ReviewerSourceStatusPayload["overallStatus"],
+): string {
+  switch (status) {
+    case "current":
+      return "Sources current";
+    case "changed":
+      return "Changes detected";
+    case "attention_required":
+      return "Sources need attention";
+    case "unknown":
+      return "Source status unknown";
+  }
+}
+
+function formatReadiness(
+  readiness: ReviewerSourceStatusPayload["regenerationReadiness"],
+): string {
+  switch (readiness) {
+    case "ready_current":
+      return "Readiness: ready with current sources";
+    case "ready_with_changes":
+      return "Readiness: ready after reviewing detected changes";
+    case "blocked_missing_sources":
+      return "Readiness: blocked by missing sources";
+    case "blocked_unavailable_sources":
+      return "Readiness: blocked by unavailable sources";
+    case "blocked_unsupported_sources":
+      return "Readiness: blocked by unsupported sources";
+    case "unknown":
+      return "Readiness: unknown";
+  }
+}
+
+function formatStatusActions(
+  actions: readonly ReviewerSourceStatusAction[],
+): string {
+  return `Next action: ${actions.map(formatStatusAction).join(", ")}`;
+}
+
+function formatStatusAction(action: ReviewerSourceStatusAction): string {
+  switch (action) {
+    case "prepare_updated_file":
+      return "prepare updated file";
+    case "sync_canvas_course":
+      return "sync Canvas course";
+    case "choose_replacement_source":
+      return "choose replacement source";
+    case "check_canvas_access":
+      return "check Canvas access";
+    case "unsupported_source_type":
+      return "unsupported source type";
+    case "status_unknown":
+      return "status unknown";
+  }
+}
+
+function formatSourceItemStatus(item: ReviewerSourceStatusItem): string {
+  const kind = item.fileKind ? ` ${item.fileKind}` : "";
+  return `${formatSourceStatusLabel(item.status)} ${formatSourceTypeLabel(
+    item.sourceType,
+  )}${kind} - ${item.message}`;
+}
+
+function formatSourceStatusLabel(
+  status: ReviewerSourceStatusItem["status"],
+): string {
+  switch (status) {
+    case "current":
+      return "Current";
+    case "changed":
+      return "Changed";
+    case "unavailable":
+      return "Unavailable";
+    case "unsupported":
+      return "Unsupported";
+    case "missing_after_sync":
+      return "Missing after sync";
+    case "unknown":
+      return "Unknown";
+  }
+}
+
+function formatSourceTypeLabel(
+  sourceType: ReviewerSourceStatusItem["sourceType"],
+): string {
+  switch (sourceType) {
+    case "page":
+      return "page";
+    case "assignment":
+      return "assignment";
+    case "announcement":
+      return "announcement";
+    case "file":
+      return "file";
+  }
+}
+
 function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -659,6 +879,44 @@ const styles = StyleSheet.create({
   statusCard: {
     alignItems: "flex-start",
     gap: spacing[2],
+  },
+  sourceStatusHeader: {
+    alignItems: "flex-start",
+    alignSelf: "stretch",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[3],
+    justifyContent: "space-between",
+  },
+  sourceStatusText: {
+    flex: 1,
+    gap: spacing[1],
+    minWidth: 220,
+  },
+  sourceStatusList: {
+    alignSelf: "stretch",
+    gap: spacing[2],
+  },
+  sourceStatusItem: {
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: spacing[1],
+    padding: spacing[3],
+  },
+  sourceStatusItemTitle: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "800",
+    lineHeight: 19,
+  },
+  statusDivider: {
+    alignSelf: "stretch",
+    backgroundColor: colors.border,
+    height: 1,
+    marginVertical: spacing[1],
   },
   statusTitle: {
     color: colors.textPrimary,

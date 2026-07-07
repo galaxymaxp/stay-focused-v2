@@ -303,6 +303,8 @@ function previewSessionRow() {
     source_count: 2,
     source_manifest: [manifestItem(1), manifestItem(2)] as unknown as Json,
     selected_block_manifest: [] as unknown as Json,
+    source_relationship_manifest: [] as unknown as Json,
+    duplicate_analysis_version: null,
     normalization_version: CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
     created_at: "2026-07-07T00:00:00.000Z",
     expires_at: "2099-01-01T00:00:00.000Z",

@@ -18,6 +18,8 @@ export const CANVAS_STORED_FILE_EXTRACTION_VERSION =
   "canvas-stored-file-extraction-v1";
 export const CANVAS_STORED_IMAGE_OCR_VERSION = "canvas-stored-image-ocr-v1";
 export const CANVAS_STORED_PDF_OCR_VERSION = "canvas-stored-pdf-ocr-v1";
+export const CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION =
+  "canvas-source-duplicate-analysis-v1";
 
 export const CANVAS_PREVIEW_SESSION_TTL_HOURS = 24;
 
@@ -62,6 +64,27 @@ export interface CanvasSelectedBlockManifestItem {
   readonly ocr_version: string | null;
 }
 
+export type CanvasSourceRelationshipType =
+  | "same_source"
+  | "same_content"
+  | "canvas_reference";
+
+export type CanvasSourceReferenceType =
+  | "none"
+  | "module"
+  | "page"
+  | "assignment"
+  | "announcement";
+
+export interface CanvasSourceRelationshipManifestItem {
+  readonly source_ordinal: number;
+  readonly related_source_ordinal: number;
+  readonly relationship_type: CanvasSourceRelationshipType;
+  readonly relationship_group_key: string;
+  readonly reference_type: CanvasSourceReferenceType;
+  readonly reference_ordinal: number;
+}
+
 export type SourceProvenanceErrorCode =
   | "canvas_preview_session_missing"
   | "canvas_preview_session_expired"
@@ -90,7 +113,7 @@ export interface ValidCanvasPreviewSession {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PREVIEW_SESSION_COLUMNS =
-  "id,user_id,canvas_connection_id,course_id,original_preview_text,original_preview_sha256,suggested_title,source_count,source_manifest,normalization_version,created_at,expires_at";
+  "id,user_id,canvas_connection_id,course_id,original_preview_text,original_preview_sha256,suggested_title,source_count,source_manifest,selected_block_manifest,source_relationship_manifest,duplicate_analysis_version,normalization_version,created_at,expires_at";
 const SNAPSHOT_COLUMNS =
   "id,user_id,preview_session_id,canvas_connection_id,course_id,source_mode,source_title,original_preview_sha256,exact_source_text,exact_source_sha256,source_count,was_edited,normalization_version,created_at";
 const SNAPSHOT_ITEM_SUMMARY_COLUMNS =
@@ -115,6 +138,7 @@ export async function createCanvasSourcePreviewSession({
   normalizationVersion,
   originalPreviewText,
   selectedBlockManifest,
+  sourceRelationshipManifest,
   suggestedTitle,
   userId,
 }: {
@@ -125,6 +149,7 @@ export async function createCanvasSourcePreviewSession({
   readonly normalizationVersion?: string;
   readonly originalPreviewText: string;
   readonly selectedBlockManifest?: readonly CanvasSelectedBlockManifestItem[];
+  readonly sourceRelationshipManifest?: readonly CanvasSourceRelationshipManifestItem[];
   readonly suggestedTitle: string;
   readonly userId: string;
 }): Promise<SourceProvenanceResult<{ readonly previewSessionId: string }>> {
@@ -142,6 +167,11 @@ export async function createCanvasSourcePreviewSession({
     original_preview_sha256: sha256Utf8Hex(originalPreviewText),
     original_preview_text: originalPreviewText,
     selected_block_manifest: (selectedBlockManifest ?? []) as unknown as Json,
+    source_relationship_manifest: (sourceRelationshipManifest ?? []) as unknown as Json,
+    duplicate_analysis_version:
+      sourceRelationshipManifest && sourceRelationshipManifest.length > 0
+        ? CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION
+        : null,
     source_count: manifest.length,
     source_manifest: manifest as unknown as Json,
     suggested_title: suggestedTitle,

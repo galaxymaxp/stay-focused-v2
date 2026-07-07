@@ -323,6 +323,18 @@ export interface CanvasSourceStructureResponse {
     readonly title: string;
     readonly fileKind?: Exclude<CanvasReviewerFileKind, "unsupported">;
     readonly pageCount?: number;
+    readonly duplicateSummary: {
+      readonly duplicateKind: "none" | "same_source" | "same_content";
+      readonly duplicateGroupId?: string;
+      readonly canonicalSourceOrdinal?: number;
+      readonly repeatedReferenceCount: number;
+      readonly repeatedReferenceKinds: readonly (
+        | "module"
+        | "page"
+        | "assignment"
+        | "announcement"
+      )[];
+    };
     readonly blocks: readonly CanvasStructuredBlock[];
   }[];
   readonly totalBlockCount: number;

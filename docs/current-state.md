@@ -46,6 +46,7 @@ Courses
 -> selected synchronized Canvas course
 -> choose supported Page, assignment-description, announcement, or ready PDF/image sources
 -> prepare one eligible PDF/image when needed
+-> choose structured content blocks
 -> preview and edit combined source text/title
 -> protected preview session
 -> existing reviewer API
@@ -53,6 +54,7 @@ Courses
 -> reviewer preview
 -> save to Study Library
 -> safe provenance summary in reviewer detail
+-> manual source-health check and regeneration-readiness summary
 ```
 
 Phase 3A also adds a protected server OCR route:
@@ -439,6 +441,24 @@ boundary still receives only `sourceText` and `sourceTitle`. Protected live
 validation for Phase 5D.2 remains blocked until previously exposed local
 credentials are rotated.
 
+Phase 5D.3 is implemented as the duplicate relationship, source freshness, and
+regeneration-readiness slice. Structure and preview sessions now preserve a
+private relationship manifest with code-defined duplicate-analysis versioning.
+The API detects same Canvas source identity, exact normalized-content
+duplicates, and repeated Canvas references while returning only opaque
+session-scoped duplicate groups and broad reference categories to mobile. Later
+exact-content duplicates remain visible but are unselected by default. Snapshot
+creation copies relationship provenance into immutable
+`reviewer_source_snapshot_item_relationships` rows. Saved Canvas reviewers have
+a protected manual source-status endpoint that compares immutable snapshot
+items against current synchronized Pages, assignments, announcements, and
+prepared PDF/image file metadata without Canvas calls, PAT decryption, Storage
+reads, OCR, or OpenAI. Missing rows become `missing_after_sync` only with later
+authoritative sync evidence; partial, failed, old, or ambiguous evidence
+remains `unknown`. The Study Library shows a source-health and readiness card
+but does not regenerate reviewers. Protected live validation remains blocked
+pending credential rotation.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -664,6 +684,18 @@ Historical and latest verification include:
   mobile 95/95, Canvas 52/52, and OCR 14/14. Supabase advisors showed no new
   Phase 5D.2 findings; remaining warnings are historical. Protected live
   validation is blocked pending credential rotation.
+- Phase 5D.3 verification uses migrations
+  `202607080001_add_canvas_source_relationships_freshness.sql` and
+  `202607080002_harden_source_relationship_grants.sql`, plus rollback-safe SQL
+  verifier
+  `scripts/phase5d3-source-relationships-freshness-verification.sql` for
+  relationship storage, RLS, grants, ownership constraints, same-snapshot
+  constraints, uniqueness, immutability, snapshot reuse, and historical
+  snapshot compatibility. Remote verification passed with 18/18 checks; root
+  typecheck/build passed across 7/7 workspaces; workspace tests passed with API
+  315/315, mobile 98/98, Canvas 52/52, and OCR 14/14; engine evals passed with
+  266/266. Supabase advisors were reviewed, with remaining warnings historical.
+  Protected live validation is blocked pending credential rotation.
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -853,9 +885,12 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   keys or signed URLs, and does not persist extracted text. Phase 5D.1 adds
   immutable source snapshots and exact reviewer linkage for the Canvas reviewer
   path. Phase 5D.2 adds structured normalized blocks and selective import with
-  selected-block snapshot provenance, but stale/deleted source comparison,
-  source recommendations, cross-course bundles, background sync, and automatic
-  reviewer generation remain deferred.
+  selected-block snapshot provenance. Phase 5D.3 adds exact duplicate
+  detection, repeated-reference indicators, immutable relationship provenance,
+  and manual source-health checks for saved Canvas reviewers. It does not add
+  source/block diff UI or actual reviewer regeneration. Broader parser
+  families, source recommendations, cross-course bundles, background sync, and
+  automatic reviewer generation remain deferred.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
   redirect flows are not validated as finished product features.
@@ -882,14 +917,16 @@ Study Library cleanup. Phase 5D.1 immutable source snapshots and exact reviewer
 provenance is implemented and remotely verified, with protected live validation
 blocked pending credential rotation. Phase 5D.2 structured normalized blocks
 and selective import is implemented and remotely verified, with protected live
-validation blocked pending credential rotation. The recommended next roadmap
-task is Phase 5D.3 - Deduplication, Repeated Relationships, Stale And Deleted
-Sources.
+validation blocked pending credential rotation. Phase 5D.3 duplicate
+relationships, source freshness, and regeneration readiness is implemented,
+with protected live validation blocked pending credential rotation. The next
+operational gate is credential rotation and protected Phase 5D.1 through
+Phase 5D.3 live validation.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks
 
-- Protected live validation for Phase 5D.2 is blocked until the previously
+- Protected live validation for Phase 5D.1 through Phase 5D.3 is blocked until the previously
   exposed local app-level credentials are rotated. Do not reuse the old
   service-role, OpenAI, Google OCR, Canvas PAT, or Canvas encryption-key values
   for live validation.

@@ -156,6 +156,11 @@ function structure() {
         ordinal: 1,
         type: "page",
         title: "Fictional Page",
+        duplicateSummary: {
+          duplicateKind: "none",
+          repeatedReferenceCount: 0,
+          repeatedReferenceKinds: [],
+        },
         blocks: [
           {
             id: "88888888-8888-4888-8888-888888888881",

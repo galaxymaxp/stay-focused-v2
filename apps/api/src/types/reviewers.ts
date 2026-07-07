@@ -5,6 +5,7 @@ import type {
   SavedReviewerSourceProvenanceSummary,
   SavedReviewerSummary,
 } from "@stay-focused/db";
+import type { ReviewerSourceStatusResponse } from "@/lib/reviewer-source-status";
 
 export type {
   SavedReviewerSourceMetadata,
@@ -30,6 +31,11 @@ export interface ReviewerSummarySuccessResponse {
 }
 
 export interface ReviewerDeleteSuccessResponse {
+  readonly ok: true;
+}
+
+export interface ReviewerSourceStatusSuccessResponse
+  extends ReviewerSourceStatusResponse {
   readonly ok: true;
 }
 
@@ -76,4 +82,8 @@ export type ReviewerSummaryResponse =
 
 export type ReviewerDeleteResponse =
   | ReviewerDeleteSuccessResponse
+  | ReviewerApiErrorResponse;
+
+export type ReviewerSourceStatusApiResponse =
+  | ReviewerSourceStatusSuccessResponse
   | ReviewerApiErrorResponse;

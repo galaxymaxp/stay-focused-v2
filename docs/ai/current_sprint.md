@@ -68,9 +68,13 @@ and selective import is implemented and remotely verified: Canvas HTML/OCR
 sources become private server-held block manifests, mobile receives safe public
 selectors, students choose exact blocks before preview, and immutable snapshots
 copy selected-block provenance after generation. Protected live validation for
-Phase 5D.2 remains blocked pending credential rotation. The next roadmap task
-is Phase 5D.3 - Deduplication, Repeated Relationships, Stale And Deleted
-Sources.
+Phase 5D.2 remains blocked pending credential rotation. Phase 5D.3 duplicate
+relationships, source freshness, and regeneration readiness is implemented:
+Canvas structure responses show exact duplicate and repeated-reference context,
+immutable snapshots preserve private relationship provenance, saved Canvas
+reviewers can be checked against current synchronized source state, and Study
+Library shows source health/readiness without regenerating. Protected live
+validation remains blocked pending credential rotation.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -484,7 +488,7 @@ There is no school-wide Canvas token.
   file-byte return, no direct mobile-to-Canvas/Storage download, and no
   persistent OCR output.
 
-## Out Of Scope After Phase 5D.2
+## Out Of Scope After Phase 5D.3
 
 - Office parsing.
 - Spreadsheet parsing.
@@ -492,8 +496,8 @@ There is no school-wide Canvas token.
 - Audio/video transcription.
 - Canvas Studio support.
 - Discussions, quizzes, submissions, grades, rubrics, and feedback.
-- Stale/deleted source comparison, duplicate-source detection, source
-  recommendations, and cross-course source bundles.
+- Actual reviewer regeneration, source/block diff UI, source recommendations,
+  and cross-course source bundles.
 - Background, queued, scheduled, or resumable synchronization.
 - Canvas OAuth, task generation, and schedule generation.
 
@@ -587,6 +591,60 @@ There is no school-wide Canvas token.
   cleanup, snapshot reuse, and historical no-block preview compatibility.
 - Supabase security and performance advisors showed no new Phase 5D.2
   findings. Remaining warnings are historical.
+- Protected live validation is blocked pending confirmed rotation of previously
+  exposed local credentials.
+
+## Completed Phase 5D.3 Scope
+
+- Added exact same-source grouping from stable Canvas source identity and exact
+  same-content grouping from complete normalized source-content SHA-256 values.
+- Kept duplicate hashes, Canvas object IDs, internal row IDs, module IDs, and
+  relationship fingerprints private; mobile receives only opaque session-scoped
+  duplicate groups, canonical source ordinals, and broad repeated-reference
+  categories.
+- Left canonical exact-content duplicate blocks selected by default and made
+  later exact-content duplicate blocks visible but unselected by default.
+- Added repeated-reference discovery from Canvas file references and
+  unambiguous module-item references, reported as broad module/page/assignment/
+  announcement categories only.
+- Added private immutable
+  `reviewer_source_snapshot_item_relationships` rows plus relationship
+  manifests on Canvas preview and structure sessions with
+  `canvas-source-duplicate-analysis-v1` versioning.
+- Updated snapshot creation so relationship manifests are copied into immutable
+  snapshot relationship rows without changing historical no-relationship
+  snapshots.
+- Added protected `GET /api/reviewers/:id/source-status`, using bearer auth and
+  owner-scoped service reads only. The route does not call Canvas, decrypt the
+  PAT, read Storage, invoke OCR, or call OpenAI.
+- Added conservative status states for current, changed, unavailable,
+  unsupported, missing-after-sync, and unknown source items.
+- Added reviewer-level overall status and regeneration-readiness assessment
+  without actual reviewer regeneration.
+- Updated Study Library with a manual source-health refresh card for saved
+  Canvas reviewers; non-Canvas reviewers remain unchanged.
+
+## Phase 5D.3 Results
+
+- Migrations `202607080001_add_canvas_source_relationships_freshness.sql` and
+  `202607080002_harden_source_relationship_grants.sql` add private relationship
+  storage, relationship manifests, duplicate-analysis versioning, same-owner
+  composite foreign keys, same-snapshot constraints, uniqueness, RLS,
+  service-role-only grants, and immutable update blocking.
+- Rollback-safe SQL verifier
+  `scripts/phase5d3-source-relationships-freshness-verification.sql` covers
+  table/column/index/constraint presence, RLS, direct grant denial,
+  service-role grants, same-snapshot acceptance, cross-snapshot and cross-user
+  rejection, invalid relationship type rejection, duplicate rejection,
+  immutable update rejection, snapshot reuse, and historical snapshot
+  compatibility. Remote verification passed with 18/18 checks after grant
+  hardening.
+- Automated verification passed: root typecheck/build across 7/7 workspaces;
+  workspace tests with API 315/315, mobile 98/98, Canvas 52/52, and OCR 14/14;
+  engine evals 266/266; plus focused API source-status/source-relationship and
+  mobile parser tests during implementation.
+- Supabase security and performance advisors were reviewed. Remaining warnings
+  are historical and not introduced by Phase 5D.3.
 - Protected live validation is blocked pending confirmed rotation of previously
   exposed local credentials.
 
@@ -1283,6 +1341,8 @@ and exact reviewer provenance is implemented and remotely verified, with
 protected live validation blocked pending credential rotation. Phase 5D.2
 structured normalized blocks and selective import is implemented and remotely
 verified, with protected live validation blocked pending credential rotation.
-The recommended next roadmap task is Phase 5D.3 - Deduplication, Repeated
-Relationships, Stale And Deleted Sources. The deferred header/footer cleanup
-task remains separate.
+Phase 5D.3 duplicate relationships, source freshness, and regeneration
+readiness is implemented, with protected live validation blocked pending
+credential rotation. The next operational gate is credential rotation and
+protected Phase 5D.1 through Phase 5D.3 live validation. The deferred
+header/footer cleanup task remains separate.

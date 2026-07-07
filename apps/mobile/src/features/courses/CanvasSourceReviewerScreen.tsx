@@ -936,6 +936,22 @@ function StructuredSourceSection({
           {" - "}
           {selectedCount}/{source.blocks.length} selected
         </Text>
+        {formatDuplicateSummary(source) ? (
+          <Text
+            style={styles.statusText}
+            testID={`canvas-source-duplicate-summary-${source.ordinal}`}
+          >
+            {formatDuplicateSummary(source)}
+          </Text>
+        ) : null}
+        {formatRepeatedReferenceSummary(source) ? (
+          <Text
+            style={styles.statusText}
+            testID={`canvas-source-reference-summary-${source.ordinal}`}
+          >
+            {formatRepeatedReferenceSummary(source)}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.actions}>
         <Button onPress={() => onSelectAllSource(source)} variant="secondary">
@@ -1411,6 +1427,54 @@ function formatBlockKind(block: CanvasStructuredBlock): string {
       return "Quote";
     case "code":
       return "Code";
+  }
+}
+
+function formatDuplicateSummary(
+  source: CanvasSourceStructurePayload["sources"][number],
+): string | null {
+  const summary = source.duplicateSummary;
+  if (summary.duplicateKind === "none") {
+    return null;
+  }
+  const canonical = summary.canonicalSourceOrdinal;
+  const isCanonical = canonical === source.ordinal;
+  if (summary.duplicateKind === "same_source") {
+    return isCanonical
+      ? "Same Canvas source appears elsewhere in this selection."
+      : `Same Canvas source as source ${canonical}.`;
+  }
+  return isCanonical
+    ? "Canonical copy for matching source content."
+    : `Content matches source ${canonical}; blocks start unselected.`;
+}
+
+function formatRepeatedReferenceSummary(
+  source: CanvasSourceStructurePayload["sources"][number],
+): string | null {
+  const { repeatedReferenceCount, repeatedReferenceKinds } =
+    source.duplicateSummary;
+  if (repeatedReferenceCount <= 0) {
+    return null;
+  }
+  const kinds = repeatedReferenceKinds.map(formatReferenceKind).join(", ");
+  return `Referenced in ${repeatedReferenceCount} Canvas ${
+    repeatedReferenceCount === 1 ? "location" : "locations"
+  }${kinds ? `: ${kinds}` : ""}.`;
+}
+
+function formatReferenceKind(
+  kind: CanvasSourceStructurePayload["sources"][number]["duplicateSummary"]["repeatedReferenceKinds"][number],
+): string {
+  switch (kind) {
+    case "module":
+      return "module";
+    case "page":
+      return "page";
+    case "assignment":
+      return "assignment";
+    case "announcement":
+      return "announcement";
   }
 }
 

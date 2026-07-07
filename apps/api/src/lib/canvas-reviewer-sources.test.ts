@@ -26,6 +26,7 @@ import {
   CANVAS_SELECTIVE_PREVIEW_VERSION,
   CANVAS_STRUCTURED_BLOCKS_VERSION,
 } from "./canvas-structured-blocks";
+import { CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION } from "./reviewer-source-provenance";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const CONNECTION_ID = "00000000-0000-4000-8000-000000000002";
@@ -398,6 +399,127 @@ describe("Canvas reviewer source service", () => {
       source_row_id: PAGE_ID,
       source_type: "page",
     });
+  });
+
+  it("flags exact-content duplicates while leaving later duplicate blocks unselected", async () => {
+    const duplicateOne = pageRow({
+      bodyText: "Shared normalized study text.",
+      id: pageId(1),
+      title: "Fictional Duplicate One",
+    });
+    const duplicateTwo = pageRow({
+      bodyText: "Shared normalized study text.",
+      id: pageId(2),
+      title: "Fictional Duplicate Two",
+    });
+    const fake = createFakeCanvasClient({
+      canvas_pages: [duplicateOne, duplicateTwo],
+    });
+
+    const result = await structureCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      sourceIds: [`page:${pageId(1)}`, `page:${pageId(2)}`],
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.selectedByDefaultCount).toBe(1);
+    expect(result.value.sources[0]).toMatchObject({
+      duplicateSummary: {
+        canonicalSourceOrdinal: 1,
+        duplicateGroupId: "same-content-1",
+        duplicateKind: "same_content",
+        repeatedReferenceCount: 0,
+        repeatedReferenceKinds: [],
+      },
+    });
+    expect(result.value.sources[1]).toMatchObject({
+      duplicateSummary: {
+        canonicalSourceOrdinal: 1,
+        duplicateGroupId: "same-content-1",
+        duplicateKind: "same_content",
+      },
+    });
+    expect(result.value.sources[0]?.blocks.every((block) => block.selectedByDefault))
+      .toBe(true);
+    expect(result.value.sources[1]?.blocks.every((block) => !block.selectedByDefault))
+      .toBe(true);
+    expect(JSON.stringify(result.value)).not.toContain("sha256");
+
+    const session = fake.insertedRowsFor("canvas_source_structure_sessions")[0];
+    expect(session).toMatchObject({
+      duplicate_analysis_version: CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION,
+    });
+    expect(session.source_relationship_manifest).toEqual([
+      expect.objectContaining({
+        reference_type: "none",
+        relationship_group_key: "same-content-1",
+        relationship_type: "same_content",
+        source_ordinal: 1,
+        related_source_ordinal: 2,
+      }),
+    ]);
+  });
+
+  it("summarizes repeated module references without exposing private reference IDs", async () => {
+    const referencedPage = pageRow({
+      bodyText: "Module referenced study text.",
+      id: pageId(1),
+      title: "Fictional Module Page",
+    });
+    const fake = createFakeCanvasClient({
+      canvas_pages: [referencedPage],
+      canvas_module_items: [
+        moduleItemRow({
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+          pageUrl: String(referencedPage.canvas_page_id),
+        }),
+        moduleItemRow({
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          pageUrl: String(referencedPage.canvas_page_id),
+        }),
+      ],
+    });
+
+    const result = await structureCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      sourceIds: [`page:${pageId(1)}`],
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.sources[0]?.duplicateSummary).toEqual({
+      duplicateKind: "none",
+      repeatedReferenceCount: 2,
+      repeatedReferenceKinds: ["module"],
+    });
+    const serialized = JSON.stringify(result.value);
+    expect(serialized).not.toContain("aaaaaaaa-aaaa");
+    expect(serialized).not.toContain("module-");
+
+    const session = fake.insertedRowsFor("canvas_source_structure_sessions")[0];
+    expect(session.source_relationship_manifest).toEqual([
+      expect.objectContaining({
+        reference_ordinal: 1,
+        reference_type: "module",
+        relationship_type: "canvas_reference",
+        source_ordinal: 1,
+        related_source_ordinal: 1,
+      }),
+      expect.objectContaining({
+        reference_ordinal: 2,
+        reference_type: "module",
+        relationship_type: "canvas_reference",
+        source_ordinal: 1,
+        related_source_ordinal: 1,
+      }),
+    ]);
   });
 
   it("builds selective previews from server-held blocks and stores selected-block provenance", async () => {
@@ -1336,6 +1458,39 @@ function pageRow({
     canvas_page_id: `page-${id.slice(-2)}`,
     id,
     title,
+  };
+}
+
+function moduleItemRow({
+  id,
+  pageUrl,
+}: {
+  readonly id: string;
+  readonly pageUrl: string;
+}): FakeRecord {
+  return {
+    id,
+    user_id: USER_ID,
+    canvas_connection_id: CONNECTION_ID,
+    course_id: COURSE_ID,
+    module_id: "module-fictional-1",
+    canvas_module_item_id: `module-item-${id.slice(-1)}`,
+    title: "Fictional module item",
+    position: 1,
+    indent: 0,
+    item_type: "Page",
+    canvas_content_id: null,
+    page_url: pageUrl,
+    external_url: null,
+    html_url: null,
+    new_tab: false,
+    published: true,
+    completion_requirement: null,
+    content_details: null,
+    first_synced_at: NOW,
+    last_synced_at: NOW,
+    created_at: NOW,
+    updated_at: NOW,
   };
 }
 

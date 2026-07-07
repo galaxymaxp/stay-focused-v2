@@ -39,9 +39,12 @@ linkage, and safe Study Library provenance summaries. Protected live
 validation for Phase 5D.1 is blocked until previously exposed local
 credentials are rotated. Phase 5D.2 adds structured normalized blocks and
 selective import: Canvas HTML/OCR sources become bounded server-held blocks,
-students choose exact blocks before preview generation, selected-block
-provenance is copied into immutable snapshots, and protected live validation
-remains blocked pending credential rotation.
+students choose exact blocks before preview generation, and selected-block
+provenance is copied into immutable snapshots. Phase 5D.3 adds exact duplicate
+source analysis, repeated-reference provenance, conservative current-source
+status checks, and regeneration-readiness assessment without implementing
+actual reviewer regeneration. Protected live validation remains blocked
+pending credential rotation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -89,6 +92,7 @@ Sign in
 -> reviewer preview
 -> save to Study Library
 -> safe provenance summary in reviewer detail
+-> manual source-health check and regeneration-readiness summary
 ```
 
 This slice uses Supabase email/password authentication in the Expo app. The
@@ -172,6 +176,11 @@ Complete:
   server-held HTML/OCR block manifests, bounded block selection before preview,
   selected-block snapshot provenance, Study Library selected-block summaries,
   and no provenance sent to OpenAI
+- Phase 5D.3 duplicate relationships and source freshness with exact
+  same-source and same-content grouping, repeated-reference summaries,
+  immutable relationship rows, protected reviewer source-status checks,
+  conservative missing-after-sync semantics, Study Library source-health UI,
+  regeneration-readiness states, and no actual regeneration
 
 Working locally:
 
@@ -279,6 +288,16 @@ Working locally:
   sessions, selected-block manifests, snapshot block copying, immutability,
   direct grant revocation, service-role grants, RLS, expired cleanup, snapshot
   reuse, and historical preview compatibility. Protected live validation is
+  blocked pending credential rotation.
+- Phase 5D.3 adds duplicate/repeated relationship provenance and reviewer
+  source status. Migrations
+  `202607080001_add_canvas_source_relationships_freshness.sql` and
+  `202607080002_harden_source_relationship_grants.sql` add private immutable
+  relationship rows, relationship manifests on Canvas preview and structure
+  sessions, and explicit service-role-only table grants. Remote rollback-safe
+  SQL verification passed with 18/18 checks. The protected source-status API
+  compares current synchronized rows to immutable snapshots without Canvas,
+  Storage, OCR, PAT decryption, or OpenAI calls. Protected live validation is
   blocked pending credential rotation.
 
 Pending:
@@ -440,9 +459,13 @@ tests do not run that opt-in provider smoke.
   text sources, is bounded and editable, and does not call Canvas, decrypt the
   PAT, call OpenAI, return Storage keys, or persist OCR output. Phase 5D.2 adds
   a structure-and-select step for normalized Canvas HTML/OCR blocks and stores
-  selected-block provenance with immutable snapshots, but broader parser
-  families, stale/deleted comparison, source recommendations, cross-course
-  bundles, background sync, and automatic reviewer generation remain deferred.
+  selected-block provenance with immutable snapshots. Phase 5D.3 adds exact
+  duplicate detection, repeated-reference indicators, immutable relationship
+  provenance, and manual source-health checks for saved Canvas reviewers.
+  Missing sources are reported only after later authoritative sync evidence;
+  partial, failed, old, or ambiguous sync evidence remains `unknown`. Broader
+  parser families, source and block diff UI, cross-course bundles, background
+  sync, and actual reviewer regeneration remain deferred.
 - No background or scheduled Canvas synchronization exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
@@ -479,6 +502,9 @@ handoff, and Study Library cleanup. Phase 5D.1 immutable source snapshots and
 exact reviewer provenance is implemented and remotely verified, with protected
 live validation blocked pending credential rotation. Phase 5D.2 structured
 normalized blocks and selective import is implemented and remotely verified,
-with protected live validation blocked pending credential rotation. The next
-roadmap task is Phase 5D.3 - Deduplication, Repeated Relationships, Stale And
-Deleted Sources. Canvas OAuth remains a future phase.
+with protected live validation blocked pending credential rotation. Phase 5D.3
+duplicate relationships, source freshness, and regeneration readiness is
+implemented, with protected live validation blocked pending credential
+rotation. The next operational gate is credential rotation and protected
+Phase 5D.1 through Phase 5D.3 live validation. Canvas OAuth remains a future
+phase.

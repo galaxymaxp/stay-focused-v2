@@ -72,6 +72,10 @@ export type ReviewerSourceSnapshotBlockRow =
   Database["public"]["Tables"]["reviewer_source_snapshot_blocks"]["Row"];
 export type ReviewerSourceSnapshotBlockInsert =
   Database["public"]["Tables"]["reviewer_source_snapshot_blocks"]["Insert"];
+export type ReviewerSourceSnapshotItemRelationshipRow =
+  Database["public"]["Tables"]["reviewer_source_snapshot_item_relationships"]["Row"];
+export type ReviewerSourceSnapshotItemRelationshipInsert =
+  Database["public"]["Tables"]["reviewer_source_snapshot_item_relationships"]["Insert"];
 export type CanvasConnectionRow =
   Database["public"]["Tables"]["canvas_connections"]["Row"];
 export type CanvasConnectionInsert =
@@ -240,6 +244,8 @@ export interface Database {
           source_count: number;
           source_manifest: Json;
           selected_block_manifest: Json;
+          source_relationship_manifest: Json;
+          duplicate_analysis_version: string | null;
           normalization_version: string;
           created_at: string;
           expires_at: string;
@@ -255,6 +261,8 @@ export interface Database {
           source_count: number;
           source_manifest: Json;
           selected_block_manifest?: Json;
+          source_relationship_manifest?: Json;
+          duplicate_analysis_version?: string | null;
           normalization_version: string;
           created_at?: string;
           expires_at: string;
@@ -270,6 +278,8 @@ export interface Database {
           source_count?: number;
           source_manifest?: Json;
           selected_block_manifest?: Json;
+          source_relationship_manifest?: Json;
+          duplicate_analysis_version?: string | null;
           normalization_version?: string;
           created_at?: string;
           expires_at?: string;
@@ -294,6 +304,8 @@ export interface Database {
           source_manifest: Json;
           block_count: number;
           block_manifest: Json;
+          source_relationship_manifest: Json;
+          duplicate_analysis_version: string | null;
           structure_version: string;
           created_at: string;
           expires_at: string;
@@ -307,6 +319,8 @@ export interface Database {
           source_manifest: Json;
           block_count: number;
           block_manifest: Json;
+          source_relationship_manifest?: Json;
+          duplicate_analysis_version?: string | null;
           structure_version: string;
           created_at?: string;
           expires_at: string;
@@ -320,6 +334,8 @@ export interface Database {
           source_manifest?: Json;
           block_count?: number;
           block_manifest?: Json;
+          source_relationship_manifest?: Json;
+          duplicate_analysis_version?: string | null;
           structure_version?: string;
           created_at?: string;
           expires_at?: string;
@@ -2099,6 +2115,97 @@ export interface Database {
           },
           {
             foreignKeyName: "reviewer_source_snapshot_blocks_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reviewer_source_snapshot_item_relationships: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_snapshot_id: string;
+          source_snapshot_item_id: string;
+          related_source_snapshot_item_id: string;
+          relationship_type: "same_source" | "same_content" | "canvas_reference";
+          relationship_group_key: string;
+          reference_type:
+            | "none"
+            | "module"
+            | "page"
+            | "assignment"
+            | "announcement";
+          reference_ordinal: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          source_snapshot_id: string;
+          source_snapshot_item_id: string;
+          related_source_snapshot_item_id: string;
+          relationship_type: "same_source" | "same_content" | "canvas_reference";
+          relationship_group_key: string;
+          reference_type?:
+            | "none"
+            | "module"
+            | "page"
+            | "assignment"
+            | "announcement";
+          reference_ordinal?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          source_snapshot_id?: string;
+          source_snapshot_item_id?: string;
+          related_source_snapshot_item_id?: string;
+          relationship_type?: "same_source" | "same_content" | "canvas_reference";
+          relationship_group_key?: string;
+          reference_type?:
+            | "none"
+            | "module"
+            | "page"
+            | "assignment"
+            | "announcement";
+          reference_ordinal?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviewer_source_snapshot_item_relationships_item_context_fkey";
+            columns: [
+              "source_snapshot_item_id",
+              "source_snapshot_id",
+              "user_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshot_items";
+            referencedColumns: ["id", "source_snapshot_id", "user_id"];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshot_item_relationships_related_context_fkey";
+            columns: [
+              "related_source_snapshot_item_id",
+              "source_snapshot_id",
+              "user_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshot_items";
+            referencedColumns: ["id", "source_snapshot_id", "user_id"];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshot_item_relationships_snapshot_owner_fkey";
+            columns: ["source_snapshot_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshots";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshot_item_relationships_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";

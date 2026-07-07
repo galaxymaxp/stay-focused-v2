@@ -192,12 +192,20 @@ paths.
   rows, mobile block-selection UI, and safe Study Library selected-block
   counts. The reviewer engine/provider boundary still receives only
   `sourceText` and `sourceTitle`.
+- Phase 5D.3 Duplicate Relationships, Source Freshness, and Regeneration
+  Readiness is implemented. It adds exact same-source and same-content
+  duplicate summaries, repeated-reference categories, private immutable
+  snapshot item relationship rows, a protected manual reviewer source-status
+  endpoint, conservative missing-after-sync semantics, Study Library
+  source-health UI, and readiness assessment without actual regeneration. The
+  source-status path does not call Canvas, decrypt the PAT, read Storage,
+  invoke OCR, or call OpenAI.
 - SECURITY ACTION REQUIRED: previously printed local credentials must be
   rotated before protected live validation reuses app-level credentials. The
   names requiring rotation are `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
   Google OCR credential material, `CANVAS_PERSONAL_ACCESS_TOKEN`, and
-  `CANVAS_TOKEN_ENCRYPTION_KEY`. Phase 5D.2 protected live validation is
-  blocked pending confirmed rotation.
+  `CANVAS_TOKEN_ENCRYPTION_KEY`. Phase 5D.1 through Phase 5D.3 protected live
+  validation is blocked pending confirmed rotation.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
@@ -347,6 +355,16 @@ paths.
   passed with API 299/299, mobile 95/95, Canvas 52/52, and OCR 14/14. Supabase
   advisors showed no new Phase 5D.2 findings; remaining warnings are
   historical. Protected live validation is blocked pending credential rotation.
+- Phase 5D.3 verification uses migrations
+  `202607080001_add_canvas_source_relationships_freshness.sql` and
+  `202607080002_harden_source_relationship_grants.sql`, plus rollback-safe SQL
+  verifier
+  `scripts/phase5d3-source-relationships-freshness-verification.sql`. Remote
+  SQL verification passed with 18/18 checks. Automated verification passed with
+  root typecheck/build across 7/7 workspaces, workspace tests API 315/315,
+  mobile 98/98, Canvas 52/52, OCR 14/14, and engine evals 266/266. Supabase
+  advisors were reviewed; remaining warnings are historical. Protected live
+  validation is blocked pending credential rotation.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -396,13 +414,15 @@ and exact reviewer provenance is implemented and remotely verified, with
 protected live validation blocked pending credential rotation. Phase 5D.2
 structured normalized blocks and selective import is implemented and remotely
 verified, with protected live validation blocked pending credential rotation.
-The recommended next roadmap task is Phase 5D.3 - Deduplication, Repeated
-Relationships, Stale And Deleted Sources. Automatic repeated scanned-PDF
-header/footer detection remains a deferred candidate.
+Phase 5D.3 duplicate relationships, source freshness, and regeneration
+readiness is implemented, with protected live validation blocked pending
+credential rotation. The next operational gate is credential rotation and
+protected Phase 5D.1 through Phase 5D.3 live validation. Automatic repeated
+scanned-PDF header/footer detection remains a deferred candidate.
 
 ## Known Blockers And Risks
 
-- Protected live validation for Phase 5D.2 is blocked until the previously
+- Protected live validation for Phase 5D.1 through Phase 5D.3 is blocked until the previously
   exposed local app-level credentials are rotated. Do not run live Canvas,
   OpenAI, OCR, or service-role validation with those old values.
 - OneDrive-backed generated Next output can leave stale reparse-point artifacts;

@@ -226,10 +226,13 @@ immutable source snapshots and exact reviewer provenance is implemented and
 remotely verified, with protected live validation blocked pending credential
 rotation. Phase 5D.2 structured normalized blocks and selective import is
 implemented and remotely verified, with protected live validation blocked
-pending credential rotation. Next: Phase 5D.3 - Deduplication, Repeated
-Relationships, Stale And Deleted Sources. Phase 5D through Phase 5F remain
-planned and must not be collapsed into a single generic Canvas integration
-task.
+pending credential rotation. Phase 5D.3 duplicate relationships, source
+freshness, and regeneration readiness is implemented, with protected live
+validation blocked pending credential rotation. The next operational gate is
+credential rotation and protected Phase 5D.1 through Phase 5D.3 live
+validation; the next roadmap phase after that gate is Phase 5E. Phase 5E
+through Phase 5F remain planned and must not be collapsed into a single generic
+Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -679,8 +682,11 @@ Canvas PDF/image OCR sources are complete and live validated for preparation,
 private Storage OCR preview, edited reviewer handoff, and Study Library
 cleanup. Phase 5D.1 immutable source snapshots and Phase 5D.2 structured
 normalized blocks are implemented and remotely verified, with protected live
-validation blocked pending credential rotation. Next: Phase 5D.3 -
-Deduplication, Repeated Relationships, Stale And Deleted Sources.
+validation blocked pending credential rotation. Phase 5D.3 duplicate
+relationships, source freshness, and regeneration readiness is implemented,
+with protected live validation blocked pending credential rotation. Next
+operational gate: credential rotation and protected Phase 5D.1 through Phase
+5D.3 live validation.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -968,11 +974,17 @@ Exit criteria:
 
 ### Phase 5D - Source Normalization, Provenance, And Selective Import
 
-Status: In progress. Phase 5D.1 is implemented and remotely verified as the
-immutable source-snapshot and exact reviewer-provenance foundation. Protected
-live validation is blocked pending rotation of previously exposed local
-credentials. Phase 5D.2 is implemented and remotely verified as the structured
-normalized-block and selective-import slice. Phase 5D.3 remains pending.
+Status: Implemented through Phase 5D.3, with protected live validation blocked
+pending rotation of previously exposed local credentials. Phase 5D.1 is
+implemented and remotely verified as the immutable source-snapshot and exact
+reviewer-provenance foundation. Phase 5D.2 is implemented and remotely verified
+as the structured normalized-block and selective-import slice. Phase 5D.3 is
+implemented as duplicate relationships, source freshness, and regeneration
+readiness without actual regeneration. Remote Phase 5D.3 verification passed
+with migrations `202607080001_add_canvas_source_relationships_freshness.sql`
+and `202607080002_harden_source_relationship_grants.sql`, plus 18/18
+rollback-safe SQL verifier checks; remaining Supabase advisor warnings are
+historical.
 
 Subphases:
 
@@ -986,10 +998,12 @@ Subphases:
   page ordering where available, safe public block selectors, bounded
   user-selectable blocks before generation, selected-block preview manifests,
   immutable snapshot block provenance, and no provenance sent to OpenAI.
-- Phase 5D.3 - Deduplication, Repeated Relationships, Stale And Deleted
-  Sources: repeated-source relationships, duplicate detection, stale/deleted
-  source comparison, unsupported-source reporting expansion, and regeneration
-  readiness.
+- Phase 5D.3 - Duplicate Relationships, Source Freshness, And Regeneration
+  Readiness: same-source and exact-content duplicate detection, repeated Canvas
+  reference summaries, immutable relationship provenance, protected
+  current-versus-snapshot source-status checks, conservative
+  missing-after-sync semantics, unsupported-source reporting, and readiness
+  assessment without actual regeneration.
 
 Scope:
 
@@ -1043,6 +1057,10 @@ Exit criteria:
 - Users can preview and selectively import source material before it reaches the
   reviewer engine. Phase 5D.2 satisfies this for the current Canvas reviewer
   path using server-held block manifests and selected-block snapshots.
+- Saved Canvas reviewers can be checked against current synchronized source
+  state with conservative current/changed/unavailable/unsupported/missing/unknown
+  results and a regeneration-readiness summary. Phase 5D.3 satisfies this as
+  assessment only; actual reviewer regeneration remains out of scope.
 
 ### Phase 5E - Grades, Submissions, Rubrics, And Feedback Foundation
 

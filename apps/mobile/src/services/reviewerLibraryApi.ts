@@ -45,6 +45,63 @@ export interface SavedReviewerDetail extends SavedReviewerSummary {
   readonly sourceProvenance?: SavedReviewerSourceProvenanceSummary;
 }
 
+export type ReviewerSourceItemStatus =
+  | "current"
+  | "changed"
+  | "unavailable"
+  | "unsupported"
+  | "missing_after_sync"
+  | "unknown";
+
+export type ReviewerSourceOverallStatus =
+  | "current"
+  | "changed"
+  | "attention_required"
+  | "unknown";
+
+export type ReviewerRegenerationReadiness =
+  | "ready_current"
+  | "ready_with_changes"
+  | "blocked_missing_sources"
+  | "blocked_unavailable_sources"
+  | "blocked_unsupported_sources"
+  | "unknown";
+
+export type ReviewerSourceStatusAction =
+  | "prepare_updated_file"
+  | "sync_canvas_course"
+  | "choose_replacement_source"
+  | "check_canvas_access"
+  | "unsupported_source_type"
+  | "status_unknown";
+
+export interface ReviewerSourceStatusItem {
+  readonly ordinal: number;
+  readonly sourceType: "page" | "assignment" | "announcement" | "file";
+  readonly title: string;
+  readonly fileKind?: "pdf" | "image";
+  readonly status: ReviewerSourceItemStatus;
+  readonly action?: ReviewerSourceStatusAction;
+  readonly message: string;
+}
+
+export interface ReviewerSourceStatusPayload {
+  readonly checkedAt: string;
+  readonly overallStatus: ReviewerSourceOverallStatus;
+  readonly regenerationReadiness: ReviewerRegenerationReadiness;
+  readonly counts: {
+    readonly total: number;
+    readonly current: number;
+    readonly changed: number;
+    readonly unavailable: number;
+    readonly unsupported: number;
+    readonly missingAfterSync: number;
+    readonly unknown: number;
+  };
+  readonly actions: readonly ReviewerSourceStatusAction[];
+  readonly items: readonly ReviewerSourceStatusItem[];
+}
+
 export interface ReviewerLibraryBaseInput {
   readonly apiBaseUrl: string;
   readonly accessToken: string;
@@ -124,6 +181,10 @@ interface ReviewerDeleteSuccessResponse {
   readonly ok: true;
 }
 
+interface ReviewerSourceStatusSuccessResponse extends ReviewerSourceStatusPayload {
+  readonly ok: true;
+}
+
 interface ReviewerApiErrorResponse {
   readonly ok: false;
   readonly error: {
@@ -188,6 +249,22 @@ export async function getReviewer(
     input,
     method: "GET",
     parseSuccess: parseReviewerDetailResponse,
+  });
+}
+
+export async function getReviewerSourceStatus(
+  input: ReviewerIdInput,
+): Promise<ReviewerLibraryResult<ReviewerSourceStatusPayload>> {
+  const endpoint = createReviewerEndpoint(input);
+  if (!endpoint.ok) {
+    return endpoint;
+  }
+
+  return requestJson({
+    endpoint: `${endpoint.url}/source-status`,
+    input,
+    method: "GET",
+    parseSuccess: parseReviewerSourceStatusResponse,
   });
 }
 
@@ -393,6 +470,20 @@ function parseReviewerDeleteResponse(
   );
 }
 
+function parseReviewerSourceStatusResponse(
+  parsed: unknown,
+): ReviewerLibraryResult<ReviewerSourceStatusPayload> {
+  if (isReviewerSourceStatusSuccessResponse(parsed)) {
+    const { ok: _ok, ...payload } = parsed;
+    return { ok: true, data: payload };
+  }
+
+  return clientError(
+    "invalid_response",
+    "Study Library returned an invalid source status response.",
+  );
+}
+
 function apiError(status: number, parsed: unknown): ReviewerLibraryResult<never> {
   if (isReviewerApiErrorResponse(parsed)) {
     const code = mapApiErrorCode(parsed.error.code);
@@ -539,6 +630,23 @@ function isReviewerDeleteSuccessResponse(
   return isRecord(value) && value.ok === true;
 }
 
+function isReviewerSourceStatusSuccessResponse(
+  value: unknown,
+): value is ReviewerSourceStatusSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    typeof value.checkedAt === "string" &&
+    isReviewerSourceOverallStatus(value.overallStatus) &&
+    isReviewerRegenerationReadiness(value.regenerationReadiness) &&
+    isReviewerSourceStatusCounts(value.counts) &&
+    Array.isArray(value.actions) &&
+    value.actions.every(isReviewerSourceStatusAction) &&
+    Array.isArray(value.items) &&
+    value.items.every(isReviewerSourceStatusItem)
+  );
+}
+
 function isReviewerApiErrorResponse(
   value: unknown,
 ): value is ReviewerApiErrorResponse {
@@ -600,6 +708,130 @@ function isSourceMode(value: unknown): value is SavedReviewerSourceMode {
     value === "pdf" ||
     value === "canvas"
   );
+}
+
+function isReviewerSourceStatusCounts(
+  value: unknown,
+): value is ReviewerSourceStatusPayload["counts"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "total",
+      "current",
+      "changed",
+      "unavailable",
+      "unsupported",
+      "missingAfterSync",
+      "unknown",
+    ]) &&
+    isNonNegativeInteger(value.total) &&
+    isNonNegativeInteger(value.current) &&
+    isNonNegativeInteger(value.changed) &&
+    isNonNegativeInteger(value.unavailable) &&
+    isNonNegativeInteger(value.unsupported) &&
+    isNonNegativeInteger(value.missingAfterSync) &&
+    isNonNegativeInteger(value.unknown)
+  );
+}
+
+function isReviewerSourceStatusItem(
+  value: unknown,
+): value is ReviewerSourceStatusItem {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "ordinal",
+      "sourceType",
+      "title",
+      "fileKind",
+      "status",
+      "action",
+      "message",
+    ]) &&
+    isNonNegativeInteger(value.ordinal) &&
+    value.ordinal > 0 &&
+    isReviewerSourceType(value.sourceType) &&
+    typeof value.title === "string" &&
+    (value.fileKind === undefined ||
+      value.fileKind === "pdf" ||
+      value.fileKind === "image") &&
+    isReviewerSourceItemStatus(value.status) &&
+    (value.action === undefined || isReviewerSourceStatusAction(value.action)) &&
+    typeof value.message === "string"
+  );
+}
+
+function isReviewerSourceType(
+  value: unknown,
+): value is ReviewerSourceStatusItem["sourceType"] {
+  return (
+    value === "page" ||
+    value === "assignment" ||
+    value === "announcement" ||
+    value === "file"
+  );
+}
+
+function isReviewerSourceItemStatus(
+  value: unknown,
+): value is ReviewerSourceItemStatus {
+  return (
+    value === "current" ||
+    value === "changed" ||
+    value === "unavailable" ||
+    value === "unsupported" ||
+    value === "missing_after_sync" ||
+    value === "unknown"
+  );
+}
+
+function isReviewerSourceOverallStatus(
+  value: unknown,
+): value is ReviewerSourceOverallStatus {
+  return (
+    value === "current" ||
+    value === "changed" ||
+    value === "attention_required" ||
+    value === "unknown"
+  );
+}
+
+function isReviewerRegenerationReadiness(
+  value: unknown,
+): value is ReviewerRegenerationReadiness {
+  return (
+    value === "ready_current" ||
+    value === "ready_with_changes" ||
+    value === "blocked_missing_sources" ||
+    value === "blocked_unavailable_sources" ||
+    value === "blocked_unsupported_sources" ||
+    value === "unknown"
+  );
+}
+
+function isReviewerSourceStatusAction(
+  value: unknown,
+): value is ReviewerSourceStatusAction {
+  return (
+    value === "prepare_updated_file" ||
+    value === "sync_canvas_course" ||
+    value === "choose_replacement_source" ||
+    value === "check_canvas_access" ||
+    value === "unsupported_source_type" ||
+    value === "status_unknown"
+  );
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
+  const allowed = new Set(keys);
+  return Object.keys(value).every((key) => allowed.has(key));
 }
 
 function looksLikeStackTrace(value: string): boolean {

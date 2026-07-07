@@ -316,6 +316,19 @@ export interface CanvasStructuredBlock {
   readonly selectedByDefault: boolean;
 }
 
+export interface CanvasStructuredSourceDuplicateSummary {
+  readonly duplicateKind: "none" | "same_source" | "same_content";
+  readonly duplicateGroupId?: string;
+  readonly canonicalSourceOrdinal?: number;
+  readonly repeatedReferenceCount: number;
+  readonly repeatedReferenceKinds: readonly (
+    | "module"
+    | "page"
+    | "assignment"
+    | "announcement"
+  )[];
+}
+
 export interface CanvasSourceStructurePayload {
   readonly structureSessionId: string;
   readonly sources: readonly {
@@ -324,6 +337,7 @@ export interface CanvasSourceStructurePayload {
     readonly title: string;
     readonly fileKind?: Exclude<CanvasReviewerFileKind, "unsupported">;
     readonly pageCount?: number;
+    readonly duplicateSummary: CanvasStructuredSourceDuplicateSummary;
     readonly blocks: readonly CanvasStructuredBlock[];
   }[];
   readonly totalBlockCount: number;
@@ -1966,6 +1980,7 @@ function isCanvasStructuredSource(
       "title",
       "fileKind",
       "pageCount",
+      "duplicateSummary",
       "blocks",
     ]) &&
     isNonNegativeInteger(value.ordinal) &&
@@ -1976,8 +1991,39 @@ function isCanvasStructuredSource(
       value.fileKind === "pdf" ||
       value.fileKind === "image") &&
     (value.pageCount === undefined || isNonNegativeInteger(value.pageCount)) &&
+    isCanvasStructuredSourceDuplicateSummary(value.duplicateSummary) &&
     Array.isArray(value.blocks) &&
     value.blocks.every(isCanvasStructuredBlock)
+  );
+}
+
+function isCanvasStructuredSourceDuplicateSummary(
+  value: unknown,
+): value is CanvasStructuredSourceDuplicateSummary {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "duplicateKind",
+      "duplicateGroupId",
+      "canonicalSourceOrdinal",
+      "repeatedReferenceCount",
+      "repeatedReferenceKinds",
+    ]) &&
+    (value.duplicateKind === "none" ||
+      value.duplicateKind === "same_source" ||
+      value.duplicateKind === "same_content") &&
+    (value.duplicateGroupId === undefined ||
+      typeof value.duplicateGroupId === "string") &&
+    (value.canonicalSourceOrdinal === undefined ||
+      (isNonNegativeInteger(value.canonicalSourceOrdinal) &&
+        value.canonicalSourceOrdinal > 0)) &&
+    isNonNegativeInteger(value.repeatedReferenceCount) &&
+    Array.isArray(value.repeatedReferenceKinds) &&
+    value.repeatedReferenceKinds.every(isCanvasRepeatedReferenceKind) &&
+    (value.duplicateKind === "none" ||
+      (typeof value.duplicateGroupId === "string" &&
+        isNonNegativeInteger(value.canonicalSourceOrdinal) &&
+        value.canonicalSourceOrdinal > 0))
   );
 }
 
@@ -2138,6 +2184,17 @@ function isCanvasReviewerFilePreparationStatus(
     value === "blocked" ||
     value === "unsupported" ||
     value === "unavailable"
+  );
+}
+
+function isCanvasRepeatedReferenceKind(
+  value: unknown,
+): value is CanvasStructuredSourceDuplicateSummary["repeatedReferenceKinds"][number] {
+  return (
+    value === "module" ||
+    value === "page" ||
+    value === "assignment" ||
+    value === "announcement"
   );
 }
 

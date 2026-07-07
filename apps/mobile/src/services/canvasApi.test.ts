@@ -576,6 +576,11 @@ describe("Canvas mobile API client", () => {
         sources: [
           {
             type: "page",
+            duplicateSummary: {
+              duplicateKind: "none",
+              repeatedReferenceCount: 0,
+              repeatedReferenceKinds: [],
+            },
             blocks: [
               { kind: "heading", text: "Overview", selectedByDefault: true },
               { kind: "paragraph", text: "Readable text.", selectable: true },
@@ -642,6 +647,28 @@ describe("Canvas mobile API client", () => {
       "Readable text",
     );
     expect(String(lastRequest(previewFetch).init.body)).not.toContain("sha256");
+  });
+
+  it("rejects invalid Canvas duplicate summaries safely", async () => {
+    const response = sourceStructureResponse();
+    response.sources[0].duplicateSummary = {
+      duplicateKind: "same_content",
+      repeatedReferenceCount: 0,
+      repeatedReferenceKinds: [],
+    } as never;
+
+    await expect(
+      structureCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(response),
+        sourceIds: ["page:11111111-1111-4111-8111-111111111111"],
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "invalid_response" },
+    });
   });
 
   it("rejects duplicate selected Canvas block IDs before fetch", async () => {
@@ -1360,6 +1387,11 @@ function sourceStructureResponse() {
         ordinal: 1,
         type: "page",
         title: "Fictional Page",
+        duplicateSummary: {
+          duplicateKind: "none",
+          repeatedReferenceCount: 0,
+          repeatedReferenceKinds: [],
+        },
         blocks: [
           {
             id: "88888888-8888-4888-8888-888888888881",

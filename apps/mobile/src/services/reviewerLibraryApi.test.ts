@@ -4,6 +4,7 @@ import type { ReviewerOutput } from "@stay-focused/engine";
 import {
   deleteReviewer,
   getReviewer,
+  getReviewerSourceStatus,
   listReviewers,
   renameReviewer,
   saveReviewer,
@@ -171,6 +172,76 @@ describe("reviewer library API", () => {
     ).resolves.toEqual({ ok: true, data: undefined });
   });
 
+  it("checks Canvas source status through the protected reviewer endpoint", async () => {
+    const fetchImpl = createFetch(sourceStatusResponse());
+
+    const result = await getReviewerSourceStatus({
+      accessToken: "token-value",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl,
+      reviewerId: REVIEWER_ID,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        overallStatus: "changed",
+        regenerationReadiness: "ready_with_changes",
+        counts: {
+          changed: 1,
+          current: 1,
+          total: 2,
+        },
+        actions: ["sync_canvas_course"],
+        items: [
+          {
+            ordinal: 1,
+            sourceType: "page",
+            status: "current",
+          },
+          {
+            ordinal: 2,
+            sourceType: "assignment",
+            status: "changed",
+          },
+        ],
+      },
+    });
+    expect(lastRequest(fetchImpl)).toMatchObject({
+      url: `${API_BASE_URL}/api/reviewers/${REVIEWER_ID}/source-status`,
+      init: {
+        method: "GET",
+        headers: { Authorization: "Bearer token-value" },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("sha256");
+    expect(JSON.stringify(result)).not.toContain("source_snapshot_id");
+  });
+
+  it("rejects unsafe source-status response fields", async () => {
+    const response = {
+      ...sourceStatusResponse(),
+      items: [
+        {
+          ...sourceStatusResponse().items[0],
+          normalizedContentSha256: "a".repeat(64),
+        },
+      ],
+    };
+
+    await expect(
+      getReviewerSourceStatus({
+        accessToken: "token-value",
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl: createFetch(response),
+        reviewerId: REVIEWER_ID,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "invalid_response" },
+    });
+  });
+
   it("maps auth, not-found, and storage errors safely", async () => {
     for (const [status, code] of [
       [401, "unauthorized"],
@@ -303,6 +374,42 @@ function canvasDetail() {
       ocrVersions: ["canvas-stored-image-ocr-v1"],
     },
     reviewerOutput: reviewerOutput(),
+  };
+}
+
+function sourceStatusResponse() {
+  return {
+    ok: true,
+    checkedAt: "2026-07-07T00:20:00.000Z",
+    overallStatus: "changed",
+    regenerationReadiness: "ready_with_changes",
+    counts: {
+      total: 2,
+      current: 1,
+      changed: 1,
+      unavailable: 0,
+      unsupported: 0,
+      missingAfterSync: 0,
+      unknown: 0,
+    },
+    actions: ["sync_canvas_course"],
+    items: [
+      {
+        ordinal: 1,
+        sourceType: "page",
+        title: "Fictional Page",
+        status: "current",
+        message: "This source still matches the saved snapshot.",
+      },
+      {
+        ordinal: 2,
+        sourceType: "assignment",
+        title: "Fictional Assignment",
+        status: "changed",
+        action: "sync_canvas_course",
+        message: "This source has changed since the reviewer was saved.",
+      },
+    ],
   };
 }
 

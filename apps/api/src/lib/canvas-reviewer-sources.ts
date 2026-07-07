@@ -5,7 +5,9 @@ import type {
   CanvasCourseRow,
   CanvasCourseSyncPreferenceRow,
   CanvasCourseSyncStateRow,
+  CanvasFileReferenceRow,
   CanvasFileRow,
+  CanvasModuleItemRow,
   CanvasPageRow,
   CanvasSyncCourseResultRow,
   CanvasSyncRunRow,
@@ -63,10 +65,13 @@ import {
   CANVAS_STORED_FILE_EXTRACTION_VERSION,
   CANVAS_STORED_IMAGE_OCR_VERSION,
   CANVAS_STORED_PDF_OCR_VERSION,
+  CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION,
   createCanvasSourcePreviewSession,
   sha256Utf8Hex,
   type CanvasSelectedBlockManifestItem,
   type CanvasSourceManifestItem,
+  type CanvasSourceReferenceType,
+  type CanvasSourceRelationshipManifestItem,
 } from "@/lib/reviewer-source-provenance";
 import type {
   CanvasApiErrorCode,
@@ -189,7 +194,19 @@ export interface CanvasStructuredSource {
   readonly title: string;
   readonly fileKind?: Exclude<CanvasStoredFileKind, "unsupported">;
   readonly pageCount?: number;
+  readonly duplicateSummary: CanvasStructuredSourceDuplicateSummary;
   readonly blocks: readonly CanvasStructuredBlockPublic[];
+}
+
+export interface CanvasStructuredSourceDuplicateSummary {
+  readonly duplicateKind: "none" | "same_source" | "same_content";
+  readonly duplicateGroupId?: string;
+  readonly canonicalSourceOrdinal?: number;
+  readonly repeatedReferenceCount: number;
+  readonly repeatedReferenceKinds: readonly Exclude<
+    CanvasSourceReferenceType,
+    "none"
+  >[];
 }
 
 export interface CanvasSourceStructure {
@@ -287,6 +304,22 @@ type CanvasSourceManifestItemBase = Omit<CanvasSourceManifestItem, "ordinal">;
 type CanvasSourceStructureManifestItemBase = CanvasSourceManifestItemBase & {
   readonly ordinal: number;
 };
+
+interface SourceRelationshipAnalysisInput {
+  readonly ordinal: number;
+  readonly provenance: CanvasSourceManifestItem;
+}
+
+interface SourceRelationshipAnalysis {
+  readonly byOrdinal: ReadonlyMap<number, CanvasStructuredSourceDuplicateSummary>;
+  readonly deselectExactDuplicateOrdinals: ReadonlySet<number>;
+  readonly relationshipManifest: readonly CanvasSourceRelationshipManifestItem[];
+}
+
+interface SourceReferenceSummary {
+  readonly count: number;
+  readonly kinds: readonly Exclude<CanvasSourceReferenceType, "none">[];
+}
 
 export function getCanvasReviewerSourceLimits(): CanvasReviewerSourceLimits {
   return {
@@ -470,12 +503,26 @@ export async function previewCanvasReviewerSources({
     ordinal: index + 1,
     ...source.provenance,
   }));
+  const relationshipAnalysis = await analyzeCanvasSourceRelationships({
+    client,
+    connectionId: course.value.connection.id,
+    courseId: course.value.course.id,
+    sources: manifest.map((source) => ({
+      ordinal: source.ordinal,
+      provenance: source,
+    })),
+    userId,
+  });
+  if (!relationshipAnalysis.ok) {
+    return storageFailure("Canvas source relationships could not be analyzed.");
+  }
   const previewSession = await createCanvasSourcePreviewSession({
     canvasConnectionId: course.value.connection.id,
     client,
     courseId: course.value.course.id,
     manifest,
     originalPreviewText: sourceText,
+    sourceRelationshipManifest: relationshipAnalysis.value.relationshipManifest,
     suggestedTitle,
     userId,
   });
@@ -603,8 +650,34 @@ export async function structureCanvasReviewerSources({
       },
     };
   });
+  const relationshipAnalysis = await analyzeCanvasSourceRelationships({
+    client,
+    connectionId: course.value.connection.id,
+    courseId: course.value.course.id,
+    sources: finalizedSources.map((source) => ({
+      ordinal: source.ordinal,
+      provenance: source.provenance,
+    })),
+    userId,
+  });
+  if (!relationshipAnalysis.ok) {
+    return storageFailure("Canvas source relationships could not be analyzed.");
+  }
 
-  const totalBlockCount = finalizedSources.reduce(
+  const finalizedSourcesWithDuplicateDefaults = finalizedSources.map((source) => {
+    if (!relationshipAnalysis.value.deselectExactDuplicateOrdinals.has(source.ordinal)) {
+      return source;
+    }
+    return {
+      ...source,
+      blocks: source.blocks.map((block) => ({
+        ...block,
+        selected_by_default: false,
+      })),
+    };
+  });
+
+  const totalBlockCount = finalizedSourcesWithDuplicateDefaults.reduce(
     (sum, source) => sum + source.blocks.length,
     0,
   );
@@ -624,14 +697,14 @@ export async function structureCanvasReviewerSources({
       details: {
         allowedMaximum: CANVAS_REVIEWER_MAX_STRUCTURED_BLOCKS,
         combinedCharacterCount: totalBlockCount,
-        selectedSourceCount: finalizedSources.length,
+        selectedSourceCount: finalizedSourcesWithDuplicateDefaults.length,
       },
       message:
         "Selected Canvas sources contain too many structured blocks. Select fewer sources.",
     };
   }
 
-  for (const source of finalizedSources) {
+  for (const source of finalizedSourcesWithDuplicateDefaults) {
     const sourceText = assembleSourceBlocks(source.blocks);
     if (sourceText.length > CANVAS_REVIEWER_MAX_SOURCE_CHARS) {
       return {
@@ -641,7 +714,7 @@ export async function structureCanvasReviewerSources({
         details: {
           allowedMaximum: CANVAS_REVIEWER_MAX_SOURCE_CHARS,
           combinedCharacterCount: sourceText.length,
-          selectedSourceCount: finalizedSources.length,
+          selectedSourceCount: finalizedSourcesWithDuplicateDefaults.length,
         },
         message:
           "One selected Canvas source is too large. Select fewer or smaller sources.",
@@ -659,11 +732,16 @@ export async function structureCanvasReviewerSources({
   }
 
   const session = await createCanvasSourceStructureSession({
-    blockManifest: finalizedSources.flatMap((source) => source.blocks),
+    blockManifest: finalizedSourcesWithDuplicateDefaults.flatMap(
+      (source) => source.blocks,
+    ),
     canvasConnectionId: course.value.connection.id,
     client,
     courseId: course.value.course.id,
-    sourceManifest: finalizedSources.map((source) => source.provenance),
+    sourceManifest: finalizedSourcesWithDuplicateDefaults.map(
+      (source) => source.provenance,
+    ),
+    sourceRelationshipManifest: relationshipAnalysis.value.relationshipManifest,
     userId,
   });
   if (!session.ok) {
@@ -677,13 +755,16 @@ export async function structureCanvasReviewerSources({
         maximumBlocks: CANVAS_REVIEWER_MAX_STRUCTURED_BLOCKS,
         maximumSelectedBlocks: CANVAS_REVIEWER_MAX_SELECTED_BLOCKS,
       },
-      selectedByDefaultCount: finalizedSources.reduce(
+      selectedByDefaultCount: finalizedSourcesWithDuplicateDefaults.reduce(
         (sum, source) =>
           sum + source.blocks.filter((block) => block.selected_by_default).length,
         0,
       ),
-      sources: finalizedSources.map((source) => ({
+      sources: finalizedSourcesWithDuplicateDefaults.map((source) => ({
         blocks: source.blocks.map(toPublicStructuredBlock),
+        duplicateSummary:
+          relationshipAnalysis.value.byOrdinal.get(source.ordinal) ??
+          emptyDuplicateSummary(),
         ...(source.fileMetadata?.fileKind
           ? { fileKind: source.fileMetadata.fileKind }
           : {}),
@@ -748,7 +829,10 @@ export async function previewSelectiveCanvasReviewerSources({
 
   const sourceManifest = parseStructureSourceManifest(session.value.source_manifest);
   const blockManifest = parseStructureBlockManifest(session.value.block_manifest);
-  if (!sourceManifest.ok || !blockManifest.ok) {
+  const relationshipManifest = parseStructureRelationshipManifest(
+    session.value.source_relationship_manifest,
+  );
+  if (!sourceManifest.ok || !blockManifest.ok || !relationshipManifest.ok) {
     return storageFailure("Canvas source structure session could not be read.");
   }
 
@@ -781,6 +865,7 @@ export async function previewSelectiveCanvasReviewerSources({
   const selectedSourceOrdinals = [
     ...new Set(orderedBlocks.map((block) => block.source_ordinal)),
   ];
+  const selectedSourceOrdinalSet = new Set(selectedSourceOrdinals);
   const sourceManifestByOrdinal = new Map(
     sourceManifest.value.map((source) => [source.ordinal, source]),
   );
@@ -859,6 +944,11 @@ export async function previewSelectiveCanvasReviewerSources({
       table_structure: block.table_structure as unknown as Json | null,
     }),
   );
+  const selectedRelationshipManifest = relationshipManifest.value.filter(
+    (relationship) =>
+      selectedSourceOrdinalSet.has(relationship.source_ordinal) &&
+      selectedSourceOrdinalSet.has(relationship.related_source_ordinal),
+  );
 
   const suggestedTitle = buildSuggestedCanvasReviewerTitle(course.value.course.name);
   const previewSession = await createCanvasSourcePreviewSession({
@@ -869,6 +959,7 @@ export async function previewSelectiveCanvasReviewerSources({
     normalizationVersion: CANVAS_SELECTIVE_PREVIEW_VERSION,
     originalPreviewText: sourceText,
     selectedBlockManifest,
+    sourceRelationshipManifest: selectedRelationshipManifest,
     suggestedTitle,
     userId,
   });
@@ -2515,12 +2606,524 @@ async function readFilesByIds(query: SourceIdsQuery): Promise<
   return { ok: true, value: data as readonly CanvasFileRow[] };
 }
 
+async function analyzeCanvasSourceRelationships({
+  client,
+  connectionId,
+  courseId,
+  sources,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly sources: readonly SourceRelationshipAnalysisInput[];
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: SourceRelationshipAnalysis }
+  | { readonly ok: false }
+> {
+  const repeatedReferences = await loadRepeatedReferenceSummaries({
+    client,
+    connectionId,
+    courseId,
+    sources,
+    userId,
+  });
+  if (!repeatedReferences.ok) {
+    return { ok: false };
+  }
+
+  const identityGroups = groupSourcesByKey(sources, sourceIdentityKey);
+  const contentGroups = groupSourcesByKey(sources, sourceContentKey);
+  const summaries = new Map<number, CanvasStructuredSourceDuplicateSummary>();
+  const relationshipManifest: CanvasSourceRelationshipManifestItem[] = [
+    ...repeatedReferences.value.relationshipManifest,
+  ];
+  const deselectExactDuplicateOrdinals = new Set<number>();
+  const sameSourceOrdinals = new Set<number>();
+  const sameSourceGroupByOrdinal = new Map<
+    number,
+    { readonly groupId: string; readonly canonicalOrdinal: number }
+  >();
+  const sameContentGroupByOrdinal = new Map<
+    number,
+    { readonly groupId: string; readonly canonicalOrdinal: number }
+  >();
+
+  identityGroups.forEach((group, index) => {
+    const groupId = `same-source-${index + 1}`;
+    const canonicalOrdinal = group[0]?.ordinal ?? 1;
+    for (const source of group) {
+      sameSourceOrdinals.add(source.ordinal);
+      sameSourceGroupByOrdinal.set(source.ordinal, {
+        canonicalOrdinal,
+        groupId,
+      });
+    }
+    relationshipManifest.push(
+      ...pairwiseRelationshipManifest({
+        group,
+        groupId,
+        relationshipType: "same_source",
+      }),
+    );
+  });
+
+  contentGroups.forEach((group, index) => {
+    const groupId = `same-content-${index + 1}`;
+    const canonicalOrdinal = group[0]?.ordinal ?? 1;
+    for (const source of group) {
+      sameContentGroupByOrdinal.set(source.ordinal, {
+        canonicalOrdinal,
+        groupId,
+      });
+      if (source.ordinal !== canonicalOrdinal) {
+        deselectExactDuplicateOrdinals.add(source.ordinal);
+      }
+    }
+
+    const distinctContentGroup = group.filter((source, sourceIndex) =>
+      group.some(
+        (other, otherIndex) =>
+          otherIndex !== sourceIndex &&
+          sourceIdentityKey(other) !== sourceIdentityKey(source),
+      ),
+    );
+    if (distinctContentGroup.length > 1) {
+      relationshipManifest.push(
+        ...pairwiseRelationshipManifest({
+          group: distinctContentGroup,
+          groupId,
+          relationshipType: "same_content",
+        }),
+      );
+    }
+  });
+
+  for (const source of sources) {
+    const referenceSummary =
+      repeatedReferences.value.summaries.get(source.ordinal) ??
+      emptyReferenceSummary();
+    const sameSourceGroup = sameSourceGroupByOrdinal.get(source.ordinal);
+    const sameContentGroup = sameContentGroupByOrdinal.get(source.ordinal);
+    if (sameSourceGroup) {
+      summaries.set(source.ordinal, {
+        canonicalSourceOrdinal: sameSourceGroup.canonicalOrdinal,
+        duplicateGroupId: sameSourceGroup.groupId,
+        duplicateKind: "same_source",
+        repeatedReferenceCount: referenceSummary.count,
+        repeatedReferenceKinds: referenceSummary.kinds,
+      });
+      continue;
+    }
+    if (sameContentGroup) {
+      summaries.set(source.ordinal, {
+        canonicalSourceOrdinal: sameContentGroup.canonicalOrdinal,
+        duplicateGroupId: sameContentGroup.groupId,
+        duplicateKind: "same_content",
+        repeatedReferenceCount: referenceSummary.count,
+        repeatedReferenceKinds: referenceSummary.kinds,
+      });
+      continue;
+    }
+
+    summaries.set(source.ordinal, {
+      ...emptyDuplicateSummary(),
+      repeatedReferenceCount: referenceSummary.count,
+      repeatedReferenceKinds: referenceSummary.kinds,
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      byOrdinal: summaries,
+      deselectExactDuplicateOrdinals,
+      relationshipManifest: relationshipManifest
+        .slice()
+        .sort(compareRelationshipManifest),
+    },
+  };
+}
+
+async function loadRepeatedReferenceSummaries({
+  client,
+  connectionId,
+  courseId,
+  sources,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly sources: readonly SourceRelationshipAnalysisInput[];
+  readonly userId: string;
+}): Promise<
+  | {
+      readonly ok: true;
+      readonly value: {
+        readonly summaries: ReadonlyMap<number, SourceReferenceSummary>;
+        readonly relationshipManifest: readonly CanvasSourceRelationshipManifestItem[];
+      };
+    }
+  | { readonly ok: false }
+> {
+  const summaryBuilder = new Map<
+    number,
+    {
+      count: number;
+      readonly kinds: Set<Exclude<CanvasSourceReferenceType, "none">>;
+    }
+  >();
+  const relationshipManifest: CanvasSourceRelationshipManifestItem[] = [];
+  const fileSourceByRowId = new Map<string, SourceRelationshipAnalysisInput[]>();
+  const moduleReferenceSources = sources.filter(
+    (source) =>
+      source.provenance.source_type === "page" ||
+      source.provenance.source_type === "assignment",
+  );
+
+  for (const source of sources) {
+    if (
+      source.provenance.source_type === "file" &&
+      source.provenance.source_row_id
+    ) {
+      const existing = fileSourceByRowId.get(source.provenance.source_row_id) ?? [];
+      fileSourceByRowId.set(source.provenance.source_row_id, [
+        ...existing,
+        source,
+      ]);
+    }
+  }
+
+  if (fileSourceByRowId.size > 0) {
+    const references = await readFileReferencesByFileIds({
+      client,
+      connectionId,
+      courseId,
+      ids: [...fileSourceByRowId.keys()],
+      userId,
+    });
+    if (!references.ok) {
+      return { ok: false };
+    }
+
+    for (const reference of references.value) {
+      const kind = referenceKindForFileReference(reference);
+      if (!kind) {
+        continue;
+      }
+      const referencedSources = fileSourceByRowId.get(reference.file_id) ?? [];
+      for (const source of referencedSources) {
+        appendReferenceRelationship({
+          kind,
+          relationshipManifest,
+          source,
+          summaryBuilder,
+        });
+      }
+    }
+  }
+
+  if (moduleReferenceSources.length > 0) {
+    const moduleItems = await readModuleItemsForReferences({
+      client,
+      connectionId,
+      courseId,
+      userId,
+    });
+    if (!moduleItems.ok) {
+      return { ok: false };
+    }
+
+    for (const moduleItem of moduleItems.value) {
+      for (const source of moduleReferenceSources) {
+        if (moduleItemReferencesSource(moduleItem, source)) {
+          appendReferenceRelationship({
+            kind: "module",
+            relationshipManifest,
+            source,
+            summaryBuilder,
+          });
+        }
+      }
+    }
+  }
+
+  const summaries = new Map<number, SourceReferenceSummary>();
+  for (const [ordinal, summary] of summaryBuilder) {
+    summaries.set(ordinal, {
+      count: summary.count,
+      kinds: [...summary.kinds].sort(compareReferenceKinds),
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      relationshipManifest,
+      summaries,
+    },
+  };
+}
+
+function appendReferenceRelationship({
+  kind,
+  relationshipManifest,
+  source,
+  summaryBuilder,
+}: {
+  readonly kind: Exclude<CanvasSourceReferenceType, "none">;
+  readonly relationshipManifest: CanvasSourceRelationshipManifestItem[];
+  readonly source: SourceRelationshipAnalysisInput;
+  readonly summaryBuilder: Map<
+    number,
+    {
+      count: number;
+      readonly kinds: Set<Exclude<CanvasSourceReferenceType, "none">>;
+    }
+  >;
+}): void {
+  const summary = summaryBuilder.get(source.ordinal) ?? {
+    count: 0,
+    kinds: new Set<Exclude<CanvasSourceReferenceType, "none">>(),
+  };
+  const referenceOrdinal = summary.count + 1;
+  summary.count = referenceOrdinal;
+  summary.kinds.add(kind);
+  summaryBuilder.set(source.ordinal, summary);
+  relationshipManifest.push({
+    reference_ordinal: referenceOrdinal,
+    reference_type: kind,
+    related_source_ordinal: source.ordinal,
+    relationship_group_key: `canvas-reference-${source.ordinal}`,
+    relationship_type: "canvas_reference",
+    source_ordinal: source.ordinal,
+  });
+}
+
+async function readFileReferencesByFileIds(
+  query: SourceIdsQuery,
+): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasFileReferenceRow[] }
+  | { readonly ok: false }
+> {
+  if (query.ids.length === 0) {
+    return { ok: true, value: [] };
+  }
+  const { data, error } = await query.client
+    .from("canvas_file_references")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId)
+    .in("file_id", [...query.ids]);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasFileReferenceRow[] };
+}
+
+async function readModuleItemsForReferences(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasModuleItemRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await query.client
+    .from("canvas_module_items")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasModuleItemRow[] };
+}
+
+function groupSourcesByKey(
+  sources: readonly SourceRelationshipAnalysisInput[],
+  keyForSource: (source: SourceRelationshipAnalysisInput) => string | null,
+): readonly (readonly SourceRelationshipAnalysisInput[])[] {
+  const groups = new Map<string, SourceRelationshipAnalysisInput[]>();
+  for (const source of sources) {
+    const key = keyForSource(source);
+    if (!key) {
+      continue;
+    }
+    groups.set(key, [...(groups.get(key) ?? []), source]);
+  }
+  return [...groups.values()]
+    .filter((group) => group.length > 1)
+    .map((group) => group.slice().sort(compareSourcesByOrdinal));
+}
+
+function sourceIdentityKey(
+  source: SourceRelationshipAnalysisInput,
+): string | null {
+  const objectId = source.provenance.canvas_source_object_id?.trim();
+  if (!objectId) {
+    return null;
+  }
+  return [
+    source.provenance.canvas_connection_id,
+    source.provenance.course_id,
+    source.provenance.source_type,
+    objectId,
+  ].join(":");
+}
+
+const EMPTY_NORMALIZED_CONTENT_SHA256 = sha256Utf8Hex("");
+
+function sourceContentKey(
+  source: SourceRelationshipAnalysisInput,
+): string | null {
+  const hash = normalizeSha256(source.provenance.normalized_content_sha256);
+  if (!hash || hash === EMPTY_NORMALIZED_CONTENT_SHA256) {
+    return null;
+  }
+  return [
+    source.provenance.canvas_connection_id,
+    source.provenance.course_id,
+    hash,
+  ].join(":");
+}
+
+function pairwiseRelationshipManifest({
+  group,
+  groupId,
+  relationshipType,
+}: {
+  readonly group: readonly SourceRelationshipAnalysisInput[];
+  readonly groupId: string;
+  readonly relationshipType: "same_source" | "same_content";
+}): readonly CanvasSourceRelationshipManifestItem[] {
+  const relationships: CanvasSourceRelationshipManifestItem[] = [];
+  const ordered = group.slice().sort(compareSourcesByOrdinal);
+  for (let leftIndex = 0; leftIndex < ordered.length; leftIndex += 1) {
+    const left = ordered[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
+      const right = ordered[rightIndex];
+      if (!left || !right) {
+        continue;
+      }
+      relationships.push({
+        reference_ordinal: 0,
+        reference_type: "none",
+        related_source_ordinal: right.ordinal,
+        relationship_group_key: groupId,
+        relationship_type: relationshipType,
+        source_ordinal: left.ordinal,
+      });
+    }
+  }
+  return relationships;
+}
+
+function moduleItemReferencesSource(
+  moduleItem: CanvasModuleItemRow,
+  source: SourceRelationshipAnalysisInput,
+): boolean {
+  const itemType = moduleItem.item_type.trim().toLowerCase();
+  if (source.provenance.source_type === "assignment") {
+    return (
+      itemType === "assignment" &&
+      Boolean(source.provenance.canvas_source_object_id) &&
+      moduleItem.canvas_content_id === source.provenance.canvas_source_object_id
+    );
+  }
+  if (source.provenance.source_type === "page") {
+    return (
+      itemType === "page" &&
+      Boolean(source.provenance.canvas_source_object_id) &&
+      moduleItem.page_url === source.provenance.canvas_source_object_id
+    );
+  }
+  return false;
+}
+
+function referenceKindForFileReference(
+  reference: CanvasFileReferenceRow,
+): Exclude<CanvasSourceReferenceType, "none"> | null {
+  switch (reference.reference_type) {
+    case "module_item":
+      return "module";
+    case "page":
+      return "page";
+    case "assignment":
+      return "assignment";
+    case "announcement":
+      return "announcement";
+    case "typed_attachment":
+      return reference.canvas_assignment_id ? "assignment" : null;
+    default:
+      return null;
+  }
+}
+
+function compareRelationshipManifest(
+  left: CanvasSourceRelationshipManifestItem,
+  right: CanvasSourceRelationshipManifestItem,
+): number {
+  return (
+    left.source_ordinal - right.source_ordinal ||
+    left.related_source_ordinal - right.related_source_ordinal ||
+    compareAsciiCaseInsensitive(left.relationship_type, right.relationship_type) ||
+    compareAsciiCaseInsensitive(left.reference_type, right.reference_type) ||
+    left.reference_ordinal - right.reference_ordinal
+  );
+}
+
+function compareSourcesByOrdinal(
+  left: SourceRelationshipAnalysisInput,
+  right: SourceRelationshipAnalysisInput,
+): number {
+  return left.ordinal - right.ordinal;
+}
+
+const REFERENCE_KIND_ORDER = new Map<
+  Exclude<CanvasSourceReferenceType, "none">,
+  number
+>([
+  ["module", 0],
+  ["page", 1],
+  ["assignment", 2],
+  ["announcement", 3],
+]);
+
+function compareReferenceKinds(
+  left: Exclude<CanvasSourceReferenceType, "none">,
+  right: Exclude<CanvasSourceReferenceType, "none">,
+): number {
+  return (
+    (REFERENCE_KIND_ORDER.get(left) ?? Number.MAX_SAFE_INTEGER) -
+    (REFERENCE_KIND_ORDER.get(right) ?? Number.MAX_SAFE_INTEGER)
+  );
+}
+
+function emptyDuplicateSummary(): CanvasStructuredSourceDuplicateSummary {
+  return {
+    duplicateKind: "none",
+    repeatedReferenceCount: 0,
+    repeatedReferenceKinds: [],
+  };
+}
+
+function emptyReferenceSummary(): SourceReferenceSummary {
+  return {
+    count: 0,
+    kinds: [],
+  };
+}
+
 async function createCanvasSourceStructureSession({
   blockManifest,
   canvasConnectionId,
   client,
   courseId,
   sourceManifest,
+  sourceRelationshipManifest,
   userId,
 }: {
   readonly blockManifest: readonly CanvasStructuredBlockManifestItem[];
@@ -2528,6 +3131,7 @@ async function createCanvasSourceStructureSession({
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
   readonly sourceManifest: readonly CanvasSourceStructureManifestItemBase[];
+  readonly sourceRelationshipManifest: readonly CanvasSourceRelationshipManifestItem[];
   readonly userId: string;
 }): Promise<
   CanvasReviewerSourceResult<{ readonly structureSessionId: string }>
@@ -2542,9 +3146,11 @@ async function createCanvasSourceStructureSession({
     canvas_connection_id: canvasConnectionId,
     course_id: courseId,
     created_at: createdAt.toISOString(),
+    duplicate_analysis_version: CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION,
     expires_at: expiresAt.toISOString(),
     source_count: sourceManifest.length,
     source_manifest: sourceManifest as unknown as Json,
+    source_relationship_manifest: sourceRelationshipManifest as unknown as Json,
     structure_version: CANVAS_STRUCTURED_BLOCKS_VERSION,
     user_id: userId,
   };
@@ -2563,7 +3169,7 @@ async function createCanvasSourceStructureSession({
 }
 
 const STRUCTURE_SESSION_COLUMNS =
-  "id,user_id,canvas_connection_id,course_id,source_count,source_manifest,block_count,block_manifest,structure_version,created_at,expires_at";
+  "id,user_id,canvas_connection_id,course_id,source_count,source_manifest,block_count,block_manifest,source_relationship_manifest,duplicate_analysis_version,structure_version,created_at,expires_at";
 
 async function readCanvasSourceStructureSession({
   client,
@@ -2700,6 +3306,20 @@ function parseStructureBlockManifest(
     : { ok: false };
 }
 
+function parseStructureRelationshipManifest(
+  value: Json,
+):
+  | { readonly ok: true; readonly value: readonly CanvasSourceRelationshipManifestItem[] }
+  | { readonly ok: false } {
+  if (!Array.isArray(value)) {
+    return { ok: false };
+  }
+  const parsed = value.filter(isSourceRelationshipManifestItem);
+  return parsed.length === value.length
+    ? { ok: true, value: parsed }
+    : { ok: false };
+}
+
 function isStructureSourceManifestItem(
   value: unknown,
 ): value is CanvasSourceStructureManifestItemBase {
@@ -2738,6 +3358,25 @@ function isStructureSourceManifestItem(
     (value.parser_version === null ||
       typeof value.parser_version === "string") &&
     (value.ocr_version === null || typeof value.ocr_version === "string")
+  );
+}
+
+function isSourceRelationshipManifestItem(
+  value: unknown,
+): value is CanvasSourceRelationshipManifestItem {
+  return (
+    isRecord(value) &&
+    isPositiveInteger(value.source_ordinal) &&
+    isPositiveInteger(value.related_source_ordinal) &&
+    (value.relationship_type === "same_source" ||
+      value.relationship_type === "same_content" ||
+      value.relationship_type === "canvas_reference") &&
+    typeof value.relationship_group_key === "string" &&
+    value.relationship_group_key.trim().length > 0 &&
+    isCanvasSourceReferenceType(value.reference_type) &&
+    typeof value.reference_ordinal === "number" &&
+    Number.isSafeInteger(value.reference_ordinal) &&
+    value.reference_ordinal >= 0
   );
 }
 
@@ -3180,6 +3819,18 @@ function isCanvasReviewerSourceType(
   );
 }
 
+function isCanvasSourceReferenceType(
+  value: unknown,
+): value is CanvasSourceReferenceType {
+  return (
+    value === "none" ||
+    value === "module" ||
+    value === "page" ||
+    value === "assignment" ||
+    value === "announcement"
+  );
+}
+
 function isUuid(value: string | undefined): value is string {
   return Boolean(
     value &&
@@ -3187,6 +3838,10 @@ function isUuid(value: string | undefined): value is string {
         value,
       ),
   );
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 function normalizeSha256(value: string | null | undefined): string | null {
