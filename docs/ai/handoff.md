@@ -200,9 +200,14 @@ paths.
   source-health UI, and readiness assessment without actual regeneration. The
   source-status path does not call Canvas, decrypt the PAT, read Storage,
   invoke OCR, or call OpenAI.
-- Phase 5D.1 through Phase 5D.3 protected live validation has not yet been run.
-  Implementation, automated verification, and remote database verification are
-  complete for those slices.
+- Phase 5D.1 through Phase 5D.3 protected live validation completed on
+  2026-07-08 with aggregate opaque output only. The run reused `connection-1`,
+  synchronized `course-1`, loaded source structure, previewed selected blocks,
+  created and removed one reviewer/snapshot validation set, verified
+  source-status `current` and `ready_current`, confirmed no source-status
+  sync/Canvas/decrypt/Storage/OCR/OpenAI/regeneration side effects, and
+  preserved pre-existing data. See
+  `docs/ai/phase5d-protected-live-validation-20260708.md`.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
@@ -366,7 +371,8 @@ Useful variable names confirmed in example files and code:
   52/52, OCR 14/14. Supabase advisors showed no new Phase 5D.1 findings after
   the follow-up function search-path hardening migration; remaining warnings
   are historical. The rollback verifier also covers snapshot item context
-  mismatch rejection. Phase 5D.1 protected live validation has not yet been run.
+  mismatch rejection. Phase 5D.1 protected live validation completed on
+  2026-07-08.
 - Phase 5D.2 verification: migration
   `202607070004_add_canvas_selective_source_blocks.sql` is applied remotely;
   rollback-safe SQL verification passed through
@@ -377,7 +383,7 @@ Useful variable names confirmed in example files and code:
   root Turbo typecheck/build passed across 7/7 workspaces; workspace tests
   passed with API 299/299, mobile 95/95, Canvas 52/52, and OCR 14/14. Supabase
   advisors showed no new Phase 5D.2 findings; remaining warnings are
-  historical. Phase 5D.2 protected live validation has not yet been run.
+  historical. Phase 5D.2 protected live validation completed on 2026-07-08.
 - Phase 5D.3 verification uses migrations
   `202607080001_add_canvas_source_relationships_freshness.sql` and
   `202607080002_harden_source_relationship_grants.sql`, plus rollback-safe SQL
@@ -387,7 +393,7 @@ Useful variable names confirmed in example files and code:
   root typecheck/build across 7/7 workspaces, workspace tests API 315/315,
   mobile 98/98, Canvas 52/52, OCR 14/14, and engine evals 266/266. Supabase
   advisors were reviewed; remaining warnings are historical. Phase 5D.3
-  protected live validation has not yet been run.
+  protected live validation completed on 2026-07-08.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -433,21 +439,15 @@ selected-course synchronization is complete and runtime-safe in local
 production validation. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated. Phase 5C.2B Canvas PDF/image OCR
 sources are complete and live validated. Phase 5D.1 immutable source snapshots
-and exact reviewer provenance is implemented and remotely verified, with
-protected live validation not yet run. Phase 5D.2
-structured normalized blocks and selective import is implemented and remotely
-verified, with protected live validation not yet run.
-Phase 5D.3 duplicate relationships, source freshness, and regeneration
-readiness is implemented, with protected live validation not yet run. The next
-operational gate is protected Phase 5D.1 through Phase 5D.3 live validation in
-a configured protected integration environment. Automatic repeated scanned-PDF
-header/footer detection remains a deferred candidate.
+and exact reviewer provenance, Phase 5D.2 structured normalized blocks and
+selective import, and Phase 5D.3 duplicate relationships, source freshness,
+and regeneration readiness are implemented, remotely verified, and
+protected-live validated. The next roadmap step is Phase 5E planning.
+Automatic repeated scanned-PDF header/footer detection remains a deferred
+candidate.
 
 ## Known Blockers And Risks
 
-- Protected live validation for Phase 5D.1 through Phase 5D.3 has not yet been
-  run in a configured protected integration environment. Do not claim protected
-  live validation complete until one completes against the intended environment.
 - OneDrive-backed generated Next output can leave stale reparse-point artifacts;
   the smoke runner clears generated `apps/api/.next/server` before
   runner-owned API startup. A stale generated

@@ -222,15 +222,11 @@ production-build validation; Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated; Phase 5C.2B Canvas PDF/image OCR
 sources are complete and live validated for preparation, private Storage OCR
 preview, edited reviewer handoff, and Study Library cleanup; Phase 5D.1
-immutable source snapshots and exact reviewer provenance is implemented and
-remotely verified; protected live validation has not yet been run. Phase 5D.2
-structured normalized blocks and selective import is implemented and remotely
-verified; protected live validation has not yet been run. Phase 5D.3 duplicate
-relationships, source freshness, and regeneration readiness is implemented;
-protected live validation has not yet been run. The next operational gate is
-protected Phase 5D.1 through Phase 5D.3 live validation in a configured
-protected integration environment; the next roadmap phase after that gate is
-Phase 5E. Phase 5E
+immutable source snapshots and exact reviewer provenance, Phase 5D.2
+structured normalized blocks and selective import, and Phase 5D.3 duplicate
+relationships, source freshness, and regeneration readiness are implemented,
+remotely verified, and protected-live validated. The next roadmap phase is
+Phase 5E planning. Phase 5E
 through Phase 5F remain planned and must not be collapsed into a single generic
 Canvas integration task.
 
@@ -680,13 +676,10 @@ per-course budget in protected live validation. Phase 5C.2A2 Canvas source
 selection and reviewer handoff is complete and live validated. Phase 5C.2B
 Canvas PDF/image OCR sources are complete and live validated for preparation,
 private Storage OCR preview, edited reviewer handoff, and Study Library
-cleanup. Phase 5D.1 immutable source snapshots and Phase 5D.2 structured
-normalized blocks are implemented and remotely verified; protected live
-validation has not yet been run for Phase 5D.1 or Phase 5D.2. Phase 5D.3
-duplicate relationships, source freshness, and regeneration readiness is
-implemented; protected live validation has not yet been run. Next operational
-gate: protected Phase 5D.1 through Phase 5D.3 live validation in a configured
-protected integration environment.
+cleanup. Phase 5D.1 immutable source snapshots, Phase 5D.2 structured
+normalized blocks, and Phase 5D.3 duplicate relationships, source freshness,
+and regeneration readiness are implemented, remotely verified, and
+protected-live validated. Next roadmap step: Phase 5E planning.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -974,17 +967,17 @@ Exit criteria:
 
 ### Phase 5D - Source Normalization, Provenance, And Selective Import
 
-Status: Implemented through Phase 5D.3. Protected live validation for Phase
-5D.1 through Phase 5D.3 has not yet been run. Phase 5D.1 is implemented and
-remotely verified as the immutable source-snapshot and exact
-reviewer-provenance foundation. Phase 5D.2 is implemented and remotely verified
-as the structured normalized-block and selective-import slice. Phase 5D.3 is
-implemented as duplicate relationships, source freshness, and regeneration
-readiness without actual regeneration. Remote Phase 5D.3 verification passed
-with migrations `202607080001_add_canvas_source_relationships_freshness.sql`
-and `202607080002_harden_source_relationship_grants.sql`, plus 18/18
-rollback-safe SQL verifier checks; remaining Supabase advisor warnings are
-historical.
+Status: Implemented through Phase 5D.3 and protected-live validated for Phase
+5D.1 through Phase 5D.3 on 2026-07-08. Phase 5D.1 is implemented and remotely
+verified as the immutable source-snapshot and exact reviewer-provenance
+foundation. Phase 5D.2 is implemented and remotely verified as the structured
+normalized-block and selective-import slice. Phase 5D.3 is implemented as
+duplicate relationships, source freshness, and regeneration readiness without
+actual regeneration. Remote Phase 5D.3 verification passed with migrations
+`202607080001_add_canvas_source_relationships_freshness.sql` and
+`202607080002_harden_source_relationship_grants.sql`, plus 18/18 rollback-safe
+SQL verifier checks; protected live validation passed with aggregate opaque
+output only; remaining Supabase advisor warnings are historical.
 
 Subphases:
 

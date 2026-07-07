@@ -59,22 +59,21 @@ eligible Canvas PDFs/images through the existing ingestion boundary, select one
 ready OCR-backed file with stored text sources, preview private Storage-backed
 OCR text, edit before generation, and save through the existing Study Library.
 Phase 5D.1 immutable source snapshots and exact reviewer provenance is
-implemented and remotely verified: Canvas preview creates private preview
-sessions, successful generation creates immutable source snapshots, Canvas
-reviewer save requires an owned snapshot, and reviewer detail returns a safe
-provenance summary. Protected live validation for Phase 5D.1 has not yet been
-run. Phase 5D.2 structured normalized blocks
-and selective import is implemented and remotely verified: Canvas HTML/OCR
-sources become private server-held block manifests, mobile receives safe public
-selectors, students choose exact blocks before preview, and immutable snapshots
-copy selected-block provenance after generation. Protected live validation for
-Phase 5D.2 has not yet been run. Phase 5D.3 duplicate
-relationships, source freshness, and regeneration readiness is implemented:
-Canvas structure responses show exact duplicate and repeated-reference context,
-immutable snapshots preserve private relationship provenance, saved Canvas
-reviewers can be checked against current synchronized source state, and Study
-Library shows source health/readiness without regenerating. Protected live
-validation for Phase 5D.3 has not yet been run.
+implemented, remotely verified, and protected-live validated: Canvas preview
+creates private preview sessions, successful generation creates immutable
+source snapshots, Canvas reviewer save requires an owned snapshot, and reviewer
+detail returns a safe provenance summary. Phase 5D.2 structured normalized
+blocks and selective import is implemented, remotely verified, and
+protected-live validated: Canvas HTML/OCR sources become private server-held
+block manifests, mobile receives safe public selectors, students choose exact
+blocks before preview, and immutable snapshots copy selected-block provenance
+after generation. Phase 5D.3 duplicate relationships, source freshness, and
+regeneration readiness is implemented, remotely verified, and protected-live
+validated: Canvas structure responses show exact duplicate and
+repeated-reference context, immutable snapshots preserve private relationship
+provenance, saved Canvas reviewers can be checked against current synchronized
+source state, and Study Library shows source health/readiness without
+regenerating.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -550,8 +549,7 @@ There is no school-wide Canvas token.
   follow-up function search-path hardening migration. Remaining advisor
   warnings are historical.
 - The rollback verifier also covers snapshot item context mismatch rejection.
-- Protected live validation is blocked pending confirmed rotation of previously
-  exposed local credentials.
+- Protected live validation had not yet been completed at the time of the earlier audit.
 
 ## Completed Phase 5D.2 Scope
 
@@ -591,8 +589,7 @@ There is no school-wide Canvas token.
   cleanup, snapshot reuse, and historical no-block preview compatibility.
 - Supabase security and performance advisors showed no new Phase 5D.2
   findings. Remaining warnings are historical.
-- Protected live validation is blocked pending confirmed rotation of previously
-  exposed local credentials.
+- Protected live validation had not yet been completed at the time of the earlier audit.
 
 ## Completed Phase 5D.3 Scope
 
@@ -645,8 +642,44 @@ There is no school-wide Canvas token.
   mobile parser tests during implementation.
 - Supabase security and performance advisors were reviewed. Remaining warnings
   are historical and not introduced by Phase 5D.3.
-- Protected live validation is blocked pending confirmed rotation of previously
-  exposed local credentials.
+- Protected live validation had not yet been completed at the time of the earlier audit.
+
+## Phase 5D Protected Live Validation Results
+
+- Protected live validation for Phase 5D.1 through Phase 5D.3 completed on
+  2026-07-08 with aggregate opaque output only. See
+  `docs/ai/phase5d-protected-live-validation-20260708.md`.
+- Environment readiness passed for required Supabase, smoke-test, Canvas
+  encryption, and Supabase CLI variables. OCR and OpenAI variables were not
+  required because OCR and reviewer generation were intentionally avoided.
+- Supabase authentication, server database access, stored Canvas connection
+  access, and the Canvas token encryption/decryption path passed without
+  printing or documenting secret values.
+- Controlled explicit synchronization reused `connection-1` and synchronized
+  `course-1` with `partial` status, zero retries, one module, four module
+  items, 38 pages, 11 announcements, zero assignments, zero file metadata, and
+  zero prepared sources.
+- Phase 5D.1 and Phase 5D.2 live validation loaded source structure, previewed
+  a selected source/block set, created immutable snapshot, item, and block
+  rows, linked one saved reviewer, and removed the temporary reviewer,
+  snapshot, preview session, and structure session.
+- Phase 5D.3 live validation returned source status `current` and regeneration
+  readiness `ready_current`. The source-status route did not trigger sync, call
+  Canvas, decrypt credentials, read Storage objects, invoke OCR/OpenAI, or
+  regenerate the reviewer.
+- Duplicate and repeated-reference live counts were zero for the selected
+  source set; existing focused API/mobile tests cover non-zero duplicate,
+  canonical-order, manually selected duplicate, empty-content exclusion, and
+  repeated-reference behavior.
+- Remote migration history aligned through
+  `202607080002_harden_source_relationship_grants.sql`; Phase 5D.1,
+  Phase 5D.2, and Phase 5D.3 rollback-safe SQL verifiers passed, and a
+  read-only preserved-policy check confirmed earlier Canvas RLS/direct grants
+  and private Canvas source-file bucket policies.
+- Focused tests and the full requested automated verification suite passed.
+  The first aggregate root build encountered a generated `.next` readlink
+  artifact; after removing only generated `apps/api/.next`, `npm run build`
+  passed.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -1337,12 +1370,8 @@ selected-course synchronization is complete and runtime-safe in local
 production validation. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated. Phase 5C.2B Canvas PDF/image OCR
 sources are complete and live validated. Phase 5D.1 immutable source snapshots
-and exact reviewer provenance is implemented and remotely verified, with
-protected live validation not yet run. Phase 5D.2
-structured normalized blocks and selective import is implemented and remotely
-verified, with protected live validation not yet run.
-Phase 5D.3 duplicate relationships, source freshness, and regeneration
-readiness is implemented, with protected live validation not yet run. The next
-operational gate is protected Phase 5D.1 through Phase 5D.3 live validation in
-a configured protected integration environment. The deferred header/footer
-cleanup task remains separate.
+and exact reviewer provenance, Phase 5D.2 structured normalized blocks and
+selective import, and Phase 5D.3 duplicate relationships, source freshness,
+and regeneration readiness are implemented, remotely verified, and
+protected-live validated. The next roadmap step is Phase 5E planning. The
+deferred header/footer cleanup task remains separate.

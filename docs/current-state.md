@@ -417,47 +417,48 @@ reviewer-generation service with only `sourceText` and `sourceTitle`, and saves
 through the existing Study Library with minimal `sourceMode: "canvas"`
 metadata. No migration or persistent Canvas provenance table was added.
 
-Phase 5D.1 is implemented and remotely verified as the first bounded Phase 5D
-slice. Canvas preview now creates a short-lived private preview session with
-the exact original assembled preview text, hash, ordered source manifest, and
-parser/OCR version identifiers. Successful Canvas reviewer generation validates
-the owned preview session, sends only final `sourceText` and `sourceTitle` to
-the reviewer engine, then creates or reuses an immutable source snapshot with
-the exact edited text, original preview hash, edit state, and ordered source
-items. Canvas reviewer save requires an owned snapshot with matching metadata,
-and reviewer detail returns only a safe provenance summary. Historical and
-non-Canvas reviewers remain valid without fake backfill. Protected live
-validation for Phase 5D.1 has not yet been run in the current protected
-integration environment.
+Phase 5D.1 is implemented, remotely verified, and protected-live validated as
+the first bounded Phase 5D slice. Canvas preview now creates a short-lived
+private preview session with the exact original assembled preview text, hash,
+ordered source manifest, and parser/OCR version identifiers. Successful Canvas
+reviewer generation validates the owned preview session, sends only final
+`sourceText` and `sourceTitle` to the reviewer engine, then creates or reuses an
+immutable source snapshot with the exact edited text, original preview hash,
+edit state, and ordered source items. Canvas reviewer save requires an owned
+snapshot with matching metadata, and reviewer detail returns only a safe
+provenance summary. Historical and non-Canvas reviewers remain valid without
+fake backfill. Protected live validation completed on 2026-07-08 with
+aggregate opaque output only.
 
-Phase 5D.2 is implemented and remotely verified as the structured selective
-import slice. Canvas sources can now be normalized into private short-lived
-HTML/OCR block manifests, returned to mobile as safe public selectors, selected
-by the student before preview, and assembled server-side into the existing
-editable preview boundary. Selected block manifests are copied into immutable
-reviewer source snapshot blocks after successful generation, reviewer detail
-summaries expose only selected-block counts, and the reviewer engine/provider
-boundary still receives only `sourceText` and `sourceTitle`. Protected live
-validation for Phase 5D.2 has not yet been run in the current protected
-integration environment.
+Phase 5D.2 is implemented, remotely verified, and protected-live validated as
+the structured selective import slice. Canvas sources can now be normalized
+into private short-lived HTML/OCR block manifests, returned to mobile as safe
+public selectors, selected by the student before preview, and assembled
+server-side into the existing editable preview boundary. Selected block
+manifests are copied into immutable reviewer source snapshot blocks after
+successful generation, reviewer detail summaries expose only selected-block
+counts, and the reviewer engine/provider boundary still receives only
+`sourceText` and `sourceTitle`. Protected live validation completed on
+2026-07-08 with a selected source/block preview and immutable snapshot import.
 
-Phase 5D.3 is implemented as the duplicate relationship, source freshness, and
-regeneration-readiness slice. Structure and preview sessions now preserve a
-private relationship manifest with code-defined duplicate-analysis versioning.
-The API detects same Canvas source identity, exact normalized-content
-duplicates, and repeated Canvas references while returning only opaque
-session-scoped duplicate groups and broad reference categories to mobile. Later
-exact-content duplicates remain visible but are unselected by default. Snapshot
-creation copies relationship provenance into immutable
-`reviewer_source_snapshot_item_relationships` rows. Saved Canvas reviewers have
-a protected manual source-status endpoint that compares immutable snapshot
-items against current synchronized Pages, assignments, announcements, and
-prepared PDF/image file metadata without Canvas calls, PAT decryption, Storage
-reads, OCR, or OpenAI. Missing rows become `missing_after_sync` only with later
-authoritative sync evidence; partial, failed, old, or ambiguous evidence
-remains `unknown`. The Study Library shows a source-health and readiness card
-but does not regenerate reviewers. Protected live validation for Phase 5D.3 has
-not yet been run in the current protected integration environment.
+Phase 5D.3 is implemented, remotely verified, and protected-live validated as
+the duplicate relationship, source freshness, and regeneration-readiness slice.
+Structure and preview sessions now preserve a private relationship manifest
+with code-defined duplicate-analysis versioning. The API detects same Canvas
+source identity, exact normalized-content duplicates, and repeated Canvas
+references while returning only opaque session-scoped duplicate groups and
+broad reference categories to mobile. Later exact-content duplicates remain
+visible but are unselected by default. Snapshot creation copies relationship
+provenance into immutable `reviewer_source_snapshot_item_relationships` rows.
+Saved Canvas reviewers have a protected manual source-status endpoint that
+compares immutable snapshot items against current synchronized Pages,
+assignments, announcements, and prepared PDF/image file metadata without
+Canvas calls, PAT decryption, Storage reads, OCR, or OpenAI. Missing rows
+become `missing_after_sync` only with later authoritative sync evidence;
+partial, failed, old, or ambiguous evidence remains `unknown`. The Study
+Library shows a source-health and readiness card but does not regenerate
+reviewers. Protected live validation completed on 2026-07-08 with the live
+selected reviewer returning `current` and `ready_current`.
 
 ## Completed Capabilities
 
@@ -667,7 +668,7 @@ Historical and latest verification include:
   Canvas 52/52, and OCR 14/14. Supabase advisors showed no new Phase 5D.1
   security findings after the follow-up function search-path hardening
   migration; remaining warnings are historical. Phase 5D.1 protected live
-  validation has not yet been run.
+  validation completed on 2026-07-08.
 - Phase 5D.2 verification: migration
   `202607070004_add_canvas_selective_source_blocks.sql` is applied remotely.
   Rollback-safe SQL verification passed through
@@ -683,7 +684,7 @@ Historical and latest verification include:
   passed across 7/7 workspaces; workspace tests passed with API 299/299,
   mobile 95/95, Canvas 52/52, and OCR 14/14. Supabase advisors showed no new
   Phase 5D.2 findings; remaining warnings are historical. Phase 5D.2 protected
-  live validation has not yet been run.
+  live validation completed on 2026-07-08.
 - Phase 5D.3 verification uses migrations
   `202607080001_add_canvas_source_relationships_freshness.sql` and
   `202607080002_harden_source_relationship_grants.sql`, plus rollback-safe SQL
@@ -695,7 +696,15 @@ Historical and latest verification include:
   typecheck/build passed across 7/7 workspaces; workspace tests passed with API
   315/315, mobile 98/98, Canvas 52/52, and OCR 14/14; engine evals passed with
   266/266. Supabase advisors were reviewed, with remaining warnings historical.
-  Phase 5D.3 protected live validation has not yet been run.
+  Phase 5D.3 protected live validation completed on 2026-07-08.
+- Phase 5D protected live validation: completed for Phase 5D.1 through Phase
+  5D.3 with aggregate opaque output only. The run reused stored
+  `connection-1`, synchronized `course-1`, loaded source structure, previewed
+  selected blocks, created and deleted one reviewer/snapshot validation set,
+  verified source-status returned `current` and `ready_current`, confirmed no
+  source-status sync/Canvas/decrypt/Storage/OCR/OpenAI/regeneration side
+  effects, and preserved pre-existing data. See
+  `docs/ai/phase5d-protected-live-validation-20260708.md`.
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -914,21 +923,14 @@ selection and reviewer handoff is complete and live validated. Phase 5C.2B
 Canvas PDF and image extraction/OCR integration is complete and live validated
 for preparation, private Storage OCR preview, edited reviewer handoff, and
 Study Library cleanup. Phase 5D.1 immutable source snapshots and exact reviewer
-provenance is implemented and remotely verified; protected live validation has
-not yet been run. Phase 5D.2 structured normalized blocks and selective import
-is implemented and remotely verified; protected live validation has not yet been
-run. Phase 5D.3 duplicate relationships, source freshness, and regeneration
-readiness is implemented; protected live validation has not yet been run. The
-next operational gate is protected Phase 5D.1 through Phase 5D.3 live
-validation in a configured protected integration environment.
+provenance, Phase 5D.2 structured normalized blocks and selective import, and
+Phase 5D.3 duplicate relationships, source freshness, and regeneration
+readiness are implemented, remotely verified, and protected-live validated.
+The next roadmap step is Phase 5E planning.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks
 
-- Protected live validation for Phase 5D.1 through Phase 5D.3 has not yet been
-  run in a configured protected integration environment. Implementation,
-  automated verification, and remote database verification are complete; do not
-  mark the phase live-validated until a protected validation run completes.
 - OneDrive-backed generated Next output can create stale reparse-point artifacts;
   the smoke runner clears the generated `apps/api/.next/server` directory before
   runner-owned API startup. During Phase 4 verification, one stale
