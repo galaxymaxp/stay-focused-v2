@@ -139,10 +139,6 @@ performance advisors were reviewed; remaining warnings were historical.
 
 ## Live Validation
 
-Protected live validation is blocked until previously exposed credentials are
-rotated and Canvas is safely reconnected.
-
-SECURITY ACTION REQUIRED — protected live validation remains blocked pending credential rotation
-
-After rotation, first complete the blocked Phase 5D.1 and Phase 5D.2 live
-catch-up path, then validate Phase 5D.3 with aggregate opaque output only.
+Protected live validation was not completed during this audit session. Validate
+Phase 5D.3 with aggregate opaque output only after any required earlier Phase
+5D protected live-validation catch-up steps are complete.

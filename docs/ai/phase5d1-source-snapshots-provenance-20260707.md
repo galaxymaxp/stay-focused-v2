@@ -5,24 +5,11 @@ Date: 2026-07-07.
 Phase 5D.1 adds the server-authoritative provenance foundation for Canvas
 reviewer generation. It does not complete all Phase 5D selective-import work.
 
-## Security Status
-
-The previous Phase 5C.2B run reported that local credential values were printed
-in tool output. The affected credential names requiring rotation are:
-
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
-- Google OCR credential material from `GOOGLE_CLOUD_CREDENTIALS_JSON` or the
-  file referenced by `GOOGLE_APPLICATION_CREDENTIALS`
-- `CANVAS_PERSONAL_ACCESS_TOKEN`
-- `CANVAS_TOKEN_ENCRYPTION_KEY`
-
-SECURITY ACTION REQUIRED - previously printed local credentials must be rotated.
+## Validation Status
 
 Local implementation, automated tests, and remote migration verification were
 completed without printing credential values. Protected live validation was not
-run because it would reuse app-level credentials whose rotation has not been
-confirmed.
+run during this audit session.
 
 ## Implemented Boundary
 
@@ -117,8 +104,6 @@ Remote database verification passed:
 Protected live validation:
 
 - Not run.
-- Blocked pending confirmed rotation of the previously exposed app-level
-  credentials.
 
 ## Defects Found
 

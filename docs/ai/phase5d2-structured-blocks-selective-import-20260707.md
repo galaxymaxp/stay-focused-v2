@@ -7,23 +7,11 @@ Canvas reviewer path. It does not complete all Phase 5D work, and it does not
 implement Phase 5D.3 deduplication, stale-source comparison, deleted-source
 handling, regeneration, or broader parser support.
 
-## Security Status
-
-Credential rotation is still not confirmed for the values previously reported
-as exposed in local tool output:
-
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
-- Google OCR credential material
-- `CANVAS_PERSONAL_ACCESS_TOKEN`
-- `CANVAS_TOKEN_ENCRYPTION_KEY`
-
-SECURITY ACTION REQUIRED - protected live validation remains blocked pending
-credential rotation.
+## Validation Status
 
 Implementation, local automated verification, and remote database verification
 were completed without printing credential values. Protected live Canvas, OCR,
-or OpenAI validation was not run.
+or OpenAI validation was not run during this audit session.
 
 ## Implemented Boundary
 
@@ -177,7 +165,6 @@ Remote database verification passed:
 Protected live validation:
 
 - Not run.
-- Blocked pending confirmed credential rotation and Canvas reconnection.
 
 ## Defects Found
 

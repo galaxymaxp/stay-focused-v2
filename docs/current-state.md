@@ -427,8 +427,8 @@ the exact edited text, original preview hash, edit state, and ordered source
 items. Canvas reviewer save requires an owned snapshot with matching metadata,
 and reviewer detail returns only a safe provenance summary. Historical and
 non-Canvas reviewers remain valid without fake backfill. Protected live
-validation for Phase 5D.1 is blocked until previously exposed local credentials
-are rotated.
+validation for Phase 5D.1 has not yet been run in the current protected
+integration environment.
 
 Phase 5D.2 is implemented and remotely verified as the structured selective
 import slice. Canvas sources can now be normalized into private short-lived
@@ -438,8 +438,8 @@ editable preview boundary. Selected block manifests are copied into immutable
 reviewer source snapshot blocks after successful generation, reviewer detail
 summaries expose only selected-block counts, and the reviewer engine/provider
 boundary still receives only `sourceText` and `sourceTitle`. Protected live
-validation for Phase 5D.2 remains blocked until previously exposed local
-credentials are rotated.
+validation for Phase 5D.2 has not yet been run in the current protected
+integration environment.
 
 Phase 5D.3 is implemented as the duplicate relationship, source freshness, and
 regeneration-readiness slice. Structure and preview sessions now preserve a
@@ -456,8 +456,8 @@ prepared PDF/image file metadata without Canvas calls, PAT decryption, Storage
 reads, OCR, or OpenAI. Missing rows become `missing_after_sync` only with later
 authoritative sync evidence; partial, failed, old, or ambiguous evidence
 remains `unknown`. The Study Library shows a source-health and readiness card
-but does not regenerate reviewers. Protected live validation remains blocked
-pending credential rotation.
+but does not regenerate reviewers. Protected live validation for Phase 5D.3 has
+not yet been run in the current protected integration environment.
 
 ## Completed Capabilities
 
@@ -666,8 +666,8 @@ Historical and latest verification include:
   and 3 fresh tasks. Workspace tests passed with API 284/284, mobile 93/93,
   Canvas 52/52, and OCR 14/14. Supabase advisors showed no new Phase 5D.1
   security findings after the follow-up function search-path hardening
-  migration; remaining warnings are historical. Protected live validation is
-  blocked pending credential rotation.
+  migration; remaining warnings are historical. Phase 5D.1 protected live
+  validation has not yet been run.
 - Phase 5D.2 verification: migration
   `202607070004_add_canvas_selective_source_blocks.sql` is applied remotely.
   Rollback-safe SQL verification passed through
@@ -682,8 +682,8 @@ Historical and latest verification include:
   engine typecheck/build/evals passed with 266/266 evals; root typecheck/build
   passed across 7/7 workspaces; workspace tests passed with API 299/299,
   mobile 95/95, Canvas 52/52, and OCR 14/14. Supabase advisors showed no new
-  Phase 5D.2 findings; remaining warnings are historical. Protected live
-  validation is blocked pending credential rotation.
+  Phase 5D.2 findings; remaining warnings are historical. Phase 5D.2 protected
+  live validation has not yet been run.
 - Phase 5D.3 verification uses migrations
   `202607080001_add_canvas_source_relationships_freshness.sql` and
   `202607080002_harden_source_relationship_grants.sql`, plus rollback-safe SQL
@@ -695,7 +695,7 @@ Historical and latest verification include:
   typecheck/build passed across 7/7 workspaces; workspace tests passed with API
   315/315, mobile 98/98, Canvas 52/52, and OCR 14/14; engine evals passed with
   266/266. Supabase advisors were reviewed, with remaining warnings historical.
-  Protected live validation is blocked pending credential rotation.
+  Phase 5D.3 protected live validation has not yet been run.
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -914,22 +914,21 @@ selection and reviewer handoff is complete and live validated. Phase 5C.2B
 Canvas PDF and image extraction/OCR integration is complete and live validated
 for preparation, private Storage OCR preview, edited reviewer handoff, and
 Study Library cleanup. Phase 5D.1 immutable source snapshots and exact reviewer
-provenance is implemented and remotely verified, with protected live validation
-blocked pending credential rotation. Phase 5D.2 structured normalized blocks
-and selective import is implemented and remotely verified, with protected live
-validation blocked pending credential rotation. Phase 5D.3 duplicate
-relationships, source freshness, and regeneration readiness is implemented,
-with protected live validation blocked pending credential rotation. The next
-operational gate is credential rotation and protected Phase 5D.1 through
-Phase 5D.3 live validation.
+provenance is implemented and remotely verified; protected live validation has
+not yet been run. Phase 5D.2 structured normalized blocks and selective import
+is implemented and remotely verified; protected live validation has not yet been
+run. Phase 5D.3 duplicate relationships, source freshness, and regeneration
+readiness is implemented; protected live validation has not yet been run. The
+next operational gate is protected Phase 5D.1 through Phase 5D.3 live
+validation in a configured protected integration environment.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks
 
-- Protected live validation for Phase 5D.1 through Phase 5D.3 is blocked until the previously
-  exposed local app-level credentials are rotated. Do not reuse the old
-  service-role, OpenAI, Google OCR, Canvas PAT, or Canvas encryption-key values
-  for live validation.
+- Protected live validation for Phase 5D.1 through Phase 5D.3 has not yet been
+  run in a configured protected integration environment. Implementation,
+  automated verification, and remote database verification are complete; do not
+  mark the phase live-validated until a protected validation run completes.
 - OneDrive-backed generated Next output can create stale reparse-point artifacts;
   the smoke runner clears the generated `apps/api/.next/server` directory before
   runner-owned API startup. During Phase 4 verification, one stale

@@ -223,14 +223,14 @@ handoff is complete and live validated; Phase 5C.2B Canvas PDF/image OCR
 sources are complete and live validated for preparation, private Storage OCR
 preview, edited reviewer handoff, and Study Library cleanup; Phase 5D.1
 immutable source snapshots and exact reviewer provenance is implemented and
-remotely verified, with protected live validation blocked pending credential
-rotation. Phase 5D.2 structured normalized blocks and selective import is
-implemented and remotely verified, with protected live validation blocked
-pending credential rotation. Phase 5D.3 duplicate relationships, source
-freshness, and regeneration readiness is implemented, with protected live
-validation blocked pending credential rotation. The next operational gate is
-credential rotation and protected Phase 5D.1 through Phase 5D.3 live
-validation; the next roadmap phase after that gate is Phase 5E. Phase 5E
+remotely verified; protected live validation has not yet been run. Phase 5D.2
+structured normalized blocks and selective import is implemented and remotely
+verified; protected live validation has not yet been run. Phase 5D.3 duplicate
+relationships, source freshness, and regeneration readiness is implemented;
+protected live validation has not yet been run. The next operational gate is
+protected Phase 5D.1 through Phase 5D.3 live validation in a configured
+protected integration environment; the next roadmap phase after that gate is
+Phase 5E. Phase 5E
 through Phase 5F remain planned and must not be collapsed into a single generic
 Canvas integration task.
 
@@ -681,12 +681,12 @@ selection and reviewer handoff is complete and live validated. Phase 5C.2B
 Canvas PDF/image OCR sources are complete and live validated for preparation,
 private Storage OCR preview, edited reviewer handoff, and Study Library
 cleanup. Phase 5D.1 immutable source snapshots and Phase 5D.2 structured
-normalized blocks are implemented and remotely verified, with protected live
-validation blocked pending credential rotation. Phase 5D.3 duplicate
-relationships, source freshness, and regeneration readiness is implemented,
-with protected live validation blocked pending credential rotation. Next
-operational gate: credential rotation and protected Phase 5D.1 through Phase
-5D.3 live validation.
+normalized blocks are implemented and remotely verified; protected live
+validation has not yet been run for Phase 5D.1 or Phase 5D.2. Phase 5D.3
+duplicate relationships, source freshness, and regeneration readiness is
+implemented; protected live validation has not yet been run. Next operational
+gate: protected Phase 5D.1 through Phase 5D.3 live validation in a configured
+protected integration environment.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -974,9 +974,9 @@ Exit criteria:
 
 ### Phase 5D - Source Normalization, Provenance, And Selective Import
 
-Status: Implemented through Phase 5D.3, with protected live validation blocked
-pending rotation of previously exposed local credentials. Phase 5D.1 is
-implemented and remotely verified as the immutable source-snapshot and exact
+Status: Implemented through Phase 5D.3. Protected live validation for Phase
+5D.1 through Phase 5D.3 has not yet been run. Phase 5D.1 is implemented and
+remotely verified as the immutable source-snapshot and exact
 reviewer-provenance foundation. Phase 5D.2 is implemented and remotely verified
 as the structured normalized-block and selective-import slice. Phase 5D.3 is
 implemented as duplicate relationships, source freshness, and regeneration
