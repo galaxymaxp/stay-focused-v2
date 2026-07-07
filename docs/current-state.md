@@ -47,9 +47,12 @@ Courses
 -> choose supported Page, assignment-description, announcement, or ready PDF/image sources
 -> prepare one eligible PDF/image when needed
 -> preview and edit combined source text/title
+-> protected preview session
 -> existing reviewer API
+-> immutable source snapshot after successful generation
 -> reviewer preview
 -> save to Study Library
+-> safe provenance summary in reviewer detail
 ```
 
 Phase 3A also adds a protected server OCR route:
@@ -412,6 +415,19 @@ reviewer-generation service with only `sourceText` and `sourceTitle`, and saves
 through the existing Study Library with minimal `sourceMode: "canvas"`
 metadata. No migration or persistent Canvas provenance table was added.
 
+Phase 5D.1 is implemented and remotely verified as the first bounded Phase 5D
+slice. Canvas preview now creates a short-lived private preview session with
+the exact original assembled preview text, hash, ordered source manifest, and
+parser/OCR version identifiers. Successful Canvas reviewer generation validates
+the owned preview session, sends only final `sourceText` and `sourceTitle` to
+the reviewer engine, then creates or reuses an immutable source snapshot with
+the exact edited text, original preview hash, edit state, and ordered source
+items. Canvas reviewer save requires an owned snapshot with matching metadata,
+and reviewer detail returns only a safe provenance summary. Historical and
+non-Canvas reviewers remain valid without fake backfill. Protected live
+validation for Phase 5D.1 is blocked until previously exposed local credentials
+are rotated.
+
 ## Completed Capabilities
 
 - Monorepo foundation with API, mobile, engine, DB, Canvas, and shared packages.
@@ -521,6 +537,11 @@ metadata. No migration or persistent Canvas provenance table was added.
   one-file synchronous preview limit, ordered mixed-source assembly, mobile
   prepare/ready states, transient OCR output only, and no Canvas or OpenAI call
   during preview.
+- Phase 5D.1 immutable Canvas source snapshots and exact reviewer provenance
+  with private preview sessions, exact edited source-text snapshots, ordered
+  source snapshot items, database-enforced reviewer/snapshot ownership, safe
+  detail summaries, no historical reviewer backfill, and no provenance sent to
+  OpenAI.
 
 ## Current Verification Baselines
 
@@ -601,6 +622,21 @@ Historical and latest verification include:
   verified Study Library visibility, and deleted the validation reviewer. An
   exploratory generation attempt including the very short/noisy live OCR
   preview text returned the existing `reviewer_validation_failed` response.
+- Phase 5D.1 verification: migrations `202607070001`, `202607070002`, and
+  `202607070003` are applied remotely; rollback-safe SQL verification passed
+  for private provenance tables, RLS, grants, ownership constraints,
+  immutability, duplicate ordinal rejection, snapshot item context mismatch
+  rejection, reviewer deletion, and Canvas disconnect preservation. Canvas
+  typecheck/build/tests passed with 52/52 tests; DB
+  typecheck passed; OCR typecheck/build/tests passed with 14/14 tests; API
+  typecheck/build/tests passed with 284/284 tests; mobile typecheck/tests
+  passed with 93/93 tests; engine typecheck/build/evals passed with 266/266
+  evals. Root Turbo typecheck/build passed across 7/7 workspaces with 4 cached
+  and 3 fresh tasks. Workspace tests passed with API 284/284, mobile 93/93,
+  Canvas 52/52, and OCR 14/14. Supabase advisors showed no new Phase 5D.1
+  security findings after the follow-up function search-path hardening
+  migration; remaining warnings are historical. Protected live validation is
+  blocked pending credential rotation.
 
 - DB package typecheck: passed
 - OCR package typecheck: passed
@@ -787,8 +823,10 @@ mocked PDF OCR response. It does not validate live Google PDF OCR.
   PNGs, and JPEGs after explicit preparation through the existing secure
   ingestion boundary. Preview supports one OCR-backed file mixed with stored
   text sources, revalidates private stored bytes before OCR, returns no Storage
-  keys or signed URLs, and does not persist extracted text. Full persistent
-  source provenance, source recommendations, cross-course bundles, background
+  keys or signed URLs, and does not persist extracted text. Phase 5D.1 adds
+  immutable source snapshots and exact reviewer linkage for the Canvas reviewer
+  path, but structured normalized blocks, selective import, stale/deleted
+  source comparison, source recommendations, cross-course bundles, background
   sync, and automatic reviewer generation remain deferred.
 - Task generation and study schedule generation are not implemented.
 - Google and Microsoft OAuth helper functions exist, but completed mobile OAuth
@@ -812,12 +850,18 @@ runtime-safe in local production validation. Phase 5C.2A2 Canvas source
 selection and reviewer handoff is complete and live validated. Phase 5C.2B
 Canvas PDF and image extraction/OCR integration is complete and live validated
 for preparation, private Storage OCR preview, edited reviewer handoff, and
-Study Library cleanup. The recommended next roadmap task is Phase 5D - Source
-Normalization, Provenance, And Selective Import.
+Study Library cleanup. Phase 5D.1 immutable source snapshots and exact reviewer
+provenance is implemented and remotely verified, with protected live validation
+blocked pending credential rotation. The recommended next roadmap task is
+Phase 5D.2 - Structured Normalized Blocks And Selective Import.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks
 
+- Protected live validation for Phase 5D.1 is blocked until the previously
+  exposed local app-level credentials are rotated. Do not reuse the old
+  service-role, OpenAI, Google OCR, Canvas PAT, or Canvas encryption-key values
+  for live validation.
 - OneDrive-backed generated Next output can create stale reparse-point artifacts;
   the smoke runner clears the generated `apps/api/.next/server` directory before
   runner-owned API startup. During Phase 4 verification, one stale

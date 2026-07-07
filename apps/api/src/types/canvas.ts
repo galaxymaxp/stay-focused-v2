@@ -261,6 +261,7 @@ export interface CanvasReviewerSourceListResponse {
 
 export interface CanvasReviewerSourcePreviewResponse {
   readonly ok: true;
+  readonly previewSessionId: string;
   readonly sourceText: string;
   readonly suggestedTitle: string;
   readonly sourceCount: number;

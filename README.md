@@ -32,7 +32,12 @@ Canvas source-selection reviewer flow: selected synchronized courses can list
 Pages, assignment descriptions, announcements, and Canvas file metadata;
 students can prepare eligible PDFs/images, preview one ready OCR-backed file
 with stored text sources, edit selected source text; generation reuses the
-existing reviewer API; and saving reuses the existing Study Library.
+existing reviewer API; and saving reuses the existing Study Library. Phase
+5D.1 adds immutable server-side Canvas source provenance for that flow: preview
+sessions, exact edited source snapshots, ordered source items, reviewer
+linkage, and safe Study Library provenance summaries. Protected live
+validation for Phase 5D.1 is blocked until previously exposed local
+credentials are rotated.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -73,9 +78,12 @@ Sign in
 -> choose supported Canvas sources
 -> prepare one eligible PDF/image when needed
 -> preview and edit combined source text/title
+-> protected preview session
 -> existing reviewer API
+-> immutable source snapshot after successful generation
 -> reviewer preview
 -> save to Study Library
+-> safe provenance summary in reviewer detail
 ```
 
 This slice uses Supabase email/password authentication in the Expo app. The
@@ -151,6 +159,10 @@ Complete:
   Storage byte/hash/signature revalidation, one OCR-backed file per preview,
   ordered mixed-source assembly, mobile prepare/ready states, transient OCR
   text only, and no Canvas/OpenAI calls during preview
+- Phase 5D.1 immutable Canvas source snapshots and exact reviewer provenance
+  with private preview sessions, exact edited source-text snapshots, ordered
+  source snapshot items, database-enforced reviewer/snapshot ownership, safe
+  detail summaries, and no provenance sent to OpenAI
 
 Working locally:
 
@@ -443,6 +455,8 @@ synchronization is complete and runtime-safe in local production validation.
 Phase 5C.2A2 Canvas source selection and reviewer handoff is complete and live
 validated. Phase 5C.2B Canvas PDF and image OCR integration is complete and
 live validated for preparation, private Storage OCR preview, edited reviewer
-handoff, and Study Library cleanup. The next roadmap task is Phase 5D - Source
-Normalization, Provenance, And Selective Import. Canvas OAuth remains a future
-phase.
+handoff, and Study Library cleanup. Phase 5D.1 immutable source snapshots and
+exact reviewer provenance is implemented and remotely verified, with protected
+live validation blocked pending credential rotation. The next roadmap task is
+Phase 5D.2 - Structured Normalized Blocks And Selective Import. Canvas OAuth
+remains a future phase.

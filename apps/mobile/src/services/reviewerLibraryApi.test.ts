@@ -72,6 +72,46 @@ describe("reviewer library API", () => {
     expect(String(request.init.body)).not.toContain("file://");
   });
 
+  it("saves a Canvas reviewer with only an opaque source snapshot ID", async () => {
+    const fetchImpl = createFetch({
+      ok: true,
+      reviewer: canvasDetail(),
+    });
+
+    const result = await saveReviewer({
+      accessToken: "token-value",
+      apiBaseUrl: API_BASE_URL,
+      fetchImpl,
+      reviewerOutput: reviewerOutput(),
+      sourceMetadata: {
+        sourceMode: "canvas",
+        sourceCharacterCount: 120,
+        sourceLabel: "Canvas Reviewer",
+      },
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      title: "Canvas Reviewer",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        sourceProvenance: {
+          sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          sourceCount: 2,
+          wasEdited: true,
+        },
+      },
+    });
+    const body = JSON.parse(String(lastRequest(fetchImpl).init.body));
+    expect(body).toMatchObject({
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      sourceMetadata: { sourceMode: "canvas" },
+    });
+    expect(JSON.stringify(body)).not.toContain("source_manifest");
+    expect(JSON.stringify(body)).not.toContain("sha256");
+    expect(JSON.stringify(body)).not.toContain("canvas_connection_id");
+  });
+
   it("opens, renames, and deletes a reviewer", async () => {
     const openFetch = createFetch({ ok: true, reviewer: detail() });
     const renameFetch = createFetch({
@@ -88,6 +128,23 @@ describe("reviewer library API", () => {
         reviewerId: REVIEWER_ID,
       }),
     ).resolves.toMatchObject({ ok: true, data: detail() });
+
+    await expect(
+      getReviewer({
+        accessToken: "token-value",
+        apiBaseUrl: API_BASE_URL,
+        fetchImpl: createFetch({ ok: true, reviewer: canvasDetail() }),
+        reviewerId: REVIEWER_ID,
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        sourceProvenance: {
+          sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          sourceCount: 2,
+        },
+      },
+    });
 
     await expect(
       renameReviewer({
@@ -220,6 +277,28 @@ function summary() {
 function detail() {
   return {
     ...summary(),
+    reviewerOutput: reviewerOutput(),
+  };
+}
+
+function canvasDetail() {
+  return {
+    ...summary(),
+    sourceMetadata: {
+      sourceMode: "canvas",
+      sourceCharacterCount: 120,
+      sourceLabel: "Canvas Reviewer",
+    },
+    sourceProvenance: {
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      sourceMode: "canvas",
+      sourceTitle: "Canvas Reviewer",
+      sourceCount: 2,
+      wasEdited: true,
+      generatedAt: "2026-07-07T00:10:00.000Z",
+      parserVersions: ["canvas-html-visible-text-v1"],
+      ocrVersions: ["canvas-stored-image-ocr-v1"],
+    },
     reviewerOutput: reviewerOutput(),
   };
 }

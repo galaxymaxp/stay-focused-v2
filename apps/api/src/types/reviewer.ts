@@ -3,11 +3,13 @@ import type { ReviewerOutput } from "@stay-focused/engine";
 export interface ReviewerGenerateRequest {
   readonly sourceText: string;
   readonly sourceTitle?: string;
+  readonly canvasPreviewSessionId?: string;
 }
 
 export interface ReviewerGenerateSuccessResponse {
   readonly ok: true;
   readonly reviewer: ReviewerOutput;
+  readonly sourceSnapshotId?: string;
 }
 
 export interface ReviewerGenerateErrorResponse {

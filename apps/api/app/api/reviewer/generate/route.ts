@@ -2,10 +2,16 @@ import { PipelineAssemblyError, runPipeline } from "@stay-focused/engine";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
+import { createCanvasServiceClient } from "@/lib/canvas-db";
 import {
   REVIEWER_GENERATE_MAX_JSON_BODY_BYTES,
   REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS,
 } from "@/lib/reviewer-generation-limits";
+import {
+  createOrReuseReviewerSourceSnapshot,
+  validateCanvasPreviewSessionForGeneration,
+  type ValidCanvasPreviewSession,
+} from "@/lib/reviewer-source-provenance";
 import { createServerOpenAIProvider } from "@/providers";
 import type {
   ReviewerGenerateErrorResponse,
@@ -111,6 +117,36 @@ async function handlePost(
     );
   }
 
+  let previewSession: ValidCanvasPreviewSession | null = null;
+  let provenanceClient: ReturnType<typeof createCanvasServiceClient> | null = null;
+  if (validation.value.canvasPreviewSessionId !== undefined) {
+    try {
+      provenanceClient = createCanvasServiceClient();
+    } catch {
+      return errorResponse(
+        500,
+        "source_snapshot_storage_failed",
+        "Canvas source provenance storage is not configured.",
+        request,
+      );
+    }
+
+    const session = await validateCanvasPreviewSessionForGeneration({
+      client: provenanceClient,
+      previewSessionId: validation.value.canvasPreviewSessionId,
+      userId: user.id,
+    });
+    if (!session.ok) {
+      return errorResponse(
+        session.status,
+        session.code,
+        session.message,
+        request,
+      );
+    }
+    previewSession = session.value;
+  }
+
   const provider = createProvider();
   if (!provider.ok) {
     return errorResponse(
@@ -134,8 +170,35 @@ async function handlePost(
       provider: provider.value,
     });
 
+    const snapshot =
+      previewSession && provenanceClient
+        ? await createOrReuseReviewerSourceSnapshot({
+            client: provenanceClient,
+            previewSession,
+            sourceText: validation.value.sourceText,
+            sourceTitle: validation.value.sourceTitle,
+            userId: user.id,
+          })
+        : null;
+    if (snapshot && !snapshot.ok) {
+      return errorResponse(
+        snapshot.status,
+        snapshot.code,
+        snapshot.message,
+        request,
+      );
+    }
+
     outcome = "success";
-    return jsonResponse({ ok: true, reviewer }, 200, request);
+    return jsonResponse(
+      {
+        ok: true,
+        reviewer,
+        ...(snapshot ? { sourceSnapshotId: snapshot.value.sourceSnapshotId } : {}),
+      },
+      200,
+      request,
+    );
   } catch (error) {
     logReviewerGenerationError(requestId, error);
     const mappedError = mapReviewerGenerationError(error);
@@ -216,8 +279,22 @@ function validateRequestBody(body: unknown): ValidationResult {
     return invalidRequest("sourceTitle must be a string when provided.");
   }
 
+  const canvasPreviewSessionId = body["canvasPreviewSessionId"];
+  if (
+    canvasPreviewSessionId !== undefined &&
+    typeof canvasPreviewSessionId !== "string"
+  ) {
+    return invalidRequest(
+      "canvasPreviewSessionId must be a string when provided.",
+    );
+  }
+
   const normalizedSourceTitle =
     typeof sourceTitle === "string" ? sourceTitle.trim() : "";
+  const normalizedCanvasPreviewSessionId =
+    typeof canvasPreviewSessionId === "string"
+      ? canvasPreviewSessionId.trim()
+      : undefined;
 
   return {
     ok: true,
@@ -225,6 +302,9 @@ function validateRequestBody(body: unknown): ValidationResult {
       sourceText: normalizedSourceText,
       ...(normalizedSourceTitle
         ? { sourceTitle: normalizedSourceTitle }
+        : {}),
+      ...(normalizedCanvasPreviewSessionId !== undefined
+        ? { canvasPreviewSessionId: normalizedCanvasPreviewSessionId }
         : {}),
     },
   };
@@ -253,7 +333,7 @@ function createProvider():
 }
 
 function errorResponse(
-  status: 400 | 401 | 413 | 422 | 500,
+  status: 400 | 401 | 404 | 409 | 413 | 422 | 500,
   code: string,
   message: string,
   request?: Request,
@@ -275,7 +355,7 @@ function errorResponse(
 
 function jsonResponse(
   body: ReviewerGenerateResponse | ReviewerGenerateErrorResponse,
-  status: 200 | 400 | 401 | 413 | 422 | 500,
+  status: 200 | 400 | 401 | 404 | 409 | 413 | 422 | 500,
   request?: Request,
 ): Response {
   return NextResponse.json(body, {

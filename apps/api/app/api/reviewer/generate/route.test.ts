@@ -29,9 +29,12 @@ const mocks = vi.hoisted(() => {
   }
 
   return {
+    createCanvasServiceClient: vi.fn(),
     createServerOpenAIProvider: vi.fn(),
+    createOrReuseReviewerSourceSnapshot: vi.fn(),
     PipelineAssemblyError,
     runPipeline: vi.fn(),
+    validateCanvasPreviewSessionForGeneration: vi.fn(),
     verifyBearerToken: vi.fn(),
   };
 });
@@ -43,6 +46,17 @@ vi.mock("@stay-focused/engine", () => ({
 
 vi.mock("@/lib/auth", () => ({
   verifyBearerToken: mocks.verifyBearerToken,
+}));
+
+vi.mock("@/lib/canvas-db", () => ({
+  createCanvasServiceClient: mocks.createCanvasServiceClient,
+}));
+
+vi.mock("@/lib/reviewer-source-provenance", () => ({
+  createOrReuseReviewerSourceSnapshot:
+    mocks.createOrReuseReviewerSourceSnapshot,
+  validateCanvasPreviewSessionForGeneration:
+    mocks.validateCanvasPreviewSessionForGeneration,
 }));
 
 vi.mock("@/providers", () => ({
@@ -80,6 +94,15 @@ describe("POST /api/reviewer/generate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.verifyBearerToken.mockResolvedValue({ id: "user-1" });
+    mocks.createCanvasServiceClient.mockReturnValue({ from: vi.fn(), rpc: vi.fn() });
+    mocks.validateCanvasPreviewSessionForGeneration.mockResolvedValue({
+      ok: true,
+      value: { row: previewSessionRow() },
+    });
+    mocks.createOrReuseReviewerSourceSnapshot.mockResolvedValue({
+      ok: true,
+      value: { sourceSnapshotId: "77777777-7777-4777-8777-777777777777" },
+    });
     mocks.createServerOpenAIProvider.mockReturnValue(fakeProvider);
     mocks.runPipeline.mockResolvedValue(fakeReviewer);
   });
@@ -309,6 +332,131 @@ describe("POST /api/reviewer/generate", () => {
     expect(JSON.stringify(body)).not.toContain("Weak content field");
   });
 
+  it("rejects an invalid Canvas preview session before provider creation", async () => {
+    mocks.validateCanvasPreviewSessionForGeneration.mockResolvedValue({
+      ok: false,
+      status: 400,
+      code: "canvas_preview_session_invalid",
+      message: "Canvas preview session is invalid.",
+    });
+
+    const response = await POST(
+      createRequest({
+        body: {
+          sourceText: "Readable notes",
+          canvasPreviewSessionId: "not-a-uuid",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expectError(response, "canvas_preview_session_invalid");
+    expect(mocks.createServerOpenAIProvider).not.toHaveBeenCalled();
+    expect(mocks.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it("rejects an expired Canvas preview session before provider creation", async () => {
+    mocks.validateCanvasPreviewSessionForGeneration.mockResolvedValue({
+      ok: false,
+      status: 409,
+      code: "canvas_preview_session_expired",
+      message: "Canvas preview session has expired. Preview the sources again.",
+    });
+
+    const response = await POST(
+      createRequest({
+        body: {
+          sourceText: "Readable notes",
+          canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expectError(response, "canvas_preview_session_expired");
+    expect(mocks.createServerOpenAIProvider).not.toHaveBeenCalled();
+    expect(mocks.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it("creates no source snapshot when reviewer generation fails", async () => {
+    mocks.runPipeline.mockRejectedValue(new Error("engine stack trace"));
+
+    const response = await POST(
+      createRequest({
+        body: {
+          sourceText: "Readable notes",
+          canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expectError(response, "reviewer_generation_failed");
+    expect(mocks.createOrReuseReviewerSourceSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("returns an opaque source snapshot id after Canvas generation succeeds", async () => {
+    const response = await POST(
+      createRequest({
+        body: {
+          sourceText: "Edited Canvas preview text.",
+          sourceTitle: "Canvas Notes",
+          canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
+        },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      ok: true,
+      reviewer: fakeReviewer,
+      sourceSnapshotId: "77777777-7777-4777-8777-777777777777",
+    });
+    expect(mocks.createOrReuseReviewerSourceSnapshot).toHaveBeenCalledWith({
+      client: expect.anything(),
+      previewSession: { row: previewSessionRow() },
+      sourceText: "Edited Canvas preview text.",
+      sourceTitle: "Canvas Notes",
+      userId: "user-1",
+    });
+    expect(JSON.stringify(body)).not.toContain("sha256");
+    expect(JSON.stringify(body)).not.toContain("exact_source_text");
+    expect(JSON.stringify(body)).not.toContain("canvas_connection_id");
+  });
+
+  it("does not send Canvas provenance fields to the reviewer provider boundary", async () => {
+    await POST(
+      createRequest({
+        body: {
+          sourceText: "Edited Canvas preview text.",
+          sourceTitle: "Canvas Notes",
+          canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
+        },
+      }),
+    );
+
+    const providerInput = mocks.runPipeline.mock.calls[0]?.[0];
+    expect(providerInput).toEqual({
+      input: {
+        text: "Edited Canvas preview text.",
+        title: "Canvas Notes",
+      },
+      provider: fakeProvider,
+    });
+    const serialized = JSON.stringify(providerInput);
+    expect(serialized).not.toContain("66666666-6666-4666-8666-666666666666");
+    expect(serialized).not.toContain("77777777-7777-4777-8777-777777777777");
+    expect(serialized).not.toContain("canvas_connection_id");
+    expect(serialized).not.toContain("canvas_course_id");
+    expect(serialized).not.toContain("source_row_id");
+    expect(serialized).not.toContain("file_id");
+    expect(serialized).not.toContain("sha256");
+    expect(serialized).not.toContain("parser_version");
+    expect(serialized).not.toContain("ocr_version");
+    expect(serialized).not.toContain("storage_object_key");
+  });
+
   it("returns 200 with a reviewer for a valid mocked request", async () => {
     const response = await POST(
       createRequest({
@@ -366,6 +514,24 @@ function createRequest(
     headers,
     body,
   });
+}
+
+function previewSessionRow() {
+  return {
+    id: "66666666-6666-4666-8666-666666666666",
+    user_id: "user-1",
+    canvas_connection_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    course_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    original_preview_text: "Original Canvas preview text.",
+    original_preview_sha256:
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    suggested_title: "Canvas Notes",
+    source_count: 2,
+    source_manifest: [],
+    normalization_version: "canvas-source-preview-v1",
+    created_at: "2026-07-07T00:00:00.000Z",
+    expires_at: "2026-07-08T00:00:00.000Z",
+  };
 }
 
 async function expectError(

@@ -2,10 +2,15 @@ import type { ReviewerOutput } from "@stay-focused/engine";
 import type {
   SavedReviewerDetail as DbSavedReviewerDetail,
   SavedReviewerSourceMetadata,
+  SavedReviewerSourceProvenanceSummary,
   SavedReviewerSummary,
 } from "@stay-focused/db";
 
-export type { SavedReviewerSourceMetadata, SavedReviewerSummary };
+export type {
+  SavedReviewerSourceMetadata,
+  SavedReviewerSourceProvenanceSummary,
+  SavedReviewerSummary,
+};
 
 export type SavedReviewerDetail = DbSavedReviewerDetail<ReviewerOutput>;
 
@@ -43,9 +48,19 @@ export type ReviewerApiErrorCode =
   | "invalid_title"
   | "invalid_source_metadata"
   | "invalid_reviewer_output"
+  | "canvas_preview_session_missing"
+  | "canvas_preview_session_expired"
+  | "canvas_preview_session_not_found"
+  | "canvas_preview_session_invalid"
   | "reviewer_not_found"
   | "reviewer_storage_not_configured"
-  | "reviewer_storage_failed";
+  | "reviewer_storage_failed"
+  | "source_snapshot_failed"
+  | "source_snapshot_not_found"
+  | "source_snapshot_ownership_mismatch"
+  | "source_snapshot_required"
+  | "source_snapshot_metadata_mismatch"
+  | "source_snapshot_storage_failed";
 
 export type ReviewerListResponse =
   | ReviewerListSuccessResponse

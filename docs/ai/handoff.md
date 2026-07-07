@@ -178,15 +178,29 @@ paths.
   ingestion service, private byte/hash/signature revalidation, one OCR-backed
   file per preview, ordered mixed-source assembly, mobile prepare/ready states,
   no extracted-text persistence, and no Canvas/OpenAI calls during preview.
+- Phase 5D.1 Immutable Source Snapshots and Exact Reviewer Provenance is
+  implemented and remotely verified as the first bounded Phase 5D slice. It
+  adds private short-lived preview sessions, immutable exact edited source
+  snapshots, ordered source snapshot items, parser/OCR version identifiers,
+  database-enforced same-owner reviewer linkage, Canvas save enforcement, and
+  safe Study Library detail provenance summaries. The reviewer engine/provider
+  boundary still receives only `sourceText` and `sourceTitle`.
+- SECURITY ACTION REQUIRED: previously printed local credentials must be
+  rotated before protected live validation reuses app-level credentials. The
+  names requiring rotation are `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
+  Google OCR credential material, `CANVAS_PERSONAL_ACCESS_TOKEN`, and
+  `CANVAS_TOKEN_ENCRYPTION_KEY`. Phase 5D.1 protected live validation is
+  blocked pending confirmed rotation.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
   connection, courses, capabilities, and disconnect behavior.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- Remaining secondary Canvas resources, broader parser families, source
-  snapshots/provenance, grades, background synchronization, task generation,
-  and study schedule generation are still pending. Production endpoint
+- Remaining secondary Canvas resources, broader parser families, structured
+  normalized blocks, selective import, stale/deleted-source comparison, grades,
+  background synchronization, task generation, and study schedule generation
+  are still pending. Production endpoint
   validators remain unsupported for the audited endpoint families. Discussions,
   quiz metadata, announcement attachment content import, and broader Canvas
   resource support remain deferred.
@@ -304,6 +318,18 @@ paths.
   verified Study Library visibility, and deleted the validation reviewer. An
   exploratory generation attempt including the very short/noisy live OCR
   preview text returned the existing `reviewer_validation_failed` response.
+- Phase 5D.1 verification: migrations `202607070001`, `202607070002`, and
+  `202607070003` are applied remotely; rollback-safe SQL verification passed
+  through `scripts/phase5d1-source-provenance-verification.sql`; Canvas
+  typecheck/build/tests 52/52; DB typecheck passed; OCR typecheck/build/tests
+  14/14; API typecheck/build/tests 284/284; mobile typecheck/tests 93/93;
+  engine typecheck/build/evals 266/266; root Turbo typecheck/build 7/7 with 4
+  cached and 3 fresh tasks; workspace tests API 284/284, mobile 93/93, Canvas
+  52/52, OCR 14/14. Supabase advisors showed no new Phase 5D.1 findings after
+  the follow-up function search-path hardening migration; remaining warnings
+  are historical. The rollback verifier also covers snapshot item context
+  mismatch rejection. Protected live validation is blocked pending credential
+  rotation.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -347,12 +373,19 @@ ingestion foundation is remotely and live validated with a documented
 account-wide synchronous route-duration limitation. Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
 production validation. Phase 5C.2A2 Canvas source selection and reviewer
-handoff is complete and live validated. The recommended next roadmap task is
-Phase 5D - Source Normalization, Provenance, And Selective Import. Automatic
-repeated scanned-PDF header/footer detection remains a deferred candidate.
+handoff is complete and live validated. Phase 5C.2B Canvas PDF/image OCR
+sources are complete and live validated. Phase 5D.1 immutable source snapshots
+and exact reviewer provenance is implemented and remotely verified, with
+protected live validation blocked pending credential rotation. The recommended
+next roadmap task is Phase 5D.2 - Structured Normalized Blocks And Selective
+Import. Automatic repeated scanned-PDF header/footer detection remains a
+deferred candidate.
 
 ## Known Blockers And Risks
 
+- Protected live validation for Phase 5D.1 is blocked until the previously
+  exposed local app-level credentials are rotated. Do not run live Canvas,
+  OpenAI, OCR, or service-role validation with those old values.
 - OneDrive-backed generated Next output can leave stale reparse-point artifacts;
   the smoke runner clears generated `apps/api/.next/server` before
   runner-owned API startup. A stale generated

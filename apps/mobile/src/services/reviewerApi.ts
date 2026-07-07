@@ -11,6 +11,7 @@ export interface GenerateReviewerInput {
   readonly accessToken: string;
   readonly sourceText: string;
   readonly sourceTitle?: string;
+  readonly canvasPreviewSessionId?: string;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
 }
@@ -19,6 +20,7 @@ export type GenerateReviewerResult =
   | {
       readonly ok: true;
       readonly reviewer: ReviewerOutput;
+      readonly sourceSnapshotId?: string;
     }
   | {
       readonly ok: false;
@@ -42,6 +44,12 @@ export type GenerateReviewerErrorCode =
   | "provider_configuration_error"
   | "reviewer_validation_failed"
   | "reviewer_generation_failed"
+  | "canvas_preview_session_missing"
+  | "canvas_preview_session_expired"
+  | "canvas_preview_session_not_found"
+  | "canvas_preview_session_invalid"
+  | "source_snapshot_failed"
+  | "source_snapshot_storage_failed"
   | "unknown_api_error";
 
 export interface GenerateReviewerError {
@@ -54,6 +62,7 @@ export interface GenerateReviewerError {
 interface ReviewerGenerateSuccessResponse {
   readonly ok: true;
   readonly reviewer: ReviewerOutput;
+  readonly sourceSnapshotId?: string;
 }
 
 interface ReviewerGenerateErrorResponse {
@@ -94,9 +103,11 @@ export async function generateReviewer(
   }
 
   const sourceTitle = input.sourceTitle?.trim();
+  const canvasPreviewSessionId = input.canvasPreviewSessionId?.trim();
   const requestBody = JSON.stringify({
     sourceText,
     ...(sourceTitle ? { sourceTitle } : {}),
+    ...(canvasPreviewSessionId ? { canvasPreviewSessionId } : {}),
   });
   const abortContext = createAbortContext(input.signal, timeoutMs);
   const startedAt = Date.now();
@@ -197,7 +208,13 @@ async function parseReviewerResponse(
 
   if (isReviewerGenerateSuccessResponse(parsed)) {
     logReviewerApiSuccessSummary(response, startedAt, parsed);
-    return { ok: true, reviewer: parsed.reviewer };
+    return {
+      ok: true,
+      reviewer: parsed.reviewer,
+      ...(parsed.sourceSnapshotId
+        ? { sourceSnapshotId: parsed.sourceSnapshotId }
+        : {}),
+    };
   }
 
   return clientError(
@@ -266,6 +283,12 @@ function mapApiErrorCode(code: string): GenerateReviewerErrorCode {
     case "provider_configuration_error":
     case "reviewer_validation_failed":
     case "reviewer_generation_failed":
+    case "canvas_preview_session_missing":
+    case "canvas_preview_session_expired":
+    case "canvas_preview_session_not_found":
+    case "canvas_preview_session_invalid":
+    case "source_snapshot_failed":
+    case "source_snapshot_storage_failed":
       return code;
     default:
       return "unknown_api_error";
@@ -332,7 +355,13 @@ function looksLikeStackTrace(value: string): boolean {
 function isReviewerGenerateSuccessResponse(
   value: unknown,
 ): value is ReviewerGenerateSuccessResponse {
-  return isRecord(value) && value.ok === true && "reviewer" in value;
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    "reviewer" in value &&
+    (value.sourceSnapshotId === undefined ||
+      typeof value.sourceSnapshotId === "string")
+  );
 }
 
 function isReviewerGenerateErrorResponse(

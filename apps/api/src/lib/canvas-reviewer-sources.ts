@@ -37,6 +37,15 @@ import {
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import { OCR_MAX_IMAGE_BYTES, OCR_MAX_PDF_BYTES } from "@/lib/ocr/upload-policy";
 import { REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS } from "@/lib/reviewer-generation-limits";
+import {
+  CANVAS_HTML_VISIBLE_TEXT_PARSER_VERSION,
+  CANVAS_STORED_FILE_EXTRACTION_VERSION,
+  CANVAS_STORED_IMAGE_OCR_VERSION,
+  CANVAS_STORED_PDF_OCR_VERSION,
+  createCanvasSourcePreviewSession,
+  sha256Utf8Hex,
+  type CanvasSourceManifestItem,
+} from "@/lib/reviewer-source-provenance";
 import type {
   CanvasApiErrorCode,
   CanvasFileIngestionResultStatus,
@@ -132,6 +141,7 @@ export interface CanvasReviewerSourceList {
 }
 
 export interface CanvasReviewerSourcePreview {
+  readonly previewSessionId: string;
   readonly sourceText: string;
   readonly suggestedTitle: string;
   readonly sourceCount: number;
@@ -202,16 +212,20 @@ interface StoredSelectedCanvasCourse {
 interface NormalizedSourceRecord {
   readonly descriptor: CanvasReviewerSourceDescriptor;
   readonly text: string | null;
+  readonly provenance?: CanvasSourceManifestItemBase;
 }
 
 export interface PreviewSourceRecord {
   readonly descriptor: CanvasReviewerSourceDescriptor;
   readonly text: string;
+  readonly provenance: CanvasSourceManifestItemBase;
   readonly fileMetadata?: {
     readonly fileKind: Exclude<CanvasStoredFileKind, "unsupported">;
     readonly pageCount?: number;
   };
 }
+
+type CanvasSourceManifestItemBase = Omit<CanvasSourceManifestItem, "ordinal">;
 
 export function getCanvasReviewerSourceLimits(): CanvasReviewerSourceLimits {
   return {
@@ -388,6 +402,29 @@ export async function previewCanvasReviewerSources({
     };
   }
 
+  const suggestedTitle = buildSuggestedCanvasReviewerTitle(course.value.course.name);
+  const manifest = previewSources.map((source, index) => ({
+    ordinal: index + 1,
+    ...source.provenance,
+  }));
+  const previewSession = await createCanvasSourcePreviewSession({
+    canvasConnectionId: course.value.connection.id,
+    client,
+    courseId: course.value.course.id,
+    manifest,
+    originalPreviewText: sourceText,
+    suggestedTitle,
+    userId,
+  });
+  if (!previewSession.ok) {
+    return {
+      ok: false,
+      status: 500,
+      code: "canvas_storage_failed",
+      message: "Canvas source preview provenance could not be stored.",
+    };
+  }
+
   const courseSync = createCourseSyncSummary({
     ...course.value,
     synchronizedSourcesAvailable: true,
@@ -402,6 +439,7 @@ export async function previewCanvasReviewerSources({
         status: courseSync.status,
       },
       limits: getCanvasReviewerSourceLimits(),
+      previewSessionId: previewSession.value.previewSessionId,
       sourceCount: previewSources.length,
       sources: previewSources.map((source) => ({
         id: source.descriptor.id,
@@ -415,7 +453,7 @@ export async function previewCanvasReviewerSources({
         updatedAt: source.descriptor.updatedAt,
       })),
       sourceText,
-      suggestedTitle: buildSuggestedCanvasReviewerTitle(course.value.course.name),
+      suggestedTitle,
     },
   };
 }
@@ -850,9 +888,11 @@ async function loadPreviewSourceRecords({
   }
 
   const normalized = [
-    ...pages.value.map(mapPageSource),
-    ...assignments.value.map(mapAssignmentSource),
-    ...announcements.value.map(mapAnnouncementSource),
+    ...pages.value.map((row) => mapPagePreviewSource(row, course)),
+    ...assignments.value.map((row) => mapAssignmentPreviewSource(row, course)),
+    ...announcements.value.map((row) =>
+      mapAnnouncementPreviewSource(row, course),
+    ),
     ...files.value.map(mapFileSource),
   ];
   const loadedIds = new Set(normalized.map((source) => source.descriptor.id));
@@ -897,6 +937,13 @@ async function loadPreviewSourceRecords({
     return filePreviewRecord;
   }
 
+  const missingTextProvenance = normalized.find(
+    (source) => source.descriptor.type !== "file" && !source.provenance,
+  );
+  if (missingTextProvenance) {
+    return storageFailure("Canvas source preview provenance could not be built.");
+  }
+
   const fileRecordById = new Map(
     filePreviewRecord?.value
       ? [[filePreviewRecord.value.descriptor.id, filePreviewRecord.value]]
@@ -914,6 +961,7 @@ async function loadPreviewSourceRecords({
       }
       return {
         descriptor: source.descriptor,
+        provenance: source.provenance as CanvasSourceManifestItemBase,
         text: source.text ?? "",
       };
     }),
@@ -965,6 +1013,12 @@ async function extractFilePreviewRecord({
           ? { pageCount: extraction.value.pageCount }
           : {}),
       },
+      provenance: createFileSourceProvenance({
+        course,
+        descriptor,
+        extraction: extraction.value,
+        row: file,
+      }),
       text: extraction.value.text,
     },
   };
@@ -1029,6 +1083,29 @@ function mapPageSource(row: CanvasPageRow): NormalizedSourceRecord {
   };
 }
 
+function mapPagePreviewSource(
+  row: CanvasPageRow,
+  course: CanvasCourseRow,
+): NormalizedSourceRecord {
+  const source = mapPageSource(row);
+  if (!source.text) {
+    return source;
+  }
+  return {
+    ...source,
+    provenance: createHtmlSourceProvenance({
+      canvasSourceObjectId: row.canvas_page_id ?? row.canvas_page_url,
+      canvasUpdatedAt: row.canvas_updated_at,
+      course,
+      descriptor: source.descriptor,
+      localSyncedAt: row.last_synced_at,
+      rowId: row.id,
+      sourceType: "page",
+      text: source.text,
+    }),
+  };
+}
+
 function mapAssignmentSource(row: CanvasAssignmentRow): NormalizedSourceRecord {
   const text = normalizeCanvasHtmlToText(row.description_html);
   return {
@@ -1046,6 +1123,29 @@ function mapAssignmentSource(row: CanvasAssignmentRow): NormalizedSourceRecord {
       updatedAt: row.canvas_updated_at ?? row.last_synced_at ?? row.updated_at,
     },
     text: text.length > 0 ? text : null,
+  };
+}
+
+function mapAssignmentPreviewSource(
+  row: CanvasAssignmentRow,
+  course: CanvasCourseRow,
+): NormalizedSourceRecord {
+  const source = mapAssignmentSource(row);
+  if (!source.text) {
+    return source;
+  }
+  return {
+    ...source,
+    provenance: createHtmlSourceProvenance({
+      canvasSourceObjectId: row.canvas_assignment_id,
+      canvasUpdatedAt: row.canvas_updated_at,
+      course,
+      descriptor: source.descriptor,
+      localSyncedAt: row.last_synced_at,
+      rowId: row.id,
+      sourceType: "assignment",
+      text: source.text,
+    }),
   };
 }
 
@@ -1069,6 +1169,29 @@ function mapAnnouncementSource(row: CanvasAnnouncementRow): NormalizedSourceReco
   };
 }
 
+function mapAnnouncementPreviewSource(
+  row: CanvasAnnouncementRow,
+  course: CanvasCourseRow,
+): NormalizedSourceRecord {
+  const source = mapAnnouncementSource(row);
+  if (!source.text) {
+    return source;
+  }
+  return {
+    ...source,
+    provenance: createHtmlSourceProvenance({
+      canvasSourceObjectId: row.canvas_announcement_id,
+      canvasUpdatedAt: row.posted_at,
+      course,
+      descriptor: source.descriptor,
+      localSyncedAt: row.last_synced_at,
+      rowId: row.id,
+      sourceType: "announcement",
+      text: source.text,
+    }),
+  };
+}
+
 function mapFileSource(row: CanvasFileRow): NormalizedSourceRecord {
   const file = buildCanvasReviewerFileState(row);
   const isReady = file.preparationStatus === "ready";
@@ -1088,6 +1211,93 @@ function mapFileSource(row: CanvasFileRow): NormalizedSourceRecord {
         row.updated_at,
     },
     text: null,
+  };
+}
+
+function createHtmlSourceProvenance({
+  canvasSourceObjectId,
+  canvasUpdatedAt,
+  course,
+  descriptor,
+  localSyncedAt,
+  rowId,
+  sourceType,
+  text,
+}: {
+  readonly canvasSourceObjectId: string | null;
+  readonly canvasUpdatedAt: string | null;
+  readonly course: CanvasCourseRow;
+  readonly descriptor: CanvasReviewerSourceDescriptor;
+  readonly localSyncedAt: string;
+  readonly rowId: string;
+  readonly sourceType: Exclude<CanvasReviewerSourceType, "file">;
+  readonly text: string;
+}): CanvasSourceManifestItemBase {
+  return {
+    canvas_connection_id: course.canvas_connection_id,
+    canvas_course_id: course.canvas_course_id,
+    canvas_source_object_id: canvasSourceObjectId,
+    canvas_updated_at: canvasUpdatedAt,
+    course_id: course.id,
+    file_id: null,
+    file_kind: null,
+    local_synced_at: localSyncedAt,
+    mime_type: null,
+    module_id: null,
+    module_item_id: null,
+    normalized_content_sha256: sha256Utf8Hex(text),
+    ocr_version: null,
+    page_count: null,
+    parser_version: CANVAS_HTML_VISIBLE_TEXT_PARSER_VERSION,
+    source_row_id: rowId,
+    source_title: descriptor.title,
+    source_type: sourceType,
+    stored_content_sha256: null,
+  };
+}
+
+function createFileSourceProvenance({
+  course,
+  descriptor,
+  extraction,
+  row,
+}: {
+  readonly course: CanvasCourseRow;
+  readonly descriptor: CanvasReviewerSourceDescriptor;
+  readonly extraction: {
+    readonly text: string;
+    readonly fileKind: Exclude<CanvasStoredFileKind, "unsupported">;
+    readonly pageCount?: number;
+  };
+  readonly row: CanvasFileRow;
+}): CanvasSourceManifestItemBase {
+  const mimeType =
+    normalizeMimeType(row.stored_content_type) ??
+    normalizeMimeType(row.content_type);
+  return {
+    canvas_connection_id: row.canvas_connection_id,
+    canvas_course_id: row.canvas_course_id || course.canvas_course_id,
+    canvas_source_object_id: row.canvas_file_id,
+    canvas_updated_at: row.canvas_modified_at ?? row.canvas_updated_at,
+    course_id: row.course_id,
+    file_id: row.canvas_file_id,
+    file_kind: extraction.fileKind,
+    local_synced_at: row.last_synced_at,
+    mime_type: mimeType,
+    module_id: null,
+    module_item_id: null,
+    normalized_content_sha256: sha256Utf8Hex(extraction.text),
+    ocr_version:
+      extraction.fileKind === "pdf"
+        ? CANVAS_STORED_PDF_OCR_VERSION
+        : CANVAS_STORED_IMAGE_OCR_VERSION,
+    page_count:
+      typeof extraction.pageCount === "number" ? extraction.pageCount : null,
+    parser_version: CANVAS_STORED_FILE_EXTRACTION_VERSION,
+    source_row_id: row.id,
+    source_title: descriptor.title,
+    source_type: "file",
+    stored_content_sha256: normalizeSha256(row.current_sha256),
   };
 }
 
@@ -2014,6 +2224,11 @@ function isUuid(value: string | undefined): value is string {
         value,
       ),
   );
+}
+
+function normalizeSha256(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && /^[a-f0-9]{64}$/.test(normalized) ? normalized : null;
 }
 
 function isDefined<TValue>(value: TValue | undefined): value is TValue {

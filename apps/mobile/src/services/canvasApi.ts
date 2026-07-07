@@ -262,6 +262,7 @@ export interface CanvasReviewerSourceListPayload {
 }
 
 export interface CanvasReviewerSourcePreviewPayload {
+  readonly previewSessionId: string;
   readonly sourceText: string;
   readonly suggestedTitle: string;
   readonly sourceCount: number;
@@ -1038,6 +1039,7 @@ function parseCanvasReviewerSourcePreviewResponse(
         characterCount: parsed.characterCount,
         courseSync: parsed.courseSync,
         limits: parsed.limits,
+        previewSessionId: parsed.previewSessionId,
         sourceCount: parsed.sourceCount,
         sources: parsed.sources,
         sourceText: parsed.sourceText,
@@ -1461,6 +1463,7 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
     value.ok === true &&
     hasOnlyKeys(value, [
       "ok",
+      "previewSessionId",
       "sourceText",
       "suggestedTitle",
       "sourceCount",
@@ -1469,6 +1472,7 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
       "courseSync",
       "limits",
     ]) &&
+    typeof value.previewSessionId === "string" &&
     typeof value.sourceText === "string" &&
     typeof value.suggestedTitle === "string" &&
     isNonNegativeInteger(value.sourceCount) &&

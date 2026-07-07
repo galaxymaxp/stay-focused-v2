@@ -3,7 +3,12 @@ import type { Database, ReviewerRow } from "@stay-focused/db";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
+import { createCanvasServiceClient } from "@/lib/canvas-db";
 import { createReviewerUserClient } from "@/lib/reviewer-db";
+import {
+  readSafeReviewerSourceProvenanceSummary,
+  verifyReviewerSourceSnapshotForSave,
+} from "@/lib/reviewer-source-provenance";
 import {
   createReviewerInsert,
   mapReviewerSummary,
@@ -87,6 +92,64 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  if (
+    validation.value.sourceMetadata.sourceMode !== "canvas" &&
+    validation.value.sourceSnapshotId
+  ) {
+    return errorResponse(
+      400,
+      "invalid_request",
+      "sourceSnapshotId is only supported for Canvas reviewers.",
+      request,
+    );
+  }
+
+  let sourceProvenance = null;
+  if (validation.value.sourceMetadata.sourceMode === "canvas") {
+    let provenanceClient: ReturnType<typeof createCanvasServiceClient>;
+    try {
+      provenanceClient = createCanvasServiceClient();
+    } catch {
+      return errorResponse(
+        500,
+        "source_snapshot_storage_failed",
+        "Canvas source provenance storage is not configured.",
+        request,
+      );
+    }
+
+    const snapshot = await verifyReviewerSourceSnapshotForSave({
+      client: provenanceClient,
+      sourceCharacterCount:
+        validation.value.sourceMetadata.sourceCharacterCount,
+      sourceSnapshotId: validation.value.sourceSnapshotId,
+      userId: auth.value.user.id,
+    });
+    if (!snapshot.ok) {
+      return errorResponse(
+        snapshot.status === 409 ? 500 : snapshot.status,
+        snapshot.code,
+        snapshot.message,
+        request,
+      );
+    }
+
+    const summary = await readSafeReviewerSourceProvenanceSummary({
+      client: provenanceClient,
+      sourceSnapshotId: snapshot.value.sourceSnapshotId,
+      userId: auth.value.user.id,
+    });
+    if (!summary.ok) {
+      return errorResponse(
+        summary.status === 409 ? 500 : summary.status,
+        summary.code,
+        summary.message,
+        request,
+      );
+    }
+    sourceProvenance = summary.value;
+  }
+
   const { data, error } = await auth.value.client
     .from("reviewers")
     .insert(createReviewerInsert(auth.value.user.id, validation.value))
@@ -110,6 +173,7 @@ export async function POST(request: Request): Promise<Response> {
       reviewer: {
         ...mapReviewerSummary(data as ReviewerRow),
         reviewerOutput: validation.value.reviewerOutput,
+        ...(sourceProvenance ? { sourceProvenance } : {}),
       },
     },
     201,
@@ -192,7 +256,7 @@ async function readJson(
 }
 
 function errorResponse(
-  status: 400 | 401 | 422 | 500,
+  status: 400 | 401 | 404 | 422 | 500,
   code: ReviewerApiErrorCode,
   message: string,
   request?: Request,
@@ -202,7 +266,7 @@ function errorResponse(
 
 function jsonResponse(
   body: ReviewerListResponse | ReviewerDetailResponse,
-  status: 200 | 201 | 400 | 401 | 422 | 500,
+  status: 200 | 201 | 400 | 401 | 404 | 422 | 500,
   request?: Request,
 ): Response {
   return NextResponse.json(body, {

@@ -528,6 +528,7 @@ describe("Canvas mobile API client", () => {
     expect(result).toMatchObject({
       ok: true,
       data: {
+        previewSessionId: "66666666-6666-4666-8666-666666666666",
         sourceText: expect.stringContaining("SOURCE 2 - PDF - Fictional File"),
         suggestedTitle: "Fictional Course - Canvas Reviewer",
         sourceCount: 3,
@@ -547,6 +548,9 @@ describe("Canvas mobile API client", () => {
     expect(JSON.parse(String(lastRequest(fetchImpl).init.body))).toEqual({
       sourceIds,
     });
+    expect(String(lastRequest(fetchImpl).init.body)).not.toContain(
+      "source_manifest",
+    );
   });
 
   it("handles Canvas source count and size validation errors", async () => {
@@ -1191,6 +1195,7 @@ function sourceListResponse() {
 function sourcePreviewResponse() {
   return {
     ok: true,
+    previewSessionId: "66666666-6666-4666-8666-666666666666",
     sourceText:
       "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.\n\nSOURCE 2 - PDF - Fictional File\n\nExtracted text.\n\nSOURCE 3 - ANNOUNCEMENT - Fictional Announcement\n\nAnnouncement text.",
     suggestedTitle: "Fictional Course - Canvas Reviewer",

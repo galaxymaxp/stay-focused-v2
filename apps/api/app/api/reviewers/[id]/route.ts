@@ -3,7 +3,9 @@ import type { Database, ReviewerRow } from "@stay-focused/db";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
+import { createCanvasServiceClient } from "@/lib/canvas-db";
 import { createReviewerUserClient } from "@/lib/reviewer-db";
+import { readSafeReviewerSourceProvenanceSummary } from "@/lib/reviewer-source-provenance";
 import {
   mapReviewerDetail,
   mapReviewerSummary,
@@ -21,9 +23,9 @@ import type {
 export const runtime = "nodejs";
 
 const REVIEWER_DETAIL_COLUMNS =
-  "id,title,source_metadata,reviewer_output,section_count,created_at,updated_at,user_id";
+  "id,title,source_metadata,reviewer_output,source_snapshot_id,section_count,created_at,updated_at,user_id";
 const REVIEWER_SUMMARY_COLUMNS =
-  "id,title,source_metadata,section_count,created_at,updated_at,user_id";
+  "id,title,source_metadata,source_snapshot_id,section_count,created_at,updated_at,user_id";
 const CORS_ALLOWED_METHODS = "GET, PATCH, DELETE, OPTIONS";
 const CORS_ALLOWED_HEADERS = "authorization, content-type";
 const CORS_MAX_AGE_SECONDS = "600";
@@ -71,7 +73,38 @@ export async function GET(
     return notFoundResponse(request);
   }
 
-  const detail = mapReviewerDetail(data as ReviewerRow);
+  let sourceProvenance = null;
+  const row = data as ReviewerRow;
+  if (row.source_snapshot_id) {
+    let provenanceClient: ReturnType<typeof createCanvasServiceClient>;
+    try {
+      provenanceClient = createCanvasServiceClient();
+    } catch {
+      return errorResponse(
+        500,
+        "source_snapshot_storage_failed",
+        "Canvas source provenance storage is not configured.",
+        request,
+      );
+    }
+
+    const provenance = await readSafeReviewerSourceProvenanceSummary({
+      client: provenanceClient,
+      sourceSnapshotId: row.source_snapshot_id,
+      userId: auth.value.user.id,
+    });
+    if (!provenance.ok) {
+      return errorResponse(
+        provenance.status === 409 ? 500 : provenance.status,
+        provenance.code,
+        provenance.message,
+        request,
+      );
+    }
+    sourceProvenance = provenance.value;
+  }
+
+  const detail = mapReviewerDetail(row, sourceProvenance);
   if (!detail.ok) {
     return errorResponse(
       500,

@@ -20,6 +20,17 @@ export interface SavedReviewerSourceMetadata {
   readonly sourceLabel?: string;
 }
 
+export interface SavedReviewerSourceProvenanceSummary {
+  readonly sourceSnapshotId: string;
+  readonly sourceMode: "canvas";
+  readonly sourceTitle: string;
+  readonly sourceCount: number;
+  readonly wasEdited: boolean;
+  readonly generatedAt: string;
+  readonly parserVersions: readonly string[];
+  readonly ocrVersions: readonly string[];
+}
+
 export interface SavedReviewerSummary {
   readonly id: string;
   readonly title: string;
@@ -32,6 +43,7 @@ export interface SavedReviewerSummary {
 export interface SavedReviewerDetail<TReviewerOutput = Json>
   extends SavedReviewerSummary {
   readonly reviewerOutput: TReviewerOutput;
+  readonly sourceProvenance?: SavedReviewerSourceProvenanceSummary;
 }
 
 export type ReviewerRow = Database["public"]["Tables"]["reviewers"]["Row"];
@@ -39,6 +51,18 @@ export type ReviewerInsert =
   Database["public"]["Tables"]["reviewers"]["Insert"];
 export type ReviewerUpdate =
   Database["public"]["Tables"]["reviewers"]["Update"];
+export type CanvasSourcePreviewSessionRow =
+  Database["public"]["Tables"]["canvas_source_preview_sessions"]["Row"];
+export type CanvasSourcePreviewSessionInsert =
+  Database["public"]["Tables"]["canvas_source_preview_sessions"]["Insert"];
+export type ReviewerSourceSnapshotRow =
+  Database["public"]["Tables"]["reviewer_source_snapshots"]["Row"];
+export type ReviewerSourceSnapshotInsert =
+  Database["public"]["Tables"]["reviewer_source_snapshots"]["Insert"];
+export type ReviewerSourceSnapshotItemRow =
+  Database["public"]["Tables"]["reviewer_source_snapshot_items"]["Row"];
+export type ReviewerSourceSnapshotItemInsert =
+  Database["public"]["Tables"]["reviewer_source_snapshot_items"]["Insert"];
 export type CanvasConnectionRow =
   Database["public"]["Tables"]["canvas_connections"]["Row"];
 export type CanvasConnectionInsert =
@@ -195,6 +219,59 @@ export type CanvasCourseSyncPreferencesReplacementResult =
 export interface Database {
   public: {
     Tables: {
+      canvas_source_preview_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          original_preview_text: string;
+          original_preview_sha256: string;
+          suggested_title: string;
+          source_count: number;
+          source_manifest: Json;
+          normalization_version: string;
+          created_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          original_preview_text: string;
+          original_preview_sha256: string;
+          suggested_title: string;
+          source_count: number;
+          source_manifest: Json;
+          normalization_version: string;
+          created_at?: string;
+          expires_at: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          original_preview_text?: string;
+          original_preview_sha256?: string;
+          suggested_title?: string;
+          source_count?: number;
+          source_manifest?: Json;
+          normalization_version?: string;
+          created_at?: string;
+          expires_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_source_preview_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       canvas_capabilities: {
         Row: {
           id: string;
@@ -1682,6 +1759,178 @@ export interface Database {
           },
         ];
       };
+      reviewer_source_snapshots: {
+        Row: {
+          id: string;
+          user_id: string;
+          preview_session_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          source_mode: "canvas";
+          source_title: string;
+          original_preview_sha256: string;
+          exact_source_text: string;
+          exact_source_sha256: string;
+          source_count: number;
+          was_edited: boolean;
+          normalization_version: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          preview_session_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          source_mode?: "canvas";
+          source_title: string;
+          original_preview_sha256: string;
+          exact_source_text: string;
+          exact_source_sha256: string;
+          source_count: number;
+          was_edited: boolean;
+          normalization_version: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          preview_session_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          source_mode?: "canvas";
+          source_title?: string;
+          original_preview_sha256?: string;
+          exact_source_text?: string;
+          exact_source_sha256?: string;
+          source_count?: number;
+          was_edited?: boolean;
+          normalization_version?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviewer_source_snapshots_preview_owner_fkey";
+            columns: [
+              "preview_session_id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_source_preview_sessions";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshots_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reviewer_source_snapshot_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_snapshot_id: string;
+          ordinal: number;
+          source_type: "page" | "assignment" | "announcement" | "file";
+          source_title: string;
+          source_row_id: string | null;
+          canvas_connection_id: string;
+          course_id: string;
+          canvas_course_id: string;
+          canvas_source_object_id: string | null;
+          module_id: string | null;
+          module_item_id: string | null;
+          file_id: string | null;
+          file_kind: "pdf" | "image" | null;
+          mime_type: string | null;
+          page_count: number | null;
+          canvas_updated_at: string | null;
+          local_synced_at: string | null;
+          normalized_content_sha256: string;
+          stored_content_sha256: string | null;
+          parser_version: string | null;
+          ocr_version: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          source_snapshot_id: string;
+          ordinal: number;
+          source_type: "page" | "assignment" | "announcement" | "file";
+          source_title: string;
+          source_row_id?: string | null;
+          canvas_connection_id: string;
+          course_id: string;
+          canvas_course_id: string;
+          canvas_source_object_id?: string | null;
+          module_id?: string | null;
+          module_item_id?: string | null;
+          file_id?: string | null;
+          file_kind?: "pdf" | "image" | null;
+          mime_type?: string | null;
+          page_count?: number | null;
+          canvas_updated_at?: string | null;
+          local_synced_at?: string | null;
+          normalized_content_sha256: string;
+          stored_content_sha256?: string | null;
+          parser_version?: string | null;
+          ocr_version?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          source_snapshot_id?: string;
+          ordinal?: number;
+          source_type?: "page" | "assignment" | "announcement" | "file";
+          source_title?: string;
+          source_row_id?: string | null;
+          canvas_connection_id?: string;
+          course_id?: string;
+          canvas_course_id?: string;
+          canvas_source_object_id?: string | null;
+          module_id?: string | null;
+          module_item_id?: string | null;
+          file_id?: string | null;
+          file_kind?: "pdf" | "image" | null;
+          mime_type?: string | null;
+          page_count?: number | null;
+          canvas_updated_at?: string | null;
+          local_synced_at?: string | null;
+          normalized_content_sha256?: string;
+          stored_content_sha256?: string | null;
+          parser_version?: string | null;
+          ocr_version?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviewer_source_snapshot_items_snapshot_owner_fkey";
+            columns: ["source_snapshot_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshots";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshot_items_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -1689,6 +1938,7 @@ export interface Database {
           title: string;
           source_metadata: Json;
           reviewer_output: Json;
+          source_snapshot_id: string | null;
           section_count: number;
           created_at: string;
           updated_at: string;
@@ -1699,6 +1949,7 @@ export interface Database {
           title: string;
           source_metadata?: Json;
           reviewer_output: Json;
+          source_snapshot_id?: string | null;
           section_count: number;
           created_at?: string;
           updated_at?: string;
@@ -1709,11 +1960,19 @@ export interface Database {
           title?: string;
           source_metadata?: Json;
           reviewer_output?: Json;
+          source_snapshot_id?: string | null;
           section_count?: number;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "reviewers_source_snapshot_owner_fkey";
+            columns: ["source_snapshot_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshots";
+            referencedColumns: ["id", "user_id"];
+          },
           {
             foreignKeyName: "reviewers_user_id_fkey";
             columns: ["user_id"];
@@ -1726,6 +1985,23 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      create_reviewer_source_snapshot: {
+        Args: {
+          p_user_id: string;
+          p_preview_session_id: string;
+          p_source_title: string;
+          p_exact_source_text: string;
+          p_exact_source_sha256: string;
+          p_was_edited: boolean;
+        };
+        Returns: Array<{ id: string }>;
+      };
+      cleanup_expired_canvas_source_preview_sessions: {
+        Args: {
+          p_before?: string;
+        };
+        Returns: number;
+      };
       begin_canvas_sync_run: {
         Args: {
           p_user_id: string;

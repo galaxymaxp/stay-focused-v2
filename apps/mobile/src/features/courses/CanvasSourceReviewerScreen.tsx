@@ -65,6 +65,7 @@ export function CanvasSourceReviewerScreen({
   const [sourceText, setSourceText] = useState("");
   const [sourceTitle, setSourceTitle] = useState("");
   const [reviewer, setReviewer] = useState<ReviewerOutput | null>(null);
+  const [sourceSnapshotId, setSourceSnapshotId] = useState<string | null>(null);
   const [saveTitle, setSaveTitle] = useState("");
   const [savedReviewer, setSavedReviewer] =
     useState<SavedReviewerSummary | null>(null);
@@ -124,6 +125,7 @@ export function CanvasSourceReviewerScreen({
     setError(null);
     setPreview(null);
     setReviewer(null);
+    setSourceSnapshotId(null);
     setSavedReviewer(null);
 
     try {
@@ -247,6 +249,7 @@ export function CanvasSourceReviewerScreen({
     setIsPreviewing(true);
     setError(null);
     setReviewer(null);
+    setSourceSnapshotId(null);
     setSavedReviewer(null);
 
     try {
@@ -260,6 +263,7 @@ export function CanvasSourceReviewerScreen({
         setPreview(result.data);
         setSourceText(result.data.sourceText);
         setSourceTitle(result.data.suggestedTitle);
+        setSourceSnapshotId(null);
         setSaveTitle(result.data.suggestedTitle);
       } else {
         setError(formatCanvasSourceError(result.error));
@@ -297,6 +301,7 @@ export function CanvasSourceReviewerScreen({
     setIsGenerating(true);
     setError(null);
     setReviewer(null);
+    setSourceSnapshotId(null);
     setSavedReviewer(null);
 
     try {
@@ -304,10 +309,12 @@ export function CanvasSourceReviewerScreen({
         ...context.value,
         sourceText: trimmedSourceText,
         ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
+        canvasPreviewSessionId: preview?.previewSessionId,
       });
 
       if (result.ok) {
         setReviewer(result.reviewer);
+        setSourceSnapshotId(result.sourceSnapshotId ?? null);
         setSaveTitle(defaultSaveTitle(result.reviewer, trimmedSourceTitle));
       } else {
         setError(formatGenerateError(result.error));
@@ -326,6 +333,13 @@ export function CanvasSourceReviewerScreen({
     if (!reviewer) {
       return;
     }
+    if (!sourceSnapshotId) {
+      setSaveError({
+        title: "Source snapshot is missing",
+        message: "Generate the Canvas reviewer again before saving.",
+      });
+      return;
+    }
     const trimmedSaveTitle = saveTitle.trim();
     if (!trimmedSaveTitle) {
       setSaveError({
@@ -342,6 +356,7 @@ export function CanvasSourceReviewerScreen({
       const result = await saveReviewer({
         ...context.value,
         reviewerOutput: reviewer,
+        sourceSnapshotId,
         sourceMetadata: {
           sourceCharacterCount: sourceText.trim().length,
           sourceLabel: sourceTitle.trim() || trimmedSaveTitle,
@@ -474,6 +489,9 @@ export function CanvasSourceReviewerScreen({
               onChangeText={(value) => {
                 setSourceTitle(value);
                 setError(null);
+                setReviewer(null);
+                setSourceSnapshotId(null);
+                setSavedReviewer(null);
               }}
               testID="canvas-preview-title-input"
               value={sourceTitle}
@@ -486,6 +504,9 @@ export function CanvasSourceReviewerScreen({
               onChangeText={(value) => {
                 setSourceText(value);
                 setError(null);
+                setReviewer(null);
+                setSourceSnapshotId(null);
+                setSavedReviewer(null);
               }}
               testID="canvas-preview-source-input"
               textAlignVertical="top"
@@ -495,7 +516,12 @@ export function CanvasSourceReviewerScreen({
             <View style={styles.actions}>
               <Button
                 disabled={isGenerating}
-                onPress={() => setPreview(null)}
+                onPress={() => {
+                  setPreview(null);
+                  setReviewer(null);
+                  setSourceSnapshotId(null);
+                  setSavedReviewer(null);
+                }}
                 variant="secondary"
               >
                 Back to sources
@@ -533,6 +559,7 @@ export function CanvasSourceReviewerScreen({
               savedReviewer={savedReviewer}
               saveError={saveError}
               saveTitle={saveTitle}
+              sourceSnapshotReady={sourceSnapshotId !== null}
             />
           ) : null}
 
@@ -704,6 +731,7 @@ function SaveCanvasReviewerPanel({
   savedReviewer,
   saveError,
   saveTitle,
+  sourceSnapshotReady,
 }: {
   readonly isSaving: boolean;
   readonly onChangeTitle: (value: string) => void;
@@ -712,6 +740,7 @@ function SaveCanvasReviewerPanel({
   readonly savedReviewer: SavedReviewerSummary | null;
   readonly saveError: CanvasSourceDisplayError | null;
   readonly saveTitle: string;
+  readonly sourceSnapshotReady: boolean;
 }) {
   return (
     <Card style={styles.formCard} testID="canvas-reviewer-save-card">
@@ -723,6 +752,11 @@ function SaveCanvasReviewerPanel({
         testID="canvas-reviewer-save-title-input"
         value={saveTitle}
       />
+      <Text style={styles.statusText} testID="canvas-source-snapshot-status">
+        {sourceSnapshotReady
+          ? "Source snapshot ready"
+          : "Source snapshot unavailable"}
+      </Text>
       {saveError ? <ErrorCard error={saveError} /> : null}
       {savedReviewer ? (
         <View style={styles.successBox} testID="canvas-reviewer-save-success">
@@ -733,7 +767,11 @@ function SaveCanvasReviewerPanel({
       ) : null}
       <View style={styles.actions}>
         <Button
-          disabled={Boolean(savedReviewer) || saveTitle.trim().length === 0}
+          disabled={
+            Boolean(savedReviewer) ||
+            saveTitle.trim().length === 0 ||
+            !sourceSnapshotReady
+          }
           loading={isSaving}
           onPress={onSave}
           testID="canvas-reviewer-save-button"
@@ -935,6 +973,17 @@ function formatGenerateError(error: GenerateReviewerError): CanvasSourceDisplayE
       detail,
     };
   }
+  if (
+    error.code === "canvas_preview_session_expired" ||
+    error.code === "canvas_preview_session_not_found" ||
+    error.code === "canvas_preview_session_invalid"
+  ) {
+    return {
+      title: "Preview expired",
+      message: "Preview the Canvas sources again before generating.",
+      detail,
+    };
+  }
   return {
     title: "Reviewer generation failed",
     message: error.message,
@@ -947,11 +996,26 @@ function formatLibraryError(error: ReviewerLibraryError): CanvasSourceDisplayErr
     error.status !== undefined
       ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
       : `Details: code ${error.apiCode ?? error.code}.`;
+  if (error.code === "unauthorized") {
+    return {
+      title: "Login session expired",
+      message: error.message,
+      detail,
+    };
+  }
+  if (
+    error.code === "source_snapshot_required" ||
+    error.code === "source_snapshot_not_found" ||
+    error.code === "source_snapshot_metadata_mismatch"
+  ) {
+    return {
+      title: "Generate again before saving",
+      message: error.message,
+      detail,
+    };
+  }
   return {
-    title:
-      error.code === "unauthorized"
-        ? "Login session expired"
-        : "Reviewer could not be saved",
+    title: "Reviewer could not be saved",
     message: error.message,
     detail,
   };

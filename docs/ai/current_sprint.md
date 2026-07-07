@@ -58,8 +58,13 @@ sources are complete and protected-live validated: students can prepare
 eligible Canvas PDFs/images through the existing ingestion boundary, select one
 ready OCR-backed file with stored text sources, preview private Storage-backed
 OCR text, edit before generation, and save through the existing Study Library.
-The next roadmap task is Phase 5D - Source Normalization, Provenance, And
-Selective Import.
+Phase 5D.1 immutable source snapshots and exact reviewer provenance is
+implemented and remotely verified: Canvas preview creates private preview
+sessions, successful generation creates immutable source snapshots, Canvas
+reviewer save requires an owned snapshot, and reviewer detail returns a safe
+provenance summary. Protected live validation is blocked pending rotation of
+previously exposed local credentials. The next roadmap task is Phase 5D.2 -
+Structured Normalized Blocks And Selective Import.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -481,9 +486,62 @@ There is no school-wide Canvas token.
 - Audio/video transcription.
 - Canvas Studio support.
 - Discussions, quizzes, submissions, grades, rubrics, and feedback.
-- Full persistent Canvas source provenance.
+- Structured block-level source provenance beyond the Phase 5D.1 snapshot
+  foundation.
 - Background, queued, scheduled, or resumable synchronization.
 - Canvas OAuth, task generation, and schedule generation.
+
+## Completed Phase 5D.1 Scope
+
+- Added private Canvas source preview sessions that store the exact original
+  assembled preview text, original preview hash, suggested title, source count,
+  ordered server-authoritative manifest, normalization version, and expiry.
+- Added immutable reviewer source snapshots that store the exact edited source
+  text sent to the reviewer engine, exact edited-text hash, original preview
+  hash, edit state, source count, title, normalization version, and originating
+  preview session.
+- Added ordered source snapshot items for Pages, assignments, announcements,
+  PDFs, PNGs, and JPEGs with available Canvas identities, timestamps,
+  normalized content hashes, parser versions, OCR versions, MIME, file kind,
+  and PDF page count.
+- Added nullable `reviewers.source_snapshot_id` with database-enforced
+  same-owner linkage. Historical and non-Canvas reviewers remain valid without
+  fake backfill.
+- Extended Canvas preview to return only opaque `previewSessionId` in addition
+  to the existing preview text/title/count.
+- Extended reviewer generation to accept optional `canvasPreviewSessionId`,
+  validate ownership and expiry, send only `sourceText` and `sourceTitle` to
+  the provider boundary, and return only opaque `sourceSnapshotId` after
+  successful generation.
+- Extended Canvas reviewer save to require an owned matching `sourceSnapshotId`
+  and extended detail responses with a safe provenance summary only.
+- Added mobile state handling so source edits or source-selection changes
+  invalidate stale generated reviewers and snapshot ids.
+- Added Study Library detail provenance UI for safe source count, edit state,
+  parser versions, and OCR version categories.
+- Added rollback-safe SQL verification for provenance tables, grants, RLS,
+  ownership constraints, immutability, duplicate ordinal rejection, reviewer
+  deletion, and Canvas disconnect preservation.
+
+## Phase 5D.1 Results
+
+- Migrations `202607070001_add_reviewer_source_provenance.sql`,
+  `202607070002_harden_reviewer_source_provenance_functions.sql`, and
+  `202607070003_enforce_snapshot_item_context.sql` are applied remotely.
+- Automated verification passed: Canvas typecheck/build/tests 52/52; DB
+  typecheck passed; OCR typecheck/build/tests 14/14; API typecheck/build/tests
+  284/284; mobile typecheck/tests 93/93; engine typecheck/build/evals 266/266;
+  root typecheck/build 7/7 with 4 cached and 3 fresh tasks; workspace tests API
+  284/284, mobile 93/93, Canvas 52/52, OCR 14/14.
+- Remote SQL verification passed through
+  `scripts/phase5d1-source-provenance-verification.sql` with rollback-only
+  fictional data.
+- Supabase security advisors showed no new Phase 5D.1 findings after the
+  follow-up function search-path hardening migration. Remaining advisor
+  warnings are historical.
+- The rollback verifier also covers snapshot item context mismatch rejection.
+- Protected live validation is blocked pending confirmed rotation of previously
+  exposed local credentials.
 
 ## Out Of Scope For Phase 3D Validation Documentation
 
@@ -1172,6 +1230,9 @@ ingestion foundation is remotely and live validated with a documented
 account-wide synchronous route-duration limitation. Phase 5C.2A1
 selected-course synchronization is complete and runtime-safe in local
 production validation. Phase 5C.2A2 Canvas source selection and reviewer
-handoff is complete and live validated. The recommended next roadmap task is
-Phase 5D - Source Normalization, Provenance, And Selective Import. The deferred
-header/footer cleanup task remains separate.
+handoff is complete and live validated. Phase 5C.2B Canvas PDF/image OCR
+sources are complete and live validated. Phase 5D.1 immutable source snapshots
+and exact reviewer provenance is implemented and remotely verified, with
+protected live validation blocked pending credential rotation. The recommended
+next roadmap task is Phase 5D.2 - Structured Normalized Blocks And Selective
+Import. The deferred header/footer cleanup task remains separate.

@@ -19,6 +19,17 @@ export interface SavedReviewerSourceMetadata {
   readonly sourceLabel?: string;
 }
 
+export interface SavedReviewerSourceProvenanceSummary {
+  readonly sourceSnapshotId: string;
+  readonly sourceMode: "canvas";
+  readonly sourceTitle: string;
+  readonly sourceCount: number;
+  readonly wasEdited: boolean;
+  readonly generatedAt: string;
+  readonly parserVersions: readonly string[];
+  readonly ocrVersions: readonly string[];
+}
+
 export interface SavedReviewerSummary {
   readonly id: string;
   readonly title: string;
@@ -30,6 +41,7 @@ export interface SavedReviewerSummary {
 
 export interface SavedReviewerDetail extends SavedReviewerSummary {
   readonly reviewerOutput: ReviewerOutput;
+  readonly sourceProvenance?: SavedReviewerSourceProvenanceSummary;
 }
 
 export interface ReviewerLibraryBaseInput {
@@ -43,6 +55,7 @@ export interface SaveReviewerInput extends ReviewerLibraryBaseInput {
   readonly title: string;
   readonly sourceMetadata: SavedReviewerSourceMetadata;
   readonly reviewerOutput: ReviewerOutput;
+  readonly sourceSnapshotId?: string;
 }
 
 export interface ReviewerIdInput extends ReviewerLibraryBaseInput {
@@ -77,6 +90,11 @@ export type ReviewerLibraryErrorCode =
   | "reviewer_not_found"
   | "reviewer_storage_not_configured"
   | "reviewer_storage_failed"
+  | "source_snapshot_not_found"
+  | "source_snapshot_ownership_mismatch"
+  | "source_snapshot_required"
+  | "source_snapshot_metadata_mismatch"
+  | "source_snapshot_storage_failed"
   | "unknown_api_error";
 
 export interface ReviewerLibraryError {
@@ -150,6 +168,7 @@ export async function saveReviewer(
       title,
       sourceMetadata: input.sourceMetadata,
       reviewerOutput: input.reviewerOutput,
+      ...(input.sourceSnapshotId ? { sourceSnapshotId: input.sourceSnapshotId } : {}),
     },
     parseSuccess: parseReviewerDetailResponse,
   });
@@ -418,6 +437,11 @@ function mapApiErrorCode(code: string): ReviewerLibraryErrorCode {
     case "reviewer_not_found":
     case "reviewer_storage_not_configured":
     case "reviewer_storage_failed":
+    case "source_snapshot_not_found":
+    case "source_snapshot_ownership_mismatch":
+    case "source_snapshot_required":
+    case "source_snapshot_metadata_mismatch":
+    case "source_snapshot_storage_failed":
       return code;
     case "invalid_json":
     case "invalid_request":
@@ -496,7 +520,9 @@ function isReviewerDetailSuccessResponse(
     value.ok === true &&
     isSavedReviewerSummary(value.reviewer) &&
     isRecord(value.reviewer) &&
-    "reviewerOutput" in value.reviewer
+    "reviewerOutput" in value.reviewer &&
+    (value.reviewer.sourceProvenance === undefined ||
+      isSavedReviewerSourceProvenanceSummary(value.reviewer.sourceProvenance))
   );
 }
 
@@ -543,6 +569,24 @@ function isSourceMetadata(value: unknown): value is SavedReviewerSourceMetadata 
     typeof value.sourceCharacterCount === "number" &&
     (value.pdfPageCount === undefined || typeof value.pdfPageCount === "number") &&
     (value.sourceLabel === undefined || typeof value.sourceLabel === "string")
+  );
+}
+
+function isSavedReviewerSourceProvenanceSummary(
+  value: unknown,
+): value is SavedReviewerSourceProvenanceSummary {
+  return (
+    isRecord(value) &&
+    typeof value.sourceSnapshotId === "string" &&
+    value.sourceMode === "canvas" &&
+    typeof value.sourceTitle === "string" &&
+    typeof value.sourceCount === "number" &&
+    typeof value.wasEdited === "boolean" &&
+    typeof value.generatedAt === "string" &&
+    Array.isArray(value.parserVersions) &&
+    value.parserVersions.every((entry) => typeof entry === "string") &&
+    Array.isArray(value.ocrVersions) &&
+    value.ocrVersions.every((entry) => typeof entry === "string")
   );
 }
 

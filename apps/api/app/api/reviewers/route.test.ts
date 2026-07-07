@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  createCanvasServiceClient: vi.fn(),
   createReviewerUserClient: vi.fn(),
+  readSafeReviewerSourceProvenanceSummary: vi.fn(),
   verifyBearerToken: vi.fn(),
+  verifyReviewerSourceSnapshotForSave: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -13,12 +16,31 @@ vi.mock("@/lib/reviewer-db", () => ({
   createReviewerUserClient: mocks.createReviewerUserClient,
 }));
 
+vi.mock("@/lib/canvas-db", () => ({
+  createCanvasServiceClient: mocks.createCanvasServiceClient,
+}));
+
+vi.mock("@/lib/reviewer-source-provenance", () => ({
+  readSafeReviewerSourceProvenanceSummary:
+    mocks.readSafeReviewerSourceProvenanceSummary,
+  verifyReviewerSourceSnapshotForSave: mocks.verifyReviewerSourceSnapshotForSave,
+}));
+
 const { GET, OPTIONS, POST } = await import("./route");
 
 describe("/api/reviewers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.verifyBearerToken.mockResolvedValue({ id: "user-1" });
+    mocks.createCanvasServiceClient.mockReturnValue({ from: vi.fn() });
+    mocks.verifyReviewerSourceSnapshotForSave.mockResolvedValue({
+      ok: true,
+      value: { sourceSnapshotId: "22222222-2222-4222-8222-222222222222" },
+    });
+    mocks.readSafeReviewerSourceProvenanceSummary.mockResolvedValue({
+      ok: true,
+      value: sourceProvenanceSummary(),
+    });
   });
 
   it("returns local web CORS headers for reviewer library preflight", () => {
@@ -139,6 +161,106 @@ describe("/api/reviewers", () => {
       section_count: 1,
     });
     expect(JSON.stringify(client.insertPayload)).not.toContain("user-2");
+  });
+
+  it("saves a Canvas reviewer only after verifying an owned source snapshot", async () => {
+    const client = createInsertClient({ row: reviewerRow({ sourceMode: "canvas" }) });
+    mocks.createReviewerUserClient.mockReturnValue(client);
+
+    const response = await POST(
+      createRequest({
+        body: {
+          title: "Canvas Reviewer",
+          sourceMetadata: canvasSourceMetadata(),
+          sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          reviewerOutput: reviewerOutput(),
+        },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(mocks.verifyReviewerSourceSnapshotForSave).toHaveBeenCalledWith({
+      client: expect.anything(),
+      sourceCharacterCount: 42,
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      userId: "user-1",
+    });
+    expect(client.insertPayload).toMatchObject({
+      source_snapshot_id: "22222222-2222-4222-8222-222222222222",
+      user_id: "user-1",
+    });
+    expect(body.reviewer.sourceProvenance).toMatchObject({
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      sourceCount: 2,
+      wasEdited: true,
+    });
+    expect(JSON.stringify(body)).not.toContain("exact_source_text");
+    expect(JSON.stringify(body)).not.toContain("sha256");
+  });
+
+  it("rejects Canvas reviewer saves without a source snapshot", async () => {
+    mocks.verifyReviewerSourceSnapshotForSave.mockResolvedValue({
+      ok: false,
+      status: 422,
+      code: "source_snapshot_required",
+      message: "Canvas reviewer saves require a generated source snapshot.",
+    });
+
+    const response = await POST(
+      createRequest({
+        body: {
+          title: "Canvas Reviewer",
+          sourceMetadata: canvasSourceMetadata(),
+          reviewerOutput: reviewerOutput(),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expectError(response, "source_snapshot_required");
+  });
+
+  it("rejects Canvas reviewer saves when snapshot metadata does not match", async () => {
+    mocks.verifyReviewerSourceSnapshotForSave.mockResolvedValue({
+      ok: false,
+      status: 422,
+      code: "source_snapshot_metadata_mismatch",
+      message: "Canvas source snapshot metadata does not match the reviewer.",
+    });
+
+    const response = await POST(
+      createRequest({
+        body: {
+          title: "Canvas Reviewer",
+          sourceMetadata: canvasSourceMetadata(),
+          sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          reviewerOutput: reviewerOutput(),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expectError(response, "source_snapshot_metadata_mismatch");
+  });
+
+  it("rejects source snapshot IDs on non-Canvas reviewer saves", async () => {
+    mocks.createReviewerUserClient.mockReturnValue(createInsertClient({ row: reviewerRow() }));
+
+    const response = await POST(
+      createRequest({
+        body: {
+          title: "Study Habits",
+          sourceMetadata: sourceMetadata(),
+          sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          reviewerOutput: reviewerOutput(),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expectError(response, "invalid_request");
+    expect(mocks.verifyReviewerSourceSnapshotForSave).not.toHaveBeenCalled();
   });
 
   it("rejects client-supplied user ownership", async () => {
@@ -322,13 +444,40 @@ function sourceMetadata() {
   };
 }
 
-function reviewerRow() {
+function canvasSourceMetadata() {
+  return {
+    sourceMode: "canvas",
+    sourceCharacterCount: 42,
+    sourceLabel: "Canvas Reviewer",
+  };
+}
+
+function sourceProvenanceSummary() {
+  return {
+    sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+    sourceMode: "canvas",
+    sourceTitle: "Canvas Reviewer",
+    sourceCount: 2,
+    wasEdited: true,
+    generatedAt: "2026-07-07T00:10:00.000Z",
+    parserVersions: ["canvas-html-visible-text-v1"],
+    ocrVersions: ["canvas-stored-image-ocr-v1"],
+  };
+}
+
+function reviewerRow(options: { readonly sourceMode?: "paste" | "canvas" } = {}) {
+  const metadata =
+    options.sourceMode === "canvas" ? canvasSourceMetadata() : sourceMetadata();
   return {
     id: "11111111-1111-4111-8111-111111111111",
     user_id: "user-1",
     title: "Study Habits",
-    source_metadata: sourceMetadata(),
+    source_metadata: metadata,
     reviewer_output: reviewerOutput(),
+    source_snapshot_id:
+      options.sourceMode === "canvas"
+        ? "22222222-2222-4222-8222-222222222222"
+        : null,
     section_count: 1,
     created_at: "2026-07-05T00:00:00.000Z",
     updated_at: "2026-07-05T00:01:00.000Z",

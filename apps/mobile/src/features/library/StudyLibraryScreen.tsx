@@ -24,6 +24,7 @@ import {
   type ReviewerLibraryError,
   type SavedReviewerDetail,
   type SavedReviewerSummary,
+  type SavedReviewerSourceProvenanceSummary,
   type SavedReviewerSourceMode,
 } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
@@ -283,6 +284,10 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
         {error ? <ErrorCard error={error} /> : null}
         {successMessage ? <SuccessCard message={successMessage} /> : null}
 
+        {openedReviewer.sourceProvenance ? (
+          <SourceProvenanceCard summary={openedReviewer.sourceProvenance} />
+        ) : null}
+
         <ReviewerPreview reviewer={openedReviewer.reviewerOutput} />
       </Screen>
     );
@@ -454,6 +459,27 @@ function SuccessCard({ message }: { readonly message: string }) {
   );
 }
 
+function SourceProvenanceCard({
+  summary,
+}: {
+  readonly summary: SavedReviewerSourceProvenanceSummary;
+}) {
+  return (
+    <Card style={styles.statusCard} testID="study-library-source-provenance">
+      <Text style={styles.statusTitle}>Canvas source provenance</Text>
+      <Text style={styles.statusText}>
+        {summary.sourceCount} sources - {summary.wasEdited ? "edited" : "unchanged"}
+      </Text>
+      <Text style={styles.statusText}>
+        Parsers: {formatVersionList(summary.parserVersions)}
+      </Text>
+      <Text style={styles.statusText}>
+        OCR: {formatVersionList(summary.ocrVersions)}
+      </Text>
+    </Card>
+  );
+}
+
 function createRequestContext(accessToken: string | undefined):
   | {
       readonly ok: true;
@@ -550,6 +576,10 @@ function formatSourceMode(sourceMode: SavedReviewerSourceMode): string {
 
 function formatSectionCount(sectionCount: number): string {
   return `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}`;
+}
+
+function formatVersionList(values: readonly string[]): string {
+  return values.length > 0 ? values.join(", ") : "none";
 }
 
 function formatDate(value: string): string {

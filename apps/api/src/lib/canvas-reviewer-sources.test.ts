@@ -31,6 +31,7 @@ const ASSIGNMENT_ID = "22222222-2222-4222-8222-222222222222";
 const ANNOUNCEMENT_ID = "33333333-3333-4333-8333-333333333333";
 const FILE_ID = "44444444-4444-4444-8444-444444444444";
 const OTHER_FILE_ID = "44444444-4444-4444-8444-444444444445";
+const PREVIEW_SESSION_ID = "66666666-6666-4666-8666-666666666666";
 const NOW = "2026-07-07T00:00:00.000Z";
 
 describe("Canvas reviewer source normalization", () => {
@@ -311,6 +312,7 @@ describe("Canvas reviewer source service", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(result.value.previewSessionId).toBe(PREVIEW_SESSION_ID);
     expect(result.value.sources.map((source) => source.id)).toEqual([
       `assignment:${ASSIGNMENT_ID}`,
       `page:${PAGE_ID}`,
@@ -320,6 +322,8 @@ describe("Canvas reviewer source service", () => {
     );
     expect(result.value.sourceText).not.toContain(ASSIGNMENT_ID);
     expect(result.value.sourceText).not.toContain(PAGE_ID);
+    expect(JSON.stringify(result.value)).not.toContain("source_manifest");
+    expect(JSON.stringify(result.value)).not.toContain("sha256");
   });
 
   it("rejects duplicate IDs before reading storage", async () => {
@@ -420,6 +424,49 @@ describe("Canvas reviewer source service", () => {
     expect(provider.calls).toHaveLength(1);
     expect(JSON.stringify(result.value)).not.toContain("storage_object_key");
     expect(JSON.stringify(result.value)).not.toContain("current_sha256");
+
+    const session = fake.insertedRowsFor("canvas_source_preview_sessions")[0];
+    expect(session).toMatchObject({
+      id: PREVIEW_SESSION_ID,
+      user_id: USER_ID,
+      canvas_connection_id: CONNECTION_ID,
+      course_id: COURSE_ID,
+      original_preview_text: result.value.sourceText,
+      original_preview_sha256: createHash("sha256")
+        .update(result.value.sourceText, "utf8")
+        .digest("hex"),
+      source_count: 3,
+      suggested_title: "Fictional Biology - Canvas Reviewer",
+      normalization_version: "canvas-source-preview-v1",
+    });
+    const manifest = session.source_manifest as readonly FakeRecord[];
+    expect(manifest.map((item) => item.ordinal)).toEqual([1, 2, 3]);
+    expect(manifest.map((item) => item.source_type)).toEqual([
+      "page",
+      "file",
+      "announcement",
+    ]);
+    expect(manifest[0]).toMatchObject({
+      parser_version: "canvas-html-visible-text-v1",
+      ocr_version: null,
+      source_row_id: PAGE_ID,
+    });
+    expect(manifest[1]).toMatchObject({
+      file_kind: "pdf",
+      ocr_version: "canvas-stored-pdf-ocr-v1",
+      page_count: 2,
+      parser_version: "canvas-stored-file-extraction-v1",
+      source_row_id: FILE_ID,
+    });
+    expect(manifest[2]).toMatchObject({
+      parser_version: "canvas-html-visible-text-v1",
+      source_row_id: ANNOUNCEMENT_ID,
+    });
+    for (const item of manifest) {
+      expect(item.normalized_content_sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(item).not.toHaveProperty("storage_bucket");
+      expect(item).not.toHaveProperty("storage_object_key");
+    }
   });
 
   it("rejects two file sources before reading Storage or invoking OCR", async () => {
@@ -583,11 +630,38 @@ function source(
       unavailableReason: null,
       updatedAt: "2026-07-07T00:00:00.000Z",
     },
+    provenance: {
+      canvas_connection_id: CONNECTION_ID,
+      canvas_course_id: "101",
+      canvas_source_object_id: "fictional-source",
+      canvas_updated_at: NOW,
+      course_id: COURSE_ID,
+      file_id: null,
+      file_kind: null,
+      local_synced_at: NOW,
+      mime_type: null,
+      module_id: null,
+      module_item_id: null,
+      normalized_content_sha256: createHash("sha256")
+        .update("Readable study text.", "utf8")
+        .digest("hex"),
+      ocr_version: null,
+      page_count: null,
+      parser_version: "canvas-html-visible-text-v1",
+      source_row_id: id.split(":")[1] ?? null,
+      source_title: title,
+      source_type: type,
+      stored_content_sha256: null,
+    },
     text: "Readable study text.",
   };
 }
 
 type FakeRecord = Readonly<Record<string, unknown>>;
+
+function isRecord(value: unknown): value is FakeRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 interface FakeCall {
   readonly table: string;
@@ -606,6 +680,7 @@ interface FakeQueryResult {
 
 class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
   private filters: Array<(row: FakeRecord) => boolean> = [];
+  private insertedRows: readonly FakeRecord[] | null = null;
   private limitCount: number | null = null;
   private orders: Array<{
     readonly column: string;
@@ -618,6 +693,7 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     private readonly tableName: string,
     private readonly rows: readonly FakeRecord[],
     private readonly calls: FakeCall[],
+    private readonly capturedInserts: Map<string, FakeRecord[]>,
   ) {}
 
   public select(columns: string): this {
@@ -626,6 +702,26 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
       selectedColumns: columns,
       table: this.tableName,
     });
+    return this;
+  }
+
+  public insert(value: unknown): this {
+    const rows = (Array.isArray(value) ? value : [value]).map((entry, index) => {
+      const record = isRecord(entry) ? entry : {};
+      return {
+        id:
+          typeof record.id === "string"
+            ? record.id
+            : index === 0
+              ? PREVIEW_SESSION_ID
+              : `${PREVIEW_SESSION_ID}-${index}`,
+        ...record,
+      };
+    });
+    this.insertedRows = rows;
+    const tableRows = this.capturedInserts.get(this.tableName) ?? [];
+    tableRows.push(...rows);
+    this.capturedInserts.set(this.tableName, tableRows);
     return this;
   }
 
@@ -670,6 +766,14 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     };
   }
 
+  public async single(): Promise<FakeQueryResult> {
+    const rows = this.insertedRows ?? this.executeRows();
+    return {
+      data: rows[0] ?? null,
+      error: null,
+    };
+  }
+
   public then<TResult1 = FakeQueryResult, TResult2 = never>(
     onfulfilled?:
       | ((value: FakeQueryResult) => TResult1 | PromiseLike<TResult1>)
@@ -683,6 +787,9 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
   }
 
   private executeRows(): readonly FakeRecord[] {
+    if (this.insertedRows) {
+      return this.insertedRows;
+    }
     const filtered = this.rows.filter((row) =>
       this.filters.every((filter) => filter(row)),
     );
@@ -739,10 +846,12 @@ function createFakeCanvasClient(
 ): {
   readonly calls: readonly FakeCall[];
   readonly client: SupabaseClient<Database>;
+  readonly insertedRowsFor: (table: string) => readonly FakeRecord[];
   readonly selectedColumnsFor: (table: string) => readonly string[];
   readonly storageCalls: readonly FakeStorageCall[];
 } {
   const calls: FakeCall[] = [];
+  const capturedInserts = new Map<string, FakeRecord[]>();
   const storageCalls: FakeStorageCall[] = [];
   const storageObjects = new Map(storageEntries);
   const tables = {
@@ -751,7 +860,12 @@ function createFakeCanvasClient(
   };
   const client = {
     from: (tableName: string) =>
-      new FakeSupabaseQuery(tableName, tables[tableName] ?? [], calls),
+      new FakeSupabaseQuery(
+        tableName,
+        tables[tableName] ?? [],
+        calls,
+        capturedInserts,
+      ),
     storage: {
       from: (bucket: string) => ({
         download: async (key: string) => {
@@ -779,6 +893,7 @@ function createFakeCanvasClient(
   return {
     calls,
     client,
+    insertedRowsFor: (table) => capturedInserts.get(table) ?? [],
     selectedColumnsFor: (table) =>
       calls
         .filter((call) => call.table === table)

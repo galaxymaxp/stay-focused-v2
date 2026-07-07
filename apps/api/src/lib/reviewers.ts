@@ -3,8 +3,10 @@ import type {
   Json,
   ReviewerInsert,
   ReviewerRow,
+  SavedReviewerDetail,
   SavedReviewerSourceMetadata,
   SavedReviewerSourceMode,
+  SavedReviewerSourceProvenanceSummary,
   SavedReviewerSummary,
 } from "@stay-focused/db";
 
@@ -30,6 +32,7 @@ export interface ValidatedCreateReviewerRequest {
   readonly title: string;
   readonly sourceMetadata: SavedReviewerSourceMetadata;
   readonly reviewerOutput: ReviewerOutput;
+  readonly sourceSnapshotId?: string;
   readonly sectionCount: number;
 }
 
@@ -97,12 +100,20 @@ export function validateCreateReviewerRequest(
     };
   }
 
+  const sourceSnapshotId = validateOptionalSourceSnapshotId(
+    body.sourceSnapshotId,
+  );
+  if (!sourceSnapshotId.ok) {
+    return sourceSnapshotId;
+  }
+
   return {
     ok: true,
     value: {
       title: title.value,
       sourceMetadata: sourceMetadata.value,
       reviewerOutput: body.reviewerOutput,
+      ...(sourceSnapshotId.value ? { sourceSnapshotId: sourceSnapshotId.value } : {}),
       sectionCount: body.reviewerOutput.sections.length,
     },
   };
@@ -146,6 +157,9 @@ export function createReviewerInsert(
     user_id: userId,
     title: value.title,
     source_metadata: sourceMetadataToJson(value.sourceMetadata),
+    ...(value.sourceSnapshotId
+      ? { source_snapshot_id: value.sourceSnapshotId }
+      : {}),
     reviewer_output: value.reviewerOutput as unknown as Json,
     section_count: value.sectionCount,
   };
@@ -164,8 +178,9 @@ export function mapReviewerSummary(row: ReviewerRow): SavedReviewerSummary {
 
 export function mapReviewerDetail(
   row: ReviewerRow,
+  sourceProvenance?: SavedReviewerSourceProvenanceSummary | null,
 ):
-  | { readonly ok: true; readonly value: SavedReviewerSummary & { readonly reviewerOutput: ReviewerOutput } }
+  | { readonly ok: true; readonly value: SavedReviewerDetail<ReviewerOutput> }
   | { readonly ok: false } {
   if (!isReviewerOutput(row.reviewer_output)) {
     return { ok: false };
@@ -176,6 +191,7 @@ export function mapReviewerDetail(
     value: {
       ...mapReviewerSummary(row),
       reviewerOutput: row.reviewer_output,
+      ...(sourceProvenance ? { sourceProvenance } : {}),
     },
   };
 }
@@ -317,6 +333,18 @@ function validateSourceMetadata(
         : {}),
     },
   };
+}
+
+function validateOptionalSourceSnapshotId(
+  value: unknown,
+): RequestValidation<string | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (typeof value !== "string" || !validateReviewerId(value)) {
+    return invalidRequest("sourceSnapshotId must be a valid UUID when provided.");
+  }
+  return { ok: true, value: value.trim() };
 }
 
 function coerceSourceMetadata(value: Json): SavedReviewerSourceMetadata {

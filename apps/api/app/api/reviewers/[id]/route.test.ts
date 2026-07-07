@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  createCanvasServiceClient: vi.fn(),
   createReviewerUserClient: vi.fn(),
+  readSafeReviewerSourceProvenanceSummary: vi.fn(),
   verifyBearerToken: vi.fn(),
 }));
 
@@ -13,6 +15,15 @@ vi.mock("@/lib/reviewer-db", () => ({
   createReviewerUserClient: mocks.createReviewerUserClient,
 }));
 
+vi.mock("@/lib/canvas-db", () => ({
+  createCanvasServiceClient: mocks.createCanvasServiceClient,
+}));
+
+vi.mock("@/lib/reviewer-source-provenance", () => ({
+  readSafeReviewerSourceProvenanceSummary:
+    mocks.readSafeReviewerSourceProvenanceSummary,
+}));
+
 const { DELETE, GET, PATCH } = await import("./route");
 
 const REVIEWER_ID = "11111111-1111-4111-8111-111111111111";
@@ -21,6 +32,11 @@ describe("/api/reviewers/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.verifyBearerToken.mockResolvedValue({ id: "user-1" });
+    mocks.createCanvasServiceClient.mockReturnValue({ from: vi.fn() });
+    mocks.readSafeReviewerSourceProvenanceSummary.mockResolvedValue({
+      ok: true,
+      value: sourceProvenanceSummary(),
+    });
   });
 
   it.each([
@@ -57,6 +73,30 @@ describe("/api/reviewers/[id]", () => {
         reviewerOutput: { id: "reviewer-output-1" },
       },
     });
+  });
+
+  it("returns a safe provenance summary for Canvas reviewers", async () => {
+    mocks.createReviewerUserClient.mockReturnValue(
+      createReadClient({ row: reviewerRow({ sourceMode: "canvas" }) }),
+    );
+
+    const response = await GET(createRequest(), routeContext(REVIEWER_ID));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mocks.readSafeReviewerSourceProvenanceSummary).toHaveBeenCalledWith({
+      client: expect.anything(),
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      userId: "user-1",
+    });
+    expect(body.reviewer.sourceProvenance).toMatchObject({
+      sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+      sourceCount: 2,
+      wasEdited: true,
+    });
+    expect(JSON.stringify(body)).not.toContain("exact_source_text");
+    expect(JSON.stringify(body)).not.toContain("original_preview_sha256");
+    expect(JSON.stringify(body)).not.toContain("normalized_content_sha256");
   });
 
   it("returns the same safe 404 for missing or inaccessible reviewers", async () => {
@@ -237,13 +277,39 @@ function sourceMetadata() {
   };
 }
 
-function reviewerRow() {
+function canvasSourceMetadata() {
+  return {
+    sourceMode: "canvas",
+    sourceCharacterCount: 42,
+    sourceLabel: "Canvas Reviewer",
+  };
+}
+
+function sourceProvenanceSummary() {
+  return {
+    sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+    sourceMode: "canvas",
+    sourceTitle: "Canvas Reviewer",
+    sourceCount: 2,
+    wasEdited: true,
+    generatedAt: "2026-07-07T00:10:00.000Z",
+    parserVersions: ["canvas-html-visible-text-v1"],
+    ocrVersions: ["canvas-stored-image-ocr-v1"],
+  };
+}
+
+function reviewerRow(options: { readonly sourceMode?: "paste" | "canvas" } = {}) {
   return {
     id: REVIEWER_ID,
     user_id: "user-1",
     title: "Study Habits",
-    source_metadata: sourceMetadata(),
+    source_metadata:
+      options.sourceMode === "canvas" ? canvasSourceMetadata() : sourceMetadata(),
     reviewer_output: reviewerOutput(),
+    source_snapshot_id:
+      options.sourceMode === "canvas"
+        ? "22222222-2222-4222-8222-222222222222"
+        : null,
     section_count: 1,
     created_at: "2026-07-05T00:00:00.000Z",
     updated_at: "2026-07-05T00:01:00.000Z",

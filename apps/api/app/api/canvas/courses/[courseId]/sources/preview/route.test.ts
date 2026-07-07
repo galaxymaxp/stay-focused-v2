@@ -87,6 +87,7 @@ describe("POST /api/canvas/courses/[courseId]/sources/preview", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       ok: true,
+      previewSessionId: "33333333-3333-4333-8333-333333333333",
       sourceCount: 2,
       characterCount: 100,
       sources: [
@@ -167,6 +168,7 @@ function currentAuthClient(): unknown {
 
 function preview() {
   return {
+    previewSessionId: "33333333-3333-4333-8333-333333333333",
     sourceText:
       "SOURCE 1 - PAGE - Fictional Page\n\nSynthetic preview text for owner.",
     suggestedTitle: "Fictional Course - Canvas Reviewer",
