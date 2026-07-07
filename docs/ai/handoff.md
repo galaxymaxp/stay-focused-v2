@@ -185,11 +185,18 @@ paths.
   database-enforced same-owner reviewer linkage, Canvas save enforcement, and
   safe Study Library detail provenance summaries. The reviewer engine/provider
   boundary still receives only `sourceText` and `sourceTitle`.
+- Phase 5D.2 Structured Normalized Blocks and Selective Import is implemented
+  and remotely verified. It adds private short-lived Canvas source structure
+  sessions, normalized HTML/OCR block manifests, safe public block selectors,
+  bounded selected-block preview creation, selected-block immutable snapshot
+  rows, mobile block-selection UI, and safe Study Library selected-block
+  counts. The reviewer engine/provider boundary still receives only
+  `sourceText` and `sourceTitle`.
 - SECURITY ACTION REQUIRED: previously printed local credentials must be
   rotated before protected live validation reuses app-level credentials. The
   names requiring rotation are `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`,
   Google OCR credential material, `CANVAS_PERSONAL_ACCESS_TOKEN`, and
-  `CANVAS_TOKEN_ENCRYPTION_KEY`. Phase 5D.1 protected live validation is
+  `CANVAS_TOKEN_ENCRYPTION_KEY`. Phase 5D.2 protected live validation is
   blocked pending confirmed rotation.
 - Live second-user validation was not run because no separate second test-user
   credentials were available. Automated route tests cover user scoping for
@@ -197,10 +204,9 @@ paths.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
-- Remaining secondary Canvas resources, broader parser families, structured
-  normalized blocks, selective import, stale/deleted-source comparison, grades,
-  background synchronization, task generation, and study schedule generation
-  are still pending. Production endpoint
+- Remaining secondary Canvas resources, broader parser families,
+  stale/deleted-source comparison, grades, background synchronization, task
+  generation, and study schedule generation are still pending. Production endpoint
   validators remain unsupported for the audited endpoint families. Discussions,
   quiz metadata, announcement attachment content import, and broader Canvas
   resource support remain deferred.
@@ -330,6 +336,17 @@ paths.
   are historical. The rollback verifier also covers snapshot item context
   mismatch rejection. Protected live validation is blocked pending credential
   rotation.
+- Phase 5D.2 verification: migration
+  `202607070004_add_canvas_selective_source_blocks.sql` is applied remotely;
+  rollback-safe SQL verification passed through
+  `scripts/phase5d2-selective-blocks-verification.sql` with 18 PASS checks;
+  shared typecheck/build passed; Canvas typecheck/build/tests 52/52; DB
+  typecheck passed; OCR typecheck/build/tests 14/14; API typecheck/build/tests
+  299/299; mobile typecheck/tests 95/95; engine typecheck/build/evals 266/266;
+  root Turbo typecheck/build passed across 7/7 workspaces; workspace tests
+  passed with API 299/299, mobile 95/95, Canvas 52/52, and OCR 14/14. Supabase
+  advisors showed no new Phase 5D.2 findings; remaining warnings are
+  historical. Protected live validation is blocked pending credential rotation.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - Reviewer web smoke: passed with real reviewer generation.
 - OCR web smoke: passed with mocked image OCR response and real reviewer
@@ -376,14 +393,16 @@ production validation. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated. Phase 5C.2B Canvas PDF/image OCR
 sources are complete and live validated. Phase 5D.1 immutable source snapshots
 and exact reviewer provenance is implemented and remotely verified, with
-protected live validation blocked pending credential rotation. The recommended
-next roadmap task is Phase 5D.2 - Structured Normalized Blocks And Selective
-Import. Automatic repeated scanned-PDF header/footer detection remains a
-deferred candidate.
+protected live validation blocked pending credential rotation. Phase 5D.2
+structured normalized blocks and selective import is implemented and remotely
+verified, with protected live validation blocked pending credential rotation.
+The recommended next roadmap task is Phase 5D.3 - Deduplication, Repeated
+Relationships, Stale And Deleted Sources. Automatic repeated scanned-PDF
+header/footer detection remains a deferred candidate.
 
 ## Known Blockers And Risks
 
-- Protected live validation for Phase 5D.1 is blocked until the previously
+- Protected live validation for Phase 5D.2 is blocked until the previously
   exposed local app-level credentials are rotated. Do not run live Canvas,
   OpenAI, OCR, or service-role validation with those old values.
 - OneDrive-backed generated Next output can leave stale reparse-point artifacts;

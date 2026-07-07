@@ -25,6 +25,7 @@ export interface SavedReviewerSourceProvenanceSummary {
   readonly sourceMode: "canvas";
   readonly sourceTitle: string;
   readonly sourceCount: number;
+  readonly selectedBlockCount: number;
   readonly wasEdited: boolean;
   readonly generatedAt: string;
   readonly parserVersions: readonly string[];
@@ -55,6 +56,10 @@ export type CanvasSourcePreviewSessionRow =
   Database["public"]["Tables"]["canvas_source_preview_sessions"]["Row"];
 export type CanvasSourcePreviewSessionInsert =
   Database["public"]["Tables"]["canvas_source_preview_sessions"]["Insert"];
+export type CanvasSourceStructureSessionRow =
+  Database["public"]["Tables"]["canvas_source_structure_sessions"]["Row"];
+export type CanvasSourceStructureSessionInsert =
+  Database["public"]["Tables"]["canvas_source_structure_sessions"]["Insert"];
 export type ReviewerSourceSnapshotRow =
   Database["public"]["Tables"]["reviewer_source_snapshots"]["Row"];
 export type ReviewerSourceSnapshotInsert =
@@ -63,6 +68,10 @@ export type ReviewerSourceSnapshotItemRow =
   Database["public"]["Tables"]["reviewer_source_snapshot_items"]["Row"];
 export type ReviewerSourceSnapshotItemInsert =
   Database["public"]["Tables"]["reviewer_source_snapshot_items"]["Insert"];
+export type ReviewerSourceSnapshotBlockRow =
+  Database["public"]["Tables"]["reviewer_source_snapshot_blocks"]["Row"];
+export type ReviewerSourceSnapshotBlockInsert =
+  Database["public"]["Tables"]["reviewer_source_snapshot_blocks"]["Insert"];
 export type CanvasConnectionRow =
   Database["public"]["Tables"]["canvas_connections"]["Row"];
 export type CanvasConnectionInsert =
@@ -230,6 +239,7 @@ export interface Database {
           suggested_title: string;
           source_count: number;
           source_manifest: Json;
+          selected_block_manifest: Json;
           normalization_version: string;
           created_at: string;
           expires_at: string;
@@ -244,6 +254,7 @@ export interface Database {
           suggested_title: string;
           source_count: number;
           source_manifest: Json;
+          selected_block_manifest?: Json;
           normalization_version: string;
           created_at?: string;
           expires_at: string;
@@ -258,6 +269,7 @@ export interface Database {
           suggested_title?: string;
           source_count?: number;
           source_manifest?: Json;
+          selected_block_manifest?: Json;
           normalization_version?: string;
           created_at?: string;
           expires_at?: string;
@@ -265,6 +277,56 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "canvas_source_preview_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_source_structure_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          source_count: number;
+          source_manifest: Json;
+          block_count: number;
+          block_manifest: Json;
+          structure_version: string;
+          created_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          source_count: number;
+          source_manifest: Json;
+          block_count: number;
+          block_manifest: Json;
+          structure_version: string;
+          created_at?: string;
+          expires_at: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          source_count?: number;
+          source_manifest?: Json;
+          block_count?: number;
+          block_manifest?: Json;
+          structure_version?: string;
+          created_at?: string;
+          expires_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_source_structure_sessions_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
@@ -1931,6 +1993,119 @@ export interface Database {
           },
         ];
       };
+      reviewer_source_snapshot_blocks: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_snapshot_id: string;
+          source_snapshot_item_id: string;
+          ordinal: number;
+          source_ordinal: number;
+          block_ordinal: number;
+          block_kind:
+            | "heading"
+            | "paragraph"
+            | "list_item"
+            | "table"
+            | "quote"
+            | "code";
+          block_text: string;
+          block_sha256: string;
+          heading_level: number | null;
+          list_depth: number | null;
+          list_style: "ordered" | "unordered" | null;
+          table_structure: Json | null;
+          page_number: number | null;
+          slide_number: number | null;
+          module_position: number | null;
+          parser_version: string | null;
+          ocr_version: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          source_snapshot_id: string;
+          source_snapshot_item_id: string;
+          ordinal: number;
+          source_ordinal: number;
+          block_ordinal: number;
+          block_kind:
+            | "heading"
+            | "paragraph"
+            | "list_item"
+            | "table"
+            | "quote"
+            | "code";
+          block_text: string;
+          block_sha256: string;
+          heading_level?: number | null;
+          list_depth?: number | null;
+          list_style?: "ordered" | "unordered" | null;
+          table_structure?: Json | null;
+          page_number?: number | null;
+          slide_number?: number | null;
+          module_position?: number | null;
+          parser_version?: string | null;
+          ocr_version?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          source_snapshot_id?: string;
+          source_snapshot_item_id?: string;
+          ordinal?: number;
+          source_ordinal?: number;
+          block_ordinal?: number;
+          block_kind?:
+            | "heading"
+            | "paragraph"
+            | "list_item"
+            | "table"
+            | "quote"
+            | "code";
+          block_text?: string;
+          block_sha256?: string;
+          heading_level?: number | null;
+          list_depth?: number | null;
+          list_style?: "ordered" | "unordered" | null;
+          table_structure?: Json | null;
+          page_number?: number | null;
+          slide_number?: number | null;
+          module_position?: number | null;
+          parser_version?: string | null;
+          ocr_version?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviewer_source_snapshot_blocks_item_context_fkey";
+            columns: [
+              "source_snapshot_item_id",
+              "source_snapshot_id",
+              "user_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshot_items";
+            referencedColumns: ["id", "source_snapshot_id", "user_id"];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshot_blocks_snapshot_owner_fkey";
+            columns: ["source_snapshot_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "reviewer_source_snapshots";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "reviewer_source_snapshot_blocks_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -1997,6 +2172,12 @@ export interface Database {
         Returns: Array<{ id: string }>;
       };
       cleanup_expired_canvas_source_preview_sessions: {
+        Args: {
+          p_before?: string;
+        };
+        Returns: number;
+      };
+      cleanup_expired_canvas_source_structure_sessions: {
         Args: {
           p_before?: string;
         };

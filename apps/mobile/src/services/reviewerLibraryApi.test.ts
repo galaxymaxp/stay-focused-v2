@@ -97,6 +97,7 @@ describe("reviewer library API", () => {
       data: {
         sourceProvenance: {
           sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          selectedBlockCount: 4,
           sourceCount: 2,
           wasEdited: true,
         },
@@ -141,6 +142,7 @@ describe("reviewer library API", () => {
       data: {
         sourceProvenance: {
           sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
+          selectedBlockCount: 4,
           sourceCount: 2,
         },
       },
@@ -294,6 +296,7 @@ function canvasDetail() {
       sourceMode: "canvas",
       sourceTitle: "Canvas Reviewer",
       sourceCount: 2,
+      selectedBlockCount: 4,
       wasEdited: true,
       generatedAt: "2026-07-07T00:10:00.000Z",
       parserVersions: ["canvas-html-visible-text-v1"],

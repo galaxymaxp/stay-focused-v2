@@ -24,6 +24,7 @@ export interface SavedReviewerSourceProvenanceSummary {
   readonly sourceMode: "canvas";
   readonly sourceTitle: string;
   readonly sourceCount: number;
+  readonly selectedBlockCount: number;
   readonly wasEdited: boolean;
   readonly generatedAt: string;
   readonly parserVersions: readonly string[];
@@ -581,6 +582,7 @@ function isSavedReviewerSourceProvenanceSummary(
     value.sourceMode === "canvas" &&
     typeof value.sourceTitle === "string" &&
     typeof value.sourceCount === "number" &&
+    typeof value.selectedBlockCount === "number" &&
     typeof value.wasEdited === "boolean" &&
     typeof value.generatedAt === "string" &&
     Array.isArray(value.parserVersions) &&

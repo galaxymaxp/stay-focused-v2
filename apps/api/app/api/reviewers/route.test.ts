@@ -458,6 +458,7 @@ function sourceProvenanceSummary() {
     sourceMode: "canvas",
     sourceTitle: "Canvas Reviewer",
     sourceCount: 2,
+    selectedBlockCount: 4,
     wasEdited: true,
     generatedAt: "2026-07-07T00:10:00.000Z",
     parserVersions: ["canvas-html-visible-text-v1"],

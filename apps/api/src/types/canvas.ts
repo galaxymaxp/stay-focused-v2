@@ -266,6 +266,7 @@ export interface CanvasReviewerSourcePreviewResponse {
   readonly suggestedTitle: string;
   readonly sourceCount: number;
   readonly characterCount: number;
+  readonly selectedBlockCount?: number;
   readonly sources: readonly {
     readonly id: string;
     readonly type: CanvasReviewerSourceType;
@@ -282,8 +283,53 @@ export interface CanvasReviewerSourcePreviewResponse {
     readonly maximumCharactersPerSource: number;
     readonly maximumCombinedPreviewCharacters: number;
     readonly maximumOcrFilesPerPreview: number;
+    readonly maximumStructuredBlocks: number;
+    readonly maximumSelectedBlocks: number;
     readonly existingReviewerRequestLimit: number;
     readonly suggestedTitleLimit: number;
+  };
+}
+
+export type CanvasStructuredBlockKind =
+  | "heading"
+  | "paragraph"
+  | "list_item"
+  | "table"
+  | "quote"
+  | "code";
+
+export interface CanvasStructuredBlock {
+  readonly id: string;
+  readonly kind: CanvasStructuredBlockKind;
+  readonly text: string;
+  readonly sourceOrdinal: number;
+  readonly blockOrdinal: number;
+  readonly headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly listDepth?: number;
+  readonly listStyle?: "ordered" | "unordered";
+  readonly pageNumber?: number;
+  readonly slideNumber?: number;
+  readonly modulePosition?: number;
+  readonly selectable: boolean;
+  readonly selectedByDefault: boolean;
+}
+
+export interface CanvasSourceStructureResponse {
+  readonly ok: true;
+  readonly structureSessionId: string;
+  readonly sources: readonly {
+    readonly ordinal: number;
+    readonly type: CanvasReviewerSourceType;
+    readonly title: string;
+    readonly fileKind?: Exclude<CanvasReviewerFileKind, "unsupported">;
+    readonly pageCount?: number;
+    readonly blocks: readonly CanvasStructuredBlock[];
+  }[];
+  readonly totalBlockCount: number;
+  readonly selectedByDefaultCount: number;
+  readonly limits: {
+    readonly maximumBlocks: number;
+    readonly maximumSelectedBlocks: number;
   };
 }
 
@@ -382,6 +428,14 @@ export type CanvasApiErrorCode =
   | "canvas_source_ocr_not_configured"
   | "canvas_source_ocr_failed"
   | "canvas_source_storage_read_failed"
+  | "canvas_source_structure_session_invalid"
+  | "canvas_source_structure_session_not_found"
+  | "canvas_source_structure_session_expired"
+  | "canvas_source_structure_too_large"
+  | "canvas_source_block_selection_empty"
+  | "canvas_source_block_selection_duplicate"
+  | "canvas_source_block_selection_invalid"
+  | "canvas_source_block_selection_limit_exceeded"
   | "canvas_source_preview_too_large"
   | "canvas_source_unavailable"
   | "canvas_storage_failed";
@@ -395,6 +449,7 @@ export type CanvasApiResponse =
   | CanvasSyncResponse
   | CanvasCourseScopedSyncResponse
   | CanvasReviewerSourceListResponse
+  | CanvasSourceStructureResponse
   | CanvasReviewerSourcePreviewResponse
   | CanvasReviewerSourcePrepareResponse
   | CanvasFileIngestionResponse

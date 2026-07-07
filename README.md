@@ -37,7 +37,11 @@ existing reviewer API; and saving reuses the existing Study Library. Phase
 sessions, exact edited source snapshots, ordered source items, reviewer
 linkage, and safe Study Library provenance summaries. Protected live
 validation for Phase 5D.1 is blocked until previously exposed local
-credentials are rotated.
+credentials are rotated. Phase 5D.2 adds structured normalized blocks and
+selective import: Canvas HTML/OCR sources become bounded server-held blocks,
+students choose exact blocks before preview generation, selected-block
+provenance is copied into immutable snapshots, and protected live validation
+remains blocked pending credential rotation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -77,7 +81,8 @@ Sign in
 -> selected synchronized Canvas course
 -> choose supported Canvas sources
 -> prepare one eligible PDF/image when needed
--> preview and edit combined source text/title
+-> choose structured content blocks
+-> preview and edit selected source text/title
 -> protected preview session
 -> existing reviewer API
 -> immutable source snapshot after successful generation
@@ -163,6 +168,10 @@ Complete:
   with private preview sessions, exact edited source-text snapshots, ordered
   source snapshot items, database-enforced reviewer/snapshot ownership, safe
   detail summaries, and no provenance sent to OpenAI
+- Phase 5D.2 structured normalized Canvas blocks and selective import with
+  server-held HTML/OCR block manifests, bounded block selection before preview,
+  selected-block snapshot provenance, Study Library selected-block summaries,
+  and no provenance sent to OpenAI
 
 Working locally:
 
@@ -264,11 +273,19 @@ Working locally:
   visibility, and deleted the validation reviewer. An exploratory generation
   attempt that included the very short/noisy live OCR preview text returned the
   existing `reviewer_validation_failed` response.
+- Phase 5D.2 automated and remote database verification passed for structured
+  normalized blocks and selective import. Migration `202607070004` is applied
+  remotely; rollback-safe SQL verification passed for private structure
+  sessions, selected-block manifests, snapshot block copying, immutability,
+  direct grant revocation, service-role grants, RLS, expired cleanup, snapshot
+  reuse, and historical preview compatibility. Protected live validation is
+  blocked pending credential rotation.
 
 Pending:
 
-- Remaining secondary Canvas resources, broader parser families, full source
-  provenance, grade sync, and background/resumable sync for larger accounts
+- Remaining secondary Canvas resources, broader parser families, stale/deleted
+  source comparison, grade sync, and background/resumable sync for larger
+  accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -421,8 +438,11 @@ tests do not run that opt-in provider smoke.
   Canvas PDFs, PNGs, and JPEGs after explicit preparation through the existing
   secure ingestion boundary. Preview supports one OCR-backed file mixed with
   text sources, is bounded and editable, and does not call Canvas, decrypt the
-  PAT, call OpenAI, return Storage keys, or persist OCR output. Full persistent
-  source provenance is still deferred.
+  PAT, call OpenAI, return Storage keys, or persist OCR output. Phase 5D.2 adds
+  a structure-and-select step for normalized Canvas HTML/OCR blocks and stores
+  selected-block provenance with immutable snapshots, but broader parser
+  families, stale/deleted comparison, source recommendations, cross-course
+  bundles, background sync, and automatic reviewer generation remain deferred.
 - No background or scheduled Canvas synchronization exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
@@ -457,6 +477,8 @@ validated. Phase 5C.2B Canvas PDF and image OCR integration is complete and
 live validated for preparation, private Storage OCR preview, edited reviewer
 handoff, and Study Library cleanup. Phase 5D.1 immutable source snapshots and
 exact reviewer provenance is implemented and remotely verified, with protected
-live validation blocked pending credential rotation. The next roadmap task is
-Phase 5D.2 - Structured Normalized Blocks And Selective Import. Canvas OAuth
-remains a future phase.
+live validation blocked pending credential rotation. Phase 5D.2 structured
+normalized blocks and selective import is implemented and remotely verified,
+with protected live validation blocked pending credential rotation. The next
+roadmap task is Phase 5D.3 - Deduplication, Repeated Relationships, Stale And
+Deleted Sources. Canvas OAuth remains a future phase.

@@ -471,6 +471,9 @@ function SourceProvenanceCard({
         {summary.sourceCount} sources - {summary.wasEdited ? "edited" : "unchanged"}
       </Text>
       <Text style={styles.statusText}>
+        {summary.selectedBlockCount} selected blocks
+      </Text>
+      <Text style={styles.statusText}>
         Parsers: {formatVersionList(summary.parserVersions)}
       </Text>
       <Text style={styles.statusText}>

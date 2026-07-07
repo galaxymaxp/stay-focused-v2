@@ -14,6 +14,7 @@ const SYNC_PATH = "/api/canvas/sync";
 const MAX_ERROR_MESSAGE_CHARS = 300;
 const SELECTED_COURSE_SYNC_CONCURRENCY = 2;
 export const CANVAS_REVIEWER_MAX_SELECTED_SOURCES = 8;
+export const CANVAS_REVIEWER_MAX_SELECTED_BLOCKS = 250;
 
 export interface CanvasConnectionSummary {
   readonly id: string;
@@ -267,6 +268,7 @@ export interface CanvasReviewerSourcePreviewPayload {
   readonly suggestedTitle: string;
   readonly sourceCount: number;
   readonly characterCount: number;
+  readonly selectedBlockCount?: number;
   readonly sources: readonly {
     readonly id: string;
     readonly type: CanvasReviewerSourceType;
@@ -283,8 +285,52 @@ export interface CanvasReviewerSourcePreviewPayload {
     readonly maximumCharactersPerSource: number;
     readonly maximumCombinedPreviewCharacters: number;
     readonly maximumOcrFilesPerPreview: number;
+    readonly maximumStructuredBlocks: number;
+    readonly maximumSelectedBlocks: number;
     readonly existingReviewerRequestLimit: number;
     readonly suggestedTitleLimit: number;
+  };
+}
+
+export type CanvasStructuredBlockKind =
+  | "heading"
+  | "paragraph"
+  | "list_item"
+  | "table"
+  | "quote"
+  | "code";
+
+export interface CanvasStructuredBlock {
+  readonly id: string;
+  readonly kind: CanvasStructuredBlockKind;
+  readonly text: string;
+  readonly sourceOrdinal: number;
+  readonly blockOrdinal: number;
+  readonly headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly listDepth?: number;
+  readonly listStyle?: "ordered" | "unordered";
+  readonly pageNumber?: number;
+  readonly slideNumber?: number;
+  readonly modulePosition?: number;
+  readonly selectable: boolean;
+  readonly selectedByDefault: boolean;
+}
+
+export interface CanvasSourceStructurePayload {
+  readonly structureSessionId: string;
+  readonly sources: readonly {
+    readonly ordinal: number;
+    readonly type: CanvasReviewerSourceType;
+    readonly title: string;
+    readonly fileKind?: Exclude<CanvasReviewerFileKind, "unsupported">;
+    readonly pageCount?: number;
+    readonly blocks: readonly CanvasStructuredBlock[];
+  }[];
+  readonly totalBlockCount: number;
+  readonly selectedByDefaultCount: number;
+  readonly limits: {
+    readonly maximumBlocks: number;
+    readonly maximumSelectedBlocks: number;
   };
 }
 
@@ -365,6 +411,14 @@ export type CanvasApiClientErrorCode =
   | "ocr_not_configured"
   | "ocr_failed"
   | "storage_read_failed"
+  | "structure_session_invalid"
+  | "structure_session_not_found"
+  | "structure_session_expired"
+  | "structure_too_large"
+  | "block_selection_empty"
+  | "block_selection_duplicate"
+  | "block_selection_invalid"
+  | "block_selection_limit_exceeded"
   | "source_preview_too_large"
   | "source_unavailable"
   | "storage_not_configured"
@@ -412,6 +466,11 @@ interface CourseSyncSuccessResponse extends CanvasCourseSyncSummary {
 
 interface CanvasReviewerSourceListSuccessResponse
   extends CanvasReviewerSourceListPayload {
+  readonly ok: true;
+}
+
+interface CanvasSourceStructureSuccessResponse
+  extends CanvasSourceStructurePayload {
   readonly ok: true;
 }
 
@@ -663,6 +722,42 @@ export async function prepareCanvasReviewerSources(
   });
 }
 
+export async function structureCanvasReviewerSources(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly sourceIds: readonly string[];
+  },
+): Promise<CanvasApiResult<CanvasSourceStructurePayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before structuring sources.",
+    );
+  }
+  const normalizedIds = input.sourceIds.map((sourceId) => sourceId.trim());
+  if (new Set(normalizedIds).size !== normalizedIds.length) {
+    return clientError(
+      "duplicate_source_submission",
+      "A Canvas source can only be selected once.",
+    );
+  }
+
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources/structure`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    body: { sourceIds: normalizedIds },
+    parseSuccess: parseCanvasSourceStructureResponse,
+  });
+}
+
 export async function previewCanvasReviewerSources(
   input: CanvasApiBaseInput & {
     readonly courseId: string;
@@ -695,6 +790,62 @@ export async function previewCanvasReviewerSources(
     input,
     method: "POST",
     body: { sourceIds: normalizedIds },
+    parseSuccess: parseCanvasReviewerSourcePreviewResponse,
+  });
+}
+
+export async function previewSelectiveCanvasReviewerSources(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly structureSessionId: string;
+    readonly selectedBlockIds: readonly string[];
+  },
+): Promise<CanvasApiResult<CanvasReviewerSourcePreviewPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before previewing sources.",
+    );
+  }
+  const structureSessionId = input.structureSessionId.trim();
+  if (!structureSessionId) {
+    return clientError(
+      "structure_session_not_found",
+      "Select Canvas sources again before previewing blocks.",
+    );
+  }
+  const normalizedBlockIds = input.selectedBlockIds.map((id) => id.trim());
+  if (normalizedBlockIds.length === 0) {
+    return clientError(
+      "block_selection_empty",
+      "Select at least one Canvas block.",
+    );
+  }
+  if (new Set(normalizedBlockIds).size !== normalizedBlockIds.length) {
+    return clientError(
+      "block_selection_duplicate",
+      "A Canvas block can only be selected once.",
+    );
+  }
+  if (normalizedBlockIds.length > CANVAS_REVIEWER_MAX_SELECTED_BLOCKS) {
+    return clientError(
+      "block_selection_limit_exceeded",
+      `Select at most ${CANVAS_REVIEWER_MAX_SELECTED_BLOCKS} Canvas blocks.`,
+    );
+  }
+
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources/selective-preview`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    body: { selectedBlockIds: normalizedBlockIds, structureSessionId },
     parseSuccess: parseCanvasReviewerSourcePreviewResponse,
   });
 }
@@ -1029,6 +1180,27 @@ function parseCanvasReviewerSourceListResponse(
   );
 }
 
+function parseCanvasSourceStructureResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasSourceStructurePayload> {
+  if (isCanvasSourceStructureSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        limits: parsed.limits,
+        selectedByDefaultCount: parsed.selectedByDefaultCount,
+        sources: parsed.sources,
+        structureSessionId: parsed.structureSessionId,
+        totalBlockCount: parsed.totalBlockCount,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid source structure response.",
+  );
+}
+
 function parseCanvasReviewerSourcePreviewResponse(
   parsed: unknown,
 ): CanvasApiResult<CanvasReviewerSourcePreviewPayload> {
@@ -1040,6 +1212,9 @@ function parseCanvasReviewerSourcePreviewResponse(
         courseSync: parsed.courseSync,
         limits: parsed.limits,
         previewSessionId: parsed.previewSessionId,
+        ...(parsed.selectedBlockCount !== undefined
+          ? { selectedBlockCount: parsed.selectedBlockCount }
+          : {}),
         sourceCount: parsed.sourceCount,
         sources: parsed.sources,
         sourceText: parsed.sourceText,
@@ -1176,6 +1351,22 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "ocr_failed";
     case "canvas_source_storage_read_failed":
       return "storage_read_failed";
+    case "canvas_source_structure_session_invalid":
+      return "structure_session_invalid";
+    case "canvas_source_structure_session_not_found":
+      return "structure_session_not_found";
+    case "canvas_source_structure_session_expired":
+      return "structure_session_expired";
+    case "canvas_source_structure_too_large":
+      return "structure_too_large";
+    case "canvas_source_block_selection_empty":
+      return "block_selection_empty";
+    case "canvas_source_block_selection_duplicate":
+      return "block_selection_duplicate";
+    case "canvas_source_block_selection_invalid":
+      return "block_selection_invalid";
+    case "canvas_source_block_selection_limit_exceeded":
+      return "block_selection_limit_exceeded";
     case "canvas_source_preview_too_large":
       return "source_preview_too_large";
     case "canvas_source_unavailable":
@@ -1264,6 +1455,21 @@ function safeApiErrorMessage(
   }
   if (code === "storage_read_failed") {
     return "Canvas file storage could not be read. Try again later.";
+  }
+  if (code === "structure_session_expired") {
+    return "Select Canvas sources again before previewing blocks.";
+  }
+  if (code === "structure_too_large") {
+    return "Selected Canvas sources contain too many blocks. Select fewer sources.";
+  }
+  if (code === "block_selection_empty") {
+    return "Select at least one Canvas block.";
+  }
+  if (code === "block_selection_limit_exceeded") {
+    return `Select at most ${CANVAS_REVIEWER_MAX_SELECTED_BLOCKS} Canvas blocks.`;
+  }
+  if (code === "block_selection_invalid" || code === "block_selection_duplicate") {
+    return "Select Canvas blocks again before previewing.";
   }
   if (code === "source_preview_too_large") {
     return "Selected Canvas sources are too large. Select fewer or smaller sources.";
@@ -1455,6 +1661,29 @@ function isCanvasReviewerSourceListSuccessResponse(
   );
 }
 
+function isCanvasSourceStructureSuccessResponse(
+  value: unknown,
+): value is CanvasSourceStructureSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, [
+      "ok",
+      "structureSessionId",
+      "sources",
+      "totalBlockCount",
+      "selectedByDefaultCount",
+      "limits",
+    ]) &&
+    typeof value.structureSessionId === "string" &&
+    Array.isArray(value.sources) &&
+    value.sources.every(isCanvasStructuredSource) &&
+    isNonNegativeInteger(value.totalBlockCount) &&
+    isNonNegativeInteger(value.selectedByDefaultCount) &&
+    isCanvasStructureLimits(value.limits)
+  );
+}
+
 function isCanvasReviewerSourcePreviewSuccessResponse(
   value: unknown,
 ): value is CanvasReviewerSourcePreviewSuccessResponse {
@@ -1468,6 +1697,7 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
       "suggestedTitle",
       "sourceCount",
       "characterCount",
+      "selectedBlockCount",
       "sources",
       "courseSync",
       "limits",
@@ -1477,6 +1707,8 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
     typeof value.suggestedTitle === "string" &&
     isNonNegativeInteger(value.sourceCount) &&
     isNonNegativeInteger(value.characterCount) &&
+    (value.selectedBlockCount === undefined ||
+      isNonNegativeInteger(value.selectedBlockCount)) &&
     Array.isArray(value.sources) &&
     value.sources.every(isCanvasPreviewSourceSummary) &&
     isCanvasPreviewCourseSync(value.courseSync) &&
@@ -1723,6 +1955,73 @@ function isCanvasSourcePagination(
   );
 }
 
+function isCanvasStructuredSource(
+  value: unknown,
+): value is CanvasSourceStructurePayload["sources"][number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "ordinal",
+      "type",
+      "title",
+      "fileKind",
+      "pageCount",
+      "blocks",
+    ]) &&
+    isNonNegativeInteger(value.ordinal) &&
+    value.ordinal > 0 &&
+    isCanvasReviewerSourceType(value.type) &&
+    typeof value.title === "string" &&
+    (value.fileKind === undefined ||
+      value.fileKind === "pdf" ||
+      value.fileKind === "image") &&
+    (value.pageCount === undefined || isNonNegativeInteger(value.pageCount)) &&
+    Array.isArray(value.blocks) &&
+    value.blocks.every(isCanvasStructuredBlock)
+  );
+}
+
+function isCanvasStructuredBlock(value: unknown): value is CanvasStructuredBlock {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "id",
+      "kind",
+      "text",
+      "sourceOrdinal",
+      "blockOrdinal",
+      "headingLevel",
+      "listDepth",
+      "listStyle",
+      "pageNumber",
+      "slideNumber",
+      "modulePosition",
+      "selectable",
+      "selectedByDefault",
+    ]) &&
+    typeof value.id === "string" &&
+    isCanvasStructuredBlockKind(value.kind) &&
+    typeof value.text === "string" &&
+    isNonNegativeInteger(value.sourceOrdinal) &&
+    value.sourceOrdinal > 0 &&
+    isNonNegativeInteger(value.blockOrdinal) &&
+    value.blockOrdinal > 0 &&
+    (value.headingLevel === undefined || isHeadingLevel(value.headingLevel)) &&
+    (value.listDepth === undefined || isNonNegativeInteger(value.listDepth)) &&
+    (value.listStyle === undefined ||
+      value.listStyle === "ordered" ||
+      value.listStyle === "unordered") &&
+    (value.pageNumber === undefined ||
+      (isNonNegativeInteger(value.pageNumber) && value.pageNumber > 0)) &&
+    (value.slideNumber === undefined ||
+      (isNonNegativeInteger(value.slideNumber) && value.slideNumber > 0)) &&
+    (value.modulePosition === undefined ||
+      isNonNegativeInteger(value.modulePosition)) &&
+    typeof value.selectable === "boolean" &&
+    typeof value.selectedByDefault === "boolean"
+  );
+}
+
 function isCanvasPreviewSourceSummary(
   value: unknown,
 ): value is CanvasReviewerSourcePreviewPayload["sources"][number] {
@@ -1760,6 +2059,8 @@ function isCanvasPreviewLimits(
       "maximumCharactersPerSource",
       "maximumCombinedPreviewCharacters",
       "maximumOcrFilesPerPreview",
+      "maximumStructuredBlocks",
+      "maximumSelectedBlocks",
       "existingReviewerRequestLimit",
       "suggestedTitleLimit",
     ]) &&
@@ -1767,9 +2068,46 @@ function isCanvasPreviewLimits(
     isNonNegativeInteger(value.maximumCharactersPerSource) &&
     isNonNegativeInteger(value.maximumCombinedPreviewCharacters) &&
     isNonNegativeInteger(value.maximumOcrFilesPerPreview) &&
+    isNonNegativeInteger(value.maximumStructuredBlocks) &&
+    isNonNegativeInteger(value.maximumSelectedBlocks) &&
     isNonNegativeInteger(value.existingReviewerRequestLimit) &&
     isNonNegativeInteger(value.suggestedTitleLimit) &&
     value.maximumCombinedPreviewCharacters < value.existingReviewerRequestLimit
+  );
+}
+
+function isCanvasStructureLimits(
+  value: unknown,
+): value is CanvasSourceStructurePayload["limits"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["maximumBlocks", "maximumSelectedBlocks"]) &&
+    isNonNegativeInteger(value.maximumBlocks) &&
+    isNonNegativeInteger(value.maximumSelectedBlocks)
+  );
+}
+
+function isCanvasStructuredBlockKind(
+  value: unknown,
+): value is CanvasStructuredBlockKind {
+  return (
+    value === "heading" ||
+    value === "paragraph" ||
+    value === "list_item" ||
+    value === "table" ||
+    value === "quote" ||
+    value === "code"
+  );
+}
+
+function isHeadingLevel(value: unknown): value is 1 | 2 | 3 | 4 | 5 | 6 {
+  return (
+    value === 1 ||
+    value === 2 ||
+    value === 3 ||
+    value === 4 ||
+    value === 5 ||
+    value === 6
   );
 }
 

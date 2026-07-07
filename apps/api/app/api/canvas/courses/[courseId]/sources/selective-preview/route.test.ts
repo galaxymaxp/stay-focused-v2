@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
       user: { id: "user-1" },
     },
   } as unknown,
-  previewCanvasReviewerSources: vi.fn(),
+  previewSelectiveCanvasReviewerSources: vi.fn(),
   requireCanvasAuth: vi.fn(),
 }));
 
@@ -21,12 +21,13 @@ vi.mock("@/lib/canvas-routes", () => ({
 }));
 
 vi.mock("@/lib/canvas-reviewer-sources", () => ({
-  previewCanvasReviewerSources: mocks.previewCanvasReviewerSources,
+  previewSelectiveCanvasReviewerSources:
+    mocks.previewSelectiveCanvasReviewerSources,
 }));
 
 const route = await import("./route");
 
-describe("POST /api/canvas/courses/[courseId]/sources/preview", () => {
+describe("POST /api/canvas/courses/[courseId]/sources/selective-preview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.authResult = {
@@ -37,48 +38,70 @@ describe("POST /api/canvas/courses/[courseId]/sources/preview", () => {
       },
     };
     mocks.requireCanvasAuth.mockImplementation(async () => mocks.authResult);
-    mocks.previewCanvasReviewerSources.mockResolvedValue({
+    mocks.previewSelectiveCanvasReviewerSources.mockResolvedValue({
       ok: true,
       value: preview(),
     });
   });
 
-  it("requires Canvas API authentication before parsing source IDs", async () => {
+  it("requires Canvas API authentication before parsing selected block IDs", async () => {
     const authResponse = Response.json(
       { ok: false, error: { code: "unauthorized" } },
       { status: 401 },
     );
     mocks.authResult = { ok: false, response: authResponse };
 
-    const response = await route.POST(createRequest(), createContext("course-1"));
-
-    expect(response.status).toBe(401);
-    expect(mocks.previewCanvasReviewerSources).not.toHaveBeenCalled();
-  });
-
-  it("rejects invalid preview JSON safely", async () => {
     const response = await route.POST(
-      new Request("http://localhost/api/canvas/courses/course-1/sources/preview", {
-        body: "{",
-        headers: { authorization: "Bearer token" },
-        method: "POST",
-      }),
-      createContext("00000000-0000-4000-8000-000000000001"),
+      createRequest("{", "application/json"),
+      createContext("course-1"),
     );
 
-    expect(response.status).toBe(400);
-    await expectError(response, "invalid_json");
-    expect(mocks.previewCanvasReviewerSources).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    expect(mocks.previewSelectiveCanvasReviewerSources).not.toHaveBeenCalled();
   });
 
-  it("submits ordered source IDs to the preview service", async () => {
-    const sourceIds = [
-      "page:11111111-1111-4111-8111-111111111111",
-      "assignment:22222222-2222-4222-8222-222222222222",
+  it("rejects non-JSON and unsupported request fields safely", async () => {
+    const nonJson = await route.POST(
+      createRequest(
+        JSON.stringify({
+          selectedBlockIds: [],
+          structureSessionId: "77777777-7777-4777-8777-777777777777",
+        }),
+        "text/plain",
+      ),
+      createContext("00000000-0000-4000-8000-000000000001"),
+    );
+    expect(nonJson.status).toBe(400);
+    await expectError(nonJson, "invalid_request");
+
+    const extraField = await route.POST(
+      createRequest(
+        JSON.stringify({
+          selectedBlockIds: ["88888888-8888-4888-8888-888888888881"],
+          sourceText: "client supplied text",
+          structureSessionId: "77777777-7777-4777-8777-777777777777",
+        }),
+      ),
+      createContext("00000000-0000-4000-8000-000000000001"),
+    );
+    expect(extraField.status).toBe(400);
+    await expectError(extraField, "invalid_request");
+    expect(mocks.previewSelectiveCanvasReviewerSources).not.toHaveBeenCalled();
+  });
+
+  it("submits structure session and selected block IDs to the preview service", async () => {
+    const selectedBlockIds = [
+      "88888888-8888-4888-8888-888888888881",
+      "88888888-8888-4888-8888-888888888882",
     ];
 
     const response = await route.POST(
-      createRequest({ sourceIds }),
+      createRequest(
+        JSON.stringify({
+          selectedBlockIds,
+          structureSessionId: "77777777-7777-4777-8777-777777777777",
+        }),
+      ),
       createContext("00000000-0000-4000-8000-000000000001"),
     );
     const text = await response.text();
@@ -88,52 +111,50 @@ describe("POST /api/canvas/courses/[courseId]/sources/preview", () => {
     expect(body).toMatchObject({
       ok: true,
       previewSessionId: "33333333-3333-4333-8333-333333333333",
-      sourceCount: 2,
-      characterCount: 100,
-      sources: [
-        { id: sourceIds[0], type: "page" },
-        { id: sourceIds[1], type: "assignment" },
-      ],
+      selectedBlockCount: 2,
+      sourceCount: 1,
     });
-    expect(mocks.previewCanvasReviewerSources).toHaveBeenCalledWith({
+    expect(mocks.previewSelectiveCanvasReviewerSources).toHaveBeenCalledWith({
       client: currentAuthClient(),
       courseId: "00000000-0000-4000-8000-000000000001",
-      sourceIds,
+      selectedBlockIds,
+      structureSessionId: "77777777-7777-4777-8777-777777777777",
       userId: "user-1",
     });
-    expect(text).not.toContain("canvas_course_id");
-    expect(text).not.toContain("storage_object_key");
-    expect(text).not.toContain("Bearer raw-token");
+    expect(text).not.toContain("block_sha256");
+    expect(text).not.toContain("selected_block_manifest");
   });
 
-  it("propagates size-limit validation details without source text", async () => {
-    mocks.previewCanvasReviewerSources.mockResolvedValue({
+  it("propagates block-selection validation details without source text", async () => {
+    mocks.previewSelectiveCanvasReviewerSources.mockResolvedValue({
       ok: false,
       status: 413,
-      code: "canvas_source_preview_too_large",
-      message: "Selected Canvas sources are too large together.",
+      code: "canvas_source_block_selection_limit_exceeded",
+      message: "Select at most 250 Canvas blocks.",
       details: {
-        selectedSourceCount: 3,
-        combinedCharacterCount: 100001,
-        allowedMaximum: 90000,
+        allowedMaximum: 250,
+        selectedSourceCount: 251,
       },
     });
 
     const response = await route.POST(
-      createRequest({
-        sourceIds: ["page:11111111-1111-4111-8111-111111111111"],
-      }),
+      createRequest(
+        JSON.stringify({
+          selectedBlockIds: ["88888888-8888-4888-8888-888888888881"],
+          structureSessionId: "77777777-7777-4777-8777-777777777777",
+        }),
+      ),
       createContext("00000000-0000-4000-8000-000000000001"),
     );
     const text = await response.text();
 
     expect(response.status).toBe(413);
-    expect(text).toContain("canvas_source_preview_too_large");
-    expect(text).toContain("100001");
+    expect(text).toContain("canvas_source_block_selection_limit_exceeded");
+    expect(text).toContain("250");
     expect(text).not.toContain("Synthetic preview text");
   });
 
-  it("allows CORS preflight for source preview", () => {
+  it("allows CORS preflight for selective preview", () => {
     const response = route.OPTIONS(createRequest());
 
     expect(response.status).toBe(204);
@@ -141,14 +162,20 @@ describe("POST /api/canvas/courses/[courseId]/sources/preview", () => {
   });
 });
 
-function createRequest(body: unknown = { sourceIds: [] }): Request {
+function createRequest(
+  body = JSON.stringify({
+    selectedBlockIds: [],
+    structureSessionId: "77777777-7777-4777-8777-777777777777",
+  }),
+  contentType = "application/json",
+): Request {
   return new Request(
-    "http://localhost/api/canvas/courses/course-1/sources/preview",
+    "http://localhost/api/canvas/courses/course-1/sources/selective-preview",
     {
-      body: JSON.stringify(body),
+      body,
       headers: {
         authorization: "Bearer token",
-        "content-type": "application/json",
+        "content-type": contentType,
       },
       method: "POST",
     },
@@ -170,19 +197,15 @@ function preview() {
   return {
     previewSessionId: "33333333-3333-4333-8333-333333333333",
     sourceText:
-      "SOURCE 1 - PAGE - Fictional Page\n\nSynthetic preview text for owner.",
+      "SOURCE 1 - PAGE - Fictional Page\n\n# Overview\n\nSynthetic preview text.",
     suggestedTitle: "Fictional Course - Canvas Reviewer",
-    sourceCount: 2,
-    characterCount: 100,
+    sourceCount: 1,
+    characterCount: 80,
+    selectedBlockCount: 2,
     sources: [
       {
         id: "page:11111111-1111-4111-8111-111111111111",
         type: "page",
-        updatedAt: "2026-07-07T00:00:00.000Z",
-      },
-      {
-        id: "assignment:22222222-2222-4222-8222-222222222222",
-        type: "assignment",
         updatedAt: "2026-07-07T00:00:00.000Z",
       },
     ],

@@ -10,7 +10,9 @@ import {
   listCanvasCourses,
   prepareCanvasReviewerSources,
   previewCanvasReviewerSources,
+  previewSelectiveCanvasReviewerSources,
   saveCanvasCoursePreferences,
+  structureCanvasReviewerSources,
   syncCanvasAcademicGraph,
   syncCanvasCourse,
   syncSelectedCanvasCourses,
@@ -551,6 +553,118 @@ describe("Canvas mobile API client", () => {
     expect(String(lastRequest(fetchImpl).init.body)).not.toContain(
       "source_manifest",
     );
+  });
+
+  it("structures Canvas sources and previews selected block IDs only", async () => {
+    const sourceIds = ["page:11111111-1111-4111-8111-111111111111"];
+    const structureFetch = createFetch(sourceStructureResponse());
+
+    const structure = await structureCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "33333333-3333-4333-8333-333333333333",
+      fetchImpl: structureFetch,
+      sourceIds,
+    });
+
+    expect(structure).toMatchObject({
+      ok: true,
+      data: {
+        structureSessionId: "77777777-7777-4777-8777-777777777777",
+        totalBlockCount: 2,
+        selectedByDefaultCount: 2,
+        sources: [
+          {
+            type: "page",
+            blocks: [
+              { kind: "heading", text: "Overview", selectedByDefault: true },
+              { kind: "paragraph", text: "Readable text.", selectable: true },
+            ],
+          },
+        ],
+      },
+    });
+    expect(lastRequest(structureFetch)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/courses/33333333-3333-4333-8333-333333333333/sources/structure`,
+      init: {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+      },
+    });
+    expect(JSON.parse(String(lastRequest(structureFetch).init.body))).toEqual({
+      sourceIds,
+    });
+
+    const selectedBlockIds = [
+      "88888888-8888-4888-8888-888888888881",
+      "88888888-8888-4888-8888-888888888882",
+    ];
+    const previewFetch = createFetch({
+      ...sourcePreviewResponse(),
+      selectedBlockCount: 2,
+      sourceCount: 1,
+      sources: [sourcePreviewResponse().sources[0]],
+    });
+    const preview = await previewSelectiveCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "33333333-3333-4333-8333-333333333333",
+      fetchImpl: previewFetch,
+      selectedBlockIds,
+      structureSessionId: "77777777-7777-4777-8777-777777777777",
+    });
+
+    expect(preview).toMatchObject({
+      ok: true,
+      data: {
+        selectedBlockCount: 2,
+        sourceCount: 1,
+      },
+    });
+    expect(lastRequest(previewFetch)).toMatchObject({
+      url: `${API_BASE_URL}/api/canvas/courses/33333333-3333-4333-8333-333333333333/sources/selective-preview`,
+      init: {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+      },
+    });
+    expect(JSON.parse(String(lastRequest(previewFetch).init.body))).toEqual({
+      selectedBlockIds,
+      structureSessionId: "77777777-7777-4777-8777-777777777777",
+    });
+    expect(String(lastRequest(previewFetch).init.body)).not.toContain(
+      "Readable text",
+    );
+    expect(String(lastRequest(previewFetch).init.body)).not.toContain("sha256");
+  });
+
+  it("rejects duplicate selected Canvas block IDs before fetch", async () => {
+    const fetchImpl = vi.fn();
+    const selectedBlockIds = [
+      "88888888-8888-4888-8888-888888888881",
+      "88888888-8888-4888-8888-888888888881",
+    ];
+
+    await expect(
+      previewSelectiveCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl,
+        selectedBlockIds,
+        structureSessionId: "77777777-7777-4777-8777-777777777777",
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "block_selection_duplicate" },
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("handles Canvas source count and size validation errors", async () => {
@@ -1229,8 +1343,51 @@ function sourcePreviewResponse() {
       maximumCharactersPerSource: 20000,
       maximumCombinedPreviewCharacters: 90000,
       maximumOcrFilesPerPreview: 1,
+      maximumStructuredBlocks: 400,
+      maximumSelectedBlocks: 250,
       existingReviewerRequestLimit: 100000,
       suggestedTitleLimit: 120,
+    },
+  };
+}
+
+function sourceStructureResponse() {
+  return {
+    ok: true,
+    structureSessionId: "77777777-7777-4777-8777-777777777777",
+    sources: [
+      {
+        ordinal: 1,
+        type: "page",
+        title: "Fictional Page",
+        blocks: [
+          {
+            id: "88888888-8888-4888-8888-888888888881",
+            kind: "heading",
+            text: "Overview",
+            sourceOrdinal: 1,
+            blockOrdinal: 1,
+            headingLevel: 1,
+            selectable: true,
+            selectedByDefault: true,
+          },
+          {
+            id: "88888888-8888-4888-8888-888888888882",
+            kind: "paragraph",
+            text: "Readable text.",
+            sourceOrdinal: 1,
+            blockOrdinal: 2,
+            selectable: true,
+            selectedByDefault: true,
+          },
+        ],
+      },
+    ],
+    totalBlockCount: 2,
+    selectedByDefaultCount: 2,
+    limits: {
+      maximumBlocks: 400,
+      maximumSelectedBlocks: 250,
     },
   };
 }

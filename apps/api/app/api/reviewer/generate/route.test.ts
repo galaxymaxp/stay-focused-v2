@@ -528,6 +528,7 @@ function previewSessionRow() {
     suggested_title: "Canvas Notes",
     source_count: 2,
     source_manifest: [],
+    selected_block_manifest: [],
     normalization_version: "canvas-source-preview-v1",
     created_at: "2026-07-07T00:00:00.000Z",
     expires_at: "2026-07-08T00:00:00.000Z",

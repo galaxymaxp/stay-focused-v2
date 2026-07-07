@@ -224,9 +224,12 @@ sources are complete and live validated for preparation, private Storage OCR
 preview, edited reviewer handoff, and Study Library cleanup; Phase 5D.1
 immutable source snapshots and exact reviewer provenance is implemented and
 remotely verified, with protected live validation blocked pending credential
-rotation. Next: Phase 5D.2 - Structured Normalized Blocks And Selective
-Import. Phase 5D through Phase 5F remain planned and must not be collapsed into
-a single generic Canvas integration task.
+rotation. Phase 5D.2 structured normalized blocks and selective import is
+implemented and remotely verified, with protected live validation blocked
+pending credential rotation. Next: Phase 5D.3 - Deduplication, Repeated
+Relationships, Stale And Deleted Sources. Phase 5D through Phase 5F remain
+planned and must not be collapsed into a single generic Canvas integration
+task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -674,7 +677,10 @@ per-course budget in protected live validation. Phase 5C.2A2 Canvas source
 selection and reviewer handoff is complete and live validated. Phase 5C.2B
 Canvas PDF/image OCR sources are complete and live validated for preparation,
 private Storage OCR preview, edited reviewer handoff, and Study Library
-cleanup. Next: Phase 5D.2 - Structured Normalized Blocks And Selective Import.
+cleanup. Phase 5D.1 immutable source snapshots and Phase 5D.2 structured
+normalized blocks are implemented and remotely verified, with protected live
+validation blocked pending credential rotation. Next: Phase 5D.3 -
+Deduplication, Repeated Relationships, Stale And Deleted Sources.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -965,7 +971,8 @@ Exit criteria:
 Status: In progress. Phase 5D.1 is implemented and remotely verified as the
 immutable source-snapshot and exact reviewer-provenance foundation. Protected
 live validation is blocked pending rotation of previously exposed local
-credentials. Phase 5D.2 and Phase 5D.3 remain pending.
+credentials. Phase 5D.2 is implemented and remotely verified as the structured
+normalized-block and selective-import slice. Phase 5D.3 remains pending.
 
 Subphases:
 
@@ -975,8 +982,10 @@ Subphases:
   linkage, safe detail summaries, no historical reviewer backfill, and no
   provenance sent to OpenAI.
 - Phase 5D.2 - Structured Normalized Blocks And Selective Import:
-  block-level structure, heading/list/table models, module/page/slide ordering
-  where available, and user-selectable blocks before generation.
+  private short-lived structure sessions, heading/list/table/OCR block models,
+  page ordering where available, safe public block selectors, bounded
+  user-selectable blocks before generation, selected-block preview manifests,
+  immutable snapshot block provenance, and no provenance sent to OpenAI.
 - Phase 5D.3 - Deduplication, Repeated Relationships, Stale And Deleted
   Sources: repeated-source relationships, duplicate detection, stale/deleted
   source comparison, unsupported-source reporting expansion, and regeneration
@@ -1032,7 +1041,8 @@ Exit criteria:
   generation. Phase 5D.1 satisfies this foundation for the current Canvas
   reviewer path.
 - Users can preview and selectively import source material before it reaches the
-  reviewer engine. This remains Phase 5D.2 scope.
+  reviewer engine. Phase 5D.2 satisfies this for the current Canvas reviewer
+  path using server-held block manifests and selected-block snapshots.
 
 ### Phase 5E - Grades, Submissions, Rubrics, And Feedback Foundation
 

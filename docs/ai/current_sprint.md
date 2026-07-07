@@ -63,8 +63,14 @@ implemented and remotely verified: Canvas preview creates private preview
 sessions, successful generation creates immutable source snapshots, Canvas
 reviewer save requires an owned snapshot, and reviewer detail returns a safe
 provenance summary. Protected live validation is blocked pending rotation of
-previously exposed local credentials. The next roadmap task is Phase 5D.2 -
-Structured Normalized Blocks And Selective Import.
+previously exposed local credentials. Phase 5D.2 structured normalized blocks
+and selective import is implemented and remotely verified: Canvas HTML/OCR
+sources become private server-held block manifests, mobile receives safe public
+selectors, students choose exact blocks before preview, and immutable snapshots
+copy selected-block provenance after generation. Protected live validation for
+Phase 5D.2 remains blocked pending credential rotation. The next roadmap task
+is Phase 5D.3 - Deduplication, Repeated Relationships, Stale And Deleted
+Sources.
 There is no school-wide Canvas token.
 
 ## Completed Phase 3A Scope
@@ -478,7 +484,7 @@ There is no school-wide Canvas token.
   file-byte return, no direct mobile-to-Canvas/Storage download, and no
   persistent OCR output.
 
-## Out Of Scope After Phase 5C.2B
+## Out Of Scope After Phase 5D.2
 
 - Office parsing.
 - Spreadsheet parsing.
@@ -486,8 +492,8 @@ There is no school-wide Canvas token.
 - Audio/video transcription.
 - Canvas Studio support.
 - Discussions, quizzes, submissions, grades, rubrics, and feedback.
-- Structured block-level source provenance beyond the Phase 5D.1 snapshot
-  foundation.
+- Stale/deleted source comparison, duplicate-source detection, source
+  recommendations, and cross-course source bundles.
 - Background, queued, scheduled, or resumable synchronization.
 - Canvas OAuth, task generation, and schedule generation.
 
@@ -540,6 +546,47 @@ There is no school-wide Canvas token.
   follow-up function search-path hardening migration. Remaining advisor
   warnings are historical.
 - The rollback verifier also covers snapshot item context mismatch rejection.
+- Protected live validation is blocked pending confirmed rotation of previously
+  exposed local credentials.
+
+## Completed Phase 5D.2 Scope
+
+- Added private Canvas source structure sessions for bounded server-held
+  normalized block manifests with owner/course/connection validation, expiry,
+  immutability, RLS, revoked direct client grants, and service-role-only access.
+- Added structured HTML/OCR block normalization for headings, paragraphs,
+  list items with hierarchy/style, tables, blockquotes, code/preformatted text,
+  OCR pages, and OCR list lines without exposing parser hashes or private
+  parser/OCR versions to mobile.
+- Added protected Canvas structure and selective-preview routes with auth-first
+  handling, strict JSON content types, request field allowlists, duplicate and
+  limit rejection, and server-side selected-block validation.
+- Extended preview sessions and reviewer source snapshots with selected-block
+  manifests and immutable snapshot block rows, including block kind, source
+  order, block order, page number, text hash, and table shape where applicable.
+- Updated mobile Canvas source reviewer flow to structure sources first, let
+  students select or clear blocks by source, build selective previews from
+  selected block ids only, and preserve the existing edit/generate/save flow.
+- Updated Study Library provenance summaries to show safe selected-block
+  counts without exposing raw Canvas ids, URLs, Storage keys, hashes, or
+  private parser/OCR metadata.
+
+## Phase 5D.2 Results
+
+- Migration `202607070004_add_canvas_selective_source_blocks.sql` is applied
+  remotely.
+- Automated verification passed: shared typecheck/build; Canvas
+  typecheck/build/tests 52/52; OCR typecheck/build/tests 14/14; DB typecheck;
+  API typecheck/build/tests 299/299; mobile typecheck/tests 95/95; engine
+  typecheck/build/evals 266/266; root typecheck/build across 7/7 workspaces;
+  workspace tests API 299/299, mobile 95/95, Canvas 52/52, OCR 14/14.
+- Remote SQL verification passed through
+  `scripts/phase5d2-selective-blocks-verification.sql` with rollback-only
+  fictional data and 18 PASS checks for structure sessions, selected-block
+  preview manifests, immutable snapshot blocks, grants, RLS, ownership,
+  cleanup, snapshot reuse, and historical no-block preview compatibility.
+- Supabase security and performance advisors showed no new Phase 5D.2
+  findings. Remaining warnings are historical.
 - Protected live validation is blocked pending confirmed rotation of previously
   exposed local credentials.
 
@@ -1233,6 +1280,9 @@ production validation. Phase 5C.2A2 Canvas source selection and reviewer
 handoff is complete and live validated. Phase 5C.2B Canvas PDF/image OCR
 sources are complete and live validated. Phase 5D.1 immutable source snapshots
 and exact reviewer provenance is implemented and remotely verified, with
-protected live validation blocked pending credential rotation. The recommended
-next roadmap task is Phase 5D.2 - Structured Normalized Blocks And Selective
-Import. The deferred header/footer cleanup task remains separate.
+protected live validation blocked pending credential rotation. Phase 5D.2
+structured normalized blocks and selective import is implemented and remotely
+verified, with protected live validation blocked pending credential rotation.
+The recommended next roadmap task is Phase 5D.3 - Deduplication, Repeated
+Relationships, Stale And Deleted Sources. The deferred header/footer cleanup
+task remains separate.

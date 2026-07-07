@@ -18,12 +18,15 @@ import {
   CANVAS_REVIEWER_MAX_SELECTED_SOURCES,
   listCanvasReviewerSources,
   prepareCanvasReviewerSources,
-  previewCanvasReviewerSources,
+  previewSelectiveCanvasReviewerSources,
+  structureCanvasReviewerSources,
   type CanvasApiClientError,
   type CanvasReviewerSourceDescriptor,
   type CanvasReviewerSourceListPayload,
   type CanvasReviewerSourcePreviewPayload,
   type CanvasReviewerSourceType,
+  type CanvasSourceStructurePayload,
+  type CanvasStructuredBlock,
 } from "../../services/canvasApi";
 import {
   API_BASE_URL_SETUP_HINT,
@@ -60,6 +63,9 @@ export function CanvasSourceReviewerScreen({
   const [sourceList, setSourceList] =
     useState<CanvasReviewerSourceListPayload | null>(null);
   const [selectedSourceIds, setSelectedSourceIds] = useState<readonly string[]>([]);
+  const [structure, setStructure] =
+    useState<CanvasSourceStructurePayload | null>(null);
+  const [selectedBlockIds, setSelectedBlockIds] = useState<readonly string[]>([]);
   const [preview, setPreview] =
     useState<CanvasReviewerSourcePreviewPayload | null>(null);
   const [sourceText, setSourceText] = useState("");
@@ -72,6 +78,7 @@ export function CanvasSourceReviewerScreen({
   const [error, setError] = useState<CanvasSourceDisplayError | null>(null);
   const [saveError, setSaveError] = useState<CanvasSourceDisplayError | null>(null);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
+  const [isStructuring, setIsStructuring] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [preparingSourceIds, setPreparingSourceIds] = useState<readonly string[]>(
     [],
@@ -123,6 +130,8 @@ export function CanvasSourceReviewerScreen({
 
     setIsLoadingSources(true);
     setError(null);
+    setStructure(null);
+    setSelectedBlockIds([]);
     setPreview(null);
     setReviewer(null);
     setSourceSnapshotId(null);
@@ -169,6 +178,12 @@ export function CanvasSourceReviewerScreen({
       return;
     }
     setError(null);
+    setStructure(null);
+    setSelectedBlockIds([]);
+    setPreview(null);
+    setReviewer(null);
+    setSourceSnapshotId(null);
+    setSavedReviewer(null);
     setSelectedSourceIds((current) => {
       if (current.includes(source.id)) {
         return current.filter((sourceId) => sourceId !== source.id);
@@ -246,17 +261,135 @@ export function CanvasSourceReviewerScreen({
       return;
     }
 
-    setIsPreviewing(true);
+    setIsStructuring(true);
     setError(null);
+    setStructure(null);
+    setSelectedBlockIds([]);
+    setPreview(null);
     setReviewer(null);
     setSourceSnapshotId(null);
     setSavedReviewer(null);
 
     try {
-      const result = await previewCanvasReviewerSources({
+      const result = await structureCanvasReviewerSources({
         ...context.value,
         courseId,
         sourceIds: selectedIdsInPreviewOrder,
+      });
+
+      if (result.ok) {
+        setStructure(result.data);
+        setSelectedBlockIds(defaultSelectedBlockIds(result.data));
+        setSourceText("");
+        setSourceTitle("");
+        setSourceSnapshotId(null);
+        setSaveTitle("");
+      } else {
+        setError(formatCanvasSourceError(result.error));
+      }
+    } finally {
+      setIsStructuring(false);
+    }
+  };
+
+  const updateSelectedBlockIds = (
+    updater: (current: readonly string[]) => readonly string[],
+  ) => {
+    setSelectedBlockIds((current) => updater(current));
+    setPreview(null);
+    setSourceText("");
+    setSourceTitle("");
+    setReviewer(null);
+    setSourceSnapshotId(null);
+    setSavedReviewer(null);
+  };
+
+  const handleToggleBlock = (block: CanvasStructuredBlock) => {
+    if (!block.selectable) {
+      return;
+    }
+    setError(null);
+    updateSelectedBlockIds((current) => {
+      if (current.includes(block.id)) {
+        return current.filter((blockId) => blockId !== block.id);
+      }
+      const maximum = structure?.limits.maximumSelectedBlocks ?? 250;
+      if (current.length >= maximum) {
+        setError({
+          title: "Too many blocks",
+          message: `Select at most ${maximum} Canvas blocks.`,
+        });
+        return current;
+      }
+      return [...current, block.id];
+    });
+  };
+
+  const handleSelectAllSourceBlocks = (
+    source: CanvasSourceStructurePayload["sources"][number],
+  ) => {
+    const selectableIds = source.blocks
+      .filter((block) => block.selectable)
+      .map((block) => block.id);
+    const maximum = structure?.limits.maximumSelectedBlocks ?? 250;
+    setError(null);
+    updateSelectedBlockIds((current) => {
+      const next = [...new Set([...current, ...selectableIds])];
+      if (next.length > maximum) {
+        setError({
+          title: "Too many blocks",
+          message: `Select at most ${maximum} Canvas blocks.`,
+        });
+        return current;
+      }
+      return next;
+    });
+  };
+
+  const handleClearSourceBlocks = (
+    source: CanvasSourceStructurePayload["sources"][number],
+  ) => {
+    const sourceBlockIds = new Set(source.blocks.map((block) => block.id));
+    setError(null);
+    updateSelectedBlockIds((current) =>
+      current.filter((blockId) => !sourceBlockIds.has(blockId)),
+    );
+  };
+
+  const handleBuildSelectivePreview = async () => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+    if (!structure) {
+      setError({
+        title: "Select sources again",
+        message: "Choose Canvas sources before previewing selected blocks.",
+      });
+      return;
+    }
+    if (selectedBlockIds.length === 0) {
+      setError({
+        title: "Choose a block",
+        message: "Choose at least one Canvas block.",
+      });
+      return;
+    }
+
+    setIsPreviewing(true);
+    setError(null);
+    setPreview(null);
+    setReviewer(null);
+    setSourceSnapshotId(null);
+    setSavedReviewer(null);
+
+    try {
+      const result = await previewSelectiveCanvasReviewerSources({
+        ...context.value,
+        courseId,
+        selectedBlockIds,
+        structureSessionId: structure.structureSessionId,
       });
 
       if (result.ok) {
@@ -401,7 +534,147 @@ export function CanvasSourceReviewerScreen({
         />
       ) : null}
 
-      {!preview ? (
+      {preview ? (
+        <View style={styles.stack} testID="canvas-source-preview-editor">
+          <Card style={styles.formCard}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.statusTitle}>Canvas source preview</Text>
+              <Text style={styles.statusText}>
+                {preview.sourceCount} sources - {sourceText.length} characters
+                {preview.selectedBlockCount !== undefined
+                  ? ` - ${preview.selectedBlockCount} blocks`
+                  : ""}
+              </Text>
+            </View>
+
+            <TextField
+              label="Source title"
+              onChangeText={(value) => {
+                setSourceTitle(value);
+                setError(null);
+                setReviewer(null);
+                setSourceSnapshotId(null);
+                setSavedReviewer(null);
+              }}
+              testID="canvas-preview-title-input"
+              value={sourceTitle}
+            />
+
+            <TextField
+              inputStyle={styles.sourceTextInput}
+              label="Source text"
+              multiline
+              onChangeText={(value) => {
+                setSourceText(value);
+                setError(null);
+                setReviewer(null);
+                setSourceSnapshotId(null);
+                setSavedReviewer(null);
+              }}
+              testID="canvas-preview-source-input"
+              textAlignVertical="top"
+              value={sourceText}
+            />
+
+            <View style={styles.actions}>
+              <Button
+                disabled={isGenerating}
+                onPress={() => {
+                  setPreview(null);
+                  setSourceText("");
+                  setSourceTitle("");
+                  setReviewer(null);
+                  setSourceSnapshotId(null);
+                  setSavedReviewer(null);
+                }}
+                variant="secondary"
+              >
+                Back to blocks
+              </Button>
+              <Button
+                disabled={sourceText.trim().length === 0}
+                loading={isGenerating}
+                onPress={() => void handleGenerate()}
+                testID="canvas-generate-reviewer-button"
+                variant="primary"
+              >
+                Generate reviewer
+              </Button>
+            </View>
+          </Card>
+
+          {isGenerating ? (
+            <Card style={styles.statusCard}>
+              <Text style={styles.statusTitle}>Generating reviewer...</Text>
+              <Text style={styles.statusText}>
+                Stay Focused is using only the edited source text and title.
+              </Text>
+            </Card>
+          ) : null}
+
+          {reviewer ? (
+            <SaveCanvasReviewerPanel
+              isSaving={isSaving}
+              onChangeTitle={(value) => {
+                setSaveTitle(value);
+                setSaveError(null);
+              }}
+              onOpenLibrary={onOpenLibrary}
+              onSave={() => void handleSaveReviewer()}
+              savedReviewer={savedReviewer}
+              saveError={saveError}
+              saveTitle={saveTitle}
+              sourceSnapshotReady={sourceSnapshotId !== null}
+            />
+          ) : null}
+
+          {reviewer ? <ReviewerPreview reviewer={reviewer} /> : null}
+        </View>
+      ) : structure ? (
+        <View style={styles.stack} testID="canvas-source-block-selector">
+          {structure.sources.map((source) => (
+            <StructuredSourceSection
+              key={`${source.type}:${source.ordinal}`}
+              onClearSource={handleClearSourceBlocks}
+              onSelectAllSource={handleSelectAllSourceBlocks}
+              onToggleBlock={handleToggleBlock}
+              selectedBlockIds={selectedBlockIds}
+              source={source}
+            />
+          ))}
+
+          <Card style={styles.actionCard}>
+            <Text style={styles.statusText} testID="canvas-selected-block-count">
+              {selectedBlockIds.length} selected blocks
+            </Text>
+            <View style={styles.actions}>
+              <Button
+                disabled={isPreviewing}
+                onPress={() => {
+                  setStructure(null);
+                  setSelectedBlockIds([]);
+                  setPreview(null);
+                  setReviewer(null);
+                  setSourceSnapshotId(null);
+                  setSavedReviewer(null);
+                }}
+                variant="secondary"
+              >
+                Back to sources
+              </Button>
+              <Button
+                disabled={selectedBlockIds.length === 0}
+                loading={isPreviewing}
+                onPress={() => void handleBuildSelectivePreview()}
+                testID="canvas-selective-preview-button"
+                variant="primary"
+              >
+                Preview selected blocks
+              </Button>
+            </View>
+          </Card>
+        </View>
+      ) : (
         <View style={styles.stack}>
           {sourceList?.courseSync.status === "never" ? (
             <Card style={styles.statusCard} testID="canvas-sources-sync-required">
@@ -463,107 +736,16 @@ export function CanvasSourceReviewerScreen({
             <Button
               disabled={selectedIdsInPreviewOrder.length === 0}
               fullWidth
-              loading={isPreviewing}
+              loading={isStructuring}
               onPress={() => void handlePreviewSources()}
               testID="canvas-preview-sources-button"
               variant="primary"
             >
-              {isPreviewing && previewIncludesFile
-                ? "Extracting source text..."
-                : "Preview selected content"}
+              {isStructuring && previewIncludesFile
+                ? "Extracting source blocks..."
+                : "Choose content blocks"}
             </Button>
           </Card>
-        </View>
-      ) : (
-        <View style={styles.stack} testID="canvas-source-preview-editor">
-          <Card style={styles.formCard}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.statusTitle}>Canvas source preview</Text>
-              <Text style={styles.statusText}>
-                {preview.sourceCount} sources - {sourceText.length} characters
-              </Text>
-            </View>
-
-            <TextField
-              label="Source title"
-              onChangeText={(value) => {
-                setSourceTitle(value);
-                setError(null);
-                setReviewer(null);
-                setSourceSnapshotId(null);
-                setSavedReviewer(null);
-              }}
-              testID="canvas-preview-title-input"
-              value={sourceTitle}
-            />
-
-            <TextField
-              inputStyle={styles.sourceTextInput}
-              label="Source text"
-              multiline
-              onChangeText={(value) => {
-                setSourceText(value);
-                setError(null);
-                setReviewer(null);
-                setSourceSnapshotId(null);
-                setSavedReviewer(null);
-              }}
-              testID="canvas-preview-source-input"
-              textAlignVertical="top"
-              value={sourceText}
-            />
-
-            <View style={styles.actions}>
-              <Button
-                disabled={isGenerating}
-                onPress={() => {
-                  setPreview(null);
-                  setReviewer(null);
-                  setSourceSnapshotId(null);
-                  setSavedReviewer(null);
-                }}
-                variant="secondary"
-              >
-                Back to sources
-              </Button>
-              <Button
-                disabled={sourceText.trim().length === 0}
-                loading={isGenerating}
-                onPress={() => void handleGenerate()}
-                testID="canvas-generate-reviewer-button"
-                variant="primary"
-              >
-                Generate reviewer
-              </Button>
-            </View>
-          </Card>
-
-          {isGenerating ? (
-            <Card style={styles.statusCard}>
-              <Text style={styles.statusTitle}>Generating reviewer...</Text>
-              <Text style={styles.statusText}>
-                Stay Focused is using only the edited source text and title.
-              </Text>
-            </Card>
-          ) : null}
-
-          {reviewer ? (
-            <SaveCanvasReviewerPanel
-              isSaving={isSaving}
-              onChangeTitle={(value) => {
-                setSaveTitle(value);
-                setSaveError(null);
-              }}
-              onOpenLibrary={onOpenLibrary}
-              onSave={() => void handleSaveReviewer()}
-              savedReviewer={savedReviewer}
-              saveError={saveError}
-              saveTitle={saveTitle}
-              sourceSnapshotReady={sourceSnapshotId !== null}
-            />
-          ) : null}
-
-          {reviewer ? <ReviewerPreview reviewer={reviewer} /> : null}
         </View>
       )}
     </Screen>
@@ -718,6 +900,95 @@ function SourceRow({
             </Button>
           </View>
         ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function StructuredSourceSection({
+  onClearSource,
+  onSelectAllSource,
+  onToggleBlock,
+  selectedBlockIds,
+  source,
+}: {
+  readonly onClearSource: (
+    source: CanvasSourceStructurePayload["sources"][number],
+  ) => void;
+  readonly onSelectAllSource: (
+    source: CanvasSourceStructurePayload["sources"][number],
+  ) => void;
+  readonly onToggleBlock: (block: CanvasStructuredBlock) => void;
+  readonly selectedBlockIds: readonly string[];
+  readonly source: CanvasSourceStructurePayload["sources"][number];
+}) {
+  const selectedCount = source.blocks.filter((block) =>
+    selectedBlockIds.includes(block.id),
+  ).length;
+
+  return (
+    <Card style={styles.sectionCard} testID={`canvas-structured-source-${source.ordinal}`}>
+      <View style={styles.previewHeader}>
+        <Text style={styles.statusTitle}>{source.title}</Text>
+        <Text style={styles.statusText}>
+          {formatSourceType(source.type)}
+          {source.fileKind ? ` - ${source.fileKind.toUpperCase()}` : ""}
+          {" - "}
+          {selectedCount}/{source.blocks.length} selected
+        </Text>
+      </View>
+      <View style={styles.actions}>
+        <Button onPress={() => onSelectAllSource(source)} variant="secondary">
+          Select all
+        </Button>
+        <Button onPress={() => onClearSource(source)} variant="secondary">
+          Clear
+        </Button>
+      </View>
+      <View style={styles.sourceList}>
+        {source.blocks.map((block) => (
+          <StructuredBlockRow
+            block={block}
+            isSelected={selectedBlockIds.includes(block.id)}
+            key={block.id}
+            onToggleBlock={onToggleBlock}
+          />
+        ))}
+      </View>
+    </Card>
+  );
+}
+
+function StructuredBlockRow({
+  block,
+  isSelected,
+  onToggleBlock,
+}: {
+  readonly block: CanvasStructuredBlock;
+  readonly isSelected: boolean;
+  readonly onToggleBlock: (block: CanvasStructuredBlock) => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: isSelected, disabled: !block.selectable }}
+      disabled={!block.selectable}
+      onPress={() => onToggleBlock(block)}
+      style={[
+        styles.sourceRow,
+        !block.selectable ? styles.sourceRowDisabled : null,
+      ]}
+      testID={`canvas-structured-block-${block.id}`}
+    >
+      <View style={[styles.checkBox, isSelected ? styles.checkBoxSelected : null]}>
+        <Text style={styles.checkMark}>{isSelected ? "x" : ""}</Text>
+      </View>
+      <View style={styles.sourceBody}>
+        <Text style={styles.sourceMeta}>
+          {formatBlockKind(block)}
+          {typeof block.pageNumber === "number" ? ` - Page ${block.pageNumber}` : ""}
+        </Text>
+        <Text style={styles.blockText}>{block.text}</Text>
       </View>
     </Pressable>
   );
@@ -880,6 +1151,39 @@ function formatCanvasSourceError(
         message: error.message,
         detail,
       };
+    case "structure_too_large":
+      return {
+        title: "Too many blocks",
+        message: "Selected Canvas sources contain too many blocks. Select fewer sources.",
+        detail,
+      };
+    case "structure_session_invalid":
+    case "structure_session_not_found":
+    case "structure_session_expired":
+      return {
+        title: "Select sources again",
+        message: "The block selection expired. Choose Canvas sources again.",
+        detail,
+      };
+    case "block_selection_empty":
+      return {
+        title: "Choose a block",
+        message: "Choose at least one Canvas block.",
+        detail,
+      };
+    case "block_selection_duplicate":
+    case "block_selection_invalid":
+      return {
+        title: "Choose blocks again",
+        message: "The selected Canvas blocks could not be used. Choose blocks again.",
+        detail,
+      };
+    case "block_selection_limit_exceeded":
+      return {
+        title: "Too many blocks",
+        message: error.message,
+        detail,
+      };
     case "source_preparation_required":
       return {
         title: "Prepare file first",
@@ -1032,6 +1336,16 @@ function defaultSaveTitle(reviewer: ReviewerOutput, sourceTitle: string): string
   return title || "Canvas Reviewer";
 }
 
+function defaultSelectedBlockIds(
+  structure: CanvasSourceStructurePayload,
+): readonly string[] {
+  return structure.sources.flatMap((source) =>
+    source.blocks
+      .filter((block) => block.selectable && block.selectedByDefault)
+      .map((block) => block.id),
+  );
+}
+
 function formatSyncStatus(
   status: CanvasReviewerSourceListPayload["courseSync"]["status"],
 ): string {
@@ -1080,6 +1394,23 @@ function formatFileState(
       return "Unsupported";
     case "unavailable":
       return "Unavailable";
+  }
+}
+
+function formatBlockKind(block: CanvasStructuredBlock): string {
+  switch (block.kind) {
+    case "heading":
+      return block.headingLevel ? `Heading ${block.headingLevel}` : "Heading";
+    case "paragraph":
+      return "Paragraph";
+    case "list_item":
+      return block.listStyle === "ordered" ? "Numbered list" : "List item";
+    case "table":
+      return "Table";
+    case "quote":
+      return "Quote";
+    case "code":
+      return "Code";
   }
 }
 
@@ -1209,6 +1540,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
+  },
+  blockText: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
   },
   sourceTextInput: {
     minHeight: SOURCE_TEXT_HEIGHT,

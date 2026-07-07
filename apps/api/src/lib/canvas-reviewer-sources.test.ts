@@ -17,8 +17,15 @@ import {
   listCanvasReviewerSources,
   normalizeCanvasHtmlToText,
   previewCanvasReviewerSources,
+  previewSelectiveCanvasReviewerSources,
   type PreviewSourceRecord,
+  structureCanvasReviewerSources,
 } from "./canvas-reviewer-sources";
+import {
+  CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
+  CANVAS_SELECTIVE_PREVIEW_VERSION,
+  CANVAS_STRUCTURED_BLOCKS_VERSION,
+} from "./canvas-structured-blocks";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const CONNECTION_ID = "00000000-0000-4000-8000-000000000002";
@@ -32,6 +39,7 @@ const ANNOUNCEMENT_ID = "33333333-3333-4333-8333-333333333333";
 const FILE_ID = "44444444-4444-4444-8444-444444444444";
 const OTHER_FILE_ID = "44444444-4444-4444-8444-444444444445";
 const PREVIEW_SESSION_ID = "66666666-6666-4666-8666-666666666666";
+const STRUCTURE_SESSION_ID = "77777777-7777-4777-8777-777777777777";
 const NOW = "2026-07-07T00:00:00.000Z";
 
 describe("Canvas reviewer source normalization", () => {
@@ -324,6 +332,156 @@ describe("Canvas reviewer source service", () => {
     expect(result.value.sourceText).not.toContain(PAGE_ID);
     expect(JSON.stringify(result.value)).not.toContain("source_manifest");
     expect(JSON.stringify(result.value)).not.toContain("sha256");
+  });
+
+  it("stores private structured blocks while returning public block selectors", async () => {
+    const fake = createFakeCanvasClient();
+
+    const result = await structureCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      sourceIds: [`page:${PAGE_ID}`],
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.structureSessionId).toBe(STRUCTURE_SESSION_ID);
+    expect(result.value.sources).toEqual([
+      expect.objectContaining({
+        ordinal: 1,
+        title: "Fictional Page",
+        type: "page",
+        blocks: [
+          expect.objectContaining({
+            kind: "heading",
+            selectedByDefault: true,
+            sourceOrdinal: 1,
+            text: "Overview",
+          }),
+          expect.objectContaining({
+            kind: "paragraph",
+            selectedByDefault: true,
+            sourceOrdinal: 1,
+            text: "Readable page text.",
+          }),
+        ],
+      }),
+    ]);
+    expect(JSON.stringify(result.value)).not.toContain("block_sha256");
+    expect(JSON.stringify(result.value)).not.toContain("parser_version");
+
+    const session = fake.insertedRowsFor("canvas_source_structure_sessions")[0];
+    expect(session).toMatchObject({
+      id: STRUCTURE_SESSION_ID,
+      user_id: USER_ID,
+      canvas_connection_id: CONNECTION_ID,
+      course_id: COURSE_ID,
+      source_count: 1,
+      block_count: 2,
+      structure_version: CANVAS_STRUCTURED_BLOCKS_VERSION,
+    });
+    const blockManifest = session.block_manifest as readonly FakeRecord[];
+    expect(blockManifest).toHaveLength(2);
+    expect(blockManifest[0]).toMatchObject({
+      block_kind: "heading",
+      block_ordinal: 1,
+      parser_version: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
+      source_ordinal: 1,
+    });
+    expect(blockManifest[0]?.block_sha256).toMatch(/^[a-f0-9]{64}$/);
+    const sourceManifest = session.source_manifest as readonly FakeRecord[];
+    expect(sourceManifest[0]).toMatchObject({
+      ordinal: 1,
+      parser_version: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
+      source_row_id: PAGE_ID,
+      source_type: "page",
+    });
+  });
+
+  it("builds selective previews from server-held blocks and stores selected-block provenance", async () => {
+    const fake = createFakeCanvasClient();
+    const structure = await structureCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      sourceIds: [`page:${PAGE_ID}`],
+      userId: USER_ID,
+    });
+    expect(structure.ok).toBe(true);
+    if (!structure.ok) return;
+
+    const blocks = structure.value.sources[0]?.blocks ?? [];
+    const result = await previewSelectiveCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      selectedBlockIds: [blocks[1]?.id ?? "", blocks[0]?.id ?? ""],
+      structureSessionId: structure.value.structureSessionId,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value).toMatchObject({
+      previewSessionId: PREVIEW_SESSION_ID,
+      selectedBlockCount: 2,
+      sourceCount: 1,
+      sources: [{ id: `page:${PAGE_ID}`, type: "page" }],
+    });
+    expect(result.value.sourceText).toContain("SOURCE 1 - PAGE - Fictional Page");
+    expect(result.value.sourceText.indexOf("# Overview")).toBeLessThan(
+      result.value.sourceText.indexOf("Readable page text."),
+    );
+    expect(JSON.stringify(result.value)).not.toContain("block_sha256");
+    expect(JSON.stringify(result.value)).not.toContain("source_manifest");
+
+    const previewSession =
+      fake.insertedRowsFor("canvas_source_preview_sessions").at(-1);
+    expect(previewSession).toMatchObject({
+      id: PREVIEW_SESSION_ID,
+      normalization_version: CANVAS_SELECTIVE_PREVIEW_VERSION,
+      source_count: 1,
+    });
+    const selectedBlockManifest =
+      previewSession?.selected_block_manifest as readonly FakeRecord[];
+    expect(selectedBlockManifest.map((block) => block.block_ordinal)).toEqual([
+      1,
+      2,
+    ]);
+    expect(selectedBlockManifest[0]).toMatchObject({
+      block_kind: "heading",
+      parser_version: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
+      source_ordinal: 1,
+    });
+    expect(selectedBlockManifest[0]?.block_sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("rejects duplicate selected block IDs before storing selective preview provenance", async () => {
+    const fake = createFakeCanvasClient();
+    const structure = await structureCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      sourceIds: [`page:${PAGE_ID}`],
+      userId: USER_ID,
+    });
+    expect(structure.ok).toBe(true);
+    if (!structure.ok) return;
+    const blockId = structure.value.sources[0]?.blocks[0]?.id ?? "";
+
+    const result = await previewSelectiveCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      selectedBlockIds: [blockId, blockId],
+      structureSessionId: structure.value.structureSessionId,
+      userId: USER_ID,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "canvas_source_block_selection_duplicate",
+    });
+    expect(fake.insertedRowsFor("canvas_source_preview_sessions")).toHaveLength(0);
   });
 
   it("rejects duplicate IDs before reading storage", async () => {
@@ -712,9 +870,11 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
         id:
           typeof record.id === "string"
             ? record.id
-            : index === 0
-              ? PREVIEW_SESSION_ID
-              : `${PREVIEW_SESSION_ID}-${index}`,
+            : this.tableName === "canvas_source_structure_sessions"
+              ? STRUCTURE_SESSION_ID
+              : index === 0
+                ? PREVIEW_SESSION_ID
+                : `${PREVIEW_SESSION_ID}-${index}`,
         ...record,
       };
     });
@@ -790,7 +950,11 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     if (this.insertedRows) {
       return this.insertedRows;
     }
-    const filtered = this.rows.filter((row) =>
+    const allRows = [
+      ...this.rows,
+      ...(this.capturedInserts.get(this.tableName) ?? []),
+    ];
+    const filtered = allRows.filter((row) =>
       this.filters.every((filter) => filter(row)),
     );
     const ordered = [...filtered].sort((left, right) =>

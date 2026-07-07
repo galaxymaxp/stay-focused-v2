@@ -44,6 +44,24 @@ export interface CanvasSourceManifestItem {
   readonly ocr_version: string | null;
 }
 
+export interface CanvasSelectedBlockManifestItem {
+  readonly ordinal: number;
+  readonly source_ordinal: number;
+  readonly block_ordinal: number;
+  readonly block_kind: string;
+  readonly block_text: string;
+  readonly block_sha256: string;
+  readonly heading_level: number | null;
+  readonly list_depth: number | null;
+  readonly list_style: string | null;
+  readonly table_structure: Json | null;
+  readonly page_number: number | null;
+  readonly slide_number: number | null;
+  readonly module_position: number | null;
+  readonly parser_version: string | null;
+  readonly ocr_version: string | null;
+}
+
 export type SourceProvenanceErrorCode =
   | "canvas_preview_session_missing"
   | "canvas_preview_session_expired"
@@ -77,6 +95,8 @@ const SNAPSHOT_COLUMNS =
   "id,user_id,preview_session_id,canvas_connection_id,course_id,source_mode,source_title,original_preview_sha256,exact_source_text,exact_source_sha256,source_count,was_edited,normalization_version,created_at";
 const SNAPSHOT_ITEM_SUMMARY_COLUMNS =
   "id,user_id,source_snapshot_id,ordinal,parser_version,ocr_version,created_at";
+const SNAPSHOT_BLOCK_SUMMARY_COLUMNS =
+  "id,user_id,source_snapshot_id,ordinal,created_at";
 
 type SnapshotItemVersionRow = Pick<
   ReviewerSourceSnapshotItemRow,
@@ -92,7 +112,9 @@ export async function createCanvasSourcePreviewSession({
   client,
   courseId,
   manifest,
+  normalizationVersion,
   originalPreviewText,
+  selectedBlockManifest,
   suggestedTitle,
   userId,
 }: {
@@ -100,7 +122,9 @@ export async function createCanvasSourcePreviewSession({
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
   readonly manifest: readonly CanvasSourceManifestItem[];
+  readonly normalizationVersion?: string;
   readonly originalPreviewText: string;
+  readonly selectedBlockManifest?: readonly CanvasSelectedBlockManifestItem[];
   readonly suggestedTitle: string;
   readonly userId: string;
 }): Promise<SourceProvenanceResult<{ readonly previewSessionId: string }>> {
@@ -113,9 +137,11 @@ export async function createCanvasSourcePreviewSession({
     course_id: courseId,
     created_at: createdAt.toISOString(),
     expires_at: expiresAt.toISOString(),
-    normalization_version: CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
+    normalization_version:
+      normalizationVersion ?? CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
     original_preview_sha256: sha256Utf8Hex(originalPreviewText),
     original_preview_text: originalPreviewText,
+    selected_block_manifest: (selectedBlockManifest ?? []) as unknown as Json,
     source_count: manifest.length,
     source_manifest: manifest as unknown as Json,
     suggested_title: suggestedTitle,
@@ -351,6 +377,17 @@ export async function readSafeReviewerSourceProvenanceSummary({
     return storageFailed("Canvas source snapshot summary could not be loaded.");
   }
 
+  const { data: blocksData, error: blocksError } = await client
+    .from("reviewer_source_snapshot_blocks")
+    .select(SNAPSHOT_BLOCK_SUMMARY_COLUMNS)
+    .eq("source_snapshot_id", sourceSnapshotId)
+    .eq("user_id", userId)
+    .order("ordinal", { ascending: true });
+
+  if (blocksError || !blocksData) {
+    return storageFailed("Canvas source snapshot summary could not be loaded.");
+  }
+
   const snapshot = snapshotData as ReviewerSourceSnapshotRow;
   const items = itemsData as unknown as readonly SnapshotItemVersionRow[];
   return {
@@ -359,6 +396,7 @@ export async function readSafeReviewerSourceProvenanceSummary({
       generatedAt: snapshot.created_at,
       ocrVersions: collectVersions(items.map((item) => item.ocr_version)),
       parserVersions: collectVersions(items.map((item) => item.parser_version)),
+      selectedBlockCount: blocksData.length,
       sourceCount: snapshot.source_count,
       sourceMode: "canvas",
       sourceSnapshotId: snapshot.id,

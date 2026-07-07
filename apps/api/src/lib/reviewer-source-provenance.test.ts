@@ -46,6 +46,7 @@ describe("reviewer source provenance helpers", () => {
       ),
       source_count: 2,
       source_manifest: [manifestItem(1), manifestItem(2)],
+      selected_block_manifest: [],
       normalization_version: CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
     });
   });
@@ -149,6 +150,7 @@ describe("reviewer source provenance helpers", () => {
       ok: true,
       value: {
         sourceSnapshotId: SNAPSHOT_ID,
+        selectedBlockCount: 2,
         sourceCount: 2,
         wasEdited: true,
         parserVersions: [CANVAS_HTML_VISIBLE_TEXT_PARSER_VERSION],
@@ -235,7 +237,7 @@ function createSelectBuilder(
       onfulfilled?: (value: { readonly data: unknown; readonly error: null }) => unknown,
     ) =>
       Promise.resolve({
-        data:
+      data:
           table === "reviewer_source_snapshot_items"
             ? [
                 {
@@ -247,6 +249,23 @@ function createSelectBuilder(
                   ocr_version: CANVAS_STORED_IMAGE_OCR_VERSION,
                 },
               ]
+            : table === "reviewer_source_snapshot_blocks"
+              ? [
+                  {
+                    id: "77777777-7777-4777-8777-777777777771",
+                    user_id: USER_ID,
+                    source_snapshot_id: SNAPSHOT_ID,
+                    ordinal: 1,
+                    created_at: "2026-07-07T00:10:00.000Z",
+                  },
+                  {
+                    id: "77777777-7777-4777-8777-777777777772",
+                    user_id: USER_ID,
+                    source_snapshot_id: SNAPSHOT_ID,
+                    ordinal: 2,
+                    created_at: "2026-07-07T00:10:00.000Z",
+                  },
+                ]
             : [],
         error: null,
       }).then(onfulfilled),
@@ -283,6 +302,7 @@ function previewSessionRow() {
     suggested_title: "Fictional Canvas Reviewer",
     source_count: 2,
     source_manifest: [manifestItem(1), manifestItem(2)] as unknown as Json,
+    selected_block_manifest: [] as unknown as Json,
     normalization_version: CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
     created_at: "2026-07-07T00:00:00.000Z",
     expires_at: "2099-01-01T00:00:00.000Z",

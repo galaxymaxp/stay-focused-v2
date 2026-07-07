@@ -1,4 +1,9 @@
-import { OCR_PDF_MIME_TYPE, normalizeOcrText, type OcrProvider } from "@stay-focused/ocr";
+import {
+  OCR_PDF_MIME_TYPE,
+  normalizeOcrText,
+  type OcrProvider,
+  type OcrResult,
+} from "@stay-focused/ocr";
 import type { CanvasFileRow, Database } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
@@ -28,6 +33,7 @@ export interface CanvasStoredFileExtraction {
   readonly text: string;
   readonly fileKind: Exclude<CanvasStoredFileKind, "unsupported">;
   readonly pageCount?: number;
+  readonly ocrResult: OcrResult;
 }
 
 export type CanvasStoredFileExtractionResult =
@@ -221,6 +227,7 @@ async function extractImage({
     ok: true,
     value: {
       fileKind: "image",
+      ocrResult: extraction.result,
       text,
     },
   };
@@ -289,6 +296,7 @@ async function extractPdf({
     ok: true,
     value: {
       fileKind: "pdf",
+      ocrResult: extraction.result,
       pageCount: validation.pageCount,
       text,
     },
