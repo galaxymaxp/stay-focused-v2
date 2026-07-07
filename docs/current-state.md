@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-07-07, Asia/Manila.
+Last refreshed: 2026-07-08, Asia/Manila.
 
 ## Repository Baseline
 
@@ -926,7 +926,11 @@ Study Library cleanup. Phase 5D.1 immutable source snapshots and exact reviewer
 provenance, Phase 5D.2 structured normalized blocks and selective import, and
 Phase 5D.3 duplicate relationships, source freshness, and regeneration
 readiness are implemented, remotely verified, and protected-live validated.
-The next roadmap step is Phase 5E planning.
+Phase 5E planning is complete in
+`docs/ai/phase5e-grades-submissions-plan-20260708.md`. The recommended next
+implementation task is Phase 5E.1, limited to the Canvas grades/submissions
+data contract, database foundation, DB types, and rollback-safe SQL
+verification. Phase 5E application logic has not started.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks

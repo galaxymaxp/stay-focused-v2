@@ -214,12 +214,19 @@ paths.
 - Canvas OAuth is not implemented. It is the intended production authorization
   path for broad multi-user deployment and requires an institution-approved
   Canvas Developer Key.
+- Phase 5E planning is complete in
+  `docs/ai/phase5e-grades-submissions-plan-20260708.md`. The recommended MVP
+  is strictly read-only selected-course assignment, submission, and visible
+  grade state with explicit per-course synchronization, DB-only read routes,
+  Canvas-provided course grade summaries only when visible, no unofficial local
+  grade estimates, no notifications, no background jobs, no submission writes,
+  and no reviewer prompt use.
 - Remaining secondary Canvas resources, broader parser families,
-  stale/deleted-source comparison, grades, background synchronization, task
-  generation, and study schedule generation are still pending. Production endpoint
-  validators remain unsupported for the audited endpoint families. Discussions,
-  quiz metadata, announcement attachment content import, and broader Canvas
-  resource support remain deferred.
+  stale/deleted-source comparison, Phase 5E implementation, background
+  synchronization, task generation, and study schedule generation are still
+  pending. Production endpoint validators remain unsupported for the audited
+  endpoint families. Discussions, quiz metadata, announcement attachment
+  content import, and broader Canvas resource support remain deferred.
 
 ## Environment and credentials
 
@@ -442,7 +449,13 @@ sources are complete and live validated. Phase 5D.1 immutable source snapshots
 and exact reviewer provenance, Phase 5D.2 structured normalized blocks and
 selective import, and Phase 5D.3 duplicate relationships, source freshness,
 and regeneration readiness are implemented, remotely verified, and
-protected-live validated. The next roadmap step is Phase 5E planning.
+protected-live validated. Phase 5E planning is complete in
+`docs/ai/phase5e-grades-submissions-plan-20260708.md`. The next roadmap step
+is Phase 5E.1 - Data contract and database foundation for read-only Canvas
+grades and submissions. That first implementation task should add only the
+normalized contract, schema, DB types, and rollback-safe SQL verifier; it must
+not add Canvas client calls, API routes, mobile screens, background jobs,
+notifications, or submission actions.
 Automatic repeated scanned-PDF header/footer detection remains a deferred
 candidate.
 
