@@ -951,11 +951,16 @@ checks, and no fictional rows remain. Phase 5E.4 is implemented in
 explicit selected-course grade sync, paginated assignment/submission list,
 assignment detail, visible course summary, and sync-status reads. Only the sync
 route can call Canvas through the Phase 5E.3 service; all GET routes are
-database-only and return `Cache-Control: no-store`. No mobile service/UI,
-background sync, notification, local grade calculation, submission action,
-private submission-content return, or reviewer integration exists. The next
-implementation task is Phase 5E.5 - mobile assignment and grade experience.
-Repeated PDF header/footer cleanup remains a separate deferred candidate.
+database-only and return `Cache-Control: no-store`. Phase 5E.4 protected live
+validation is complete in
+`docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
+fixed sync route course-scope preflight so unknown valid course UUIDs return
+safe `404` and owned but unselected courses return safe `400` before Canvas
+synchronization. No mobile service/UI, background sync, notification, local
+grade calculation, submission action, private submission-content return, or
+reviewer integration exists. The next implementation task is Phase 5E.5 -
+mobile assignment and grade experience. Repeated PDF header/footer cleanup
+remains a separate deferred candidate.
 
 ## Known Risks
 

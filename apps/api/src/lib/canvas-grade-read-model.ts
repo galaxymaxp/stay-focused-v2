@@ -507,6 +507,24 @@ export async function getCanvasGradeSyncStatus({
   });
 }
 
+export async function authorizeSelectedCanvasGradeCourse({
+  client,
+  courseId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly courseId: string;
+  readonly userId: string;
+}): Promise<CanvasGradeReadResult<null>> {
+  return withReadModelErrors<null>(async () => {
+    const course = await authorizeSelectedGradeCourse({ client, courseId, userId });
+    if (!course.ok) {
+      return course;
+    }
+    return { ok: true, value: null };
+  });
+}
+
 async function authorizeSelectedGradeCourse({
   client,
   courseId,

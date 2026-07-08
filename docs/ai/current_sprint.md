@@ -1399,8 +1399,11 @@ Phase 5E.4 is implemented in
 explicit selected-course grade sync, paginated assignment/submission list,
 assignment detail, Canvas-provided visible course summary, and sync status. Only
 the sync route can call Canvas through the Phase 5E.3 service; all GET routes
-are DB-only and no-store. No mobile service/UI, background sync, notification,
-local grade calculation, submission mutation, private submission-content return,
-or reviewer integration exists. The next roadmap step is Phase 5E.5 - mobile
-assignment and grade experience. The deferred header/footer cleanup task remains
-separate.
+are DB-only and no-store. Phase 5E.4 protected live validation is complete in
+`docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
+fixed the sync route so unknown valid course UUIDs return safe `404` and owned
+but unselected courses return safe `400` before Canvas synchronization. No
+mobile service/UI, background sync, notification, local grade calculation,
+submission mutation, private submission-content return, or reviewer integration
+exists. The next roadmap step is Phase 5E.5 - mobile assignment and grade
+experience. The deferred header/footer cleanup task remains separate.

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
       user: { id: "user-1" },
     },
   } as unknown,
+  authorizeSelectedCanvasGradeCourse: vi.fn(),
   requireCanvasAuth: vi.fn(),
   syncCanvasCourseGrades: vi.fn(),
 }));
@@ -27,6 +28,10 @@ vi.mock("@/lib/canvas-grade-sync", () => ({
   syncCanvasCourseGrades: mocks.syncCanvasCourseGrades,
 }));
 
+vi.mock("@/lib/canvas-grade-read-model", () => ({
+  authorizeSelectedCanvasGradeCourse: mocks.authorizeSelectedCanvasGradeCourse,
+}));
+
 const route = await import("./route");
 
 describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
@@ -40,6 +45,10 @@ describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
       },
     };
     mocks.requireCanvasAuth.mockImplementation(async () => mocks.authResult);
+    mocks.authorizeSelectedCanvasGradeCourse.mockResolvedValue({
+      ok: true,
+      value: null,
+    });
     mocks.syncCanvasCourseGrades.mockResolvedValue(syncResult("succeeded"));
   });
 
@@ -66,6 +75,34 @@ describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
     expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
   });
 
+  it("rejects unknown or unselected course scope before synchronization", async () => {
+    mocks.authorizeSelectedCanvasGradeCourse.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      code: "canvas_course_not_found",
+      message: "Canvas course was not found for this connection.",
+    });
+
+    const unknown = await route.POST(createRequest(), createContext(COURSE_ID));
+
+    expect(unknown.status).toBe(404);
+    await expectError(unknown, "canvas_course_not_found");
+    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
+
+    mocks.authorizeSelectedCanvasGradeCourse.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      code: "canvas_course_not_selected",
+      message: "Select the Canvas course before reading synchronized grade data.",
+    });
+
+    const unselected = await route.POST(createRequest(), createContext(COURSE_ID));
+
+    expect(unselected.status).toBe(400);
+    await expectError(unselected, "canvas_course_not_selected");
+    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
+  });
+
   it("accepts no body and delegates exactly once to Phase 5E.3 sync", async () => {
     const response = await route.POST(
       new Request(`http://localhost/api/canvas/courses/${COURSE_ID}/grades/sync`, {
@@ -82,6 +119,11 @@ describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
       ok: true,
       status: "succeeded",
       assignmentSubmission: { persistedCount: 2 },
+    });
+    expect(mocks.authorizeSelectedCanvasGradeCourse).toHaveBeenCalledWith({
+      client: currentAuthClient(),
+      courseId: COURSE_ID,
+      userId: "user-1",
     });
     expect(mocks.syncCanvasCourseGrades).toHaveBeenCalledTimes(1);
     expect(mocks.syncCanvasCourseGrades).toHaveBeenCalledWith({

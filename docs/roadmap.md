@@ -231,8 +231,10 @@ complete in
 `docs/ai/phase5e1-grades-submissions-foundation-20260708.md`, and Phase 5E.2
 is complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. Phase 5E.3
 explicit synchronized import is complete and remotely verified, and Phase 5E.4
-protected grade APIs are implemented. Phase 5E.5 through Phase 5F remain planned and
-must not be collapsed into a single generic Canvas integration task.
+protected grade APIs are implemented and protected-live validated in
+`docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`. Phase 5E.5
+through Phase 5F remain planned and must not be collapsed into a single generic
+Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -1091,6 +1093,11 @@ and return `Cache-Control: no-store`. No mobile UI exists, synchronization is
 manual and per selected course only, Canvas access remains read-only, and no
 background job, notification, local grade calculation, submission write,
 private submission-content storage, or reviewer prompt integration exists.
+Phase 5E.4 protected live validation is complete in
+`docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
+fixed the sync route course-scope preflight so unknown valid course UUIDs return
+safe `404` and owned but unselected courses return safe `400` before Canvas
+synchronization.
 
 MVP boundary:
 
@@ -1136,7 +1143,7 @@ MVP subphases:
 - Phase 5E.1 - Data contract and database foundation (complete)
 - Phase 5E.2 - Canvas assignment/submission client support (complete)
 - Phase 5E.3 - Explicit synchronized import (complete and remotely verified)
-- Phase 5E.4 - Protected API read model (complete)
+- Phase 5E.4 - Protected API read model (complete and live validated)
 - Phase 5E.5 - Mobile assignment and grade experience
 - Phase 5E.6 - Protected live validation and hardening
 

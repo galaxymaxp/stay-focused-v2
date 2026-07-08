@@ -3,6 +3,7 @@ import {
   optionsResponse,
   requireCanvasAuth,
 } from "@/lib/canvas-routes";
+import { authorizeSelectedCanvasGradeCourse } from "@/lib/canvas-grade-read-model";
 import { syncCanvasCourseGrades } from "@/lib/canvas-grade-sync";
 
 export const runtime = "nodejs";
@@ -44,6 +45,22 @@ export async function POST(
     return jsonResponse(
       { ok: false, error: { code: body.code, message: body.message } },
       body.status,
+      request,
+    );
+  }
+
+  const authorized = await authorizeSelectedCanvasGradeCourse({
+    client: auth.value.client,
+    courseId,
+    userId: auth.value.user.id,
+  });
+  if (!authorized.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: authorized.code, message: authorized.message },
+      },
+      authorized.status,
       request,
     );
   }
