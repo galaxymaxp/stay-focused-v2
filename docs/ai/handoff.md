@@ -226,13 +226,16 @@ paths.
   applied remotely, RPC execution is service-role-only, RLS/direct grants
   remain hardened, the rollback-safe verifier passed 17/17 checks, and no
   fictional rows remain. The recommended MVP remains strictly read-only
-  selected-course assignment, submission, and visible grade state. Phase 5E.3
-  adds only the internal explicit synchronization service; DB-backed read routes
-  are Phase 5E.4, mobile UI is Phase 5E.5, and unofficial local grade
+  selected-course assignment, submission, and visible grade state. Phase 5E.4
+  is implemented in
+  `docs/ai/phase5e4-protected-grade-api-20260708.md`; it exposes protected
+  explicit grade sync plus DB-only list, detail, summary, and sync-status
+  routes for owned selected courses. Only the sync route can call Canvas through
+  the Phase 5E.3 service. Mobile UI is Phase 5E.5, and unofficial local grade
   estimates, notifications, background jobs, submission writes, private
-  submission-content storage, and reviewer prompt use remain excluded.
+  submission-content return, and reviewer prompt use remain excluded.
 - Remaining secondary Canvas resources, broader parser families,
-  stale/deleted-source comparison, Phase 5E.4+ implementation, background
+  stale/deleted-source comparison, Phase 5E.5+ implementation, background
   synchronization, task generation, and study schedule generation are still
   pending. Production endpoint validators remain unsupported for the audited
   endpoint families. Discussions, quiz metadata, announcement attachment
@@ -473,13 +476,14 @@ internal explicit per-selected-course grade synchronization service,
 Canvas-to-database normalization, deterministic fingerprints, service-role-only
 RPC persistence, authoritative absence marking, partial-failure preservation,
 and per-course grade sync state. Canvas access remains read-only and manual.
-No public grade API route, mobile service/UI, background synchronization,
-notification, local grade calculation, submission mutation, private
-submission-content storage, or reviewer integration exists. Remote Supabase
-verification is complete through `202607080006`, with service-role-only RPC
-execution, hardened table grants/RLS, 17/17 rollback verifier checks passing,
-and zero fictional rows remaining. The next roadmap step is Phase 5E.4 -
-protected API read model.
+Remote Supabase verification is complete through `202607080006`, with
+service-role-only RPC execution, hardened table grants/RLS, 17/17 rollback
+verifier checks passing, and zero fictional rows remaining. Phase 5E.4 exposes
+protected grade API routes for explicit selected-course sync plus DB-only list,
+detail, summary, and sync-status reads. No mobile service/UI, background
+synchronization, notification, local grade calculation, submission mutation,
+private submission-content return, or reviewer integration exists. The next
+roadmap step is Phase 5E.5 - mobile assignment and grade experience.
 Automatic repeated scanned-PDF header/footer detection remains a deferred
 candidate.
 

@@ -49,10 +49,13 @@ submission state and visible grade summaries, Phase 5E.2 adds strictly
 read-only typed Canvas client support for assignment grade metadata, the
 current user's own submissions, and Canvas-provided visible course grade
 summaries, and Phase 5E.3 adds the internal explicit per-selected-course grade
-synchronization service. Canvas access remains GET-only and manual. No public
-grade API route, mobile UI, background synchronization, notification, local
-grade calculation, submission action, private submission-content storage, or
-reviewer integration exists yet.
+synchronization service. Phase 5E.4 exposes protected grade API routes for
+explicit selected-course grade synchronization and DB-only assignment,
+submission, visible summary, and sync-status reads. Canvas access remains
+GET-only and manual, and only the explicit sync route can call Canvas. No
+mobile grade UI, background synchronization, notification, local grade
+calculation, submission action, private submission-content storage, or reviewer
+integration exists yet.
 Protected live validation remains blocked pending credential rotation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
@@ -340,10 +343,20 @@ Working locally:
   applied remotely, RPC execution is service-role-only, RLS/direct grants remain
   hardened, the rollback-safe verifier passed 17/17 checks, and no fictional
   rows remain.
+- Phase 5E.4 adds protected Canvas grade API routes for one owned selected
+  course: explicit grade sync, paginated assignment/submission list,
+  assignment detail, Canvas-provided visible course summary, and sync status.
+  The sync route delegates to the Phase 5E.3 service. All GET routes are
+  DB-only, use explicit safe column selections, enforce bearer auth plus
+  connection/course/selection ownership, return `Cache-Control: no-store`, and
+  exclude Canvas IDs, connection/user IDs, submission bodies, comments,
+  attachments, rubrics, unposted grades, raw JSON, and fingerprints. No
+  migration, mobile service/UI, background sync, notification, grade estimate,
+  submission mutation, or reviewer integration was added.
 
 Pending:
 
-- Phase 5E.4 protected grade read APIs, then mobile grade UI
+- Phase 5E.5 mobile assignment and grade experience
 - Remaining secondary Canvas resources, broader parser families, and
   background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
@@ -507,6 +520,13 @@ tests do not run that opt-in provider smoke.
   partial, failed, old, or ambiguous sync evidence remains `unknown`. Broader
   parser families, source and block diff UI, cross-course bundles, background
   sync, and actual reviewer regeneration remain deferred.
+- Phase 5E.4 exposes protected grade APIs only. The explicit
+  `POST /api/canvas/courses/:courseId/grades/sync` route may call Canvas
+  through the Phase 5E.3 service; the grade list, assignment detail, summary,
+  and sync-status GET routes read synchronized database state only. No mobile
+  UI, background synchronization, notifications, local grade estimates,
+  submission actions, private submission content, or reviewer prompt
+  integration exists yet.
 - No background or scheduled Canvas synchronization exists yet.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
@@ -546,6 +566,5 @@ normalized blocks and selective import is implemented and remotely verified,
 with protected live validation blocked pending credential rotation. Phase 5D.3
 duplicate relationships, source freshness, and regeneration readiness is
 implemented, with protected live validation blocked pending credential
-rotation. The next operational gate is credential rotation and protected
-Phase 5D.1 through Phase 5D.3 live validation. Canvas OAuth remains a future
-phase.
+rotation. Phase 5E.4 protected grade APIs are implemented; Phase 5E.5 mobile
+assignment and grade UI is next. Canvas OAuth remains a future phase.

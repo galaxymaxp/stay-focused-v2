@@ -941,15 +941,20 @@ internal explicit synchronization service for exactly one owned selected course,
 Canvas-to-database normalization, conservative status derivation, deterministic
 fingerprints, service-role-only RPC persistence, partial-failure preservation,
 and per-course grade sync state. Canvas access remains read-only, manual, and
-per selected course. No public grade API route, mobile service/UI, background
-sync, notification, local grade calculation, submission action, private
-submission-content storage, or reviewer integration exists. Remote Supabase
-verification is complete: `202607080005_add_canvas_grade_sync_rpcs.sql` is
-applied, `202607080006_harden_canvas_grade_sync_rpc_function_references.sql`
-hardens the security-definer RPC function reference, RPC execution is
-service-role-only, RLS/direct grants remain hardened, the rollback-safe verifier
-passed 17/17 checks, and no fictional rows remain. The next implementation task
-is Phase 5E.4 - protected API read model.
+per selected course. Remote Supabase verification is complete:
+`202607080005_add_canvas_grade_sync_rpcs.sql` is applied,
+`202607080006_harden_canvas_grade_sync_rpc_function_references.sql` hardens the
+security-definer RPC function reference, RPC execution is service-role-only,
+RLS/direct grants remain hardened, the rollback-safe verifier passed 17/17
+checks, and no fictional rows remain. Phase 5E.4 is implemented in
+`docs/ai/phase5e4-protected-grade-api-20260708.md`: protected routes now expose
+explicit selected-course grade sync, paginated assignment/submission list,
+assignment detail, visible course summary, and sync-status reads. Only the sync
+route can call Canvas through the Phase 5E.3 service; all GET routes are
+database-only and return `Cache-Control: no-store`. No mobile service/UI,
+background sync, notification, local grade calculation, submission action,
+private submission-content return, or reviewer integration exists. The next
+implementation task is Phase 5E.5 - mobile assignment and grade experience.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks

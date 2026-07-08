@@ -230,7 +230,8 @@ in `docs/ai/phase5e-grades-submissions-plan-20260708.md`, Phase 5E.1 is
 complete in
 `docs/ai/phase5e1-grades-submissions-foundation-20260708.md`, and Phase 5E.2
 is complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. Phase 5E.3
-through Phase 5F remain planned and
+explicit synchronized import is complete and remotely verified, and Phase 5E.4
+protected grade APIs are implemented. Phase 5E.5 through Phase 5F remain planned and
 must not be collapsed into a single generic Canvas integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
@@ -1081,10 +1082,15 @@ preservation. Remote Supabase verification is complete: migrations
 `202607080006_harden_canvas_grade_sync_rpc_function_references.sql` are applied
 remotely, RPC execution is service-role-only, RLS/direct grants remain
 hardened, the rollback-safe verifier passed 17/17 checks, and no fictional rows
-remain. No public grade API route or mobile UI exists, synchronization is manual
-and per selected course only, Canvas access remains read-only, and no background
-job, notification, local grade calculation, submission write, private
-submission-content storage, or reviewer prompt integration exists.
+remain. Phase 5E.4 is implemented in
+`docs/ai/phase5e4-protected-grade-api-20260708.md`: protected API routes now
+allow explicit selected-course grade sync, paginated assignment/submission
+list, assignment detail, Canvas-provided visible course summary, and sync-status
+reads. The sync route delegates to Phase 5E.3; all GET routes are database-only
+and return `Cache-Control: no-store`. No mobile UI exists, synchronization is
+manual and per selected course only, Canvas access remains read-only, and no
+background job, notification, local grade calculation, submission write,
+private submission-content storage, or reviewer prompt integration exists.
 
 MVP boundary:
 
@@ -1130,7 +1136,7 @@ MVP subphases:
 - Phase 5E.1 - Data contract and database foundation (complete)
 - Phase 5E.2 - Canvas assignment/submission client support (complete)
 - Phase 5E.3 - Explicit synchronized import (complete and remotely verified)
-- Phase 5E.4 - Protected API read model
+- Phase 5E.4 - Protected API read model (complete)
 - Phase 5E.5 - Mobile assignment and grade experience
 - Phase 5E.6 - Protected live validation and hardening
 
@@ -1139,9 +1145,8 @@ Exit criteria:
 - Grade and submission records remain separate from reviewer source content.
 - Grades never automatically enter reviewer-generation prompts.
 - Hidden or incomplete Canvas grading information is represented honestly.
-- Phase 5E.1, Phase 5E.2, and Phase 5E.3 are complete. Phase 5E.4 is next and
-  is limited to protected DB-backed grade read and explicit-sync route
-  contracts; mobile UI remains Phase 5E.5.
+- Phase 5E.1 through Phase 5E.4 are complete. Phase 5E.5 is next and is limited
+  to mobile assignment and grade display over the protected API contracts.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 

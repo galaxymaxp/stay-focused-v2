@@ -201,6 +201,142 @@ export interface CanvasCourseScopedSyncResponse
   readonly ok: true;
 }
 
+export type CanvasNormalizedAssignmentStatus =
+  | "unknown"
+  | "excused"
+  | "unavailable"
+  | "locked"
+  | "missing"
+  | "graded_hidden"
+  | "graded"
+  | "submitted_late"
+  | "submitted"
+  | "late_unsubmitted"
+  | "available"
+  | "upcoming"
+  | "no_due_date";
+
+export type CanvasGradeVisibilityState =
+  | "unknown"
+  | "visible"
+  | "hidden"
+  | "unavailable"
+  | "not_applicable";
+
+export interface CanvasVisibleScoreDto {
+  readonly state: CanvasGradeVisibilityState;
+  readonly value: number | null;
+}
+
+export interface CanvasVisibleGradeDto {
+  readonly state: CanvasGradeVisibilityState;
+  readonly value: string | null;
+}
+
+export interface CanvasGradeSyncStatusDto {
+  readonly status: "never_synced" | "running" | "succeeded" | "partial" | "failed";
+  readonly assignmentSubmissionState: string;
+  readonly courseGradeSummaryState: string;
+  readonly authoritativeAssignmentSubmission: boolean;
+  readonly lastCheckedAt: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+  readonly stale: boolean;
+  readonly failureCode: string | null;
+}
+
+export interface CanvasGradeAssignmentListItemDto {
+  readonly id: string;
+  readonly title: string;
+  readonly dueAt: string | null;
+  readonly unlockAt: string | null;
+  readonly lockAt: string | null;
+  readonly pointsPossible: number | null;
+  readonly gradingType: string | null;
+  readonly submissionTypes: readonly string[];
+  readonly normalizedStatus: CanvasNormalizedAssignmentStatus;
+  readonly workflowState: string | null;
+  readonly submittedAt: string | null;
+  readonly gradedAt: string | null;
+  readonly attempt: number | null;
+  readonly late: boolean;
+  readonly missing: boolean;
+  readonly excused: boolean;
+  readonly assignmentVisible: boolean | null;
+  readonly score: CanvasVisibleScoreDto;
+  readonly grade: CanvasVisibleGradeDto;
+  readonly lastSyncedAt: string | null;
+}
+
+export interface CanvasGradeAssignmentListResponse {
+  readonly ok: true;
+  readonly items: readonly CanvasGradeAssignmentListItemDto[];
+  readonly page: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly nextOffset: number | null;
+    readonly hasMore: boolean;
+  };
+  readonly sync: CanvasGradeSyncStatusDto;
+}
+
+export interface CanvasGradeAssignmentDetailDto
+  extends CanvasGradeAssignmentListItemDto {
+  readonly allowedAttempts: number | null;
+  readonly hideInGradebook: boolean | null;
+  readonly postManually: boolean | null;
+  readonly submissionType: string | null;
+  readonly postedAt: string | null;
+  readonly secondsLate: number | null;
+  readonly latePolicyStatus: string | null;
+  readonly gradeMatchesCurrentSubmission: boolean | null;
+  readonly pointsPossibleAtSync: number | null;
+  readonly sync: CanvasGradeSyncStatusDto;
+}
+
+export interface CanvasGradeAssignmentDetailResponse {
+  readonly ok: true;
+  readonly assignment: CanvasGradeAssignmentDetailDto;
+}
+
+export interface CanvasCourseGradeSummaryDto {
+  readonly currentScore: CanvasVisibleScoreDto;
+  readonly currentGrade: CanvasVisibleGradeDto;
+  readonly finalScore: CanvasVisibleScoreDto;
+  readonly finalGrade: CanvasVisibleGradeDto;
+  readonly lastSyncedAt: string | null;
+  readonly sync: CanvasGradeSyncStatusDto;
+}
+
+export interface CanvasCourseGradeSummaryResponse {
+  readonly ok: true;
+  readonly summary: CanvasCourseGradeSummaryDto;
+}
+
+export interface CanvasGradeSyncStatusResponse {
+  readonly ok: true;
+  readonly sync: CanvasGradeSyncStatusDto;
+}
+
+export interface CanvasGradeSyncApiResponse {
+  readonly ok: true;
+  readonly status: "succeeded" | "partial" | "failed";
+  readonly assignmentSubmission: {
+    readonly status: "succeeded" | "unchanged" | "failed";
+    readonly assignmentCount: number;
+    readonly submissionEvidenceCount: number;
+    readonly persistedCount: number;
+    readonly statusCounts: Record<CanvasNormalizedAssignmentStatus, number>;
+    readonly failureCode?: string;
+  };
+  readonly courseGradeSummary: {
+    readonly status: "succeeded" | "unchanged" | "failed" | "not_applicable";
+    readonly visibleFieldCount: number;
+    readonly failureCode?: string;
+  };
+  readonly lastCheckedAt: string;
+  readonly lastSuccessfulSyncAt: string | null;
+}
+
 export type CanvasReviewerSourceType =
   | "page"
   | "assignment"
@@ -444,6 +580,9 @@ export type CanvasApiErrorCode =
   | "canvas_source_structure_session_not_found"
   | "canvas_source_structure_session_expired"
   | "canvas_source_structure_too_large"
+  | "canvas_assignment_not_found"
+  | "canvas_grade_data_unavailable"
+  | "canvas_grade_sync_failed"
   | "canvas_source_block_selection_empty"
   | "canvas_source_block_selection_duplicate"
   | "canvas_source_block_selection_invalid"
@@ -460,6 +599,11 @@ export type CanvasApiResponse =
   | CanvasCapabilitiesResponse
   | CanvasSyncResponse
   | CanvasCourseScopedSyncResponse
+  | CanvasGradeSyncApiResponse
+  | CanvasGradeAssignmentListResponse
+  | CanvasGradeAssignmentDetailResponse
+  | CanvasCourseGradeSummaryResponse
+  | CanvasGradeSyncStatusResponse
   | CanvasReviewerSourceListResponse
   | CanvasSourceStructureResponse
   | CanvasReviewerSourcePreviewResponse
