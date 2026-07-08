@@ -15,6 +15,7 @@ import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { colors, spacing, typography } from "../src/design/tokens";
 import { CanvasSourceReviewerScreen } from "../src/features/courses/CanvasSourceReviewerScreen";
+import { CanvasGradeScreen } from "../src/features/courses/CanvasGradeScreen";
 import { CoursesScreen } from "../src/features/courses/CoursesScreen";
 import { StudyLibraryScreen } from "../src/features/library/StudyLibraryScreen";
 import { ReviewerGenerateScreen } from "../src/features/reviewer/ReviewerGenerateScreen";
@@ -39,6 +40,11 @@ function AuthenticatedApp() {
     | { readonly name: "library" }
     | { readonly name: "courses" }
     | { readonly name: "canvas-reviewer"; readonly courseId: string }
+    | {
+        readonly name: "canvas-grades";
+        readonly courseId: string;
+        readonly courseName: string;
+      }
   >({ name: "generate" });
 
   if (activeView.name === "library") {
@@ -54,6 +60,9 @@ function AuthenticatedApp() {
         onCreateReviewerFromCanvas={(courseId) =>
           setActiveView({ name: "canvas-reviewer", courseId })
         }
+        onOpenGrades={(courseId, courseName) =>
+          setActiveView({ name: "canvas-grades", courseId, courseName })
+        }
         onOpenLibrary={() => setActiveView({ name: "library" })}
       />
     );
@@ -65,6 +74,16 @@ function AuthenticatedApp() {
         courseId={activeView.courseId}
         onBackToCourses={() => setActiveView({ name: "courses" })}
         onOpenLibrary={() => setActiveView({ name: "library" })}
+      />
+    );
+  }
+
+  if (activeView.name === "canvas-grades") {
+    return (
+      <CanvasGradeScreen
+        courseId={activeView.courseId}
+        courseName={activeView.courseName}
+        onBackToCourses={() => setActiveView({ name: "courses" })}
       />
     );
   }

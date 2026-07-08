@@ -956,10 +956,16 @@ validation is complete in
 `docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
 fixed sync route course-scope preflight so unknown valid course UUIDs return
 safe `404` and owned but unselected courses return safe `400` before Canvas
-synchronization. No mobile service/UI, background sync, notification, local
+synchronization. Phase 5E.5 is complete and locally validated in
+`docs/ai/phase5e5-mobile-grade-experience-20260708.md`: selected available
+Canvas courses expose a `Grades` entry point, the mobile grade screen performs
+GET-only loading and reloads, explicit per-course `Sync grades` is the only
+grade POST, assignment pagination appends without duplicates, detail loads the
+protected detail route, and hidden or unavailable grade wrappers are never
+shown as zero. No background sync, durable grade cache, notification, local
 grade calculation, submission action, private submission-content return, or
-reviewer integration exists. The next implementation task is Phase 5E.5 -
-mobile assignment and grade experience. Repeated PDF header/footer cleanup
+reviewer integration exists. The next implementation task is Phase 5E.6 -
+protected live validation and hardening. Repeated PDF header/footer cleanup
 remains a separate deferred candidate.
 
 ## Known Risks

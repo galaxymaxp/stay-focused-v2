@@ -15,6 +15,8 @@ const MAX_ERROR_MESSAGE_CHARS = 300;
 const SELECTED_COURSE_SYNC_CONCURRENCY = 2;
 export const CANVAS_REVIEWER_MAX_SELECTED_SOURCES = 8;
 export const CANVAS_REVIEWER_MAX_SELECTED_BLOCKS = 250;
+export const CANVAS_GRADE_LIST_DEFAULT_LIMIT = 50;
+export const CANVAS_GRADE_LIST_MAX_LIMIT = 100;
 
 export interface CanvasConnectionSummary {
   readonly id: string;
@@ -185,6 +187,155 @@ export interface UpdateCanvasCoursePreferencesPayload {
   readonly selectedCourseIds: readonly string[];
   readonly selectedCount: number;
   readonly deselectedCount: number;
+}
+
+export type CanvasNormalizedAssignmentStatus =
+  | "unknown"
+  | "excused"
+  | "unavailable"
+  | "locked"
+  | "missing"
+  | "graded_hidden"
+  | "graded"
+  | "submitted_late"
+  | "submitted"
+  | "late_unsubmitted"
+  | "available"
+  | "upcoming"
+  | "no_due_date";
+
+export type CanvasGradeVisibilityState =
+  | "unknown"
+  | "visible"
+  | "hidden"
+  | "unavailable"
+  | "not_applicable";
+
+export interface CanvasVisibleScore {
+  readonly state: CanvasGradeVisibilityState;
+  readonly value: number | null;
+}
+
+export interface CanvasVisibleGrade {
+  readonly state: CanvasGradeVisibilityState;
+  readonly value: string | null;
+}
+
+export type CanvasGradeSyncStatus =
+  | "never_synced"
+  | "running"
+  | "succeeded"
+  | "partial"
+  | "failed";
+
+export interface CanvasGradeSyncStatusPayload {
+  readonly status: CanvasGradeSyncStatus;
+  readonly assignmentSubmissionState: string;
+  readonly courseGradeSummaryState: string;
+  readonly authoritativeAssignmentSubmission: boolean;
+  readonly lastCheckedAt: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+  readonly stale: boolean;
+  readonly failureCode: string | null;
+}
+
+export interface CanvasGradeAssignmentListItem {
+  readonly id: string;
+  readonly title: string;
+  readonly dueAt: string | null;
+  readonly unlockAt: string | null;
+  readonly lockAt: string | null;
+  readonly pointsPossible: number | null;
+  readonly gradingType: string | null;
+  readonly submissionTypes: readonly string[];
+  readonly normalizedStatus: CanvasNormalizedAssignmentStatus;
+  readonly workflowState: string | null;
+  readonly submittedAt: string | null;
+  readonly gradedAt: string | null;
+  readonly attempt: number | null;
+  readonly late: boolean;
+  readonly missing: boolean;
+  readonly excused: boolean;
+  readonly assignmentVisible: boolean | null;
+  readonly score: CanvasVisibleScore;
+  readonly grade: CanvasVisibleGrade;
+  readonly lastSyncedAt: string | null;
+}
+
+export interface CanvasGradeAssignmentDetail
+  extends CanvasGradeAssignmentListItem {
+  readonly allowedAttempts: number | null;
+  readonly hideInGradebook: boolean | null;
+  readonly postManually: boolean | null;
+  readonly submissionType: string | null;
+  readonly postedAt: string | null;
+  readonly secondsLate: number | null;
+  readonly latePolicyStatus: string | null;
+  readonly gradeMatchesCurrentSubmission: boolean | null;
+  readonly pointsPossibleAtSync: number | null;
+  readonly sync: CanvasGradeSyncStatusPayload;
+}
+
+export interface CanvasCourseGradeSummary {
+  readonly currentScore: CanvasVisibleScore;
+  readonly currentGrade: CanvasVisibleGrade;
+  readonly finalScore: CanvasVisibleScore;
+  readonly finalGrade: CanvasVisibleGrade;
+  readonly lastSyncedAt: string | null;
+  readonly sync: CanvasGradeSyncStatusPayload;
+}
+
+export interface CanvasGradeAssignmentListPayload {
+  readonly items: readonly CanvasGradeAssignmentListItem[];
+  readonly page: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly nextOffset: number | null;
+    readonly hasMore: boolean;
+  };
+  readonly sync: CanvasGradeSyncStatusPayload;
+}
+
+export interface CanvasGradeAssignmentDetailPayload {
+  readonly assignment: CanvasGradeAssignmentDetail;
+}
+
+export interface CanvasCourseGradeSummaryPayload {
+  readonly summary: CanvasCourseGradeSummary;
+}
+
+export interface CanvasGradeSyncPayload {
+  readonly status: "succeeded" | "partial" | "failed";
+  readonly assignmentSubmission: {
+    readonly status: "succeeded" | "unchanged" | "failed";
+    readonly assignmentCount: number;
+    readonly submissionEvidenceCount: number;
+    readonly persistedCount: number;
+    readonly statusCounts: Record<CanvasNormalizedAssignmentStatus, number>;
+    readonly failureCode?: string;
+  };
+  readonly courseGradeSummary: {
+    readonly status: "succeeded" | "unchanged" | "failed" | "not_applicable";
+    readonly visibleFieldCount: number;
+    readonly failureCode?: string;
+  };
+  readonly lastCheckedAt: string;
+  readonly lastSuccessfulSyncAt: string | null;
+}
+
+export interface ListCanvasCourseGradesInput extends CanvasApiBaseInput {
+  readonly courseId: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface GetCanvasCourseGradeAssignmentInput extends CanvasApiBaseInput {
+  readonly courseId: string;
+  readonly assignmentId: string;
+}
+
+export interface CanvasCourseGradeInput extends CanvasApiBaseInput {
+  readonly courseId: string;
 }
 
 export interface SyncSelectedCanvasCoursesInput extends CanvasApiBaseInput {
@@ -394,6 +545,8 @@ export type CanvasApiClientErrorCode =
   | "missing_access_token"
   | "missing_canvas_url"
   | "missing_canvas_token"
+  | "invalid_request"
+  | "payload_too_large"
   | "request_aborted"
   | "network_error"
   | "invalid_response"
@@ -410,6 +563,10 @@ export type CanvasApiClientErrorCode =
   | "course_not_found"
   | "course_not_selected"
   | "course_unavailable"
+  | "canvas_grade_sync_partial"
+  | "canvas_grade_sync_failed"
+  | "canvas_grade_data_unavailable"
+  | "assignment_not_found"
   | "duplicate_course_submission"
   | "duplicate_source_submission"
   | "source_count_exceeded"
@@ -475,6 +632,30 @@ interface SyncSuccessResponse extends CanvasSyncSummary {
 }
 
 interface CourseSyncSuccessResponse extends CanvasCourseSyncSummary {
+  readonly ok: true;
+}
+
+interface CanvasGradeAssignmentListSuccessResponse
+  extends CanvasGradeAssignmentListPayload {
+  readonly ok: true;
+}
+
+interface CanvasGradeAssignmentDetailSuccessResponse
+  extends CanvasGradeAssignmentDetailPayload {
+  readonly ok: true;
+}
+
+interface CanvasCourseGradeSummarySuccessResponse
+  extends CanvasCourseGradeSummaryPayload {
+  readonly ok: true;
+}
+
+interface CanvasGradeSyncStatusSuccessResponse {
+  readonly ok: true;
+  readonly sync: CanvasGradeSyncStatusPayload;
+}
+
+interface CanvasGradeSyncSuccessResponse extends CanvasGradeSyncPayload {
   readonly ok: true;
 }
 
@@ -667,6 +848,142 @@ export async function syncCanvasCourse(
     input,
     method: "POST",
     parseSuccess: parseCourseSyncResponse,
+  });
+}
+
+export async function syncCanvasCourseGrades(
+  input: CanvasCourseGradeInput,
+): Promise<CanvasApiResult<CanvasGradeSyncPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before syncing grades.",
+    );
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/grades/sync`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "POST",
+    parseSuccess: parseCanvasGradeSyncResponse,
+  });
+}
+
+export async function listCanvasCourseGrades(
+  input: ListCanvasCourseGradesInput,
+): Promise<CanvasApiResult<CanvasGradeAssignmentListPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before loading grades.",
+    );
+  }
+  const pagination = normalizeGradeListPagination({
+    limit: input.limit,
+    offset: input.offset,
+  });
+  if (!pagination.ok) return pagination;
+
+  const searchParams = new URLSearchParams();
+  searchParams.set("limit", String(pagination.value.limit));
+  searchParams.set("offset", String(pagination.value.offset));
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/grades?${searchParams.toString()}`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCanvasGradeAssignmentListResponse,
+  });
+}
+
+export async function getCanvasCourseGradeAssignment(
+  input: GetCanvasCourseGradeAssignmentInput,
+): Promise<CanvasApiResult<CanvasGradeAssignmentDetailPayload>> {
+  const courseId = input.courseId.trim();
+  const assignmentId = input.assignmentId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before loading assignment grades.",
+    );
+  }
+  if (!assignmentId) {
+    return clientError(
+      "assignment_not_found",
+      "Choose a synchronized Canvas assignment before loading details.",
+    );
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/grades/${encodeURIComponent(assignmentId)}`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCanvasGradeAssignmentDetailResponse,
+  });
+}
+
+export async function getCanvasCourseGradeSummary(
+  input: CanvasCourseGradeInput,
+): Promise<CanvasApiResult<CanvasCourseGradeSummaryPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before loading grade summary.",
+    );
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/grades/summary`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCanvasCourseGradeSummaryResponse,
+  });
+}
+
+export async function getCanvasCourseGradeSyncStatus(
+  input: CanvasCourseGradeInput,
+): Promise<CanvasApiResult<CanvasGradeSyncStatusPayload>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError(
+      "course_not_found",
+      "Choose a selected Canvas course before loading grade sync status.",
+    );
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/grades/sync-status`,
+  );
+  if (!endpoint.ok) return endpoint;
+
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCanvasGradeSyncStatusResponse,
   });
 }
 
@@ -1172,6 +1489,82 @@ function parseCourseSyncResponse(
   );
 }
 
+function parseCanvasGradeSyncResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasGradeSyncPayload> {
+  if (isCanvasGradeSyncSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        assignmentSubmission: parsed.assignmentSubmission,
+        courseGradeSummary: parsed.courseGradeSummary,
+        lastCheckedAt: parsed.lastCheckedAt,
+        lastSuccessfulSyncAt: parsed.lastSuccessfulSyncAt,
+        status: parsed.status,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid grade synchronization response.",
+  );
+}
+
+function parseCanvasGradeAssignmentListResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasGradeAssignmentListPayload> {
+  if (isCanvasGradeAssignmentListSuccessResponse(parsed)) {
+    return {
+      ok: true,
+      data: {
+        items: parsed.items,
+        page: parsed.page,
+        sync: parsed.sync,
+      },
+    };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid grade list response.",
+  );
+}
+
+function parseCanvasGradeAssignmentDetailResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasGradeAssignmentDetailPayload> {
+  if (isCanvasGradeAssignmentDetailSuccessResponse(parsed)) {
+    return { ok: true, data: { assignment: parsed.assignment } };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid assignment grade response.",
+  );
+}
+
+function parseCanvasCourseGradeSummaryResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasCourseGradeSummaryPayload> {
+  if (isCanvasCourseGradeSummarySuccessResponse(parsed)) {
+    return { ok: true, data: { summary: parsed.summary } };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid course grade summary response.",
+  );
+}
+
+function parseCanvasGradeSyncStatusResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasGradeSyncStatusPayload> {
+  if (isCanvasGradeSyncStatusSuccessResponse(parsed)) {
+    return { ok: true, data: parsed.sync };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid grade sync status response.",
+  );
+}
+
 function parseCanvasReviewerSourceListResponse(
   parsed: unknown,
 ): CanvasApiResult<CanvasReviewerSourceListPayload> {
@@ -1335,6 +1728,14 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "course_not_selected";
     case "canvas_course_unavailable":
       return "course_unavailable";
+    case "canvas_grade_sync_partial":
+      return "canvas_grade_sync_partial";
+    case "canvas_grade_sync_failed":
+      return "canvas_grade_sync_failed";
+    case "canvas_grade_data_unavailable":
+      return "canvas_grade_data_unavailable";
+    case "canvas_assignment_not_found":
+      return "assignment_not_found";
     case "canvas_source_count_exceeded":
       return "source_count_exceeded";
     case "canvas_source_ocr_file_limit_exceeded":
@@ -1389,9 +1790,11 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
       return "storage_not_configured";
     case "canvas_storage_failed":
       return "storage_failed";
-    case "invalid_json":
     case "invalid_request":
+      return "invalid_request";
     case "payload_too_large":
+      return "payload_too_large";
+    case "invalid_json":
       return "invalid_response";
     default:
       return "unknown_api_error";
@@ -1400,9 +1803,11 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
 
 function statusToClientErrorCode(status: number): CanvasApiClientErrorCode {
   if (status === 401) return "unauthorized";
+  if (status === 400) return "invalid_request";
   if (status === 403) return "permission_denied";
   if (status === 404) return "missing_connection";
   if (status === 429) return "rate_limited";
+  if (status === 413) return "payload_too_large";
   if (status === 504) return "canvas_timeout";
   if (status >= 500) return "canvas_unavailable";
   return "invalid_response";
@@ -1410,9 +1815,11 @@ function statusToClientErrorCode(status: number): CanvasApiClientErrorCode {
 
 function statusToClientErrorMessage(status: number): string {
   if (status === 401) return "Sign in again before using Canvas.";
+  if (status === 400) return "Canvas request was invalid.";
   if (status === 403) return "Canvas denied access for this token.";
   if (status === 404) return "Connect Canvas before loading courses.";
   if (status === 429) return "Canvas rate limited the request. Try again later.";
+  if (status === 413) return "Canvas request was too large.";
   if (status === 504) return "Canvas did not respond in time.";
   if (status >= 500) return "Canvas is temporarily unavailable.";
   return "Canvas returned an unexpected response.";
@@ -1423,6 +1830,42 @@ function normalizeCourseSyncConcurrency(value: number | undefined): number {
     return SELECTED_COURSE_SYNC_CONCURRENCY;
   }
   return Math.min(value, SELECTED_COURSE_SYNC_CONCURRENCY);
+}
+
+function normalizeGradeListPagination({
+  limit,
+  offset,
+}: {
+  readonly limit: number | undefined;
+  readonly offset: number | undefined;
+}):
+  | {
+      readonly ok: true;
+      readonly value: { readonly limit: number; readonly offset: number };
+    }
+  | { readonly ok: false; readonly error: CanvasApiClientError } {
+  const normalizedLimit = limit ?? CANVAS_GRADE_LIST_DEFAULT_LIMIT;
+  const normalizedOffset = offset ?? 0;
+  if (
+    !Number.isSafeInteger(normalizedLimit) ||
+    normalizedLimit < 1 ||
+    normalizedLimit > CANVAS_GRADE_LIST_MAX_LIMIT
+  ) {
+    return clientError(
+      "invalid_request",
+      `Grade list limit must be between 1 and ${CANVAS_GRADE_LIST_MAX_LIMIT}.`,
+    );
+  }
+  if (!Number.isSafeInteger(normalizedOffset) || normalizedOffset < 0) {
+    return clientError(
+      "invalid_request",
+      "Grade list offset must be a non-negative integer.",
+    );
+  }
+  return {
+    ok: true,
+    value: { limit: normalizedLimit, offset: normalizedOffset },
+  };
 }
 
 function safeApiErrorMessage(
@@ -1439,6 +1882,21 @@ function safeApiErrorMessage(
   }
   if (code === "corrupted_credentials") {
     return "Reconnect Canvas before loading courses.";
+  }
+  if (code === "assignment_not_found") {
+    return "Canvas assignment grade data was not found.";
+  }
+  if (code === "canvas_grade_data_unavailable") {
+    return "Synchronized Canvas grade data is unavailable.";
+  }
+  if (code === "canvas_grade_sync_partial") {
+    return "Canvas grade synchronization completed with incomplete data.";
+  }
+  if (code === "canvas_grade_sync_failed") {
+    return "Canvas grade synchronization failed. Try again later.";
+  }
+  if (code === "payload_too_large") {
+    return "Canvas request was too large.";
   }
   if (code === "ocr_file_limit_exceeded") {
     return "You can use one PDF or image per reviewer preview.";
@@ -1647,6 +2105,318 @@ function isCourseSyncSuccessResponse(
     (value.sanitizedFailures === undefined ||
       (Array.isArray(value.sanitizedFailures) &&
         value.sanitizedFailures.every(isSyncFailureSummary)))
+  );
+}
+
+function isCanvasGradeAssignmentListSuccessResponse(
+  value: unknown,
+): value is CanvasGradeAssignmentListSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, ["ok", "items", "page", "sync"]) &&
+    Array.isArray(value.items) &&
+    value.items.every(isCanvasGradeAssignmentListItem) &&
+    isCanvasGradePage(value.page) &&
+    isCanvasGradeSyncStatusPayload(value.sync)
+  );
+}
+
+function isCanvasGradeAssignmentDetailSuccessResponse(
+  value: unknown,
+): value is CanvasGradeAssignmentDetailSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, ["ok", "assignment"]) &&
+    isCanvasGradeAssignmentDetail(value.assignment)
+  );
+}
+
+function isCanvasCourseGradeSummarySuccessResponse(
+  value: unknown,
+): value is CanvasCourseGradeSummarySuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, ["ok", "summary"]) &&
+    isCanvasCourseGradeSummary(value.summary)
+  );
+}
+
+function isCanvasGradeSyncStatusSuccessResponse(
+  value: unknown,
+): value is CanvasGradeSyncStatusSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, ["ok", "sync"]) &&
+    isCanvasGradeSyncStatusPayload(value.sync)
+  );
+}
+
+function isCanvasGradeSyncSuccessResponse(
+  value: unknown,
+): value is CanvasGradeSyncSuccessResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    hasOnlyKeys(value, [
+      "ok",
+      "status",
+      "assignmentSubmission",
+      "courseGradeSummary",
+      "lastCheckedAt",
+      "lastSuccessfulSyncAt",
+    ]) &&
+    isCanvasGradeSyncResultStatus(value.status) &&
+    isCanvasGradeAssignmentSubmissionSync(value.assignmentSubmission) &&
+    isCanvasGradeCourseSummarySync(value.courseGradeSummary) &&
+    isTimestamp(value.lastCheckedAt) &&
+    isTimestampOrNull(value.lastSuccessfulSyncAt)
+  );
+}
+
+function isCanvasGradeAssignmentListItem(
+  value: unknown,
+): value is CanvasGradeAssignmentListItem {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "id",
+      "title",
+      "dueAt",
+      "unlockAt",
+      "lockAt",
+      "pointsPossible",
+      "gradingType",
+      "submissionTypes",
+      "normalizedStatus",
+      "workflowState",
+      "submittedAt",
+      "gradedAt",
+      "attempt",
+      "late",
+      "missing",
+      "excused",
+      "assignmentVisible",
+      "score",
+      "grade",
+      "lastSyncedAt",
+    ]) &&
+    hasCanvasGradeAssignmentListFields(value)
+  );
+}
+
+function hasCanvasGradeAssignmentListFields(
+  value: Readonly<Record<string, unknown>>,
+): boolean {
+  return (
+    typeof value.id === "string" &&
+    value.id.trim().length > 0 &&
+    typeof value.title === "string" &&
+    value.title.trim().length > 0 &&
+    isTimestampOrNull(value.dueAt) &&
+    isTimestampOrNull(value.unlockAt) &&
+    isTimestampOrNull(value.lockAt) &&
+    isNonNegativeNumberOrNull(value.pointsPossible) &&
+    isBoundedTextOrNull(value.gradingType) &&
+    Array.isArray(value.submissionTypes) &&
+    value.submissionTypes.every(isBoundedText) &&
+    isCanvasNormalizedAssignmentStatus(value.normalizedStatus) &&
+    isCanvasWorkflowStateOrNull(value.workflowState) &&
+    isTimestampOrNull(value.submittedAt) &&
+    isTimestampOrNull(value.gradedAt) &&
+    isNonNegativeIntegerOrNull(value.attempt) &&
+    typeof value.late === "boolean" &&
+    typeof value.missing === "boolean" &&
+    typeof value.excused === "boolean" &&
+    isBooleanOrNull(value.assignmentVisible) &&
+    isCanvasVisibleScore(value.score) &&
+    isCanvasVisibleGrade(value.grade) &&
+    isTimestampOrNull(value.lastSyncedAt)
+  );
+}
+
+function isCanvasGradeAssignmentDetail(
+  value: unknown,
+): value is CanvasGradeAssignmentDetail {
+  return (
+    isRecord(value) &&
+    hasCanvasGradeAssignmentListFields(value) &&
+    hasOnlyKeys(value, [
+      "id",
+      "title",
+      "dueAt",
+      "unlockAt",
+      "lockAt",
+      "pointsPossible",
+      "gradingType",
+      "submissionTypes",
+      "normalizedStatus",
+      "workflowState",
+      "submittedAt",
+      "gradedAt",
+      "attempt",
+      "late",
+      "missing",
+      "excused",
+      "assignmentVisible",
+      "score",
+      "grade",
+      "lastSyncedAt",
+      "allowedAttempts",
+      "hideInGradebook",
+      "postManually",
+      "submissionType",
+      "postedAt",
+      "secondsLate",
+      "latePolicyStatus",
+      "gradeMatchesCurrentSubmission",
+      "pointsPossibleAtSync",
+      "sync",
+    ]) &&
+    isNonNegativeIntegerOrNull(value.allowedAttempts) &&
+    isBooleanOrNull(value.hideInGradebook) &&
+    isBooleanOrNull(value.postManually) &&
+    isBoundedTextOrNull(value.submissionType) &&
+    isTimestampOrNull(value.postedAt) &&
+    isNonNegativeIntegerOrNull(value.secondsLate) &&
+    isLatePolicyStatusOrNull(value.latePolicyStatus) &&
+    isBooleanOrNull(value.gradeMatchesCurrentSubmission) &&
+    isNonNegativeNumberOrNull(value.pointsPossibleAtSync) &&
+    isCanvasGradeSyncStatusPayload(value.sync)
+  );
+}
+
+function isCanvasCourseGradeSummary(
+  value: unknown,
+): value is CanvasCourseGradeSummary {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "currentScore",
+      "currentGrade",
+      "finalScore",
+      "finalGrade",
+      "lastSyncedAt",
+      "sync",
+    ]) &&
+    isCanvasVisibleScore(value.currentScore) &&
+    isCanvasVisibleGrade(value.currentGrade) &&
+    isCanvasVisibleScore(value.finalScore) &&
+    isCanvasVisibleGrade(value.finalGrade) &&
+    isTimestampOrNull(value.lastSyncedAt) &&
+    isCanvasGradeSyncStatusPayload(value.sync)
+  );
+}
+
+function isCanvasGradePage(
+  value: unknown,
+): value is CanvasGradeAssignmentListPayload["page"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["limit", "offset", "nextOffset", "hasMore"]) &&
+    isNonNegativeInteger(value.limit) &&
+    value.limit >= 1 &&
+    value.limit <= CANVAS_GRADE_LIST_MAX_LIMIT &&
+    isNonNegativeInteger(value.offset) &&
+    (value.nextOffset === null ||
+      (isNonNegativeInteger(value.nextOffset) && value.nextOffset > value.offset)) &&
+    typeof value.hasMore === "boolean" &&
+    (value.hasMore ? value.nextOffset !== null : value.nextOffset === null)
+  );
+}
+
+function isCanvasGradeSyncStatusPayload(
+  value: unknown,
+): value is CanvasGradeSyncStatusPayload {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "status",
+      "assignmentSubmissionState",
+      "courseGradeSummaryState",
+      "authoritativeAssignmentSubmission",
+      "lastCheckedAt",
+      "lastSuccessfulSyncAt",
+      "stale",
+      "failureCode",
+    ]) &&
+    isCanvasGradeSyncStatus(value.status) &&
+    isCanvasGradeFamilyState(value.assignmentSubmissionState) &&
+    isCanvasGradeFamilyState(value.courseGradeSummaryState) &&
+    typeof value.authoritativeAssignmentSubmission === "boolean" &&
+    isTimestampOrNull(value.lastCheckedAt) &&
+    isTimestampOrNull(value.lastSuccessfulSyncAt) &&
+    typeof value.stale === "boolean" &&
+    isSafeFailureCodeOrNull(value.failureCode)
+  );
+}
+
+function isCanvasVisibleScore(value: unknown): value is CanvasVisibleScore {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["state", "value"]) &&
+    isCanvasGradeVisibilityState(value.state) &&
+    (value.state === "visible"
+      ? isFiniteNumber(value.value)
+      : value.value === null)
+  );
+}
+
+function isCanvasVisibleGrade(value: unknown): value is CanvasVisibleGrade {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["state", "value"]) &&
+    isCanvasGradeVisibilityState(value.state) &&
+    (value.state === "visible" ? typeof value.value === "string" : value.value === null)
+  );
+}
+
+function isCanvasGradeAssignmentSubmissionSync(
+  value: unknown,
+): value is CanvasGradeSyncPayload["assignmentSubmission"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "status",
+      "assignmentCount",
+      "submissionEvidenceCount",
+      "persistedCount",
+      "statusCounts",
+      "failureCode",
+    ]) &&
+    isCanvasGradeFamilySyncStatus(value.status) &&
+    isNonNegativeInteger(value.assignmentCount) &&
+    isNonNegativeInteger(value.submissionEvidenceCount) &&
+    isNonNegativeInteger(value.persistedCount) &&
+    isCanvasGradeStatusCounts(value.statusCounts) &&
+    (value.failureCode === undefined || isSafeFailureCode(value.failureCode))
+  );
+}
+
+function isCanvasGradeCourseSummarySync(
+  value: unknown,
+): value is CanvasGradeSyncPayload["courseGradeSummary"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["status", "visibleFieldCount", "failureCode"]) &&
+    (isCanvasGradeFamilySyncStatus(value.status) ||
+      value.status === "not_applicable") &&
+    isNonNegativeInteger(value.visibleFieldCount) &&
+    (value.failureCode === undefined || isSafeFailureCode(value.failureCode))
+  );
+}
+
+function isCanvasGradeStatusCounts(
+  value: unknown,
+): value is Record<CanvasNormalizedAssignmentStatus, number> {
+  if (!isRecord(value) || !hasOnlyKeys(value, CANVAS_NORMALIZED_STATUSES)) {
+    return false;
+  }
+  return CANVAS_NORMALIZED_STATUSES.every((status) =>
+    isNonNegativeInteger(value[status]),
   );
 }
 
@@ -1877,6 +2647,96 @@ function isCanvasCourseSyncStatus(
   value: unknown,
 ): value is CanvasCourseSyncStatus {
   return value === "success" || value === "partial" || value === "failed";
+}
+
+const CANVAS_NORMALIZED_STATUSES = [
+  "unknown",
+  "excused",
+  "unavailable",
+  "locked",
+  "missing",
+  "graded_hidden",
+  "graded",
+  "submitted_late",
+  "submitted",
+  "late_unsubmitted",
+  "available",
+  "upcoming",
+  "no_due_date",
+] as const satisfies readonly CanvasNormalizedAssignmentStatus[];
+
+function isCanvasNormalizedAssignmentStatus(
+  value: unknown,
+): value is CanvasNormalizedAssignmentStatus {
+  return CANVAS_NORMALIZED_STATUSES.includes(
+    value as CanvasNormalizedAssignmentStatus,
+  );
+}
+
+function isCanvasGradeVisibilityState(
+  value: unknown,
+): value is CanvasGradeVisibilityState {
+  return (
+    value === "unknown" ||
+    value === "visible" ||
+    value === "hidden" ||
+    value === "unavailable" ||
+    value === "not_applicable"
+  );
+}
+
+function isCanvasGradeSyncStatus(
+  value: unknown,
+): value is CanvasGradeSyncStatus {
+  return (
+    value === "never_synced" ||
+    value === "running" ||
+    value === "succeeded" ||
+    value === "partial" ||
+    value === "failed"
+  );
+}
+
+function isCanvasGradeSyncResultStatus(
+  value: unknown,
+): value is CanvasGradeSyncPayload["status"] {
+  return value === "succeeded" || value === "partial" || value === "failed";
+}
+
+function isCanvasGradeFamilySyncStatus(
+  value: unknown,
+): value is CanvasGradeSyncPayload["assignmentSubmission"]["status"] {
+  return value === "succeeded" || value === "unchanged" || value === "failed";
+}
+
+function isCanvasGradeFamilyState(value: unknown): value is string {
+  return (
+    value === "not_started" ||
+    value === "succeeded" ||
+    value === "partial" ||
+    value === "failed" ||
+    value === "skipped"
+  );
+}
+
+function isCanvasWorkflowStateOrNull(value: unknown): value is string | null {
+  return (
+    value === null ||
+    value === "submitted" ||
+    value === "unsubmitted" ||
+    value === "graded" ||
+    value === "pending_review"
+  );
+}
+
+function isLatePolicyStatusOrNull(value: unknown): value is string | null {
+  return (
+    value === null ||
+    value === "late" ||
+    value === "missing" ||
+    value === "extended" ||
+    value === "none"
+  );
 }
 
 function isCanvasReviewerCourseSyncStatus(
@@ -2443,6 +3303,46 @@ function isSyncFailureSummary(
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isNonNegativeIntegerOrNull(value: unknown): value is number | null {
+  return value === null || isNonNegativeInteger(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNonNegativeNumberOrNull(value: unknown): value is number | null {
+  return value === null || (isFiniteNumber(value) && value >= 0);
+}
+
+function isBoundedText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= 120;
+}
+
+function isBoundedTextOrNull(value: unknown): value is string | null {
+  return value === null || isBoundedText(value);
+}
+
+function isBooleanOrNull(value: unknown): value is boolean | null {
+  return value === null || typeof value === "boolean";
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function isTimestampOrNull(value: unknown): value is string | null {
+  return value === null || isTimestamp(value);
+}
+
+function isSafeFailureCode(value: unknown): value is string {
+  return typeof value === "string" && /^[a-z0-9_]{1,80}$/.test(value);
+}
+
+function isSafeFailureCodeOrNull(value: unknown): value is string | null {
+  return value === null || isSafeFailureCode(value);
 }
 
 function hasOnlyKeys(

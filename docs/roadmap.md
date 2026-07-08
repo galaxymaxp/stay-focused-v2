@@ -233,8 +233,10 @@ is complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. Phase 5E.3
 explicit synchronized import is complete and remotely verified, and Phase 5E.4
 protected grade APIs are implemented and protected-live validated in
 `docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`. Phase 5E.5
-through Phase 5F remain planned and must not be collapsed into a single generic
-Canvas integration task.
+mobile assignment and grade experience is complete and locally validated in
+`docs/ai/phase5e5-mobile-grade-experience-20260708.md`. Phase 5E.6 and Phase
+5F remain planned and must not be collapsed into a single generic Canvas
+integration task.
 
 Purpose: Bring Canvas LMS data into Stay Focused as a permission-aware academic
 graph that can feed the existing OCR, normalization, provenance, reviewer, and
@@ -1089,10 +1091,16 @@ remain. Phase 5E.4 is implemented in
 allow explicit selected-course grade sync, paginated assignment/submission
 list, assignment detail, Canvas-provided visible course summary, and sync-status
 reads. The sync route delegates to Phase 5E.3; all GET routes are database-only
-and return `Cache-Control: no-store`. No mobile UI exists, synchronization is
-manual and per selected course only, Canvas access remains read-only, and no
-background job, notification, local grade calculation, submission write,
-private submission-content storage, or reviewer prompt integration exists.
+and return `Cache-Control: no-store`. Phase 5E.5 is complete and locally
+validated in `docs/ai/phase5e5-mobile-grade-experience-20260708.md`: mobile now
+adds selected-course `Grades` entry points, strict grade API client parsers,
+GET-only initial loading and reload behavior, explicit per-course grade sync,
+course summary display, assignment pagination, safe assignment detail loading,
+status presentation, stale/partial/failed copy, and in-memory-only
+network-failure preservation. Synchronization is manual and per selected course
+only, Canvas access remains read-only, and no background job, notification,
+durable grade cache, local grade calculation, submission write, private
+submission-content storage, or reviewer prompt integration exists.
 Phase 5E.4 protected live validation is complete in
 `docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
 fixed the sync route course-scope preflight so unknown valid course UUIDs return
@@ -1144,16 +1152,21 @@ MVP subphases:
 - Phase 5E.2 - Canvas assignment/submission client support (complete)
 - Phase 5E.3 - Explicit synchronized import (complete and remotely verified)
 - Phase 5E.4 - Protected API read model (complete and live validated)
-- Phase 5E.5 - Mobile assignment and grade experience
+- Phase 5E.5 - Mobile assignment and grade experience (complete and locally validated)
 - Phase 5E.6 - Protected live validation and hardening
+
+Roadmap result: Phase 5E.5 — complete and locally validated
+
+Next: Phase 5E.6 — protected live validation and hardening
 
 Exit criteria:
 
 - Grade and submission records remain separate from reviewer source content.
 - Grades never automatically enter reviewer-generation prompts.
 - Hidden or incomplete Canvas grading information is represented honestly.
-- Phase 5E.1 through Phase 5E.4 are complete. Phase 5E.5 is next and is limited
-  to mobile assignment and grade display over the protected API contracts.
+- Phase 5E.1 through Phase 5E.5 are complete. Phase 5E.6 is next and is limited
+  to protected live validation and hardening before Phase 5E can be marked
+  complete.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 

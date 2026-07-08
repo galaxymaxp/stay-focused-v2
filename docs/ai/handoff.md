@@ -231,13 +231,18 @@ paths.
   `docs/ai/phase5e4-protected-grade-api-20260708.md`; it exposes protected
   explicit grade sync plus DB-only list, detail, summary, and sync-status
   routes for owned selected courses. Only the sync route can call Canvas through
-  the Phase 5E.3 service. Mobile UI is Phase 5E.5, and unofficial local grade
-  estimates, notifications, background jobs, submission writes, private
-  submission-content return, and reviewer prompt use remain excluded.
+  the Phase 5E.3 service. Phase 5E.5 is complete and locally validated in
+  `docs/ai/phase5e5-mobile-grade-experience-20260708.md`: selected courses now
+  expose a mobile `Grades` entry point, grade reads are strict and GET-only on
+  mount/reload, explicit `Sync grades` is the only grade POST, assignment
+  pagination and detail are wired, and hidden grade wrappers are never shown as
+  zero. Unofficial local grade estimates, durable grade caching, notifications,
+  background jobs, submission writes, private submission-content return, and
+  reviewer prompt use remain excluded.
 - Remaining secondary Canvas resources, broader parser families,
-  stale/deleted-source comparison, Phase 5E.5+ implementation, background
-  synchronization, task generation, and study schedule generation are still
-  pending. Production endpoint validators remain unsupported for the audited
+  stale/deleted-source comparison, Phase 5E.6 protected live validation,
+  background synchronization, task generation, and study schedule generation are
+  still pending. Production endpoint validators remain unsupported for the audited
   endpoint families. Discussions, quiz metadata, announcement attachment
   content import, and broader Canvas resource support remain deferred.
 
@@ -480,15 +485,19 @@ Remote Supabase verification is complete through `202607080006`, with
 service-role-only RPC execution, hardened table grants/RLS, 17/17 rollback
 verifier checks passing, and zero fictional rows remaining. Phase 5E.4 exposes
 protected grade API routes for explicit selected-course sync plus DB-only list,
-detail, summary, and sync-status reads. No mobile service/UI, background
-synchronization, notification, local grade calculation, submission mutation,
-private submission-content return, or reviewer integration exists. Phase 5E.4
-protected live validation is complete in
-`docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
-fixed the sync route course-scope preflight so unknown valid course UUIDs return
-safe `404` and owned but unselected courses return safe `400` before Canvas
-synchronization. The next roadmap step is Phase 5E.5 - mobile assignment and
-grade experience.
+detail, summary, and sync-status reads. Phase 5E.4 protected live validation is
+complete in `docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`;
+the closeout fixed the sync route course-scope preflight so unknown valid
+course UUIDs return safe `404` and owned but unselected courses return safe
+`400` before Canvas synchronization. Phase 5E.5 is complete and locally
+validated in `docs/ai/phase5e5-mobile-grade-experience-20260708.md`: mobile now
+has selected-course `Grades`, strict parsers, GET-only loading/reload, explicit
+per-course grade sync, course summary display, assignment pagination, protected
+assignment detail, stale/partial/failed copy, and in-memory-only network
+failure preservation. No background synchronization, durable grade cache,
+notification, local grade calculation, submission mutation, private
+submission-content return, or reviewer integration exists. The next roadmap
+step is Phase 5E.6 - protected live validation and hardening.
 Automatic repeated scanned-PDF header/footer detection remains a deferred
 candidate.
 

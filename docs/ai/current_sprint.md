@@ -1402,8 +1402,15 @@ the sync route can call Canvas through the Phase 5E.3 service; all GET routes
 are DB-only and no-store. Phase 5E.4 protected live validation is complete in
 `docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
 fixed the sync route so unknown valid course UUIDs return safe `404` and owned
-but unselected courses return safe `400` before Canvas synchronization. No
-mobile service/UI, background sync, notification, local grade calculation,
-submission mutation, private submission-content return, or reviewer integration
-exists. The next roadmap step is Phase 5E.5 - mobile assignment and grade
-experience. The deferred header/footer cleanup task remains separate.
+but unselected courses return safe `400` before Canvas synchronization. Phase
+5E.5 is complete and locally validated in
+`docs/ai/phase5e5-mobile-grade-experience-20260708.md`: selected Canvas courses
+now open a mobile `Grades` screen, strict grade API parsers cover list, detail,
+summary, sync status, and explicit sync responses, initial load and reload are
+GET-only, `Sync grades` is the only mobile grade POST, pagination appends
+without duplicates, assignment details use the protected detail route, and
+hidden/unavailable wrappers are never shown as zero. No background sync,
+notification, durable grade cache, local grade calculation, submission
+mutation, private submission-content return, or reviewer integration exists.
+The next roadmap step is Phase 5E.6 - protected live validation and hardening.
+The deferred header/footer cleanup task remains separate.

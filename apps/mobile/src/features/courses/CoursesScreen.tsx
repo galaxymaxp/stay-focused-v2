@@ -37,6 +37,7 @@ import {
 interface CoursesScreenProps {
   readonly onCreateReviewer: () => void;
   readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onOpenLibrary: () => void;
 }
 
@@ -63,6 +64,7 @@ interface CourseSyncDisplayState {
 export function CoursesScreen({
   onCreateReviewer,
   onCreateReviewerFromCanvas,
+  onOpenGrades,
   onOpenLibrary,
 }: CoursesScreenProps) {
   const { isSigningOut, session, signOut } = useAuth();
@@ -406,6 +408,7 @@ export function CoursesScreen({
           onSaveSelection={handleSaveSelection}
           onDisconnect={handleDisconnectRequest}
           onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+          onOpenGrades={onOpenGrades}
           onRefresh={handleRefresh}
           onSyncSelected={handleSyncSelected}
           onToggleCourse={handleToggleCourse}
@@ -504,6 +507,7 @@ function ConnectedCanvasState({
   isSyncingSelected,
   onDisconnect,
   onCreateReviewerFromCanvas,
+  onOpenGrades,
   onRefresh,
   onSaveSelection,
   onSyncSelected,
@@ -521,6 +525,7 @@ function ConnectedCanvasState({
   readonly isSyncingSelected: boolean;
   readonly onDisconnect: () => void;
   readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onRefresh: () => void;
   readonly onSaveSelection: () => void;
   readonly onSyncSelected: () => void;
@@ -615,6 +620,7 @@ function ConnectedCanvasState({
                 isSelected={selectedCourseIds.includes(course.id)}
                 key={course.id}
                 onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+                onOpenGrades={onOpenGrades}
                 onToggle={onToggleCourse}
                 syncState={courseSyncStates[course.id]}
               />
@@ -630,6 +636,7 @@ function ConnectedCanvasState({
         courses={likelyCurrent}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
         selectedCourseIds={selectedCourseIds}
         title="Likely current"
@@ -638,6 +645,7 @@ function ConnectedCanvasState({
         courses={past}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
         selectedCourseIds={selectedCourseIds}
         title="Past or concluded"
@@ -646,6 +654,7 @@ function ConnectedCanvasState({
         courses={uncertain}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
         selectedCourseIds={selectedCourseIds}
         title="Other or uncertain"
@@ -654,6 +663,7 @@ function ConnectedCanvasState({
         courses={unavailable}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
         selectedCourseIds={selectedCourseIds}
         title="Unavailable"
@@ -666,6 +676,7 @@ function CourseSection({
   courses,
   courseSyncStates,
   onCreateReviewerFromCanvas,
+  onOpenGrades,
   onToggleCourse,
   selectedCourseIds,
   title,
@@ -673,6 +684,7 @@ function CourseSection({
   readonly courses: readonly CanvasCourseInventoryItem[];
   readonly courseSyncStates: Readonly<Record<string, CourseSyncDisplayState>>;
   readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onToggleCourse: (courseId: string) => void;
   readonly selectedCourseIds: readonly string[];
   readonly title: string;
@@ -691,6 +703,7 @@ function CourseSection({
             isSelected={selectedCourseIds.includes(course.id)}
             key={course.id}
             onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+            onOpenGrades={onOpenGrades}
             onToggle={onToggleCourse}
             syncState={courseSyncStates[course.id]}
           />
@@ -704,17 +717,20 @@ function CourseSelectionRow({
   course,
   isSelected,
   onCreateReviewerFromCanvas,
+  onOpenGrades,
   onToggle,
   syncState,
 }: {
   readonly course: CanvasCourseInventoryItem;
   readonly isSelected: boolean;
   readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onToggle: (courseId: string) => void;
   readonly syncState: CourseSyncDisplayState | undefined;
 }) {
   const disabled = !course.selectable;
   const canCreateReviewer = course.selected && hasCompletedSourceSync(course);
+  const canOpenGrades = course.selected && course.selectable;
   const needsSync = course.selected && !hasCompletedSourceSync(course);
 
   return (
@@ -738,6 +754,15 @@ function CourseSelectionRow({
         <Text style={styles.summaryMeta}>
           {formatCourseSyncState(syncState, course)}
         </Text>
+        {canOpenGrades ? (
+          <Button
+            onPress={() => onOpenGrades(course.id, course.displayName)}
+            testID={`canvas-open-grades-${course.id}`}
+            variant="primary"
+          >
+            Grades
+          </Button>
+        ) : null}
         {canCreateReviewer ? (
           <Button
             onPress={() => onCreateReviewerFromCanvas(course.id)}
