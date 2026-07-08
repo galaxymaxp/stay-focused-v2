@@ -255,3 +255,177 @@ Pending final commit and push from the implementation turn.
 
 Phase 5E.3 is implemented and locally validated, with remote database
 verification remaining blocked by missing Supabase link configuration.
+
+## 22. Remote Verification Condition Closure
+
+Closure date: 2026-07-08, Asia/Manila.
+
+Previous blocking condition: the earlier run could not execute linked Supabase
+checks because this checkout had no linked project ref and the CLI returned
+`LegacyProjectNotLinkedError`.
+
+Starting repository state:
+
+- Branch: `main`
+- Starting commit: `d033436`
+- Ahead/behind at start: `0/0` against `origin/main`
+- Dirty files at start: `apps/api/next-env.d.ts`,
+  `apps/mobile/expo-env.d.ts`, and `apps/mobile/.gitignore`
+- Unrelated files preserved: those three files were not edited, staged,
+  formatted, or reverted.
+
+Supabase linking:
+
+- Restored through an ignored temporary Supabase CLI workdir populated from the
+  canonical `packages/db/migrations` tree.
+- Correct existing project confirmed from ignored local Supabase configuration
+  and matching local Supabase URL shape.
+- No new Supabase project was created.
+- No project ref, database password, access token, service-role key,
+  connection string, or environment value was committed or recorded here.
+
+Migration verification and application:
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Pre-application migration history | PASS | Local and remote histories matched through `202607080004`; `202607080005` was pending remotely; no unexplained remote-only migrations or earlier unapplied local migrations were present. |
+| Initial dry run | PASS | Proposed only `202607080005_add_canvas_grade_sync_rpcs.sql`. |
+| Migration apply | PASS | Applied `202607080005_add_canvas_grade_sync_rpcs.sql` remotely. |
+| Post-application migration history | PASS | Remote history included `202607080005`. |
+| Initial final dry run | PASS | Remote database was up to date after `202607080005`. |
+| Repair dry run | PASS | Proposed only `202607080006_harden_canvas_grade_sync_rpc_function_references.sql`. |
+| Repair migration apply | PASS | Applied `202607080006` remotely. |
+| Final migration history | PASS | Local and remote histories matched through `202607080006`. |
+| Final dry run | PASS | Remote database is up to date. |
+
+The Supabase CLI emitted the known non-fatal Docker catalog-cache warning after
+both remote pushes. Migration application completed successfully despite that
+local Docker cache warning.
+
+RPC inventory:
+
+| Function | Signature | Return type |
+| --- | --- | --- |
+| `begin_canvas_course_grade_sync` | `(uuid, uuid, uuid, timestamptz, integer)` | `SETOF canvas_course_grade_sync_states` |
+| `replace_canvas_course_assignment_submission_snapshot` | `(uuid, uuid, uuid, timestamptz, jsonb, text, text)` | `TABLE(assignments_inserted integer, assignments_updated integer, assignments_unchanged integer, assignments_marked_absent integer, persisted_count integer)` |
+| `upsert_canvas_course_grade_summary` | `(uuid, uuid, uuid, timestamptz, jsonb)` | `TABLE(summaries_inserted integer, summaries_updated integer, summaries_unchanged integer, visible_field_count integer)` |
+| `finish_canvas_course_grade_sync` | `(uuid, uuid, uuid, timestamptz, text, text, text, text, integer, integer, integer, text, text, text, text)` | `SETOF canvas_course_grade_sync_states` |
+
+Remote RPC security verification queried PostgreSQL catalogs (`pg_proc`,
+`pg_namespace`, function definitions, ACLs, and effective function privileges):
+
+| Function | Owner | Security mode | Search path | Public | Anon | Authenticated | Service role | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `begin_canvas_course_grade_sync` | `postgres` | `security definer` | `public, pg_temp` | no execute | no execute | no execute | execute | PASS |
+| `replace_canvas_course_assignment_submission_snapshot` | `postgres` | `security definer` | `public, pg_temp` | no execute | no execute | no execute | execute | PASS |
+| `upsert_canvas_course_grade_summary` | `postgres` | `security definer` | `public, pg_temp` | no execute | no execute | no execute | execute | PASS |
+| `finish_canvas_course_grade_sync` | `postgres` | `security definer` | `public, pg_temp` | no execute | no execute | no execute | execute | PASS |
+
+Additional RPC checks:
+
+- No unexpected overload exists for any Phase 5E.3 RPC.
+- No callable public, anon, or authenticated variant exists.
+- `anon` and `authenticated` role-call probes failed before function-body
+  dispatch with permission denial.
+- `service_role` executed the begin, replace, upsert, and finish RPC sequence
+  successfully against rollback-only fictional rows.
+- RPC definitions contain no dynamic SQL and do not use raw `sqlerrm` or
+  `sqlstate` output.
+- Phase 5E.3 table references are schema-qualified.
+- Repair migration `202607080006` qualified the pgcrypto call as
+  `extensions.digest(...)` in
+  `replace_canvas_course_assignment_submission_snapshot`.
+
+Remote table security verification:
+
+- RLS remains enabled on `canvas_assignment_submissions`,
+  `canvas_course_grade_summaries`, and `canvas_course_grade_sync_states`.
+- `public`, `anon`, and `authenticated` have no direct `select`, `insert`,
+  `update`, or `delete` privilege on those tables.
+- `service_role` has only the intended `select`, `insert`, `update`, and
+  `delete` privileges on those tables; it does not have `truncate`,
+  `references`, or `trigger`.
+- Composite ownership FKs remain present for connection/user, course/user/
+  connection, and assignment/user/connection/course relationships.
+- Uniqueness constraints remain present for one current submission row per
+  assignment, one grade summary per course, and one sync-state row per course.
+- Catalog checks found no raw submission body, comment, attachment payload,
+  rubric assessment, grader identity, preview URL, raw JSON payload, or
+  unposted-grade storage column.
+
+Rollback-safe SQL verifier:
+
+- Script: `scripts/phase5e3-grade-sync-verification.sql`
+- Check count: 17
+- Result: PASS, 17/17 checks passed
+- Rollback result: PASS
+- Fictional cleanup result: PASS, zero fictional verifier rows remained in
+  `auth.users`, `canvas_connections`, `canvas_courses`,
+  `canvas_course_sync_preferences`, `canvas_assignments`,
+  `canvas_assignment_submissions`, `canvas_course_grade_summaries`, and
+  `canvas_course_grade_sync_states`.
+
+Verifier coverage included same-owner persistence, cross-user rejection,
+cross-course assignment rejection, duplicate assignment rejection, idempotent
+snapshot persistence, stable row identity and `first_synced_at`,
+authoritative absence marking, visible-to-hidden replacement, begin/finish sync
+state transitions, overlap rejection, stale running recovery, failed-run
+cleanup, service-role execute, public/anon/authenticated execute denial, and
+schema-qualified Phase 5E.3 RPC function references.
+
+Advisor review:
+
+| Advisor | Result | Classification |
+| --- | --- | --- |
+| Security advisors | PASS with warnings | No new Phase 5E.3/5E.3A blockers. Remaining warnings are historical mutable-search-path functions, public `rls_auto_enable()` execute posture, and disabled leaked-password protection. |
+| Performance advisors | PASS with warnings | No new Phase 5E.3/5E.3A blockers. Remaining warnings are historical `reviewers` RLS init-plan items. |
+
+Repair:
+
+- Repair required: yes.
+- Defect: `replace_canvas_course_assignment_submission_snapshot` contained an
+  unqualified `digest(...)` function call inside a security-definer RPC.
+- Impact: remote catalog verification showed the RPC did not satisfy the
+  Phase 5E.3A requirement that function references be schema-qualified.
+- Repair: added forward-only migration
+  `202607080006_harden_canvas_grade_sync_rpc_function_references.sql` to
+  qualify the call as `extensions.digest(...)` and reassert service-role-only
+  execute grants.
+- Verifier update: `scripts/phase5e3-grade-sync-verification.sql` now checks
+  that Phase 5E.3 RPC function references are schema-qualified.
+- Verification result: PASS after applying `202607080006` remotely.
+
+Local regression verification:
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `npm --workspace apps/api run typecheck` | PASS | API TypeScript check passed. |
+| `npm --workspace apps/api run test` | PASS | 347 API tests passed. |
+| Focused Phase 5E.3 tests | PASS | `npx vitest run src/lib/canvas-grade-sync-normalize.test.ts src/lib/canvas-grade-sync.test.ts`, 32 tests. |
+| `npm --workspace @stay-focused/db run typecheck` | PASS | DB package typecheck passed. |
+| `npm --workspace @stay-focused/canvas run test` | PASS | 69 Canvas tests passed. |
+| `npm --workspace apps/api run lint` | PASS | API ESLint passed. |
+| `npm --workspace apps/api run build` | PASS | Next production build passed. |
+| `npm run lint` | PASS | 7/7 workspace lint tasks passed. |
+| `npm run typecheck` | PASS | Final rerun passed 7/7 workspace typecheck tasks; an earlier concurrent run failed while `apps/api` build was regenerating `.next/types`. |
+| `git diff --check` | PASS | Exit 0 with existing CRLF conversion warnings only. |
+
+Explicit non-execution:
+
+- No Canvas request ran.
+- No Canvas PAT was decrypted.
+- No real grade synchronization ran.
+- No public API route, mobile code, notification, background job, local grade
+  calculation, submission mutation, or reviewer integration was added.
+
+Final Phase 5E.3 verdict:
+
+```text
+PASS - Phase 5E.3 remote verification condition is closed
+```
+
+Phase 5E.3 is complete and remotely verified. Migration `202607080005` is
+applied remotely, repair migration `202607080006` is applied remotely, RPC
+execution is service-role-only, RLS and direct table grants remain hardened, the
+rollback-safe verifier passed, no fictional rows remain, no Canvas call or real
+academic-data synchronization occurred, and Phase 5E.4 is next.

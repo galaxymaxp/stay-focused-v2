@@ -944,9 +944,12 @@ and per-course grade sync state. Canvas access remains read-only, manual, and
 per selected course. No public grade API route, mobile service/UI, background
 sync, notification, local grade calculation, submission action, private
 submission-content storage, or reviewer integration exists. Remote Supabase
-dry-run/list/verifier checks remain pending because this checkout is not linked
-to a Supabase project. The next implementation task is Phase 5E.4 - protected
-API read model.
+verification is complete: `202607080005_add_canvas_grade_sync_rpcs.sql` is
+applied, `202607080006_harden_canvas_grade_sync_rpc_function_references.sql`
+hardens the security-definer RPC function reference, RPC execution is
+service-role-only, RLS/direct grants remain hardened, the rollback-safe verifier
+passed 17/17 checks, and no fictional rows remain. The next implementation task
+is Phase 5E.4 - protected API read model.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks

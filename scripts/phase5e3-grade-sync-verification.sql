@@ -53,7 +53,25 @@ select
     from expected_functions expected
     where not has_function_privilege('service_role', expected.signature, 'execute')
   ),
-  'service_role can execute Phase 5E.3 RPCs';
+  'service_role can execute Phase 5E.3 RPCs'
+union all
+select
+  'phase5e3_rpc_schema_qualified_function_references',
+  not exists (
+    select 1
+    from expected_functions expected
+    join pg_proc proc on proc.oid = expected.signature
+    where pg_get_functiondef(proc.oid) like '% digest(%'
+  )
+  and exists (
+    select 1
+    from expected_functions expected
+    join pg_proc proc on proc.oid = expected.signature
+    where expected.signature =
+      'public.replace_canvas_course_assignment_submission_snapshot(uuid,uuid,uuid,timestamp with time zone,jsonb,text,text)'::regprocedure
+      and pg_get_functiondef(proc.oid) like '%extensions.digest(%'
+  ),
+  'Phase 5E.3 RPC function references are schema-qualified';
 
 do $$
 declare

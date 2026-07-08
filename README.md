@@ -334,13 +334,18 @@ Working locally:
   per-course sync state, and returns aggregate mobile-safe diagnostics. No
   public API route, mobile service/UI, background job, notification, local grade
   calculation, submission mutation, private submission-content storage, or
-  reviewer integration was added.
+  reviewer integration was added. Remote Supabase verification is complete:
+  `202607080005_add_canvas_grade_sync_rpcs.sql` and
+  `202607080006_harden_canvas_grade_sync_rpc_function_references.sql` are
+  applied remotely, RPC execution is service-role-only, RLS/direct grants remain
+  hardened, the rollback-safe verifier passed 17/17 checks, and no fictional
+  rows remain.
 
 Pending:
 
 - Phase 5E.4 protected grade read APIs, then mobile grade UI
-- Remaining secondary Canvas resources, broader parser families, grade sync
-  hardening, and background/resumable sync for larger accounts
+- Remaining secondary Canvas resources, broader parser families, and
+  background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling

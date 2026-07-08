@@ -1392,6 +1392,10 @@ service-role-only RPCs, marks authoritative absences, preserves failed
 families, and records per-course grade sync state. No public grade API route,
 mobile service/UI, background sync, notification, local grade calculation,
 submission mutation, private submission-content storage, or reviewer
-integration exists. The next roadmap step is Phase 5E.4 - protected API read
-model. The
+integration exists. Remote Supabase verification is complete:
+`202607080005_add_canvas_grade_sync_rpcs.sql` and
+`202607080006_harden_canvas_grade_sync_rpc_function_references.sql` are applied
+remotely, RPC execution is service-role-only, RLS/direct grants remain
+hardened, the rollback-safe verifier passed 17/17 checks, and no fictional rows
+remain. The next roadmap step is Phase 5E.4 - protected API read model. The
 deferred header/footer cleanup task remains separate.

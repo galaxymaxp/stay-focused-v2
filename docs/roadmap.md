@@ -1076,12 +1076,15 @@ in
 service can synchronize one owned selected course into the Phase 5E.1
 assignment/submission and visible-summary tables with service-role-only RPCs,
 deterministic fingerprints, sync-state transitions, and failed-family
-preservation. Remote Supabase dry-run/list/verifier checks remain pending
-because this checkout is not linked to a Supabase project. No public grade API
-route or mobile UI exists, synchronization is manual and per selected course
-only, Canvas access remains read-only, and no background job, notification,
-local grade calculation, submission write, private submission-content storage,
-or reviewer prompt integration exists.
+preservation. Remote Supabase verification is complete: migrations
+`202607080005_add_canvas_grade_sync_rpcs.sql` and
+`202607080006_harden_canvas_grade_sync_rpc_function_references.sql` are applied
+remotely, RPC execution is service-role-only, RLS/direct grants remain
+hardened, the rollback-safe verifier passed 17/17 checks, and no fictional rows
+remain. No public grade API route or mobile UI exists, synchronization is manual
+and per selected course only, Canvas access remains read-only, and no background
+job, notification, local grade calculation, submission write, private
+submission-content storage, or reviewer prompt integration exists.
 
 MVP boundary:
 
@@ -1126,8 +1129,7 @@ MVP subphases:
 
 - Phase 5E.1 - Data contract and database foundation (complete)
 - Phase 5E.2 - Canvas assignment/submission client support (complete)
-- Phase 5E.3 - Explicit synchronized import (implemented locally; remote DB
-  verification pending)
+- Phase 5E.3 - Explicit synchronized import (complete and remotely verified)
 - Phase 5E.4 - Protected API read model
 - Phase 5E.5 - Mobile assignment and grade experience
 - Phase 5E.6 - Protected live validation and hardening
@@ -1137,10 +1139,9 @@ Exit criteria:
 - Grade and submission records remain separate from reviewer source content.
 - Grades never automatically enter reviewer-generation prompts.
 - Hidden or incomplete Canvas grading information is represented honestly.
-- Phase 5E.1 and Phase 5E.2 are complete. Phase 5E.3 implementation and local
-  verification passed, with remote Supabase verification pending a linked
-  project. Phase 5E.4 is next and is limited to protected DB-backed grade read
-  and explicit-sync route contracts; mobile UI remains Phase 5E.5.
+- Phase 5E.1, Phase 5E.2, and Phase 5E.3 are complete. Phase 5E.4 is next and
+  is limited to protected DB-backed grade read and explicit-sync route
+  contracts; mobile UI remains Phase 5E.5.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 
