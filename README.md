@@ -43,13 +43,14 @@ students choose exact blocks before preview generation, and selected-block
 provenance is copied into immutable snapshots. Phase 5D.3 adds exact duplicate
 source analysis, repeated-reference provenance, conservative current-source
 status checks, and regeneration-readiness assessment without implementing
-actual reviewer regeneration. Phase 5E planning is complete, and Phase 5E.1
-adds the service-role-only database foundation for read-only Canvas assignment
-submission state and visible grade summaries: normalized status/visibility
-contracts, owner-scoped tables, composite FKs, RLS/grants, DB types, and a
-rollback-safe SQL verifier. No Canvas grade/submission data is fetched or
-imported yet, and no grade API route, mobile UI, sync service, notification,
-local grade calculation, submission action, or reviewer integration exists.
+actual reviewer regeneration. Phase 5E planning is complete, Phase 5E.1 adds
+the service-role-only database foundation for read-only Canvas assignment
+submission state and visible grade summaries, and Phase 5E.2 adds strictly
+read-only typed Canvas client support for assignment grade metadata, the
+current user's own submissions, and Canvas-provided visible course grade
+summaries. No Canvas grade/submission data is persisted or imported yet, and no
+grade API route, mobile UI, sync service, notification, local grade
+calculation, submission action, or reviewer integration exists.
 Protected live validation remains blocked pending credential rotation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
@@ -315,12 +316,22 @@ Working locally:
   behavior. No Canvas data was fetched, no grades or submissions were imported,
   no API route or mobile UI exists, no unofficial grade calculation exists, and
   no submission write capability exists.
+- Phase 5E.2 adds read-only `@stay-focused/canvas` client methods and parser
+  contracts for Phase 5E.3: `listCourseAssignments`,
+  `listOwnCourseSubmissions`, and `getOwnCourseGradeSummary`. The methods use
+  GET-only requests, shared pagination/security checks, omitted `student_ids[]`,
+  `user_id=self` for own enrollment grades, explicit visible/hidden/
+  unavailable/unknown wrappers, and unsafe-field discards for submission bodies,
+  comments, attachments, user/grader IDs, URLs, rubrics, raw JSON, and unposted
+  grades. No persistence, API route, mobile UI, synchronization service, grade
+  calculation, submission action, or reviewer integration was added.
 
 Pending:
 
-- Remaining secondary Canvas resources, broader parser families, stale/deleted
-  source comparison, grade sync, and background/resumable sync for larger
-  accounts
+- Phase 5E.3 explicit synchronized import, then protected grade read APIs and
+  mobile grade UI
+- Remaining secondary Canvas resources, broader parser families, grade sync
+  hardening, and background/resumable sync for larger accounts
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling

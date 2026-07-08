@@ -217,14 +217,15 @@ paths.
 - Phase 5E planning is complete in
   `docs/ai/phase5e-grades-submissions-plan-20260708.md`, and Phase 5E.1 is
   complete in
-  `docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. The recommended
-  MVP remains strictly read-only selected-course assignment, submission, and
-  visible grade state with explicit per-course synchronization, DB-only read
-  routes, Canvas-provided course grade summaries only when visible, no
-  unofficial local grade estimates, no notifications, no background jobs, no
+  `docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.2 is
+  complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. The
+  recommended MVP remains strictly read-only selected-course assignment,
+  submission, and visible grade state with explicit per-course synchronization,
+  DB-only read routes, Canvas-provided course grade summaries only when visible,
+  no unofficial local grade estimates, no notifications, no background jobs, no
   submission writes, and no reviewer prompt use.
 - Remaining secondary Canvas resources, broader parser families,
-  stale/deleted-source comparison, Phase 5E.2+ implementation, background
+  stale/deleted-source comparison, Phase 5E.3+ implementation, background
   synchronization, task generation, and study schedule generation are still
   pending. Production endpoint validators remain unsupported for the audited
   endpoint families. Discussions, quiz metadata, announcement attachment
@@ -454,12 +455,17 @@ and regeneration readiness are implemented, remotely verified, and
 protected-live validated. Phase 5E planning is complete in
 `docs/ai/phase5e-grades-submissions-plan-20260708.md`, and Phase 5E.1 is
 complete in
-`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.1 adds
+`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.2 is
+complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. Phase 5E.1 adds
 only the normalized contract, schema, DB types, and rollback-safe SQL verifier.
-No Canvas data was fetched, no grades or submissions were imported, no API route
-or mobile UI exists, no unofficial grade calculation exists, and no submission
-write capability exists. The next roadmap step is Phase 5E.2 - Canvas
-assignment/submission client support.
+Phase 5E.2 adds only read-only Canvas assignment metadata, own-submission, and
+visible course-grade client methods with safe normalized provider contracts,
+explicit visibility wrappers, shared pagination/error handling, omitted
+`student_ids[]`, `user_id=self`, and unsafe-field discards. No Canvas
+grade/submission data was persisted or imported, no API route or mobile UI
+exists, no sync service exists, no unofficial grade calculation exists, and no
+submission write capability exists. The next roadmap step is Phase 5E.3 -
+explicit synchronized import.
 Automatic repeated scanned-PDF header/footer detection remains a deferred
 candidate.
 

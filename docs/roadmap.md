@@ -226,9 +226,10 @@ immutable source snapshots and exact reviewer provenance, Phase 5D.2
 structured normalized blocks and selective import, and Phase 5D.3 duplicate
 relationships, source freshness, and regeneration readiness are implemented,
 remotely verified, and protected-live validated. Phase 5E planning is complete
-in `docs/ai/phase5e-grades-submissions-plan-20260708.md`, and Phase 5E.1 is
+in `docs/ai/phase5e-grades-submissions-plan-20260708.md`, Phase 5E.1 is
 complete in
-`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.2
+`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`, and Phase 5E.2
+is complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. Phase 5E.3
 through Phase 5F remain planned and
 must not be collapsed into a single generic Canvas integration task.
 
@@ -681,9 +682,9 @@ private Storage OCR preview, edited reviewer handoff, and Study Library
 cleanup. Phase 5D.1 immutable source snapshots, Phase 5D.2 structured
 normalized blocks, and Phase 5D.3 duplicate relationships, source freshness,
 and regeneration readiness are implemented, remotely verified, and
-protected-live validated. Phase 5E planning and Phase 5E.1 data contract and
-database foundation are complete; next roadmap step: Phase 5E.2 Canvas
-assignment/submission client support.
+protected-live validated. Phase 5E planning, Phase 5E.1 data contract and
+database foundation, and Phase 5E.2 read-only Canvas grade client support are
+complete; next roadmap step: Phase 5E.3 explicit synchronized import.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -1065,9 +1066,14 @@ Status: In progress. The implementation-ready plan is recorded in
 `docs/ai/phase5e-grades-submissions-plan-20260708.md`. Phase 5E.1 is complete
 in `docs/ai/phase5e1-grades-submissions-foundation-20260708.md`: database
 tables, normalized data contracts, DB types, remote migration verification, and
-rollback-safe SQL verification are done. No Canvas data was fetched, no grades
-or submissions were imported, no API route or mobile UI exists, no unofficial
-grade calculation exists, and no submission write capability exists.
+rollback-safe SQL verification are done. Phase 5E.2 is complete in
+`docs/ai/phase5e2-canvas-grade-client-20260708.md`: typed read-only Canvas
+client methods, normalized assignment/submission/course-grade provider
+contracts, explicit visibility wrappers, pagination/error coverage, and
+unsafe-field discards are done. No Canvas grade/submission data is persisted or
+imported, no API route or mobile UI exists, no synchronization service exists,
+no unofficial grade calculation exists, and no submission write capability
+exists.
 
 MVP boundary:
 
@@ -1111,7 +1117,7 @@ Scope:
 MVP subphases:
 
 - Phase 5E.1 - Data contract and database foundation (complete)
-- Phase 5E.2 - Canvas assignment/submission client support
+- Phase 5E.2 - Canvas assignment/submission client support (complete)
 - Phase 5E.3 - Explicit synchronized import
 - Phase 5E.4 - Protected API read model
 - Phase 5E.5 - Mobile assignment and grade experience
@@ -1122,9 +1128,9 @@ Exit criteria:
 - Grade and submission records remain separate from reviewer source content.
 - Grades never automatically enter reviewer-generation prompts.
 - Hidden or incomplete Canvas grading information is represented honestly.
-- Phase 5E.1 is complete only because implementation and required verification
-  passed. Phase 5E.2 is next and is limited to read-only Canvas
-  assignment/submission client support.
+- Phase 5E.1 and Phase 5E.2 are complete only because implementation and
+  required verification passed. Phase 5E.3 is next and is limited to explicit
+  synchronized import into the existing Phase 5E.1 storage contracts.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 

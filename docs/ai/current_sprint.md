@@ -1376,10 +1376,15 @@ and regeneration readiness are implemented, remotely verified, and
 protected-live validated. Phase 5E planning is complete in
 `docs/ai/phase5e-grades-submissions-plan-20260708.md`, and Phase 5E.1 is
 complete in
-`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.1 adds
+`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.2 is
+complete in `docs/ai/phase5e2-canvas-grade-client-20260708.md`. Phase 5E.1 adds
 only the read-only Canvas grades/submissions database contract, owner-scoped
-schema, DB types, and rollback-safe SQL verifier. No Canvas data was fetched,
-no grades or submissions were imported, no API route or mobile UI exists, no
+schema, DB types, and rollback-safe SQL verifier. Phase 5E.2 adds only
+GET-only Canvas assignment metadata, own-submission, and visible course-grade
+client methods with safe normalized contracts, explicit visibility wrappers,
+pagination/error coverage, omitted `student_ids[]`, `user_id=self`, and
+unsafe-field discards. No Canvas grade/submission data was persisted or
+imported, no API route or mobile UI exists, no sync service exists, no
 unofficial grade calculation exists, and no submission write capability exists.
-The next roadmap step is Phase 5E.2 - Canvas assignment/submission client
-support. The deferred header/footer cleanup task remains separate.
+The next roadmap step is Phase 5E.3 - explicit synchronized import. The
+deferred header/footer cleanup task remains separate.

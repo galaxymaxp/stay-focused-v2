@@ -444,6 +444,562 @@ describe("CanvasClient", () => {
     ]);
   });
 
+  it("lists Phase 5E course assignments with safe grade metadata", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          id: 50,
+          assignment_group_id: 10,
+          name: "Fictional Draft",
+          description: "<p>Existing assignment description.</p>",
+          points_possible: 0,
+          grading_type: "points",
+          submission_types: ["online_upload", "external_tool"],
+          due_at: null,
+          unlock_at: null,
+          lock_at: null,
+          published: true,
+          muted: false,
+          omit_from_final_grade: false,
+          allowed_attempts: 3,
+          hide_in_gradebook: true,
+          post_manually: true,
+          quiz_id: 88,
+          discussion_topic_id: null,
+          assignment_visibility: [137, 381],
+          rubric: [{ private: "discarded" }],
+          final_grader_id: 999,
+        },
+        {
+          id: "51",
+          name: "Fictional Practice",
+          submission_types: [],
+          allowed_attempts: -1,
+        },
+      ]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(client.listCourseAssignments("course/7")).resolves.toEqual([
+      {
+        canvasAssignmentId: "50",
+        title: "Fictional Draft",
+        assignmentGroupId: "10",
+        pointsPossible: 0,
+        gradingType: "points",
+        submissionTypes: ["online_upload", "external_tool"],
+        dueAt: null,
+        unlockAt: null,
+        lockAt: null,
+        published: true,
+        muted: false,
+        omitFromFinalGrade: false,
+        allowedAttempts: 3,
+        allowedAttemptsUnlimited: false,
+        hideInGradebook: true,
+        postManually: true,
+        quizId: "88",
+        discussionTopicId: null,
+        assignmentVisible: true,
+      },
+      {
+        canvasAssignmentId: "51",
+        title: "Fictional Practice",
+        assignmentGroupId: null,
+        pointsPossible: null,
+        gradingType: null,
+        submissionTypes: [],
+        dueAt: null,
+        unlockAt: null,
+        lockAt: null,
+        published: null,
+        muted: null,
+        omitFromFinalGrade: null,
+        allowedAttempts: null,
+        allowedAttemptsUnlimited: true,
+        hideInGradebook: null,
+        postManually: null,
+        quizId: null,
+        discussionTopicId: null,
+        assignmentVisible: null,
+      },
+    ]);
+
+    const first = new URL(String(fetchImpl.mock.calls[0]?.[0]));
+    expect(first.pathname).toBe("/api/v1/courses/course%2F7/assignments");
+    expect(first.searchParams.get("per_page")).toBe("50");
+    expect(first.searchParams.getAll("include[]")).toEqual([]);
+  });
+
+  it("rejects malformed Phase 5E assignment metadata", async () => {
+    const cases = [
+      [{ id: 1, name: "Bad Points", points_possible: "NaN" }],
+      [{ id: 1, name: "x".repeat(501) }],
+      [{ id: 1, name: "Bad Attempts", allowed_attempts: -2 }],
+      [{ id: 1, name: "Bad Types", submission_types: ["online_upload", {}] }],
+      [{ id: 1, name: "Bad Date", due_at: "not-a-date" }],
+    ];
+
+    for (const body of cases) {
+      const client = createClient(createFetch([jsonResponse(body)]));
+      await expect(client.listCourseAssignments("7")).rejects.toMatchObject({
+        code: "canvas_invalid_response",
+      });
+    }
+  });
+
+  it("applies pagination security to Phase 5E assignments", async () => {
+    const pagedFetch = createFetch([
+      jsonResponse([{ id: 1, name: "One" }], {
+        link: '<https://canvas.test/api/v1/courses/7/assignments?page=2>; rel="next"',
+      }),
+      jsonResponse([{ id: 2, name: "Two" }]),
+    ]);
+    await expect(createClient(pagedFetch).listCourseAssignments("7")).resolves.toEqual([
+      expect.objectContaining({ canvasAssignmentId: "1" }),
+      expect.objectContaining({ canvasAssignmentId: "2" }),
+    ]);
+
+    const crossOrigin = createFetch([
+      jsonResponse([{ id: 1, name: "One" }], {
+        link: '<https://evil.test/api/v1/courses/7/assignments?page=2>; rel="next"',
+      }),
+    ]);
+    await expect(
+      createClient(crossOrigin).listCourseAssignments("7"),
+    ).rejects.toMatchObject({ code: "canvas_pagination_rejected" });
+
+    const repeatedUrl =
+      "https://canvas.test/api/v1/courses/7/assignments?per_page=50";
+    const repeated = createFetch([
+      jsonResponse([{ id: 1, name: "One" }], {
+        link: `<${repeatedUrl}>; rel="next"`,
+      }),
+    ]);
+    await expect(
+      createClient(repeated).listCourseAssignments("7"),
+    ).rejects.toMatchObject({ code: "canvas_pagination_rejected" });
+
+    const limited = createFetch([
+      jsonResponse([{ id: 1, name: "One" }], {
+        link: '<https://canvas.test/api/v1/courses/7/assignments?page=2>; rel="next"',
+      }),
+    ]);
+    await expect(
+      createClient(limited, "token", 1).listCourseAssignments("7"),
+    ).rejects.toMatchObject({ code: "canvas_pagination_rejected" });
+
+    const malformed = createFetch([jsonResponse({ id: 1, name: "No Array" })]);
+    await expect(
+      createClient(malformed).listCourseAssignments("7"),
+    ).rejects.toMatchObject({ code: "canvas_invalid_response" });
+  });
+
+  it("lists own course submissions while discarding unsafe fields", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          assignment_id: 100,
+          workflow_state: "unsubmitted",
+          late: false,
+          missing: false,
+          excused: false,
+        },
+        {
+          assignment_id: 101,
+          workflow_state: "submitted",
+          submission_type: "online_upload",
+          submitted_at: "2026-07-01T01:00:00Z",
+          attempt: 1,
+          late: true,
+          missing: false,
+          excused: false,
+          seconds_late: 300,
+          late_policy_status: "late",
+          assignment_visible: true,
+          body: "private body",
+          submission_comments: [{ comment: "private comment" }],
+          attachments: [{ id: 1, display_name: "private.pdf" }],
+          preview_url: "https://canvas.test/preview",
+          html_url: "https://canvas.test/submission",
+          url: "https://example.invalid/submitted",
+          user_id: 444,
+          grader_id: 555,
+          media_comment: { media_id: "private" },
+          rubric_assessment: { private: true },
+          submission_history: [{ private: true }],
+          anonymous_id: "anon",
+        },
+        {
+          assignment_id: 102,
+          workflow_state: "graded",
+          submitted_at: "2026-07-01T01:00:00Z",
+          graded_at: "2026-07-02T01:00:00Z",
+          posted_at: "2026-07-03T01:00:00Z",
+          attempt: 0,
+          late: false,
+          missing: false,
+          excused: false,
+          grade_matches_current_submission: true,
+          score: 0,
+          grade: "",
+        },
+        {
+          assignment_id: 103,
+          workflow_state: "graded",
+          graded_at: "2026-07-02T01:00:00Z",
+          score: 98.5,
+          grade: "A",
+          grade_matches_current_submission: false,
+        },
+        {
+          assignment_id: 104,
+          workflow_state: "graded",
+          graded_at: "2026-07-02T01:00:00Z",
+        },
+      ], {
+        link: '<https://canvas.test/api/v1/courses/7/students/submissions?page=2>; rel="next"',
+      }),
+      jsonResponse([
+        {
+          assignment_id: 105,
+          workflow_state: "submitted",
+          late: true,
+          missing: null,
+          excused: true,
+          score: null,
+          grade: null,
+        },
+        {
+          assignment_id: 106,
+          workflow_state: "missing",
+          late: true,
+          missing: true,
+          excused: false,
+          late_policy_status: "missing",
+        },
+      ]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    const result = await client.listOwnCourseSubmissions("7");
+
+    expect(result).toHaveLength(7);
+    expect(result[0]).toMatchObject({
+      canvasAssignmentId: "100",
+      workflowState: "unsubmitted",
+      score: { state: "unknown", value: null },
+      grade: { state: "unknown", value: null },
+    });
+    expect(result[1]).toMatchObject({
+      canvasAssignmentId: "101",
+      submittedAt: "2026-07-01T01:00:00Z",
+      attempt: 1,
+      late: true,
+      secondsLate: 300,
+      latePolicyStatus: "late",
+      assignmentVisible: true,
+    });
+    expect(result[2]).toMatchObject({
+      canvasAssignmentId: "102",
+      attempt: 0,
+      score: { state: "visible", value: 0 },
+      grade: { state: "visible", value: "" },
+    });
+    expect(result[3]).toMatchObject({
+      score: { state: "visible", value: 98.5 },
+      grade: { state: "visible", value: "A" },
+      gradeMatchesCurrentSubmission: false,
+    });
+    expect(result[4]).toMatchObject({
+      score: { state: "hidden", value: null },
+      grade: { state: "hidden", value: null },
+    });
+    expect(result[5]).toMatchObject({
+      excused: true,
+      score: { state: "unavailable", value: null },
+      grade: { state: "unavailable", value: null },
+    });
+    expect(result[6]).toMatchObject({
+      late: true,
+      missing: true,
+      latePolicyStatus: "missing",
+    });
+
+    for (const submission of result) {
+      expect(Object.keys(submission)).not.toEqual(
+        expect.arrayContaining([
+          "body",
+          "submission_comments",
+          "attachments",
+          "preview_url",
+          "html_url",
+          "url",
+          "user_id",
+          "grader_id",
+          "rubric_assessment",
+          "submission_history",
+          "anonymous_id",
+        ]),
+      );
+    }
+  });
+
+  it("requests own submissions without student ids or unsafe includes", async () => {
+    const fetchImpl = createFetch([jsonResponse([])]);
+    const client = createClient(fetchImpl, "submission-token");
+
+    await client.listOwnCourseSubmissions("course/7");
+
+    const request = lastRequest(fetchImpl);
+    const url = new URL(request.url);
+    expect(url.pathname).toBe("/api/v1/courses/course%2F7/students/submissions");
+    expect(url.searchParams.get("per_page")).toBe("50");
+    expect(url.searchParams.getAll("student_ids[]")).toEqual([]);
+    expect(url.searchParams.getAll("include[]")).toEqual([]);
+    expect(url.searchParams.get("grouped")).toBeNull();
+    expect(request.init.method).toBe("GET");
+    expect(request.init.body).toBeUndefined();
+    expect(authorizationHeader(request.init)).toBe("Bearer submission-token");
+  });
+
+  it("rejects malformed own submission responses", async () => {
+    const cases = [
+      [{ workflow_state: "submitted" }],
+      [{ assignment_id: 1, attempt: -1 }],
+      [{ assignment_id: 1, seconds_late: -1 }],
+      [{ assignment_id: 1, score: "10" }],
+      [{ assignment_id: 1, grade: "x".repeat(121) }],
+      { assignment_id: 1 },
+    ];
+
+    for (const body of cases) {
+      const client = createClient(createFetch([jsonResponse(body)]));
+      await expect(client.listOwnCourseSubmissions("7")).rejects.toMatchObject({
+        code: "canvas_invalid_response",
+      });
+    }
+  });
+
+  it("normalizes own course grade summaries from student enrollments only", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([
+        {
+          id: 1,
+          type: "TeacherEnrollment",
+          grades: {
+            current_score: 999,
+            current_grade: "hidden teacher value",
+          },
+        },
+        {
+          id: 2,
+          type: "StudentEnrollment",
+          enrollment_state: "active",
+          grades: {
+            current_score: 0,
+            current_grade: "",
+            final_score: 91.25,
+            final_grade: "A-",
+            unposted_current_score: 10,
+            unposted_current_grade: "private",
+            unposted_final_score: 20,
+            unposted_final_grade: "private",
+            html_url: "https://canvas.test/private-grades",
+          },
+          user_id: 123,
+          user: { id: 123, name: "Private User" },
+        },
+      ]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(client.getOwnCourseGradeSummary("7")).resolves.toEqual({
+      currentScore: { state: "visible", value: 0 },
+      currentGrade: { state: "visible", value: "" },
+      finalScore: { state: "visible", value: 91.25 },
+      finalGrade: { state: "visible", value: "A-" },
+    });
+
+    const request = lastRequest(fetchImpl);
+    const url = new URL(request.url);
+    expect(url.pathname).toBe("/api/v1/courses/7/enrollments");
+    expect(url.searchParams.get("user_id")).toBe("self");
+    expect(url.searchParams.getAll("type[]")).toEqual(["StudentEnrollment"]);
+    expect(url.searchParams.getAll("include[]")).toEqual([]);
+    expect(request.init.method).toBe("GET");
+    expect(request.init.body).toBeUndefined();
+  });
+
+  it("distinguishes hidden, null, and unavailable course grade summaries", async () => {
+    await expect(
+      createClient(
+        createFetch([
+          jsonResponse([
+            {
+              id: 2,
+              type: "StudentEnrollment",
+              grades: {
+                current_score: null,
+                current_grade: null,
+              },
+            },
+          ]),
+        ]),
+      ).getOwnCourseGradeSummary("7"),
+    ).resolves.toEqual({
+      currentScore: { state: "unavailable", value: null },
+      currentGrade: { state: "unavailable", value: null },
+      finalScore: { state: "hidden", value: null },
+      finalGrade: { state: "hidden", value: null },
+    });
+
+    await expect(
+      createClient(
+        createFetch([jsonResponse([{ id: 2, type: "StudentEnrollment" }])]),
+      ).getOwnCourseGradeSummary("7"),
+    ).resolves.toEqual({
+      currentScore: { state: "unavailable", value: null },
+      currentGrade: { state: "unavailable", value: null },
+      finalScore: { state: "unavailable", value: null },
+      finalGrade: { state: "unavailable", value: null },
+    });
+
+    await expect(
+      createClient(
+        createFetch([jsonResponse([{ id: 3, type: "ObserverEnrollment" }])]),
+      ).getOwnCourseGradeSummary("7"),
+    ).resolves.toEqual({
+      currentScore: { state: "unavailable", value: null },
+      currentGrade: { state: "unavailable", value: null },
+      finalScore: { state: "unavailable", value: null },
+      finalGrade: { state: "unavailable", value: null },
+    });
+  });
+
+  it("rejects malformed course grade objects", async () => {
+    const client = createClient(
+      createFetch([
+        jsonResponse([
+          {
+            id: 2,
+            type: "StudentEnrollment",
+            grades: { current_score: "95" },
+          },
+        ]),
+      ]),
+    );
+
+    await expect(client.getOwnCourseGradeSummary("7")).rejects.toMatchObject({
+      code: "canvas_invalid_response",
+    });
+  });
+
+  it("keeps Phase 5E methods GET-only and does not add mutation helpers", async () => {
+    for (const methodName of [
+      "submitAssignment",
+      "uploadSubmission",
+      "gradeSubmission",
+      "commentOnSubmission",
+      "excuseSubmission",
+      "updateLatePolicy",
+      "listStudentSubmissions",
+    ]) {
+      expect(
+        Object.prototype.hasOwnProperty.call(CanvasClient.prototype, methodName),
+      ).toBe(false);
+    }
+
+    const fetchImpl = createFetch([
+      jsonResponse([{ id: 1, name: "One" }]),
+      jsonResponse([{ assignment_id: 1 }]),
+      jsonResponse([]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await client.listCourseAssignments("7");
+    await client.listOwnCourseSubmissions("7");
+    await client.getOwnCourseGradeSummary("7");
+
+    for (const call of fetchImpl.mock.calls) {
+      const init = call[1] as RequestInit;
+      const url = new URL(String(call[0]));
+      expect(init.method).toBe("GET");
+      expect(init.body).toBeUndefined();
+      expect(url.searchParams.getAll("include[]")).toEqual([]);
+      expect(url.searchParams.getAll("student_ids[]")).toEqual([]);
+    }
+  });
+
+  it.each([
+    [401, "canvas_unauthorized"],
+    [403, "canvas_forbidden"],
+    [404, "canvas_not_found"],
+    [429, "canvas_rate_limited"],
+    [400, "canvas_request_failed"],
+    [503, "canvas_unavailable"],
+  ] as const)("maps Phase 5E HTTP %s safely", async (status, code) => {
+    const fetchImpl = createFetch([
+      new Response(JSON.stringify({ raw: "secret-token private grade" }), {
+        status,
+        headers: status === 429 ? { "retry-after": "2" } : {},
+      }),
+    ]);
+    const client = createClient(fetchImpl, "secret-token");
+
+    const error = await client
+      .listOwnCourseSubmissions("7")
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code });
+    expect(String((error as Error).message)).not.toMatch(/secret-token|private grade/);
+  });
+
+  it("handles Phase 5E malformed JSON, timeout, redirects, and bad links safely", async () => {
+    await expect(
+      createClient(createFetch([new Response("{nope", { status: 200 })]))
+        .listOwnCourseSubmissions("7"),
+    ).rejects.toMatchObject({ code: "canvas_malformed_json" });
+
+    const timeoutFetch = vi.fn(
+      (_url: RequestInfo | URL, init?: RequestInit): Promise<Response> =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("aborted secret-token", "AbortError"));
+          });
+        }),
+    ) as FetchMock;
+    const timedOut = new CanvasClient({
+      allowHttpForTesting: true,
+      baseUrl: "https://canvas.test",
+      fetchImpl: timeoutFetch,
+      personalAccessToken: "secret-token",
+      timeoutMs: 1,
+    });
+    await expect(timedOut.listOwnCourseSubmissions("7")).rejects.toMatchObject({
+      code: "canvas_timeout",
+    });
+
+    await expect(
+      createClient(
+        createRedirectFetch(
+          "https://canvas.test/api/v1/courses/7/students/submissions?per_page=50",
+          "https://canvas.test/login",
+        ),
+      ).listOwnCourseSubmissions("7"),
+    ).rejects.toMatchObject({ code: "canvas_redirect_rejected" });
+
+    await expect(
+      createClient(
+        createFetch([
+          jsonResponse([{ assignment_id: 1 }], {
+            link: '<notaurl>; rel="next"',
+          }),
+        ]),
+      ).listOwnCourseSubmissions("7"),
+    ).rejects.toMatchObject({ code: "canvas_pagination_rejected" });
+  });
+
   it("lists planner items with repeated course context codes and deterministic dates", async () => {
     const fetchImpl = createFetch([
       jsonResponse([

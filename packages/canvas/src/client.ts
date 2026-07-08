@@ -10,6 +10,7 @@ import {
   type CanvasClientErrorCode,
   type CanvasClientOptions,
   type CanvasCourse,
+  type CanvasCourseGradeSummary,
   type CanvasCourseEnrollment,
   type CanvasCourseSection,
   type CanvasCourseTerm,
@@ -21,6 +22,7 @@ import {
   type CanvasJsonObject,
   type CanvasModule,
   type CanvasModuleItem,
+  type CanvasOwnSubmission,
   type CanvasPageDetail,
   type CanvasPageSummary,
   type CanvasPlannerItem,
@@ -28,6 +30,9 @@ import {
   type CanvasPlannerOverrideSummary,
   type CanvasPlannerSubmissionState,
   type CanvasProfile,
+  type CanvasGradeAssignment,
+  type CanvasVisibleNumber,
+  type CanvasVisibleText,
 } from "./types";
 
 const API_PREFIX = "/api/v1";
@@ -37,6 +42,11 @@ const DEFAULT_PER_PAGE = 50;
 const PROBE_PER_PAGE = 1;
 const INTEGRATION_VERSION = "phase5a";
 const MAX_RETRY_AFTER_MS = 30_000;
+const MAX_CANVAS_ID_LENGTH = 80;
+const MAX_CANVAS_TITLE_LENGTH = 500;
+const MAX_CANVAS_STATUS_LENGTH = 80;
+const MAX_CANVAS_GRADE_LENGTH = 120;
+const MAX_CANVAS_SCORE = 1_000_000;
 
 export const CANVAS_CAPABILITIES: readonly CanvasCapability[] = [
   "profile",
@@ -239,6 +249,46 @@ export class CanvasClient {
       `/courses/${encodeCanvasPathSegment(courseId)}/assignments?per_page=${DEFAULT_PER_PAGE}`,
     );
     return parsed.map(normalizeAssignment);
+  }
+
+  public async listCourseAssignments(
+    courseId: string,
+  ): Promise<readonly CanvasGradeAssignment[]> {
+    const parsed = await this.requestPaginatedJson(
+      createPathWithQuery(
+        `/courses/${encodeCanvasPathSegment(courseId)}/assignments`,
+        [["per_page", String(DEFAULT_PER_PAGE)]],
+      ),
+    );
+    return parsed.map(normalizeGradeAssignment);
+  }
+
+  public async listOwnCourseSubmissions(
+    courseId: string,
+  ): Promise<readonly CanvasOwnSubmission[]> {
+    const parsed = await this.requestPaginatedJson(
+      createPathWithQuery(
+        `/courses/${encodeCanvasPathSegment(courseId)}/students/submissions`,
+        [["per_page", String(DEFAULT_PER_PAGE)]],
+      ),
+    );
+    return parsed.map(normalizeOwnSubmission);
+  }
+
+  public async getOwnCourseGradeSummary(
+    courseId: string,
+  ): Promise<CanvasCourseGradeSummary> {
+    const parsed = await this.requestPaginatedJson(
+      createPathWithQuery(
+        `/courses/${encodeCanvasPathSegment(courseId)}/enrollments`,
+        [
+          ["per_page", String(DEFAULT_PER_PAGE)],
+          ["user_id", "self"],
+          ["type[]", "StudentEnrollment"],
+        ],
+      ),
+    );
+    return normalizeOwnCourseGradeSummary(parsed);
   }
 
   public async listPlannerItems({
@@ -1307,6 +1357,7 @@ function normalizeAssignment(value: unknown): CanvasAssignment {
     );
   }
 
+  const allowedAttempts = legacyAllowedAttempts(value.allowed_attempts);
   return {
     id,
     assignmentGroupId: normalizeId(value.assignment_group_id),
@@ -1326,8 +1377,233 @@ function normalizeAssignment(value: unknown): CanvasAssignment {
     htmlUrl: stringOrNull(value.html_url),
     quizId: normalizeId(value.quiz_id),
     discussionTopicId: normalizeId(value.discussion_topic_id),
+    allowedAttempts: allowedAttempts.allowedAttempts,
+    allowedAttemptsUnlimited: allowedAttempts.allowedAttemptsUnlimited,
+    hideInGradebook: booleanOrNull(value.hide_in_gradebook),
+    postManually: booleanOrNull(value.post_manually),
+    assignmentVisible: assignmentVisibleOrNull(value),
     createdAt: stringOrNull(value.created_at),
     updatedAt: stringOrNull(value.updated_at),
+  };
+}
+
+function normalizeGradeAssignment(value: unknown): CanvasGradeAssignment {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas assignment response was invalid.",
+    );
+  }
+
+  const allowedAttempts = normalizeAllowedAttempts(value.allowed_attempts);
+  return {
+    canvasAssignmentId: requiredCanvasId(value.id, "Canvas assignment id"),
+    title: requiredBoundedText(
+      value.name,
+      "Canvas assignment title",
+      MAX_CANVAS_TITLE_LENGTH,
+    ),
+    assignmentGroupId: nullableCanvasId(
+      value.assignment_group_id,
+      "Canvas assignment group id",
+    ),
+    pointsPossible: nullableNonNegativeNumber(
+      value.points_possible,
+      "Canvas assignment points possible",
+    ),
+    gradingType: nullableBoundedText(
+      value.grading_type,
+      "Canvas assignment grading type",
+      MAX_CANVAS_STATUS_LENGTH,
+    ),
+    submissionTypes: boundedStringArray(
+      value.submission_types,
+      "Canvas assignment submission types",
+      MAX_CANVAS_STATUS_LENGTH,
+    ),
+    dueAt: nullableCanvasTimestamp(value.due_at, "Canvas assignment due date"),
+    unlockAt: nullableCanvasTimestamp(
+      value.unlock_at,
+      "Canvas assignment unlock date",
+    ),
+    lockAt: nullableCanvasTimestamp(value.lock_at, "Canvas assignment lock date"),
+    published: nullableBoolean(value.published, "Canvas assignment published"),
+    muted: nullableBoolean(value.muted, "Canvas assignment muted"),
+    omitFromFinalGrade: nullableBoolean(
+      value.omit_from_final_grade,
+      "Canvas assignment final-grade omission",
+    ),
+    allowedAttempts: allowedAttempts.allowedAttempts,
+    allowedAttemptsUnlimited: allowedAttempts.allowedAttemptsUnlimited,
+    hideInGradebook: nullableBoolean(
+      value.hide_in_gradebook,
+      "Canvas assignment gradebook visibility",
+    ),
+    postManually: nullableBoolean(
+      value.post_manually,
+      "Canvas assignment posting policy",
+    ),
+    quizId: nullableCanvasId(value.quiz_id, "Canvas assignment quiz id"),
+    discussionTopicId: nullableCanvasId(
+      value.discussion_topic_id,
+      "Canvas assignment discussion topic id",
+    ),
+    assignmentVisible: assignmentVisibleOrNull(value),
+  };
+}
+
+function normalizeOwnSubmission(value: unknown): CanvasOwnSubmission {
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas submission response was invalid.",
+    );
+  }
+
+  const workflowState = nullableBoundedText(
+    value.workflow_state,
+    "Canvas submission workflow state",
+    MAX_CANVAS_STATUS_LENGTH,
+  );
+  const gradedAt = nullableCanvasTimestamp(
+    value.graded_at,
+    "Canvas submission graded timestamp",
+  );
+  const postedAt = nullableCanvasTimestamp(
+    value.posted_at,
+    "Canvas submission posted timestamp",
+  );
+  const hasGradeEvidence =
+    workflowState === "graded" || gradedAt !== null || postedAt !== null;
+
+  return {
+    canvasAssignmentId: requiredCanvasId(
+      value.assignment_id,
+      "Canvas submission assignment id",
+    ),
+    workflowState,
+    submissionType: nullableBoundedText(
+      value.submission_type,
+      "Canvas submission type",
+      MAX_CANVAS_STATUS_LENGTH,
+    ),
+    submittedAt: nullableCanvasTimestamp(
+      value.submitted_at,
+      "Canvas submission submitted timestamp",
+    ),
+    gradedAt,
+    postedAt,
+    attempt: nullableNonNegativeInteger(
+      value.attempt,
+      "Canvas submission attempt",
+    ),
+    late: nullableBoolean(value.late, "Canvas submission late flag"),
+    missing: nullableBoolean(value.missing, "Canvas submission missing flag"),
+    excused: nullableBoolean(value.excused, "Canvas submission excused flag"),
+    secondsLate: nullableNonNegativeInteger(
+      value.seconds_late,
+      "Canvas submission seconds late",
+    ),
+    latePolicyStatus: nullableBoundedText(
+      value.late_policy_status,
+      "Canvas submission late policy status",
+      MAX_CANVAS_STATUS_LENGTH,
+    ),
+    assignmentVisible: nullableBoolean(
+      value.assignment_visible,
+      "Canvas submission assignment visibility",
+    ),
+    gradeMatchesCurrentSubmission: nullableBoolean(
+      value.grade_matches_current_submission,
+      "Canvas submission grade freshness flag",
+    ),
+    score: visibleNumberFromPresence({
+      hiddenWhenOmitted: hasGradeEvidence,
+      label: "Canvas submission score",
+      record: value,
+      field: "score",
+    }),
+    grade: visibleTextFromPresence({
+      hiddenWhenOmitted: hasGradeEvidence,
+      label: "Canvas submission grade",
+      record: value,
+      field: "grade",
+    }),
+  };
+}
+
+function normalizeOwnCourseGradeSummary(
+  values: readonly unknown[],
+): CanvasCourseGradeSummary {
+  for (const value of values) {
+    if (!isRecord(value)) {
+      throw new CanvasClientError(
+        "canvas_invalid_response",
+        "Canvas enrollment response was invalid.",
+      );
+    }
+
+    const type = nullableBoundedText(
+      value.type,
+      "Canvas enrollment type",
+      MAX_CANVAS_STATUS_LENGTH,
+    );
+    if (type !== "StudentEnrollment") {
+      continue;
+    }
+    if (hasOwn(value, "grades")) {
+      return normalizeCourseGradeObject(value.grades);
+    }
+  }
+
+  return unavailableCourseGradeSummary();
+}
+
+function normalizeCourseGradeObject(value: unknown): CanvasCourseGradeSummary {
+  if (value === null || value === undefined) {
+    return unavailableCourseGradeSummary();
+  }
+  if (!isRecord(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      "Canvas enrollment grade response was invalid.",
+    );
+  }
+
+  return {
+    currentScore: visibleNumberFromPresence({
+      hiddenWhenOmitted: true,
+      label: "Canvas course current score",
+      record: value,
+      field: "current_score",
+    }),
+    currentGrade: visibleTextFromPresence({
+      hiddenWhenOmitted: true,
+      label: "Canvas course current grade",
+      record: value,
+      field: "current_grade",
+    }),
+    finalScore: visibleNumberFromPresence({
+      hiddenWhenOmitted: true,
+      label: "Canvas course final score",
+      record: value,
+      field: "final_score",
+    }),
+    finalGrade: visibleTextFromPresence({
+      hiddenWhenOmitted: true,
+      label: "Canvas course final grade",
+      record: value,
+      field: "final_grade",
+    }),
+  };
+}
+
+function unavailableCourseGradeSummary(): CanvasCourseGradeSummary {
+  return {
+    currentScore: { state: "unavailable", value: null },
+    currentGrade: { state: "unavailable", value: null },
+    finalScore: { state: "unavailable", value: null },
+    finalGrade: { state: "unavailable", value: null },
   };
 }
 
@@ -1555,6 +1831,298 @@ function normalizeContextCodes(values: readonly string[]): readonly string[] {
   return normalized;
 }
 
+function requiredCanvasId(value: unknown, label: string): string {
+  const id = nullableCanvasId(value, label);
+  if (!id) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      `${label} was missing.`,
+    );
+  }
+  return id;
+}
+
+function nullableCanvasId(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "number") {
+    if (Number.isSafeInteger(value) && value >= 0) {
+      return String(value);
+    }
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      `${label} was invalid.`,
+    );
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (
+      trimmed.length > 0 &&
+      trimmed.length <= MAX_CANVAS_ID_LENGTH &&
+      /^[A-Za-z0-9:_-]+$/.test(trimmed)
+    ) {
+      return trimmed;
+    }
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function requiredBoundedText(
+  value: unknown,
+  label: string,
+  maxLength: number,
+): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length > 0 && trimmed.length <= maxLength) {
+      return trimmed;
+    }
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was missing or invalid.`,
+  );
+}
+
+function nullableBoundedText(
+  value: unknown,
+  label: string,
+  maxLength: number,
+): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+    if (trimmed.length <= maxLength) {
+      return trimmed;
+    }
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function boundedStringArray(
+  value: unknown,
+  label: string,
+  maxLength: number,
+): readonly string[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new CanvasClientError(
+      "canvas_invalid_response",
+      `${label} was invalid.`,
+    );
+  }
+  return value.map((entry) => {
+    if (typeof entry !== "string") {
+      throw new CanvasClientError(
+        "canvas_invalid_response",
+        `${label} included an invalid entry.`,
+      );
+    }
+    const trimmed = entry.trim();
+    if (trimmed.length === 0 || trimmed.length > maxLength) {
+      throw new CanvasClientError(
+        "canvas_invalid_response",
+        `${label} included an invalid entry.`,
+      );
+    }
+    return trimmed;
+  });
+}
+
+function nullableCanvasTimestamp(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (
+      trimmed.length > 0 &&
+      trimmed.length <= MAX_CANVAS_STATUS_LENGTH &&
+      Number.isFinite(Date.parse(trimmed))
+    ) {
+      return trimmed;
+    }
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function nullableBoolean(value: unknown, label: string): boolean | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function nullableNonNegativeInteger(
+  value: unknown,
+  label: string,
+): number | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return value;
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function nullableNonNegativeNumber(
+  value: unknown,
+  label: string,
+): number | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= MAX_CANVAS_SCORE
+  ) {
+    return value;
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function normalizeAllowedAttempts(value: unknown): {
+  readonly allowedAttempts: number | null;
+  readonly allowedAttemptsUnlimited: boolean | null;
+} {
+  if (value === undefined || value === null) {
+    return { allowedAttempts: null, allowedAttemptsUnlimited: null };
+  }
+  if (value === -1) {
+    return { allowedAttempts: null, allowedAttemptsUnlimited: true };
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return { allowedAttempts: value, allowedAttemptsUnlimited: false };
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    "Canvas assignment allowed attempts was invalid.",
+  );
+}
+
+function legacyAllowedAttempts(value: unknown): {
+  readonly allowedAttempts: number | null;
+  readonly allowedAttemptsUnlimited: boolean | null;
+} {
+  if (value === -1) {
+    return { allowedAttempts: null, allowedAttemptsUnlimited: true };
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return { allowedAttempts: value, allowedAttemptsUnlimited: false };
+  }
+  return { allowedAttempts: null, allowedAttemptsUnlimited: null };
+}
+
+function assignmentVisibleOrNull(
+  value: Readonly<Record<string, unknown>>,
+): boolean | null {
+  const explicit = booleanOrNull(value.assignment_visible);
+  if (explicit !== null) {
+    return explicit;
+  }
+  if (!hasOwn(value, "assignment_visibility")) {
+    return null;
+  }
+  return Array.isArray(value.assignment_visibility) ? true : null;
+}
+
+function visibleNumberFromPresence({
+  field,
+  hiddenWhenOmitted,
+  label,
+  record,
+}: {
+  readonly field: string;
+  readonly hiddenWhenOmitted: boolean;
+  readonly label: string;
+  readonly record: Readonly<Record<string, unknown>>;
+}): CanvasVisibleNumber {
+  if (!hasOwn(record, field)) {
+    return {
+      state: hiddenWhenOmitted ? "hidden" : "unknown",
+      value: null,
+    };
+  }
+  const value = record[field];
+  if (value === null || value === undefined) {
+    return { state: "unavailable", value: null };
+  }
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= -MAX_CANVAS_SCORE &&
+    value <= MAX_CANVAS_SCORE
+  ) {
+    return { state: "visible", value };
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
+function visibleTextFromPresence({
+  field,
+  hiddenWhenOmitted,
+  label,
+  record,
+}: {
+  readonly field: string;
+  readonly hiddenWhenOmitted: boolean;
+  readonly label: string;
+  readonly record: Readonly<Record<string, unknown>>;
+}): CanvasVisibleText {
+  if (!hasOwn(record, field)) {
+    return {
+      state: hiddenWhenOmitted ? "hidden" : "unknown",
+      value: null,
+    };
+  }
+  const value = record[field];
+  if (value === null || value === undefined) {
+    return { state: "unavailable", value: null };
+  }
+  if (typeof value === "string" && value.length <= MAX_CANVAS_GRADE_LENGTH) {
+    return { state: "visible", value };
+  }
+  throw new CanvasClientError(
+    "canvas_invalid_response",
+    `${label} was invalid.`,
+  );
+}
+
 function normalizeId(value: unknown): string | null {
   if (typeof value === "number" && Number.isSafeInteger(value)) {
     return String(value);
@@ -1760,4 +2328,11 @@ function isAbortError(error: unknown): boolean {
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOwn(
+  value: Readonly<Record<string, unknown>>,
+  key: string,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }

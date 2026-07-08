@@ -124,8 +124,162 @@ export interface CanvasAssignment {
   readonly htmlUrl: string | null;
   readonly quizId: string | null;
   readonly discussionTopicId: string | null;
+  readonly allowedAttempts?: number | null;
+  readonly allowedAttemptsUnlimited?: boolean | null;
+  readonly hideInGradebook?: boolean | null;
+  readonly postManually?: boolean | null;
+  readonly assignmentVisible?: boolean | null;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
+}
+
+export interface CanvasRawAssignmentResponse {
+  readonly id?: unknown;
+  readonly assignment_group_id?: unknown;
+  readonly name?: unknown;
+  readonly description?: unknown;
+  readonly points_possible?: unknown;
+  readonly grading_type?: unknown;
+  readonly submission_types?: unknown;
+  readonly due_at?: unknown;
+  readonly unlock_at?: unknown;
+  readonly lock_at?: unknown;
+  readonly published?: unknown;
+  readonly muted?: unknown;
+  readonly omit_from_final_grade?: unknown;
+  readonly allowed_attempts?: unknown;
+  readonly hide_in_gradebook?: unknown;
+  readonly post_manually?: unknown;
+  readonly quiz_id?: unknown;
+  readonly discussion_topic_id?: unknown;
+  readonly assignment_visibility?: unknown;
+  readonly rubric?: unknown;
+  readonly rubric_settings?: unknown;
+  readonly moderated_grading?: unknown;
+  readonly final_grader_id?: unknown;
+}
+
+export interface CanvasRawOwnSubmissionResponse {
+  readonly assignment_id?: unknown;
+  readonly workflow_state?: unknown;
+  readonly submission_type?: unknown;
+  readonly submitted_at?: unknown;
+  readonly graded_at?: unknown;
+  readonly posted_at?: unknown;
+  readonly attempt?: unknown;
+  readonly late?: unknown;
+  readonly missing?: unknown;
+  readonly excused?: unknown;
+  readonly seconds_late?: unknown;
+  readonly late_policy_status?: unknown;
+  readonly assignment_visible?: unknown;
+  readonly grade_matches_current_submission?: unknown;
+  readonly score?: unknown;
+  readonly grade?: unknown;
+  readonly body?: unknown;
+  readonly submission_comments?: unknown;
+  readonly attachments?: unknown;
+  readonly preview_url?: unknown;
+  readonly html_url?: unknown;
+  readonly url?: unknown;
+  readonly user_id?: unknown;
+  readonly grader_id?: unknown;
+  readonly media_comment?: unknown;
+  readonly rubric_assessment?: unknown;
+  readonly submission_history?: unknown;
+  readonly anonymous_id?: unknown;
+}
+
+export interface CanvasRawEnrollmentGradeResponse {
+  readonly current_score?: unknown;
+  readonly current_grade?: unknown;
+  readonly final_score?: unknown;
+  readonly final_grade?: unknown;
+  readonly html_url?: unknown;
+  readonly unposted_current_score?: unknown;
+  readonly unposted_current_grade?: unknown;
+  readonly unposted_final_score?: unknown;
+  readonly unposted_final_grade?: unknown;
+}
+
+export interface CanvasRawOwnEnrollmentResponse {
+  readonly id?: unknown;
+  readonly type?: unknown;
+  readonly enrollment_state?: unknown;
+  readonly workflow_state?: unknown;
+  readonly grades?: unknown;
+  readonly user?: unknown;
+  readonly user_id?: unknown;
+  readonly role?: unknown;
+}
+
+export type CanvasVisibilityState =
+  | "visible"
+  | "hidden"
+  | "unavailable"
+  | "unknown"
+  | "not_applicable";
+
+export type CanvasVisibleNumber =
+  | { readonly state: "visible"; readonly value: number }
+  | {
+      readonly state: Exclude<CanvasVisibilityState, "visible">;
+      readonly value: null;
+    };
+
+export type CanvasVisibleText =
+  | { readonly state: "visible"; readonly value: string }
+  | {
+      readonly state: Exclude<CanvasVisibilityState, "visible">;
+      readonly value: null;
+    };
+
+export interface CanvasGradeAssignment {
+  readonly canvasAssignmentId: string;
+  readonly title: string;
+  readonly assignmentGroupId: string | null;
+  readonly pointsPossible: number | null;
+  readonly gradingType: string | null;
+  readonly submissionTypes: readonly string[];
+  readonly dueAt: string | null;
+  readonly unlockAt: string | null;
+  readonly lockAt: string | null;
+  readonly published: boolean | null;
+  readonly muted: boolean | null;
+  readonly omitFromFinalGrade: boolean | null;
+  readonly allowedAttempts: number | null;
+  readonly allowedAttemptsUnlimited: boolean | null;
+  readonly hideInGradebook: boolean | null;
+  readonly postManually: boolean | null;
+  readonly quizId: string | null;
+  readonly discussionTopicId: string | null;
+  readonly assignmentVisible: boolean | null;
+}
+
+export interface CanvasOwnSubmission {
+  readonly canvasAssignmentId: string;
+  readonly workflowState: string | null;
+  readonly submissionType: string | null;
+  readonly submittedAt: string | null;
+  readonly gradedAt: string | null;
+  readonly postedAt: string | null;
+  readonly attempt: number | null;
+  readonly late: boolean | null;
+  readonly missing: boolean | null;
+  readonly excused: boolean | null;
+  readonly secondsLate: number | null;
+  readonly latePolicyStatus: string | null;
+  readonly assignmentVisible: boolean | null;
+  readonly gradeMatchesCurrentSubmission: boolean | null;
+  readonly score: CanvasVisibleNumber;
+  readonly grade: CanvasVisibleText;
+}
+
+export interface CanvasCourseGradeSummary {
+  readonly currentScore: CanvasVisibleNumber;
+  readonly currentGrade: CanvasVisibleText;
+  readonly finalScore: CanvasVisibleNumber;
+  readonly finalGrade: CanvasVisibleText;
 }
 
 export interface CanvasPlannerOverrideSummary {
