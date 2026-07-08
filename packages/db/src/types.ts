@@ -124,6 +124,77 @@ export type CanvasAssignmentInsert =
   Database["public"]["Tables"]["canvas_assignments"]["Insert"];
 export type CanvasAssignmentUpdate =
   Database["public"]["Tables"]["canvas_assignments"]["Update"];
+export type CanvasAssignmentSubmissionWorkflowState =
+  | "submitted"
+  | "unsubmitted"
+  | "graded"
+  | "pending_review";
+export type CanvasAssignmentNormalizedStatus =
+  | "unknown"
+  | "excused"
+  | "unavailable"
+  | "locked"
+  | "missing"
+  | "graded_hidden"
+  | "graded"
+  | "submitted_late"
+  | "submitted"
+  | "late_unsubmitted"
+  | "available"
+  | "upcoming"
+  | "no_due_date";
+export type CanvasGradeVisibilityState =
+  | "unknown"
+  | "visible"
+  | "hidden"
+  | "unavailable"
+  | "not_applicable";
+export type CanvasLatePolicyStatus = "late" | "missing" | "extended" | "none";
+export type CanvasCourseGradeSyncStatus =
+  | "never_synced"
+  | "running"
+  | "succeeded"
+  | "partial"
+  | "failed";
+export type CanvasCourseGradeSyncFamilyState =
+  | "not_started"
+  | "succeeded"
+  | "partial"
+  | "failed"
+  | "skipped";
+export type CanvasCourseGradeSyncFailureCategory =
+  | "authentication_failure"
+  | "permission_denied"
+  | "resource_not_found"
+  | "rate_limited"
+  | "server_error"
+  | "network_error"
+  | "timeout"
+  | "malformed_response"
+  | "pagination_rejected"
+  | "redirect_rejected"
+  | "persistence_failure"
+  | "normalization_failure"
+  | "partial_sync"
+  | "unknown";
+export type CanvasAssignmentSubmissionRow =
+  Database["public"]["Tables"]["canvas_assignment_submissions"]["Row"];
+export type CanvasAssignmentSubmissionInsert =
+  Database["public"]["Tables"]["canvas_assignment_submissions"]["Insert"];
+export type CanvasAssignmentSubmissionUpdate =
+  Database["public"]["Tables"]["canvas_assignment_submissions"]["Update"];
+export type CanvasCourseGradeSummaryRow =
+  Database["public"]["Tables"]["canvas_course_grade_summaries"]["Row"];
+export type CanvasCourseGradeSummaryInsert =
+  Database["public"]["Tables"]["canvas_course_grade_summaries"]["Insert"];
+export type CanvasCourseGradeSummaryUpdate =
+  Database["public"]["Tables"]["canvas_course_grade_summaries"]["Update"];
+export type CanvasCourseGradeSyncStateRow =
+  Database["public"]["Tables"]["canvas_course_grade_sync_states"]["Row"];
+export type CanvasCourseGradeSyncStateInsert =
+  Database["public"]["Tables"]["canvas_course_grade_sync_states"]["Insert"];
+export type CanvasCourseGradeSyncStateUpdate =
+  Database["public"]["Tables"]["canvas_course_grade_sync_states"]["Update"];
 export type CanvasSyncMode = "full" | "incremental" | "course";
 export type CanvasSyncRunStatus =
   | "running"
@@ -998,6 +1069,329 @@ export interface Database {
           },
           {
             foreignKeyName: "canvas_assignments_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_assignment_submissions: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          assignment_id: string;
+          workflow_state: CanvasAssignmentSubmissionWorkflowState | null;
+          normalized_status: CanvasAssignmentNormalizedStatus;
+          submitted_at: string | null;
+          graded_at: string | null;
+          posted_at: string | null;
+          attempt: number | null;
+          submission_type: string | null;
+          grade_matches_current_submission: boolean | null;
+          late: boolean | null;
+          missing: boolean | null;
+          excused: boolean | null;
+          assignment_visible: boolean | null;
+          late_policy_status: CanvasLatePolicyStatus | null;
+          seconds_late: number | null;
+          score: number | null;
+          grade: string | null;
+          score_visibility_state: CanvasGradeVisibilityState;
+          grade_visibility_state: CanvasGradeVisibilityState;
+          points_possible_at_sync: number | null;
+          first_synced_at: string;
+          last_synced_at: string;
+          last_seen_at: string;
+          absent_after_sync_at: string | null;
+          source_fingerprint: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          assignment_id: string;
+          workflow_state?: CanvasAssignmentSubmissionWorkflowState | null;
+          normalized_status?: CanvasAssignmentNormalizedStatus;
+          submitted_at?: string | null;
+          graded_at?: string | null;
+          posted_at?: string | null;
+          attempt?: number | null;
+          submission_type?: string | null;
+          grade_matches_current_submission?: boolean | null;
+          late?: boolean | null;
+          missing?: boolean | null;
+          excused?: boolean | null;
+          assignment_visible?: boolean | null;
+          late_policy_status?: CanvasLatePolicyStatus | null;
+          seconds_late?: number | null;
+          score?: number | null;
+          grade?: string | null;
+          score_visibility_state?: CanvasGradeVisibilityState;
+          grade_visibility_state?: CanvasGradeVisibilityState;
+          points_possible_at_sync?: number | null;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          last_seen_at?: string;
+          absent_after_sync_at?: string | null;
+          source_fingerprint: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          assignment_id?: string;
+          workflow_state?: CanvasAssignmentSubmissionWorkflowState | null;
+          normalized_status?: CanvasAssignmentNormalizedStatus;
+          submitted_at?: string | null;
+          graded_at?: string | null;
+          posted_at?: string | null;
+          attempt?: number | null;
+          submission_type?: string | null;
+          grade_matches_current_submission?: boolean | null;
+          late?: boolean | null;
+          missing?: boolean | null;
+          excused?: boolean | null;
+          assignment_visible?: boolean | null;
+          late_policy_status?: CanvasLatePolicyStatus | null;
+          seconds_late?: number | null;
+          score?: number | null;
+          grade?: string | null;
+          score_visibility_state?: CanvasGradeVisibilityState;
+          grade_visibility_state?: CanvasGradeVisibilityState;
+          points_possible_at_sync?: number | null;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          last_seen_at?: string;
+          absent_after_sync_at?: string | null;
+          source_fingerprint?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_assignment_submissions_assignment_owner_fkey";
+            columns: [
+              "assignment_id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "canvas_assignments";
+            referencedColumns: [
+              "id",
+              "user_id",
+              "canvas_connection_id",
+              "course_id",
+            ];
+          },
+          {
+            foreignKeyName: "canvas_assignment_submissions_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_assignment_submissions_course_owner_fkey";
+            columns: ["course_id", "user_id", "canvas_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: ["id", "user_id", "canvas_connection_id"];
+          },
+          {
+            foreignKeyName: "canvas_assignment_submissions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_course_grade_summaries: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          current_score: number | null;
+          current_score_visibility_state: CanvasGradeVisibilityState;
+          current_grade: string | null;
+          current_grade_visibility_state: CanvasGradeVisibilityState;
+          final_score: number | null;
+          final_score_visibility_state: CanvasGradeVisibilityState;
+          final_grade: string | null;
+          final_grade_visibility_state: CanvasGradeVisibilityState;
+          first_synced_at: string;
+          last_synced_at: string;
+          last_seen_at: string;
+          source_fingerprint: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          current_score?: number | null;
+          current_score_visibility_state?: CanvasGradeVisibilityState;
+          current_grade?: string | null;
+          current_grade_visibility_state?: CanvasGradeVisibilityState;
+          final_score?: number | null;
+          final_score_visibility_state?: CanvasGradeVisibilityState;
+          final_grade?: string | null;
+          final_grade_visibility_state?: CanvasGradeVisibilityState;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          last_seen_at?: string;
+          source_fingerprint: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          current_score?: number | null;
+          current_score_visibility_state?: CanvasGradeVisibilityState;
+          current_grade?: string | null;
+          current_grade_visibility_state?: CanvasGradeVisibilityState;
+          final_score?: number | null;
+          final_score_visibility_state?: CanvasGradeVisibilityState;
+          final_grade?: string | null;
+          final_grade_visibility_state?: CanvasGradeVisibilityState;
+          first_synced_at?: string;
+          last_synced_at?: string;
+          last_seen_at?: string;
+          source_fingerprint?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_course_grade_summaries_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_grade_summaries_course_owner_fkey";
+            columns: ["course_id", "user_id", "canvas_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: ["id", "user_id", "canvas_connection_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_grade_summaries_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_course_grade_sync_states: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          sync_status: CanvasCourseGradeSyncStatus;
+          last_checked_at: string | null;
+          last_completed_at: string | null;
+          last_successful_sync_at: string | null;
+          last_completed_snapshot_authoritative: boolean;
+          consecutive_failure_count: number;
+          last_failure_code: string | null;
+          last_failure_category: CanvasCourseGradeSyncFailureCategory | null;
+          synced_assignment_count: number;
+          synced_submission_count: number;
+          synced_course_grade_summary_count: number;
+          assignment_family_state: CanvasCourseGradeSyncFamilyState;
+          submission_family_state: CanvasCourseGradeSyncFamilyState;
+          course_grade_summary_family_state: CanvasCourseGradeSyncFamilyState;
+          source_fingerprint: string | null;
+          fingerprint_version: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          sync_status?: CanvasCourseGradeSyncStatus;
+          last_checked_at?: string | null;
+          last_completed_at?: string | null;
+          last_successful_sync_at?: string | null;
+          last_completed_snapshot_authoritative?: boolean;
+          consecutive_failure_count?: number;
+          last_failure_code?: string | null;
+          last_failure_category?: CanvasCourseGradeSyncFailureCategory | null;
+          synced_assignment_count?: number;
+          synced_submission_count?: number;
+          synced_course_grade_summary_count?: number;
+          assignment_family_state?: CanvasCourseGradeSyncFamilyState;
+          submission_family_state?: CanvasCourseGradeSyncFamilyState;
+          course_grade_summary_family_state?: CanvasCourseGradeSyncFamilyState;
+          source_fingerprint?: string | null;
+          fingerprint_version?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          canvas_connection_id?: string;
+          course_id?: string;
+          sync_status?: CanvasCourseGradeSyncStatus;
+          last_checked_at?: string | null;
+          last_completed_at?: string | null;
+          last_successful_sync_at?: string | null;
+          last_completed_snapshot_authoritative?: boolean;
+          consecutive_failure_count?: number;
+          last_failure_code?: string | null;
+          last_failure_category?: CanvasCourseGradeSyncFailureCategory | null;
+          synced_assignment_count?: number;
+          synced_submission_count?: number;
+          synced_course_grade_summary_count?: number;
+          assignment_family_state?: CanvasCourseGradeSyncFamilyState;
+          submission_family_state?: CanvasCourseGradeSyncFamilyState;
+          course_grade_summary_family_state?: CanvasCourseGradeSyncFamilyState;
+          source_fingerprint?: string | null;
+          fingerprint_version?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "canvas_course_grade_sync_states_connection_user_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_grade_sync_states_course_owner_fkey";
+            columns: ["course_id", "user_id", "canvas_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: ["id", "user_id", "canvas_connection_id"];
+          },
+          {
+            foreignKeyName: "canvas_course_grade_sync_states_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";

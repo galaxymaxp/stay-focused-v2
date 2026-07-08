@@ -43,8 +43,14 @@ students choose exact blocks before preview generation, and selected-block
 provenance is copied into immutable snapshots. Phase 5D.3 adds exact duplicate
 source analysis, repeated-reference provenance, conservative current-source
 status checks, and regeneration-readiness assessment without implementing
-actual reviewer regeneration. Protected live validation remains blocked
-pending credential rotation.
+actual reviewer regeneration. Phase 5E planning is complete, and Phase 5E.1
+adds the service-role-only database foundation for read-only Canvas assignment
+submission state and visible grade summaries: normalized status/visibility
+contracts, owner-scoped tables, composite FKs, RLS/grants, DB types, and a
+rollback-safe SQL verifier. No Canvas grade/submission data is fetched or
+imported yet, and no grade API route, mobile UI, sync service, notification,
+local grade calculation, submission action, or reviewer integration exists.
+Protected live validation remains blocked pending credential rotation.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -299,6 +305,16 @@ Working locally:
   compares current synchronized rows to immutable snapshots without Canvas,
   Storage, OCR, PAT decryption, or OpenAI calls. Protected live validation is
   blocked pending credential rotation.
+- Phase 5E.1 adds the read-only Canvas grades/submissions database
+  foundation. Migrations
+  `202607080003_add_canvas_grades_submissions_foundation.sql` and
+  `202607080004_harden_canvas_grade_trigger_search_path.sql` are applied
+  remotely; rollback-safe SQL verification passed for normalized status and
+  visibility contracts, owner-scoped tables, composite FKs, RLS, revoked direct
+  client grants, service-role DML grants, privacy exclusions, and cascade
+  behavior. No Canvas data was fetched, no grades or submissions were imported,
+  no API route or mobile UI exists, no unofficial grade calculation exists, and
+  no submission write capability exists.
 
 Pending:
 

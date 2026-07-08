@@ -1374,10 +1374,12 @@ and exact reviewer provenance, Phase 5D.2 structured normalized blocks and
 selective import, and Phase 5D.3 duplicate relationships, source freshness,
 and regeneration readiness are implemented, remotely verified, and
 protected-live validated. Phase 5E planning is complete in
-`docs/ai/phase5e-grades-submissions-plan-20260708.md`. The next roadmap step
-is Phase 5E.1 - Data contract and database foundation for read-only Canvas
-grades and submissions. That first implementation task should add only the
-normalized contract, schema, DB types, and rollback-safe SQL verifier; it must
-not add Canvas client calls, API routes, mobile screens, background jobs,
-notifications, or submission actions. The deferred header/footer cleanup task
-remains separate.
+`docs/ai/phase5e-grades-submissions-plan-20260708.md`, and Phase 5E.1 is
+complete in
+`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.1 adds
+only the read-only Canvas grades/submissions database contract, owner-scoped
+schema, DB types, and rollback-safe SQL verifier. No Canvas data was fetched,
+no grades or submissions were imported, no API route or mobile UI exists, no
+unofficial grade calculation exists, and no submission write capability exists.
+The next roadmap step is Phase 5E.2 - Canvas assignment/submission client
+support. The deferred header/footer cleanup task remains separate.

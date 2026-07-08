@@ -927,10 +927,15 @@ provenance, Phase 5D.2 structured normalized blocks and selective import, and
 Phase 5D.3 duplicate relationships, source freshness, and regeneration
 readiness are implemented, remotely verified, and protected-live validated.
 Phase 5E planning is complete in
-`docs/ai/phase5e-grades-submissions-plan-20260708.md`. The recommended next
-implementation task is Phase 5E.1, limited to the Canvas grades/submissions
-data contract, database foundation, DB types, and rollback-safe SQL
-verification. Phase 5E application logic has not started.
+`docs/ai/phase5e-grades-submissions-plan-20260708.md`, and Phase 5E.1 is
+complete in
+`docs/ai/phase5e1-grades-submissions-foundation-20260708.md`. Phase 5E.1 adds
+only the Canvas grades/submissions data contract, database foundation, DB
+types, and rollback-safe SQL verification. No Canvas data was fetched, no
+grades or submissions were imported, no API route or mobile UI exists, no
+unofficial grade calculation exists, and no submission write capability exists.
+The next implementation task is Phase 5E.2 - Canvas assignment/submission
+client support.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks
