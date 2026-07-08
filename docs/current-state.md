@@ -935,11 +935,18 @@ adds only the Canvas grades/submissions data contract, database foundation, DB
 types, and rollback-safe SQL verification. Phase 5E.2 adds only read-only
 `@stay-focused/canvas` assignment, own-submission, and visible course-grade
 client methods, normalized provider contracts, field-presence-aware visibility
-wrappers, pagination coverage, and unsafe-field discards. No Canvas
-grade/submission data is persisted or imported, no API route or mobile UI
-exists, no sync service exists, no unofficial grade calculation exists, and no
-submission write capability exists. The next implementation task is Phase
-5E.3 - explicit synchronized import.
+wrappers, pagination coverage, and unsafe-field discards. Phase 5E.3 is
+implemented in `docs/ai/phase5e3-explicit-grade-sync-20260708.md`: it adds an
+internal explicit synchronization service for exactly one owned selected course,
+Canvas-to-database normalization, conservative status derivation, deterministic
+fingerprints, service-role-only RPC persistence, partial-failure preservation,
+and per-course grade sync state. Canvas access remains read-only, manual, and
+per selected course. No public grade API route, mobile service/UI, background
+sync, notification, local grade calculation, submission action, private
+submission-content storage, or reviewer integration exists. Remote Supabase
+dry-run/list/verifier checks remain pending because this checkout is not linked
+to a Supabase project. The next implementation task is Phase 5E.4 - protected
+API read model.
 Repeated PDF header/footer cleanup remains a separate deferred candidate.
 
 ## Known Risks

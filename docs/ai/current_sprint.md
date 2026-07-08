@@ -1,6 +1,6 @@
 # Current Sprint
 
-Last refreshed: 2026-07-07, Asia/Manila.
+Last refreshed: 2026-07-08, Asia/Manila.
 
 ## Active Objective
 
@@ -1383,8 +1383,15 @@ schema, DB types, and rollback-safe SQL verifier. Phase 5E.2 adds only
 GET-only Canvas assignment metadata, own-submission, and visible course-grade
 client methods with safe normalized contracts, explicit visibility wrappers,
 pagination/error coverage, omitted `student_ids[]`, `user_id=self`, and
-unsafe-field discards. No Canvas grade/submission data was persisted or
-imported, no API route or mobile UI exists, no sync service exists, no
-unofficial grade calculation exists, and no submission write capability exists.
-The next roadmap step is Phase 5E.3 - explicit synchronized import. The
+unsafe-field discards. Phase 5E.3 is implemented in
+`docs/ai/phase5e3-explicit-grade-sync-20260708.md` as an internal manual
+per-selected-course synchronization service: it uses only the Phase 5E.2
+GET-only Canvas methods, normalizes assignment/submission and visible summary
+state into the Phase 5E.1 tables, derives conservative statuses, writes through
+service-role-only RPCs, marks authoritative absences, preserves failed
+families, and records per-course grade sync state. No public grade API route,
+mobile service/UI, background sync, notification, local grade calculation,
+submission mutation, private submission-content storage, or reviewer
+integration exists. The next roadmap step is Phase 5E.4 - protected API read
+model. The
 deferred header/footer cleanup task remains separate.

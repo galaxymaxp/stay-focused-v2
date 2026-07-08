@@ -2761,6 +2761,39 @@ export interface Database {
           updated_at: string;
         }>;
       };
+      begin_canvas_course_grade_sync: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_course_id: string;
+          p_started_at?: string;
+          p_stale_after_seconds?: number;
+        };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          sync_status: CanvasCourseGradeSyncStatus;
+          last_checked_at: string | null;
+          last_completed_at: string | null;
+          last_successful_sync_at: string | null;
+          last_completed_snapshot_authoritative: boolean;
+          consecutive_failure_count: number;
+          last_failure_code: string | null;
+          last_failure_category: CanvasCourseGradeSyncFailureCategory | null;
+          synced_assignment_count: number;
+          synced_submission_count: number;
+          synced_course_grade_summary_count: number;
+          assignment_family_state: CanvasCourseGradeSyncFamilyState;
+          submission_family_state: CanvasCourseGradeSyncFamilyState;
+          course_grade_summary_family_state: CanvasCourseGradeSyncFamilyState;
+          source_fingerprint: string | null;
+          fingerprint_version: string | null;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
       finish_canvas_sync_run: {
         Args: {
           p_user_id: string;
@@ -2942,6 +2975,82 @@ export interface Database {
           sync_state_last_checked_at: string;
           sync_state_last_changed_at: string | null;
           sync_state_consecutive_failure_count: number;
+        }>;
+      };
+      replace_canvas_course_assignment_submission_snapshot: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_course_id: string;
+          p_synced_at: string;
+          p_assignments: Json;
+          p_snapshot_fingerprint: string;
+          p_fingerprint_version: string;
+        };
+        Returns: Array<{
+          assignments_inserted: number;
+          assignments_updated: number;
+          assignments_unchanged: number;
+          assignments_marked_absent: number;
+          persisted_count: number;
+        }>;
+      };
+      upsert_canvas_course_grade_summary: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_course_id: string;
+          p_synced_at: string;
+          p_summary: Json;
+        };
+        Returns: Array<{
+          summaries_inserted: number;
+          summaries_updated: number;
+          summaries_unchanged: number;
+          visible_field_count: number;
+        }>;
+      };
+      finish_canvas_course_grade_sync: {
+        Args: {
+          p_user_id: string;
+          p_canvas_connection_id: string;
+          p_course_id: string;
+          p_completed_at: string;
+          p_status: "succeeded" | "partial" | "failed";
+          p_assignment_family_state: "succeeded" | "failed";
+          p_submission_family_state: "succeeded" | "failed";
+          p_course_grade_summary_family_state: "succeeded" | "failed";
+          p_assignment_count: number;
+          p_submission_count: number;
+          p_course_grade_summary_count: number;
+          p_failure_code: string | null;
+          p_failure_category: CanvasCourseGradeSyncFailureCategory | null;
+          p_source_fingerprint: string | null;
+          p_fingerprint_version: string | null;
+        };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          sync_status: CanvasCourseGradeSyncStatus;
+          last_checked_at: string | null;
+          last_completed_at: string | null;
+          last_successful_sync_at: string | null;
+          last_completed_snapshot_authoritative: boolean;
+          consecutive_failure_count: number;
+          last_failure_code: string | null;
+          last_failure_category: CanvasCourseGradeSyncFailureCategory | null;
+          synced_assignment_count: number;
+          synced_submission_count: number;
+          synced_course_grade_summary_count: number;
+          assignment_family_state: CanvasCourseGradeSyncFamilyState;
+          submission_family_state: CanvasCourseGradeSyncFamilyState;
+          course_grade_summary_family_state: CanvasCourseGradeSyncFamilyState;
+          source_fingerprint: string | null;
+          fingerprint_version: string | null;
+          created_at: string;
+          updated_at: string;
         }>;
       };
       replace_canvas_planner_items_snapshot: {
