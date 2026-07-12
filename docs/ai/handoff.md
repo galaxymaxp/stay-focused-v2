@@ -238,9 +238,15 @@ paths.
   pagination and detail are wired, and hidden grade wrappers are never shown as
   zero. Unofficial local grade estimates, durable grade caching, notifications,
   background jobs, submission writes, private submission-content return, and
-  reviewer prompt use remain excluded.
+  reviewer prompt use remain excluded. Phase 5E.6 is in progress in
+  `docs/ai/phase5e6-mobile-grade-protected-live-validation-20260708.md`:
+  automated baseline checks, protected API preflight, Expo Web protected smoke,
+  session-only smoke, controlled fictional edge validation, authorization
+  regression checks, and privacy scans passed. Physical iPhone Expo Go
+  validation remains required before Phase 5E.6 and Phase 5E can be marked
+  complete.
 - Remaining secondary Canvas resources, broader parser families,
-  stale/deleted-source comparison, Phase 5E.6 protected live validation,
+  stale/deleted-source comparison, Phase 5E.6 physical-device validation,
   background synchronization, task generation, and study schedule generation are
   still pending. Production endpoint validators remain unsupported for the audited
   endpoint families. Discussions, quiz metadata, announcement attachment
@@ -496,8 +502,14 @@ per-course grade sync, course summary display, assignment pagination, protected
 assignment detail, stale/partial/failed copy, and in-memory-only network
 failure preservation. No background synchronization, durable grade cache,
 notification, local grade calculation, submission mutation, private
-submission-content return, or reviewer integration exists. The next roadmap
-step is Phase 5E.6 - protected live validation and hardening.
+submission-content return, or reviewer integration exists. Phase 5E.6 is in
+progress in
+`docs/ai/phase5e6-mobile-grade-protected-live-validation-20260708.md`:
+automated baseline checks, protected API preflight, Expo Web protected smoke,
+session-only smoke, controlled fictional edge validation, authorization
+regression checks, and privacy scans passed. The next roadmap step is Phase
+5E.6 physical iPhone Expo Go validation; Phase 5E is not complete until that
+device checklist passes.
 Automatic repeated scanned-PDF header/footer detection remains a deferred
 candidate.
 

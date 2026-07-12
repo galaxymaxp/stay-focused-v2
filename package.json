@@ -10,9 +10,11 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
+    "smoke:canvas-grades:web": "node scripts/canvas-grades-web-smoke.mjs",
     "smoke:ocr-pdf:web": "node scripts/ocr-pdf-web-smoke.mjs",
     "smoke:ocr:web": "node scripts/ocr-web-smoke.mjs",
     "smoke:reviewer:web": "node scripts/reviewer-web-smoke.mjs",
+    "test:canvas-grades-web-smoke": "node --test scripts/canvas-grades-web-smoke.test.mjs",
     "test:reviewer-web-smoke": "node --test scripts/reviewer-web-smoke.test.mjs",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean"

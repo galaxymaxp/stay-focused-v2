@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-07-08, Asia/Manila.
+Last refreshed: 2026-07-13, Asia/Manila.
 
 ## Repository Baseline
 
@@ -964,9 +964,14 @@ grade POST, assignment pagination appends without duplicates, detail loads the
 protected detail route, and hidden or unavailable grade wrappers are never
 shown as zero. No background sync, durable grade cache, notification, local
 grade calculation, submission action, private submission-content return, or
-reviewer integration exists. The next implementation task is Phase 5E.6 -
-protected live validation and hardening. Repeated PDF header/footer cleanup
-remains a separate deferred candidate.
+reviewer integration exists. Phase 5E.6 is in progress in
+`docs/ai/phase5e6-mobile-grade-protected-live-validation-20260708.md`:
+automated baseline checks, protected API preflight, Expo Web protected smoke,
+session-only smoke, controlled fictional edge validation, authorization
+regression checks, and privacy scans passed with sanitized aggregate evidence.
+Physical iPhone Expo Go validation remains required before Phase 5E.6 and
+Phase 5E can be marked complete. Repeated PDF header/footer cleanup remains a
+separate deferred candidate.
 
 ## Known Risks
 

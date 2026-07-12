@@ -1,6 +1,6 @@
 # Current Sprint
 
-Last refreshed: 2026-07-08, Asia/Manila.
+Last refreshed: 2026-07-13, Asia/Manila.
 
 ## Active Objective
 
@@ -1412,5 +1412,10 @@ without duplicates, assignment details use the protected detail route, and
 hidden/unavailable wrappers are never shown as zero. No background sync,
 notification, durable grade cache, local grade calculation, submission
 mutation, private submission-content return, or reviewer integration exists.
-The next roadmap step is Phase 5E.6 - protected live validation and hardening.
+Phase 5E.6 is in progress in
+`docs/ai/phase5e6-mobile-grade-protected-live-validation-20260708.md`:
+automated baseline checks, protected API preflight, Expo Web protected smoke,
+session-only smoke, controlled fictional edge validation, authorization
+regression checks, and privacy scans passed. Physical iPhone Expo Go validation
+remains required before Phase 5E.6 and Phase 5E can be marked complete.
 The deferred header/footer cleanup task remains separate.

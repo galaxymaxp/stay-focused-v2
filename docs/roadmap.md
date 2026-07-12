@@ -1,6 +1,6 @@
 # Roadmap
 
-Last refreshed: 2026-07-06, Asia/Manila.
+Last refreshed: 2026-07-13, Asia/Manila.
 
 ## Phase 1 - Foundation And Reviewer Engine
 
@@ -1101,6 +1101,12 @@ network-failure preservation. Synchronization is manual and per selected course
 only, Canvas access remains read-only, and no background job, notification,
 durable grade cache, local grade calculation, submission write, private
 submission-content storage, or reviewer prompt integration exists.
+Phase 5E.6 is in progress in
+`docs/ai/phase5e6-mobile-grade-protected-live-validation-20260708.md`:
+automated baseline checks, protected API preflight, Expo Web protected smoke,
+session-only smoke, controlled fictional edge validation, authorization
+regression checks, and privacy scans passed. Physical iPhone Expo Go validation
+remains required before Phase 5E.6 and Phase 5E can be marked complete.
 Phase 5E.4 protected live validation is complete in
 `docs/ai/phase5e4-protected-grade-api-live-validation-20260708.md`; the closeout
 fixed the sync route course-scope preflight so unknown valid course UUIDs return
@@ -1153,20 +1159,20 @@ MVP subphases:
 - Phase 5E.3 - Explicit synchronized import (complete and remotely verified)
 - Phase 5E.4 - Protected API read model (complete and live validated)
 - Phase 5E.5 - Mobile assignment and grade experience (complete and locally validated)
-- Phase 5E.6 - Protected live validation and hardening
+- Phase 5E.6 - Protected live validation and hardening (in progress)
 
-Roadmap result: Phase 5E.5 — complete and locally validated
+Roadmap result: Phase 5E.6 - in progress
 
-Next: Phase 5E.6 — protected live validation and hardening
+Next: Phase 5E.6 - physical iPhone Expo Go validation
 
 Exit criteria:
 
 - Grade and submission records remain separate from reviewer source content.
 - Grades never automatically enter reviewer-generation prompts.
 - Hidden or incomplete Canvas grading information is represented honestly.
-- Phase 5E.1 through Phase 5E.5 are complete. Phase 5E.6 is next and is limited
-  to protected live validation and hardening before Phase 5E can be marked
-  complete.
+- Phase 5E.1 through Phase 5E.5 are complete. Phase 5E.6 automated,
+  protected API, and Expo Web validation passed; physical iPhone Expo Go
+  validation remains before Phase 5E can be marked complete.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 
