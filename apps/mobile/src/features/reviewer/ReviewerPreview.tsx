@@ -55,6 +55,15 @@ export function ReviewerPreview({ reviewer }: ReviewerPreviewProps) {
         </View>
       </Card>
 
+      {reviewer.metadata.reviewerQualityStatus === "complete_with_fallbacks" ||
+      reviewer.metadata.reviewerQualityStatus === "limited" ? (
+        <Card style={styles.qualityNotice}>
+          <Text style={styles.qualityNoticeText} testID="reviewer-quality-notice">
+            Some sections use source-only fallback because generation could not be safely verified.
+          </Text>
+        </Card>
+      ) : null}
+
       {sectionCount > 0 ? (
         <View style={styles.sectionList}>
           {reviewer.sections.map((section, index) => (
@@ -299,6 +308,16 @@ function countSectionKeyPoints(section: ReviewerSection): number {
 }
 
 const styles = StyleSheet.create({
+  qualityNotice: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+  },
+  qualityNoticeText: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
   previewStack: {
     gap: spacing[5],
   },

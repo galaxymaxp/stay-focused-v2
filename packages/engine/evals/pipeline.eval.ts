@@ -5,7 +5,6 @@ import validationFixtures from "./fixtures/pipeline-validation.json" with {
 };
 
 import {
-  PipelineAssemblyError,
   runPipeline,
   type RunPipelineArgs,
 } from "../src/generate.js";
@@ -184,29 +183,11 @@ function createCollectAndContinueCase(): EvalCase {
     name: "Stage 3 validation failure is recorded and the next section is processed",
     run: async () => {
       const provider = new FakeProvider("first-validation-error");
-      try {
-        await runPipeline({
-          input: multiSectionValidationInput(),
-          provider,
-          retryPolicy: noRetriesPolicy(),
-        });
-        return [
-          {
-            message:
-              "Expected collected Stage 3 validation failure to reject after the full pass.",
-          },
-        ];
-      } catch (error) {
-        if (!(error instanceof PipelineAssemblyError)) {
-          return [
-            {
-              message:
-                "Collected validation failure did not produce pipeline diagnostics.",
-              actual: errorMessage(error),
-            },
-          ];
-        }
-
+      const reviewer = await runPipeline({
+        input: multiSectionValidationInput(),
+        provider,
+        retryPolicy: noRetriesPolicy(),
+      });
         const firstSectionId = readMetadataString(
           provider.requests[0]?.metadata,
           "plannedSectionId",
@@ -221,30 +202,13 @@ function createCollectAndContinueCase(): EvalCase {
             2,
             "Pipeline did not attempt the section after a validation failure.",
           ),
-          ...assertDeepEqual(
-            error.state.sectionValidationFailures,
-            [
-              {
-                sectionTitle: "First Topic",
-                sectionId: firstSectionId,
-                stage: "stage3",
-                reason: "output-validation",
-                issues: [
-                  `plannedSectionId must be "${firstSectionId}"`,
-                ],
-              },
-            ],
-            "Pipeline did not retain the structured Stage 3 failure.",
-          ),
           ...assertEqual(
-            error.state.outputs.some(
-              (output) => output.plannedSectionId === secondSectionId,
-            ),
+            reviewer.sections.some((section) => section.plannedSectionId === secondSectionId),
             true,
             "Later section output was not evaluated after the earlier validation failure.",
           ),
+          ...assertEqual(reviewer.sections[0]?.qualityStatus, "extractive_fallback", "Malformed section was not recovered independently."),
         ];
-      }
     },
   };
 }
@@ -254,37 +218,20 @@ function createInfraErrorBoundaryCase(): EvalCase {
     name: "provider infrastructure error propagates outside collected validation failures",
     run: async () => {
       const provider = new FakeProvider("validation-then-infra-error");
-      try {
-        await runPipeline({
-          input: multiSectionValidationInput(),
-          provider,
-          retryPolicy: noRetriesPolicy(),
-        });
-        return [{ message: "Expected provider infrastructure error to propagate." }];
-      } catch (error) {
+      const reviewer = await runPipeline({
+        input: multiSectionValidationInput(),
+        provider,
+        retryPolicy: noRetriesPolicy(),
+      });
         return [
-          ...assertEqual(
-            error instanceof PipelineAssemblyError,
-            false,
-            "Infrastructure error was incorrectly bucketed as a collected pipeline validation failure.",
-          ),
-          ...assertIncludes(
-            errorMessage(error),
-            "Stage 3 provider generation failed for section",
-            "Infrastructure error lost its Stage 3 provider context.",
-          ),
-          ...assertIncludes(
-            errorMessage(error),
-            "second section infrastructure failure",
-            "Infrastructure error lost the provider failure detail.",
-          ),
           ...assertEqual(
             provider.requests.length,
             2,
             "Infrastructure boundary fixture did not reach the second section.",
           ),
+          ...assertEqual(reviewer.sections.length, 2, "Provider-wide failure did not return a useful reviewer."),
+          ...assertEqual(reviewer.metadata.fallbackPlanUsed, true, "Provider-wide failure did not record the emergency fallback plan."),
         ];
-      }
     },
   };
 }
@@ -356,6 +303,23 @@ function createValidationCase(fixture: ValidationFixture): EvalCase {
   return {
     name: fixture.name,
     run: async () => {
+      if (fixture.scenario === "initial-provider-failure") {
+        const reviewer = await runPipeline({
+          input: {
+            id: "pipeline-validation-source",
+            title: "Pipeline Validation",
+            kind: "plain-text",
+            language: "en",
+            text: "A complete concept explanation for validation.",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          provider: new FakeProvider("initial-error"),
+        });
+        return [
+          ...assertEqual(reviewer.metadata.reviewerQualityStatus, "complete", "Transient initial provider failure did not recover through repair."),
+          ...assertEqual(reviewer.metadata.repairedSectionCount, reviewer.sections.length, "Transient provider failure did not record repaired sections."),
+        ];
+      }
       try {
         await runValidationScenario(fixture.scenario);
         return [
@@ -515,38 +479,18 @@ async function runRetryScenario(
     }
     case "weak-then-error": {
       const provider = new FakeProvider("weak-then-error");
-      try {
-        await runWithProvider(fixture.input, provider);
-        return [{ message: "Expected retry provider fault to propagate." }];
-      } catch (error) {
-        return [
-          ...assertIncludes(
-            errorMessage(error),
-            fixture.expectErrorContains ?? "",
-            "Retry provider fault did not propagate with Stage 3 context.",
-          ),
-          ...assertEqual(
-            provider.requests.length,
-            2,
-            "Retry provider fault was swallowed instead of failing immediately.",
-          ),
-        ];
-      }
+      const reviewer = await runWithProvider(fixture.input, provider);
+      return [
+        ...assertEqual(provider.requests.length, 3, "Provider retry calls exceeded the configured bound."),
+        ...assertEqual(reviewer.metadata.fallbackSectionCount, 1, "Retry provider failure did not use fallback."),
+      ];
     }
     case "weak-rejected": {
       const provider = new FakeProvider("always-weak");
-      try {
-        await runWithProvider(fixture.input, provider, {
-          retryPolicy: noRetriesPolicy(),
-        });
-        return [{ message: "Expected weak final coverage to be rejected." }];
-      } catch (error) {
-        return assertIncludes(
-          errorMessage(error),
-          fixture.expectErrorContains ?? "",
-          "Weak final coverage rejection did not match.",
-        );
-      }
+      const reviewer = await runWithProvider(fixture.input, provider, {
+        retryPolicy: noRetriesPolicy(),
+      });
+      return assertEqual(reviewer.sections[0]?.qualityStatus, "extractive_fallback", "Weak output was not safely recovered.");
     }
     case "weak-allowed": {
       const provider = new FakeProvider("always-weak");
@@ -561,9 +505,9 @@ async function runRetryScenario(
           "Source-outline coverage status was not preserved.",
         ),
         ...assertEqual(
-          reviewer.sections[0]?.coverageStatus,
-          "weak",
-          "Weak reviewer section status was not preserved.",
+          reviewer.sections[0]?.qualityStatus,
+          "extractive_fallback",
+          "Weak reviewer section was not replaced by validated fallback.",
         ),
       ];
     }

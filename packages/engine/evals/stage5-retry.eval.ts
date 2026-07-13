@@ -281,26 +281,14 @@ async function runBasicScenario(
     }
     case "failed-retry-keeps": {
       const provider = new FakeProvider([errorResponse("provider unavailable")]);
-      try {
-        await retryFailedSections({
-          ...baseArgs(context, [weakOutput], provider),
-          coverage: createCoverage(context, [weakOutput]),
-        });
-        return [{ message: "Expected retry provider fault to propagate." }];
-      } catch (error) {
-        return [
-          ...assertEqual(
-            provider.requests.length,
-            1,
-            "Retry provider fault was swallowed instead of failing immediately.",
-          ),
-          ...assertIncludes(
-            errorMessage(error),
-            "provider unavailable",
-            "Retry provider fault lost its original detail.",
-          ),
-        ];
-      }
+      const outputs = await retryFailedSections({
+        ...baseArgs(context, [weakOutput], provider),
+        coverage: createCoverage(context, [weakOutput]),
+      });
+      return [
+        ...assertEqual(provider.requests.length, 2, "Retry bound changed after provider failures."),
+        ...assertEqual(outputs[0]?.id.startsWith("extractive-"), true, "Provider failure did not use extractive fallback."),
+      ];
     }
     case "missing-generated": {
       const provider = new FakeProvider([outputResponse(retryOutput)]);
@@ -323,28 +311,14 @@ async function runBasicScenario(
     }
     case "provider-failure-no-output": {
       const provider = new FakeProvider([errorResponse("provider unavailable")]);
-      try {
-        await retryFailedSections({
-          ...baseArgs(context, [], provider),
-          coverage: createCoverage(context, []),
-        });
-        return [
-          { message: "Expected missing-output provider fault to propagate." },
-        ];
-      } catch (error) {
-        return [
-          ...assertEqual(
-            provider.requests.length,
-            1,
-            "Missing-output provider fault was swallowed.",
-          ),
-          ...assertIncludes(
-            errorMessage(error),
-            "provider unavailable",
-            "Missing-output provider fault lost its original detail.",
-          ),
-        ];
-      }
+      const outputs = await retryFailedSections({
+        ...baseArgs(context, [], provider),
+        coverage: createCoverage(context, []),
+      });
+      return [
+        ...assertEqual(provider.requests.length, 2, "Missing-output retry bound changed."),
+        ...assertEqual(outputs[0]?.id.startsWith("extractive-"), true, "Missing provider output did not use fallback."),
+      ];
     }
     case "unplanned-excluded": {
       const unplannedOutput: SectionOutput = {
@@ -448,9 +422,9 @@ async function runGroundingExtractiveFallbackCase(): Promise<readonly EvalIssue[
       "Grounding fallback skipped bounded provider retries.",
     ),
     ...assertEqual(
-      output?.id,
-      unsupportedRetry.id,
-      "Extractive fallback should preserve the latest retry output identity.",
+      output?.id.startsWith("extractive-"),
+      true,
+      "Extractive fallback did not receive a deterministic fallback identity.",
     ),
     ...assertDeepEqual(
       output?.sourceCore,
@@ -516,7 +490,7 @@ async function runPolicyScenario(
       });
       return [
         ...assertEqual(provider.requests.length, 0, "maxRetries zero called the provider."),
-        ...assertEqual(outputs[0], weakOutput, "maxRetries zero changed the output."),
+        ...assertEqual(outputs[0]?.id.startsWith("extractive-"), true, "maxRetries zero did not proceed to fallback."),
       ];
     }
     case "bounded-calls": {
@@ -529,7 +503,7 @@ async function runPolicyScenario(
       });
       return [
         ...assertEqual(provider.requests.length, 3, "Provider calls exceeded or missed maxRetries."),
-        ...assertEqual(outputs[0]?.id, weakRetry.id, "Latest attempted output was not retained."),
+        ...assertEqual(outputs[0]?.id.startsWith("extractive-"), true, "Retry exhaustion did not proceed to fallback."),
       ];
     }
     case "default-two-retries": {
@@ -551,27 +525,15 @@ async function runPolicyScenario(
         errorResponse("temporary failure"),
         outputResponse(passedRetry),
       ]);
-      try {
-        await retryFailedSections({
-          ...baseArgs(context, [weakOutput], provider),
-          coverage: createCoverage(context, [weakOutput]),
-          retryPolicy: policy({ maxRetries: 3 }),
-        });
-        return [{ message: "Expected temporary provider fault to propagate." }];
-      } catch (error) {
-        return [
-          ...assertEqual(
-            provider.requests.length,
-            1,
-            "Provider fault was swallowed before a later scripted success.",
-          ),
-          ...assertIncludes(
-            errorMessage(error),
-            "temporary failure",
-            "Temporary provider fault lost its original detail.",
-          ),
-        ];
-      }
+      const outputs = await retryFailedSections({
+        ...baseArgs(context, [weakOutput], provider),
+        coverage: createCoverage(context, [weakOutput]),
+        retryPolicy: policy({ maxRetries: 3 }),
+      });
+      return [
+        ...assertEqual(provider.requests.length, 2, "Temporary provider fault prevented bounded retry recovery."),
+        ...assertEqual(outputs[0]?.id, passedRetry.id, "Later valid repair was not accepted."),
+      ];
     }
   }
 }

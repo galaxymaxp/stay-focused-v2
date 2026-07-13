@@ -239,6 +239,14 @@ export interface CoverageReport {
 }
 
 export type GroundingReportStatus = "passed" | "failed";
+export type ReviewerSectionQualityStatus =
+  | "generated"
+  | "repaired"
+  | "extractive_fallback";
+export type ReviewerQualityStatus =
+  | "complete"
+  | "complete_with_fallbacks"
+  | "limited";
 export type GroundingIssueType =
   | "grounding-fabrication"
   | "grounding-omission";
@@ -338,6 +346,7 @@ export interface ReviewerSection {
   readonly groundingIssues: readonly GroundingIssue[];
   readonly leakageStatus: "passed" | "failed";
   readonly leakageIssues: readonly LeakageIssue[];
+  readonly qualityStatus: ReviewerSectionQualityStatus;
   readonly items: readonly SectionOutput[];
 }
 
@@ -350,6 +359,13 @@ export interface ReviewerMetadata {
   readonly language: string;
   readonly sectionCount: number;
   readonly generatedSectionCount: number;
+  readonly originalGeneratedSectionCount?: number;
+  readonly repairedSectionCount?: number;
+  readonly fallbackSectionCount?: number;
+  readonly reviewerQualityStatus?: ReviewerQualityStatus;
+  readonly fallbackPlanUsed?: boolean;
+  readonly limitedSource?: boolean;
+  readonly uncoveredSourceTopics?: readonly string[];
   readonly coverageStatus: CoverageStatus;
   readonly coverageScore: number;
   readonly coverage: CoverageReport;

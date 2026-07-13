@@ -5,6 +5,7 @@ import type {
   LeakageReport,
   NormalizedSource,
   ReviewerOutput,
+  ReviewerSectionQualityStatus,
   ReviewerSection,
   SectionCoverageResult,
   SectionGroundingResult,
@@ -21,6 +22,8 @@ export interface AssembleReviewerArgs {
   readonly grounding: GroundingReport;
   readonly leakage: LeakageReport;
   readonly allowWeakSections?: boolean;
+  readonly sectionQualityById?: Readonly<Record<string, ReviewerSectionQualityStatus>>;
+  readonly fallbackPlanUsed?: boolean;
 }
 
 export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
@@ -89,11 +92,28 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       source.id,
       plan.id,
       coverage.id,
+      args.sectionQualityById?.[plannedSection.id] ?? "generated",
     );
   });
   validateReportAcceptance(coverage);
   validateGroundingReportAcceptance(grounding);
   validateLeakageReportAcceptance(leakage);
+
+  const originalGeneratedSectionCount = sections.filter(
+    (section) => section.qualityStatus === "generated",
+  ).length;
+  const repairedSectionCount = sections.filter(
+    (section) => section.qualityStatus === "repaired",
+  ).length;
+  const fallbackSectionCount = sections.filter(
+    (section) => section.qualityStatus === "extractive_fallback",
+  ).length;
+  const fallbackPlanUsed = args.fallbackPlanUsed ?? false;
+  const limitedSource = fallbackPlanUsed || coverage.sourceSectionsCovered < coverage.sourceSectionsTotal;
+  const reviewerQualityStatus =
+    fallbackPlanUsed || limitedSource || fallbackSectionCount > 0
+      ? "limited"
+      : "complete";
 
   return {
     id: stableId(
@@ -113,6 +133,15 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       language: source.language,
       sectionCount: plan.sections.length,
       generatedSectionCount: sections.length,
+      originalGeneratedSectionCount,
+      repairedSectionCount,
+      fallbackSectionCount,
+      reviewerQualityStatus,
+      fallbackPlanUsed,
+      limitedSource,
+      uncoveredSourceTopics: coverage.sourceSections
+        .filter((section) => section.status === "missing")
+        .map((section) => section.title),
       coverageStatus: coverage.status,
       coverageScore: coverage.score,
       coverage,
@@ -401,6 +430,7 @@ function createReviewerSection(
   sourceId: string,
   planId: string,
   coverageId: string,
+  qualityStatus: ReviewerSectionQualityStatus,
 ): ReviewerSection {
   const visibleOutput = toDefaultStudentVisibleSectionOutput(output);
 
@@ -422,6 +452,7 @@ function createReviewerSection(
     groundingIssues: [...grounding.issues],
     leakageStatus: leakage.status,
     leakageIssues: [...leakage.issues],
+    qualityStatus,
     items: [visibleOutput],
   };
 }

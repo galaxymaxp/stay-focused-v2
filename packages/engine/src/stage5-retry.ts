@@ -3,10 +3,16 @@ import { validateLeakage } from "./leakage-guard.js";
 import {
   collectSectionSourceBlocks,
   generateSection,
+  SectionProviderError,
   SectionValidationError,
 } from "./stage3-generate.js";
-import { verifyCoverage } from "./stage4-verify.js";
-import { validateGrounding } from "./stage5a-grounding.js";
+import { normalizeCoverageTitleKey, verifyCoverage } from "./stage4-verify.js";
+import {
+  extractGroundingSourceSectionText,
+  validateGrounding,
+} from "./stage5a-grounding.js";
+import { extractCleanSourceItems } from "./source-items.js";
+import { extractProtectedSourceTokens } from "./source-token-fidelity.js";
 import type {
   CoverageReport,
   CoverageStatus,
@@ -20,6 +26,7 @@ import type {
   SectionGroundingResult,
   SectionLeakageResult,
   SectionOutput,
+  ReviewerSectionQualityStatus,
   SourceOutline,
 } from "./types";
 
@@ -44,6 +51,11 @@ export interface RetryFailedSectionsArgs {
     section: PlannedSection,
     attempt: number,
   ) => void;
+  readonly onProviderFailure?: (section: PlannedSection, error: unknown) => void;
+  readonly onSectionRecovered?: (
+    section: PlannedSection,
+    status: Exclude<ReviewerSectionQualityStatus, "generated">,
+  ) => void;
 }
 
 export const defaultRetryPolicy: RetryPolicy = {
@@ -51,11 +63,6 @@ export const defaultRetryPolicy: RetryPolicy = {
   retryWeakSections: true,
   retryFailedSections: true,
 };
-
-const EXTRACTIVE_PROSE_MAX_CHARS = 2_500;
-const EXTRACTIVE_PROSE_MIN_CONTENT_BLOCKS = 3;
-const EXTRACTIVE_PROSE_MAX_CONTENT_BLOCKS = 12;
-const EXTRACTIVE_PROSE_MAX_BLOCK_CHARS = 350;
 
 export async function retryFailedSections(
   args: RetryFailedSectionsArgs,
@@ -76,10 +83,6 @@ export async function retryFailedSections(
     ) {
       currentOutputs.set(output.plannedSectionId, output);
     }
-  }
-
-  if (retryPolicy.maxRetries === 0) {
-    return orderedOutputs(plan, currentOutputs);
   }
 
   const coverageBySectionId = new Map(
@@ -123,6 +126,8 @@ export async function retryFailedSections(
           model: args.model,
           temperature: args.temperature,
           retryGuidance: buildRetryGuidance(
+            section,
+            source,
             sectionCoverage,
             sectionGrounding,
             sectionLeakage,
@@ -135,6 +140,10 @@ export async function retryFailedSections(
       } catch (error) {
         if (error instanceof SectionValidationError) {
           args.onValidationFailure?.(section, error);
+          continue;
+        }
+        if (error instanceof SectionProviderError) {
+          args.onProviderFailure?.(section, error);
           continue;
         }
         throw error;
@@ -160,27 +169,124 @@ export async function retryFailedSections(
           sectionLeakage,
         )
       ) {
+        args.onSectionRecovered?.(section, "repaired");
         break;
       }
     }
 
-    if (
-      isSectionAccepted(sectionCoverage, sectionGrounding, sectionLeakage) ||
-      sectionGrounding?.status !== "failed"
-    ) {
+    if (isSectionAccepted(sectionCoverage, sectionGrounding, sectionLeakage)) {
       continue;
     }
 
-    const fallbackOutput = createExtractiveProseFallbackOutput({
+    const sourceOutlineSection = outline.sections.find(
+      (candidate) => candidate.id === section.sourceSectionId,
+    );
+    const sourceTextOverride = sourceOutlineSection
+      ? extractGroundingSourceSectionText(source, sourceOutlineSection)
+      : undefined;
+    const fallbackOutput = createExtractiveSectionFallback({
       section,
       source,
-      output: currentOutputs.get(section.id),
+      sourceTextOverride,
     });
     if (!fallbackOutput) {
+      currentOutputs.delete(section.id);
       continue;
     }
 
     currentOutputs.set(section.id, fallbackOutput);
+    let fallbackReports = refreshSectionReports({
+      section,
+      currentOutputs,
+      plan,
+      source,
+      outline,
+      groundingEnabled: grounding !== undefined,
+      leakageEnabled: leakage !== undefined,
+    });
+    let accepted = isSectionAccepted(
+      fallbackReports.coverage,
+      fallbackReports.grounding,
+      fallbackReports.leakage,
+    );
+    if (!accepted) {
+      const blockFallback = createExtractiveSectionFallback({
+        section,
+        source,
+        sourceTextOverride,
+        mode: "blocks",
+      });
+      if (blockFallback) {
+        currentOutputs.set(section.id, blockFallback);
+        fallbackReports = refreshSectionReports({
+          section,
+          currentOutputs,
+          plan,
+          source,
+          outline,
+          groundingEnabled: grounding !== undefined,
+          leakageEnabled: leakage !== undefined,
+        });
+        accepted = isSectionAccepted(
+          fallbackReports.coverage,
+          fallbackReports.grounding,
+          fallbackReports.leakage,
+        );
+      }
+    }
+    if (!accepted) {
+      const lineFallback = createExtractiveSectionFallback({
+        section,
+        source,
+        sourceTextOverride,
+        mode: "lines",
+      });
+      if (lineFallback) {
+        currentOutputs.set(section.id, lineFallback);
+        fallbackReports = refreshSectionReports({
+          section,
+          currentOutputs,
+          plan,
+          source,
+          outline,
+          groundingEnabled: grounding !== undefined,
+          leakageEnabled: leakage !== undefined,
+        });
+        accepted = isSectionAccepted(
+          fallbackReports.coverage,
+          fallbackReports.grounding,
+          fallbackReports.leakage,
+        );
+      }
+    }
+    if (!accepted) {
+      const spanFallback = createExtractiveSectionFallback({
+        section,
+        source,
+        sourceTextOverride,
+        mode: "span",
+      });
+      if (spanFallback) {
+        currentOutputs.set(section.id, spanFallback);
+        fallbackReports = refreshSectionReports({
+          section,
+          currentOutputs,
+          plan,
+          source,
+          outline,
+          groundingEnabled: grounding !== undefined,
+          leakageEnabled: leakage !== undefined,
+        });
+        accepted = isSectionAccepted(
+          fallbackReports.coverage,
+          fallbackReports.grounding,
+          fallbackReports.leakage,
+        );
+      }
+    }
+    if (accepted) {
+      args.onSectionRecovered?.(section, "extractive_fallback");
+    }
   }
 
   return orderedOutputs(plan, currentOutputs);
@@ -241,47 +347,78 @@ function refreshSectionReports(args: {
   };
 }
 
-function createExtractiveProseFallbackOutput(args: {
+export function createExtractiveSectionFallback(args: {
   readonly section: PlannedSection;
   readonly source: NormalizedSource;
-  readonly output: SectionOutput | undefined;
+  readonly sourceTextOverride?: string;
+  readonly mode?: "items" | "blocks" | "lines" | "span";
 }): SectionOutput | undefined {
-  if (!args.output) {
-    return undefined;
-  }
-
   const sourceBlocks = collectSectionSourceBlocks(args.section, args.source);
-  const sourceText = sourceBlocks
-    .map((block) => block.text)
-    .join("\n")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (
-    sourceText.length === 0 ||
-    sourceText.length > EXTRACTIVE_PROSE_MAX_CHARS
-  ) {
+  const sourceText =
+    args.sourceTextOverride?.trim() ||
+    sourceBlocks.map((block) => block.text).join("\n").trim();
+  if (sourceText.length === 0) {
     return undefined;
   }
 
-  const contentBlocks = sourceBlocks
-    .map((block) => normalizeBlockText(block.text))
-    .filter((text) => isExtractiveProseContentBlock(text));
-  if (
-    contentBlocks.length < EXTRACTIVE_PROSE_MIN_CONTENT_BLOCKS ||
-    contentBlocks.length > EXTRACTIVE_PROSE_MAX_CONTENT_BLOCKS
-  ) {
-    return undefined;
-  }
-
-  const explanation = contentBlocks.at(-1);
+  const detectedItems = extractCleanSourceItems({
+    sourceSpanText: sourceText,
+    sectionTitle: args.section.title,
+  }).map((item) => normalizeBlockText(item.text));
+  const sourceLines = sourceText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const extractiveItems = detectedItems.map(
+    (item) => {
+      const restoredItem = restoreProtectedSourceTokens(item, sourceText);
+      return (
+      findRawItemText(restoredItem, sourceText) ??
+      sourceLines.find(
+        (line) =>
+          normalizeCoverageTitleKey(line) === normalizeCoverageTitleKey(restoredItem),
+      ) ?? restoredItem
+      );
+    },
+  );
+  const allBlocks = sourceLines.length > 0 ? sourceLines : [normalizeBlockText(sourceText)];
+  const contentBlocks = allBlocks.filter(
+    (text) => normalizeBlockText(text).toLocaleLowerCase() !== normalizeBlockText(args.section.title).toLocaleLowerCase(),
+  );
+  const proseBlocks = contentBlocks.filter((text) => /[.!?]$/.test(text));
+  const explanation =
+    proseBlocks.at(-1) ?? contentBlocks.at(-1) ?? detectedItems[0] ?? allBlocks[0];
   if (!explanation) {
     return undefined;
   }
 
-  const keyPoints = contentBlocks.slice(0, -1);
+  const keyPoints = uniqueExtracts(
+    args.mode === "span"
+      ? [
+          sourceText,
+          ...extractiveItems.filter(
+            (item) =>
+              !normalizeCoverageTitleKey(sourceText).includes(
+                normalizeCoverageTitleKey(item),
+              ),
+          ),
+        ]
+      : args.mode === "lines"
+      ? sourceLines
+      : args.mode !== "blocks" && extractiveItems.length > 0
+      ? extractiveItems
+      : proseBlocks.length > 1
+        ? proseBlocks.slice(0, -1)
+        : contentBlocks.length > 0
+          ? contentBlocks
+          : allBlocks,
+  );
   return {
-    ...args.output,
+    id: stableId("extractive", `${args.source.id}\u001f${args.section.id}`),
+    kind: args.section.schemaKind,
+    plannedSectionId: args.section.id,
     title: args.section.title,
+    sourceBlockIds: [...args.section.sourceBlockIds],
     sourceCore: {
       explanation,
       keyPoints: keyPoints.length > 0 ? keyPoints : [explanation],
@@ -294,19 +431,58 @@ function normalizeBlockText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function isExtractiveProseContentBlock(value: string): boolean {
-  if (
-    value.length === 0 ||
-    value.length > EXTRACTIVE_PROSE_MAX_BLOCK_CHARS
-  ) {
-    return false;
-  }
-
-  return /[.!?]$/.test(value) && countTerms(value) >= 6;
+function uniqueExtracts(values: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = value.toLocaleLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
-function countTerms(value: string): number {
-  return [...value.matchAll(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g)].length;
+function findRawItemText(item: string, sourceText: string): string | undefined {
+  const components = item.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (components.length === 0) return undefined;
+  const match = new RegExp(
+    components.map(escapeRegExp).join("[^\\p{L}\\p{N}]+"),
+    "iu",
+  ).exec(sourceText);
+  return match?.[0].trim();
+}
+
+function restoreProtectedSourceTokens(item: string, sourceText: string): string {
+  return extractProtectedSourceTokens(sourceText).reduce((restored, token) => {
+    if (restored.includes(token.text)) return restored;
+    const components = token.text.match(/[\p{L}\p{N}]+/gu) ?? [];
+    if (components.length === 0) return restored;
+    const pattern = new RegExp(
+      components.map(escapeRegExp).join("[^\\p{L}\\p{N}]*"),
+      "iu",
+    );
+    if (!pattern.test(restored)) return restored;
+    const candidate = restored.replace(pattern, token.text);
+    return alphaNumericKey(candidate) === alphaNumericKey(restored)
+      ? candidate
+      : restored;
+  }, item);
+}
+
+function alphaNumericKey(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stableId(prefix: string, value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${prefix}-${(hash >>> 0).toString(36)}`;
 }
 
 function validateArgs(args: RetryFailedSectionsArgs): void {
@@ -458,11 +634,37 @@ function shouldRetry(
 }
 
 function buildRetryGuidance(
+  section: PlannedSection,
+  source: NormalizedSource,
   coverageResult: SectionCoverageResult,
   groundingResult: SectionGroundingResult | undefined,
   leakageResult: SectionLeakageResult | undefined,
 ): readonly string[] {
   const guidance: string[] = [];
+  const failedFields = new Set<string>();
+  for (const issue of groundingResult?.issues ?? []) {
+    if (issue.fieldPath) failedFields.add(issue.fieldPath);
+  }
+  for (const issue of leakageResult?.issues ?? []) {
+    failedFields.add(issue.fieldPath);
+  }
+  if (coverageResult.status !== "passed") {
+    failedFields.add("sourceCore");
+  }
+  if (failedFields.size > 0) {
+    guidance.push(
+      `Repair only the failed field scope when practical: ${[...failedFields].join(", ")}. Preserve already grounded fields, shorten uncertain wording, and regenerate the entire section only if the listed fields cannot be repaired independently.`,
+    );
+  }
+  const exactTerms = collectAllowedSourceTerms(section, source);
+  if (exactTerms.length > 0) {
+    guidance.push(
+      `Allowed source terminology that should be preserved exactly when used: ${exactTerms.join(", ")}.`,
+    );
+  }
+  guidance.push(
+    "Do not add examples, synonyms, explanations, recommendations, or consequences absent from the passage.",
+  );
 
   if (coverageResult.status !== "passed" && coverageResult.issues.length > 0) {
     guidance.push(
@@ -489,6 +691,17 @@ function buildRetryGuidance(
   }
 
   return guidance;
+}
+
+function collectAllowedSourceTerms(
+  section: PlannedSection,
+  source: NormalizedSource,
+): readonly string[] {
+  const text = collectSectionSourceBlocks(section, source)
+    .map((block) => block.text)
+    .join(" ");
+  const candidates = text.match(/\b(?:[A-Z]{2,}(?:-[A-Z0-9]+)*|[A-Z][A-Za-z0-9]+(?:-[A-Za-z0-9]+)+|\d+(?:\.\d+)*%?)\b/g) ?? [];
+  return uniqueExtracts(candidates).slice(0, 24);
 }
 
 function formatGroundingIssueGuidance(

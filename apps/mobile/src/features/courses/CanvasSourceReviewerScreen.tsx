@@ -1306,7 +1306,8 @@ function formatGenerateError(error: GenerateReviewerError): CanvasSourceDisplayE
   }
   return {
     title: "Reviewer generation failed",
-    message: error.message,
+    message:
+      "Review the source text, return to block selection when applicable, then retry generation. Shorten or clarify the source only if it is incomplete or hard to read.",
     detail,
   };
 }

@@ -5,6 +5,7 @@ import { buildGenerationPlan } from "./stage2-plan.js";
 import {
   collectSectionSourceBlocks,
   generateSection,
+  SectionProviderError,
   SectionValidationError,
   type SectionValidationFailureReason,
 } from "./stage3-generate.js";
@@ -22,6 +23,7 @@ import type {
   PipelineOptions,
   PlannedSection,
   ReviewerOutput,
+  ReviewerSectionQualityStatus,
   SectionOutput,
   SourceOutline,
   SourceNormalizationInput,
@@ -58,9 +60,7 @@ export interface PipelineAssemblyOutputDiagnostic {
   readonly title: string;
   readonly sourceBlockIds: readonly string[];
   readonly explanationLength: number;
-  readonly explanationExcerpt: string;
   readonly keyPointCount: number;
-  readonly keyPointExcerpts: readonly string[];
 }
 
 export interface PipelineAssemblySectionDiagnostic {
@@ -75,10 +75,11 @@ export interface PipelineAssemblySectionDiagnostic {
   readonly coverageStatus?: string;
   readonly groundingScore?: number;
   readonly groundingStatus?: string;
+  readonly groundingIssueTypes?: readonly string[];
+  readonly groundingFailedFields?: readonly string[];
   readonly leakageStatus?: string;
   readonly leakageIssueCount?: number;
   readonly sourceSpanLength?: number;
-  readonly sourceExcerpt?: string;
   readonly output?: PipelineAssemblyOutputDiagnostic;
 }
 
@@ -120,11 +121,11 @@ export async function runPipeline(
     SectionValidationFailure
   >();
   const retryAttemptsBySectionId = new Map<string, number>();
+  const sectionQualityById = new Map<string, ReviewerSectionQualityStatus>();
 
   for (const section of plan.sections) {
     try {
-      initialOutputs.push(
-        await generateSection({
+      const output = await generateSection({
           section,
           plan,
           source,
@@ -132,9 +133,13 @@ export async function runPipeline(
           model: args.model,
           temperature: args.temperature,
           metadata: args.metadata,
-        }),
-      );
+        });
+      initialOutputs.push(output);
+      sectionQualityById.set(section.id, "generated");
     } catch (error) {
+      if (error instanceof SectionProviderError) {
+        continue;
+      }
       if (!(error instanceof SectionValidationError)) {
         throw error;
       }
@@ -187,6 +192,9 @@ export async function runPipeline(
         Math.max(retryAttemptsBySectionId.get(section.id) ?? 0, attempt),
       );
     },
+    onSectionRecovered: (section, status) => {
+      sectionQualityById.set(section.id, status);
+    },
   });
   const finalCoverage = verifyCoverage({
     outputs: finalOutputs,
@@ -221,6 +229,11 @@ export async function runPipeline(
 
   let reviewer: ReviewerOutput;
   try {
+    const fallbackPlanUsed =
+      initialOutputs.length === 0 &&
+      plan.sections.every(
+        (section) => sectionQualityById.get(section.id) === "extractive_fallback",
+      );
     reviewer = assembleReviewer({
       outputs: finalOutputs,
       coverage: finalCoverage,
@@ -229,20 +242,14 @@ export async function runPipeline(
       plan,
       source,
       allowWeakSections: args.allowWeakSections,
+      sectionQualityById: Object.fromEntries(sectionQualityById),
+      fallbackPlanUsed,
     });
   } catch (error) {
     throw new PipelineAssemblyError(
       errorMessage(error),
       state,
       error,
-    );
-  }
-
-  if (state.sectionValidationFailures.length > 0) {
-    throw new PipelineAssemblyError(
-      `Stage 3 validation failed for ${state.sectionValidationFailures.length} section(s).`,
-      state,
-      state.sectionValidationFailures,
     );
   }
 
@@ -385,6 +392,8 @@ function createSectionDiagnostic(args: {
       ? {
           groundingStatus: args.grounding.status,
           groundingScore: args.grounding.score,
+          groundingIssueTypes: [...new Set(args.grounding.issues.map((issue) => issue.type))],
+          groundingFailedFields: [...new Set(args.grounding.issues.map((issue) => issue.fieldPath).filter((field): field is string => Boolean(field)))],
         }
       : {}),
     ...(args.leakage
@@ -490,7 +499,7 @@ function sourceSpanDiagnostic(
   source: NormalizedSource,
 ): Pick<
   PipelineAssemblySectionDiagnostic,
-  "sourceSpanLength" | "sourceExcerpt"
+  "sourceSpanLength"
 > {
   try {
     const text = collectSectionSourceBlocks(section, source)
@@ -500,9 +509,6 @@ function sourceSpanDiagnostic(
 
     return {
       sourceSpanLength: text.length,
-      ...(text
-        ? { sourceExcerpt: sanitizeDiagnosticText(text, 240) }
-        : {}),
     };
   } catch {
     return {
@@ -523,14 +529,7 @@ function outputDiagnostic(output: SectionOutput): PipelineAssemblyOutputDiagnost
       sanitizeDiagnosticText(blockId, 120),
     ),
     explanationLength: output.sourceCore.explanation.length,
-    explanationExcerpt: sanitizeDiagnosticText(
-      output.sourceCore.explanation,
-      240,
-    ),
     keyPointCount: output.sourceCore.keyPoints.length,
-    keyPointExcerpts: output.sourceCore.keyPoints
-      .slice(0, 5)
-      .map((keyPoint) => sanitizeDiagnosticText(keyPoint, 180)),
   };
 }
 

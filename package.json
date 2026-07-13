@@ -16,6 +16,7 @@
     "smoke:reviewer:web": "node scripts/reviewer-web-smoke.mjs",
     "test:canvas-grades-web-smoke": "node --test scripts/canvas-grades-web-smoke.test.mjs",
     "test:reviewer-web-smoke": "node --test scripts/reviewer-web-smoke.test.mjs",
+    "validate:reviewer-canvas:r2": "node scripts/r2-canvas-live-validation.mjs",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean"
   },

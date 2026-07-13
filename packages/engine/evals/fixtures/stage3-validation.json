@@ -31,7 +31,7 @@
       "scenario": "provider-failure",
       "schemaKind": "concept-card",
       "providerError": "simulated provider outage",
-      "expectError": "Stage 3 provider generation failed for section \"planned-concept-card\": simulated provider outage"
+      "expectError": "Stage 3 provider generation failed for section \"planned-concept-card\"."
     },
     {
       "name": "section outside plan is rejected",

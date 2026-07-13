@@ -980,8 +980,12 @@ contracts, tests, provenance, and grade isolation should be preserved, but that
 V2 is currently over-constrained for practical student use. The highest-impact
 recovery areas are reviewer fallback reliability, full-document OCR with page
 completeness, broader Canvas usable-content resolution, and a simpler student
-workflow. The next task is Product Recovery Phase R2 - Reviewer reliability and
-fallback redesign. Repeated PDF header/footer cleanup remains a separate
+workflow. Product Recovery Phase R2 is complete in
+`docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`: reviewer
+generation now repairs and recovers per section, validates deterministic
+extractive and emergency source-outline fallbacks, returns safe limited-quality
+metadata, and renders recovered output normally. The next task is Product
+Recovery Phase R3 - Full-document OCR with page completeness. Repeated PDF header/footer cleanup remains a separate
 deferred candidate.
 
 ## Known Risks

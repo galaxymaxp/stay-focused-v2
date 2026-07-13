@@ -40,6 +40,14 @@ const FIXTURE_SOURCES: readonly FixtureSource[] = [
     title: "Arnis M1",
     fileName: "arnis-m1.txt",
   },
+  {
+    title: "Fictional Short Prose",
+    fileName: "fictional-short-prose.txt",
+  },
+  {
+    title: "Fictional List Notes",
+    fileName: "fictional-list-notes.txt",
+  },
 ];
 
 const FIXTURE_DIRECTORY = resolvePackagePath("scripts", "fixtures");

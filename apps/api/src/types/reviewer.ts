@@ -22,6 +22,8 @@ export interface ReviewerGenerateErrorResponse {
       readonly failingSectionTitle?: string;
       readonly validationReason?: string;
       readonly retryCount?: number;
+      readonly validationCategory?: string;
+      readonly failedField?: string;
     };
   };
 }

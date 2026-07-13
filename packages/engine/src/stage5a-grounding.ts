@@ -342,13 +342,16 @@ function checkOmissions(args: {
 
   const representedItemKeys = new Set(
     args.keyPoints
-      .map(normalizeCoverageTitleKey)
+      .map(normalizeListItemCoverageKey)
       .filter((key) => key.length > 0),
   );
   const missingItems: SourceItem[] = [];
 
   for (const item of args.sourceItems) {
-    if (!representedItemKeys.has(normalizeCoverageTitleKey(item.text))) {
+    const itemKey = normalizeListItemCoverageKey(item.text);
+    const represented = representedItemKeys.has(itemKey) ||
+      (itemKey.length >= 3 && [...representedItemKeys].some((key) => key.includes(itemKey)));
+    if (!represented) {
       missingItems.push(item);
     }
   }
@@ -383,6 +386,12 @@ function checkOmissions(args: {
       },
     ],
   };
+}
+
+function normalizeListItemCoverageKey(value: string): string {
+  return normalizeCoverageTitleKey(
+    value.replace(/^\s*(?:[-*+\u2022]\s+|\d{1,3}[.)]\s+)/, ""),
+  );
 }
 
 function createFabricationIssue(args: {

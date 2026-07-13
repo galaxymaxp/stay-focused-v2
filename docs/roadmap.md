@@ -1161,11 +1161,11 @@ MVP subphases:
 - Phase 5E.5 - Mobile assignment and grade experience (complete and locally validated)
 - Phase 5E.6 - Protected live validation and hardening (in progress)
 
-Roadmap result: Phase 5E.6 - in progress. Product Recovery Phase R1 is complete
-and documented in
-`docs/ai/product-recovery-r1-v1-audit-20260713.md`.
+Roadmap result: Phase 5E.6 - in progress. Product Recovery Phases R1 and R2 are
+complete and documented in `docs/ai/product-recovery-r1-v1-audit-20260713.md`
+and `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`.
 
-Next: Product Recovery Phase R2 - Reviewer reliability and fallback redesign
+Next: Product Recovery Phase R3 - Full-document OCR with page completeness
 
 Exit criteria:
 
@@ -1178,7 +1178,9 @@ Exit criteria:
 
 ## Product Recovery
 
-Status: In progress. Phase R1 is complete.
+Status: In progress. Phases R1 and R2 are complete.
+
+Product Recovery Phase R2 - Complete.
 
 Purpose: Restore practical student usefulness while preserving the stronger V2
 architecture. V1 is the behavioral benchmark; V2 is the security,
@@ -1201,13 +1203,13 @@ Phase R1 result:
 
 Recovery roadmap:
 
-- Phase R2 - Reviewer reliability and fallback redesign.
+- Phase R2 - Reviewer reliability and fallback redesign (complete; 287/287 engine evals and protected Canvas HTTP 200 with validated limited fallback output).
 - Phase R3 - Full-document OCR with page completeness.
 - Phase R4 - Canvas usable-content resolution.
 - Phase R5 - Simplified student workflow.
 - Phase R6 - Real-device product acceptance.
 
-Immediate next task: Phase R2 - Reviewer reliability and fallback redesign.
+Immediate next task: Phase R3 - Full-document OCR with page completeness.
 
 Phase 5F remains pending until the reviewer, OCR, and Canvas usefulness
 regressions exposed during physical-device validation have a recovery path.

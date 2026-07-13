@@ -57,6 +57,19 @@ export class SectionValidationError extends Error {
 }
 
 const SPARSE_SOURCE_WORD_LIMIT = 8;
+
+export class SectionProviderError extends Error {
+  public readonly sectionId: string;
+  public override readonly cause: unknown;
+
+  public constructor(sectionId: string, cause: unknown) {
+    super(`Stage 3 provider generation failed for section "${sectionId}".`);
+    this.name = "SectionProviderError";
+    this.sectionId = sectionId;
+    this.cause = cause;
+  }
+}
+
 const TERM_PATTERN = /[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g;
 const LIST_MARKER_PATTERN =
   /(?:^|\s)(?:[-*]\s+|(?:â€¢|Ã¢â‚¬Â¢)\s+|\d{1,2}[.)]\s+|[a-z]\)\s+)/i;
@@ -95,9 +108,7 @@ export async function generateSection(
   try {
     providerOutput = await provider.generate<unknown>(request);
   } catch (error) {
-    throw new Error(
-      `Stage 3 provider generation failed for section "${section.id}": ${errorMessage(error)}`,
-    );
+    throw new SectionProviderError(section.id, error);
   }
 
   const structurallyValidOutput = validateSectionOutputShape(
@@ -607,10 +618,6 @@ function arraysEqual(
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function escapeRegExp(value: string): string {

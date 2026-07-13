@@ -6,13 +6,16 @@ paths.
 
 ## Current Status
 
-- Product Recovery Phase R1 is complete in
-  `docs/ai/product-recovery-r1-v1-audit-20260713.md`. It compared V1 as the
+- Product Recovery Phases R1 and R2 are complete in
+  `docs/ai/product-recovery-r1-v1-audit-20260713.md` and
+  `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`. R1 compared V1 as the
   behavioral benchmark with V2 as the architecture benchmark. V2's
   authentication, RLS, encrypted Canvas credentials, protected APIs, private
   source snapshots, provenance, tests, strict parsers, and grade/reviewer
-  separation should remain. The next task is Product Recovery Phase R2 -
-  Reviewer reliability and fallback redesign, before returning to Phase 5F.
+  separation should remain. R2 added bounded field-aware repair, validated
+  per-section extractive fallback, emergency source-outline recovery, safe
+  quality metadata, and calm mobile fallback rendering. The next task is
+  Product Recovery Phase R3 - Full-document OCR with page completeness.
 - Baseline before this Phase 4 implementation:
   `0fdf1e4 docs: complete Phase 3D live PDF validation`.
 - Phase 4 implementation commit: the commit containing this handoff update.

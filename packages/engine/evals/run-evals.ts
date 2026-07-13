@@ -14,6 +14,7 @@ import { stage6AssembleSuite } from "./stage6-assemble.eval.js";
 import { studentVisibleFaithfulnessSuite } from "./student-visible-faithfulness.eval.js";
 import { pipelineSuite } from "./pipeline.eval.js";
 import { sourceTokenFidelitySuite } from "./source-token-fidelity.eval.js";
+import { reviewerRecoverySuite } from "./reviewer-recovery.eval.js";
 
 const suites = [
   stage0NormalizationSuite,
@@ -27,6 +28,7 @@ const suites = [
   studentVisibleFaithfulnessSuite,
   sourceTokenFidelitySuite,
   pipelineSuite,
+  reviewerRecoverySuite,
 ];
 const results = [];
 

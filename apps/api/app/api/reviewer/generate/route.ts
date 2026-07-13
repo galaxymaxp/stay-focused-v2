@@ -455,6 +455,8 @@ function createReviewerValidationDiagnostic(
       failingSection?.title ?? validationFailure?.sectionTitle,
     validationReason,
     retryCount: failingSection?.retryCount,
+    validationCategory: failingSection?.groundingIssueTypes?.[0],
+    failedField: failingSection?.groundingFailedFields?.[0],
   };
 
   return Object.fromEntries(
