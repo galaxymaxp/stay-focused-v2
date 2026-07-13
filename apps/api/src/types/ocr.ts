@@ -1,4 +1,8 @@
-import type { OcrPage, OcrWarning } from "@stay-focused/ocr";
+import type {
+  DocumentExtractionDiagnostics,
+  OcrPage,
+  OcrWarning,
+} from "@stay-focused/ocr";
 
 export interface OcrExtractSuccessResponse {
   readonly ok: true;
@@ -8,6 +12,7 @@ export interface OcrExtractSuccessResponse {
     readonly mimeType: string;
     readonly pageCount?: number;
     readonly processedPageCount?: number;
+    readonly extraction: DocumentExtractionDiagnostics;
     readonly provider: string;
     readonly warnings: readonly OcrWarning[];
   };
@@ -29,6 +34,9 @@ export type OcrExtractErrorCode =
   | "ocr_not_configured"
   | "ocr_provider_failed"
   | "ocr_empty_result"
+  | "document_unreadable"
+  | "document_extraction_incomplete"
+  | "document_extraction_failed"
   | "internal_error";
 
 export interface OcrExtractErrorResponse {
@@ -36,6 +44,7 @@ export interface OcrExtractErrorResponse {
   readonly error: {
     readonly code: OcrExtractErrorCode;
     readonly message: string;
+    readonly extraction?: DocumentExtractionDiagnostics;
   };
 }
 

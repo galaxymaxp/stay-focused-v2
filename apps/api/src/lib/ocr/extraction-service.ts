@@ -2,6 +2,9 @@ import {
   OCR_PDF_MIME_TYPE,
   OCR_SUPPORTED_IMAGE_MIME_TYPES,
   OcrProviderError,
+  createFailedDocumentExtractionDiagnostics,
+  verifyDocumentExtraction,
+  type DocumentExtractionDiagnostics,
   type OcrImageMimeType,
   type OcrInput,
   type OcrPdfInput,
@@ -24,10 +27,13 @@ export type OcrProviderFailureCode =
   | "ocr_not_configured"
   | "ocr_provider_failed"
   | "ocr_empty_result"
+  | "document_extraction_incomplete"
+  | "document_unreadable"
   | "internal_error";
 
 export interface OcrProviderFailure {
   readonly code: OcrProviderFailureCode;
+  readonly extraction: DocumentExtractionDiagnostics;
 }
 
 export type ImageOcrValidationFailureCode =
@@ -66,7 +72,11 @@ export type PdfOcrValidationResult =
     };
 
 export type OcrExtractionResult =
-  | { readonly ok: true; readonly result: OcrResult }
+  | {
+      readonly ok: true;
+      readonly result: OcrResult;
+      readonly extraction: DocumentExtractionDiagnostics;
+    }
   | { readonly ok: false; readonly failure: OcrProviderFailure };
 
 export function validateImageOcrBytes({
@@ -151,28 +161,65 @@ export async function extractWithOcrProvider(
   provider: OcrProvider,
   input: OcrInput,
 ): Promise<OcrExtractionResult> {
+  const expectedPageCount =
+    input.kind === "image" ? 1 : input.requestedPages.length;
   try {
-    return { ok: true, result: await provider.extract(input) };
+    const result = await provider.extract(input);
+    const verification = verifyDocumentExtraction({
+      expectedPageCount,
+      pages: result.pages,
+    });
+    if (!verification.sourceEligible) {
+      return {
+        ok: false,
+        failure: {
+          code:
+            verification.status === "incomplete"
+              ? "document_extraction_incomplete"
+              : "document_unreadable",
+          extraction: verification.diagnostics,
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      result: {
+        ...result,
+        text: verification.text,
+        pages: verification.pages,
+      },
+      extraction: verification.diagnostics,
+    };
   } catch (error) {
+    const failure = mapOcrProviderError(error, expectedPageCount);
     return {
       ok: false,
-      failure: mapOcrProviderError(error),
+      failure,
     };
   }
 }
 
-export function mapOcrProviderError(error: unknown): OcrProviderFailure {
+export function mapOcrProviderError(
+  error: unknown,
+  expectedPageCount = 0,
+): OcrProviderFailure {
+  const failedExtraction = createFailedDocumentExtractionDiagnostics({
+    expectedPageCount,
+    failureCategory:
+      error instanceof OcrProviderError ? "provider_failure" : "internal_failure",
+  });
   if (error instanceof OcrProviderError) {
     if (error.code === "ocr_not_configured") {
-      return { code: "ocr_not_configured" };
+      return { code: "ocr_not_configured", extraction: failedExtraction };
     }
     if (error.code === "ocr_empty_result") {
-      return { code: "ocr_empty_result" };
+      return { code: "ocr_empty_result", extraction: failedExtraction };
     }
-    return { code: "ocr_provider_failed" };
+    return { code: "ocr_provider_failed", extraction: failedExtraction };
   }
 
-  return { code: "internal_error" };
+  return { code: "internal_error", extraction: failedExtraction };
 }
 
 export function isSupportedImageMimeType(

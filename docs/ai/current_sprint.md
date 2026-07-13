@@ -4,16 +4,20 @@ Last refreshed: 2026-07-13, Asia/Manila.
 
 ## Active Objective
 
-Product Recovery Phases R1 and R2 are complete in
-`docs/ai/product-recovery-r1-v1-audit-20260713.md` and
-`docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`. The current priority is no
-longer Phase 5F. The V1/V2 audit found that V2 should preserve its stronger
+Product Recovery Phases R1, R2, and R3 are complete in
+`docs/ai/product-recovery-r1-v1-audit-20260713.md`,
+`docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`, and
+`docs/ai/product-recovery-r3-full-document-ocr-20260713.md`. The current
+priority is no longer Phase 5F. The V1/V2 audit found that V2 should preserve its stronger
 security, authentication, encrypted Canvas storage, protected APIs, strict
 parsers, provenance, tests, and grade/reviewer separation, but must recover
 practical student usefulness in reviewer generation, OCR page coverage, Canvas
 usable-content discovery, and the mobile workflow. R2 restored per-section
 repair, validated extractive fallback, and emergency source-outline recovery.
-The next objective is Product Recovery Phase R3 - Full-document OCR with page completeness.
+R3 enforces exact page completeness for every accepted image/PDF OCR source,
+preserves explicit blank pages, and stops incomplete extraction before reviewer
+generation. The next objective is Product Recovery Phase R4 - Canvas
+usable-content resolution.
 
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
 Secure Canvas Connection and Capability Discovery is complete, live validated,
@@ -86,6 +90,29 @@ provenance, saved Canvas reviewers can be checked against current synchronized
 source state, and Study Library shows source health/readiness without
 regenerating.
 There is no school-wide Canvas token.
+
+## Completed Product Recovery R3 Scope
+
+- Audited V2 image, PDF, Canvas prepared-file, mobile handoff, and V1
+  page-rendering behavior without modifying V1.
+- Added strict complete/incomplete/failed document states and
+  text/blank/failed page states in `@stay-focused/ocr`.
+- Added one authoritative exact-coverage verifier for expected count,
+  uniqueness, range, terminal states, blanks, ordering, diagnostics, and source
+  eligibility.
+- Centralized the accepted PDF limit at five pages, matching the synchronous
+  Google Vision inline-file constraint and checking it before provider work.
+- Gated manual and Canvas-backed source assembly plus mobile reviewer start on
+  complete extraction proof; failed retries clear stale OCR text.
+- Added sanitized additive API metadata and actionable OCR-specific mobile
+  guidance without source excerpts or provider internals.
+- Passed OCR 25/25, engine 287/287, API 391/391, mobile 130/130, reviewer smoke
+  tests 51/51, full typecheck/lint/build checks, mocked PDF browser smoke, and a
+  protected real-OCR matrix. The live five-page case processed/extracted 5/5
+  pages in one call and 1.591 seconds; incomplete input made zero reviewer
+  calls.
+- Full report:
+  `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`.
 
 ## Completed Phase 3A Scope
 
@@ -1429,6 +1456,8 @@ automated baseline checks, protected API preflight, Expo Web protected smoke,
 session-only smoke, controlled fictional edge validation, authorization
 regression checks, and privacy scans passed. Physical iPhone Expo Go validation
 remains required before Phase 5E.6 and Phase 5E can be marked complete.
-Product Recovery Phases R1 and R2 are complete and the next objective is Product
-Recovery Phase R3 - Full-document OCR with page completeness. The deferred
+Product Recovery Phases R1, R2, and R3 are complete and the next objective is
+Product Recovery Phase R4 - Canvas usable-content resolution. R3's exact page
+coverage and reviewer gate are documented in
+`docs/ai/product-recovery-r3-full-document-ocr-20260713.md`. The deferred
 header/footer cleanup task remains separate.

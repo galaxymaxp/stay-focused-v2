@@ -1,5 +1,6 @@
 import {
   OCR_SUPPORTED_IMAGE_MIME_TYPES,
+  type DocumentExtractionDiagnostics,
   type OcrImageMimeType,
   type OcrProvider,
 } from "@stay-focused/ocr";
@@ -45,6 +46,7 @@ interface MappedOcrError {
   readonly status: 422 | 500 | 502;
   readonly code: OcrExtractErrorCode;
   readonly message: string;
+  readonly extraction: DocumentExtractionDiagnostics;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -119,7 +121,13 @@ async function handlePost(request: Request): Promise<Response> {
   });
   if (!extraction.ok) {
     const mapped = mapOcrError(extraction.failure);
-    return errorResponse(mapped.status, mapped.code, mapped.message, request);
+    return errorResponse(
+      mapped.status,
+      mapped.code,
+      mapped.message,
+      request,
+      mapped.extraction,
+    );
   }
   const result = extraction.result;
 
@@ -139,6 +147,7 @@ async function handlePost(request: Request): Promise<Response> {
         text: result.text,
         pages: result.pages,
         mimeType: result.mimeType,
+        extraction: extraction.extraction,
         provider: result.provider,
         warnings: result.warnings,
       },
@@ -330,25 +339,43 @@ function mapOcrError(error: OcrProviderFailure): MappedOcrError {
         status: 500,
         code: "ocr_not_configured",
         message: "OCR provider is not configured.",
+        extraction: error.extraction,
       };
     case "ocr_empty_result":
       return {
         status: 422,
         code: "ocr_empty_result",
         message: "OCR provider returned no extracted text.",
+        extraction: error.extraction,
       };
     case "ocr_provider_failed":
       return {
         status: 502,
         code: "ocr_provider_failed",
         message: "OCR provider failed.",
+        extraction: error.extraction,
+      };
+    case "document_unreadable":
+      return {
+        status: 422,
+        code: "document_unreadable",
+        message: "No readable text was detected in this image. Try a clearer image.",
+        extraction: error.extraction,
+      };
+    case "document_extraction_incomplete":
+      return {
+        status: 422,
+        code: "document_extraction_incomplete",
+        message: "The image extraction result was incomplete. Try the image again.",
+        extraction: error.extraction,
       };
     case "internal_error":
-    return {
-      status: 500,
-      code: "internal_error",
-      message: "OCR extraction failed.",
-    };
+      return {
+        status: 500,
+        code: "document_extraction_failed",
+        message: "OCR extraction failed.",
+        extraction: error.extraction,
+      };
   }
 }
 
@@ -357,11 +384,12 @@ function errorResponse(
   code: OcrExtractErrorCode,
   message: string,
   request?: Request,
+  extraction?: DocumentExtractionDiagnostics,
 ): Response {
   return jsonResponse(
     {
       ok: false,
-      error: { code, message },
+      error: { code, message, ...(extraction ? { extraction } : {}) },
     },
     status,
     request,

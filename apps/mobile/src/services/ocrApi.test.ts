@@ -16,6 +16,7 @@ const SUCCESS_BODY = {
     mimeType: "image/png",
     provider: "google-cloud-vision",
     warnings: [],
+    extraction: completeExtraction(1),
   },
 };
 
@@ -29,6 +30,7 @@ const SUCCESS_PDF_BODY = {
     processedPageCount: 2,
     provider: "google-cloud-vision",
     warnings: [],
+    extraction: completeExtraction(2),
   },
 };
 
@@ -211,7 +213,7 @@ describe("extractOcrText", () => {
       ok: false,
       error: {
         code: "ocr_provider_failed",
-        message: "OCR extraction failed on the server.",
+        message: "Text extraction is temporarily unavailable. Try again in a moment.",
       },
     });
     expect(JSON.stringify(result)).not.toContain("raw-secret-value");
@@ -390,6 +392,74 @@ describe("extractPdfOcrText", () => {
     });
   });
 
+  it("maps incomplete document metadata without exposing OCR content", async () => {
+    const extraction = {
+      ...completeExtraction(3),
+      status: "incomplete",
+      processedPageCount: 2,
+      successfulPageCount: 2,
+      missingPageNumbers: [3],
+      outOfRangePageNumbers: [0],
+      affectedPageNumbers: [0, 3],
+      failureCategories: ["missing_page", "out_of_range_page"],
+    };
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl: createApiFetch(
+        {
+          ok: false,
+          error: {
+            code: "document_extraction_incomplete",
+            message: "Not every page could be read.",
+            extraction,
+          },
+        },
+        422,
+      ),
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: "document_extraction_incomplete",
+        extraction: {
+          status: "incomplete",
+          expectedPageCount: 3,
+          affectedPageNumbers: [0, 3],
+        },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("source sentence");
+  });
+
+  it("rejects a PDF success response without a complete extraction proof", async () => {
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl: createApiFetch({
+        ...SUCCESS_PDF_BODY,
+        data: {
+          ...SUCCESS_PDF_BODY.data,
+          extraction: {
+            ...completeExtraction(2),
+            status: "incomplete",
+            failureCategories: ["failed_page"],
+          },
+        },
+      }),
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "document_extraction_incomplete" },
+    });
+  });
+
   it("maps PDF network failures", async () => {
     const result = await extractPdfOcrText({
       accessToken: "token-value",
@@ -467,4 +537,21 @@ function readFormDataFile(formData: FormData, fieldName: string): Blob {
     throw new Error(`FormData ${fieldName} field was not a Blob`);
   }
   return file;
+}
+
+function completeExtraction(expectedPageCount: number) {
+  return {
+    status: "complete",
+    expectedPageCount,
+    processedPageCount: expectedPageCount,
+    successfulPageCount: expectedPageCount,
+    blankPageCount: 0,
+    failedPageCount: 0,
+    missingPageNumbers: [],
+    duplicatePageNumbers: [],
+    outOfRangePageNumbers: [],
+    invalidPageNumbers: [],
+    affectedPageNumbers: [],
+    failureCategories: [],
+  };
 }

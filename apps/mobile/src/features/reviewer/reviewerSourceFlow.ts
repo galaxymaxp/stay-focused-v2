@@ -1,4 +1,7 @@
-import type { OcrClientError } from "../../services/ocrApi";
+import {
+  OCR_MAX_PDF_PAGES,
+  type OcrClientError,
+} from "../../services/ocrApi";
 import type {
   GallerySelectionError,
   SelectedGalleryImage,
@@ -102,10 +105,26 @@ export function reviewerSourceReducer(
 ): ReviewerSourceState {
   switch (action.type) {
     case "switch_mode":
+      if (action.mode === state.mode || action.mode === "paste") {
+        return {
+          ...state,
+          mode: action.mode,
+          ocrError: null,
+        };
+      }
       return {
         ...state,
         mode: action.mode,
+        ocrText: "",
         ocrError: null,
+        ocrStatus:
+          action.mode === "image"
+            ? state.selectedImage
+              ? "selected"
+              : "idle"
+            : state.selectedPdf
+              ? "selected"
+              : "idle",
       };
 
     case "edit_source_text":
@@ -168,7 +187,9 @@ export function reviewerSourceReducer(
     case "ocr_started":
       return {
         ...state,
+        ocrText: "",
         ocrError: null,
+        pdfPageCount: state.mode === "pdf" ? null : state.pdfPageCount,
         ocrStatus: "uploading",
       };
 
@@ -199,7 +220,9 @@ export function reviewerSourceReducer(
     case "ocr_failed":
       return {
         ...state,
+        ocrText: "",
         ocrError: formatOcrClientError(action.error),
+        pdfPageCount: state.mode === "pdf" ? null : state.pdfPageCount,
         ocrStatus: "failed",
       };
 
@@ -236,6 +259,16 @@ export function getCurrentSourceText(state: ReviewerSourceState): string {
 
 export function getSourceCharacterCount(state: ReviewerSourceState): number {
   return getCurrentSourceText(state).length;
+}
+
+export function isReviewerSourceReadyForGeneration(
+  state: ReviewerSourceState,
+): boolean {
+  if (state.mode === "paste") {
+    return state.manualText.trim().length > 0;
+  }
+
+  return state.ocrStatus === "ready" && state.ocrText.trim().length > 0;
 }
 
 export function canExtractOcrText(state: ReviewerSourceState): boolean {
@@ -375,7 +408,7 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
       return {
         code: error.code,
         title: "PDF has too many pages",
-        message: "PDF OCR supports up to 5 pages per request.",
+        message: `PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per request.`,
       };
     case "pdf_encrypted":
       return {
@@ -384,10 +417,25 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
         message: "Choose a PDF that does not require a password.",
       };
     case "no_text_detected":
+    case "document_unreadable":
       return {
         code: error.code,
         title: "No readable text found",
-        message: "No readable text was detected in this PDF.",
+        message:
+          "The document did not contain readable text. Rescan it or choose a clearer file.",
+      };
+    case "document_extraction_incomplete":
+      return {
+        code: error.code,
+        title: "Not every page could be read",
+        message: formatIncompleteDocumentMessage(error),
+      };
+    case "document_extraction_failed":
+      return {
+        code: error.code,
+        title: "Document could not be read",
+        message:
+          "Try again in a moment. If it still fails, rescan the document or choose another file.",
       };
     case "ocr_empty_result":
       return {
@@ -404,8 +452,8 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
     case "ocr_provider_failed":
       return {
         code: error.code,
-        title: "OCR failed",
-        message: "The OCR provider could not extract text. Try again.",
+        title: "Text extraction is unavailable",
+        message: "Try again in a moment. Your document was not sent to reviewer generation.",
       };
     case "network_error":
       return {
@@ -430,4 +478,13 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
         message: "Text extraction could not be completed. Try again.",
       };
   }
+}
+
+function formatIncompleteDocumentMessage(error: OcrClientError): string {
+  const affectedPages = error.extraction?.affectedPageNumbers ?? [];
+  const pageDetail =
+    affectedPages.length > 0
+      ? ` Affected ${affectedPages.length === 1 ? "page" : "pages"}: ${affectedPages.join(", ")}.`
+      : "";
+  return `Not every page could be read.${pageDetail} Retry, rescan the affected pages, or choose another document.`;
 }

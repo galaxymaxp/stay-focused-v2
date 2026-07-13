@@ -11,6 +11,28 @@ export type OcrPdfMimeType = typeof OCR_PDF_MIME_TYPE;
 
 export type OcrMimeType = OcrImageMimeType | OcrPdfMimeType;
 
+export type DocumentExtractionStatus = "complete" | "incomplete" | "failed";
+
+export type PageExtractionStatus = "text_extracted" | "blank" | "failed";
+
+export type PageExtractionMethod = "native_text" | "ocr" | "blank";
+
+export type PageExtractionFailureCategory =
+  | "provider_page_error"
+  | "malformed_page_result"
+  | "unresolved_page";
+
+export type DocumentExtractionFailureCategory =
+  | "invalid_expected_page_count"
+  | "missing_page"
+  | "duplicate_page"
+  | "out_of_range_page"
+  | "malformed_page_result"
+  | "failed_page"
+  | "empty_document"
+  | "provider_failure"
+  | "internal_failure";
+
 export interface OcrPoint {
   readonly x: number;
   readonly y: number;
@@ -59,8 +81,11 @@ export interface OcrBlock {
 
 export interface OcrPage {
   readonly pageNumber: number;
+  readonly status: PageExtractionStatus;
+  readonly method: PageExtractionMethod;
   readonly text: string;
   readonly blocks: readonly OcrBlock[];
+  readonly failureCategory?: PageExtractionFailureCategory;
   readonly width?: number;
   readonly height?: number;
   readonly confidence?: number;
@@ -83,6 +108,29 @@ export interface OcrResult {
   readonly mimeType: OcrMimeType;
   readonly provider: string;
   readonly warnings: readonly OcrWarning[];
+}
+
+export interface DocumentExtractionDiagnostics {
+  readonly status: DocumentExtractionStatus;
+  readonly expectedPageCount: number;
+  readonly processedPageCount: number;
+  readonly successfulPageCount: number;
+  readonly blankPageCount: number;
+  readonly failedPageCount: number;
+  readonly missingPageNumbers: readonly number[];
+  readonly duplicatePageNumbers: readonly number[];
+  readonly outOfRangePageNumbers: readonly number[];
+  readonly invalidPageNumbers: readonly number[];
+  readonly affectedPageNumbers: readonly number[];
+  readonly failureCategories: readonly DocumentExtractionFailureCategory[];
+}
+
+export interface DocumentExtractionVerification {
+  readonly status: DocumentExtractionStatus;
+  readonly sourceEligible: boolean;
+  readonly text: string;
+  readonly pages: readonly OcrPage[];
+  readonly diagnostics: DocumentExtractionDiagnostics;
 }
 
 export interface OcrProvider {
@@ -132,6 +180,9 @@ export interface OcrDraftBlock {
 
 export interface OcrDraftPage {
   readonly pageNumber?: number;
+  readonly status?: PageExtractionStatus;
+  readonly method?: PageExtractionMethod;
+  readonly failureCategory?: PageExtractionFailureCategory;
   readonly text?: string;
   readonly order?: number;
   readonly blocks?: readonly OcrDraftBlock[];

@@ -191,14 +191,6 @@ export class GoogleCloudVisionOcrProvider implements OcrProvider {
     const result = normalizeOcrResult(
       mapGoogleVisionPdfResponse(response, input.mimeType, input.requestedPages),
     );
-    if (result.text.length === 0) {
-      throw new OcrProviderError({
-        code: "ocr_empty_result",
-        message: "Google Cloud Vision OCR returned no extracted text.",
-        provider: this.id,
-      });
-    }
-
     return result;
   }
 }
@@ -278,14 +270,18 @@ function mapGoogleVisionPdfResponse(
     throw providerFailure(new Error("Google Vision returned a file error."));
   }
 
-  const pageResponses = fileResponse.responses;
-  if (!Array.isArray(pageResponses) || pageResponses.length < requestedPages.length) {
-    throw providerFailure(new Error("Google Vision returned missing page responses."));
-  }
+  const pageResponses = Array.isArray(fileResponse.responses)
+    ? fileResponse.responses
+    : [];
 
   const warnings: OcrWarning[] = [];
-  const pages = requestedPages.map((pageNumber, index) =>
-    mapPdfPageResponse(pageResponses[index], pageNumber, warnings),
+  const lastRequestedPage = requestedPages.at(-1) ?? 0;
+  const pages = pageResponses.map((pageResponse, index) =>
+    mapPdfPageResponse(
+      pageResponse,
+      requestedPages[index] ?? lastRequestedPage + index - requestedPages.length + 1,
+      warnings,
+    ),
   );
 
   return {
@@ -302,12 +298,12 @@ function mapPdfPageResponse(
   warnings: OcrWarning[],
 ): OcrDraftPage {
   if (!isGoogleVisionDocumentTextResponse(response)) {
-    throw providerFailure(new Error("Malformed Google Vision page response."));
+    return failedPdfPage(pageNumber, "malformed_page_result");
   }
 
   const pageError = readNonEmptyString(response.error?.message);
   if (pageError) {
-    throw providerFailure(new Error("Google Vision returned a page error."));
+    return failedPdfPage(pageNumber, "provider_page_error");
   }
 
   const annotation = response.fullTextAnnotation;
@@ -330,6 +326,8 @@ function mapPdfPageResponse(
     });
     return {
       ...mappedPage,
+      status: "text_extracted",
+      method: "ocr",
       text: fullText,
     };
   }
@@ -348,7 +346,23 @@ function mapPdfPageResponse(
 
   return {
     pageNumber,
+    status: fallbackText ? "text_extracted" : "blank",
+    method: fallbackText ? "ocr" : "blank",
     text: fallbackText,
+  };
+}
+
+function failedPdfPage(
+  pageNumber: number,
+  failureCategory: "malformed_page_result" | "provider_page_error",
+): OcrDraftPage {
+  return {
+    pageNumber,
+    status: "failed",
+    method: "ocr",
+    failureCategory,
+    text: "",
+    blocks: [],
   };
 }
 

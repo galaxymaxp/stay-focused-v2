@@ -7,6 +7,7 @@ import {
   canExtractPdfText,
   getCurrentSourceText,
   initialReviewerSourceState,
+  isReviewerSourceReadyForGeneration,
   reviewerSourceReducer,
 } from "./reviewerSourceFlow";
 
@@ -201,7 +202,7 @@ describe("reviewer source flow", () => {
     expect(state.ocrStatus).toBe("failed");
     expect(state.ocrError).toMatchObject({
       code: "ocr_provider_failed",
-      title: "OCR failed",
+      title: "Text extraction is unavailable",
     });
     expect(JSON.stringify(state)).not.toContain("raw Google stack");
   });
@@ -224,6 +225,65 @@ describe("reviewer source flow", () => {
     expect(ready.ocrStatus).toBe("ready");
     expect(ready.ocrError).toBeNull();
     expect(getCurrentSourceText(ready)).toBe("Recovered text");
+  });
+
+  it("clears prior OCR text and blocks reviewer generation after an incomplete document", () => {
+    const ready = reviewerSourceReducer(
+      reviewerSourceReducer(initialReviewerSourceState, {
+        type: "pdf_selected",
+        pdf: pdf(),
+      }),
+      { type: "ocr_succeeded", text: "Previously complete text", pageCount: 2 },
+    );
+    const failed = reviewerSourceReducer(ready, {
+      type: "ocr_failed",
+      error: {
+        code: "document_extraction_incomplete",
+        message: "internal detail",
+        extraction: {
+          status: "incomplete",
+          expectedPageCount: 2,
+          processedPageCount: 1,
+          successfulPageCount: 1,
+          blankPageCount: 0,
+          failedPageCount: 0,
+          missingPageNumbers: [2],
+          duplicatePageNumbers: [],
+          outOfRangePageNumbers: [],
+          invalidPageNumbers: [],
+          affectedPageNumbers: [2],
+          failureCategories: ["missing_page"],
+        },
+      },
+    });
+
+    expect(failed.ocrStatus).toBe("failed");
+    expect(getCurrentSourceText(failed)).toBe("");
+    expect(isReviewerSourceReadyForGeneration(failed)).toBe(false);
+    expect(failed.ocrError).toMatchObject({
+      title: "Not every page could be read",
+      message: expect.stringContaining("Affected page: 2"),
+    });
+    expect(JSON.stringify(failed.ocrError)).not.toMatch(
+      /reviewer recovery|validation fallback/i,
+    );
+  });
+
+  it("allows reviewer generation only after complete OCR reaches ready state", () => {
+    const selected = reviewerSourceReducer(initialReviewerSourceState, {
+      type: "pdf_selected",
+      pdf: pdf(),
+    });
+    const uploading = reviewerSourceReducer(selected, { type: "ocr_started" });
+    const ready = reviewerSourceReducer(uploading, {
+      type: "ocr_succeeded",
+      text: "Complete fictional source",
+      pageCount: 1,
+    });
+
+    expect(isReviewerSourceReadyForGeneration(selected)).toBe(false);
+    expect(isReviewerSourceReadyForGeneration(uploading)).toBe(false);
+    expect(isReviewerSourceReadyForGeneration(ready)).toBe(true);
   });
 
   it("allows PDF retry to succeed after failure", () => {

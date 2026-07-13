@@ -22,6 +22,8 @@ const fakeResult: OcrResult = {
   pages: [
     {
       pageNumber: 1,
+      status: "text_extracted",
+      method: "ocr",
       text: "STUDY HABITS\nSet one clear goal before studying.",
       blocks: [
         {
@@ -154,7 +156,13 @@ describe("POST /api/ocr/extract", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ ok: true, data: fakeResult });
+    expect(body).toEqual({
+      ok: true,
+      data: {
+        ...fakeResult,
+        extraction: completeExtraction(1, 1),
+      },
+    });
     expect(fakeProvider.extract).toHaveBeenCalledWith({
       kind: "image",
       mimeType: "image/png",
@@ -187,7 +195,16 @@ describe("POST /api/ocr/extract", () => {
     const response = await POST(createRequest());
 
     expect(response.status).toBe(422);
-    await expectError(response, "ocr_empty_result");
+    const body = await expectError(response, "document_extraction_incomplete");
+    expect(body).toMatchObject({
+      error: {
+        extraction: {
+          status: "incomplete",
+          expectedPageCount: 1,
+          missingPageNumbers: [1],
+        },
+      },
+    });
   });
 
   it("maps provider failures safely", async () => {
@@ -229,7 +246,7 @@ describe("POST /api/ocr/extract", () => {
     );
 
     const response = await POST(createRequest());
-    const body = await expectError(response, "internal_error");
+    const body = await expectError(response, "document_extraction_failed");
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(body)).not.toContain("raw-provider-response");
@@ -268,6 +285,23 @@ function createRequest(
     headers,
     body: formData,
   });
+}
+
+function completeExtraction(expectedPageCount: number, successfulPageCount: number) {
+  return {
+    status: "complete",
+    expectedPageCount,
+    processedPageCount: expectedPageCount,
+    successfulPageCount,
+    blankPageCount: expectedPageCount - successfulPageCount,
+    failedPageCount: 0,
+    missingPageNumbers: [],
+    duplicatePageNumbers: [],
+    outOfRangePageNumbers: [],
+    invalidPageNumbers: [],
+    affectedPageNumbers: [],
+    failureCategories: [],
+  };
 }
 
 function toBlobPart(bytes: Uint8Array): BlobPart {

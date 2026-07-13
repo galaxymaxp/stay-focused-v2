@@ -27,6 +27,8 @@ const fakePdfResult: OcrResult = {
   pages: [
     {
       pageNumber: 1,
+      status: "text_extracted",
+      method: "ocr",
       text: "STUDY HABITS\nSet one clear goal before studying.",
       blocks: [
         {
@@ -272,6 +274,7 @@ describe("POST /api/ocr/extract-pdf", () => {
         ...fakePdfResult,
         pageCount: 1,
         processedPageCount: 1,
+        extraction: completeExtraction(1, 1),
       },
     });
     expect(fakeProvider.extract).toHaveBeenCalledWith({
@@ -288,8 +291,8 @@ describe("POST /api/ocr/extract-pdf", () => {
       ...fakePdfResult,
       text: "Page one\n\nPage two",
       pages: [
-        { pageNumber: 1, text: "Page one", blocks: [] },
-        { pageNumber: 2, text: "Page two", blocks: [] },
+        { pageNumber: 1, status: "text_extracted", method: "ocr", text: "Page one", blocks: [] },
+        { pageNumber: 2, status: "text_extracted", method: "ocr", text: "Page two", blocks: [] },
       ],
     };
     fakeProvider.extract.mockResolvedValueOnce(multiPageResult);
@@ -306,13 +309,122 @@ describe("POST /api/ocr/extract-pdf", () => {
     );
   });
 
+  it("accounts for every page in an accepted five-page PDF", async () => {
+    fakeProvider.extract.mockResolvedValueOnce(
+      resultForPages([5, 3, 1, 4, 2].map(textPage)),
+    );
+
+    const response = await POST(
+      await createRequest({ bytes: await createPdfBytes(OCR_MAX_PDF_PAGES) }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.extraction).toEqual(completeExtraction(5, 5));
+    expect(body.data.pages.map((page: { pageNumber: number }) => page.pageNumber)).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+    expect(body.data.text).toBe(
+      [1, 2, 3, 4, 5]
+        .map((pageNumber) => `Fictional page ${pageNumber}`)
+        .join("\n\n"),
+    );
+    expect(body.data.text).not.toMatch(/Page\s+\d+:/);
+    expect(fakeProvider.extract).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains a blank middle page and later page identity", async () => {
+    fakeProvider.extract.mockResolvedValueOnce(
+      resultForPages([textPage(1), blankPage(2), textPage(3)]),
+    );
+
+    const response = await POST(await createRequest({ bytes: await createPdfBytes(3) }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.extraction).toEqual(completeExtraction(3, 2));
+    expect(body.data.pages.map((page: { pageNumber: number; status: string }) => [
+      page.pageNumber,
+      page.status,
+    ])).toEqual([
+      [1, "text_extracted"],
+      [2, "blank"],
+      [3, "text_extracted"],
+    ]);
+  });
+
+  it.each([
+    ["missing final page", [textPage(1), textPage(2)], [3]],
+    ["duplicate page", [textPage(1), textPage(2), textPage(2), textPage(3)], [2]],
+    ["out-of-range page", [textPage(1), textPage(2), textPage(3), textPage(4)], [4]],
+    [
+      "failed middle page",
+      [textPage(1), failedPage(2), textPage(3)],
+      [2],
+    ],
+  ])("rejects an incomplete document with a %s", async (_label, pages, affected) => {
+    fakeProvider.extract.mockResolvedValueOnce(resultForPages(pages));
+
+    const response = await POST(await createRequest({ bytes: await createPdfBytes(3) }));
+    const body = await expectError(response, "document_extraction_incomplete") as {
+      error: { extraction: { affectedPageNumbers: number[]; status: string } };
+    };
+
+    expect(response.status).toBe(422);
+    expect(body.error.extraction.status).toBe("incomplete");
+    expect(body.error.extraction.affectedPageNumbers).toEqual(affected);
+    expect(JSON.stringify(body)).not.toContain("Fictional page");
+    expect(fakeProvider.extract).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a malformed page result without returning partial text", async () => {
+    fakeProvider.extract.mockResolvedValueOnce(
+      resultForPages([
+        textPage(1),
+        {
+          pageNumber: 2,
+          status: "text_extracted",
+          method: "ocr",
+          text: "",
+          blocks: [],
+        } as OcrResult["pages"][number],
+      ]),
+    );
+
+    const response = await POST(await createRequest({ bytes: await createPdfBytes(2) }));
+    const body = await expectError(response, "document_extraction_incomplete") as {
+      error: { extraction: { invalidPageNumbers: number[] } };
+    };
+
+    expect(response.status).toBe(422);
+    expect(body.error.extraction.invalidPageNumbers).toEqual([2]);
+    expect(JSON.stringify(body)).not.toContain("Fictional page 1");
+  });
+
+  it("rejects a fully blank document as unreadable", async () => {
+    fakeProvider.extract.mockResolvedValueOnce(
+      resultForPages([blankPage(1), blankPage(2)]),
+    );
+
+    const response = await POST(await createRequest({ bytes: await createPdfBytes(2) }));
+    const body = await expectError(response, "document_unreadable") as {
+      error: { extraction: { blankPageCount: number; status: string } };
+    };
+
+    expect(response.status).toBe(422);
+    expect(body.error.extraction).toMatchObject({
+      status: "failed",
+      blankPageCount: 2,
+    });
+  });
+
   it("preserves provider page order in the response", async () => {
     fakeProvider.extract.mockResolvedValueOnce({
       ...fakePdfResult,
       text: "First\n\nSecond",
       pages: [
-        { pageNumber: 1, text: "First", blocks: [] },
-        { pageNumber: 2, text: "Second", blocks: [] },
+        { pageNumber: 2, status: "text_extracted", method: "ocr", text: "Second", blocks: [] },
+        { pageNumber: 1, status: "text_extracted", method: "ocr", text: "First", blocks: [] },
       ],
     });
 
@@ -374,6 +486,64 @@ async function createRequest(
     headers,
     body: formData,
   });
+}
+
+function completeExtraction(expectedPageCount: number, successfulPageCount: number) {
+  return {
+    status: "complete",
+    expectedPageCount,
+    processedPageCount: expectedPageCount,
+    successfulPageCount,
+    blankPageCount: expectedPageCount - successfulPageCount,
+    failedPageCount: 0,
+    missingPageNumbers: [],
+    duplicatePageNumbers: [],
+    outOfRangePageNumbers: [],
+    invalidPageNumbers: [],
+    affectedPageNumbers: [],
+    failureCategories: [],
+  };
+}
+
+function resultForPages(pages: readonly OcrResult["pages"][number][]): OcrResult {
+  return {
+    text: "provider combined text is not trusted",
+    pages,
+    mimeType: "application/pdf",
+    provider: "fake-ocr",
+    warnings: [],
+  };
+}
+
+function textPage(pageNumber: number): OcrResult["pages"][number] {
+  return {
+    pageNumber,
+    status: "text_extracted",
+    method: "ocr",
+    text: `Fictional page ${pageNumber}`,
+    blocks: [],
+  };
+}
+
+function blankPage(pageNumber: number): OcrResult["pages"][number] {
+  return {
+    pageNumber,
+    status: "blank",
+    method: "blank",
+    text: "",
+    blocks: [],
+  };
+}
+
+function failedPage(pageNumber: number): OcrResult["pages"][number] {
+  return {
+    pageNumber,
+    status: "failed",
+    method: "ocr",
+    failureCategory: "provider_page_error",
+    text: "",
+    blocks: [],
+  };
 }
 
 async function createPdfBytes(pageCount: number): Promise<Uint8Array> {

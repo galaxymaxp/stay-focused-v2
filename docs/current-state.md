@@ -81,7 +81,8 @@ Phase 3D adds scanned-PDF ingestion as a validated synchronous small-batch MVP:
 Bearer-authenticated multipart PDF upload
 -> PDF signature, size, parseability, encryption, and 1-5 page validation
 -> Google Vision synchronous batchAnnotateFiles with inline PDF bytes
--> normalized page-ordered text
+-> strict verification of exactly one terminal result for every page
+-> normalized page-ordered text only when the document is complete
 -> editable extracted-text review
 -> existing reviewer generation route
 ```
@@ -90,6 +91,17 @@ PDF files stay server-bound, Google credentials remain server-only, Cloud
 Storage is not used, and PDFs over five pages are rejected instead of silently
 truncated. Live iPhone Expo Go validation has passed against the local Next.js
 API over LAN with server-only Google Cloud Vision PDF OCR.
+
+Product Recovery Phase R3 makes page completeness an enforced source boundary
+for manual and Canvas-backed OCR. `@stay-focused/ocr` now verifies the trusted
+expected page count, exact unique coverage of `1..N`, page range, terminal page
+status, explicit blank pages, failures, deterministic order, and source
+eligibility. Missing, duplicate, malformed, out-of-range, or failed pages
+return sanitized incomplete-document metadata with no assembled source;
+reviewer generation cannot start from that result. The five-page PDF limit is
+centralized and retained because the current inline synchronous Google Vision
+`files:annotate` method supports at most five pages per request. R3 is complete
+in `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`.
 
 Phase 4 adds user-owned reviewer persistence:
 
@@ -490,6 +502,10 @@ selected reviewer returning `current` and `ready_current`.
   retry, and clear-PDF handling.
 - Mocked PDF OCR web smoke with a fictional in-memory PDF fixture and real
   reviewer generation.
+- Product Recovery R3 strict full-document extraction with explicit
+  `text_extracted`/`blank`/`failed` page states, complete/incomplete/failed
+  document states, exact page coverage verification, sanitized diagnostics,
+  mobile stale-source clearing, and a hard reviewer-generation readiness gate.
 - Manual pasted text remains available as a separate source mode.
 - Supabase `reviewers` migration with timestamps, source metadata, reviewer
   JSON output, section count, and owner-scoped RLS policies.
@@ -578,6 +594,17 @@ selected reviewer returning `current` and `ready_current`.
 ## Current Verification Baselines
 
 Historical and latest verification include:
+
+- Product Recovery R3 verification: OCR typecheck/build/tests passed with
+  25/25 tests; engine typecheck/build/evals passed with 287/287; API
+  typecheck/lint/build/tests passed with 391/391; mobile typecheck/lint/tests
+  passed with 130/130; root typecheck and lint passed across 7/7 workspaces;
+  reviewer smoke-runner tests passed 51/51; mocked PDF OCR browser smoke passed
+  with reviewer HTTP 200. Protected real-Google OCR validation passed for a
+  single-page image, two-page PDF, five-page PDF, blank-middle PDF, and
+  controlled incomplete result. The five-page PDF processed and extracted
+  5/5 pages in one provider call and 1.591 seconds; coverage, grounding, and
+  leakage passed. The incomplete case made zero reviewer calls.
 
 - Phase 5B.3B final verification: Canvas package typecheck/build/tests passed
   with 33/33 tests; DB package typecheck passed; API typecheck/build/tests
@@ -984,9 +1011,13 @@ workflow. Product Recovery Phase R2 is complete in
 `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`: reviewer
 generation now repairs and recovers per section, validates deterministic
 extractive and emergency source-outline fallbacks, returns safe limited-quality
-metadata, and renders recovered output normally. The next task is Product
-Recovery Phase R3 - Full-document OCR with page completeness. Repeated PDF header/footer cleanup remains a separate
-deferred candidate.
+metadata, and renders recovered output normally. Product Recovery Phase R3 is
+complete in
+`docs/ai/product-recovery-r3-full-document-ocr-20260713.md`: every accepted OCR
+document now requires exact terminal page coverage before source assembly or
+reviewer generation. The next task is Product Recovery Phase R4 - Canvas
+usable-content resolution. Repeated PDF header/footer cleanup remains a
+separate deferred candidate.
 
 ## Known Risks
 
@@ -1004,9 +1035,13 @@ deferred candidate.
   PDFs has passed on a correctly configured local API. Future live OCR remains
   dependent on machine-specific server credential setup, LAN reachability, and
   device state.
-- Scanned-PDF support is implemented as a synchronous 1-5 page MVP. Visible
-  repeated headers and footers may still need manual removal before generation
-  until a later cleanup task adds automatic repeated header/footer detection.
+- Scanned-PDF support is a synchronous 1-5 page product boundary. The limit is
+  imposed by the current inline Google Vision `files:annotate` method and is
+  checked before provider work. Documents inside the limit require exact page
+  completeness; documents above it need a separately planned asynchronous
+  Cloud Storage architecture. Visible repeated headers and footers may still
+  need manual removal before generation until a later cleanup task adds
+  automatic repeated header/footer detection.
 - Reviewer persistence now has a live cross-user RLS validation baseline.
   Future persistence changes should preserve owner-scoped access, safe 404
   denial, and owner-only cleanup behavior.

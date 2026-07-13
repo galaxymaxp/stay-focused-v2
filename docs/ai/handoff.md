@@ -6,16 +6,19 @@ paths.
 
 ## Current Status
 
-- Product Recovery Phases R1 and R2 are complete in
-  `docs/ai/product-recovery-r1-v1-audit-20260713.md` and
-  `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`. R1 compared V1 as the
+- Product Recovery Phases R1, R2, and R3 are complete in
+  `docs/ai/product-recovery-r1-v1-audit-20260713.md`,
+  `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`, and
+  `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`. R1 compared V1 as the
   behavioral benchmark with V2 as the architecture benchmark. V2's
   authentication, RLS, encrypted Canvas credentials, protected APIs, private
   source snapshots, provenance, tests, strict parsers, and grade/reviewer
   separation should remain. R2 added bounded field-aware repair, validated
   per-section extractive fallback, emergency source-outline recovery, safe
-  quality metadata, and calm mobile fallback rendering. The next task is
-  Product Recovery Phase R3 - Full-document OCR with page completeness.
+  quality metadata, and calm mobile fallback rendering. R3 added exact page
+  coverage, explicit blank pages, sanitized completeness metadata, stale OCR
+  source clearing, and a hard reviewer-generation gate. The next task is
+  Product Recovery Phase R4 - Canvas usable-content resolution.
 - Baseline before this Phase 4 implementation:
   `0fdf1e4 docs: complete Phase 3D live PDF validation`.
 - Phase 4 implementation commit: the commit containing this handoff update.
@@ -291,6 +294,14 @@ Useful variable names confirmed in example files and code:
 
 ## Current Test Baselines
 
+- Product Recovery R3: OCR typecheck/build/tests 25/25; engine
+  typecheck/build/evals 287/287; API typecheck/lint/build/tests 391/391; mobile
+  typecheck/lint/tests 130/130; root typecheck/lint 7/7 workspaces; reviewer
+  smoke-runner tests 51/51; mocked PDF OCR browser smoke passed; protected
+  real-OCR validation passed for single-page image, two-page PDF, five-page
+  PDF, blank-middle PDF, and controlled incomplete input. Five-page extraction
+  was 5/5 in one call and 1.591 seconds; incomplete input made zero reviewer
+  calls.
 - Reviewer smoke-runner tests: 51 passed, 0 failed.
 - DB package typecheck: passed.
 - OCR package typecheck/build/tests: passed; 14 tests passed, 0 failed.
@@ -520,6 +531,10 @@ session-only smoke, controlled fictional edge validation, authorization
 regression checks, and privacy scans passed. The next roadmap step is Phase
 5E.6 physical iPhone Expo Go validation; Phase 5E is not complete until that
 device checklist passes.
+Product Recovery R3 is complete with exact OCR page completeness enforced for
+all accepted documents. Product Recovery R4 - Canvas usable-content resolution
+is the immediate product-recovery task. Phase 5E.6 remains in progress and is
+not marked complete by R3.
 Automatic repeated scanned-PDF header/footer detection remains a deferred
 candidate.
 
@@ -538,9 +553,12 @@ candidate.
   live OCR remains credential-, LAN-, and device-dependent. Credential paths
   are machine-specific and must not be documented or committed.
 - Scanned-PDF OCR is implemented and live-validated as a synchronous 1-5 page
-  MVP. Visible repeated headers and footers in scanned PDFs may be extracted as
-  source text and become reviewer sections until a later cleanup task adds
-  automatic repeated header/footer detection.
+  product boundary. Five is the inline Google Vision `files:annotate` limit,
+  is centralized in `@stay-focused/ocr`, and is checked before provider work.
+  Accepted documents require exact terminal coverage of every page. Larger
+  PDFs require a separately planned asynchronous Cloud Storage architecture.
+  Visible repeated headers and footers may still be extracted as source text
+  until a later cleanup task adds automatic repeated header/footer detection.
 - Reviewer persistence has a live cross-user RLS validation baseline. Future
   persistence changes should preserve owner-scoped access, safe 404 denial, and
   owner-only cleanup behavior.
@@ -818,6 +836,37 @@ Latest full verification through pipeline integration on 2026-06-15:
   root monorepo typecheck and build results.
 
 ## Session Log
+
+### 2026-07-13 Product Recovery R3 full-document OCR completeness
+
+- Started on `main` at
+  `a1ffef95cdc99dc9f0845d6dd2779b2969466f37`, synced 0/0 with origin. The
+  four declared unrelated dirty paths remained untouched and unstaged.
+- Audited manual image/PDF OCR, Canvas stored-file OCR, mobile reviewer handoff,
+  Google provider normalization, page-count and upload enforcement, and V1's
+  read-only page-rendering behavior.
+- Added one authoritative shared verifier for expected page count, exact unique
+  coverage, range, valid terminal states, explicit blank pages, deterministic
+  ordering, sanitized diagnostics, and assembled-source eligibility.
+- Provider, extraction service, API routes, Canvas preparation, mobile parsing,
+  source state, and reviewer start now all fail closed on incomplete OCR. A
+  failed retry cannot reuse stale OCR text.
+- Retained and centralized the five-page PDF limit because the current
+  synchronous inline Google Vision method permits at most five pages per call;
+  all over-limit rejection happens before the provider call.
+- Automated verification passed: OCR 25/25, engine 287/287, API 391/391,
+  mobile 130/130, reviewer smoke-runner 51/51, full typecheck/lint/build checks,
+  and mocked PDF OCR browser smoke with reviewer HTTP 200.
+- Protected fictional real-OCR validation passed for 1-page image, 2-page PDF,
+  5-page PDF, blank-middle PDF, and controlled incomplete input. The 5-page
+  case processed/extracted all 5 pages in one call and 1.591 seconds, with
+  reviewer coverage/grounding/leakage passing. The incomplete case made zero
+  reviewer calls.
+- No OCR text, document title, private Canvas content, provider body, provider
+  ID, upload, rendered page, credential, or local validation artifact was
+  printed or committed.
+- Full report:
+  `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`.
 
 ### 2026-07-06 Phase 5C.1 Canvas file inventory and bounded ingestion
 

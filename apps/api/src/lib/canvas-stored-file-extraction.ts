@@ -20,10 +20,12 @@ import {
   extractWithOcrProvider,
   validateImageOcrBytes,
   validatePdfOcrBytes,
+  type OcrProviderFailureCode,
 } from "@/lib/ocr/extraction-service";
 import {
   OCR_MAX_IMAGE_BYTES,
   OCR_MAX_PDF_BYTES,
+  OCR_MAX_PDF_PAGES,
 } from "@/lib/ocr/upload-policy";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
@@ -210,6 +212,14 @@ async function extractImage({
 
   const extraction = await extractWithOcrProvider(ocrProvider, validation.input);
   if (!extraction.ok) {
+    if (extraction.failure.code === "document_unreadable") {
+      return {
+        ok: false,
+        status: 422,
+        code: "canvas_source_image_ocr_empty",
+        message: "No readable text was detected in this Canvas image.",
+      };
+    }
     return mapOcrFailure(extraction.failure.code);
   }
 
@@ -263,7 +273,7 @@ async function extractPdf({
           ok: false,
           status: 422,
           code: "canvas_source_pdf_page_limit_exceeded",
-          message: "Canvas PDF OCR supports up to five pages per preview.",
+          message: `Canvas PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per preview.`,
         };
       case "file_too_large":
         return {
@@ -279,6 +289,14 @@ async function extractPdf({
 
   const extraction = await extractWithOcrProvider(ocrProvider, validation.input);
   if (!extraction.ok) {
+    if (extraction.failure.code === "document_unreadable") {
+      return {
+        ok: false,
+        status: 422,
+        code: "canvas_source_pdf_ocr_empty",
+        message: "No readable text was detected in this Canvas PDF.",
+      };
+    }
     return mapOcrFailure(extraction.failure.code);
   }
 
@@ -432,7 +450,7 @@ function fileEligibilityForKind(
 }
 
 function mapOcrFailure(
-  code: "ocr_not_configured" | "ocr_provider_failed" | "ocr_empty_result" | "internal_error",
+  code: OcrProviderFailureCode,
 ): Extract<CanvasStoredFileExtractionResult, { readonly ok: false }> {
   if (code === "ocr_not_configured") {
     return {
@@ -442,12 +460,20 @@ function mapOcrFailure(
       message: "OCR provider is not configured.",
     };
   }
-  if (code === "ocr_empty_result") {
+  if (code === "ocr_empty_result" || code === "document_unreadable") {
     return {
       ok: false,
       status: 422,
       code: "canvas_source_ocr_empty",
       message: "No readable text was detected in this Canvas file.",
+    };
+  }
+  if (code === "document_extraction_incomplete") {
+    return {
+      ok: false,
+      status: 422,
+      code: "canvas_source_ocr_failed",
+      message: "Not every page in this Canvas file could be read. Try preparing it again.",
     };
   }
   return {

@@ -79,9 +79,13 @@ function normalizePage(
     .filter((blockText) => blockText.length > 0)
     .join("\n\n");
   const normalizedPageText = normalizeOcrText(page.text ?? "");
-  const text = textFromBlocks || normalizedPageText;
+  const extractedText = textFromBlocks || normalizedPageText;
+  const status = page.status ?? (extractedText ? "text_extracted" : "blank");
+  const method = page.method ?? (status === "blank" ? "blank" : "ocr");
+  const text = status === "text_extracted" ? extractedText : "";
+  const normalizedBlocks = status === "text_extracted" ? blocks : [];
 
-  if (blocks.length === 0 && text.length > 0) {
+  if (normalizedBlocks.length === 0 && text.length > 0) {
     warnings.push({
       code: "missing_layout",
       message: "The OCR provider returned page text without block layout.",
@@ -91,8 +95,13 @@ function normalizePage(
 
   return {
     pageNumber,
+    status,
+    method,
     text,
-    blocks,
+    blocks: normalizedBlocks,
+    ...(page.failureCategory
+      ? { failureCategory: page.failureCategory }
+      : {}),
     ...(readPositiveNumber(page.width) !== undefined
       ? { width: readPositiveNumber(page.width) }
       : {}),

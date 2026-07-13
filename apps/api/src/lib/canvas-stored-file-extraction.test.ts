@@ -420,19 +420,33 @@ function createThrowingOcrProvider(error: Error): OcrProvider {
 }
 
 function ocrResult(input: OcrInput, text: string): OcrResult {
+  const normalizedText = text.trim() ? text : "";
+  const pageTexts = normalizedText.split("\n\n");
   const pages =
     input.kind === "pdf"
-      ? input.requestedPages.map((pageNumber) => ({
+      ? input.requestedPages.map((pageNumber, index) => ({
           blocks: [],
+          method: (pageTexts[index] ? "ocr" : "blank") as "ocr" | "blank",
           pageNumber,
-          text,
+          status: (pageTexts[index] ? "text_extracted" : "blank") as
+            | "text_extracted"
+            | "blank",
+          text: pageTexts[index] ?? "",
         }))
-      : [{ blocks: [], pageNumber: 1, text }];
+      : [{
+          blocks: [],
+          method: (normalizedText ? "ocr" : "blank") as "ocr" | "blank",
+          pageNumber: 1,
+          status: (normalizedText ? "text_extracted" : "blank") as
+            | "text_extracted"
+            | "blank",
+          text: normalizedText,
+        }];
   return {
     mimeType: input.mimeType,
     pages,
     provider: "fake-ocr",
-    text,
+    text: normalizedText,
     warnings: [],
   };
 }

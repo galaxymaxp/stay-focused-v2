@@ -46,6 +46,7 @@ import {
   getCurrentSourceText,
   getSourceCharacterCount,
   initialReviewerSourceState,
+  isReviewerSourceReadyForGeneration,
   reviewerSourceReducer,
   type ReviewerSourceState,
   type SourceFlowError,
@@ -126,6 +127,16 @@ export function ReviewerGenerateScreen({
 
     setValidationMessage(null);
     setGenerationError(null);
+
+    if (
+      (sourceState.mode === "image" || sourceState.mode === "pdf") &&
+      !isReviewerSourceReadyForGeneration(sourceState)
+    ) {
+      setValidationMessage(
+        "Finish reading the entire selected file successfully before generating a reviewer.",
+      );
+      return;
+    }
 
     if (!trimmedSourceText) {
       setValidationMessage(

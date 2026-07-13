@@ -1,3 +1,8 @@
+import {
+  OCR_MAX_PDF_PAGES,
+  type DocumentExtractionDiagnostics,
+} from "@stay-focused/ocr";
+
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
 
 const OCR_EXTRACT_PATH = "/api/ocr/extract";
@@ -6,6 +11,7 @@ const OCR_IMAGE_FORM_FIELD = "image";
 const OCR_PDF_FORM_FIELD = "pdf";
 export const OCR_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const OCR_MAX_PDF_BYTES = 10 * 1024 * 1024;
+export { OCR_MAX_PDF_PAGES };
 const MAX_ERROR_MESSAGE_CHARS = 300;
 
 export const SUPPORTED_OCR_IMAGE_MIME_TYPES = [
@@ -86,6 +92,9 @@ export type OcrClientErrorCode =
   | "ocr_not_configured"
   | "ocr_provider_failed"
   | "ocr_empty_result"
+  | "document_unreadable"
+  | "document_extraction_incomplete"
+  | "document_extraction_failed"
   | "network_error"
   | "request_cancelled"
   | "invalid_response"
@@ -96,6 +105,7 @@ export interface OcrClientError {
   readonly message: string;
   readonly status?: number;
   readonly apiCode?: string;
+  readonly extraction?: DocumentExtractionDiagnostics;
 }
 
 export interface OcrExtractData {
@@ -104,6 +114,7 @@ export interface OcrExtractData {
   readonly mimeType: string;
   readonly pageCount?: number;
   readonly processedPageCount?: number;
+  readonly extraction?: DocumentExtractionDiagnostics;
   readonly provider: string;
   readonly warnings: readonly unknown[];
 }
@@ -118,6 +129,7 @@ interface OcrExtractErrorResponse {
   readonly error: {
     readonly code: string;
     readonly message: string;
+    readonly extraction?: DocumentExtractionDiagnostics;
   };
 }
 
@@ -548,6 +560,17 @@ async function parseOcrResponse(
   }
 
   if (isOcrExtractSuccessResponse(parsed)) {
+    if (
+      sourceKind === "pdf" &&
+      (!parsed.data.extraction || parsed.data.extraction.status !== "complete")
+    ) {
+      return clientError(
+        "document_extraction_incomplete",
+        "Not every page could be verified. Retry, rescan the document, or choose another PDF.",
+        422,
+        parsed.data.extraction,
+      );
+    }
     if (parsed.data.text.trim().length === 0) {
       return clientError(
         sourceKind === "pdf" ? "no_text_detected" : "ocr_empty_result",
@@ -599,6 +622,9 @@ function apiError(
           sourceKind,
         ),
         status,
+        ...(parsed.error.extraction
+          ? { extraction: parsed.error.extraction }
+          : {}),
         ...(code === "unknown_error" ? { apiCode: parsed.error.code } : {}),
       },
     };
@@ -615,6 +641,7 @@ function clientError(
   code: OcrClientErrorCode,
   message: string,
   status?: number,
+  extraction?: DocumentExtractionDiagnostics,
 ): { readonly ok: false; readonly error: OcrClientError } {
   return {
     ok: false,
@@ -622,6 +649,7 @@ function clientError(
       code,
       message: sanitizeOcrDiagnosticText(message),
       ...(status !== undefined ? { status } : {}),
+      ...(extraction ? { extraction } : {}),
     },
   };
 }
@@ -643,6 +671,9 @@ function mapApiErrorCode(code: string): OcrClientErrorCode {
     case "ocr_not_configured":
     case "ocr_provider_failed":
     case "ocr_empty_result":
+    case "document_unreadable":
+    case "document_extraction_incomplete":
+    case "document_extraction_failed":
     case "internal_error":
       return code === "internal_error" ? "unknown_error" : code;
     default:
@@ -664,7 +695,9 @@ function statusToClientErrorCode(
     return sourceKind === "pdf" ? "unsupported_file_type" : "unsupported_media_type";
   }
   if (status === 422) {
-    return sourceKind === "pdf" ? "no_text_detected" : "ocr_empty_result";
+    return sourceKind === "pdf"
+      ? "document_extraction_incomplete"
+      : "ocr_empty_result";
   }
   if (status >= 500) {
     return "ocr_provider_failed";
@@ -705,7 +738,11 @@ function safeApiErrorMessage(
   sourceKind: "image" | "pdf",
 ): string {
   if (code === "ocr_provider_failed") {
-    return "OCR extraction failed on the server.";
+    return "Text extraction is temporarily unavailable. Try again in a moment.";
+  }
+
+  if (code === "document_extraction_failed") {
+    return "The document could not be read completely. Try again, rescan it, or choose another file.";
   }
 
   if (code === "ocr_not_configured") {
@@ -768,7 +805,9 @@ function isOcrExtractSuccessResponse(
     typeof value.data.mimeType === "string" &&
     typeof value.data.provider === "string" &&
     Array.isArray(value.data.pages) &&
-    Array.isArray(value.data.warnings)
+    Array.isArray(value.data.warnings) &&
+    (value.data.extraction === undefined ||
+      isDocumentExtractionDiagnostics(value.data.extraction))
   );
 }
 
@@ -781,12 +820,52 @@ function isOcrExtractErrorResponse(
 
   return (
     typeof value.error.code === "string" &&
-    typeof value.error.message === "string"
+    typeof value.error.message === "string" &&
+    (value.error.extraction === undefined ||
+      isDocumentExtractionDiagnostics(value.error.extraction))
   );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isDocumentExtractionDiagnostics(
+  value: unknown,
+): value is DocumentExtractionDiagnostics {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    (value.status === "complete" ||
+      value.status === "incomplete" ||
+      value.status === "failed") &&
+    isNonNegativeInteger(value.expectedPageCount) &&
+    isNonNegativeInteger(value.processedPageCount) &&
+    isNonNegativeInteger(value.successfulPageCount) &&
+    isNonNegativeInteger(value.blankPageCount) &&
+    isNonNegativeInteger(value.failedPageCount) &&
+    isIntegerArray(value.missingPageNumbers) &&
+    isIntegerArray(value.duplicatePageNumbers) &&
+    isIntegerArray(value.outOfRangePageNumbers) &&
+    isIntegerArray(value.invalidPageNumbers) &&
+    isIntegerArray(value.affectedPageNumbers) &&
+    Array.isArray(value.failureCategories) &&
+    value.failureCategories.every((entry) => typeof entry === "string")
+  );
+}
+
+function isIntegerArray(value: unknown): value is readonly number[] {
+  return Array.isArray(value) && value.every(isInteger);
+}
+
+function isInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isInteger(value) && value >= 0;
 }
 
 function looksLikeStackTrace(value: string): boolean {

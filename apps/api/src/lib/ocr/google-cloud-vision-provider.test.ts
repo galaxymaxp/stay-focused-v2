@@ -262,41 +262,56 @@ describe("GoogleCloudVisionOcrProvider", () => {
     const result = await provider.extract(createPdfInput([1, 2]));
 
     expect(result.pages).toHaveLength(2);
+    expect(result.pages[1]?.status).toBe("blank");
+    expect(result.pages[1]?.method).toBe("blank");
     expect(result.pages[1]?.text).toBe("");
     expect(result.text).toBe("Page one");
   });
 
-  it("throws a typed empty-result error for a PDF with no detected text", async () => {
+  it("retains a confirmed blank PDF page as an explicit terminal result", async () => {
     const provider = createPdfProvider(
       pdfResponse([{ fullTextAnnotation: { text: "", pages: [{ blocks: [] }] } }]),
     );
 
-    await expect(provider.extract(createPdfInput([1]))).rejects.toMatchObject({
-      code: "ocr_empty_result",
-      provider: "google-cloud-vision",
-    });
+    const result = await provider.extract(createPdfInput([1]));
+
+    expect(result.text).toBe("");
+    expect(result.pages).toEqual([
+      expect.objectContaining({
+        pageNumber: 1,
+        status: "blank",
+        method: "blank",
+        text: "",
+      }),
+    ]);
   });
 
-  it("wraps missing PDF page responses in a safe typed error", async () => {
+  it("leaves a missing PDF page absent for completeness verification", async () => {
     const provider = createPdfProvider(
       pdfResponse([pdfPageResponse("Only page", [paragraph("Only page", 10, 10)])]),
     );
 
-    await expect(provider.extract(createPdfInput([1, 2]))).rejects.toMatchObject({
-      code: "ocr_provider_failed",
-      message: "Google Cloud Vision OCR failed.",
-    });
+    const result = await provider.extract(createPdfInput([1, 2]));
+
+    expect(result.pages.map((page) => page.pageNumber)).toEqual([1]);
   });
 
-  it("wraps page-level PDF provider errors safely", async () => {
+  it("isolates page-level PDF provider errors as failed terminal results", async () => {
     const provider = createPdfProvider(
       pdfResponse([{ error: { message: "raw provider detail" } }]),
     );
 
-    await expect(provider.extract(createPdfInput([1]))).rejects.toMatchObject({
-      code: "ocr_provider_failed",
-      message: "Google Cloud Vision OCR failed.",
-    });
+    const result = await provider.extract(createPdfInput([1]));
+
+    expect(result.pages).toEqual([
+      expect.objectContaining({
+        pageNumber: 1,
+        status: "failed",
+        failureCategory: "provider_page_error",
+        text: "",
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("raw provider detail");
   });
 
   it("wraps malformed PDF provider responses safely", async () => {
