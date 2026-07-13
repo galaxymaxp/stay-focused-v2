@@ -970,8 +970,19 @@ automated baseline checks, protected API preflight, Expo Web protected smoke,
 session-only smoke, controlled fictional edge validation, authorization
 regression checks, and privacy scans passed with sanitized aggregate evidence.
 Physical iPhone Expo Go validation remains required before Phase 5E.6 and
-Phase 5E can be marked complete. Repeated PDF header/footer cleanup remains a
-separate deferred candidate.
+Phase 5E can be marked complete.
+
+Product Recovery Phase R1 is complete in
+`docs/ai/product-recovery-r1-v1-audit-20260713.md`. The audit used V1 as the
+behavioral benchmark and V2 as the architecture benchmark. It found that V2's
+security, authentication, encrypted Canvas storage, protected APIs, typed
+contracts, tests, provenance, and grade isolation should be preserved, but that
+V2 is currently over-constrained for practical student use. The highest-impact
+recovery areas are reviewer fallback reliability, full-document OCR with page
+completeness, broader Canvas usable-content resolution, and a simpler student
+workflow. The next task is Product Recovery Phase R2 - Reviewer reliability and
+fallback redesign. Repeated PDF header/footer cleanup remains a separate
+deferred candidate.
 
 ## Known Risks
 

@@ -1161,9 +1161,11 @@ MVP subphases:
 - Phase 5E.5 - Mobile assignment and grade experience (complete and locally validated)
 - Phase 5E.6 - Protected live validation and hardening (in progress)
 
-Roadmap result: Phase 5E.6 - in progress
+Roadmap result: Phase 5E.6 - in progress. Product Recovery Phase R1 is complete
+and documented in
+`docs/ai/product-recovery-r1-v1-audit-20260713.md`.
 
-Next: Phase 5E.6 - physical iPhone Expo Go validation
+Next: Product Recovery Phase R2 - Reviewer reliability and fallback redesign
 
 Exit criteria:
 
@@ -1173,6 +1175,42 @@ Exit criteria:
 - Phase 5E.1 through Phase 5E.5 are complete. Phase 5E.6 automated,
   protected API, and Expo Web validation passed; physical iPhone Expo Go
   validation remains before Phase 5E can be marked complete.
+
+## Product Recovery
+
+Status: In progress. Phase R1 is complete.
+
+Purpose: Restore practical student usefulness while preserving the stronger V2
+architecture. V1 is the behavioral benchmark; V2 is the security,
+maintainability, privacy, and mobile architecture benchmark.
+
+Phase R1 result:
+
+- Completed `docs/ai/product-recovery-r1-v1-audit-20260713.md`.
+- Located and inspected the V1 repository without modifying it.
+- Compared V1 and V2 reviewer generation, OCR, Canvas source resolution,
+  mobile workflow, security, and maintainability behavior.
+- Identified V2 safeguards that must remain: authentication, RLS, encrypted
+  Canvas credentials, server-only OCR/OpenAI credentials, protected Canvas APIs,
+  private source snapshots, provenance, strict parsers, grade/reviewer
+  separation, and privacy-preserving validation docs.
+- Identified product restrictions that are blocking usefulness: the five-page
+  OCR ceiling, incomplete page coverage handling, all-or-nothing reviewer
+  assembly, narrow Canvas source eligibility, ambiguous sync/capability copy,
+  and a workflow that exposes too many implementation gates to students.
+
+Recovery roadmap:
+
+- Phase R2 - Reviewer reliability and fallback redesign.
+- Phase R3 - Full-document OCR with page completeness.
+- Phase R4 - Canvas usable-content resolution.
+- Phase R5 - Simplified student workflow.
+- Phase R6 - Real-device product acceptance.
+
+Immediate next task: Phase R2 - Reviewer reliability and fallback redesign.
+
+Phase 5F remains pending until the reviewer, OCR, and Canvas usefulness
+regressions exposed during physical-device validation have a recovery path.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 

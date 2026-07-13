@@ -4,6 +4,15 @@ Last refreshed: 2026-07-13, Asia/Manila.
 
 ## Active Objective
 
+Product Recovery Phase R1 is complete in
+`docs/ai/product-recovery-r1-v1-audit-20260713.md`. The current priority is no
+longer Phase 5F. The V1/V2 audit found that V2 should preserve its stronger
+security, authentication, encrypted Canvas storage, protected APIs, strict
+parsers, provenance, tests, and grade/reviewer separation, but must recover
+practical student usefulness in reviewer generation, OCR page coverage, Canvas
+usable-content discovery, and the mobile workflow. The next objective is
+Product Recovery Phase R2 - Reviewer reliability and fallback redesign.
+
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
 Secure Canvas Connection and Capability Discovery is complete, live validated,
 and audit-hardened: direct server-side Canvas validation used one
@@ -1418,4 +1427,6 @@ automated baseline checks, protected API preflight, Expo Web protected smoke,
 session-only smoke, controlled fictional edge validation, authorization
 regression checks, and privacy scans passed. Physical iPhone Expo Go validation
 remains required before Phase 5E.6 and Phase 5E can be marked complete.
-The deferred header/footer cleanup task remains separate.
+Product Recovery Phase R1 is complete and the next objective is Product
+Recovery Phase R2 - Reviewer reliability and fallback redesign. The deferred
+header/footer cleanup task remains separate.
