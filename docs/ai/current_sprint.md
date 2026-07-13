@@ -2,6 +2,26 @@
 
 Last refreshed: 2026-07-13, Asia/Manila.
 
+## Completed Product Recovery R4 Scope
+
+- Added one reusable Canvas terminal resolver with `usable`, `empty`,
+  `unsupported`, `inaccessible`, and `failed` results.
+- Consolidated Page, Assignment, Announcement, and secure stored-file content
+  behind deterministic normalization and the exact R3 OCR verifier.
+- Removed source titles, filenames, type labels, and page markers from reviewer
+  source assembly.
+- Added a JWT-protected opaque-item resolution route with selected-course and
+  ownership enforcement and no user-controlled URL, host, PAT, or method.
+- Added preview fingerprints and a current-row server gate before reviewer
+  provider creation.
+- Added mobile abort/token/reducer protection against stale source reuse.
+- Passed Canvas 69/69, OCR 25/25, engine 287/287, API 426/426, mobile 138/138,
+  root typecheck/lint 7/7, reviewer smoke tests 51/51, PDF web smoke, R3
+  protected validation, and R4 protected validation.
+
+The active objective is Product Recovery Phase R5 — Canvas source-selection
+and reviewer UX recovery.
+
 ## Active Objective
 
 Product Recovery Phases R1, R2, and R3 are complete in

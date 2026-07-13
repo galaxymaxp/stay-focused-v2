@@ -90,7 +90,7 @@ describe("Canvas reviewer source normalization", () => {
     expect(normalizeCanvasHtmlToText("<script>onlyCode()</script>")).toBe("");
   });
 
-  it("assembles selected sources with deterministic visible boundaries only", () => {
+  it("assembles only usable content without metadata-derived padding", () => {
     const sourceText = assembleCanvasSourcePreview([
       source("page:11111111-1111-4111-8111-111111111111", "page", "Overview"),
       source(
@@ -100,9 +100,10 @@ describe("Canvas reviewer source normalization", () => {
       ),
     ]);
 
-    expect(sourceText).toContain("SOURCE 1 - PAGE - Overview");
-    expect(sourceText).toContain("SOURCE 2 - ASSIGNMENT - Practice");
-    expect(sourceText).toContain("Readable study text.");
+    expect(sourceText).toBe("Readable study text.\n\nReadable study text.");
+    expect(sourceText).not.toContain("SOURCE");
+    expect(sourceText).not.toContain("Overview");
+    expect(sourceText).not.toContain("Practice");
     expect(sourceText).not.toContain("11111111-1111-4111-8111-111111111111");
     expect(sourceText).not.toContain("22222222-2222-4222-8222-222222222222");
   });
@@ -326,9 +327,10 @@ describe("Canvas reviewer source service", () => {
       `assignment:${ASSIGNMENT_ID}`,
       `page:${PAGE_ID}`,
     ]);
-    expect(result.value.sourceText.indexOf("SOURCE 1 - ASSIGNMENT")).toBeLessThan(
-      result.value.sourceText.indexOf("SOURCE 2 - PAGE"),
+    expect(result.value.sourceText.indexOf("Readable assignment text.")).toBeLessThan(
+      result.value.sourceText.indexOf("Readable page text."),
     );
+    expect(result.value.sourceText).not.toContain("SOURCE");
     expect(result.value.sourceText).not.toContain(ASSIGNMENT_ID);
     expect(result.value.sourceText).not.toContain(PAGE_ID);
     expect(JSON.stringify(result.value)).not.toContain("source_manifest");
@@ -551,7 +553,8 @@ describe("Canvas reviewer source service", () => {
       sourceCount: 1,
       sources: [{ id: `page:${PAGE_ID}`, type: "page" }],
     });
-    expect(result.value.sourceText).toContain("SOURCE 1 - PAGE - Fictional Page");
+    expect(result.value.sourceText).not.toContain("SOURCE");
+    expect(result.value.sourceText).not.toContain("Fictional Page");
     expect(result.value.sourceText.indexOf("# Overview")).toBeLessThan(
       result.value.sourceText.indexOf("Readable page text."),
     );
@@ -693,12 +696,13 @@ describe("Canvas reviewer source service", () => {
         type: "announcement",
       }),
     ]);
-    expect(result.value.sourceText.indexOf("SOURCE 1 - PAGE")).toBeLessThan(
-      result.value.sourceText.indexOf("SOURCE 2 - PDF"),
+    expect(result.value.sourceText.indexOf("Readable page text.")).toBeLessThan(
+      result.value.sourceText.indexOf("PDF page 1 text."),
     );
-    expect(result.value.sourceText.indexOf("SOURCE 2 - PDF")).toBeLessThan(
-      result.value.sourceText.indexOf("SOURCE 3 - ANNOUNCEMENT"),
+    expect(result.value.sourceText.indexOf("PDF page 2 text.")).toBeLessThan(
+      result.value.sourceText.indexOf("Readable announcement text."),
     );
+    expect(result.value.sourceText).not.toContain("SOURCE");
     expect(result.value.sourceText).toContain("PDF page 1 text.\n\nPDF page 2 text.");
     expect(fake.storageCalls).toHaveLength(1);
     expect(provider.calls).toHaveLength(1);
@@ -717,7 +721,7 @@ describe("Canvas reviewer source service", () => {
         .digest("hex"),
       source_count: 3,
       suggested_title: "Fictional Biology - Canvas Reviewer",
-      normalization_version: "canvas-source-preview-v1",
+      normalization_version: "canvas-source-preview-v2",
     });
     const manifest = session.source_manifest as readonly FakeRecord[];
     expect(manifest.map((item) => item.ordinal)).toEqual([1, 2, 3]);
@@ -807,7 +811,9 @@ describe("Canvas reviewer source service", () => {
     const result = await previewCanvasReviewerSources({
       client: fake.client,
       courseId: COURSE_ID,
-      ocrProvider: createFakeOcrProvider("A".repeat(CANVAS_REVIEWER_MAX_SOURCE_CHARS + 1)),
+      ocrProvider: createFakeOcrProvider(
+        "Fact ".repeat(Math.ceil(CANVAS_REVIEWER_MAX_SOURCE_CHARS / 5) + 1),
+      ),
       sourceIds: [`file:${FILE_ID}`],
       userId: USER_ID,
     });
@@ -819,13 +825,13 @@ describe("Canvas reviewer source service", () => {
         allowedMaximum: CANVAS_REVIEWER_MAX_SOURCE_CHARS,
       },
     });
-    expect(JSON.stringify(result)).not.toContain("AAAAA");
+    expect(JSON.stringify(result)).not.toContain("Fact Fact Fact");
   });
 
   it("enforces the combined limit after file OCR assembly", async () => {
     const pageRows = Array.from({ length: 7 }, (_, index) =>
       pageRow({
-        bodyText: "P".repeat(11_500),
+        bodyText: "Paragraph ".repeat(1_278),
         id: pageId(index),
         title: `Fictional Page ${index + 1}`,
       }),
@@ -848,7 +854,7 @@ describe("Canvas reviewer source service", () => {
     const result = await previewCanvasReviewerSources({
       client: fake.client,
       courseId: COURSE_ID,
-      ocrProvider: createFakeOcrProvider("I".repeat(10_000)),
+      ocrProvider: createFakeOcrProvider("Image fact ".repeat(1_000)),
       sourceIds: [...pageRows.map((row) => `page:${row.id}`), `file:${FILE_ID}`],
       userId: USER_ID,
     });

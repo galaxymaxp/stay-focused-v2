@@ -6,6 +6,20 @@ paths.
 
 ## Current Status
 
+- Product Recovery R4 is complete. The authoritative Canvas usable-content
+  boundary classifies synchronized Page/Assignment/Announcement content,
+  protected stored Image/PDF OCR, and supported module links as `usable`,
+  `empty`, `unsupported`, `inaccessible`, or `failed`. Source labels, titles,
+  filenames, IDs, and page markers are no longer injected into reviewer text.
+  Preview fingerprints plus current selected-course/item/hash checks run before
+  Canvas reviewer provider creation, and mobile abort/token state prevents late
+  results from restoring stale content. Protected validation passed for a real
+  Page reviewer and real stored Image; non-usable fixtures made zero reviewer
+  calls. See
+  `docs/ai/product-recovery-r4-canvas-usable-content-resolution-20260713.md`.
+- Next task: Product Recovery Phase R5 — Canvas source-selection and reviewer
+  UX recovery.
+
 - Product Recovery Phases R1, R2, and R3 are complete in
   `docs/ai/product-recovery-r1-v1-audit-20260713.md`,
   `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`, and

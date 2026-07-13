@@ -11,7 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 
 export const CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION =
-  "canvas-source-preview-v1";
+  "canvas-source-preview-v2";
 export const CANVAS_HTML_VISIBLE_TEXT_PARSER_VERSION =
   "canvas-html-visible-text-v1";
 export const CANVAS_STORED_FILE_EXTRACTION_VERSION =
@@ -130,6 +130,42 @@ export function sha256Utf8Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
+export function createCanvasResolutionFingerprint({
+  manifest,
+  normalizationVersion = CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
+  selectedBlockManifest = [],
+}: {
+  readonly manifest: readonly CanvasSourceManifestItem[];
+  readonly normalizationVersion?: string;
+  readonly selectedBlockManifest?: readonly CanvasSelectedBlockManifestItem[];
+}): string {
+  const canonical = {
+    normalizationVersion,
+    sources: manifest.map((item) => ({
+      ordinal: item.ordinal,
+      sourceType: item.source_type,
+      sourceRowId: item.source_row_id,
+      connectionId: item.canvas_connection_id,
+      courseId: item.course_id,
+      canvasObjectId: item.canvas_source_object_id,
+      moduleId: item.module_id,
+      moduleItemId: item.module_item_id,
+      fileId: item.file_id,
+      normalizedContentSha256: item.normalized_content_sha256,
+      storedContentSha256: item.stored_content_sha256,
+      parserVersion: item.parser_version,
+      ocrVersion: item.ocr_version,
+    })),
+    selectedBlocks: selectedBlockManifest.map((item) => ({
+      ordinal: item.ordinal,
+      sourceOrdinal: item.source_ordinal,
+      blockOrdinal: item.block_ordinal,
+      blockSha256: item.block_sha256,
+    })),
+  };
+  return sha256Utf8Hex(JSON.stringify(canonical));
+}
+
 export async function createCanvasSourcePreviewSession({
   canvasConnectionId,
   client,
@@ -152,7 +188,12 @@ export async function createCanvasSourcePreviewSession({
   readonly sourceRelationshipManifest?: readonly CanvasSourceRelationshipManifestItem[];
   readonly suggestedTitle: string;
   readonly userId: string;
-}): Promise<SourceProvenanceResult<{ readonly previewSessionId: string }>> {
+}): Promise<
+  SourceProvenanceResult<{
+    readonly previewSessionId: string;
+    readonly resolutionFingerprint: string;
+  }>
+> {
   const createdAt = new Date();
   const expiresAt = new Date(
     createdAt.getTime() + CANVAS_PREVIEW_SESSION_TTL_HOURS * 60 * 60 * 1000,
@@ -188,7 +229,18 @@ export async function createCanvasSourcePreviewSession({
     return storageFailed("Preview provenance could not be stored.");
   }
 
-  return { ok: true, value: { previewSessionId: data.id } };
+  return {
+    ok: true,
+    value: {
+      previewSessionId: data.id,
+      resolutionFingerprint: createCanvasResolutionFingerprint({
+        manifest,
+        normalizationVersion:
+          normalizationVersion ?? CANVAS_SOURCE_PREVIEW_NORMALIZATION_VERSION,
+        selectedBlockManifest,
+      }),
+    },
+  };
 }
 
 export async function validateCanvasPreviewSessionForGeneration({

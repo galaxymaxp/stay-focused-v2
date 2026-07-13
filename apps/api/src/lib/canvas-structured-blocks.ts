@@ -220,13 +220,8 @@ export function assembleSelectedCanvasBlocks(
   }[],
 ): string {
   return sources
-    .map(({ blocks, displayOrdinal, source }) => {
-      const label = formatStructuredSourceLabel(source).toUpperCase();
-      const body = assembleSourceBlocks(blocks);
-      return [`SOURCE ${displayOrdinal} - ${label} - ${source.source_title}`, "", body]
-        .filter((part, index) => index < 2 || part.length > 0)
-        .join("\n");
-    })
+    .map(({ blocks }) => assembleSourceBlocks(blocks))
+    .filter((body) => body.length > 0)
     .join("\n\n");
 }
 
@@ -234,18 +229,8 @@ export function assembleSourceBlocks(
   blocks: readonly CanvasStructuredBlockManifestItem[],
 ): string {
   const lines: string[] = [];
-  let currentPage: number | null = null;
 
   for (const block of blocks) {
-    if (block.page_number !== null && block.page_number !== currentPage) {
-      if (lines.length > 0 && lines.at(-1) !== "") {
-        lines.push("");
-      }
-      lines.push(`[Page ${block.page_number}]`);
-      lines.push("");
-      currentPage = block.page_number;
-    }
-
     const text = formatBlockForPreview(block);
     if (!text) {
       continue;
@@ -657,30 +642,6 @@ function formatBlockForPreview(
       return ["```", block.block_text, "```"].join("\n");
     case "paragraph":
       return block.block_text;
-  }
-}
-
-function formatStructuredSourceLabel(
-  source: CanvasStructuredSourceForAssembly,
-): string {
-  if (source.source_type === "file") {
-    if (source.file_kind === "pdf") {
-      return "PDF";
-    }
-    if (source.file_kind === "image") {
-      return "Image";
-    }
-  }
-
-  switch (source.source_type) {
-    case "page":
-      return "Page";
-    case "assignment":
-      return "Assignment";
-    case "announcement":
-      return "Announcement";
-    case "file":
-      return "File";
   }
 }
 

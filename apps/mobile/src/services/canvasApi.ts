@@ -415,6 +415,7 @@ export interface CanvasReviewerSourceListPayload {
 
 export interface CanvasReviewerSourcePreviewPayload {
   readonly previewSessionId: string;
+  readonly resolutionFingerprint: string;
   readonly sourceText: string;
   readonly suggestedTitle: string;
   readonly sourceCount: number;
@@ -1619,6 +1620,7 @@ function parseCanvasReviewerSourcePreviewResponse(
         courseSync: parsed.courseSync,
         limits: parsed.limits,
         previewSessionId: parsed.previewSessionId,
+        resolutionFingerprint: parsed.resolutionFingerprint,
         ...(parsed.selectedBlockCount !== undefined
           ? { selectedBlockCount: parsed.selectedBlockCount }
           : {}),
@@ -2477,6 +2479,7 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
     hasOnlyKeys(value, [
       "ok",
       "previewSessionId",
+      "resolutionFingerprint",
       "sourceText",
       "suggestedTitle",
       "sourceCount",
@@ -2487,6 +2490,7 @@ function isCanvasReviewerSourcePreviewSuccessResponse(
       "limits",
     ]) &&
     typeof value.previewSessionId === "string" &&
+    typeof value.resolutionFingerprint === "string" &&
     typeof value.sourceText === "string" &&
     typeof value.suggestedTitle === "string" &&
     isNonNegativeInteger(value.sourceCount) &&

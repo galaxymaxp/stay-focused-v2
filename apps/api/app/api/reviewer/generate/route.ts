@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createCanvasServiceClient } from "@/lib/canvas-db";
+import { validateCanvasReviewerGenerationGate } from "@/lib/canvas-reviewer-generation-gate";
 import {
   REVIEWER_GENERATE_MAX_JSON_BODY_BYTES,
   REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS,
@@ -145,6 +146,26 @@ async function handlePost(
       );
     }
     previewSession = session.value;
+    if (!previewSession) {
+      return errorResponse(
+        409,
+        "canvas_resolution_stale",
+        "Canvas source resolution changed. Preview the selected sources again.",
+        request,
+      );
+    }
+    const gate = await validateCanvasReviewerGenerationGate({
+      client: provenanceClient,
+      courseId: validation.value.canvasCourseId as string,
+      itemIds: validation.value.canvasItemIds as readonly string[],
+      previewSession,
+      resolutionFingerprint:
+        validation.value.canvasResolutionFingerprint as string,
+      userId: user.id,
+    });
+    if (!gate.ok) {
+      return errorResponse(gate.status, gate.code, gate.message, request);
+    }
   }
 
   const provider = createProvider();
@@ -200,8 +221,9 @@ async function handlePost(
       request,
     );
   } catch (error) {
-    logReviewerGenerationError(requestId, error);
-    const mappedError = mapReviewerGenerationError(error);
+    const isCanvasGeneration = previewSession !== null;
+    logReviewerGenerationError(requestId, error, isCanvasGeneration);
+    const mappedError = mapReviewerGenerationError(error, isCanvasGeneration);
     return errorResponse(
       mappedError.status,
       mappedError.code,
@@ -289,6 +311,36 @@ function validateRequestBody(body: unknown): ValidationResult {
     );
   }
 
+  const canvasCourseId = body["canvasCourseId"];
+  const canvasItemIds = body["canvasItemIds"];
+  const canvasResolutionFingerprint = body["canvasResolutionFingerprint"];
+  const hasCanvasProvenance =
+    canvasPreviewSessionId !== undefined ||
+    canvasCourseId !== undefined ||
+    canvasItemIds !== undefined ||
+    canvasResolutionFingerprint !== undefined;
+  if (hasCanvasProvenance) {
+    if (
+      typeof canvasPreviewSessionId !== "string" ||
+      !isUuid(canvasPreviewSessionId.trim()) ||
+      typeof canvasCourseId !== "string" ||
+      !isUuid(canvasCourseId.trim()) ||
+      !Array.isArray(canvasItemIds) ||
+      canvasItemIds.length === 0 ||
+      canvasItemIds.length > 8 ||
+      canvasItemIds.some(
+        (item) => typeof item !== "string" || !isCanvasItemId(item.trim()),
+      ) ||
+      new Set(canvasItemIds).size !== canvasItemIds.length ||
+      typeof canvasResolutionFingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/i.test(canvasResolutionFingerprint.trim())
+    ) {
+      return invalidRequest(
+        "Canvas generation requires a valid preview session, course, item IDs, and resolution fingerprint.",
+      );
+    }
+  }
+
   const normalizedSourceTitle =
     typeof sourceTitle === "string" ? sourceTitle.trim() : "";
   const normalizedCanvasPreviewSessionId =
@@ -306,8 +358,35 @@ function validateRequestBody(body: unknown): ValidationResult {
       ...(normalizedCanvasPreviewSessionId !== undefined
         ? { canvasPreviewSessionId: normalizedCanvasPreviewSessionId }
         : {}),
+      ...(hasCanvasProvenance
+        ? {
+            canvasCourseId: (canvasCourseId as string).trim(),
+            canvasItemIds: (canvasItemIds as string[]).map((item) => item.trim()),
+            canvasResolutionFingerprint: (
+              canvasResolutionFingerprint as string
+            ).trim().toLowerCase(),
+          }
+        : {}),
     },
   };
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function isCanvasItemId(value: string): boolean {
+  const [type, rowId, extra] = value.split(":");
+  return (
+    extra === undefined &&
+    (type === "page" ||
+      type === "assignment" ||
+      type === "announcement" ||
+      type === "file") &&
+    isUuid(rowId ?? "")
+  );
 }
 
 function invalidRequest(message: string): ValidationResult {
@@ -409,14 +488,16 @@ function getAllowedCorsOrigin(origin: string | null): string | null {
   return null;
 }
 
-function mapReviewerGenerationError(error: unknown): {
+function mapReviewerGenerationError(error: unknown, suppressDiagnostic = false): {
   readonly status: 422 | 500;
   readonly code: string;
   readonly message: string;
   readonly diagnostic?: ReviewerGenerateErrorResponse["error"]["diagnostic"];
 } {
   if (isReviewerValidationFailure(error)) {
-    const diagnostic = createReviewerValidationDiagnostic(error);
+    const diagnostic = suppressDiagnostic
+      ? undefined
+      : createReviewerValidationDiagnostic(error);
     return {
       status: 422,
       code: REVIEWER_VALIDATION_FAILED_CODE,
@@ -535,11 +616,23 @@ function logReviewerGenerationEnd(
   });
 }
 
-function logReviewerGenerationError(requestId: string, error: unknown): void {
+function logReviewerGenerationError(
+  requestId: string,
+  error: unknown,
+  contentPrivate = false,
+): void {
   console.error("reviewer_generation.error", {
     requestId,
     route: REVIEWER_GENERATE_ROUTE,
-    ...getSafeErrorDetails(error),
+    ...(contentPrivate
+      ? {
+          errorName:
+            error instanceof Error
+              ? sanitizeDiagnosticText(error.name || "Error")
+              : "UnknownError",
+          privacy: "canvas_source_redacted",
+        }
+      : getSafeErrorDetails(error)),
   });
 }
 

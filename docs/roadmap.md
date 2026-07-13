@@ -2,6 +2,18 @@
 
 Last refreshed: 2026-07-13, Asia/Manila.
 
+## Product Recovery Phase R4 — Complete
+
+Canvas usable-content resolution is enforced across synchronized HTML,
+protected stored-file OCR, preview provenance, reviewer generation, and mobile
+stale-result handling. Empty, unsupported, inaccessible, failed, incomplete,
+and stale sources cannot call the reviewer provider. External URLs/tools remain
+unsupported and are never scraped or followed. No database migration was
+required.
+
+Immediate next task: Product Recovery Phase R5 — Canvas source-selection and
+reviewer UX recovery.
+
 ## Phase 1 - Foundation And Reviewer Engine
 
 Status: Complete

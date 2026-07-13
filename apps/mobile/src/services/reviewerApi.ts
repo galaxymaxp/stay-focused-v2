@@ -12,6 +12,9 @@ export interface GenerateReviewerInput {
   readonly sourceText: string;
   readonly sourceTitle?: string;
   readonly canvasPreviewSessionId?: string;
+  readonly canvasCourseId?: string;
+  readonly canvasItemIds?: readonly string[];
+  readonly canvasResolutionFingerprint?: string;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
 }
@@ -48,6 +51,9 @@ export type GenerateReviewerErrorCode =
   | "canvas_preview_session_expired"
   | "canvas_preview_session_not_found"
   | "canvas_preview_session_invalid"
+  | "invalid_canvas_resolution"
+  | "canvas_resolution_stale"
+  | "canvas_resolution_failed"
   | "source_snapshot_failed"
   | "source_snapshot_storage_failed"
   | "unknown_api_error";
@@ -104,10 +110,31 @@ export async function generateReviewer(
 
   const sourceTitle = input.sourceTitle?.trim();
   const canvasPreviewSessionId = input.canvasPreviewSessionId?.trim();
+  const canvasCourseId = input.canvasCourseId?.trim();
+  const canvasItemIds = input.canvasItemIds?.map((item) => item.trim());
+  const canvasResolutionFingerprint = input.canvasResolutionFingerprint?.trim();
+  if (
+    canvasPreviewSessionId &&
+    (!canvasCourseId ||
+      !canvasItemIds?.length ||
+      !canvasResolutionFingerprint)
+  ) {
+    return clientError(
+      "invalid_canvas_resolution",
+      "Canvas preview identity is incomplete. Preview the selected sources again.",
+    );
+  }
   const requestBody = JSON.stringify({
     sourceText,
     ...(sourceTitle ? { sourceTitle } : {}),
     ...(canvasPreviewSessionId ? { canvasPreviewSessionId } : {}),
+    ...(canvasPreviewSessionId
+      ? {
+          canvasCourseId,
+          canvasItemIds,
+          canvasResolutionFingerprint,
+        }
+      : {}),
   });
   const abortContext = createAbortContext(input.signal, timeoutMs);
   const startedAt = Date.now();
@@ -287,6 +314,8 @@ function mapApiErrorCode(code: string): GenerateReviewerErrorCode {
     case "canvas_preview_session_expired":
     case "canvas_preview_session_not_found":
     case "canvas_preview_session_invalid":
+    case "canvas_resolution_stale":
+    case "canvas_resolution_failed":
     case "source_snapshot_failed":
     case "source_snapshot_storage_failed":
       return code;

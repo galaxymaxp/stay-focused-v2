@@ -57,6 +57,13 @@ const preview = await requestJson(
 if (typeof preview.sourceText !== "string" || preview.sourceText.trim().length === 0) {
   throw new Error("Canvas preview did not contain readable text.");
 }
+if (
+  typeof preview.resolutionFingerprint !== "string" ||
+  !Array.isArray(preview.sources) ||
+  preview.sources.some((source) => typeof source?.id !== "string")
+) {
+  throw new Error("Canvas preview did not contain a current resolution identity.");
+}
 
 if (process.env.R2_PREFLIGHT_ONLY === "1") {
   console.log(JSON.stringify(await fallbackPreflight(preview.sourceText, preview.suggestedTitle)));
@@ -71,6 +78,9 @@ const reviewerResponse = await fetch(`${apiBaseUrl}/api/reviewer/generate`, {
     sourceText: preview.sourceText,
     sourceTitle: preview.suggestedTitle,
     canvasPreviewSessionId: preview.previewSessionId,
+    canvasCourseId: selected.courseId,
+    canvasItemIds: preview.sources.map((source) => source.id),
+    canvasResolutionFingerprint: preview.resolutionFingerprint,
   }),
 });
 const durationMs = Date.now() - startedAt;

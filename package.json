@@ -18,6 +18,7 @@
     "test:reviewer-web-smoke": "node --test scripts/reviewer-web-smoke.test.mjs",
     "validate:reviewer-canvas:r2": "node scripts/r2-canvas-live-validation.mjs",
     "validate:ocr:r3": "tsx scripts/r3-ocr-protected-validation.ts",
+    "validate:canvas:r4": "tsx scripts/r4-canvas-protected-validation.ts",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean"
   },

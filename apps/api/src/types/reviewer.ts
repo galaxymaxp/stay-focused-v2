@@ -4,6 +4,9 @@ export interface ReviewerGenerateRequest {
   readonly sourceText: string;
   readonly sourceTitle?: string;
   readonly canvasPreviewSessionId?: string;
+  readonly canvasCourseId?: string;
+  readonly canvasItemIds?: readonly string[];
+  readonly canvasResolutionFingerprint?: string;
 }
 
 export interface ReviewerGenerateSuccessResponse {

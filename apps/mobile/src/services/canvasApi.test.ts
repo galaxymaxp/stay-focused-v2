@@ -531,7 +531,8 @@ describe("Canvas mobile API client", () => {
       ok: true,
       data: {
         previewSessionId: "66666666-6666-4666-8666-666666666666",
-        sourceText: expect.stringContaining("SOURCE 2 - PDF - Fictional File"),
+        resolutionFingerprint: "a".repeat(64),
+        sourceText: expect.stringContaining("Extracted text."),
         suggestedTitle: "Fictional Course - Canvas Reviewer",
         sourceCount: 3,
         limits: {
@@ -1337,8 +1338,9 @@ function sourcePreviewResponse() {
   return {
     ok: true,
     previewSessionId: "66666666-6666-4666-8666-666666666666",
+    resolutionFingerprint: "a".repeat(64),
     sourceText:
-      "SOURCE 1 - PAGE - Fictional Page\n\nReadable text.\n\nSOURCE 2 - PDF - Fictional File\n\nExtracted text.\n\nSOURCE 3 - ANNOUNCEMENT - Fictional Announcement\n\nAnnouncement text.",
+      "Readable text.\n\nExtracted text.\n\nAnnouncement text.",
     suggestedTitle: "Fictional Course - Canvas Reviewer",
     sourceCount: 3,
     characterCount: 168,

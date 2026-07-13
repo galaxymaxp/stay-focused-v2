@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => {
     createCanvasServiceClient: vi.fn(),
     createServerOpenAIProvider: vi.fn(),
     createOrReuseReviewerSourceSnapshot: vi.fn(),
+    validateCanvasReviewerGenerationGate: vi.fn(),
     PipelineAssemblyError,
     runPipeline: vi.fn(),
     validateCanvasPreviewSessionForGeneration: vi.fn(),
@@ -52,6 +53,11 @@ vi.mock("@/lib/canvas-db", () => ({
   createCanvasServiceClient: mocks.createCanvasServiceClient,
 }));
 
+vi.mock("@/lib/canvas-reviewer-generation-gate", () => ({
+  validateCanvasReviewerGenerationGate:
+    mocks.validateCanvasReviewerGenerationGate,
+}));
+
 vi.mock("@/lib/reviewer-source-provenance", () => ({
   createOrReuseReviewerSourceSnapshot:
     mocks.createOrReuseReviewerSourceSnapshot,
@@ -66,6 +72,11 @@ vi.mock("@/providers", () => ({
 const { OPTIONS, POST } = await import("./route");
 
 const fakeProvider = { name: "fake-provider" };
+const canvasGenerationBinding = {
+  canvasCourseId: "55555555-5555-4555-8555-555555555555",
+  canvasItemIds: ["page:44444444-4444-4444-8444-444444444444"],
+  canvasResolutionFingerprint: "a".repeat(64),
+} as const;
 const fakeReviewer = {
   id: "reviewer-1",
   title: "Mock Reviewer",
@@ -106,6 +117,7 @@ describe("POST /api/reviewer/generate", () => {
       ok: true,
       value: { row: previewSessionRow() },
     });
+    mocks.validateCanvasReviewerGenerationGate.mockResolvedValue({ ok: true });
     mocks.createOrReuseReviewerSourceSnapshot.mockResolvedValue({
       ok: true,
       value: { sourceSnapshotId: "77777777-7777-4777-8777-777777777777" },
@@ -351,13 +363,14 @@ describe("POST /api/reviewer/generate", () => {
       createRequest({
         body: {
           sourceText: "Readable notes",
+          ...canvasGenerationBinding,
           canvasPreviewSessionId: "not-a-uuid",
         },
       }),
     );
 
     expect(response.status).toBe(400);
-    await expectError(response, "canvas_preview_session_invalid");
+    await expectError(response, "invalid_request");
     expect(mocks.createServerOpenAIProvider).not.toHaveBeenCalled();
     expect(mocks.runPipeline).not.toHaveBeenCalled();
   });
@@ -374,6 +387,7 @@ describe("POST /api/reviewer/generate", () => {
       createRequest({
         body: {
           sourceText: "Readable notes",
+          ...canvasGenerationBinding,
           canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
         },
       }),
@@ -385,6 +399,45 @@ describe("POST /api/reviewer/generate", () => {
     expect(mocks.runPipeline).not.toHaveBeenCalled();
   });
 
+  it("rejects incomplete Canvas resolution identity before auth or provider work", async () => {
+    const response = await POST(
+      createRequest({
+        body: {
+          sourceText: "Readable notes",
+          canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expectError(response, "invalid_request");
+    expect(mocks.verifyBearerToken).not.toHaveBeenCalled();
+    expect(mocks.createServerOpenAIProvider).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale Canvas resolution before provider creation", async () => {
+    mocks.validateCanvasReviewerGenerationGate.mockResolvedValue({
+      ok: false,
+      status: 409,
+      code: "canvas_resolution_stale",
+      message: "Canvas source resolution changed. Preview the selected sources again.",
+    });
+    const response = await POST(
+      createRequest({
+        body: {
+          sourceText: "Readable notes",
+          ...canvasGenerationBinding,
+          canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expectError(response, "canvas_resolution_stale");
+    expect(mocks.createServerOpenAIProvider).not.toHaveBeenCalled();
+    expect(mocks.runPipeline).not.toHaveBeenCalled();
+  });
+
   it("creates no source snapshot when reviewer generation fails", async () => {
     mocks.runPipeline.mockRejectedValue(new Error("engine stack trace"));
 
@@ -392,6 +445,7 @@ describe("POST /api/reviewer/generate", () => {
       createRequest({
         body: {
           sourceText: "Readable notes",
+          ...canvasGenerationBinding,
           canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
         },
       }),
@@ -408,6 +462,7 @@ describe("POST /api/reviewer/generate", () => {
         body: {
           sourceText: "Edited Canvas preview text.",
           sourceTitle: "Canvas Notes",
+          ...canvasGenerationBinding,
           canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
         },
       }),
@@ -438,6 +493,7 @@ describe("POST /api/reviewer/generate", () => {
         body: {
           sourceText: "Edited Canvas preview text.",
           sourceTitle: "Canvas Notes",
+          ...canvasGenerationBinding,
           canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666",
         },
       }),

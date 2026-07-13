@@ -2,6 +2,26 @@
 
 Last refreshed: 2026-07-13, Asia/Manila.
 
+## Product Recovery R4 — Canvas Usable-Content Resolution
+
+R4 is complete. Canvas Page, Assignment, Announcement, stored Image/PDF, and
+supported module-link resolution now pass through one typed terminal boundary:
+`usable`, `empty`, `unsupported`, `inaccessible`, or `failed`. Reviewer source
+contains only normalized instructional content; source titles, filenames,
+module/item labels, IDs, and artificial page/source markers remain separate
+provenance. Stored files reuse the secure ingestion/extraction path and exact
+R3 completeness verifier without a second download or OCR implementation.
+
+Protected Canvas reviewer generation now requires a preview session, course,
+exact ordered item IDs, and deterministic resolution fingerprint. The server
+rechecks selection, ownership/course boundaries, current synchronized HTML
+hashes, and stored-file hash/readiness before creating a provider. Mobile uses
+abort controllers and monotonic request tokens to clear or ignore stale source.
+R4 protected validation passed for a real Page reviewer and real stored Image;
+controlled unsupported, inaccessible, and incomplete sources made zero
+reviewer calls. Full details are in
+`docs/ai/product-recovery-r4-canvas-usable-content-resolution-20260713.md`.
+
 ## Repository Baseline
 
 - Branch: `main`

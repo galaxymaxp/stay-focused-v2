@@ -1,5 +1,12 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -39,6 +46,12 @@ import {
   type SavedReviewerSummary,
 } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
+import {
+  canvasResolutionReducer,
+  createCanvasResolutionState,
+  createCanvasSelectionKey,
+  isCanvasGenerationCurrent,
+} from "./canvasResolutionState";
 
 const SOURCE_TEXT_HEIGHT = 260;
 
@@ -68,8 +81,13 @@ export function CanvasSourceReviewerScreen({
   const [selectedBlockIds, setSelectedBlockIds] = useState<readonly string[]>([]);
   const [preview, setPreview] =
     useState<CanvasReviewerSourcePreviewPayload | null>(null);
-  const [sourceText, setSourceText] = useState("");
-  const [sourceTitle, setSourceTitle] = useState("");
+  const [resolution, dispatchResolution] = useReducer(
+    canvasResolutionReducer,
+    undefined,
+    createCanvasResolutionState,
+  );
+  const sourceText = resolution.sourceText;
+  const sourceTitle = resolution.sourceTitle;
   const [reviewer, setReviewer] = useState<ReviewerOutput | null>(null);
   const [sourceSnapshotId, setSourceSnapshotId] = useState<string | null>(null);
   const [saveTitle, setSaveTitle] = useState("");
@@ -86,6 +104,11 @@ export function CanvasSourceReviewerScreen({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const structureAbortRef = useRef<AbortController | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
+  const structureTokenRef = useRef(0);
+  const resolutionTokenRef = useRef(0);
 
   const selectedIdsInPreviewOrder = useMemo(
     () =>
@@ -116,6 +139,19 @@ export function CanvasSourceReviewerScreen({
     [sourceList?.sources],
   );
 
+  const clearResolvedContent = useCallback((sourceIds: readonly string[] = []) => {
+    previewAbortRef.current?.abort();
+    generationAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    generationAbortRef.current = null;
+    resolutionTokenRef.current += 1;
+    setPreview(null);
+    dispatchResolution({
+      type: "selection_changed",
+      selectionKey: createCanvasSelectionKey(sourceIds),
+    });
+  }, []);
+
   const loadSources = useCallback(async () => {
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
@@ -123,7 +159,6 @@ export function CanvasSourceReviewerScreen({
       setIsLoadingSources(false);
       return;
     }
-
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -132,7 +167,7 @@ export function CanvasSourceReviewerScreen({
     setError(null);
     setStructure(null);
     setSelectedBlockIds([]);
-    setPreview(null);
+    clearResolvedContent();
     setReviewer(null);
     setSourceSnapshotId(null);
     setSavedReviewer(null);
@@ -163,13 +198,20 @@ export function CanvasSourceReviewerScreen({
         setIsLoadingSources(false);
       }
     }
-  }, [courseId, session?.accessToken]);
+  }, [clearResolvedContent, courseId, session?.accessToken]);
 
   useEffect(() => {
     void loadSources();
     return () => {
       abortControllerRef.current?.abort();
+      structureAbortRef.current?.abort();
+      previewAbortRef.current?.abort();
+      generationAbortRef.current?.abort();
       abortControllerRef.current = null;
+      structureAbortRef.current = null;
+      previewAbortRef.current = null;
+      generationAbortRef.current = null;
+      dispatchResolution({ type: "cleared" });
     };
   }, [loadSources]);
 
@@ -178,15 +220,19 @@ export function CanvasSourceReviewerScreen({
       return;
     }
     setError(null);
+    structureAbortRef.current?.abort();
+    structureTokenRef.current += 1;
     setStructure(null);
     setSelectedBlockIds([]);
-    setPreview(null);
+    clearResolvedContent();
     setReviewer(null);
     setSourceSnapshotId(null);
     setSavedReviewer(null);
     setSelectedSourceIds((current) => {
       if (current.includes(source.id)) {
-        return current.filter((sourceId) => sourceId !== source.id);
+        const next = current.filter((sourceId) => sourceId !== source.id);
+        clearResolvedContent(next);
+        return next;
       }
       if (
         source.type === "file" &&
@@ -209,7 +255,9 @@ export function CanvasSourceReviewerScreen({
         });
         return current;
       }
-      return [...current, source.id];
+      const next = [...current, source.id];
+      clearResolvedContent(next);
+      return next;
     });
   };
 
@@ -261,11 +309,16 @@ export function CanvasSourceReviewerScreen({
       return;
     }
 
+    structureAbortRef.current?.abort();
+    const abortController = new AbortController();
+    structureAbortRef.current = abortController;
+    const requestToken = structureTokenRef.current + 1;
+    structureTokenRef.current = requestToken;
     setIsStructuring(true);
     setError(null);
     setStructure(null);
     setSelectedBlockIds([]);
-    setPreview(null);
+    clearResolvedContent(selectedIdsInPreviewOrder);
     setReviewer(null);
     setSourceSnapshotId(null);
     setSavedReviewer(null);
@@ -274,21 +327,29 @@ export function CanvasSourceReviewerScreen({
       const result = await structureCanvasReviewerSources({
         ...context.value,
         courseId,
+        signal: abortController.signal,
         sourceIds: selectedIdsInPreviewOrder,
       });
+
+      if (structureTokenRef.current !== requestToken) return;
 
       if (result.ok) {
         setStructure(result.data);
         setSelectedBlockIds(defaultSelectedBlockIds(result.data));
-        setSourceText("");
-        setSourceTitle("");
+        dispatchResolution({
+          type: "selection_changed",
+          selectionKey: createCanvasSelectionKey(selectedIdsInPreviewOrder),
+        });
         setSourceSnapshotId(null);
         setSaveTitle("");
       } else {
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
-      setIsStructuring(false);
+      if (structureTokenRef.current === requestToken) {
+        structureAbortRef.current = null;
+        setIsStructuring(false);
+      }
     }
   };
 
@@ -296,9 +357,7 @@ export function CanvasSourceReviewerScreen({
     updater: (current: readonly string[]) => readonly string[],
   ) => {
     setSelectedBlockIds((current) => updater(current));
-    setPreview(null);
-    setSourceText("");
-    setSourceTitle("");
+    clearResolvedContent(selectedIdsInPreviewOrder);
     setReviewer(null);
     setSourceSnapshotId(null);
     setSavedReviewer(null);
@@ -377,9 +436,15 @@ export function CanvasSourceReviewerScreen({
       return;
     }
 
+    clearResolvedContent(selectedIdsInPreviewOrder);
+    const abortController = new AbortController();
+    previewAbortRef.current = abortController;
+    const requestToken = resolutionTokenRef.current + 1;
+    resolutionTokenRef.current = requestToken;
+    const selectionKey = createCanvasSelectionKey(selectedIdsInPreviewOrder);
+    dispatchResolution({ type: "started", requestToken, selectionKey });
     setIsPreviewing(true);
     setError(null);
-    setPreview(null);
     setReviewer(null);
     setSourceSnapshotId(null);
     setSavedReviewer(null);
@@ -389,20 +454,42 @@ export function CanvasSourceReviewerScreen({
         ...context.value,
         courseId,
         selectedBlockIds,
+        signal: abortController.signal,
         structureSessionId: structure.structureSessionId,
       });
 
+      if (resolutionTokenRef.current !== requestToken) return;
+
       if (result.ok) {
         setPreview(result.data);
-        setSourceText(result.data.sourceText);
-        setSourceTitle(result.data.suggestedTitle);
+        dispatchResolution({
+          type: "resolved",
+          requestToken,
+          selectionKey,
+          preview: {
+            previewSessionId: result.data.previewSessionId,
+            resolutionFingerprint: result.data.resolutionFingerprint,
+            sourceIds: result.data.sources.map((source) => source.id),
+          },
+          sourceText: result.data.sourceText,
+          sourceTitle: result.data.suggestedTitle,
+        });
         setSourceSnapshotId(null);
         setSaveTitle(result.data.suggestedTitle);
       } else {
+        dispatchResolution({
+          type: "terminal",
+          requestToken,
+          selectionKey,
+          status: "failed",
+        });
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
-      setIsPreviewing(false);
+      if (resolutionTokenRef.current === requestToken) {
+        previewAbortRef.current = null;
+        setIsPreviewing(false);
+      }
     }
   };
 
@@ -410,6 +497,16 @@ export function CanvasSourceReviewerScreen({
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
       setError(context.error);
+      return;
+    }
+    if (
+      !preview ||
+      !isCanvasGenerationCurrent(resolution, selectedIdsInPreviewOrder)
+    ) {
+      setError({
+        title: "Preview changed",
+        message: "Preview the current Canvas selection again before generating.",
+      });
       return;
     }
 
@@ -431,6 +528,10 @@ export function CanvasSourceReviewerScreen({
       return;
     }
 
+    generationAbortRef.current?.abort();
+    const abortController = new AbortController();
+    generationAbortRef.current = abortController;
+    const requestToken = resolutionTokenRef.current;
     setIsGenerating(true);
     setError(null);
     setReviewer(null);
@@ -442,8 +543,14 @@ export function CanvasSourceReviewerScreen({
         ...context.value,
         sourceText: trimmedSourceText,
         ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
-        canvasPreviewSessionId: preview?.previewSessionId,
+        canvasPreviewSessionId: preview.previewSessionId,
+        canvasCourseId: courseId,
+        canvasItemIds: preview.sources.map((source) => source.id),
+        canvasResolutionFingerprint: preview.resolutionFingerprint,
+        signal: abortController.signal,
       });
+
+      if (resolutionTokenRef.current !== requestToken) return;
 
       if (result.ok) {
         setReviewer(result.reviewer);
@@ -453,7 +560,10 @@ export function CanvasSourceReviewerScreen({
         setError(formatGenerateError(result.error));
       }
     } finally {
-      setIsGenerating(false);
+      if (resolutionTokenRef.current === requestToken) {
+        generationAbortRef.current = null;
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -550,7 +660,7 @@ export function CanvasSourceReviewerScreen({
             <TextField
               label="Source title"
               onChangeText={(value) => {
-                setSourceTitle(value);
+                dispatchResolution({ type: "edited", sourceTitle: value });
                 setError(null);
                 setReviewer(null);
                 setSourceSnapshotId(null);
@@ -565,7 +675,7 @@ export function CanvasSourceReviewerScreen({
               label="Source text"
               multiline
               onChangeText={(value) => {
-                setSourceText(value);
+                dispatchResolution({ type: "edited", sourceText: value });
                 setError(null);
                 setReviewer(null);
                 setSourceSnapshotId(null);
@@ -580,9 +690,7 @@ export function CanvasSourceReviewerScreen({
               <Button
                 disabled={isGenerating}
                 onPress={() => {
-                  setPreview(null);
-                  setSourceText("");
-                  setSourceTitle("");
+                  clearResolvedContent(selectedIdsInPreviewOrder);
                   setReviewer(null);
                   setSourceSnapshotId(null);
                   setSavedReviewer(null);
@@ -653,7 +761,7 @@ export function CanvasSourceReviewerScreen({
                 onPress={() => {
                   setStructure(null);
                   setSelectedBlockIds([]);
-                  setPreview(null);
+                  clearResolvedContent(selectedIdsInPreviewOrder);
                   setReviewer(null);
                   setSourceSnapshotId(null);
                   setSavedReviewer(null);

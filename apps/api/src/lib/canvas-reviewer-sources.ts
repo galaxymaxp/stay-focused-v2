@@ -18,11 +18,6 @@ import type {
 } from "@stay-focused/db";
 import type { OcrProvider } from "@stay-focused/ocr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  parseFragment,
-  type DefaultTreeAdapterMap,
-} from "parse5";
-
 import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
 import {
   CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST,
@@ -33,6 +28,7 @@ import {
   classifyStoredCanvasFileKind,
   extractPreparedCanvasFileText,
   isPreparedCanvasFileReadyForOcr,
+  type CanvasStoredFileExtractionResult,
   type CanvasStoredFileKind,
 } from "@/lib/canvas-stored-file-extraction";
 import {
@@ -57,6 +53,14 @@ import {
   sanitizeCanvasPreviewText,
   sanitizeCanvasTitleText,
 } from "@/lib/canvas-source-safety";
+import {
+  isMeaningfulCanvasContent,
+  normalizeCanvasHtmlToText as normalizeCanvasHtmlToTextAuthoritative,
+} from "@/lib/canvas-content-normalization";
+import {
+  resolveCanvasUsableContent,
+  type CanvasUsableContentMethod,
+} from "@/lib/canvas-usable-content";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import { OCR_MAX_IMAGE_BYTES, OCR_MAX_PDF_BYTES } from "@/lib/ocr/upload-policy";
 import { REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS } from "@/lib/reviewer-generation-limits";
@@ -105,10 +109,6 @@ const SYNC_STATE_COLUMNS =
   "id,user_id,canvas_connection_id,canvas_course_id,course_id,snapshot_fingerprint,fingerprint_version,last_checked_at,last_changed_at,last_successful_sync_at,consecutive_failure_count,last_failure_code,created_at,updated_at";
 const COURSE_RESULT_COLUMNS =
   "id,sync_run_id,user_id,canvas_connection_id,course_fingerprint,status,failure_code,failed_operation,failure_category,http_status_class,retryable,retry_count,duration_ms,created_at,updated_at";
-
-type HtmlNode = DefaultTreeAdapterMap["node"];
-type HtmlElement = DefaultTreeAdapterMap["element"];
-type HtmlTextNode = DefaultTreeAdapterMap["textNode"];
 
 export type CanvasReviewerSourceType =
   | "page"
@@ -169,6 +169,7 @@ export interface CanvasReviewerSourceList {
 
 export interface CanvasReviewerSourcePreview {
   readonly previewSessionId: string;
+  readonly resolutionFingerprint: string;
   readonly sourceText: string;
   readonly suggestedTitle: string;
   readonly sourceCount: number;
@@ -550,6 +551,7 @@ export async function previewCanvasReviewerSources({
       },
       limits: getCanvasReviewerSourceLimits(),
       previewSessionId: previewSession.value.previewSessionId,
+      resolutionFingerprint: previewSession.value.resolutionFingerprint,
       sourceCount: previewSources.length,
       sources: previewSources.map((source) => ({
         id: source.descriptor.id,
@@ -987,6 +989,7 @@ export async function previewSelectiveCanvasReviewerSources({
       },
       limits: getCanvasReviewerSourceLimits(),
       previewSessionId: previewSession.value.previewSessionId,
+      resolutionFingerprint: previewSession.value.resolutionFingerprint,
       selectedBlockCount: orderedBlocks.length,
       sourceCount: selectedSources.length,
       sources: selectedSources.map((source) => ({
@@ -1133,43 +1136,16 @@ export async function prepareCanvasReviewerSources({
 }
 
 export function normalizeCanvasHtmlToText(html: string | null): string {
-  if (!html?.trim()) {
-    return "";
-  }
-
-  const fragment = parseFragment(html);
-  const writer = createTextWriter();
-  walkHtmlChildren(fragment.childNodes, writer, { orderedListStack: [] });
-  return sanitizeCanvasPreviewText(writer.toString());
+  return normalizeCanvasHtmlToTextAuthoritative(html);
 }
 
 export function assembleCanvasSourcePreview(
   sources: readonly PreviewSourceRecord[],
 ): string {
   return sources
-    .map((source, index) => {
-      const sourceNumber = index + 1;
-      const label = formatPreviewSourceLabel(source).toUpperCase();
-      return [
-        `SOURCE ${sourceNumber} - ${label} - ${source.descriptor.title}`,
-        "",
-        source.text,
-      ].join("\n");
-    })
+    .map((source) => sanitizeCanvasPreviewText(source.text))
+    .filter(isMeaningfulCanvasContent)
     .join("\n\n");
-}
-
-function formatPreviewSourceLabel(source: PreviewSourceRecord): string {
-  if (source.descriptor.type === "file") {
-    const kind = source.fileMetadata?.fileKind ?? source.descriptor.file?.kind;
-    if (kind === "pdf") {
-      return "PDF";
-    }
-    if (kind === "image") {
-      return "Image";
-    }
-  }
-  return formatSourceType(source.descriptor.type);
 }
 
 export function buildSuggestedCanvasReviewerTitle(courseName: string): string {
@@ -1221,7 +1197,7 @@ function createCourseSyncSummary({
   };
 }
 
-async function loadStoredSelectedCanvasCourse({
+export async function loadStoredSelectedCanvasCourse({
   client,
   courseId,
   userId,
@@ -1436,12 +1412,40 @@ async function loadPreviewSourceRecords({
     return storageFailure("Canvas source preview could not be loaded.");
   }
 
-  const normalized = [
-    ...pages.value.map((row) => mapPagePreviewSource(row, course)),
-    ...assignments.value.map((row) => mapAssignmentPreviewSource(row, course)),
-    ...announcements.value.map((row) =>
-      mapAnnouncementPreviewSource(row, course),
+  const directSources = await Promise.all([
+    ...pages.value.map((row) =>
+      resolveHtmlPreviewSource({
+        connectionId: connection.id,
+        courseId: course.id,
+        html: row.body_html,
+        method: "synchronized_page_html",
+        record: mapPagePreviewSource(row, course),
+        userId,
+      }),
     ),
+    ...assignments.value.map((row) =>
+      resolveHtmlPreviewSource({
+        connectionId: connection.id,
+        courseId: course.id,
+        html: row.description_html,
+        method: "synchronized_assignment_html",
+        record: mapAssignmentPreviewSource(row, course),
+        userId,
+      }),
+    ),
+    ...announcements.value.map((row) =>
+      resolveHtmlPreviewSource({
+        connectionId: connection.id,
+        courseId: course.id,
+        html: row.message_html,
+        method: "synchronized_announcement_html",
+        record: mapAnnouncementPreviewSource(row, course),
+        userId,
+      }),
+    ),
+  ]);
+  const normalized = [
+    ...directSources,
     ...files.value.map(mapFileSource),
   ];
   const loadedIds = new Set(normalized.map((source) => source.descriptor.id));
@@ -1583,7 +1587,15 @@ async function loadStructuredSourceRecords({
 
   for (const row of pages.value) {
     const source = mapPagePreviewSource(row, course);
-    if (!source.text || !source.provenance) {
+    const resolvedText = await resolveHtmlPreviewSource({
+      connectionId: connection.id,
+      courseId: course.id,
+      html: row.body_html,
+      method: "synchronized_page_html",
+      record: source,
+      userId,
+    });
+    if (!resolvedText.text || !resolvedText.provenance) {
       records.push(unavailableStructuredRecord(mapPageSource(row).descriptor));
       continue;
     }
@@ -1594,9 +1606,9 @@ async function loadStructuredSourceRecords({
           parserVersion: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
           sourceOrdinal,
         }),
-      descriptor: source.descriptor,
+      descriptor: resolvedText.descriptor,
       provenance: {
-        ...source.provenance,
+        ...resolvedText.provenance,
         parser_version: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
       },
     });
@@ -1604,7 +1616,15 @@ async function loadStructuredSourceRecords({
 
   for (const row of assignments.value) {
     const source = mapAssignmentPreviewSource(row, course);
-    if (!source.text || !source.provenance) {
+    const resolvedText = await resolveHtmlPreviewSource({
+      connectionId: connection.id,
+      courseId: course.id,
+      html: row.description_html,
+      method: "synchronized_assignment_html",
+      record: source,
+      userId,
+    });
+    if (!resolvedText.text || !resolvedText.provenance) {
       records.push(unavailableStructuredRecord(mapAssignmentSource(row).descriptor));
       continue;
     }
@@ -1615,9 +1635,9 @@ async function loadStructuredSourceRecords({
           parserVersion: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
           sourceOrdinal,
         }),
-      descriptor: source.descriptor,
+      descriptor: resolvedText.descriptor,
       provenance: {
-        ...source.provenance,
+        ...resolvedText.provenance,
         parser_version: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
       },
     });
@@ -1625,7 +1645,15 @@ async function loadStructuredSourceRecords({
 
   for (const row of announcements.value) {
     const source = mapAnnouncementPreviewSource(row, course);
-    if (!source.text || !source.provenance) {
+    const resolvedText = await resolveHtmlPreviewSource({
+      connectionId: connection.id,
+      courseId: course.id,
+      html: row.message_html,
+      method: "synchronized_announcement_html",
+      record: source,
+      userId,
+    });
+    if (!resolvedText.text || !resolvedText.provenance) {
       records.push(unavailableStructuredRecord(mapAnnouncementSource(row).descriptor));
       continue;
     }
@@ -1636,9 +1664,9 @@ async function loadStructuredSourceRecords({
           parserVersion: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
           sourceOrdinal,
         }),
-      descriptor: source.descriptor,
+      descriptor: resolvedText.descriptor,
       provenance: {
-        ...source.provenance,
+        ...resolvedText.provenance,
         parser_version: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
       },
     });
@@ -1742,10 +1770,10 @@ async function extractFileStructuredRecord({
     return provider;
   }
 
-  const extraction = await extractPreparedCanvasFileText({
+  const extraction = await resolveStoredFileForReviewer({
     client,
-    connectionId: connection.id,
-    courseId: course.id,
+    connection,
+    course,
     fileRow: file,
     ocrProvider: provider.value,
     userId,
@@ -1809,10 +1837,10 @@ async function extractFilePreviewRecord({
     return provider;
   }
 
-  const extraction = await extractPreparedCanvasFileText({
+  const extraction = await resolveStoredFileForReviewer({
     client,
-    connectionId: connection.id,
-    courseId: course.id,
+    connection,
+    course,
     fileRow: file,
     ocrProvider: provider.value,
     userId,
@@ -1839,6 +1867,114 @@ async function extractFilePreviewRecord({
       }),
       text: extraction.value.text,
     },
+  };
+}
+
+async function resolveStoredFileForReviewer({
+  client,
+  connection,
+  course,
+  fileRow,
+  ocrProvider,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connection: CanvasConnectionRow;
+  readonly course: CanvasCourseRow;
+  readonly fileRow: CanvasFileRow;
+  readonly ocrProvider: OcrProvider;
+  readonly userId: string;
+}): Promise<CanvasStoredFileExtractionResult> {
+  const holder: { extraction?: CanvasStoredFileExtractionResult } = {};
+  const fileKind = classifyStoredCanvasFileKind(fileRow);
+  const resolution = await resolveCanvasUsableContent({
+    accessible: fileRow.availability_status === "available",
+    connectionId: fileRow.canvas_connection_id,
+    courseId: fileRow.course_id,
+    expectedConnectionId: connection.id,
+    expectedCourseId: course.id,
+    expectedUserId: userId,
+    extractFile: async () => {
+      const extraction = await extractPreparedCanvasFileText({
+        client,
+        connectionId: connection.id,
+        courseId: course.id,
+        fileRow,
+        ocrProvider,
+        userId,
+      });
+      holder.extraction = extraction;
+      if (!extraction.ok) {
+        const code = extraction.code;
+        return {
+          status:
+            code === "canvas_source_image_ocr_empty" ||
+            code === "canvas_source_pdf_ocr_empty"
+              ? "empty"
+              : code === "canvas_source_not_found"
+                ? "inaccessible"
+                : code === "canvas_source_unsupported_file_type" ||
+                    code === "canvas_source_file_preparation_required" ||
+                    code === "canvas_source_preview_too_large"
+                  ? "unsupported"
+                  : "failed",
+        };
+      }
+      return {
+        status: "usable",
+        text: extraction.value.text,
+        evidence: {
+          fileKind: extraction.value.fileKind,
+          ...(typeof extraction.value.pageCount === "number"
+            ? { pageCount: extraction.value.pageCount }
+            : {}),
+        },
+      };
+    },
+    method: fileKind === "image" ? "stored_image_ocr" : "stored_pdf_ocr",
+    provenance: {
+      resourceId: fileRow.id,
+      canvasObjectId: fileRow.canvas_file_id,
+      ...(fileRow.current_sha256
+        ? { contentSha256: fileRow.current_sha256 }
+        : {}),
+    },
+    sourceId: formatSourceId("file", fileRow.id),
+    sourceKind: "file",
+    userId: fileRow.user_id,
+  });
+
+  const extraction = holder.extraction;
+  if (extraction && !extraction.ok) {
+    return extraction;
+  }
+  if (!extraction || !extraction.ok) {
+    return {
+      ok: false,
+      status: resolution.status === "inaccessible" ? 404 : 422,
+      code:
+        resolution.status === "inaccessible"
+          ? "canvas_source_not_found"
+          : fileKind === "image"
+            ? "canvas_source_image_ocr_empty"
+            : "canvas_source_pdf_ocr_empty",
+      message: "The prepared Canvas file does not contain usable text.",
+    };
+  }
+  if (resolution.status !== "usable" || !resolution.sourceText) {
+    return {
+      ok: false,
+      status: 422,
+      code:
+        fileKind === "image"
+          ? "canvas_source_image_ocr_empty"
+          : "canvas_source_pdf_ocr_empty",
+      message: "The prepared Canvas file does not contain usable text.",
+    };
+  }
+  return {
+    ok: true,
+    value: { ...extraction.value, text: resolution.sourceText },
   };
 }
 
@@ -1883,18 +2019,82 @@ function fileUnavailablePreviewResult(
   };
 }
 
+async function resolveHtmlPreviewSource({
+  connectionId,
+  courseId,
+  html,
+  method,
+  record,
+  userId,
+}: {
+  readonly connectionId: string;
+  readonly courseId: string;
+  readonly html: string | null;
+  readonly method: Extract<
+    CanvasUsableContentMethod,
+    | "synchronized_page_html"
+    | "synchronized_assignment_html"
+    | "synchronized_announcement_html"
+  >;
+  readonly record: NormalizedSourceRecord;
+  readonly userId: string;
+}): Promise<NormalizedSourceRecord> {
+  if (record.descriptor.type === "file") {
+    return { descriptor: record.descriptor, text: null };
+  }
+  const resolution = await resolveCanvasUsableContent({
+    accessible: true,
+    connectionId,
+    courseId,
+    expectedConnectionId: connectionId,
+    expectedCourseId: courseId,
+    expectedUserId: userId,
+    html,
+    method,
+    provenance: {
+      ...(record.provenance?.source_row_id
+        ? { resourceId: record.provenance.source_row_id }
+        : {}),
+      ...(record.provenance?.canvas_source_object_id
+        ? { canvasObjectId: record.provenance.canvas_source_object_id }
+        : {}),
+    },
+    sourceId: record.descriptor.id,
+    sourceKind: record.descriptor.type,
+    userId,
+  });
+  if (
+    resolution.status !== "usable" ||
+    !resolution.sourceText ||
+    !record.provenance
+  ) {
+    return { descriptor: record.descriptor, text: null };
+  }
+  return {
+    descriptor: record.descriptor,
+    provenance: {
+      ...record.provenance,
+      normalized_content_sha256:
+        resolution.contentFingerprint ??
+        record.provenance.normalized_content_sha256,
+    },
+    text: resolution.sourceText,
+  };
+}
+
 function mapPageSource(row: CanvasPageRow): NormalizedSourceRecord {
   const text = normalizeCanvasHtmlToText(row.body_html);
+  const isAvailable = isMeaningfulCanvasContent(text);
   return {
     descriptor: {
-      availability: text.length > 0 ? "available" : "unavailable",
-      estimatedCharacters: text.length > 0 ? text.length : null,
+      availability: isAvailable ? "available" : "unavailable",
+      estimatedCharacters: isAvailable ? text.length : null,
       file: null,
       id: formatSourceId("page", row.id),
       title: sanitizeCanvasTitleText(row.title) || "Untitled Page",
       type: "page",
       unavailableReason:
-        text.length > 0 ? null : "This Page does not have readable body text.",
+        isAvailable ? null : "This Page does not have readable body text.",
       updatedAt: row.canvas_updated_at ?? row.last_synced_at ?? row.updated_at,
     },
     text: text.length > 0 ? text : null,
@@ -1926,16 +2126,17 @@ function mapPagePreviewSource(
 
 function mapAssignmentSource(row: CanvasAssignmentRow): NormalizedSourceRecord {
   const text = normalizeCanvasHtmlToText(row.description_html);
+  const isAvailable = isMeaningfulCanvasContent(text);
   return {
     descriptor: {
-      availability: text.length > 0 ? "available" : "unavailable",
-      estimatedCharacters: text.length > 0 ? text.length : null,
+      availability: isAvailable ? "available" : "unavailable",
+      estimatedCharacters: isAvailable ? text.length : null,
       file: null,
       id: formatSourceId("assignment", row.id),
       title: sanitizeCanvasTitleText(row.name) || "Untitled Assignment",
       type: "assignment",
       unavailableReason:
-        text.length > 0
+        isAvailable
           ? null
           : "This assignment does not have readable description text.",
       updatedAt: row.canvas_updated_at ?? row.last_synced_at ?? row.updated_at,
@@ -1969,16 +2170,17 @@ function mapAssignmentPreviewSource(
 
 function mapAnnouncementSource(row: CanvasAnnouncementRow): NormalizedSourceRecord {
   const text = normalizeCanvasHtmlToText(row.message_html);
+  const isAvailable = isMeaningfulCanvasContent(text);
   return {
     descriptor: {
-      availability: text.length > 0 ? "available" : "unavailable",
-      estimatedCharacters: text.length > 0 ? text.length : null,
+      availability: isAvailable ? "available" : "unavailable",
+      estimatedCharacters: isAvailable ? text.length : null,
       file: null,
       id: formatSourceId("announcement", row.id),
       title: sanitizeCanvasTitleText(row.title) || "Untitled Announcement",
       type: "announcement",
       unavailableReason:
-        text.length > 0
+        isAvailable
           ? null
           : "This announcement does not have readable message text.",
       updatedAt: row.posted_at ?? row.last_synced_at ?? row.updated_at,
@@ -3545,140 +3747,6 @@ function collectFailureCategories({
   return [...new Set(categories)].sort(compareAsciiCaseInsensitive);
 }
 
-function walkHtmlChildren(
-  nodes: readonly HtmlNode[],
-  writer: TextWriter,
-  context: HtmlWalkContext,
-): void {
-  for (const node of nodes) {
-    walkHtmlNode(node, writer, context);
-  }
-}
-
-interface HtmlWalkContext {
-  readonly orderedListStack: readonly number[];
-}
-
-function walkHtmlNode(
-  node: HtmlNode,
-  writer: TextWriter,
-  context: HtmlWalkContext,
-): void {
-  if (isTextNode(node)) {
-    writer.text(node.value);
-    return;
-  }
-
-  if (!isElementNode(node) || shouldSkipElement(node)) {
-    return;
-  }
-
-  const tag = node.tagName.toLowerCase();
-  if (tag === "br") {
-    writer.lineBreak();
-    return;
-  }
-
-  if (tag === "li") {
-    const itemNumber = context.orderedListStack.at(-1);
-    writer.blockBreak();
-    writer.text(itemNumber === undefined ? "- " : `${itemNumber}. `);
-    walkHtmlChildren(node.childNodes, writer, context);
-    writer.lineBreak();
-    return;
-  }
-
-  if (tag === "ol") {
-    writer.blockBreak();
-    let listIndex = 0;
-    node.childNodes.forEach((child) => {
-      if (isElementNode(child) && child.tagName.toLowerCase() === "li") {
-        listIndex += 1;
-      }
-      walkHtmlNode(child, writer, {
-        orderedListStack: [...context.orderedListStack, listIndex],
-      });
-    });
-    writer.blockBreak();
-    return;
-  }
-
-  if (tag === "ul") {
-    writer.blockBreak();
-    walkHtmlChildren(node.childNodes, writer, context);
-    writer.blockBreak();
-    return;
-  }
-
-  if (tag === "tr") {
-    writer.blockBreak();
-    walkHtmlChildren(node.childNodes, writer, context);
-    writer.lineBreak();
-    return;
-  }
-
-  if (tag === "td" || tag === "th") {
-    walkHtmlChildren(node.childNodes, writer, context);
-    writer.text(" | ");
-    return;
-  }
-
-  if (isBlockTag(tag)) {
-    writer.blockBreak();
-    walkHtmlChildren(node.childNodes, writer, context);
-    writer.blockBreak();
-    return;
-  }
-
-  walkHtmlChildren(node.childNodes, writer, context);
-}
-
-interface TextWriter {
-  readonly blockBreak: () => void;
-  readonly lineBreak: () => void;
-  readonly text: (value: string) => void;
-  readonly toString: () => string;
-}
-
-function createTextWriter(): TextWriter {
-  const parts: string[] = [];
-
-  function appendBreak(count: 1 | 2): void {
-    const current = parts.join("");
-    const trimmedEnd = current.replace(/[ \t]+$/g, "");
-    parts.length = 0;
-    parts.push(trimmedEnd);
-    const existingBreaks = /\n*$/.exec(trimmedEnd)?.[0].length ?? 0;
-    const needed = Math.max(0, count - existingBreaks);
-    if (needed > 0 && trimmedEnd.length > 0) {
-      parts.push("\n".repeat(needed));
-    }
-  }
-
-  return {
-    blockBreak: () => appendBreak(2),
-    lineBreak: () => appendBreak(1),
-    text: (value: string) => {
-      const normalized = value.replace(/\s+/g, " ");
-      if (!normalized.trim()) {
-        return;
-      }
-      const current = parts.join("");
-      const needsSpace =
-        current.length > 0 &&
-        !/[\s(]$/.test(current) &&
-        !/^[,.;:!?)]/.test(normalized);
-      parts.push(`${needsSpace ? " " : ""}${normalized.trim()}`);
-    },
-    toString: () =>
-      parts
-        .join("")
-        .replace(/[ \t]+\n/g, "\n")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim(),
-  };
-}
-
 function truncateAtWordBoundary(value: string, maximum: number): string {
   if (value.length <= maximum) {
     return value;
@@ -3689,96 +3757,6 @@ function truncateAtWordBoundary(value: string, maximum: number): string {
     return truncated.slice(0, lastSpace).trimEnd();
   }
   return truncated;
-}
-
-function shouldSkipElement(node: HtmlElement): boolean {
-  const tag = node.tagName.toLowerCase();
-  if (
-    tag === "script" ||
-    tag === "style" ||
-    tag === "form" ||
-    tag === "input" ||
-    tag === "button" ||
-    tag === "select" ||
-    tag === "textarea" ||
-    tag === "iframe" ||
-    tag === "object" ||
-    tag === "embed" ||
-    tag === "svg" ||
-    tag === "canvas"
-  ) {
-    return true;
-  }
-
-  const hidden = getAttribute(node, "hidden");
-  const ariaHidden = getAttribute(node, "aria-hidden");
-  const style = (getAttribute(node, "style")?.toLowerCase() ?? "").replace(
-    /\s+/g,
-    "",
-  );
-  return (
-    hidden !== null ||
-    ariaHidden === "true" ||
-    style.includes("display:none") ||
-    style.includes("visibility:hidden")
-  );
-}
-
-function getAttribute(node: HtmlElement, name: string): string | null {
-  const attribute = node.attrs.find(
-    (entry) => entry.name.toLowerCase() === name.toLowerCase(),
-  );
-  return attribute?.value ?? null;
-}
-
-function isBlockTag(tag: string): boolean {
-  return (
-    tag === "address" ||
-    tag === "article" ||
-    tag === "aside" ||
-    tag === "blockquote" ||
-    tag === "div" ||
-    tag === "dl" ||
-    tag === "fieldset" ||
-    tag === "figcaption" ||
-    tag === "figure" ||
-    tag === "footer" ||
-    tag === "h1" ||
-    tag === "h2" ||
-    tag === "h3" ||
-    tag === "h4" ||
-    tag === "h5" ||
-    tag === "h6" ||
-    tag === "header" ||
-    tag === "hr" ||
-    tag === "main" ||
-    tag === "nav" ||
-    tag === "p" ||
-    tag === "pre" ||
-    tag === "section" ||
-    tag === "table"
-  );
-}
-
-function isTextNode(node: HtmlNode): node is HtmlTextNode {
-  return node.nodeName === "#text" && "value" in node;
-}
-
-function isElementNode(node: HtmlNode): node is HtmlElement {
-  return "tagName" in node && Array.isArray(node.childNodes);
-}
-
-function formatSourceType(type: CanvasReviewerSourceType): string {
-  switch (type) {
-    case "page":
-      return "Page";
-    case "assignment":
-      return "Assignment";
-    case "announcement":
-      return "Announcement";
-    case "file":
-      return "File";
-  }
 }
 
 function normalizeListLimit(limit: number | undefined): number {

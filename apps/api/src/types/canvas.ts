@@ -398,6 +398,7 @@ export interface CanvasReviewerSourceListResponse {
 export interface CanvasReviewerSourcePreviewResponse {
   readonly ok: true;
   readonly previewSessionId: string;
+  readonly resolutionFingerprint: string;
   readonly sourceText: string;
   readonly suggestedTitle: string;
   readonly sourceCount: number;
@@ -424,6 +425,26 @@ export interface CanvasReviewerSourcePreviewResponse {
     readonly existingReviewerRequestLimit: number;
     readonly suggestedTitleLimit: number;
   };
+}
+
+export interface CanvasUsableContentResolutionResponse {
+  readonly ok: true;
+  readonly status: "usable" | "empty" | "unsupported" | "inaccessible" | "failed";
+  readonly sourceKind: "page" | "assignment" | "announcement" | "file" | "module_item";
+  readonly method:
+    | "synchronized_page_html"
+    | "synchronized_assignment_html"
+    | "synchronized_announcement_html"
+    | "stored_image_ocr"
+    | "stored_pdf_ocr"
+    | "module_reference";
+  readonly sourceText?: string;
+  readonly contentFingerprint?: string;
+  readonly safeFailureCategory?:
+    | "content_empty"
+    | "source_unsupported"
+    | "source_inaccessible"
+    | "resolution_failed";
 }
 
 export type CanvasStructuredBlockKind =
@@ -607,6 +628,7 @@ export type CanvasApiResponse =
   | CanvasReviewerSourceListResponse
   | CanvasSourceStructureResponse
   | CanvasReviewerSourcePreviewResponse
+  | CanvasUsableContentResolutionResponse
   | CanvasReviewerSourcePrepareResponse
   | CanvasFileIngestionResponse
   | CanvasDeleteResponse

@@ -35,10 +35,13 @@ describe("reviewer source provenance helpers", () => {
       userId: USER_ID,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       value: { previewSessionId: PREVIEW_SESSION_ID },
     });
+    if (result.ok) {
+      expect(result.value.resolutionFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    }
     expect(fake.inserted.canvas_source_preview_sessions).toMatchObject({
       original_preview_text: "SOURCE 1\n\nFictional preview text.",
       original_preview_sha256: sha256Utf8Hex(
