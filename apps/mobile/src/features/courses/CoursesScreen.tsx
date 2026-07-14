@@ -36,7 +36,10 @@ import {
 
 interface CoursesScreenProps {
   readonly onCreateReviewer: () => void;
-  readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onCreateReviewerFromCanvas: (
+    courseId: string,
+    courseName: string,
+  ) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onOpenLibrary: () => void;
 }
@@ -524,7 +527,10 @@ function ConnectedCanvasState({
   readonly isSavingSelection: boolean;
   readonly isSyncingSelected: boolean;
   readonly onDisconnect: () => void;
-  readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onCreateReviewerFromCanvas: (
+    courseId: string,
+    courseName: string,
+  ) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onRefresh: () => void;
   readonly onSaveSelection: () => void;
@@ -683,7 +689,10 @@ function CourseSection({
 }: {
   readonly courses: readonly CanvasCourseInventoryItem[];
   readonly courseSyncStates: Readonly<Record<string, CourseSyncDisplayState>>;
-  readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onCreateReviewerFromCanvas: (
+    courseId: string,
+    courseName: string,
+  ) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onToggleCourse: (courseId: string) => void;
   readonly selectedCourseIds: readonly string[];
@@ -723,7 +732,10 @@ function CourseSelectionRow({
 }: {
   readonly course: CanvasCourseInventoryItem;
   readonly isSelected: boolean;
-  readonly onCreateReviewerFromCanvas: (courseId: string) => void;
+  readonly onCreateReviewerFromCanvas: (
+    courseId: string,
+    courseName: string,
+  ) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onToggle: (courseId: string) => void;
   readonly syncState: CourseSyncDisplayState | undefined;
@@ -754,25 +766,27 @@ function CourseSelectionRow({
         <Text style={styles.summaryMeta}>
           {formatCourseSyncState(syncState, course)}
         </Text>
+        {canCreateReviewer ? (
+          <Button
+            onPress={() =>
+              onCreateReviewerFromCanvas(course.id, course.displayName)
+            }
+            testID={`canvas-create-reviewer-${course.id}`}
+            variant="primary"
+          >
+            Create reviewer
+          </Button>
+        ) : needsSync ? (
+          <Text style={styles.courseWarning}>Sync this course first</Text>
+        ) : null}
         {canOpenGrades ? (
           <Button
             onPress={() => onOpenGrades(course.id, course.displayName)}
             testID={`canvas-open-grades-${course.id}`}
-            variant="primary"
+            variant="secondary"
           >
             Grades
           </Button>
-        ) : null}
-        {canCreateReviewer ? (
-          <Button
-            onPress={() => onCreateReviewerFromCanvas(course.id)}
-            testID={`canvas-create-reviewer-${course.id}`}
-            variant="secondary"
-          >
-            Create reviewer from Canvas
-          </Button>
-        ) : needsSync ? (
-          <Text style={styles.courseWarning}>Sync this course first</Text>
         ) : null}
       </View>
     </Pressable>

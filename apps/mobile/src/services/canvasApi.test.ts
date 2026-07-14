@@ -415,6 +415,42 @@ describe("Canvas mobile API client", () => {
     });
   });
 
+  it("loads a bounded later Canvas source page without exposing cursor state", async () => {
+    const fetchImpl = createFetch(sourceListResponse());
+
+    const result = await listCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "11111111-1111-4111-8111-111111111111",
+      fetchImpl,
+      limit: 100,
+      offset: 100,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(lastRequest(fetchImpl).url).toBe(
+      `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sources?limit=100&offset=100`,
+    );
+  });
+
+  it("rejects invalid Canvas source pagination before fetch", async () => {
+    const fetchImpl = vi.fn();
+
+    const result = await listCanvasReviewerSources({
+      accessToken: "session-token",
+      apiBaseUrl: API_BASE_URL,
+      courseId: "11111111-1111-4111-8111-111111111111",
+      fetchImpl,
+      offset: -1,
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "invalid_request" },
+      ok: false,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("prepares Canvas file sources with descriptor IDs only", async () => {
     const fetchImpl = createFetch(sourcePrepareResponse());
     const sourceIds = ["file:22222222-2222-4222-8222-222222222222"];
@@ -1288,6 +1324,7 @@ function sourceListResponse() {
   return {
     ok: true,
     courseId: "11111111-1111-4111-8111-111111111111",
+    courseName: "Fictional Biology",
     courseSync: {
       status: "partial",
       completedAt: "2026-07-07T01:00:00.000Z",
@@ -1303,6 +1340,13 @@ function sourceListResponse() {
         id: "page:11111111-1111-4111-8111-111111111111",
         type: "page",
         title: "Fictional Page",
+        capability: "ready",
+        placement: {
+          group: "module",
+          moduleTitle: "Unit one",
+          modulePosition: 1,
+          itemPosition: 1,
+        },
         availability: "available",
         unavailableReason: null,
         updatedAt: "2026-07-07T01:00:00.000Z",
@@ -1313,6 +1357,13 @@ function sourceListResponse() {
         id: "file:22222222-2222-4222-8222-222222222222",
         type: "file",
         title: "Fictional File",
+        capability: "needs_preparation",
+        placement: {
+          group: "ungrouped",
+          moduleTitle: null,
+          modulePosition: null,
+          itemPosition: null,
+        },
         availability: "unavailable",
         unavailableReason: "Prepare this file before using it.",
         updatedAt: "2026-07-07T01:00:00.000Z",
@@ -1443,6 +1494,13 @@ function sourcePrepareResponse() {
         id: "file:22222222-2222-4222-8222-222222222222",
         type: "file",
         title: "Fictional File",
+        capability: "ready",
+        placement: {
+          group: "ungrouped",
+          moduleTitle: null,
+          modulePosition: null,
+          itemPosition: null,
+        },
         availability: "available",
         unavailableReason: null,
         updatedAt: "2026-07-07T01:00:00.000Z",

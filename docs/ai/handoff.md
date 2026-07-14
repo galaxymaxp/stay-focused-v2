@@ -6,6 +6,17 @@ paths.
 
 ## Current Status
 
+- Product Recovery R5 is complete. The selected-course Canvas reviewer path is
+  now `choose source -> prepare/check -> exact editable preview -> generate ->
+  reviewer ready -> immutable snapshot save`. Sources use authoritative module
+  placement or conservative ungrouped fallback, safe capability labels, bounded
+  continuous pagination, request-token/abort protection, exact generation/save
+  bindings, single-flight locks, and discard confirmation. Protected validation
+  passed the live Page, stored-file, generate, save, cleanup, and controlled
+  zero-call scenarios. See
+  `docs/ai/product-recovery-r5-canvas-source-selection-reviewer-ux-20260715.md`.
+- Next task: Product Recovery Phase R6 — real-device product acceptance on
+  iPhone/Expo Go, including Dynamic Type and screen-reader observation.
 - Product Recovery R4 is complete. The authoritative Canvas usable-content
   boundary classifies synchronized Page/Assignment/Announcement content,
   protected stored Image/PDF OCR, and supported module links as `usable`,
@@ -17,22 +28,22 @@ paths.
   Page reviewer and real stored Image; non-usable fixtures made zero reviewer
   calls. See
   `docs/ai/product-recovery-r4-canvas-usable-content-resolution-20260713.md`.
-- Next task: Product Recovery Phase R5 — Canvas source-selection and reviewer
-  UX recovery.
-
-- Product Recovery Phases R1, R2, and R3 are complete in
+- Product Recovery Phases R1 through R5 are complete. Focused reports include
   `docs/ai/product-recovery-r1-v1-audit-20260713.md`,
-  `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`, and
-  `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`. R1 compared V1 as the
-  behavioral benchmark with V2 as the architecture benchmark. V2's
-  authentication, RLS, encrypted Canvas credentials, protected APIs, private
-  source snapshots, provenance, tests, strict parsers, and grade/reviewer
-  separation should remain. R2 added bounded field-aware repair, validated
-  per-section extractive fallback, emergency source-outline recovery, safe
-  quality metadata, and calm mobile fallback rendering. R3 added exact page
-  coverage, explicit blank pages, sanitized completeness metadata, stale OCR
-  source clearing, and a hard reviewer-generation gate. The next task is
-  Product Recovery Phase R4 - Canvas usable-content resolution.
+  `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`,
+  `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`,
+  `docs/ai/product-recovery-r4-canvas-usable-content-resolution-20260713.md`, and
+  `docs/ai/product-recovery-r5-canvas-source-selection-reviewer-ux-20260715.md`.
+  R1 compared V1 as the behavioral benchmark with V2 as the architecture
+  benchmark. V2's authentication, RLS, encrypted Canvas credentials, protected
+  APIs, private source snapshots, provenance, tests, strict parsers, and
+  grade/reviewer separation should remain. R2 added bounded field-aware repair,
+  validated per-section extractive fallback, emergency source-outline recovery,
+  safe quality metadata, and calm mobile fallback rendering. R3 added exact
+  page coverage, explicit blank pages, sanitized completeness metadata, stale
+  OCR source clearing, and a hard reviewer-generation gate. R4 established the
+  authoritative content boundary and R5 recovered the student workflow. The
+  next task is Product Recovery Phase R6 - real-device product acceptance.
 - Baseline before this Phase 4 implementation:
   `0fdf1e4 docs: complete Phase 3D live PDF validation`.
 - Phase 4 implementation commit: the commit containing this handoff update.

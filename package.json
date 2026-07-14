@@ -19,6 +19,7 @@
     "validate:reviewer-canvas:r2": "node scripts/r2-canvas-live-validation.mjs",
     "validate:ocr:r3": "tsx scripts/r3-ocr-protected-validation.ts",
     "validate:canvas:r4": "tsx scripts/r4-canvas-protected-validation.ts",
+    "validate:canvas:r5": "tsx scripts/r5-canvas-protected-validation.ts",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean"
   },

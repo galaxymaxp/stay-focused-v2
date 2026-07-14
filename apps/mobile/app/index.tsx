@@ -39,7 +39,11 @@ function AuthenticatedApp() {
     | { readonly name: "generate" }
     | { readonly name: "library" }
     | { readonly name: "courses" }
-    | { readonly name: "canvas-reviewer"; readonly courseId: string }
+    | {
+        readonly name: "canvas-reviewer";
+        readonly courseId: string;
+        readonly courseName: string;
+      }
     | {
         readonly name: "canvas-grades";
         readonly courseId: string;
@@ -57,8 +61,8 @@ function AuthenticatedApp() {
     return (
       <CoursesScreen
         onCreateReviewer={() => setActiveView({ name: "generate" })}
-        onCreateReviewerFromCanvas={(courseId) =>
-          setActiveView({ name: "canvas-reviewer", courseId })
+        onCreateReviewerFromCanvas={(courseId, courseName) =>
+          setActiveView({ name: "canvas-reviewer", courseId, courseName })
         }
         onOpenGrades={(courseId, courseName) =>
           setActiveView({ name: "canvas-grades", courseId, courseName })
@@ -72,6 +76,7 @@ function AuthenticatedApp() {
     return (
       <CanvasSourceReviewerScreen
         courseId={activeView.courseId}
+        courseName={activeView.courseName}
         onBackToCourses={() => setActiveView({ name: "courses" })}
         onOpenLibrary={() => setActiveView({ name: "library" })}
       />

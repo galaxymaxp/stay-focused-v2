@@ -1,20 +1,20 @@
 export const colors = {
-  background: "#1b1814",
-  card: "#252018",
-  cardElevated: "#2a2218",
-  cardPressed: "#32291d",
-  accent: "#f5a623",
-  accentPressed: "#e8971f",
-  accentText: "#241704",
-  textPrimary: "#f0e6d3",
-  textSecondary: "#cabaa4",
-  textMuted: "#8a7a6a",
-  border: "rgba(240, 230, 211, 0.1)",
-  borderStrong: "rgba(240, 230, 211, 0.18)",
-  error: "#d9897d",
-  errorSurface: "rgba(217, 137, 125, 0.12)",
-  success: "#8bb49a",
-  successSurface: "rgba(139, 180, 154, 0.12)",
+  background: "#f6f4ef",
+  card: "#fffdf8",
+  cardElevated: "#f1ecdf",
+  cardPressed: "#eee5cf",
+  accent: "#d7aa38",
+  accentPressed: "#b88b24",
+  accentText: "#2b210b",
+  textPrimary: "#2a251d",
+  textSecondary: "#5e5549",
+  textMuted: "#817565",
+  border: "rgba(78, 64, 45, 0.12)",
+  borderStrong: "rgba(78, 64, 45, 0.22)",
+  error: "#9b4c43",
+  errorSurface: "#f7e9e5",
+  success: "#52755f",
+  successSurface: "#e8f0e9",
   transparent: "transparent",
 } as const;
 
@@ -52,11 +52,11 @@ export const typography = {
 
 export const shadows = {
   card: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 2,
+    shadowColor: "#4b3a22",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 1,
   },
 } as const;
 

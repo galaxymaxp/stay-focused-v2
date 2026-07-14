@@ -22,6 +22,16 @@ export interface CanvasResolutionState {
   readonly sourceTitle: string;
 }
 
+export interface CanvasGeneratedBinding {
+  readonly fingerprint: string;
+  readonly selectionKey: string;
+  readonly sourceText: string;
+}
+
+export interface CanvasSingleFlightLock {
+  current: boolean;
+}
+
 export type CanvasResolutionAction =
   | { readonly type: "selection_changed"; readonly selectionKey: string }
   | { readonly type: "started"; readonly requestToken: number; readonly selectionKey: string }
@@ -113,6 +123,31 @@ export function isCanvasGenerationCurrent(
     state.selectionKey === selectedKey &&
     createCanvasSelectionKey(state.preview.sourceIds) === selectedKey
   );
+}
+
+export function isCanvasGeneratedBindingCurrent(
+  binding: CanvasGeneratedBinding | null,
+  state: CanvasResolutionState,
+  selectedSourceIds: readonly string[],
+): boolean {
+  if (!binding || !state.preview) return false;
+  const selectionKey = createCanvasSelectionKey(selectedSourceIds);
+  return (
+    isCanvasGenerationCurrent(state, selectedSourceIds) &&
+    binding.selectionKey === selectionKey &&
+    binding.fingerprint === state.preview.resolutionFingerprint &&
+    binding.sourceText === state.sourceText.trim()
+  );
+}
+
+export function tryBeginCanvasSingleFlight(lock: CanvasSingleFlightLock): boolean {
+  if (lock.current) return false;
+  lock.current = true;
+  return true;
+}
+
+export function finishCanvasSingleFlight(lock: CanvasSingleFlightLock): void {
+  lock.current = false;
 }
 
 function isCurrentResponse(

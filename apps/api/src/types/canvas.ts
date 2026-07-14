@@ -372,6 +372,19 @@ export interface CanvasReviewerSourceDescriptor {
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
   readonly title: string;
+  readonly capability:
+    | "ready"
+    | "empty"
+    | "needs_preparation"
+    | "unsupported"
+    | "inaccessible"
+    | "failed";
+  readonly placement: {
+    readonly group: "module" | "ungrouped";
+    readonly moduleTitle: string | null;
+    readonly modulePosition: number | null;
+    readonly itemPosition: number | null;
+  };
   readonly availability: "available" | "unavailable";
   readonly unavailableReason: string | null;
   readonly updatedAt: string | null;
@@ -382,6 +395,7 @@ export interface CanvasReviewerSourceDescriptor {
 export interface CanvasReviewerSourceListResponse {
   readonly ok: true;
   readonly courseId: string;
+  readonly courseName: string;
   readonly courseSync: CanvasReviewerCourseSyncSummary;
   readonly availableSourceCount: number;
   readonly unavailableSourceCount: number;

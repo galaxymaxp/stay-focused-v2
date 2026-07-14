@@ -1,6 +1,27 @@
 # Current Sprint
 
-Last refreshed: 2026-07-13, Asia/Manila.
+Last refreshed: 2026-07-15, Asia/Manila.
+
+## Completed Product Recovery R5 Scope
+
+- Promoted the selected-course `Create reviewer` action and passed safe course
+  context into the reviewer flow.
+- Added authoritative module/item placement, stable ungrouped fallback,
+  student-facing capability states, and bounded continuous inventory pages.
+- Replaced the normal multi-source/block console with choose, prepare/check,
+  exact editable preview, generate, reviewer-ready, and save stages.
+- Added complete abort/token/binding invalidation, generation/save single-flight
+  locks, and discard confirmation for meaningful edits or unsaved output.
+- Applied the bundled parchment/gold/flat-content mobile design rules and
+  Lucide outline icons with 44px controls and announced progress states.
+- Added deterministic API/mobile regressions and aggregate-only
+  `validate:canvas:r5` protected validation.
+- Passed Canvas 69/69, OCR 25/25, engine 287/287, API 428/428, mobile 154/154,
+  root typecheck/lint, production API build, web smoke, and R3/R4/R5 protected
+  validations.
+
+The active objective is Product Recovery Phase R6 — real-device product
+acceptance.
 
 ## Completed Product Recovery R4 Scope
 
@@ -19,25 +40,27 @@ Last refreshed: 2026-07-13, Asia/Manila.
   root typecheck/lint 7/7, reviewer smoke tests 51/51, PDF web smoke, R3
   protected validation, and R4 protected validation.
 
-The active objective is Product Recovery Phase R5 — Canvas source-selection
-and reviewer UX recovery.
-
 ## Active Objective
 
-Product Recovery Phases R1, R2, and R3 are complete in
+Product Recovery Phases R1 through R5 are complete. Focused reports include
 `docs/ai/product-recovery-r1-v1-audit-20260713.md`,
-`docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`, and
-`docs/ai/product-recovery-r3-full-document-ocr-20260713.md`. The current
-priority is no longer Phase 5F. The V1/V2 audit found that V2 should preserve its stronger
-security, authentication, encrypted Canvas storage, protected APIs, strict
-parsers, provenance, tests, and grade/reviewer separation, but must recover
-practical student usefulness in reviewer generation, OCR page coverage, Canvas
+`docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`,
+`docs/ai/product-recovery-r3-full-document-ocr-20260713.md`,
+`docs/ai/product-recovery-r4-canvas-usable-content-resolution-20260713.md`, and
+`docs/ai/product-recovery-r5-canvas-source-selection-reviewer-ux-20260715.md`.
+The current priority is Product Recovery Phase R6 real-device acceptance. The
+V1/V2 audit found that V2 should preserve its stronger security,
+authentication, encrypted Canvas storage, protected APIs, strict parsers,
+provenance, tests, and grade/reviewer separation, but must recover practical
+student usefulness in reviewer generation, OCR page coverage, Canvas
 usable-content discovery, and the mobile workflow. R2 restored per-section
 repair, validated extractive fallback, and emergency source-outline recovery.
 R3 enforces exact page completeness for every accepted image/PDF OCR source,
 preserves explicit blank pages, and stops incomplete extraction before reviewer
-generation. The next objective is Product Recovery Phase R4 - Canvas
-usable-content resolution.
+generation. R4 established authoritative usable Canvas content and R5
+recovered the complete staged student workflow. R6 must now accept that
+workflow on a physical iPhone with accessibility, slow-network, retry,
+navigation, and save handoff checks.
 
 Phase 4 Study Library and Persistence is complete and live validated. Phase 5A
 Secure Canvas Connection and Capability Discovery is complete, live validated,

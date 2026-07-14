@@ -1,6 +1,35 @@
 # Current State
 
-Last refreshed: 2026-07-13, Asia/Manila.
+Last refreshed: 2026-07-15, Asia/Manila.
+
+## Product Recovery R5 — Canvas Source Selection and Reviewer UX
+
+R5 is complete. The selected-course Canvas path is now a staged student flow:
+open a synchronized course, choose one authoritatively ordered source, prepare
+a file when needed, check and edit the exact usable text, generate through the
+existing protected reviewer route, and save the immutable source snapshot to
+Study Library. The normal mobile path no longer forces multi-source structure
+and block-selection controls on a student creating a reviewer from one item.
+
+Source descriptors now carry safe typed capability and proven module/item
+placement. The API orders proven module sources by module and item position,
+keeps unproven sources in a conservative ungrouped section, and exposes no
+source body, raw Canvas identity, hash, URL, or Storage field. Bounded later
+pages can be loaded only through continuous duplicate-free inventory merges.
+
+Mobile request tokens, abort controllers, exact selection keys, fingerprint
+bindings, single-flight locks, and destructive-navigation prompts clear or
+ignore stale preparation, preview, generation, and save work. The UI follows
+the bundled V1.2 parchment/gold/flat-content system, uses Lucide outline icons,
+and announces progress and selected/disabled states without color-only meaning.
+
+Protected R5 validation passed a selected-course inventory, stable ordering,
+live usable Page resolution, a genuine preview edit, reviewer generation,
+snapshot-bound save and cleanup, stored-file resolution, and controlled
+unsupported/inaccessible/stale zero-reviewer-call gates. Measured durations
+were 8,734 ms inventory, 5,450 ms text resolution, 5,362 ms file resolution,
+and 8,320 ms reviewer generation. Full details are in
+`docs/ai/product-recovery-r5-canvas-source-selection-reviewer-ux-20260715.md`.
 
 ## Product Recovery R4 — Canvas Usable-Content Resolution
 

@@ -1,18 +1,18 @@
 # Roadmap
 
-Last refreshed: 2026-07-13, Asia/Manila.
+Last refreshed: 2026-07-15, Asia/Manila.
 
-## Product Recovery Phase R4 — Complete
+## Product Recovery Phase R5 — Complete
 
-Canvas usable-content resolution is enforced across synchronized HTML,
-protected stored-file OCR, preview provenance, reviewer generation, and mobile
-stale-result handling. Empty, unsupported, inaccessible, failed, incomplete,
-and stale sources cannot call the reviewer provider. External URLs/tools remain
-unsupported and are never scraped or followed. No database migration was
-required.
+The Canvas reviewer path now presents authoritative module/item ordering, safe
+capability states, explicit file preparation and source checking, exact editable
+preview text, existing protected generation, immutable snapshot save, and
+stale-state invalidation as one calm staged student journey. Large bounded
+inventories can load later pages without mixing changed or duplicate pages.
+R1-R4 security, OCR completeness, reviewer grounding, and provider-call gates
+remain intact. No database migration was required.
 
-Immediate next task: Product Recovery Phase R5 — Canvas source-selection and
-reviewer UX recovery.
+Immediate next task: Product Recovery Phase R6 — real-device product acceptance.
 
 ## Phase 1 - Foundation And Reviewer Engine
 
@@ -1192,9 +1192,9 @@ Exit criteria:
 
 ## Product Recovery
 
-Status: In progress. Phases R1, R2, and R3 are complete.
+Status: In progress. Phases R1 through R5 are complete.
 
-Product Recovery Phase R3 - Complete.
+Product Recovery Phase R5 - Complete.
 
 Purpose: Restore practical student usefulness while preserving the stronger V2
 architecture. V1 is the behavioral benchmark; V2 is the security,
@@ -1228,15 +1228,34 @@ Phase R3 result:
 - Preserved R2 at 287/287 engine evaluations and protected-live validated all
   five accepted pages with coverage, grounding, and leakage passing.
 
+Phase R4 result:
+
+- Enforced one authoritative `usable`, `empty`, `unsupported`, `inaccessible`,
+  or `failed` Canvas content boundary.
+- Kept metadata and incomplete OCR out of reviewer text and added current-row,
+  selection, fingerprint, and preview-session generation gates.
+
+Phase R5 result:
+
+- Recovered the selected-course student journey with authoritative ordering,
+  safe capability states, explicit preparation/checking, exact editable
+  preview, existing reviewer generation, and snapshot-bound save.
+- Added continuous bounded source pagination, complete stale-state clearing,
+  duplicate-request prevention, accessible progress, and the parchment/gold
+  flat-content visual hierarchy.
+- Protected R5 validation passed live generation/save/cleanup and stored-file
+  resolution; unsupported, inaccessible, and stale scenarios made zero
+  reviewer calls.
+
 Recovery roadmap:
 
 - Phase R2 - Reviewer reliability and fallback redesign (complete; 287/287 engine evals and protected Canvas HTTP 200 with validated limited fallback output).
 - Phase R3 - Full-document OCR with page completeness (complete; exact page coverage enforced, OCR 25/25, API 391/391, mobile 130/130, protected five-page extraction 5/5 with reviewer validation passing).
-- Phase R4 - Canvas usable-content resolution.
-- Phase R5 - Simplified student workflow.
+- Phase R4 - Canvas usable-content resolution (complete; typed terminal states, exact content-only normalization, current fingerprint gate, and zero reviewer calls for non-usable sources).
+- Phase R5 - Simplified student workflow (complete; module ordering, safe capability presentation, staged single-source preview/generation/save, pagination, stale invalidation, and protected end-to-end validation).
 - Phase R6 - Real-device product acceptance.
 
-Immediate next task: Phase R4 - Canvas usable-content resolution.
+Immediate next task: Phase R6 - Real-device product acceptance.
 
 Phase 5F remains pending until the reviewer, OCR, and Canvas usefulness
 regressions exposed during physical-device validation have a recovery path.

@@ -1,5 +1,15 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
 import {
+  AlertCircle,
+  ArrowLeft,
+  BookOpen,
+  Check,
+  ClipboardList,
+  FileText,
+  Megaphone,
+  RotateCcw,
+} from "lucide-react-native";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -9,6 +19,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -20,20 +31,16 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
-import { colors, spacing, typography } from "../../design/tokens";
+import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
 import {
-  CANVAS_REVIEWER_MAX_SELECTED_SOURCES,
   listCanvasReviewerSources,
   prepareCanvasReviewerSources,
-  previewSelectiveCanvasReviewerSources,
-  structureCanvasReviewerSources,
+  previewCanvasReviewerSources,
   type CanvasApiClientError,
   type CanvasReviewerSourceDescriptor,
   type CanvasReviewerSourceListPayload,
   type CanvasReviewerSourcePreviewPayload,
   type CanvasReviewerSourceType,
-  type CanvasSourceStructurePayload,
-  type CanvasStructuredBlock,
 } from "../../services/canvasApi";
 import {
   API_BASE_URL_SETUP_HINT,
@@ -50,13 +57,26 @@ import {
   canvasResolutionReducer,
   createCanvasResolutionState,
   createCanvasSelectionKey,
+  finishCanvasSingleFlight,
+  isCanvasGeneratedBindingCurrent,
   isCanvasGenerationCurrent,
+  tryBeginCanvasSingleFlight,
+  type CanvasGeneratedBinding,
+  type CanvasResolutionStatus,
 } from "./canvasResolutionState";
+import {
+  formatCanvasSourceType,
+  groupCanvasSourcesForSelection,
+  mergeCanvasSourceListPages,
+  presentCanvasSourceCapability,
+  sourceSelectionHelp,
+} from "./canvasSourcePresentation";
 
-const SOURCE_TEXT_HEIGHT = 260;
+const SOURCE_TEXT_HEIGHT = 320;
 
 interface CanvasSourceReviewerScreenProps {
   readonly courseId: string;
+  readonly courseName: string;
   readonly onBackToCourses: () => void;
   readonly onOpenLibrary: () => void;
 }
@@ -64,21 +84,18 @@ interface CanvasSourceReviewerScreenProps {
 interface CanvasSourceDisplayError {
   readonly title: string;
   readonly message: string;
-  readonly detail?: string;
 }
 
 export function CanvasSourceReviewerScreen({
   courseId,
+  courseName,
   onBackToCourses,
   onOpenLibrary,
 }: CanvasSourceReviewerScreenProps) {
   const { session } = useAuth();
   const [sourceList, setSourceList] =
     useState<CanvasReviewerSourceListPayload | null>(null);
-  const [selectedSourceIds, setSelectedSourceIds] = useState<readonly string[]>([]);
-  const [structure, setStructure] =
-    useState<CanvasSourceStructurePayload | null>(null);
-  const [selectedBlockIds, setSelectedBlockIds] = useState<readonly string[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [preview, setPreview] =
     useState<CanvasReviewerSourcePreviewPayload | null>(null);
   const [resolution, dispatchResolution] = useReducer(
@@ -86,512 +103,556 @@ export function CanvasSourceReviewerScreen({
     undefined,
     createCanvasResolutionState,
   );
-  const sourceText = resolution.sourceText;
-  const sourceTitle = resolution.sourceTitle;
   const [reviewer, setReviewer] = useState<ReviewerOutput | null>(null);
   const [sourceSnapshotId, setSourceSnapshotId] = useState<string | null>(null);
+  const [generatedBinding, setGeneratedBinding] =
+    useState<CanvasGeneratedBinding | null>(null);
   const [saveTitle, setSaveTitle] = useState("");
   const [savedReviewer, setSavedReviewer] =
     useState<SavedReviewerSummary | null>(null);
   const [error, setError] = useState<CanvasSourceDisplayError | null>(null);
   const [saveError, setSaveError] = useState<CanvasSourceDisplayError | null>(null);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
-  const [isStructuring, setIsStructuring] = useState(false);
+  const [isLoadingMoreSources, setIsLoadingMoreSources] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
-  const [preparingSourceIds, setPreparingSourceIds] = useState<readonly string[]>(
-    [],
-  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const structureAbortRef = useRef<AbortController | null>(null);
+
+  const inventoryAbortRef = useRef<AbortController | null>(null);
+  const preparationAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
-  const structureTokenRef = useRef(0);
+  const saveAbortRef = useRef<AbortController | null>(null);
+  const inventoryTokenRef = useRef(0);
+  const preparationTokenRef = useRef(0);
   const resolutionTokenRef = useRef(0);
+  const selectedSourceIdRef = useRef<string | null>(null);
+  const preparationLockRef = useRef(false);
+  const loadMoreLockRef = useRef(false);
+  const previewLockRef = useRef(false);
+  const generationLockRef = useRef(false);
+  const saveLockRef = useRef(false);
 
-  const selectedIdsInPreviewOrder = useMemo(
+  const selectedSource = useMemo(
     () =>
-      selectedSourceIds.filter((sourceId) =>
-        sourceList?.sources.some(
-          (source) =>
-            source.id === sourceId && source.availability === "available",
-        ),
-      ),
-    [selectedSourceIds, sourceList?.sources],
+      sourceList?.sources.find((source) => source.id === selectedSourceId) ?? null,
+    [selectedSourceId, sourceList?.sources],
   );
-  const selectedFileCount = useMemo(
-    () =>
-      selectedSourceIds.filter((sourceId) =>
-        sourceList?.sources.some(
-          (source) => source.id === sourceId && source.type === "file",
-        ),
-      ).length,
-    [selectedSourceIds, sourceList?.sources],
-  );
-  const previewIncludesFile = selectedIdsInPreviewOrder.some((sourceId) =>
-    sourceList?.sources.some(
-      (source) => source.id === sourceId && source.type === "file",
-    ),
-  );
-  const groupedSources = useMemo(
-    () => groupSourcesByType(sourceList?.sources ?? []),
+  const selectionIds = selectedSourceId ? [selectedSourceId] : [];
+  const selectionKey = createCanvasSelectionKey(selectionIds);
+  const sourceGroups = useMemo(
+    () => groupCanvasSourcesForSelection(sourceList?.sources ?? []),
     [sourceList?.sources],
   );
+  const hasMeaningfulEdit = Boolean(
+    preview && resolution.sourceText !== preview.sourceText,
+  );
+  const hasUnsavedReviewer = Boolean(reviewer && !savedReviewer);
 
-  const clearResolvedContent = useCallback((sourceIds: readonly string[] = []) => {
-    previewAbortRef.current?.abort();
+  const invalidateGeneratedOutput = useCallback(() => {
     generationAbortRef.current?.abort();
-    previewAbortRef.current = null;
+    saveAbortRef.current?.abort();
     generationAbortRef.current = null;
+    saveAbortRef.current = null;
+    generationLockRef.current = false;
+    saveLockRef.current = false;
     resolutionTokenRef.current += 1;
-    setPreview(null);
-    dispatchResolution({
-      type: "selection_changed",
-      selectionKey: createCanvasSelectionKey(sourceIds),
-    });
-  }, []);
-
-  const loadSources = useCallback(async () => {
-    const context = createRequestContext(session?.accessToken);
-    if (!context.ok) {
-      setError(context.error);
-      setIsLoadingSources(false);
-      return;
-    }
-    abortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    setIsLoadingSources(true);
-    setError(null);
-    setStructure(null);
-    setSelectedBlockIds([]);
-    clearResolvedContent();
     setReviewer(null);
     setSourceSnapshotId(null);
+    setGeneratedBinding(null);
     setSavedReviewer(null);
+    setSaveError(null);
+    setIsGenerating(false);
+    setIsSaving(false);
+  }, []);
+
+  const clearDependentState = useCallback(
+    (nextSourceId: string | null) => {
+      previewAbortRef.current?.abort();
+      previewAbortRef.current = null;
+      finishCanvasSingleFlight(previewLockRef);
+      setPreview(null);
+      dispatchResolution({
+        type: "selection_changed",
+        selectionKey: createCanvasSelectionKey(nextSourceId ? [nextSourceId] : []),
+      });
+      invalidateGeneratedOutput();
+      setError(null);
+      setSaveTitle("");
+      setIsPreviewing(false);
+    },
+    [invalidateGeneratedOutput],
+  );
+
+  const loadSources = useCallback(
+    async (preferredSourceId: string | null = null) => {
+      const context = createRequestContext(session?.accessToken);
+      if (!context.ok) {
+        selectedSourceIdRef.current = null;
+        setSelectedSourceId(null);
+        setSourceList(null);
+        clearDependentState(null);
+        setError(context.error);
+        setIsLoadingSources(false);
+        return;
+      }
+
+      inventoryAbortRef.current?.abort();
+      const controller = new AbortController();
+      inventoryAbortRef.current = controller;
+      const requestToken = inventoryTokenRef.current + 1;
+      inventoryTokenRef.current = requestToken;
+      clearDependentState(preferredSourceId);
+      finishCanvasSingleFlight(loadMoreLockRef);
+      setIsLoadingMoreSources(false);
+      setIsLoadingSources(true);
+
+      try {
+        const result = await listCanvasReviewerSources({
+          ...context.value,
+          courseId,
+          signal: controller.signal,
+        });
+        if (inventoryTokenRef.current !== requestToken) return;
+
+        if (result.ok) {
+          setSourceList(result.data);
+          const preferred = preferredSourceId
+            ? result.data.sources.find((source) => source.id === preferredSourceId)
+            : null;
+          const canKeep = preferred
+            ? presentCanvasSourceCapability(preferred).selectable
+            : false;
+          setSelectedSourceId(canKeep ? preferredSourceId : null);
+          selectedSourceIdRef.current = canKeep ? preferredSourceId : null;
+          if (!canKeep) {
+            dispatchResolution({ type: "selection_changed", selectionKey: "" });
+          }
+        } else {
+          setSourceList(null);
+          setSelectedSourceId(null);
+          selectedSourceIdRef.current = null;
+          setError(formatCanvasSourceError(result.error));
+        }
+      } finally {
+        if (inventoryTokenRef.current === requestToken) {
+          inventoryAbortRef.current = null;
+          setIsLoadingSources(false);
+        }
+      }
+    },
+    [clearDependentState, courseId, session?.accessToken],
+  );
+
+  const loadMoreSources = async () => {
+    if (
+      !sourceList?.pagination.hasMore ||
+      isLoadingMoreSources ||
+      !tryBeginCanvasSingleFlight(loadMoreLockRef)
+    ) {
+      return;
+    }
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      finishCanvasSingleFlight(loadMoreLockRef);
+      setError(context.error);
+      return;
+    }
+
+    inventoryAbortRef.current?.abort();
+    const controller = new AbortController();
+    inventoryAbortRef.current = controller;
+    const requestToken = inventoryTokenRef.current + 1;
+    inventoryTokenRef.current = requestToken;
+    const expectedCourseId = sourceList.courseId;
+    const nextOffset = sourceList.pagination.offset + sourceList.pagination.returned;
+    setIsLoadingMoreSources(true);
+    setError(null);
 
     try {
       const result = await listCanvasReviewerSources({
         ...context.value,
         courseId,
-        signal: abortController.signal,
+        limit: sourceList.pagination.limit,
+        offset: nextOffset,
+        signal: controller.signal,
       });
+      if (inventoryTokenRef.current !== requestToken) return;
 
       if (result.ok) {
-        setSourceList(result.data);
-        setSelectedSourceIds((current) =>
-          current.filter((sourceId) =>
-            result.data.sources.some(
-              (source) =>
-                source.id === sourceId && source.availability === "available",
-            ),
-          ),
-        );
+        const merged = mergeCanvasSourceListPages(sourceList, result.data);
+        if (!merged || merged.courseId !== expectedCourseId) {
+          await loadSources(selectedSourceIdRef.current);
+          return;
+        }
+        setSourceList(merged);
       } else {
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null;
-        setIsLoadingSources(false);
+      if (inventoryTokenRef.current === requestToken) {
+        inventoryAbortRef.current = null;
+        finishCanvasSingleFlight(loadMoreLockRef);
+        setIsLoadingMoreSources(false);
       }
     }
-  }, [clearResolvedContent, courseId, session?.accessToken]);
+  };
 
   useEffect(() => {
     void loadSources();
     return () => {
-      abortControllerRef.current?.abort();
-      structureAbortRef.current?.abort();
+      inventoryTokenRef.current += 1;
+      preparationTokenRef.current += 1;
+      resolutionTokenRef.current += 1;
+      inventoryAbortRef.current?.abort();
+      preparationAbortRef.current?.abort();
       previewAbortRef.current?.abort();
       generationAbortRef.current?.abort();
-      abortControllerRef.current = null;
-      structureAbortRef.current = null;
+      saveAbortRef.current?.abort();
+      inventoryAbortRef.current = null;
+      preparationAbortRef.current = null;
       previewAbortRef.current = null;
       generationAbortRef.current = null;
+      saveAbortRef.current = null;
+      generationLockRef.current = false;
+      saveLockRef.current = false;
+      preparationLockRef.current = false;
+      previewLockRef.current = false;
+      loadMoreLockRef.current = false;
       dispatchResolution({ type: "cleared" });
     };
   }, [loadSources]);
 
-  const handleToggleSource = (source: CanvasReviewerSourceDescriptor) => {
-    if (source.availability !== "available") {
-      return;
-    }
-    setError(null);
-    structureAbortRef.current?.abort();
-    structureTokenRef.current += 1;
-    setStructure(null);
-    setSelectedBlockIds([]);
-    clearResolvedContent();
-    setReviewer(null);
-    setSourceSnapshotId(null);
-    setSavedReviewer(null);
-    setSelectedSourceIds((current) => {
-      if (current.includes(source.id)) {
-        const next = current.filter((sourceId) => sourceId !== source.id);
-        clearResolvedContent(next);
-        return next;
-      }
-      if (
-        source.type === "file" &&
-        current.some((sourceId) =>
-          sourceList?.sources.some(
-            (candidate) => candidate.id === sourceId && candidate.type === "file",
-          ),
-        )
-      ) {
-        setError({
-          title: "One file per preview",
-          message: "You can use one PDF or image per reviewer preview.",
-        });
-        return current;
-      }
-      if (current.length >= CANVAS_REVIEWER_MAX_SELECTED_SOURCES) {
-        setError({
-          title: "Too many sources",
-          message: `Select at most ${CANVAS_REVIEWER_MAX_SELECTED_SOURCES} Canvas sources.`,
-        });
-        return current;
-      }
-      const next = [...current, source.id];
-      clearResolvedContent(next);
-      return next;
-    });
+  const selectSource = (source: CanvasReviewerSourceDescriptor) => {
+    if (!presentCanvasSourceCapability(source).selectable) return;
+    preparationTokenRef.current += 1;
+    preparationAbortRef.current?.abort();
+    preparationAbortRef.current = null;
+    finishCanvasSingleFlight(preparationLockRef);
+    setIsPreparing(false);
+    setSelectedSourceId(source.id);
+    selectedSourceIdRef.current = source.id;
+    clearDependentState(source.id);
   };
 
-  const handlePrepareSource = async (source: CanvasReviewerSourceDescriptor) => {
+  const requestSourceSelection = (source: CanvasReviewerSourceDescriptor) => {
+    if (source.id === selectedSourceId) return;
+    if (hasMeaningfulEdit || hasUnsavedReviewer) {
+      Alert.alert(
+        "Change source?",
+        "Your edited preview and unsaved reviewer will be cleared.",
+        [
+          { style: "cancel", text: "Keep current source" },
+          { onPress: () => selectSource(source), style: "destructive", text: "Change source" },
+        ],
+      );
+      return;
+    }
+    selectSource(source);
+  };
+
+  const requestBackToCourses = () => {
+    if (hasMeaningfulEdit || hasUnsavedReviewer) {
+      Alert.alert(
+        "Return to courses?",
+        "Your edited preview and unsaved reviewer will be cleared.",
+        [
+          { style: "cancel", text: "Stay here" },
+          { onPress: onBackToCourses, style: "destructive", text: "Return to courses" },
+        ],
+      );
+      return;
+    }
+    onBackToCourses();
+  };
+
+  const requestChangeSource = () => {
+    if (hasMeaningfulEdit || hasUnsavedReviewer) {
+      Alert.alert(
+        "Change source?",
+        "Your edited preview and unsaved reviewer will be cleared.",
+        [
+          { style: "cancel", text: "Keep current source" },
+          {
+            onPress: () => clearDependentState(selectedSourceId),
+            style: "destructive",
+            text: "Change source",
+          },
+        ],
+      );
+      return;
+    }
+    clearDependentState(selectedSourceId);
+  };
+
+  const handlePrepare = async () => {
+    if (
+      !selectedSource ||
+      isPreparing ||
+      !tryBeginCanvasSingleFlight(preparationLockRef)
+    ) {
+      return;
+    }
+    const presentation = presentCanvasSourceCapability(selectedSource);
+    if (presentation.action !== "prepare" && presentation.action !== "retry") {
+      finishCanvasSingleFlight(preparationLockRef);
+      return;
+    }
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
+      finishCanvasSingleFlight(preparationLockRef);
       setError(context.error);
       return;
     }
-    if (source.type !== "file" || source.file?.canPrepare !== true) {
-      return;
-    }
-    if (preparingSourceIds.includes(source.id)) {
-      return;
-    }
 
-    setPreparingSourceIds((current) => [...current, source.id]);
-    setError(null);
+    preparationAbortRef.current?.abort();
+    const controller = new AbortController();
+    preparationAbortRef.current = controller;
+    const requestToken = preparationTokenRef.current + 1;
+    preparationTokenRef.current = requestToken;
+    const activeSelectionKey = selectionKey;
+    clearDependentState(selectedSource.id);
+    setIsPreparing(true);
+
     try {
       const result = await prepareCanvasReviewerSources({
         ...context.value,
         courseId,
-        sourceIds: [source.id],
+        signal: controller.signal,
+        sourceIds: [selectedSource.id],
       });
+      if (
+        preparationTokenRef.current !== requestToken ||
+        createCanvasSelectionKey(
+          selectedSourceIdRef.current ? [selectedSourceIdRef.current] : [],
+        ) !==
+          activeSelectionKey
+      ) {
+        return;
+      }
       if (result.ok) {
-        await loadSources();
+        await loadSources(selectedSource.id);
       } else {
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
-      setPreparingSourceIds((current) =>
-        current.filter((sourceId) => sourceId !== source.id),
-      );
+      if (preparationTokenRef.current === requestToken) {
+        preparationAbortRef.current = null;
+        finishCanvasSingleFlight(preparationLockRef);
+        setIsPreparing(false);
+      }
     }
   };
 
-  const handlePreviewSources = async () => {
+  const handlePreview = async () => {
+    if (
+      !selectedSource ||
+      isPreviewing ||
+      !tryBeginCanvasSingleFlight(previewLockRef)
+    ) {
+      return;
+    }
+    if (presentCanvasSourceCapability(selectedSource).action !== "preview") {
+      finishCanvasSingleFlight(previewLockRef);
+      return;
+    }
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
+      finishCanvasSingleFlight(previewLockRef);
       setError(context.error);
       return;
     }
 
-    if (selectedIdsInPreviewOrder.length === 0) {
-      setError({
-        title: "Choose a source",
-        message: "Choose at least one available Canvas source.",
-      });
-      return;
-    }
-
-    structureAbortRef.current?.abort();
-    const abortController = new AbortController();
-    structureAbortRef.current = abortController;
-    const requestToken = structureTokenRef.current + 1;
-    structureTokenRef.current = requestToken;
-    setIsStructuring(true);
-    setError(null);
-    setStructure(null);
-    setSelectedBlockIds([]);
-    clearResolvedContent(selectedIdsInPreviewOrder);
-    setReviewer(null);
-    setSourceSnapshotId(null);
-    setSavedReviewer(null);
-
-    try {
-      const result = await structureCanvasReviewerSources({
-        ...context.value,
-        courseId,
-        signal: abortController.signal,
-        sourceIds: selectedIdsInPreviewOrder,
-      });
-
-      if (structureTokenRef.current !== requestToken) return;
-
-      if (result.ok) {
-        setStructure(result.data);
-        setSelectedBlockIds(defaultSelectedBlockIds(result.data));
-        dispatchResolution({
-          type: "selection_changed",
-          selectionKey: createCanvasSelectionKey(selectedIdsInPreviewOrder),
-        });
-        setSourceSnapshotId(null);
-        setSaveTitle("");
-      } else {
-        setError(formatCanvasSourceError(result.error));
-      }
-    } finally {
-      if (structureTokenRef.current === requestToken) {
-        structureAbortRef.current = null;
-        setIsStructuring(false);
-      }
-    }
-  };
-
-  const updateSelectedBlockIds = (
-    updater: (current: readonly string[]) => readonly string[],
-  ) => {
-    setSelectedBlockIds((current) => updater(current));
-    clearResolvedContent(selectedIdsInPreviewOrder);
-    setReviewer(null);
-    setSourceSnapshotId(null);
-    setSavedReviewer(null);
-  };
-
-  const handleToggleBlock = (block: CanvasStructuredBlock) => {
-    if (!block.selectable) {
-      return;
-    }
-    setError(null);
-    updateSelectedBlockIds((current) => {
-      if (current.includes(block.id)) {
-        return current.filter((blockId) => blockId !== block.id);
-      }
-      const maximum = structure?.limits.maximumSelectedBlocks ?? 250;
-      if (current.length >= maximum) {
-        setError({
-          title: "Too many blocks",
-          message: `Select at most ${maximum} Canvas blocks.`,
-        });
-        return current;
-      }
-      return [...current, block.id];
-    });
-  };
-
-  const handleSelectAllSourceBlocks = (
-    source: CanvasSourceStructurePayload["sources"][number],
-  ) => {
-    const selectableIds = source.blocks
-      .filter((block) => block.selectable)
-      .map((block) => block.id);
-    const maximum = structure?.limits.maximumSelectedBlocks ?? 250;
-    setError(null);
-    updateSelectedBlockIds((current) => {
-      const next = [...new Set([...current, ...selectableIds])];
-      if (next.length > maximum) {
-        setError({
-          title: "Too many blocks",
-          message: `Select at most ${maximum} Canvas blocks.`,
-        });
-        return current;
-      }
-      return next;
-    });
-  };
-
-  const handleClearSourceBlocks = (
-    source: CanvasSourceStructurePayload["sources"][number],
-  ) => {
-    const sourceBlockIds = new Set(source.blocks.map((block) => block.id));
-    setError(null);
-    updateSelectedBlockIds((current) =>
-      current.filter((blockId) => !sourceBlockIds.has(blockId)),
-    );
-  };
-
-  const handleBuildSelectivePreview = async () => {
-    const context = createRequestContext(session?.accessToken);
-    if (!context.ok) {
-      setError(context.error);
-      return;
-    }
-    if (!structure) {
-      setError({
-        title: "Select sources again",
-        message: "Choose Canvas sources before previewing selected blocks.",
-      });
-      return;
-    }
-    if (selectedBlockIds.length === 0) {
-      setError({
-        title: "Choose a block",
-        message: "Choose at least one Canvas block.",
-      });
-      return;
-    }
-
-    clearResolvedContent(selectedIdsInPreviewOrder);
-    const abortController = new AbortController();
-    previewAbortRef.current = abortController;
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
+    const activeSelectionKey = createCanvasSelectionKey([selectedSource.id]);
+    setPreview(null);
+    invalidateGeneratedOutput();
     const requestToken = resolutionTokenRef.current + 1;
     resolutionTokenRef.current = requestToken;
-    const selectionKey = createCanvasSelectionKey(selectedIdsInPreviewOrder);
-    dispatchResolution({ type: "started", requestToken, selectionKey });
+    dispatchResolution({
+      requestToken,
+      selectionKey: activeSelectionKey,
+      type: "started",
+    });
     setIsPreviewing(true);
     setError(null);
-    setReviewer(null);
-    setSourceSnapshotId(null);
-    setSavedReviewer(null);
 
     try {
-      const result = await previewSelectiveCanvasReviewerSources({
+      const result = await previewCanvasReviewerSources({
         ...context.value,
         courseId,
-        selectedBlockIds,
-        signal: abortController.signal,
-        structureSessionId: structure.structureSessionId,
+        signal: controller.signal,
+        sourceIds: [selectedSource.id],
       });
-
       if (resolutionTokenRef.current !== requestToken) return;
 
       if (result.ok) {
         setPreview(result.data);
         dispatchResolution({
-          type: "resolved",
-          requestToken,
-          selectionKey,
           preview: {
             previewSessionId: result.data.previewSessionId,
             resolutionFingerprint: result.data.resolutionFingerprint,
             sourceIds: result.data.sources.map((source) => source.id),
           },
+          requestToken,
+          selectionKey: activeSelectionKey,
           sourceText: result.data.sourceText,
-          sourceTitle: result.data.suggestedTitle,
+          sourceTitle: selectedSource.title,
+          type: "resolved",
         });
-        setSourceSnapshotId(null);
-        setSaveTitle(result.data.suggestedTitle);
+        setSaveTitle(result.data.suggestedTitle || selectedSource.title);
       } else {
         dispatchResolution({
-          type: "terminal",
           requestToken,
-          selectionKey,
-          status: "failed",
+          selectionKey: activeSelectionKey,
+          status: terminalStatusForCanvasError(result.error),
+          type: "terminal",
         });
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
       if (resolutionTokenRef.current === requestToken) {
         previewAbortRef.current = null;
+        finishCanvasSingleFlight(previewLockRef);
         setIsPreviewing(false);
       }
     }
   };
 
+  const handleSourceTextChange = (value: string) => {
+    dispatchResolution({ sourceText: value, type: "edited" });
+    invalidateGeneratedOutput();
+    setError(null);
+  };
+
   const handleGenerate = async () => {
+    if (isGenerating || !tryBeginCanvasSingleFlight(generationLockRef)) return;
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
+      finishCanvasSingleFlight(generationLockRef);
       setError(context.error);
       return;
     }
-    if (
-      !preview ||
-      !isCanvasGenerationCurrent(resolution, selectedIdsInPreviewOrder)
-    ) {
+    if (!preview || !isCanvasGenerationCurrent(resolution, selectionIds)) {
       setError({
-        title: "Preview changed",
-        message: "Preview the current Canvas selection again before generating.",
+        message: "Check the current source again before creating a reviewer.",
+        title: "Source preview changed",
       });
+      finishCanvasSingleFlight(generationLockRef);
       return;
     }
 
-    const trimmedSourceText = sourceText.trim();
-    const trimmedSourceTitle = sourceTitle.trim();
-    if (!trimmedSourceText) {
+    const finalSourceText = resolution.sourceText.trim();
+    if (!finalSourceText) {
       setError({
-        title: "Source text is empty",
-        message: "Keep at least one readable source line before generating.",
+        message: "Keep at least one readable line in the preview.",
+        title: "Preview is empty",
       });
+      finishCanvasSingleFlight(generationLockRef);
       return;
     }
-    const reviewerLimit = preview?.limits.existingReviewerRequestLimit ?? 100_000;
-    if (trimmedSourceText.length > reviewerLimit) {
+    if (finalSourceText.length > preview.limits.existingReviewerRequestLimit) {
       setError({
-        title: "Source is too large",
-        message: `Edited source text must be at most ${reviewerLimit} characters.`,
+        message: `Keep the edited preview under ${preview.limits.existingReviewerRequestLimit.toLocaleString()} characters.`,
+        title: "Preview is too long",
       });
+      finishCanvasSingleFlight(generationLockRef);
       return;
     }
 
     generationAbortRef.current?.abort();
-    const abortController = new AbortController();
-    generationAbortRef.current = abortController;
+    const controller = new AbortController();
+    generationAbortRef.current = controller;
     const requestToken = resolutionTokenRef.current;
+    const activeSelectionKey = selectionKey;
     setIsGenerating(true);
     setError(null);
     setReviewer(null);
     setSourceSnapshotId(null);
+    setGeneratedBinding(null);
     setSavedReviewer(null);
 
     try {
       const result = await generateReviewer({
         ...context.value,
-        sourceText: trimmedSourceText,
-        ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
-        canvasPreviewSessionId: preview.previewSessionId,
         canvasCourseId: courseId,
         canvasItemIds: preview.sources.map((source) => source.id),
+        canvasPreviewSessionId: preview.previewSessionId,
         canvasResolutionFingerprint: preview.resolutionFingerprint,
-        signal: abortController.signal,
+        signal: controller.signal,
+        sourceText: finalSourceText,
+        sourceTitle: resolution.sourceTitle,
       });
-
-      if (resolutionTokenRef.current !== requestToken) return;
-
+      if (
+        resolutionTokenRef.current !== requestToken ||
+        createCanvasSelectionKey(
+          selectedSourceIdRef.current ? [selectedSourceIdRef.current] : [],
+        ) !== activeSelectionKey
+      ) {
+        return;
+      }
       if (result.ok) {
         setReviewer(result.reviewer);
         setSourceSnapshotId(result.sourceSnapshotId ?? null);
-        setSaveTitle(defaultSaveTitle(result.reviewer, trimmedSourceTitle));
+        setGeneratedBinding({
+          fingerprint: preview.resolutionFingerprint,
+          selectionKey: activeSelectionKey,
+          sourceText: finalSourceText,
+        });
+        setSaveTitle(
+          resolution.sourceTitle.trim() || result.reviewer.title.trim() || "Canvas reviewer",
+        );
       } else {
         setError(formatGenerateError(result.error));
       }
     } finally {
       if (resolutionTokenRef.current === requestToken) {
         generationAbortRef.current = null;
+        finishCanvasSingleFlight(generationLockRef);
         setIsGenerating(false);
       }
     }
   };
 
-  const handleSaveReviewer = async () => {
+  const handleSave = async () => {
+    if (isSaving || !reviewer || !tryBeginCanvasSingleFlight(saveLockRef)) return;
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
+      finishCanvasSingleFlight(saveLockRef);
       setSaveError(context.error);
       return;
     }
-    if (!reviewer) {
+    const finalSourceText = resolution.sourceText.trim();
+    if (
+      !sourceSnapshotId ||
+      !preview ||
+      !isCanvasGeneratedBindingCurrent(
+        generatedBinding,
+        resolution,
+        selectionIds,
+      )
+    ) {
+      setSaveError({
+        message: "Create the reviewer again from the current preview before saving.",
+        title: "Reviewer is no longer current",
+      });
+      finishCanvasSingleFlight(saveLockRef);
       return;
     }
-    if (!sourceSnapshotId) {
-      setSaveError({
-        title: "Source snapshot is missing",
-        message: "Generate the Canvas reviewer again before saving.",
-      });
-      return;
-    }
-    const trimmedSaveTitle = saveTitle.trim();
-    if (!trimmedSaveTitle) {
-      setSaveError({
-        title: "Save needs a title",
-        message: "Enter a title before saving this reviewer.",
-      });
+    const title = saveTitle.trim();
+    if (!title) {
+      setSaveError({ message: "Enter a title before saving.", title: "Title needed" });
+      finishCanvasSingleFlight(saveLockRef);
       return;
     }
 
+    saveAbortRef.current?.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+    const requestToken = resolutionTokenRef.current;
     setIsSaving(true);
     setSaveError(null);
 
@@ -599,15 +660,16 @@ export function CanvasSourceReviewerScreen({
       const result = await saveReviewer({
         ...context.value,
         reviewerOutput: reviewer,
-        sourceSnapshotId,
+        signal: controller.signal,
         sourceMetadata: {
-          sourceCharacterCount: sourceText.trim().length,
-          sourceLabel: sourceTitle.trim() || trimmedSaveTitle,
+          sourceCharacterCount: finalSourceText.length,
+          sourceLabel: resolution.sourceTitle,
           sourceMode: "canvas",
         },
-        title: trimmedSaveTitle,
+        sourceSnapshotId,
+        title,
       });
-
+      if (resolutionTokenRef.current !== requestToken) return;
       if (result.ok) {
         setSavedReviewer(result.data);
         setSaveTitle(result.data.title);
@@ -615,245 +677,155 @@ export function CanvasSourceReviewerScreen({
         setSaveError(formatLibraryError(result.error));
       }
     } finally {
-      setIsSaving(false);
+      if (resolutionTokenRef.current === requestToken) {
+        saveAbortRef.current = null;
+        finishCanvasSingleFlight(saveLockRef);
+        setIsSaving(false);
+      }
     }
   };
 
-  if (isLoadingSources) {
-    return (
-      <Screen contentContainerStyle={styles.content}>
-        <Header onBackToCourses={onBackToCourses} />
-        <Card style={styles.statusCard} testID="canvas-sources-loading">
-          <ActivityIndicator color={colors.accent} />
-          <Text style={styles.statusTitle}>Loading Canvas sources...</Text>
-        </Card>
-      </Screen>
-    );
-  }
+  const displayCourseName = sourceList?.courseName || courseName;
+  const stage = reviewer ? "REVIEWER READY" : preview ? "CHECK SOURCE" : "CHOOSE SOURCE";
 
   return (
     <Screen contentContainerStyle={styles.content}>
-      <Header onBackToCourses={onBackToCourses} />
+      <Header
+        courseName={displayCourseName}
+        onBackToCourses={requestBackToCourses}
+        stage={stage}
+      />
 
       {error ? <ErrorCard error={error} /> : null}
 
-      {sourceList ? (
-        <CourseFreshnessCard
-          courseSync={sourceList.courseSync}
-          onRefresh={loadSources}
+      {isLoadingSources ? (
+        <StatusCard
+          message="Loading the synchronized items for this course."
+          loading
+          testID="canvas-sources-loading"
+          title="Loading course content"
         />
-      ) : null}
-
-      {preview ? (
-        <View style={styles.stack} testID="canvas-source-preview-editor">
-          <Card style={styles.formCard}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.statusTitle}>Canvas source preview</Text>
-              <Text style={styles.statusText}>
-                {preview.sourceCount} sources - {sourceText.length} characters
-                {preview.selectedBlockCount !== undefined
-                  ? ` - ${preview.selectedBlockCount} blocks`
-                  : ""}
-              </Text>
-            </View>
-
-            <TextField
-              label="Source title"
-              onChangeText={(value) => {
-                dispatchResolution({ type: "edited", sourceTitle: value });
-                setError(null);
-                setReviewer(null);
-                setSourceSnapshotId(null);
-                setSavedReviewer(null);
-              }}
-              testID="canvas-preview-title-input"
-              value={sourceTitle}
-            />
-
-            <TextField
-              inputStyle={styles.sourceTextInput}
-              label="Source text"
-              multiline
-              onChangeText={(value) => {
-                dispatchResolution({ type: "edited", sourceText: value });
-                setError(null);
-                setReviewer(null);
-                setSourceSnapshotId(null);
-                setSavedReviewer(null);
-              }}
-              testID="canvas-preview-source-input"
-              textAlignVertical="top"
-              value={sourceText}
-            />
-
-            <View style={styles.actions}>
-              <Button
-                disabled={isGenerating}
-                onPress={() => {
-                  clearResolvedContent(selectedIdsInPreviewOrder);
-                  setReviewer(null);
-                  setSourceSnapshotId(null);
-                  setSavedReviewer(null);
-                }}
-                variant="secondary"
-              >
-                Back to blocks
-              </Button>
-              <Button
-                disabled={sourceText.trim().length === 0}
-                loading={isGenerating}
-                onPress={() => void handleGenerate()}
-                testID="canvas-generate-reviewer-button"
-                variant="primary"
-              >
-                Generate reviewer
-              </Button>
-            </View>
-          </Card>
-
-          {isGenerating ? (
-            <Card style={styles.statusCard}>
-              <Text style={styles.statusTitle}>Generating reviewer...</Text>
-              <Text style={styles.statusText}>
-                Stay Focused is using only the edited source text and title.
-              </Text>
-            </Card>
-          ) : null}
-
-          {reviewer ? (
-            <SaveCanvasReviewerPanel
-              isSaving={isSaving}
-              onChangeTitle={(value) => {
-                setSaveTitle(value);
-                setSaveError(null);
-              }}
-              onOpenLibrary={onOpenLibrary}
-              onSave={() => void handleSaveReviewer()}
-              savedReviewer={savedReviewer}
-              saveError={saveError}
-              saveTitle={saveTitle}
-              sourceSnapshotReady={sourceSnapshotId !== null}
-            />
-          ) : null}
-
-          {reviewer ? <ReviewerPreview reviewer={reviewer} /> : null}
+      ) : reviewer ? (
+        <View style={styles.stack}>
+          <SaveCanvasReviewerPanel
+            isSaving={isSaving}
+            onChangeTitle={(value) => {
+              setSaveTitle(value);
+              setSaveError(null);
+            }}
+            onOpenLibrary={onOpenLibrary}
+            onSave={() => void handleSave()}
+            savedReviewer={savedReviewer}
+            saveError={saveError}
+            saveTitle={saveTitle}
+            sourceSnapshotReady={sourceSnapshotId !== null}
+          />
+          <ReviewerPreview reviewer={reviewer} />
+          <Button onPress={requestChangeSource} variant="secondary">
+            Change source
+          </Button>
         </View>
-      ) : structure ? (
-        <View style={styles.stack} testID="canvas-source-block-selector">
-          {structure.sources.map((source) => (
-            <StructuredSourceSection
-              key={`${source.type}:${source.ordinal}`}
-              onClearSource={handleClearSourceBlocks}
-              onSelectAllSource={handleSelectAllSourceBlocks}
-              onToggleBlock={handleToggleBlock}
-              selectedBlockIds={selectedBlockIds}
-              source={source}
-            />
-          ))}
-
-          <Card style={styles.actionCard}>
-            <Text style={styles.statusText} testID="canvas-selected-block-count">
-              {selectedBlockIds.length} selected blocks
-            </Text>
-            <View style={styles.actions}>
-              <Button
-                disabled={isPreviewing}
-                onPress={() => {
-                  setStructure(null);
-                  setSelectedBlockIds([]);
-                  clearResolvedContent(selectedIdsInPreviewOrder);
-                  setReviewer(null);
-                  setSourceSnapshotId(null);
-                  setSavedReviewer(null);
-                }}
-                variant="secondary"
-              >
-                Back to sources
-              </Button>
-              <Button
-                disabled={selectedBlockIds.length === 0}
-                loading={isPreviewing}
-                onPress={() => void handleBuildSelectivePreview()}
-                testID="canvas-selective-preview-button"
-                variant="primary"
-              >
-                Preview selected blocks
-              </Button>
-            </View>
-          </Card>
-        </View>
+      ) : preview ? (
+        <PreviewStage
+          isGenerating={isGenerating}
+          onBack={() => clearDependentState(selectedSourceId)}
+          onChangeText={handleSourceTextChange}
+          onGenerate={() => void handleGenerate()}
+          source={selectedSource}
+          sourceText={resolution.sourceText}
+        />
       ) : (
         <View style={styles.stack}>
+          {sourceList ? <CourseFreshnessCard courseSync={sourceList.courseSync} /> : null}
+
           {sourceList?.courseSync.status === "never" ? (
-            <Card style={styles.statusCard} testID="canvas-sources-sync-required">
-              <Text style={styles.statusTitle}>Synchronize this course first</Text>
-              <Text style={styles.statusText}>
-                Synchronize this course before selecting sources.
-              </Text>
-            </Card>
-          ) : sourceList && sourceList.availableSourceCount === 0 ? (
-            <Card style={styles.statusCard} testID="canvas-sources-empty">
-              <Text style={styles.statusTitle}>No supported sources yet</Text>
-              <Text style={styles.statusText}>
-                Pages, assignment descriptions, and announcements with readable
-                text will appear here after synchronization.
-              </Text>
-            </Card>
+            <StatusCard
+              message="Return to Courses and synchronize this course before choosing study material."
+              testID="canvas-sources-sync-required"
+              title="Synchronize this course first"
+            />
+          ) : sourceList && sourceList.sources.length === 0 ? (
+            <StatusCard
+              message="No synchronized pages, assignment descriptions, announcements, images, or PDFs are available yet."
+              testID="canvas-sources-empty"
+              title="No course content found"
+            />
           ) : (
-            <>
+            sourceGroups.map((group) => (
               <SourceSection
-                onToggleSource={handleToggleSource}
-                onPrepareSource={handlePrepareSource}
-                preparingSourceIds={preparingSourceIds}
-                selectedSourceIds={selectedSourceIds}
-                sources={groupedSources.pages}
-                title="Pages"
+                key={group.key}
+                onSelect={requestSourceSelection}
+                selectedSourceId={selectedSourceId}
+                sources={group.sources}
+                title={group.title}
               />
-              <SourceSection
-                onToggleSource={handleToggleSource}
-                onPrepareSource={handlePrepareSource}
-                preparingSourceIds={preparingSourceIds}
-                selectedSourceIds={selectedSourceIds}
-                sources={groupedSources.assignments}
-                title="Assignments"
-              />
-              <SourceSection
-                onToggleSource={handleToggleSource}
-                onPrepareSource={handlePrepareSource}
-                preparingSourceIds={preparingSourceIds}
-                selectedSourceIds={selectedSourceIds}
-                sources={groupedSources.announcements}
-                title="Announcements"
-              />
-              <SourceSection
-                onToggleSource={handleToggleSource}
-                onPrepareSource={handlePrepareSource}
-                preparingSourceIds={preparingSourceIds}
-                selectedSourceIds={selectedSourceIds}
-                sources={groupedSources.files}
-                title="Files"
-              />
-            </>
+            ))
           )}
 
-          <Card style={styles.actionCard}>
-            <Text style={styles.statusText} testID="canvas-selected-source-count">
-              {selectedIdsInPreviewOrder.length} selected
-              {selectedFileCount > 0 ? " - 1 file" : ""}
+          {sourceList?.pagination.hasMore ? (
+            <View style={styles.stack}>
+              <Button
+                accessibilityLabel={
+                  isLoadingMoreSources
+                    ? "Loading more course items"
+                    : "Load more course items"
+                }
+                fullWidth
+                loading={isLoadingMoreSources}
+                onPress={() => void loadMoreSources()}
+                testID="canvas-load-more-sources"
+                variant="secondary"
+              >
+                Load more course items
+              </Button>
+              {isLoadingMoreSources ? (
+                <Text accessibilityLiveRegion="polite" style={styles.statusText}>
+                  Loading the next synchronized course items.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          <Card accent={Boolean(selectedSource)} style={styles.actionCard}>
+            <Text style={styles.sectionLabel}>NEXT STEP</Text>
+            <Text style={styles.cardTitle}>
+              {selectedSource?.title ?? "Choose one course item"}
             </Text>
-            <Button
-              disabled={selectedIdsInPreviewOrder.length === 0}
-              fullWidth
-              loading={isStructuring}
-              onPress={() => void handlePreviewSources()}
-              testID="canvas-preview-sources-button"
-              variant="primary"
-            >
-              {isStructuring && previewIncludesFile
-                ? "Extracting source blocks..."
-                : "Choose content blocks"}
-            </Button>
+            <Text style={styles.bodyText}>{sourceSelectionHelp(selectedSource)}</Text>
+            {resolution.status !== "idle" ? (
+              <Text style={styles.statusText}>{resolutionStatusCopy(resolution.status)}</Text>
+            ) : null}
+            {selectedSource ? (
+              <SelectionAction
+                isPreparing={isPreparing}
+                isPreviewing={isPreviewing}
+                onPrepare={() => void handlePrepare()}
+                onPreview={() => void handlePreview()}
+                source={selectedSource}
+              />
+            ) : (
+              <Button disabled fullWidth variant="primary">
+                Check source
+              </Button>
+            )}
           </Card>
+          {isPreparing ? (
+            <StatusCard
+              loading
+              message="Stay Focused is securely preparing this file. Preparation may take a moment."
+              title="Preparing file"
+            />
+          ) : isPreviewing ? (
+            <StatusCard
+              loading
+              message={
+                selectedSource?.type === "file"
+                  ? "Reading the prepared file and checking that its study text is complete."
+                  : "Checking the synchronized study text for this item."
+              }
+              title="Checking source"
+            />
+          ) : null}
         </View>
       )}
     </Screen>
@@ -861,260 +833,273 @@ export function CanvasSourceReviewerScreen({
 }
 
 function Header({
+  courseName,
   onBackToCourses,
+  stage,
 }: {
+  readonly courseName: string;
   readonly onBackToCourses: () => void;
+  readonly stage: string;
 }) {
   return (
     <View style={styles.header} testID="canvas-source-reviewer-screen">
-      <Text style={styles.kicker}>Canvas reviewer</Text>
-      <Text style={styles.title}>Create reviewer from Canvas</Text>
-      <Button onPress={onBackToCourses} variant="secondary">
-        Back to courses
-      </Button>
+      <Pressable
+        accessibilityLabel="Back to courses"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onBackToCourses}
+        style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
+      >
+        <ArrowLeft color={colors.textPrimary} size={22} strokeWidth={1.8} />
+      </Pressable>
+      <View style={styles.headerText}>
+        <Text style={styles.sectionLabel}>{stage}</Text>
+        <Text style={styles.title}>Create a Canvas reviewer</Text>
+        <Text style={styles.courseName}>{courseName}</Text>
+      </View>
     </View>
   );
 }
 
 function CourseFreshnessCard({
   courseSync,
-  onRefresh,
 }: {
   readonly courseSync: CanvasReviewerSourceListPayload["courseSync"];
-  readonly onRefresh: () => void;
 }) {
-  const warning =
-    courseSync.status === "partial"
-      ? "Latest synchronization was partial."
-      : courseSync.status === "failed"
-        ? "Latest synchronization failed."
-        : null;
-
+  const copy =
+    courseSync.status === "success"
+      ? "Course content is synchronized."
+      : courseSync.status === "partial"
+        ? "Some course areas could not be synchronized. Available items are shown below."
+        : courseSync.status === "failed"
+          ? "The latest synchronization did not finish. Previously synchronized items may still be available."
+          : "This course has not been synchronized yet.";
   return (
-    <Card style={styles.statusCard} testID="canvas-source-freshness">
-      <View style={styles.summaryHeader}>
-        <Text style={styles.statusTitle}>{formatSyncStatus(courseSync.status)}</Text>
-        <Text style={styles.statusText}>
-          {courseSync.completedAt
-            ? `Last checked ${formatDateTime(courseSync.completedAt)}`
-            : "No completed synchronization yet."}
-        </Text>
-        {warning ? <Text style={styles.warningText}>{warning}</Text> : null}
-        {courseSync.failureCategories.length > 0 ? (
-          <Text style={styles.statusText}>
-            Limited areas: {courseSync.failureCategories.join(", ")}
-          </Text>
-        ) : null}
-      </View>
-      <Button onPress={onRefresh} variant="secondary">
-        Retry loading
-      </Button>
-    </Card>
+    <View accessibilityLiveRegion="polite" style={styles.freshnessRow}>
+      <RotateCcw color={colors.textMuted} size={17} strokeWidth={1.8} />
+      <Text style={styles.statusText}>{copy}</Text>
+    </View>
   );
 }
 
 function SourceSection({
-  onToggleSource,
-  onPrepareSource,
-  preparingSourceIds,
-  selectedSourceIds,
+  onSelect,
+  selectedSourceId,
   sources,
   title,
 }: {
-  readonly onToggleSource: (source: CanvasReviewerSourceDescriptor) => void;
-  readonly onPrepareSource: (source: CanvasReviewerSourceDescriptor) => void;
-  readonly preparingSourceIds: readonly string[];
-  readonly selectedSourceIds: readonly string[];
+  readonly onSelect: (source: CanvasReviewerSourceDescriptor) => void;
+  readonly selectedSourceId: string | null;
   readonly sources: readonly CanvasReviewerSourceDescriptor[];
   readonly title: string;
 }) {
-  if (sources.length === 0) {
-    return null;
-  }
-
   return (
-    <Card style={styles.sectionCard}>
-      <Text style={styles.statusTitle}>{title}</Text>
-      <View style={styles.sourceList}>
-        {sources.map((source) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{title.toUpperCase()}</Text>
+      <Card style={styles.sourceCard}>
+        {sources.map((source, index) => (
           <SourceRow
-            isSelected={selectedSourceIds.includes(source.id)}
-            isPreparing={preparingSourceIds.includes(source.id)}
+            index={index}
+            isLast={index === sources.length - 1}
+            isSelected={source.id === selectedSourceId}
             key={source.id}
-            onPrepareSource={onPrepareSource}
-            onToggleSource={onToggleSource}
+            onSelect={onSelect}
             source={source}
           />
         ))}
-      </View>
-    </Card>
+      </Card>
+    </View>
   );
 }
 
 function SourceRow({
+  index,
+  isLast,
   isSelected,
-  isPreparing,
-  onPrepareSource,
-  onToggleSource,
+  onSelect,
   source,
 }: {
+  readonly index: number;
+  readonly isLast: boolean;
   readonly isSelected: boolean;
-  readonly isPreparing: boolean;
-  readonly onPrepareSource: (source: CanvasReviewerSourceDescriptor) => void;
-  readonly onToggleSource: (source: CanvasReviewerSourceDescriptor) => void;
+  readonly onSelect: (source: CanvasReviewerSourceDescriptor) => void;
   readonly source: CanvasReviewerSourceDescriptor;
 }) {
-  const disabled = source.availability !== "available";
-
+  const presentation = presentCanvasSourceCapability(source);
   return (
     <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: isSelected, disabled }}
-      disabled={disabled && source.file?.canPrepare !== true}
-      onPress={() => {
-        if (!disabled) {
-          onToggleSource(source);
-        }
+      accessibilityLabel={`${source.title}, ${formatCanvasSourceType(source.type)}, ${presentation.statusLabel}`}
+      accessibilityHint={presentation.explanation}
+      accessibilityRole="radio"
+      accessibilityState={{
+        checked: isSelected,
+        disabled: !presentation.selectable,
+        selected: isSelected,
       }}
-      style={[styles.sourceRow, disabled ? styles.sourceRowDisabled : null]}
-      testID={`canvas-source-row-${source.id}`}
+      disabled={!presentation.selectable}
+      onPress={() => onSelect(source)}
+      style={({ pressed }) => [
+        styles.sourceRow,
+        !isLast ? styles.sourceRowBorder : null,
+        isSelected ? styles.sourceRowSelected : null,
+        !presentation.selectable ? styles.sourceRowDisabled : null,
+        pressed ? styles.pressed : null,
+      ]}
+      testID={`canvas-source-row-${index}`}
     >
-      <View style={[styles.checkBox, isSelected ? styles.checkBoxSelected : null]}>
-        <Text style={styles.checkMark}>{isSelected ? "x" : ""}</Text>
+      <View style={styles.sourceIcon}>
+        <SourceTypeIcon type={source.type} />
       </View>
       <View style={styles.sourceBody}>
         <Text style={styles.sourceTitle}>{source.title}</Text>
-        <Text style={styles.sourceMeta}>
-          {formatSourceType(source.type)}
-          {source.file ? ` - ${formatFileState(source.file, isPreparing)}` : ""}
-          {source.estimatedCharacters !== null
-            ? ` - ${source.estimatedCharacters} characters`
-            : ""}
-          {source.updatedAt ? ` - ${formatDate(source.updatedAt)}` : ""}
-        </Text>
-        {source.unavailableReason ? (
-          <Text style={styles.warningText}>{source.unavailableReason}</Text>
-        ) : null}
-        {source.file?.canPrepare ? (
-          <View style={styles.inlineAction}>
-            <Button
-              disabled={isPreparing}
-              loading={isPreparing}
-              onPress={() => onPrepareSource(source)}
-              testID={`canvas-prepare-source-${source.id}`}
-              variant="secondary"
-            >
-              Prepare file
-            </Button>
-          </View>
-        ) : null}
+        <Text style={styles.sourceMeta}>{formatCanvasSourceType(source.type)}</Text>
+        <View style={styles.statusRow}>
+          {source.capability === "ready" ? (
+            <Check color={colors.success} size={15} strokeWidth={2} />
+          ) : (
+            <AlertCircle color={colors.textMuted} size={15} strokeWidth={1.8} />
+          )}
+          <Text style={styles.statusText}>{presentation.statusLabel}</Text>
+        </View>
+      </View>
+      <View style={[styles.radio, isSelected ? styles.radioSelected : null]}>
+        {isSelected ? <Check color={colors.accentText} size={14} strokeWidth={3} /> : null}
       </View>
     </Pressable>
   );
 }
 
-function StructuredSourceSection({
-  onClearSource,
-  onSelectAllSource,
-  onToggleBlock,
-  selectedBlockIds,
+function SourceTypeIcon({ type }: { readonly type: CanvasReviewerSourceType }) {
+  const props = { color: colors.textSecondary, size: 21, strokeWidth: 1.7 } as const;
+  switch (type) {
+    case "page":
+      return <BookOpen {...props} />;
+    case "assignment":
+      return <ClipboardList {...props} />;
+    case "announcement":
+      return <Megaphone {...props} />;
+    case "file":
+      return <FileText {...props} />;
+  }
+}
+
+function SelectionAction({
+  isPreparing,
+  isPreviewing,
+  onPrepare,
+  onPreview,
   source,
 }: {
-  readonly onClearSource: (
-    source: CanvasSourceStructurePayload["sources"][number],
-  ) => void;
-  readonly onSelectAllSource: (
-    source: CanvasSourceStructurePayload["sources"][number],
-  ) => void;
-  readonly onToggleBlock: (block: CanvasStructuredBlock) => void;
-  readonly selectedBlockIds: readonly string[];
-  readonly source: CanvasSourceStructurePayload["sources"][number];
+  readonly isPreparing: boolean;
+  readonly isPreviewing: boolean;
+  readonly onPrepare: () => void;
+  readonly onPreview: () => void;
+  readonly source: CanvasReviewerSourceDescriptor;
 }) {
-  const selectedCount = source.blocks.filter((block) =>
-    selectedBlockIds.includes(block.id),
-  ).length;
-
+  const presentation = presentCanvasSourceCapability(source);
+  if (presentation.action === "prepare" || presentation.action === "retry") {
+    return (
+      <Button
+        fullWidth
+        loading={isPreparing}
+        onPress={onPrepare}
+        testID="canvas-prepare-selected-source"
+        variant="primary"
+      >
+        {presentation.action === "retry" ? "Try preparation again" : "Prepare file"}
+      </Button>
+    );
+  }
   return (
-    <Card style={styles.sectionCard} testID={`canvas-structured-source-${source.ordinal}`}>
-      <View style={styles.previewHeader}>
-        <Text style={styles.statusTitle}>{source.title}</Text>
-        <Text style={styles.statusText}>
-          {formatSourceType(source.type)}
-          {source.fileKind ? ` - ${source.fileKind.toUpperCase()}` : ""}
-          {" - "}
-          {selectedCount}/{source.blocks.length} selected
-        </Text>
-        {formatDuplicateSummary(source) ? (
-          <Text
-            style={styles.statusText}
-            testID={`canvas-source-duplicate-summary-${source.ordinal}`}
-          >
-            {formatDuplicateSummary(source)}
-          </Text>
-        ) : null}
-        {formatRepeatedReferenceSummary(source) ? (
-          <Text
-            style={styles.statusText}
-            testID={`canvas-source-reference-summary-${source.ordinal}`}
-          >
-            {formatRepeatedReferenceSummary(source)}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.actions}>
-        <Button onPress={() => onSelectAllSource(source)} variant="secondary">
-          Select all
-        </Button>
-        <Button onPress={() => onClearSource(source)} variant="secondary">
-          Clear
-        </Button>
-      </View>
-      <View style={styles.sourceList}>
-        {source.blocks.map((block) => (
-          <StructuredBlockRow
-            block={block}
-            isSelected={selectedBlockIds.includes(block.id)}
-            key={block.id}
-            onToggleBlock={onToggleBlock}
-          />
-        ))}
-      </View>
-    </Card>
+    <Button
+      disabled={presentation.action !== "preview"}
+      fullWidth
+      loading={isPreviewing}
+      onPress={onPreview}
+      testID="canvas-preview-selected-source"
+      variant="primary"
+    >
+      {isPreviewing
+        ? source.type === "file"
+          ? "Reading prepared file"
+          : "Checking source"
+        : "Check source"}
+    </Button>
   );
 }
 
-function StructuredBlockRow({
-  block,
-  isSelected,
-  onToggleBlock,
+function PreviewStage({
+  isGenerating,
+  onBack,
+  onChangeText,
+  onGenerate,
+  source,
+  sourceText,
 }: {
-  readonly block: CanvasStructuredBlock;
-  readonly isSelected: boolean;
-  readonly onToggleBlock: (block: CanvasStructuredBlock) => void;
+  readonly isGenerating: boolean;
+  readonly onBack: () => void;
+  readonly onChangeText: (value: string) => void;
+  readonly onGenerate: () => void;
+  readonly source: CanvasReviewerSourceDescriptor | null;
+  readonly sourceText: string;
 }) {
   return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: isSelected, disabled: !block.selectable }}
-      disabled={!block.selectable}
-      onPress={() => onToggleBlock(block)}
-      style={[
-        styles.sourceRow,
-        !block.selectable ? styles.sourceRowDisabled : null,
-      ]}
-      testID={`canvas-structured-block-${block.id}`}
-    >
-      <View style={[styles.checkBox, isSelected ? styles.checkBoxSelected : null]}>
-        <Text style={styles.checkMark}>{isSelected ? "x" : ""}</Text>
-      </View>
-      <View style={styles.sourceBody}>
-        <Text style={styles.sourceMeta}>
-          {formatBlockKind(block)}
-          {typeof block.pageNumber === "number" ? ` - Page ${block.pageNumber}` : ""}
+    <View style={styles.stack} testID="canvas-source-preview-editor">
+      <Card style={styles.previewCard}>
+        <Text style={styles.sectionLabel}>SOURCE</Text>
+        <View style={styles.previewSourceHeader}>
+          <FileText color={colors.textSecondary} size={20} strokeWidth={1.7} />
+          <View style={styles.sourceBody}>
+            <Text style={styles.cardTitle}>{source?.title ?? "Canvas source"}</Text>
+            <Text style={styles.statusText}>
+              {source ? formatCanvasSourceType(source.type) : "Course item"}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.bodyText}>
+          This is the exact study text the reviewer will use. Edit only what you
+          want corrected or removed.
         </Text>
-        <Text style={styles.blockText}>{block.text}</Text>
-      </View>
-    </Pressable>
+        <TextField
+          editable={!isGenerating}
+          inputStyle={styles.sourceTextInput}
+          label="Reviewer source text"
+          multiline
+          onChangeText={onChangeText}
+          testID="canvas-preview-source-input"
+          textAlignVertical="top"
+          value={sourceText}
+        />
+        <Text style={styles.characterCount}>
+          {sourceText.length.toLocaleString()} characters
+        </Text>
+        <Text style={styles.prerequisiteCopy}>
+          {sourceText.trim()
+            ? "Ready to create a reviewer."
+            : "Keep at least one readable line to continue."}
+        </Text>
+        <Button
+          disabled={!sourceText.trim()}
+          fullWidth
+          loading={isGenerating}
+          onPress={onGenerate}
+          testID="canvas-generate-reviewer-button"
+          variant="primary"
+        >
+          Create reviewer
+        </Button>
+        <Button disabled={isGenerating} fullWidth onPress={onBack} variant="secondary">
+          Change source
+        </Button>
+      </Card>
+      {isGenerating ? (
+        <StatusCard
+          message="Stay Focused is creating a reviewer from the text above."
+          loading
+          title="Creating reviewer"
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -1138,45 +1123,80 @@ function SaveCanvasReviewerPanel({
   readonly sourceSnapshotReady: boolean;
 }) {
   return (
-    <Card style={styles.formCard} testID="canvas-reviewer-save-card">
-      <Text style={styles.statusTitle}>Save to Study Library</Text>
+    <Card accent style={styles.previewCard} testID="canvas-reviewer-save-card">
+      <Text style={styles.sectionLabel}>REVIEWER READY</Text>
+      <Text style={styles.cardTitle}>
+        {savedReviewer ? "Saved to Study Library" : "Save this reviewer"}
+      </Text>
+      <Text style={styles.bodyText}>
+        {savedReviewer
+          ? "The saved copy keeps its verified Canvas source snapshot."
+          : "Save a source-bound copy so you can return to it from Study Library."}
+      </Text>
       <TextField
-        editable={!savedReviewer}
-        label="Saved reviewer title"
+        editable={!savedReviewer && !isSaving}
+        label="Reviewer title"
         onChangeText={onChangeTitle}
         testID="canvas-reviewer-save-title-input"
         value={saveTitle}
       />
-      <Text style={styles.statusText} testID="canvas-source-snapshot-status">
-        {sourceSnapshotReady
-          ? "Source snapshot ready"
-          : "Source snapshot unavailable"}
-      </Text>
+      {!sourceSnapshotReady ? (
+        <Text style={styles.prerequisiteCopy}>
+          Create the reviewer again before saving.
+        </Text>
+      ) : null}
       {saveError ? <ErrorCard error={saveError} /> : null}
-      {savedReviewer ? (
-        <View style={styles.successBox} testID="canvas-reviewer-save-success">
-          <Text style={styles.successText}>
-            Saved to Study Library as {savedReviewer.title}.
-          </Text>
+      {isSaving ? (
+        <View accessibilityLiveRegion="polite" style={styles.progressRow}>
+          <ActivityIndicator color={colors.accent} size="small" />
+          <Text style={styles.statusText}>Saving to Study Library.</Text>
         </View>
       ) : null}
-      <View style={styles.actions}>
-        <Button
-          disabled={
-            Boolean(savedReviewer) ||
-            saveTitle.trim().length === 0 ||
-            !sourceSnapshotReady
-          }
-          loading={isSaving}
-          onPress={onSave}
-          testID="canvas-reviewer-save-button"
-          variant="primary"
-        >
-          {savedReviewer ? "Saved" : "Save reviewer"}
-        </Button>
-        <Button disabled={isSaving} onPress={onOpenLibrary} variant="secondary">
-          Study Library
-        </Button>
+      {savedReviewer ? (
+        <View accessibilityLiveRegion="polite" style={styles.successBox}>
+          <Check color={colors.success} size={18} strokeWidth={2} />
+          <Text style={styles.successText}>Reviewer saved.</Text>
+        </View>
+      ) : null}
+      <Button
+        disabled={Boolean(savedReviewer) || !saveTitle.trim() || !sourceSnapshotReady}
+        fullWidth
+        loading={isSaving}
+        onPress={onSave}
+        testID="canvas-reviewer-save-button"
+        variant="primary"
+      >
+        {savedReviewer ? "Saved" : "Save reviewer"}
+      </Button>
+      <Button disabled={isSaving} fullWidth onPress={onOpenLibrary} variant="secondary">
+        Open Study Library
+      </Button>
+    </Card>
+  );
+}
+
+function StatusCard({
+  loading = false,
+  message,
+  testID,
+  title,
+}: {
+  readonly loading?: boolean;
+  readonly message: string;
+  readonly testID?: string;
+  readonly title: string;
+}) {
+  return (
+    <Card
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+      style={styles.statusCard}
+      testID={testID}
+    >
+      {loading ? <ActivityIndicator color={colors.accent} /> : null}
+      <View style={styles.sourceBody}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.bodyText}>{message}</Text>
       </View>
     </Card>
   );
@@ -1184,253 +1204,121 @@ function SaveCanvasReviewerPanel({
 
 function ErrorCard({ error }: { readonly error: CanvasSourceDisplayError }) {
   return (
-    <View style={styles.errorBox} testID="canvas-source-error">
-      <Text style={styles.errorTitle}>{error.title}</Text>
-      <Text style={styles.errorText}>{error.message}</Text>
-      {error.detail ? <Text style={styles.errorDetail}>{error.detail}</Text> : null}
+    <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorBox}>
+      <AlertCircle color={colors.error} size={20} strokeWidth={1.8} />
+      <View style={styles.sourceBody}>
+        <Text style={styles.errorTitle}>{error.title}</Text>
+        <Text style={styles.errorText}>{error.message}</Text>
+      </View>
     </View>
   );
-}
-
-function groupSourcesByType(sources: readonly CanvasReviewerSourceDescriptor[]): {
-  readonly pages: readonly CanvasReviewerSourceDescriptor[];
-  readonly assignments: readonly CanvasReviewerSourceDescriptor[];
-  readonly announcements: readonly CanvasReviewerSourceDescriptor[];
-  readonly files: readonly CanvasReviewerSourceDescriptor[];
-} {
-  return {
-    announcements: sources.filter((source) => source.type === "announcement"),
-    assignments: sources.filter((source) => source.type === "assignment"),
-    files: sources.filter((source) => source.type === "file"),
-    pages: sources.filter((source) => source.type === "page"),
-  };
 }
 
 function createRequestContext(accessToken: string | undefined):
   | {
       readonly ok: true;
-      readonly value: {
-        readonly apiBaseUrl: string;
-        readonly accessToken: string;
-      };
+      readonly value: { readonly apiBaseUrl: string; readonly accessToken: string };
     }
   | { readonly ok: false; readonly error: CanvasSourceDisplayError } {
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
   if (!apiBaseUrl) {
     return {
+      error: { message: API_BASE_URL_SETUP_HINT, title: "API address needs setup" },
       ok: false,
-      error: {
-        title: "API address needs setup",
-        message: API_BASE_URL_SETUP_HINT,
-      },
     };
   }
-
   const token = accessToken?.trim();
   if (!token) {
     return {
-      ok: false,
       error: {
-        title: "Login session expired",
-        message: "Sign out and sign in again before using Canvas sources.",
+        message: "Sign in again before using Canvas course content.",
+        title: "Session expired",
       },
+      ok: false,
     };
   }
+  return { ok: true, value: { accessToken: token, apiBaseUrl } };
+}
 
-  return { ok: true, value: { apiBaseUrl, accessToken: token } };
+function terminalStatusForCanvasError(
+  error: CanvasApiClientError,
+): Exclude<CanvasResolutionStatus, "idle" | "pending" | "usable"> {
+  if (error.code === "ocr_empty") return "empty";
+  if (error.code === "unsupported_file_type") return "unsupported";
+  if (
+    error.code === "source_not_found" ||
+    error.code === "source_unavailable" ||
+    error.code === "course_not_found" ||
+    error.code === "course_not_selected"
+  ) {
+    return "inaccessible";
+  }
+  return "failed";
 }
 
 function formatCanvasSourceError(
   error: CanvasApiClientError,
 ): CanvasSourceDisplayError {
-  const detail = formatCanvasDetail(error);
   switch (error.code) {
     case "course_not_selected":
       return {
-        title: "Course is not selected",
-        message: "Select this course before creating a reviewer from it.",
-        detail,
+        message: "Select and synchronize this course before creating a reviewer.",
+        title: "Course is not ready",
       };
     case "course_not_found":
-      return {
-        title: "Course unavailable",
-        message: "Canvas did not return this course for your connection.",
-        detail,
-      };
-    case "source_count_exceeded":
-      return {
-        title: "Too many sources",
-        message: error.message,
-        detail,
-      };
-    case "ocr_file_limit_exceeded":
-      return {
-        title: "One file per preview",
-        message: "You can use one PDF or image per reviewer preview.",
-        detail,
-      };
-    case "source_preview_too_large":
-      return {
-        title: "Source preview is too large",
-        message: error.message,
-        detail,
-      };
-    case "structure_too_large":
-      return {
-        title: "Too many blocks",
-        message: "Selected Canvas sources contain too many blocks. Select fewer sources.",
-        detail,
-      };
-    case "structure_session_invalid":
-    case "structure_session_not_found":
-    case "structure_session_expired":
-      return {
-        title: "Select sources again",
-        message: "The block selection expired. Choose Canvas sources again.",
-        detail,
-      };
-    case "block_selection_empty":
-      return {
-        title: "Choose a block",
-        message: "Choose at least one Canvas block.",
-        detail,
-      };
-    case "block_selection_duplicate":
-    case "block_selection_invalid":
-      return {
-        title: "Choose blocks again",
-        message: "The selected Canvas blocks could not be used. Choose blocks again.",
-        detail,
-      };
-    case "block_selection_limit_exceeded":
-      return {
-        title: "Too many blocks",
-        message: error.message,
-        detail,
-      };
+    case "source_not_found":
+    case "source_unavailable":
+      return { message: "Choose another synchronized item.", title: "Item unavailable" };
     case "source_preparation_required":
-      return {
-        title: "Prepare file first",
-        message: "Prepare this file before using it as reviewer source text.",
-        detail,
-      };
+      return { message: "Prepare this file before checking its text.", title: "Preparation needed" };
     case "stored_file_missing":
     case "stored_file_corrupt":
-      return {
-        title: "Prepare file again",
-        message: "The prepared file needs to be refreshed before previewing.",
-        detail,
-      };
+      return { message: "Prepare this file again, then retry.", title: "File needs preparation" };
     case "unsupported_file_type":
-      return {
-        title: "Unsupported file",
-        message: "This Canvas file type is not supported yet.",
-        detail,
-      };
+      return { message: "This item type cannot create a reviewer yet.", title: "Item not supported" };
     case "ocr_empty":
-      return {
-        title: "No readable text",
-        message: "OCR did not find readable text in this file.",
-        detail,
-      };
+      return { message: "Choose a clearer scan or another item.", title: "No readable text found" };
     case "pdf_encrypted":
-      return {
-        title: "PDF is locked",
-        message: "Password-protected PDFs cannot be read.",
-        detail,
-      };
+      return { message: "Choose an unlocked PDF or another item.", title: "PDF is locked" };
     case "pdf_page_limit_exceeded":
-      return {
-        title: "PDF has too many pages",
-        message: "Canvas PDF OCR supports up to five pages per preview.",
-        detail,
-      };
+      return { message: "Choose a PDF with five pages or fewer.", title: "PDF is too long" };
     case "ocr_not_configured":
     case "ocr_failed":
     case "storage_read_failed":
-      return {
-        title: "Text extraction failed",
-        message: "The file could not be extracted right now. Try again later.",
-        detail,
-      };
-    case "source_not_found":
-    case "source_unavailable":
-      return {
-        title: "Source unavailable",
-        message: error.message,
-        detail,
-      };
+      return { message: "Try preparation again later or choose another item.", title: "File could not be read" };
     case "unauthorized":
     case "missing_access_token":
-      return {
-        title: "Login session expired",
-        message: "Sign out and sign in again before using Canvas sources.",
-        detail,
-      };
+      return { message: "Sign in again before continuing.", title: "Session expired" };
     case "network_error":
-      return {
-        title: "Could not reach the API",
-        message: "Check the API address and network connection.",
-        detail,
-      };
+      return { message: "Check your connection and try again.", title: "Could not reach Stay Focused" };
     default:
-      return {
-        title: "Canvas sources could not load",
-        message: error.message,
-        detail,
-      };
+      return { message: "Try again or choose another course item.", title: "Course content could not load" };
   }
 }
 
 function formatGenerateError(error: GenerateReviewerError): CanvasSourceDisplayError {
-  const detail =
-    error.status !== undefined
-      ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
-      : `Details: code ${error.apiCode ?? error.code}.`;
   if (error.code === "source_text_too_large" || error.status === 413) {
-    return {
-      title: "Source is too large",
-      message: error.message,
-      detail,
-    };
+    return { message: "Shorten the edited preview, then try again.", title: "Preview is too long" };
   }
   if (error.code === "unauthorized") {
-    return {
-      title: "Login session expired",
-      message: "Sign out and sign in again before generating.",
-      detail,
-    };
+    return { message: "Sign in again before continuing.", title: "Session expired" };
   }
   if (
     error.code === "canvas_preview_session_expired" ||
     error.code === "canvas_preview_session_not_found" ||
     error.code === "canvas_preview_session_invalid"
   ) {
-    return {
-      title: "Preview expired",
-      message: "Preview the Canvas sources again before generating.",
-      detail,
-    };
+    return { message: "Check the current source again before retrying.", title: "Source preview expired" };
   }
   return {
-    title: "Reviewer generation failed",
-    message:
-      "Review the source text, return to block selection when applicable, then retry generation. Shorten or clarify the source only if it is incomplete or hard to read.",
-    detail,
+    message: "Review the source text and try again. If it still fails, choose another source.",
+    title: "Reviewer could not be created",
   };
 }
 
 function formatLibraryError(error: ReviewerLibraryError): CanvasSourceDisplayError {
-  const detail =
-    error.status !== undefined
-      ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
-      : `Details: code ${error.apiCode ?? error.code}.`;
   if (error.code === "unauthorized") {
-    return {
-      title: "Login session expired",
-      message: error.message,
-      detail,
-    };
+    return { message: "Sign in again before saving.", title: "Session expired" };
   }
   if (
     error.code === "source_snapshot_required" ||
@@ -1438,321 +1326,166 @@ function formatLibraryError(error: ReviewerLibraryError): CanvasSourceDisplayErr
     error.code === "source_snapshot_metadata_mismatch"
   ) {
     return {
-      title: "Generate again before saving",
-      message: error.message,
-      detail,
+      message: "Create the reviewer again from the current preview before saving.",
+      title: "Source snapshot changed",
     };
   }
-  return {
-    title: "Reviewer could not be saved",
-    message: error.message,
-    detail,
-  };
+  return { message: "Try saving again.", title: "Reviewer could not be saved" };
 }
 
-function formatCanvasDetail(error: CanvasApiClientError): string {
-  return error.status !== undefined
-    ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
-    : `Details: code ${error.apiCode ?? error.code}.`;
-}
-
-function defaultSaveTitle(reviewer: ReviewerOutput, sourceTitle: string): string {
-  const title = sourceTitle.trim() || reviewer.title.trim();
-  return title || "Canvas Reviewer";
-}
-
-function defaultSelectedBlockIds(
-  structure: CanvasSourceStructurePayload,
-): readonly string[] {
-  return structure.sources.flatMap((source) =>
-    source.blocks
-      .filter((block) => block.selectable && block.selectedByDefault)
-      .map((block) => block.id),
-  );
-}
-
-function formatSyncStatus(
-  status: CanvasReviewerSourceListPayload["courseSync"]["status"],
-): string {
+function resolutionStatusCopy(status: CanvasResolutionStatus): string {
   switch (status) {
-    case "success":
-      return "Latest sync complete";
-    case "partial":
-      return "Latest sync partial";
-    case "failed":
-      return "Latest sync failed";
-    case "never":
-      return "Not synchronized yet";
-  }
-}
-
-function formatSourceType(type: CanvasReviewerSourceType): string {
-  switch (type) {
-    case "page":
-      return "Page";
-    case "assignment":
-      return "Assignment";
-    case "announcement":
-      return "Announcement";
-    case "file":
-      return "File";
-  }
-}
-
-function formatFileState(
-  file: NonNullable<CanvasReviewerSourceDescriptor["file"]>,
-  isPreparing = false,
-): string {
-  if (isPreparing) {
-    return "Preparing...";
-  }
-  switch (file.preparationStatus) {
-    case "ready":
-      return "Ready";
-    case "not_prepared":
-      return "Prepare";
-    case "failed":
-      return "Preparation failed";
-    case "blocked":
-      return "Unavailable";
+    case "idle":
+      return "";
+    case "pending":
+      return "Checking this source.";
+    case "usable":
+      return "Source text is ready.";
+    case "empty":
+      return "No study text was found.";
     case "unsupported":
-      return "Unsupported";
-    case "unavailable":
-      return "Unavailable";
+      return "This item type is not supported yet.";
+    case "inaccessible":
+      return "This item is unavailable.";
+    case "failed":
+      return "Stay Focused could not read this item.";
   }
-}
-
-function formatBlockKind(block: CanvasStructuredBlock): string {
-  switch (block.kind) {
-    case "heading":
-      return block.headingLevel ? `Heading ${block.headingLevel}` : "Heading";
-    case "paragraph":
-      return "Paragraph";
-    case "list_item":
-      return block.listStyle === "ordered" ? "Numbered list" : "List item";
-    case "table":
-      return "Table";
-    case "quote":
-      return "Quote";
-    case "code":
-      return "Code";
-  }
-}
-
-function formatDuplicateSummary(
-  source: CanvasSourceStructurePayload["sources"][number],
-): string | null {
-  const summary = source.duplicateSummary;
-  if (summary.duplicateKind === "none") {
-    return null;
-  }
-  const canonical = summary.canonicalSourceOrdinal;
-  const isCanonical = canonical === source.ordinal;
-  if (summary.duplicateKind === "same_source") {
-    return isCanonical
-      ? "Same Canvas source appears elsewhere in this selection."
-      : `Same Canvas source as source ${canonical}.`;
-  }
-  return isCanonical
-    ? "Canonical copy for matching source content."
-    : `Content matches source ${canonical}; blocks start unselected.`;
-}
-
-function formatRepeatedReferenceSummary(
-  source: CanvasSourceStructurePayload["sources"][number],
-): string | null {
-  const { repeatedReferenceCount, repeatedReferenceKinds } =
-    source.duplicateSummary;
-  if (repeatedReferenceCount <= 0) {
-    return null;
-  }
-  const kinds = repeatedReferenceKinds.map(formatReferenceKind).join(", ");
-  return `Referenced in ${repeatedReferenceCount} Canvas ${
-    repeatedReferenceCount === 1 ? "location" : "locations"
-  }${kinds ? `: ${kinds}` : ""}.`;
-}
-
-function formatReferenceKind(
-  kind: CanvasSourceStructurePayload["sources"][number]["duplicateSummary"]["repeatedReferenceKinds"][number],
-): string {
-  switch (kind) {
-    case "module":
-      return "module";
-    case "page":
-      return "page";
-    case "assignment":
-      return "assignment";
-    case "announcement":
-      return "announcement";
-  }
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString(undefined, {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: spacing[5],
+  content: { gap: spacing[5] },
+  stack: { gap: spacing[4] },
+  header: { alignItems: "flex-start", flexDirection: "row", gap: spacing[3] },
+  headerText: { flex: 1, gap: spacing[1] },
+  iconButton: {
+    alignItems: "center",
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: hitTarget.min,
+    justifyContent: "center",
+    width: hitTarget.min,
   },
-  stack: {
-    gap: spacing[4],
-  },
-  header: {
-    gap: spacing[3],
-  },
-  kicker: {
+  pressed: { opacity: 0.75 },
+  sectionLabel: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily,
     fontSize: typography.kicker,
     fontWeight: "800",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
+    letterSpacing: 1.15,
   },
   title: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.h1,
     fontWeight: "800",
-    lineHeight: 30,
+    lineHeight: 31,
   },
-  statusCard: {
-    alignItems: "flex-start",
-    gap: spacing[3],
+  courseName: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    lineHeight: 22,
   },
-  actionCard: {
-    gap: spacing[3],
-  },
-  formCard: {
-    gap: spacing[4],
-  },
-  sectionCard: {
-    gap: spacing[4],
-  },
-  previewHeader: {
-    gap: spacing[1],
-  },
-  summaryHeader: {
-    gap: spacing[1],
-  },
-  sourceList: {
-    gap: spacing[3],
-  },
-  sourceRow: {
-    alignItems: "flex-start",
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
+  freshnessRow: {
+    alignItems: "center",
     flexDirection: "row",
     gap: spacing[2],
-    paddingBottom: spacing[3],
+    paddingHorizontal: spacing[1],
   },
-  sourceRowDisabled: {
-    opacity: 0.58,
-  },
-  checkBox: {
+  section: { gap: spacing[2] },
+  sourceCard: { gap: 0, padding: 0, overflow: "hidden" },
+  sourceRow: {
     alignItems: "center",
-    borderColor: colors.borderStrong,
-    borderRadius: 4,
-    borderWidth: 1,
-    height: 22,
+    flexDirection: "row",
+    gap: spacing[3],
+    minHeight: 72,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+  },
+  sourceRowBorder: { borderBottomColor: colors.border, borderBottomWidth: 1 },
+  sourceRowSelected: { backgroundColor: colors.cardPressed },
+  sourceRowDisabled: { opacity: 0.62 },
+  sourceIcon: {
+    alignItems: "center",
+    backgroundColor: colors.cardElevated,
+    borderRadius: radius.tight,
+    height: 42,
     justifyContent: "center",
-    marginTop: 1,
-    width: 22,
+    width: 42,
   },
-  checkBoxSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accentPressed,
-  },
-  checkMark: {
-    color: colors.accentText,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.caption,
-    fontWeight: "900",
-    lineHeight: 15,
-    textAlign: "center",
-  },
-  sourceBody: {
-    flex: 1,
-    gap: spacing[1],
-  },
-  inlineAction: {
-    alignSelf: "flex-start",
-    marginTop: spacing[1],
-  },
+  sourceBody: { flex: 1, gap: spacing[1] },
   sourceTitle: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.body,
-    fontWeight: "800",
+    fontWeight: "700",
     lineHeight: 21,
   },
   sourceMeta: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 17,
+  },
+  statusRow: { alignItems: "center", flexDirection: "row", gap: spacing[1] },
+  statusText: {
+    color: colors.textMuted,
+    flexShrink: 1,
+    fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
   },
-  blockText: {
-    color: colors.textPrimary,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    lineHeight: 20,
+  radio: {
+    alignItems: "center",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    width: 24,
   },
-  sourceTextInput: {
-    minHeight: SOURCE_TEXT_HEIGHT,
-  },
-  statusTitle: {
+  radioSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
+  actionCard: { gap: spacing[3] },
+  previewCard: { gap: spacing[4] },
+  previewSourceHeader: { alignItems: "center", flexDirection: "row", gap: spacing[3] },
+  cardTitle: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.h3,
     fontWeight: "800",
+    lineHeight: 22,
   },
-  statusText: {
+  bodyText: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    lineHeight: 23,
+  },
+  sourceTextInput: { minHeight: SOURCE_TEXT_HEIGHT, lineHeight: 23 },
+  characterCount: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    lineHeight: 20,
+    fontSize: typography.caption,
+    textAlign: "right",
   },
-  warningText: {
-    color: colors.error,
+  prerequisiteCopy: {
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
   },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[2],
-  },
+  statusCard: { alignItems: "center", flexDirection: "row", gap: spacing[3] },
   errorBox: {
+    alignItems: "flex-start",
     backgroundColor: colors.errorSurface,
     borderColor: colors.error,
-    borderRadius: 12,
+    borderRadius: radius.control,
     borderWidth: 1,
-    gap: spacing[2],
-    padding: spacing[3],
+    flexDirection: "row",
+    gap: spacing[3],
+    padding: spacing[4],
   },
   errorTitle: {
     color: colors.textPrimary,
@@ -1767,24 +1500,25 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall,
     lineHeight: 19,
   },
-  errorDetail: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.caption,
-    lineHeight: 17,
-  },
   successBox: {
+    alignItems: "center",
     backgroundColor: colors.successSurface,
     borderColor: colors.success,
-    borderRadius: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing[2],
     padding: spacing[3],
+  },
+  progressRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[2],
   },
   successText: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     fontWeight: "700",
-    lineHeight: 19,
   },
 });

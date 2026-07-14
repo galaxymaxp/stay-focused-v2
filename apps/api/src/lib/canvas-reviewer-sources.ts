@@ -7,6 +7,7 @@ import type {
   CanvasCourseSyncStateRow,
   CanvasFileReferenceRow,
   CanvasFileRow,
+  CanvasModuleRow,
   CanvasModuleItemRow,
   CanvasPageRow,
   CanvasSyncCourseResultRow,
@@ -118,6 +119,21 @@ export type CanvasReviewerSourceType =
 
 export type CanvasReviewerSourceAvailability = "available" | "unavailable";
 
+export type CanvasReviewerSourceCapability =
+  | "ready"
+  | "empty"
+  | "needs_preparation"
+  | "unsupported"
+  | "inaccessible"
+  | "failed";
+
+export interface CanvasReviewerSourcePlacement {
+  readonly group: "module" | "ungrouped";
+  readonly moduleTitle: string | null;
+  readonly modulePosition: number | null;
+  readonly itemPosition: number | null;
+}
+
 export type CanvasReviewerFilePreparationStatus =
   | "ready"
   | "not_prepared"
@@ -136,6 +152,8 @@ export interface CanvasReviewerSourceDescriptor {
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
   readonly title: string;
+  readonly capability: CanvasReviewerSourceCapability;
+  readonly placement: CanvasReviewerSourcePlacement;
   readonly availability: CanvasReviewerSourceAvailability;
   readonly unavailableReason: string | null;
   readonly updatedAt: string | null;
@@ -154,6 +172,7 @@ export interface CanvasReviewerCourseSyncSummary {
 
 export interface CanvasReviewerSourceList {
   readonly courseId: string;
+  readonly courseName: string;
   readonly courseSync: CanvasReviewerCourseSyncSummary;
   readonly availableSourceCount: number;
   readonly unavailableSourceCount: number;
@@ -381,6 +400,8 @@ export async function listCanvasReviewerSources({
     value: {
       availableSourceCount,
       courseId: course.value.course.id,
+      courseName:
+        sanitizeCanvasTitleText(course.value.course.name) || "Selected Canvas course",
       courseSync: createCourseSyncSummary({
         ...course.value,
         synchronizedSourcesAvailable: availableSourceCount > 0,
@@ -1318,7 +1339,7 @@ async function loadCourseSourceDescriptors({
   readonly course: CanvasCourseRow;
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<readonly NormalizedSourceRecord[]>> {
-  const [pages, assignments, announcements, files] = await Promise.all([
+  const [pages, assignments, announcements, files, modules, moduleItems] = await Promise.all([
     readPages({ client, connectionId: connection.id, courseId: course.id, userId }),
     readAssignments({
       client,
@@ -1333,19 +1354,49 @@ async function loadCourseSourceDescriptors({
       userId,
     }),
     readFiles({ client, connectionId: connection.id, courseId: course.id, userId }),
+    readModules({ client, connectionId: connection.id, courseId: course.id, userId }),
+    readModuleItemsForReferences({
+      client,
+      connectionId: connection.id,
+      courseId: course.id,
+      userId,
+    }),
   ]);
 
-  if (!pages.ok || !assignments.ok || !announcements.ok || !files.ok) {
+  if (
+    !pages.ok ||
+    !assignments.ok ||
+    !announcements.ok ||
+    !files.ok ||
+    !modules.ok ||
+    !moduleItems.ok
+  ) {
     return storageFailure("Canvas sources could not be loaded.");
   }
+
+  const placements = buildSourcePlacementMap({
+    assignments: assignments.value,
+    files: files.value,
+    moduleItems: moduleItems.value,
+    modules: modules.value,
+    pages: pages.value,
+  });
+
+  const applyPlacement = (record: NormalizedSourceRecord): NormalizedSourceRecord => ({
+    ...record,
+    descriptor: {
+      ...record.descriptor,
+      placement: placements.get(record.descriptor.id) ?? ungroupedPlacement(),
+    },
+  });
 
   return {
     ok: true,
     value: [
-      ...pages.value.map(mapPageSource),
-      ...assignments.value.map(mapAssignmentSource),
-      ...announcements.value.map(mapAnnouncementSource),
-      ...files.value.map(mapFileSource),
+      ...pages.value.map(mapPageSource).map(applyPlacement),
+      ...assignments.value.map(mapAssignmentSource).map(applyPlacement),
+      ...announcements.value.map(mapAnnouncementSource).map(applyPlacement),
+      ...files.value.map(mapFileSource).map(applyPlacement),
     ],
   };
 }
@@ -2088,9 +2139,11 @@ function mapPageSource(row: CanvasPageRow): NormalizedSourceRecord {
   return {
     descriptor: {
       availability: isAvailable ? "available" : "unavailable",
+      capability: isAvailable ? "ready" : "empty",
       estimatedCharacters: isAvailable ? text.length : null,
       file: null,
       id: formatSourceId("page", row.id),
+      placement: ungroupedPlacement(),
       title: sanitizeCanvasTitleText(row.title) || "Untitled Page",
       type: "page",
       unavailableReason:
@@ -2130,9 +2183,11 @@ function mapAssignmentSource(row: CanvasAssignmentRow): NormalizedSourceRecord {
   return {
     descriptor: {
       availability: isAvailable ? "available" : "unavailable",
+      capability: isAvailable ? "ready" : "empty",
       estimatedCharacters: isAvailable ? text.length : null,
       file: null,
       id: formatSourceId("assignment", row.id),
+      placement: ungroupedPlacement(),
       title: sanitizeCanvasTitleText(row.name) || "Untitled Assignment",
       type: "assignment",
       unavailableReason:
@@ -2174,9 +2229,11 @@ function mapAnnouncementSource(row: CanvasAnnouncementRow): NormalizedSourceReco
   return {
     descriptor: {
       availability: isAvailable ? "available" : "unavailable",
+      capability: isAvailable ? "ready" : "empty",
       estimatedCharacters: isAvailable ? text.length : null,
       file: null,
       id: formatSourceId("announcement", row.id),
+      placement: ungroupedPlacement(),
       title: sanitizeCanvasTitleText(row.title) || "Untitled Announcement",
       type: "announcement",
       unavailableReason:
@@ -2218,9 +2275,11 @@ function mapFileSource(row: CanvasFileRow): NormalizedSourceRecord {
   return {
     descriptor: {
       availability: isReady ? "available" : "unavailable",
+      capability: capabilityForFile(file),
       estimatedCharacters: null,
       file,
       id: formatSourceId("file", row.id),
+      placement: ungroupedPlacement(),
       title: sanitizeCanvasTitleText(row.display_name) || "Canvas file",
       type: "file",
       unavailableReason: isReady ? null : unavailableReasonForFile(row, file),
@@ -2432,6 +2491,24 @@ function unavailableReasonForFile(
     return "This file cannot be prepared safely.";
   }
   return "This file type is not supported yet.";
+}
+
+function capabilityForFile(
+  file: CanvasReviewerFileState,
+): CanvasReviewerSourceCapability {
+  switch (file.preparationStatus) {
+    case "ready":
+      return "ready";
+    case "not_prepared":
+      return "needs_preparation";
+    case "failed":
+      return "failed";
+    case "unsupported":
+      return "unsupported";
+    case "blocked":
+    case "unavailable":
+      return "inaccessible";
+  }
 }
 
 function isFileMetadataAvailable(row: CanvasFileRow): boolean {
@@ -2722,6 +2799,23 @@ async function readFiles(query: SourceQuery): Promise<
     return { ok: false };
   }
   return { ok: true, value: data as readonly CanvasFileRow[] };
+}
+
+async function readModules(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasModuleRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await query.client
+    .from("canvas_modules")
+    .select("*")
+    .eq("user_id", query.userId)
+    .eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId);
+
+  if (error || !data) {
+    return { ok: false };
+  }
+  return { ok: true, value: data as readonly CanvasModuleRow[] };
 }
 
 async function readPagesByIds(query: SourceIdsQuery): Promise<
@@ -3686,12 +3780,134 @@ function formatSourceId(type: CanvasReviewerSourceType, rowId: string): string {
   return `${type}:${rowId}`;
 }
 
+function buildSourcePlacementMap({
+  assignments,
+  files,
+  moduleItems,
+  modules,
+  pages,
+}: {
+  readonly assignments: readonly CanvasAssignmentRow[];
+  readonly files: readonly CanvasFileRow[];
+  readonly moduleItems: readonly CanvasModuleItemRow[];
+  readonly modules: readonly CanvasModuleRow[];
+  readonly pages: readonly CanvasPageRow[];
+}): ReadonlyMap<string, CanvasReviewerSourcePlacement> {
+  const moduleById = new Map(
+    modules.map((moduleRow) => [moduleRow.id, moduleRow]),
+  );
+  const placementBySourceId = new Map<string, CanvasReviewerSourcePlacement>();
+  const pageByCanvasId = new Map(
+    pages.flatMap((page) =>
+      page.canvas_page_id ? [[page.canvas_page_id, page] as const] : [],
+    ),
+  );
+  const pageByUrl = new Map(
+    pages.flatMap((page) =>
+      page.canvas_page_url ? [[page.canvas_page_url, page] as const] : [],
+    ),
+  );
+  const assignmentByCanvasId = new Map(
+    assignments.map((assignment) => [assignment.canvas_assignment_id, assignment]),
+  );
+  const fileByCanvasId = new Map(files.map((file) => [file.canvas_file_id, file]));
+
+  const orderedItems = [...moduleItems].sort((left, right) => {
+    const leftModule = moduleById.get(left.module_id);
+    const rightModule = moduleById.get(right.module_id);
+    return (
+      compareNullablePosition(leftModule?.position, rightModule?.position) ||
+      compareAsciiCaseInsensitive(leftModule?.name ?? "", rightModule?.name ?? "") ||
+      compareNullablePosition(left.position, right.position) ||
+      compareAsciiCaseInsensitive(left.title, right.title) ||
+      compareAsciiCaseInsensitive(left.id, right.id)
+    );
+  });
+
+  for (const item of orderedItems) {
+    const moduleRow = moduleById.get(item.module_id);
+    if (!moduleRow) continue;
+
+    const contentId = item.canvas_content_id?.trim() ?? "";
+    const page =
+      (item.item_type === "Page" && item.page_url
+        ? pageByUrl.get(item.page_url)
+        : undefined) ??
+      (item.item_type === "Page" && contentId
+        ? pageByCanvasId.get(contentId)
+        : undefined);
+    const assignment =
+      item.item_type === "Assignment" && contentId
+        ? assignmentByCanvasId.get(contentId)
+        : undefined;
+    const file =
+      item.item_type === "File" && contentId
+        ? fileByCanvasId.get(contentId)
+        : undefined;
+    const sourceId = page
+      ? formatSourceId("page", page.id)
+      : assignment
+        ? formatSourceId("assignment", assignment.id)
+        : file
+          ? formatSourceId("file", file.id)
+          : null;
+    if (!sourceId || placementBySourceId.has(sourceId)) continue;
+
+    placementBySourceId.set(sourceId, {
+      group: "module",
+      itemPosition: item.position,
+      modulePosition: moduleRow.position,
+      moduleTitle: sanitizeCanvasTitleText(moduleRow.name) || "Course module",
+    });
+  }
+
+  return placementBySourceId;
+}
+
+function ungroupedPlacement(): CanvasReviewerSourcePlacement {
+  return {
+    group: "ungrouped",
+    itemPosition: null,
+    modulePosition: null,
+    moduleTitle: null,
+  };
+}
+
+function compareNullablePosition(
+  left: number | null | undefined,
+  right: number | null | undefined,
+): number {
+  const leftValue = typeof left === "number" ? left : Number.MAX_SAFE_INTEGER;
+  const rightValue = typeof right === "number" ? right : Number.MAX_SAFE_INTEGER;
+  return leftValue - rightValue;
+}
+
 function compareSources(
   left: CanvasReviewerSourceDescriptor,
   right: CanvasReviewerSourceDescriptor,
 ): number {
-  if (left.availability !== right.availability) {
-    return left.availability === "available" ? -1 : 1;
+  if (left.placement.group !== right.placement.group) {
+    return left.placement.group === "module" ? -1 : 1;
+  }
+
+  if (left.placement.group === "module" && right.placement.group === "module") {
+    const modulePosition = compareNullablePosition(
+      left.placement.modulePosition,
+      right.placement.modulePosition,
+    );
+    if (modulePosition !== 0) return modulePosition;
+
+    const moduleTitle = compareAsciiCaseInsensitive(
+      left.placement.moduleTitle ?? "",
+      right.placement.moduleTitle ?? "",
+    );
+    if (moduleTitle !== 0) return moduleTitle;
+
+    const itemPosition = compareNullablePosition(
+      left.placement.itemPosition,
+      right.placement.itemPosition,
+    );
+    if (itemPosition !== 0) return itemPosition;
   }
 
   const leftType = SOURCE_TYPE_ORDER.get(left.type) ?? Number.MAX_SAFE_INTEGER;

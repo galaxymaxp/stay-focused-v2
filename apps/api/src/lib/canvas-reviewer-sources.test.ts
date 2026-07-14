@@ -235,6 +235,110 @@ describe("Canvas reviewer source service", () => {
     expect(serialized).not.toContain("current_sha256");
   });
 
+  it("orders proven module sources by module and item position before stable ungrouped sources", async () => {
+    const firstPage = {
+      ...basePageRow(),
+      canvas_page_id: "page-first",
+      id: PAGE_ID,
+      title: "Alphabetically later",
+    };
+    const secondPage = {
+      ...basePageRow(),
+      canvas_page_id: "page-second",
+      id: OTHER_PAGE_ID,
+      title: "Alphabetically earlier",
+    };
+    const fake = createFakeCanvasClient({
+      canvas_module_items: [
+        {
+          ...moduleItemRow({
+            id: "88888888-8888-4888-8888-888888888881",
+            pageUrl: "",
+          }),
+          canvas_content_id: "page-first",
+          module_id: "module-one",
+          position: 1,
+        },
+        {
+          ...moduleItemRow({
+            id: "88888888-8888-4888-8888-888888888882",
+            pageUrl: "",
+          }),
+          canvas_content_id: "page-second",
+          module_id: "module-two",
+          position: 1,
+        },
+      ],
+      canvas_modules: [
+        moduleRow("module-two", "Unit two", 2),
+        moduleRow("module-one", "Unit one", 1),
+      ],
+      canvas_pages: [secondPage, firstPage],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.courseName).toBe("Fictional Biology");
+    expect(result.value.sources.slice(0, 2).map((source) => source.id)).toEqual([
+      `page:${PAGE_ID}`,
+      `page:${OTHER_PAGE_ID}`,
+    ]);
+    expect(result.value.sources.slice(0, 2).map((source) => source.placement)).toEqual([
+      {
+        group: "module",
+        itemPosition: 1,
+        modulePosition: 1,
+        moduleTitle: "Unit one",
+      },
+      {
+        group: "module",
+        itemPosition: 1,
+        modulePosition: 2,
+        moduleTitle: "Unit two",
+      },
+    ]);
+    expect(result.value.sources.at(-1)?.placement.group).toBe("ungrouped");
+  });
+
+  it("returns safe source capabilities without resolving content or calling providers", async () => {
+    const fake = createFakeCanvasClient({
+      canvas_assignments: [{ ...baseAssignmentRow(), description_html: null }],
+      canvas_files: [
+        {
+          ...baseFileRow(),
+          content_type: "text/plain",
+          ingestion_eligibility: "metadata_only_unsupported",
+          ingestion_status: "metadata_only",
+        },
+      ],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.find((source) => source.type === "page")?.capability).toBe(
+      "ready",
+    );
+    expect(
+      result.value.sources.find((source) => source.type === "assignment")?.capability,
+    ).toBe("empty");
+    expect(result.value.sources.find((source) => source.type === "file")?.capability).toBe(
+      "unsupported",
+    );
+    expect(fake.storageCalls).toHaveLength(0);
+  });
+
   it.each([
     [
       "failed but retryable",
@@ -908,9 +1012,16 @@ function source(
   return {
     descriptor: {
       availability: "available",
+      capability: "ready",
       estimatedCharacters: 20,
       file: null,
       id,
+      placement: {
+        group: "ungrouped",
+        itemPosition: null,
+        modulePosition: null,
+        moduleTitle: null,
+      },
       title,
       type,
       unavailableReason: null,
@@ -1497,6 +1608,17 @@ function moduleItemRow({
     last_synced_at: NOW,
     created_at: NOW,
     updated_at: NOW,
+  };
+}
+
+function moduleRow(id: string, name: string, position: number): FakeRecord {
+  return {
+    canvas_connection_id: CONNECTION_ID,
+    course_id: COURSE_ID,
+    id,
+    name,
+    position,
+    user_id: USER_ID,
   };
 }
 

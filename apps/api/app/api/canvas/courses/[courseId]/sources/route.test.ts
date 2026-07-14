@@ -76,14 +76,29 @@ describe("GET /api/canvas/courses/[courseId]/sources", () => {
     expect(body).toMatchObject({
       ok: true,
       availableSourceCount: 1,
+      courseName: "Fictional Biology",
       sources: [
         {
           id: "page:11111111-1111-4111-8111-111111111111",
           availability: "available",
+          capability: "ready",
+          placement: {
+            group: "module",
+            itemPosition: 1,
+            modulePosition: 1,
+            moduleTitle: "Unit one",
+          },
         },
         {
           id: "file:22222222-2222-4222-8222-222222222222",
           availability: "unavailable",
+          capability: "needs_preparation",
+          placement: {
+            group: "ungrouped",
+            itemPosition: null,
+            modulePosition: null,
+            moduleTitle: null,
+          },
         },
       ],
     });
@@ -148,6 +163,7 @@ function currentAuthClient(): unknown {
 function sourceList() {
   return {
     courseId: "00000000-0000-4000-8000-000000000001",
+    courseName: "Fictional Biology",
     courseSync: {
       status: "partial",
       completedAt: "2026-07-07T00:00:00.000Z",
@@ -163,6 +179,13 @@ function sourceList() {
         id: "page:11111111-1111-4111-8111-111111111111",
         type: "page",
         title: "Fictional Page",
+        capability: "ready",
+        placement: {
+          group: "module",
+          moduleTitle: "Unit one",
+          modulePosition: 1,
+          itemPosition: 1,
+        },
         availability: "available",
         file: null,
         unavailableReason: null,
@@ -173,6 +196,13 @@ function sourceList() {
         id: "file:22222222-2222-4222-8222-222222222222",
         type: "file",
         title: "Fictional File",
+        capability: "needs_preparation",
+        placement: {
+          group: "ungrouped",
+          moduleTitle: null,
+          modulePosition: null,
+          itemPosition: null,
+        },
         availability: "unavailable",
         file: {
           canPrepare: true,

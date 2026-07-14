@@ -34,7 +34,7 @@ export function Screen({
 
   return (
     <SafeAreaView style={[styles.safeArea, style]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       {scroll ? (
         <ScrollView
           contentContainerStyle={contentStyle}

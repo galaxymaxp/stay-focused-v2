@@ -387,6 +387,19 @@ export interface CanvasReviewerSourceDescriptor {
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
   readonly title: string;
+  readonly capability:
+    | "ready"
+    | "empty"
+    | "needs_preparation"
+    | "unsupported"
+    | "inaccessible"
+    | "failed";
+  readonly placement: {
+    readonly group: "module" | "ungrouped";
+    readonly moduleTitle: string | null;
+    readonly modulePosition: number | null;
+    readonly itemPosition: number | null;
+  };
   readonly availability: "available" | "unavailable";
   readonly unavailableReason: string | null;
   readonly updatedAt: string | null;
@@ -400,6 +413,7 @@ export interface CanvasReviewerSourceDescriptor {
 
 export interface CanvasReviewerSourceListPayload {
   readonly courseId: string;
+  readonly courseName: string;
   readonly courseSync: CanvasReviewerCourseSyncSummary;
   readonly availableSourceCount: number;
   readonly unavailableSourceCount: number;
@@ -989,7 +1003,11 @@ export async function getCanvasCourseGradeSyncStatus(
 }
 
 export async function listCanvasReviewerSources(
-  input: CanvasApiBaseInput & { readonly courseId: string },
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly limit?: number;
+    readonly offset?: number;
+  },
 ): Promise<CanvasApiResult<CanvasReviewerSourceListPayload>> {
   const courseId = input.courseId.trim();
   if (!courseId) {
@@ -998,9 +1016,25 @@ export async function listCanvasReviewerSources(
       "Choose a selected Canvas course before loading sources.",
     );
   }
+  if (
+    (input.limit !== undefined &&
+      (!Number.isSafeInteger(input.limit) || input.limit <= 0 || input.limit > 100)) ||
+    (input.offset !== undefined &&
+      (!Number.isSafeInteger(input.offset) || input.offset < 0 || input.offset > 1_000))
+  ) {
+    return clientError(
+      "invalid_request",
+      "Canvas source pagination is invalid.",
+    );
+  }
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.offset !== undefined) query.set("offset", String(input.offset));
   const endpoint = createEndpoint(
     input.apiBaseUrl,
-    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources`,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources${
+      query.size > 0 ? `?${query.toString()}` : ""
+    }`,
   );
   if (!endpoint.ok) return endpoint;
 
@@ -1575,6 +1609,7 @@ function parseCanvasReviewerSourceListResponse(
       data: {
         availableSourceCount: parsed.availableSourceCount,
         courseId: parsed.courseId,
+        courseName: parsed.courseName,
         courseSync: parsed.courseSync,
         pagination: parsed.pagination,
         sources: parsed.sources,
@@ -2431,6 +2466,7 @@ function isCanvasReviewerSourceListSuccessResponse(
     hasOnlyKeys(value, [
       "ok",
       "courseId",
+      "courseName",
       "courseSync",
       "availableSourceCount",
       "unavailableSourceCount",
@@ -2438,6 +2474,7 @@ function isCanvasReviewerSourceListSuccessResponse(
       "pagination",
     ]) &&
     typeof value.courseId === "string" &&
+    typeof value.courseName === "string" &&
     isCanvasReviewerCourseSyncSummary(value.courseSync) &&
     isNonNegativeInteger(value.availableSourceCount) &&
     isNonNegativeInteger(value.unavailableSourceCount) &&
@@ -2787,6 +2824,8 @@ function isCanvasReviewerSourceDescriptor(
       "id",
       "type",
       "title",
+      "capability",
+      "placement",
       "availability",
       "unavailableReason",
       "updatedAt",
@@ -2796,6 +2835,8 @@ function isCanvasReviewerSourceDescriptor(
     typeof value.id === "string" &&
     isCanvasReviewerSourceType(value.type) &&
     typeof value.title === "string" &&
+    isCanvasReviewerSourceCapability(value.capability) &&
+    isCanvasReviewerSourcePlacement(value.placement) &&
     (value.availability === "available" ||
       value.availability === "unavailable") &&
     (value.unavailableReason === null ||
@@ -2804,6 +2845,37 @@ function isCanvasReviewerSourceDescriptor(
     (value.estimatedCharacters === null ||
       isNonNegativeInteger(value.estimatedCharacters)) &&
     (value.file === null || isCanvasReviewerFileState(value.file))
+  );
+}
+
+function isCanvasReviewerSourceCapability(
+  value: unknown,
+): value is CanvasReviewerSourceDescriptor["capability"] {
+  return (
+    value === "ready" ||
+    value === "empty" ||
+    value === "needs_preparation" ||
+    value === "unsupported" ||
+    value === "inaccessible" ||
+    value === "failed"
+  );
+}
+
+function isCanvasReviewerSourcePlacement(
+  value: unknown,
+): value is CanvasReviewerSourceDescriptor["placement"] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "group",
+      "moduleTitle",
+      "modulePosition",
+      "itemPosition",
+    ]) &&
+    (value.group === "module" || value.group === "ungrouped") &&
+    (value.moduleTitle === null || typeof value.moduleTitle === "string") &&
+    (value.modulePosition === null || isNonNegativeInteger(value.modulePosition)) &&
+    (value.itemPosition === null || isNonNegativeInteger(value.itemPosition))
   );
 }
 
