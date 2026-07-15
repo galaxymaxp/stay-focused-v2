@@ -2,6 +2,25 @@
 
 Last refreshed: 2026-07-15, Asia/Manila.
 
+## Product Recovery R6 - Partial Device Acceptance
+
+R6 automated acceptance is complete, but real-device acceptance remains
+partial because this runtime did not provide a controllable physical iPhone
+Expo Go session. The API dev server started on port 3000, `/api/health`
+returned `{"status":"ok","version":"2.0.0"}`, Metro started on port 8081, and
+the Expo root returned HTTP 200. Root typecheck, lint, workspace tests,
+reviewer web smoke tests, PDF OCR web smoke, R3 OCR validation, R4 Canvas
+validation, R5 Canvas validation, and the root production build all passed with
+the R5 totals intact: Canvas 69/69, OCR 25/25, engine 287/287, API 428/428,
+mobile 154/154, and reviewer web smoke 51/51.
+
+No R6 production defect was reproduced and no product code was changed. The
+focused report is
+`docs/ai/product-recovery-r6-device-acceptance-20260715.md`. Physical iPhone
+normal text size, Dynamic Type, VoiceOver, LAN reachability, slow-network
+interruption, destructive-navigation prompts, and Study Library handoff remain
+deferred and must be observed before R6 can be marked complete.
+
 ## Product Recovery R5 — Canvas Source Selection and Reviewer UX
 
 R5 is complete. The selected-course Canvas path is now a staged student flow:

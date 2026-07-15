@@ -2,6 +2,19 @@
 
 Last refreshed: 2026-07-15, Asia/Manila.
 
+## Product Recovery Phase R6 - Partial
+
+Automated R6 acceptance passed on 2026-07-15, but physical-device acceptance
+remains deferred because no controllable physical iPhone Expo Go session was
+available to this agent. No product defect was reproduced, no product code was
+changed, and the R5 automated/protected gates remain green: Canvas 69/69, OCR
+25/25, engine 287/287, API 428/428, mobile 154/154, reviewer web smoke 51/51,
+R3/R4/R5 protected validations, PDF OCR web smoke, root lint/typecheck, and
+root production build.
+
+Immediate next task: complete Product Recovery Phase R6 on a physical iPhone
+with Expo Go before starting the next product phase.
+
 ## Product Recovery Phase R5 — Complete
 
 The Canvas reviewer path now presents authoritative module/item ordering, safe
@@ -12,7 +25,8 @@ inventories can load later pages without mixing changed or duplicate pages.
 R1-R4 security, OCR completeness, reviewer grounding, and provider-call gates
 remain intact. No database migration was required.
 
-Immediate next task: Product Recovery Phase R6 — real-device product acceptance.
+Immediate next task result: Product Recovery Phase R6 automated acceptance is
+partial pending physical-device observation.
 
 ## Phase 1 - Foundation And Reviewer Engine
 

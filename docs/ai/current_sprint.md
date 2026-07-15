@@ -2,6 +2,24 @@
 
 Last refreshed: 2026-07-15, Asia/Manila.
 
+## Product Recovery R6 Automated Acceptance
+
+R6 is partial. Automated acceptance passed, but required physical iPhone Expo
+Go checks remain deferred because this runtime had no controllable physical
+iPhone session. Local services were started only for readiness: the API served
+`/api/health` on port 3000 and Metro served the Expo root on port 8081. Root
+typecheck, lint, workspace tests, reviewer web smoke tests, PDF OCR web smoke,
+R3 OCR validation, R4 Canvas validation, R5 Canvas validation, and root build
+passed. Final totals remained Canvas 69/69, OCR 25/25, engine 287/287, API
+428/428, mobile 154/154, and reviewer web smoke 51/51.
+
+No R6 production defect was reproduced and no product code was changed. The
+focused R6 report is
+`docs/ai/product-recovery-r6-device-acceptance-20260715.md`. The next objective
+is still physical R6 acceptance on iPhone/Expo Go, including normal text size,
+Dynamic Type, VoiceOver, LAN reachability, slow/interrupted API behavior,
+destructive-navigation prompts, and Study Library handoff.
+
 ## Completed Product Recovery R5 Scope
 
 - Promoted the selected-course `Create reviewer` action and passed safe course

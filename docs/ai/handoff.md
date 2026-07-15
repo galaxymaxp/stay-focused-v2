@@ -6,6 +6,22 @@ paths.
 
 ## Current Status
 
+- Product Recovery R6 is partial. Automated acceptance passed on 2026-07-15,
+  but physical-device acceptance remains deferred because this agent did not
+  have a controllable physical iPhone Expo Go session. The API dev server
+  started on port 3000, `/api/health` returned the expected V2 payload, Metro
+  started on port 8081, the Expo root returned HTTP 200, root typecheck/lint,
+  workspace tests, reviewer web smoke tests, PDF OCR web smoke, R3/R4/R5
+  protected validations, and root production build passed. Totals remained
+  Canvas 69/69, OCR 25/25, engine 287/287, API 428/428, mobile 154/154, and
+  reviewer web smoke 51/51. No R6 production defect was reproduced and no
+  product code was changed. See
+  `docs/ai/product-recovery-r6-device-acceptance-20260715.md`.
+- Next task: finish Product Recovery Phase R6 on a physical iPhone with Expo
+  Go. Do not claim R6 complete until normal text size, Dynamic Type, VoiceOver,
+  LAN reachability, slow/interrupted API behavior, destructive-navigation
+  prompts, duplicate prevention, sign-out/session cleanup, and Study Library
+  handoff are actually observed with safe labels.
 - Product Recovery R5 is complete. The selected-course Canvas reviewer path is
   now `choose source -> prepare/check -> exact editable preview -> generate ->
   reviewer ready -> immutable snapshot save`. Sources use authoritative module
