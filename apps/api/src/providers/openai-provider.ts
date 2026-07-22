@@ -6,6 +6,12 @@ import type {
 import OpenAI from "openai";
 import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 
+import { REVIEWER_PROVIDER_CALL_TIMEOUT_MS } from "@/lib/processing-jobs/constants";
+
+// Each generation call has a provider-level deadline. The durable worker may
+// retry a retryable job, but no individual HTTP call may wait indefinitely.
+export const OPENAI_PROVIDER_REQUEST_TIMEOUT_MS = REVIEWER_PROVIDER_CALL_TIMEOUT_MS;
+
 export interface OpenAIJsonSchemaFormat {
   readonly type: "json_schema";
   readonly name: string;
@@ -160,7 +166,11 @@ export function createServerOpenAIProvider(
 }
 
 function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI({
+    apiKey,
+    timeout: OPENAI_PROVIDER_REQUEST_TIMEOUT_MS,
+    maxRetries: 1,
+  });
 
   return {
     responses: {

@@ -32,6 +32,36 @@ import type {
 export interface RunPipelineArgs extends PipelineOptions {
   readonly input: SourceNormalizationInput;
   readonly provider: GenerationProvider;
+  readonly onProgress?: (
+    progress: ReviewerPipelineProgress,
+  ) => void | Promise<void>;
+  readonly shouldCancel?: () => boolean | Promise<boolean>;
+}
+
+export interface ReviewerPipelineProgress {
+  readonly stage:
+    | "normalizing_source"
+    | "detecting_outline"
+    | "planning_sections"
+    | "generating_sections"
+    | "verifying_coverage"
+    | "retrying_sections"
+    | "assembling_reviewer";
+  readonly completedUnits?: number;
+  readonly totalUnits?: number;
+  readonly sourceCharacterCount?: number;
+  readonly normalizedCharacterCount?: number;
+  readonly outlineItemCount?: number;
+  readonly plannedSectionCount?: number;
+  readonly providerCallCount: number;
+  readonly retryCount: number;
+}
+
+export class PipelineCancellationError extends Error {
+  public constructor() {
+    super("Reviewer generation was cancelled.");
+    this.name = "PipelineCancellationError";
+  }
 }
 
 export interface SectionValidationFailure {
@@ -112,8 +142,34 @@ export async function runPipeline(
 ): Promise<ReviewerOutput> {
   validateArgs(args);
 
+  let providerCallCount = 0;
+  let retryCount = 0;
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "normalizing_source",
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    providerCallCount,
+    retryCount,
+  });
   const source = await normalizeSource(args.input);
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "detecting_outline",
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    providerCallCount,
+    retryCount,
+  });
   const outline = await detectOutline(source);
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "planning_sections",
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    outlineItemCount: outline.sections.length,
+    providerCallCount,
+    retryCount,
+  });
   const plan = buildGenerationPlan(outline, source);
   const initialOutputs: SectionOutput[] = [];
   const sectionValidationFailures = new Map<
@@ -123,7 +179,20 @@ export async function runPipeline(
   const retryAttemptsBySectionId = new Map<string, number>();
   const sectionQualityById = new Map<string, ReviewerSectionQualityStatus>();
 
-  for (const section of plan.sections) {
+  for (const [sectionIndex, section] of plan.sections.entries()) {
+    await assertNotCancelled(args);
+    await emitProgress(args, {
+      stage: "generating_sections",
+      completedUnits: sectionIndex,
+      totalUnits: plan.sections.length,
+      sourceCharacterCount: sourceInputCharacterCount(args.input),
+      normalizedCharacterCount: normalizedSourceCharacterCount(source),
+      outlineItemCount: outline.sections.length,
+      plannedSectionCount: plan.sections.length,
+      providerCallCount,
+      retryCount,
+    });
+    providerCallCount += 1;
     try {
       const output = await generateSection({
           section,
@@ -148,8 +217,31 @@ export async function runPipeline(
         createSectionValidationFailure(section.title, error),
       );
     }
+    await emitProgress(args, {
+      stage: "generating_sections",
+      completedUnits: sectionIndex + 1,
+      totalUnits: plan.sections.length,
+      sourceCharacterCount: sourceInputCharacterCount(args.input),
+      normalizedCharacterCount: normalizedSourceCharacterCount(source),
+      outlineItemCount: outline.sections.length,
+      plannedSectionCount: plan.sections.length,
+      providerCallCount,
+      retryCount,
+    });
   }
 
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "verifying_coverage",
+    completedUnits: initialOutputs.length,
+    totalUnits: plan.sections.length,
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    outlineItemCount: outline.sections.length,
+    plannedSectionCount: plan.sections.length,
+    providerCallCount,
+    retryCount,
+  });
   const initialCoverage = verifyCoverage({
     outputs: initialOutputs,
     plan,
@@ -166,6 +258,18 @@ export async function runPipeline(
     outputs: initialOutputs,
     plan,
     source,
+  });
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "retrying_sections",
+    completedUnits: initialOutputs.length,
+    totalUnits: plan.sections.length,
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    outlineItemCount: outline.sections.length,
+    plannedSectionCount: plan.sections.length,
+    providerCallCount,
+    retryCount,
   });
   const finalOutputs = await retryFailedSections({
     outputs: initialOutputs,
@@ -187,6 +291,8 @@ export async function runPipeline(
       );
     },
     onRetryAttempt: (section, attempt) => {
+      providerCallCount += 1;
+      retryCount += 1;
       retryAttemptsBySectionId.set(
         section.id,
         Math.max(retryAttemptsBySectionId.get(section.id) ?? 0, attempt),
@@ -212,6 +318,18 @@ export async function runPipeline(
     outputs: finalOutputs,
     plan,
     source,
+  });
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "assembling_reviewer",
+    completedUnits: finalOutputs.length,
+    totalUnits: plan.sections.length,
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    outlineItemCount: outline.sections.length,
+    plannedSectionCount: plan.sections.length,
+    providerCallCount,
+    retryCount,
   });
   const state: PipelineAssemblyErrorState = {
     source,
@@ -254,6 +372,30 @@ export async function runPipeline(
   }
 
   return reviewer;
+}
+
+async function emitProgress(
+  args: RunPipelineArgs,
+  progress: ReviewerPipelineProgress,
+): Promise<void> {
+  await args.onProgress?.(progress);
+}
+
+async function assertNotCancelled(args: RunPipelineArgs): Promise<void> {
+  if (await args.shouldCancel?.()) {
+    throw new PipelineCancellationError();
+  }
+}
+
+function sourceInputCharacterCount(input: SourceNormalizationInput): number {
+  if (typeof input.text === "string") {
+    return input.text.length;
+  }
+  return (input.blocks ?? []).reduce((total, block) => total + block.text.length, 0);
+}
+
+function normalizedSourceCharacterCount(source: NormalizedSource): number {
+  return source.blocks.reduce((total, block) => total + block.text.length, 0);
 }
 
 function createSectionValidationFailure(

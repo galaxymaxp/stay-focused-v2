@@ -178,6 +178,24 @@ describe("extractPdfDocument", () => {
 });
 
 describe("validatePdfOcrBytes", () => {
+  it("rejects an encrypted PDF without attempting provider extraction", async () => {
+    const result = await validatePdfOcrBytes({
+      bytes: new TextEncoder().encode("%PDF-1.7\n1 0 obj << /Encrypt 2 0 R >>\n"),
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({ ok: false, code: "pdf_encrypted" });
+  });
+
+  it("rejects an invalid PDF with a misleading file signature", async () => {
+    const result = await validatePdfOcrBytes({
+      bytes: new TextEncoder().encode("%PDF-this-is-not-a-document"),
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({ ok: false, code: "invalid_pdf" });
+  });
+
   it("enforces the configured document limit independently of the provider limit", async () => {
     const result = await validatePdfOcrBytes({
       bytes: await scannedPdf(7),

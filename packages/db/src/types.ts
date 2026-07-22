@@ -300,6 +300,80 @@ export type CanvasFilesInventorySnapshotResult =
 export type CanvasCourseSyncPreferencesReplacementResult =
   Database["public"]["Functions"]["replace_canvas_course_sync_preferences"]["Returns"][number];
 
+export type ProcessingJobType =
+  | "document_extraction"
+  | "reviewer_generation";
+export type ProcessingJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancellation_requested"
+  | "cancelled"
+  | "expired";
+export type ProcessingJobStage =
+  | "accepting_upload"
+  | "inspecting_document"
+  | "extracting_native_text"
+  | "preparing_ocr_chunks"
+  | "extracting_ocr"
+  | "verifying_pages"
+  | "assembling_text"
+  | "storing_result"
+  | "preparing_source"
+  | "normalizing_source"
+  | "detecting_outline"
+  | "planning_sections"
+  | "generating_sections"
+  | "verifying_coverage"
+  | "retrying_sections"
+  | "assembling_reviewer"
+  | "storing_reviewer";
+
+export type ProcessingJobDatabaseRow = {
+  readonly id: string;
+  readonly user_id: string;
+  readonly job_type: ProcessingJobType;
+  readonly status: ProcessingJobStatus;
+  readonly stage: ProcessingJobStage;
+  readonly status_message: string;
+  readonly completed_units: number | null;
+  readonly total_units: number | null;
+  readonly unit_label: "pages" | "sections" | null;
+  readonly source_metadata: Json;
+  readonly metrics: Json;
+  readonly source_snapshot_id: string;
+  readonly result_id: string | null;
+  readonly idempotency_key: string;
+  readonly request_fingerprint: string;
+  readonly idempotency_expires_at: string;
+  readonly retry_of_job_id: string | null;
+  readonly created_at: string;
+  readonly accepted_at: string;
+  readonly started_at: string | null;
+  readonly updated_at: string;
+  readonly completed_at: string | null;
+  readonly failed_at: string | null;
+  readonly cancellation_requested_at: string | null;
+  readonly expires_at: string;
+  readonly error_code: string | null;
+  readonly safe_error_message: string | null;
+  readonly retryable: boolean;
+  readonly attempt_count: number;
+  readonly max_attempts: number;
+  readonly next_attempt_at: string;
+  readonly lease_owner: string | null;
+  readonly lease_expires_at: string | null;
+  readonly heartbeat_at: string | null;
+};
+
+export type ProcessingJobRow =
+  Database["public"]["Tables"]["processing_jobs"]["Row"];
+export type ProcessingJobSourceRow =
+  Database["public"]["Tables"]["processing_job_sources"]["Row"];
+export type ProcessingJobResultRow =
+  Database["public"]["Tables"]["processing_job_results"]["Row"];
+
 export interface Database {
   public: {
     Tables: {
@@ -2607,6 +2681,170 @@ export interface Database {
           },
         ];
       };
+      processing_job_sources: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_kind: "pdf" | "image" | "text";
+          display_name: string;
+          mime_type: string;
+          storage_bucket: string | null;
+          storage_object_path: string | null;
+          source_text: string | null;
+          byte_size: number | null;
+          source_character_count: number | null;
+          page_count: number | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          source_kind: "pdf" | "image" | "text";
+          display_name: string;
+          mime_type: string;
+          storage_bucket?: string | null;
+          storage_object_path?: string | null;
+          source_text?: string | null;
+          byte_size?: number | null;
+          source_character_count?: number | null;
+          page_count?: number | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          source_kind?: "pdf" | "image" | "text";
+          display_name?: string;
+          mime_type?: string;
+          storage_bucket?: string | null;
+          storage_object_path?: string | null;
+          source_text?: string | null;
+          byte_size?: number | null;
+          source_character_count?: number | null;
+          page_count?: number | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      processing_jobs: {
+        Row: ProcessingJobDatabaseRow;
+        Insert: {
+          id?: string;
+          user_id: string;
+          job_type: ProcessingJobType;
+          status?: ProcessingJobStatus;
+          stage: ProcessingJobStage;
+          status_message?: string;
+          completed_units?: number | null;
+          total_units?: number | null;
+          unit_label?: "pages" | "sections" | null;
+          source_metadata?: Json;
+          metrics?: Json;
+          source_snapshot_id: string;
+          result_id?: string | null;
+          idempotency_key: string;
+          request_fingerprint: string;
+          idempotency_expires_at?: string;
+          retry_of_job_id?: string | null;
+          created_at?: string;
+          accepted_at?: string;
+          started_at?: string | null;
+          updated_at?: string;
+          completed_at?: string | null;
+          failed_at?: string | null;
+          cancellation_requested_at?: string | null;
+          expires_at?: string;
+          error_code?: string | null;
+          safe_error_message?: string | null;
+          retryable?: boolean;
+          attempt_count?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          lease_owner?: string | null;
+          lease_expires_at?: string | null;
+          heartbeat_at?: string | null;
+        };
+        Update: Partial<ProcessingJobDatabaseRow>;
+        Relationships: [];
+      };
+      processing_job_results: {
+        Row: {
+          id: string;
+          job_id: string;
+          user_id: string;
+          source_snapshot_id: string;
+          result_type: ProcessingJobType;
+          payload: Json;
+          metrics: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          user_id: string;
+          source_snapshot_id: string;
+          result_type: ProcessingJobType;
+          payload: Json;
+          metrics?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          job_id?: string;
+          user_id?: string;
+          source_snapshot_id?: string;
+          result_type?: ProcessingJobType;
+          payload?: Json;
+          metrics?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      processing_job_events: {
+        Row: {
+          id: string;
+          job_id: string;
+          user_id: string;
+          event_type:
+            | "job_succeeded"
+            | "job_failed"
+            | "job_cancelled"
+            | "job_expired";
+          payload: Json;
+          created_at: string;
+          delivered_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          user_id: string;
+          event_type:
+            | "job_succeeded"
+            | "job_failed"
+            | "job_cancelled"
+            | "job_expired";
+          payload?: Json;
+          created_at?: string;
+          delivered_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          job_id?: string;
+          user_id?: string;
+          event_type?:
+            | "job_succeeded"
+            | "job_failed"
+            | "job_cancelled"
+            | "job_expired";
+          payload?: Json;
+          created_at?: string;
+          delivered_at?: string | null;
+        };
+        Relationships: [];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -2661,6 +2899,102 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      create_processing_job: {
+        Args: {
+          p_user_id: string;
+          p_job_type: string;
+          p_idempotency_key: string;
+          p_request_fingerprint: string;
+          p_source_kind: string;
+          p_display_name: string;
+          p_mime_type: string;
+          p_storage_bucket: string | null;
+          p_storage_object_path: string | null;
+          p_source_text: string | null;
+          p_byte_size: number | null;
+          p_source_character_count: number | null;
+          p_page_count: number | null;
+          p_source_metadata: Json;
+          p_source_private_metadata: Json;
+          p_expires_at?: string | null;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      claim_processing_jobs: {
+        Args: {
+          p_worker_id: string;
+          p_job_types: string[];
+          p_limit?: number;
+          p_lease_seconds?: number;
+          p_now?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      heartbeat_processing_job: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_lease_seconds?: number;
+          p_now?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      update_processing_job_progress: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_stage: string;
+          p_status_message: string;
+          p_completed_units?: number | null;
+          p_total_units?: number | null;
+          p_unit_label?: string | null;
+          p_metrics?: Json;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      complete_processing_job: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_result_type: string;
+          p_payload: Json;
+          p_metrics?: Json;
+          p_completed_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      fail_processing_job: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_error_code: string;
+          p_safe_error_message: string;
+          p_retryable: boolean;
+          p_failed_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      request_processing_job_cancellation: {
+        Args: {
+          p_user_id: string;
+          p_job_id: string;
+          p_requested_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      retry_processing_job: {
+        Args: {
+          p_user_id: string;
+          p_job_id: string;
+          p_idempotency_key: string;
+          p_requested_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      recover_stale_processing_jobs: {
+        Args: { p_now?: string };
+        Returns: number;
+      };
       create_reviewer_source_snapshot: {
         Args: {
           p_user_id: string;

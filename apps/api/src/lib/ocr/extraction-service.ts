@@ -96,6 +96,26 @@ export type OcrExtractionResult =
     }
   | { readonly ok: false; readonly failure: OcrProviderFailure };
 
+export interface DocumentExtractionProgress {
+  readonly stage:
+    | "inspecting_document"
+    | "extracting_native_text"
+    | "preparing_ocr_chunks"
+    | "extracting_ocr"
+    | "verifying_pages"
+    | "assembling_text";
+  readonly completedPages?: number;
+  readonly totalPages?: number;
+  readonly ocrChunkCount?: number;
+}
+
+export class DocumentExtractionCancellationError extends Error {
+  public constructor() {
+    super("Document extraction was cancelled.");
+    this.name = "DocumentExtractionCancellationError";
+  }
+}
+
 export function validateImageOcrBytes({
   bytes,
   fileName,
@@ -193,6 +213,10 @@ export async function extractPdfDocument({
     readonly chunkConcurrency?: number;
     readonly documentTimeoutMs?: number;
     readonly providerRequestTimeoutMs?: number;
+    readonly onProgress?: (
+      progress: DocumentExtractionProgress,
+    ) => void | Promise<void>;
+    readonly shouldCancel?: () => boolean | Promise<boolean>;
   };
 }): Promise<OcrExtractionResult> {
   const documentTimeoutMs =
@@ -208,10 +232,15 @@ export async function extractPdfDocument({
         pageCount,
         providerRequestTimeoutMs:
           options.providerRequestTimeoutMs ?? OCR_PROVIDER_REQUEST_TIMEOUT_MS,
+        onProgress: options.onProgress,
+        shouldCancel: options.shouldCancel,
       }),
       documentTimeoutMs,
     );
   } catch (error) {
+    if (error instanceof DocumentExtractionCancellationError) {
+      throw error;
+    }
     if (error instanceof ExtractionTimeoutError) {
       return {
         ok: false,
@@ -235,15 +264,27 @@ async function extractPdfDocumentWithinDeadline({
   chunkConcurrency,
   getProvider,
   input,
+  onProgress,
   pageCount,
   providerRequestTimeoutMs,
+  shouldCancel,
 }: {
   readonly chunkConcurrency: number;
   readonly getProvider: () => OcrProvider;
   readonly input: OcrPdfInput;
   readonly pageCount: number;
   readonly providerRequestTimeoutMs: number;
+  readonly onProgress?: (
+    progress: DocumentExtractionProgress,
+  ) => void | Promise<void>;
+  readonly shouldCancel?: () => boolean | Promise<boolean>;
 }): Promise<OcrExtractionResult> {
+  await assertExtractionNotCancelled(shouldCancel);
+  await onProgress?.({
+    stage: "inspecting_document",
+    completedPages: 0,
+    totalPages: pageCount,
+  });
   let inspections: readonly PdfPageInspection[];
   const warnings: OcrWarning[] = [];
   try {
@@ -259,6 +300,16 @@ async function extractPdfDocumentWithinDeadline({
       message: "Embedded PDF text could not be inspected; affected pages used OCR.",
     });
   }
+
+  await assertExtractionNotCancelled(shouldCancel);
+  const inspectedPageCount = inspections.filter(
+    (page) => page.kind === "native_text" || page.kind === "blank",
+  ).length;
+  await onProgress?.({
+    stage: "extracting_native_text",
+    completedPages: inspectedPageCount,
+    totalPages: pageCount,
+  });
 
   const pages: OcrPage[] = inspections.flatMap((page) => {
     if (page.kind === "native_text") {
@@ -276,6 +327,12 @@ async function extractPdfDocumentWithinDeadline({
   let providerId = "pdfjs-native-text";
   let chunks: readonly PdfOcrChunk[] = [];
   if (ocrPageNumbers.length > 0) {
+    await assertExtractionNotCancelled(shouldCancel);
+    await onProgress?.({
+      stage: "preparing_ocr_chunks",
+      completedPages: inspectedPageCount,
+      totalPages: pageCount,
+    });
     let provider: OcrProvider;
     try {
       provider = getProvider();
@@ -294,16 +351,33 @@ async function extractPdfDocumentWithinDeadline({
       pageNumbers: ocrPageNumbers,
       pagesPerChunk: OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
     });
+    let processedPageCount = inspectedPageCount;
+    await onProgress?.({
+      stage: "extracting_ocr",
+      completedPages: processedPageCount,
+      totalPages: pageCount,
+      ocrChunkCount: chunks.length,
+    });
     const chunkResults = await mapWithConcurrency(
       chunks,
       chunkConcurrency,
-      async (chunk) =>
-        await extractOcrChunk({
+      async (chunk) => {
+        await assertExtractionNotCancelled(shouldCancel);
+        const chunkResult = await extractOcrChunk({
           chunk,
           fileName: input.fileName,
           provider,
           timeoutMs: providerRequestTimeoutMs,
-        }),
+        });
+        processedPageCount += chunk.originalPageNumbers.length;
+        await onProgress?.({
+          stage: "extracting_ocr",
+          completedPages: Math.min(processedPageCount, pageCount),
+          totalPages: pageCount,
+          ocrChunkCount: chunks.length,
+        });
+        return chunkResult;
+      },
     );
     for (const chunkResult of chunkResults) {
       pages.push(...chunkResult.pages);
@@ -311,6 +385,13 @@ async function extractPdfDocumentWithinDeadline({
     }
   }
 
+  await assertExtractionNotCancelled(shouldCancel);
+  await onProgress?.({
+    stage: "verifying_pages",
+    completedPages: pages.length,
+    totalPages: pageCount,
+    ocrChunkCount: chunks.length,
+  });
   const verification = verifyDocumentExtraction({
     expectedPageCount: pageCount,
     pages,
@@ -346,6 +427,13 @@ async function extractPdfDocumentWithinDeadline({
     };
   }
 
+  await onProgress?.({
+    stage: "assembling_text",
+    completedPages: pageCount,
+    totalPages: pageCount,
+    ocrChunkCount: chunks.length,
+  });
+
   return {
     ok: true,
     result: {
@@ -357,6 +445,14 @@ async function extractPdfDocumentWithinDeadline({
     },
     extraction: diagnostics,
   };
+}
+
+async function assertExtractionNotCancelled(
+  shouldCancel: (() => boolean | Promise<boolean>) | undefined,
+): Promise<void> {
+  if (await shouldCancel?.()) {
+    throw new DocumentExtractionCancellationError();
+  }
 }
 
 async function extractOcrChunk({
