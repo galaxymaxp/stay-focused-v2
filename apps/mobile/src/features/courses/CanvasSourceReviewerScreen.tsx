@@ -1281,7 +1281,7 @@ function formatCanvasSourceError(
     case "pdf_encrypted":
       return { message: "Choose an unlocked PDF or another item.", title: "PDF is locked" };
     case "pdf_page_limit_exceeded":
-      return { message: "Choose a PDF with five pages or fewer.", title: "PDF is too long" };
+      return { message: "Choose a shorter PDF that fits the current document limit.", title: "PDF is too long" };
     case "ocr_not_configured":
     case "ocr_failed":
     case "storage_read_failed":

@@ -1818,3 +1818,11 @@ Current route status:
 - Signed-in reviewer generation: pending manual confirmation because credentials must be entered by the human and were not requested, logged, stored, or hardcoded.
 - Reviewer preview/logout: pending manual confirmation with the same constraint.
 - Verification: reviewer route test PASS (17/17); mobile typecheck PASS; API typecheck PASS; engine build PASS; engine eval PASS (264/264); `git diff --check` PASS with line-ending warnings only.
+
+### 2026-07-23 generalized multi-page PDF extraction
+- Split the Google synchronous provider boundary (5 pages per request) from the user-document boundary (40 pages, configurable downward), while retaining the 10 MiB upload limit.
+- Added subject-neutral per-page inspection: usable embedded text stays local through PDF.js, confirmed blank pages remain explicit, and only scanned/unreadable pages are copied with `pdf-lib` into five-page OCR chunks.
+- Added concurrency 2, local-to-original page remapping, deterministic merge order, chunk/page diagnostics, a 50-second document deadline, and a retryable timeout response. Missing, duplicate, failed, or malformed pages remain ineligible for reviewer generation.
+- Mobile now reports the actual configured document limit, retains affected-page details for incomplete extraction, and no longer describes five pages as the product limit.
+- Synthetic coverage includes 1/5/6/12-page scans, native, mixed, blank, failed/incomplete chunks, limit validation, provider-boundary enforcement, concurrency, and cross-domain reviewer checks for biology, history, and mathematics.
+- Black-box fixture result: the 32-page example extracted completely in mixed mode (31 native pages, 1 OCR page, 1 OCR chunk, 6,622 characters); live reviewer generation produced 13 sections with coverage, grounding, and leakage all passing at 1.00/zero issues. Physical iPhone interaction was not performed in this run.

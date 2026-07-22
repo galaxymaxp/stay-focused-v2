@@ -385,12 +385,16 @@ describe("reviewer source flow", () => {
   it("shows PDF page-limit errors safely", () => {
     const state = reviewerSourceReducer(initialReviewerSourceState, {
       type: "ocr_failed",
-      error: ocrError("pdf_page_limit_exceeded", "raw detail"),
+      error: {
+        ...ocrError("pdf_page_limit_exceeded", "raw detail"),
+        documentPageLimit: 40,
+      },
     });
 
     expect(state.ocrError).toMatchObject({
       code: "pdf_page_limit_exceeded",
       title: "PDF has too many pages",
+      message: "Choose a PDF with 40 pages or fewer.",
     });
     expect(JSON.stringify(state)).not.toContain("raw detail");
   });

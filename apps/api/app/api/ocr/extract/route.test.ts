@@ -301,6 +301,9 @@ function completeExtraction(expectedPageCount: number, successfulPageCount: numb
     invalidPageNumbers: [],
     affectedPageNumbers: [],
     failureCategories: [],
+    extractionMode: "ocr",
+    nativeTextPageCount: 0,
+    ocrPageCount: expectedPageCount,
   };
 }
 

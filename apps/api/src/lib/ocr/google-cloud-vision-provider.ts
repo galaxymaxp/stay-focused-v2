@@ -1,4 +1,5 @@
 import {
+  OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
   normalizeOcrResult,
   OcrProviderError,
   type NormalizeOcrResultInput,
@@ -173,6 +174,14 @@ export class GoogleCloudVisionOcrProvider implements OcrProvider {
   private async extractPdf(input: Extract<OcrInput, { readonly kind: "pdf" }>): Promise<OcrResult> {
     if (input.requestedPages.length === 0) {
       throw providerFailure(new Error("PDF OCR requires at least one page."));
+    }
+    if (
+      input.requestedPages.length >
+      OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST
+    ) {
+      throw providerFailure(
+        new Error("PDF OCR provider request exceeded its page boundary."),
+      );
     }
 
     let response: unknown;

@@ -100,11 +100,120 @@ export const pipelineSuite: EvalSuite = {
     ...basicCases.map(createBasicCase),
     ...retryCases.map(createRetryCase),
     ...validationCases.map(createValidationCase),
+    ...createDomainGeneralizationCases(),
     createFlatOcrPlainTextBoundaryCase(),
     createCollectAndContinueCase(),
     createInfraErrorBoundaryCase(),
   ],
 };
+
+function createDomainGeneralizationCases(): readonly EvalCase[] {
+  const fixtures = [
+    {
+      name: "biology source preserves domain terminology without visible enrichment",
+      id: "pipeline-generalization-biology",
+      text: "# Cell Membrane\n\nThe phospholipid bilayer regulates transport.\n\n# Mitosis\n\nProphase precedes metaphase and anaphase.",
+      sectionTitles: ["Cell Membrane", "Mitosis"],
+      terms: ["phospholipid bilayer", "Prophase", "metaphase", "anaphase"],
+    },
+    {
+      name: "history source preserves chronology without a fixed section template",
+      id: "pipeline-generalization-history",
+      text: "# Reform Movement\n\nThe movement developed during the late nineteenth century.\n\n# Primary Sources\n\nLetters and newspapers document competing perspectives.\n\n# Historical Context\n\nInterpretation depends on chronology and authorship.",
+      sectionTitles: ["Reform Movement", "Primary Sources", "Historical Context"],
+      terms: ["nineteenth century", "Letters and newspapers", "chronology", "authorship"],
+    },
+    {
+      name: "mathematics source preserves symbols and technical order",
+      id: "pipeline-generalization-mathematics",
+      text: "# Linear Function\n\nFor f(x) = 2x + 3, the slope is 2.\n\n# Worked Comparison\n\nIf x = 4, then f(4) = 11; compare this with g(x) = x².",
+      sectionTitles: ["Linear Function", "Worked Comparison"],
+      terms: ["f(x) = 2x + 3", "slope is 2", "f(4) = 11", "g(x) = x²"],
+    },
+  ] as const;
+
+  return fixtures.map((fixture) => ({
+    name: fixture.name,
+    run: async () => {
+      const reviewer = await runWithProvider(
+        {
+          id: fixture.id,
+          kind: "document",
+          language: "en",
+          text: fixture.text,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        new FakeProvider("pass"),
+      );
+      const visibleText = reviewer.sections
+        .flatMap((section) =>
+          section.items.flatMap((item) => [
+            item.title,
+            item.sourceCore.explanation,
+            ...item.sourceCore.keyPoints,
+          ]),
+        )
+        .join("\n");
+      const normalizedSource = normalizeComparableText(fixture.text);
+      const issues: EvalIssue[] = [
+        ...assertDeepEqual(
+          reviewer.sections.map((section) => section.title),
+          fixture.sectionTitles,
+          "Generalized reviewer sections did not preserve source order.",
+        ),
+        ...assertEqual(
+          reviewer.sections.every((section) =>
+            section.items.every((item) => item.enrichment === null),
+          ),
+          true,
+          "Generalized reviewer exposed unsupported enrichment.",
+        ),
+        ...assertEqual(
+          /\b(?:malware|infiltration|denial of service|blended attacks)\b/i.test(
+            visibleText,
+          ),
+          false,
+          "Generalized reviewer leaked unrelated subject vocabulary.",
+        ),
+      ];
+
+      for (const term of fixture.terms) {
+        issues.push(
+          ...assertIncludes(
+            visibleText,
+            term,
+            `Generalized reviewer lost source term "${term}".`,
+          ),
+        );
+      }
+      for (const section of reviewer.sections) {
+        for (const item of section.items) {
+          for (const value of [
+            item.sourceCore.explanation,
+            ...item.sourceCore.keyPoints,
+          ]) {
+            if (!value) continue;
+            issues.push(
+              ...assertEqual(
+                normalizedSource.includes(normalizeComparableText(value)),
+                true,
+                "Generalized reviewer emitted source-core text absent from its source.",
+              ),
+            );
+          }
+        }
+      }
+      return issues;
+    },
+  }));
+}
+
+function normalizeComparableText(value: string): string {
+  return value
+    .replace(/^#+\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function createFlatOcrPlainTextBoundaryCase(): EvalCase {
   return {

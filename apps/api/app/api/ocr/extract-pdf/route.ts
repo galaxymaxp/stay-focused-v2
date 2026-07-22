@@ -1,20 +1,19 @@
 import {
   OCR_PDF_MIME_TYPE,
   type DocumentExtractionDiagnostics,
-  type OcrProvider,
 } from "@stay-focused/ocr";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import {
-  extractWithOcrProvider,
+  extractPdfDocument,
   validatePdfOcrBytes,
   type OcrProviderFailure,
 } from "@/lib/ocr/extraction-service";
 import {
+  DOCUMENT_MAX_PDF_PAGES,
   OCR_MAX_PDF_BYTES,
-  OCR_MAX_PDF_PAGES,
   OCR_PDF_FORM_FIELD,
 } from "@/lib/ocr/upload-policy";
 import type {
@@ -44,7 +43,7 @@ interface ValidatedPdfUpload {
 }
 
 interface MappedOcrError {
-  readonly status: 422 | 500 | 502;
+  readonly status: 422 | 500 | 502 | 503;
   readonly code: OcrExtractErrorCode;
   readonly message: string;
   readonly extraction: DocumentExtractionDiagnostics;
@@ -101,25 +100,26 @@ async function handlePost(request: Request): Promise<Response> {
 
   const upload = await readAndValidateUpload(request);
   if (!upload.ok) {
-    return errorResponse(upload.status, upload.code, upload.message, request);
-  }
-
-  const provider = createProvider();
-  if (!provider.ok) {
     return errorResponse(
-      500,
-      "ocr_not_configured",
-      "OCR provider is not configured.",
+      upload.status,
+      upload.code,
+      upload.message,
       request,
+      undefined,
+      upload.documentPageLimit,
     );
   }
 
-  const extraction = await extractWithOcrProvider(provider.value, {
-    kind: "pdf",
-    mimeType: OCR_PDF_MIME_TYPE,
-    bytes: upload.value.bytes,
-    requestedPages: upload.value.requestedPages,
-    ...(upload.value.fileName ? { fileName: upload.value.fileName } : {}),
+  const extraction = await extractPdfDocument({
+    getProvider: createServerOcrProvider,
+    input: {
+      kind: "pdf",
+      mimeType: OCR_PDF_MIME_TYPE,
+      bytes: upload.value.bytes,
+      requestedPages: upload.value.requestedPages,
+      ...(upload.value.fileName ? { fileName: upload.value.fileName } : {}),
+    },
+    pageCount: upload.value.pageCount,
   });
   if (!extraction.ok) {
     const mapped = mapOcrError(extraction.failure);
@@ -170,6 +170,7 @@ async function readAndValidateUpload(
       readonly status: 400 | 413 | 415 | 422;
       readonly code: OcrExtractErrorCode;
       readonly message: string;
+      readonly documentPageLimit?: number;
     }
 > {
   let formData: FormData;
@@ -227,7 +228,10 @@ async function readAndValidateUpload(
     mimeType,
   });
   if (!validation.ok) {
-    return pdfValidationError(validation.code);
+    return pdfValidationError(
+      validation.code,
+      validation.documentPageLimit,
+    );
   }
 
   return {
@@ -249,11 +253,13 @@ function pdfValidationError(
     | "pdf_encrypted"
     | "pdf_page_limit_exceeded"
     | "unsupported_file_type",
+  documentPageLimit?: number,
 ): {
   readonly ok: false;
   readonly status: 400 | 413 | 415 | 422;
   readonly code: OcrExtractErrorCode;
   readonly message: string;
+  readonly documentPageLimit?: number;
 } {
   switch (code) {
     case "empty_file":
@@ -279,7 +285,8 @@ function pdfValidationError(
         ok: false,
         status: 422,
         code: "pdf_page_limit_exceeded",
-        message: `PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per request.`,
+        message: `This service accepts PDFs with up to ${documentPageLimit ?? DOCUMENT_MAX_PDF_PAGES} pages.`,
+        documentPageLimit: documentPageLimit ?? DOCUMENT_MAX_PDF_PAGES,
       };
     case "invalid_pdf":
       return invalidPdf("The uploaded PDF could not be parsed.");
@@ -376,16 +383,6 @@ function isMultipartFormData(contentType: string | null): boolean {
   return contentType?.toLowerCase().startsWith("multipart/form-data") ?? false;
 }
 
-function createProvider():
-  | { readonly ok: true; readonly value: OcrProvider }
-  | { readonly ok: false } {
-  try {
-    return { ok: true, value: createServerOcrProvider() };
-  } catch {
-    return { ok: false };
-  }
-}
-
 function mapOcrError(error: OcrProviderFailure): MappedOcrError {
   switch (error.code) {
     case "ocr_not_configured":
@@ -423,6 +420,13 @@ function mapOcrError(error: OcrProviderFailure): MappedOcrError {
         message: "Not every page could be read. Retry, rescan the affected pages, or choose another document.",
         extraction: error.extraction,
       };
+    case "document_extraction_timeout":
+      return {
+        status: 503,
+        code: "document_extraction_timeout",
+        message: "Document extraction reached the synchronous time limit. Retry the request.",
+        extraction: error.extraction,
+      };
     case "internal_error":
       return {
         status: 500,
@@ -434,25 +438,35 @@ function mapOcrError(error: OcrProviderFailure): MappedOcrError {
 }
 
 function errorResponse(
-  status: 400 | 401 | 413 | 415 | 422 | 500 | 502,
+  status: 400 | 401 | 413 | 415 | 422 | 500 | 502 | 503,
   code: OcrExtractErrorCode,
   message: string,
   request?: Request,
   extraction?: DocumentExtractionDiagnostics,
+  documentPageLimit?: number,
 ): Response {
-  return jsonResponse(
+  const response = jsonResponse(
     {
       ok: false,
-      error: { code, message, ...(extraction ? { extraction } : {}) },
+      error: {
+        code,
+        message,
+        ...(extraction ? { extraction } : {}),
+        ...(documentPageLimit !== undefined ? { documentPageLimit } : {}),
+      },
     },
     status,
     request,
   );
+  if (code === "document_extraction_timeout") {
+    response.headers.set("Retry-After", "5");
+  }
+  return response;
 }
 
 function jsonResponse(
   body: OcrExtractResponse,
-  status: 200 | 400 | 401 | 413 | 415 | 422 | 500 | 502,
+  status: 200 | 400 | 401 | 413 | 415 | 422 | 500 | 502 | 503,
   request?: Request,
 ): Response {
   return NextResponse.json(body, {

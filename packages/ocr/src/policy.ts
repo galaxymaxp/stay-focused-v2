@@ -1,3 +1,3 @@
 // Google Vision synchronous files:annotate accepts at most five pages per file.
-// Raising this limit requires a separately planned asynchronous storage workflow.
-export const OCR_MAX_PDF_PAGES = 5;
+// This is a provider-call boundary, never a user-document limit.
+export const OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST = 5;

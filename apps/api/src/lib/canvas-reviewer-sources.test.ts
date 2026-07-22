@@ -1688,7 +1688,9 @@ function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
 async function createPdfBytes(pageCount: number): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   for (let index = 0; index < pageCount; index += 1) {
-    pdf.addPage([200, 200]);
+    pdf
+      .addPage([200, 200])
+      .drawRectangle({ x: 20, y: 20, width: 20, height: 20 });
   }
   return pdf.save({ updateFieldAppearances: false });
 }

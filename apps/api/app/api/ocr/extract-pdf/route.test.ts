@@ -16,8 +16,9 @@ vi.mock("@/lib/ocr/create-server-ocr-provider", () => ({
 }));
 
 const {
+  DOCUMENT_MAX_PDF_PAGES,
   OCR_MAX_PDF_BYTES,
-  OCR_MAX_PDF_PAGES,
+  OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
   OCR_PDF_FORM_FIELD,
 } = await import("@/lib/ocr/upload-policy");
 const { OPTIONS, POST } = await import("./route");
@@ -198,11 +199,15 @@ describe("POST /api/ocr/extract-pdf", () => {
 
   it("returns 422 when the PDF is above the page limit", async () => {
     const response = await POST(
-      await createRequest({ bytes: await createPdfBytes(OCR_MAX_PDF_PAGES + 1) }),
+      await createRequest({ bytes: await createPdfBytes(DOCUMENT_MAX_PDF_PAGES + 1) }),
     );
 
     expect(response.status).toBe(422);
-    await expectError(response, "pdf_page_limit_exceeded");
+    const body = await expectError(response, "pdf_page_limit_exceeded") as {
+      error: { documentPageLimit: number; message: string };
+    };
+    expect(body.error.documentPageLimit).toBe(DOCUMENT_MAX_PDF_PAGES);
+    expect(body.error.message).toContain(String(DOCUMENT_MAX_PDF_PAGES));
     expect(fakeProvider.extract).not.toHaveBeenCalled();
   });
 
@@ -232,7 +237,7 @@ describe("POST /api/ocr/extract-pdf", () => {
     expect(fakeProvider.extract).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when the OCR provider fails", async () => {
+  it("reports affected pages without leaking details when an OCR chunk fails", async () => {
     fakeProvider.extract.mockRejectedValueOnce(
       new OcrProviderError({
         code: "ocr_provider_failed",
@@ -242,25 +247,22 @@ describe("POST /api/ocr/extract-pdf", () => {
     );
 
     const response = await POST(await createRequest());
-    const body = await expectError(response, "ocr_provider_failed");
+    const body = await expectError(response, "document_extraction_incomplete") as {
+      error: { extraction: { affectedPageNumbers: number[] } };
+    };
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(422);
+    expect(body.error.extraction.affectedPageNumbers).toEqual([1]);
     expect(JSON.stringify(body)).not.toContain("raw Google response");
   });
 
   it("returns 422 when no text is detected", async () => {
-    fakeProvider.extract.mockRejectedValueOnce(
-      new OcrProviderError({
-        code: "ocr_empty_result",
-        message: "empty",
-        provider: "google-cloud-vision",
-      }),
-    );
+    fakeProvider.extract.mockResolvedValueOnce(resultForPages([blankPage(1)]));
 
     const response = await POST(await createRequest());
 
     expect(response.status).toBe(422);
-    await expectError(response, "no_text_detected");
+    await expectError(response, "document_unreadable");
   });
 
   it("returns a typed OCR result for a valid one-page PDF", async () => {
@@ -272,6 +274,7 @@ describe("POST /api/ocr/extract-pdf", () => {
       ok: true,
       data: {
         ...fakePdfResult,
+        provider: "fake-ocr",
         pageCount: 1,
         processedPageCount: 1,
         extraction: completeExtraction(1, 1),
@@ -315,7 +318,7 @@ describe("POST /api/ocr/extract-pdf", () => {
     );
 
     const response = await POST(
-      await createRequest({ bytes: await createPdfBytes(OCR_MAX_PDF_PAGES) }),
+      await createRequest({ bytes: await createPdfBytes(OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST) }),
     );
     const body = await response.json();
 
@@ -331,6 +334,44 @@ describe("POST /api/ocr/extract-pdf", () => {
     );
     expect(body.data.text).not.toMatch(/Page\s+\d+:/);
     expect(fakeProvider.extract).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts six scanned pages while keeping provider calls at five pages", async () => {
+    let chunkIndex = 0;
+    fakeProvider.extract.mockImplementation(async (input) => {
+      if (input.kind !== "pdf") {
+        throw new Error("Expected PDF input");
+      }
+      const offset = chunkIndex * OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST;
+      chunkIndex += 1;
+      return resultForPages(
+        input.requestedPages.map((localPageNumber: number) => ({
+          ...textPage(localPageNumber),
+          text: `Neutral source page ${offset + localPageNumber}`,
+        })),
+      );
+    });
+
+    const response = await POST(await createRequest({ bytes: await createPdfBytes(6) }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fakeProvider.extract).toHaveBeenCalledTimes(2);
+    expect(
+      fakeProvider.extract.mock.calls.map(([input]) =>
+        input.kind === "pdf" ? input.requestedPages : [],
+      ),
+    ).toEqual([
+      [1, 2, 3, 4, 5],
+      [1],
+    ]);
+    expect(body.data.extraction.ocrChunks).toEqual([
+      { originalPageNumbers: [1, 2, 3, 4, 5] },
+      { originalPageNumbers: [6] },
+    ]);
+    expect(body.data.pages.map((page: { pageNumber: number }) => page.pageNumber)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ]);
   });
 
   it("retains a blank middle page and later page identity", async () => {
@@ -502,6 +543,32 @@ function completeExtraction(expectedPageCount: number, successfulPageCount: numb
     invalidPageNumbers: [],
     affectedPageNumbers: [],
     failureCategories: [],
+    extractionMode: "ocr",
+    nativeTextPageCount: 0,
+    ocrPageCount: expectedPageCount,
+    ocrChunkCount: Math.ceil(
+      expectedPageCount / OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+    ),
+    ocrChunks: Array.from(
+      {
+        length: Math.ceil(
+          expectedPageCount / OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+        ),
+      },
+      (_, chunkIndex) => ({
+        originalPageNumbers: Array.from(
+          {
+            length: Math.min(
+              OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+              expectedPageCount -
+                chunkIndex * OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+            ),
+          },
+          (_, pageIndex) =>
+            chunkIndex * OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST + pageIndex + 1,
+        ),
+      }),
+    ),
   };
 }
 
@@ -549,7 +616,8 @@ function failedPage(pageNumber: number): OcrResult["pages"][number] {
 async function createPdfBytes(pageCount: number): Promise<Uint8Array> {
   const document = await PDFDocument.create();
   for (let index = 0; index < pageCount; index += 1) {
-    document.addPage();
+    const page = document.addPage();
+    page.drawRectangle({ x: 12, y: 12, width: 12, height: 12 });
   }
   return await document.save({ useObjectStreams: false });
 }

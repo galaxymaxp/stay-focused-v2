@@ -115,6 +115,7 @@ export function verifyDocumentExtraction({
     outOfRangePageNumbers: normalizedOutOfRangePageNumbers,
     invalidPageNumbers: normalizedInvalidPageNumbers,
     affectedPageNumbers,
+    ...createMethodDiagnostics(inRangePages),
   };
 
   if (failureCategories.length > 0) {
@@ -164,12 +165,31 @@ export function verifyDocumentExtraction({
   };
 }
 
+function createMethodDiagnostics(pages: readonly OcrPage[]): {
+  readonly extractionMode: "native_text" | "ocr" | "mixed";
+  readonly nativeTextPageCount: number;
+  readonly ocrPageCount: number;
+} {
+  const nativeTextPageCount = pages.filter(
+    (page) => page.method === "native_text",
+  ).length;
+  const ocrPageCount = pages.filter((page) => page.method === "ocr").length;
+  const extractionMode =
+    nativeTextPageCount > 0 && ocrPageCount > 0
+      ? "mixed"
+      : nativeTextPageCount > 0
+        ? "native_text"
+        : "ocr";
+
+  return { extractionMode, nativeTextPageCount, ocrPageCount };
+}
+
 export function createFailedDocumentExtractionDiagnostics({
   expectedPageCount,
   failureCategory,
 }: {
   readonly expectedPageCount: number;
-  readonly failureCategory: "provider_failure" | "internal_failure";
+  readonly failureCategory: "provider_failure" | "timeout" | "internal_failure";
 }): DocumentExtractionDiagnostics {
   const safeExpectedPageCount = isPositiveInteger(expectedPageCount)
     ? expectedPageCount

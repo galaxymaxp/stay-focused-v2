@@ -14,6 +14,7 @@ import {
   CANVAS_SOURCE_FILE_BUCKET,
   safeObjectKeyForCanvasFile,
 } from "@/lib/canvas-file-policy";
+import { DOCUMENT_MAX_PDF_PAGES } from "@/lib/ocr/upload-policy";
 
 import { extractPreparedCanvasFileText } from "./canvas-stored-file-extraction";
 
@@ -274,8 +275,8 @@ describe("Canvas stored file extraction", () => {
     expect(provider.calls).toHaveLength(0);
   });
 
-  it("rejects PDFs over the synchronous page limit", async () => {
-    const bytes = await makePdfBytes(6);
+  it("rejects PDFs over the configured document page limit", async () => {
+    const bytes = await makePdfBytes(DOCUMENT_MAX_PDF_PAGES + 1);
     const file = makeReadyFile({
       bytes,
       contentType: "application/pdf",
@@ -523,7 +524,9 @@ function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
 async function makePdfBytes(pageCount: number): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   for (let index = 0; index < pageCount; index += 1) {
-    pdf.addPage([200, 200]);
+    pdf
+      .addPage([200, 200])
+      .drawRectangle({ x: 20, y: 20, width: 20, height: 20 });
   }
   return pdf.save({ updateFieldAppearances: false });
 }

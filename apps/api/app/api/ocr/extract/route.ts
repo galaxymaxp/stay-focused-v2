@@ -369,6 +369,13 @@ function mapOcrError(error: OcrProviderFailure): MappedOcrError {
         message: "The image extraction result was incomplete. Try the image again.",
         extraction: error.extraction,
       };
+    case "document_extraction_timeout":
+      return {
+        status: 500,
+        code: "internal_error",
+        message: "OCR extraction failed.",
+        extraction: error.extraction,
+      };
     case "internal_error":
       return {
         status: 500,

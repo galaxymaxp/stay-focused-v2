@@ -353,7 +353,8 @@ describe("extractPdfOcrText", () => {
           ok: false,
           error: {
             code: "pdf_page_limit_exceeded",
-            message: "PDF OCR supports up to 5 pages per request.",
+            message: "This service accepts PDFs with up to 40 pages.",
+            documentPageLimit: 40,
           },
         },
         422,
@@ -364,7 +365,35 @@ describe("extractPdfOcrText", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      error: { code: "pdf_page_limit_exceeded", status: 422 },
+      error: {
+        code: "pdf_page_limit_exceeded",
+        status: 422,
+        documentPageLimit: 40,
+      },
+    });
+  });
+
+  it("maps a retryable synchronous extraction timeout", async () => {
+    const result = await extractPdfOcrText({
+      accessToken: "token-value",
+      apiBaseUrl: "http://localhost:3000",
+      fetchImpl: createApiFetch(
+        {
+          ok: false,
+          error: {
+            code: "document_extraction_timeout",
+            message: "Document extraction reached the synchronous time limit. Retry the request.",
+          },
+        },
+        503,
+      ),
+      pdf: createPdf(),
+      platformOS: "web",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "document_extraction_timeout", status: 503 },
     });
   });
 

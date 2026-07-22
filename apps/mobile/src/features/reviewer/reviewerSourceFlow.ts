@@ -1,7 +1,4 @@
-import {
-  OCR_MAX_PDF_PAGES,
-  type OcrClientError,
-} from "../../services/ocrApi";
+import type { OcrClientError } from "../../services/ocrApi";
 import type {
   GallerySelectionError,
   SelectedGalleryImage,
@@ -408,7 +405,9 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
       return {
         code: error.code,
         title: "PDF has too many pages",
-        message: `PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per request.`,
+        message: error.documentPageLimit
+          ? `Choose a PDF with ${error.documentPageLimit} pages or fewer.`
+          : "Choose a shorter PDF and try again.",
       };
     case "pdf_encrypted":
       return {
@@ -436,6 +435,12 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
         title: "Document could not be read",
         message:
           "Try again in a moment. If it still fails, rescan the document or choose another file.",
+      };
+    case "document_extraction_timeout":
+      return {
+        code: error.code,
+        title: "Extraction took too long",
+        message: "Retry the PDF. If it still times out, choose a shorter document.",
       };
     case "ocr_empty_result":
       return {

@@ -17,15 +17,16 @@ import {
 } from "@/lib/canvas-file-policy";
 import { sanitizeCanvasPreviewText } from "@/lib/canvas-source-safety";
 import {
+  extractPdfDocument,
   extractWithOcrProvider,
   validateImageOcrBytes,
   validatePdfOcrBytes,
   type OcrProviderFailureCode,
 } from "@/lib/ocr/extraction-service";
 import {
+  DOCUMENT_MAX_PDF_PAGES,
   OCR_MAX_IMAGE_BYTES,
   OCR_MAX_PDF_BYTES,
-  OCR_MAX_PDF_PAGES,
 } from "@/lib/ocr/upload-policy";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
@@ -273,7 +274,7 @@ async function extractPdf({
           ok: false,
           status: 422,
           code: "canvas_source_pdf_page_limit_exceeded",
-          message: `Canvas PDF OCR supports up to ${OCR_MAX_PDF_PAGES} pages per preview.`,
+          message: `Canvas PDF extraction supports up to ${validation.documentPageLimit ?? DOCUMENT_MAX_PDF_PAGES} pages per preview.`,
         };
       case "file_too_large":
         return {
@@ -287,7 +288,11 @@ async function extractPdf({
     }
   }
 
-  const extraction = await extractWithOcrProvider(ocrProvider, validation.input);
+  const extraction = await extractPdfDocument({
+    getProvider: () => ocrProvider,
+    input: validation.input,
+    pageCount: validation.pageCount,
+  });
   if (!extraction.ok) {
     if (extraction.failure.code === "document_unreadable") {
       return {

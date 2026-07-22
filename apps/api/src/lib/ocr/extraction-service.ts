@@ -7,9 +7,11 @@ import {
   type DocumentExtractionDiagnostics,
   type OcrImageMimeType,
   type OcrInput,
+  type OcrPage,
   type OcrPdfInput,
   type OcrProvider,
   type OcrResult,
+  type OcrWarning,
 } from "@stay-focused/ocr";
 
 import {
@@ -18,9 +20,22 @@ import {
   readPdfPageCount,
 } from "@/lib/ocr/pdf-validation";
 import {
+  createPdfOcrChunks,
+  mapWithConcurrency,
+  type PdfOcrChunk,
+} from "@/lib/ocr/pdf-chunking";
+import {
+  inspectPdfTextPages,
+  type PdfPageInspection,
+} from "@/lib/ocr/pdf-native-text";
+import {
+  DOCUMENT_EXTRACTION_TIMEOUT_MS,
   OCR_MAX_IMAGE_BYTES,
   OCR_MAX_PDF_BYTES,
-  OCR_MAX_PDF_PAGES,
+  OCR_PDF_CHUNK_CONCURRENCY,
+  OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+  OCR_PROVIDER_REQUEST_TIMEOUT_MS,
+  getConfiguredDocumentMaxPdfPages,
 } from "@/lib/ocr/upload-policy";
 
 export type OcrProviderFailureCode =
@@ -29,6 +44,7 @@ export type OcrProviderFailureCode =
   | "ocr_empty_result"
   | "document_extraction_incomplete"
   | "document_unreadable"
+  | "document_extraction_timeout"
   | "internal_error";
 
 export interface OcrProviderFailure {
@@ -69,6 +85,7 @@ export type PdfOcrValidationResult =
   | {
       readonly ok: false;
       readonly code: PdfOcrValidationFailureCode;
+      readonly documentPageLimit?: number;
     };
 
 export type OcrExtractionResult =
@@ -111,10 +128,12 @@ export function validateImageOcrBytes({
 
 export async function validatePdfOcrBytes({
   bytes,
+  documentMaxPages = getConfiguredDocumentMaxPdfPages(),
   fileName,
   mimeType,
 }: {
   readonly bytes: Uint8Array;
+  readonly documentMaxPages?: number;
   readonly fileName?: string;
   readonly mimeType: string;
 }): Promise<PdfOcrValidationResult> {
@@ -138,8 +157,12 @@ export async function validatePdfOcrBytes({
   if (pageCount.pageCount < 1) {
     return { ok: false, code: "invalid_pdf" };
   }
-  if (pageCount.pageCount > OCR_MAX_PDF_PAGES) {
-    return { ok: false, code: "pdf_page_limit_exceeded" };
+  if (pageCount.pageCount > documentMaxPages) {
+    return {
+      ok: false,
+      code: "pdf_page_limit_exceeded",
+      documentPageLimit: documentMaxPages,
+    };
   }
 
   const requestedPages = createRequestedPdfPages(pageCount.pageCount);
@@ -155,6 +178,319 @@ export async function validatePdfOcrBytes({
     pageCount: pageCount.pageCount,
     requestedPages,
   };
+}
+
+export async function extractPdfDocument({
+  getProvider,
+  input,
+  pageCount,
+  options = {},
+}: {
+  readonly getProvider: () => OcrProvider;
+  readonly input: OcrPdfInput;
+  readonly pageCount: number;
+  readonly options?: {
+    readonly chunkConcurrency?: number;
+    readonly documentTimeoutMs?: number;
+    readonly providerRequestTimeoutMs?: number;
+  };
+}): Promise<OcrExtractionResult> {
+  const documentTimeoutMs =
+    options.documentTimeoutMs ?? DOCUMENT_EXTRACTION_TIMEOUT_MS;
+
+  try {
+    return await withTimeout(
+      extractPdfDocumentWithinDeadline({
+        chunkConcurrency:
+          options.chunkConcurrency ?? OCR_PDF_CHUNK_CONCURRENCY,
+        getProvider,
+        input,
+        pageCount,
+        providerRequestTimeoutMs:
+          options.providerRequestTimeoutMs ?? OCR_PROVIDER_REQUEST_TIMEOUT_MS,
+      }),
+      documentTimeoutMs,
+    );
+  } catch (error) {
+    if (error instanceof ExtractionTimeoutError) {
+      return {
+        ok: false,
+        failure: {
+          code: "document_extraction_timeout",
+          extraction: createFailedDocumentExtractionDiagnostics({
+            expectedPageCount: pageCount,
+            failureCategory: "timeout",
+          }),
+        },
+      };
+    }
+    return {
+      ok: false,
+      failure: mapOcrProviderError(error, pageCount),
+    };
+  }
+}
+
+async function extractPdfDocumentWithinDeadline({
+  chunkConcurrency,
+  getProvider,
+  input,
+  pageCount,
+  providerRequestTimeoutMs,
+}: {
+  readonly chunkConcurrency: number;
+  readonly getProvider: () => OcrProvider;
+  readonly input: OcrPdfInput;
+  readonly pageCount: number;
+  readonly providerRequestTimeoutMs: number;
+}): Promise<OcrExtractionResult> {
+  let inspections: readonly PdfPageInspection[];
+  const warnings: OcrWarning[] = [];
+  try {
+    inspections = await inspectPdfTextPages(input.bytes, pageCount);
+  } catch {
+    inspections = createRequestedPdfPages(pageCount).map((pageNumber) => ({
+      pageNumber,
+      kind: "ocr" as const,
+      text: "" as const,
+    }));
+    warnings.push({
+      code: "native_text_unavailable",
+      message: "Embedded PDF text could not be inspected; affected pages used OCR.",
+    });
+  }
+
+  const pages: OcrPage[] = inspections.flatMap((page) => {
+    if (page.kind === "native_text") {
+      return [createNativeTextPage(page.pageNumber, page.text)];
+    }
+    if (page.kind === "blank") {
+      return [createBlankPage(page.pageNumber)];
+    }
+    return [];
+  });
+  const ocrPageNumbers = inspections
+    .filter((page) => page.kind === "ocr")
+    .map((page) => page.pageNumber);
+
+  let providerId = "pdfjs-native-text";
+  let chunks: readonly PdfOcrChunk[] = [];
+  if (ocrPageNumbers.length > 0) {
+    let provider: OcrProvider;
+    try {
+      provider = getProvider();
+    } catch (error) {
+      return {
+        ok: false,
+        failure: mapOcrProviderError(error, pageCount),
+      };
+    }
+    providerId =
+      pages.some((page) => page.method === "native_text")
+        ? `pdfjs-native-text+${provider.id}`
+        : provider.id;
+    chunks = await createPdfOcrChunks({
+      bytes: input.bytes,
+      pageNumbers: ocrPageNumbers,
+      pagesPerChunk: OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+    });
+    const chunkResults = await mapWithConcurrency(
+      chunks,
+      chunkConcurrency,
+      async (chunk) =>
+        await extractOcrChunk({
+          chunk,
+          fileName: input.fileName,
+          provider,
+          timeoutMs: providerRequestTimeoutMs,
+        }),
+    );
+    for (const chunkResult of chunkResults) {
+      pages.push(...chunkResult.pages);
+      warnings.push(...chunkResult.warnings);
+    }
+  }
+
+  const verification = verifyDocumentExtraction({
+    expectedPageCount: pageCount,
+    pages,
+  });
+  const diagnostics: DocumentExtractionDiagnostics = {
+    ...verification.diagnostics,
+    extractionMode:
+      pages.some((page) => page.method === "native_text") &&
+      ocrPageNumbers.length > 0
+        ? "mixed"
+        : pages.some((page) => page.method === "native_text")
+          ? "native_text"
+          : "ocr",
+    nativeTextPageCount: inspections.filter(
+      (page) => page.kind === "native_text",
+    ).length,
+    ocrPageCount: ocrPageNumbers.length,
+    ocrChunkCount: chunks.length,
+    ocrChunks: chunks.map((chunk) => ({
+      originalPageNumbers: chunk.originalPageNumbers,
+    })),
+  };
+  if (!verification.sourceEligible) {
+    return {
+      ok: false,
+      failure: {
+        code:
+          verification.status === "incomplete"
+            ? "document_extraction_incomplete"
+            : "document_unreadable",
+        extraction: diagnostics,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    result: {
+      text: verification.text,
+      pages: verification.pages,
+      mimeType: input.mimeType,
+      provider: providerId,
+      warnings,
+    },
+    extraction: diagnostics,
+  };
+}
+
+async function extractOcrChunk({
+  chunk,
+  fileName,
+  provider,
+  timeoutMs,
+}: {
+  readonly chunk: PdfOcrChunk;
+  readonly fileName?: string;
+  readonly provider: OcrProvider;
+  readonly timeoutMs: number;
+}): Promise<{
+  readonly pages: readonly OcrPage[];
+  readonly warnings: readonly OcrWarning[];
+}> {
+  try {
+    const result = await withTimeout(
+      provider.extract({
+        bytes: chunk.bytes,
+        kind: "pdf",
+        mimeType: OCR_PDF_MIME_TYPE,
+        requestedPages: chunk.requestedPages,
+        ...(fileName ? { fileName } : {}),
+      }),
+      timeoutMs,
+    );
+
+    return {
+      pages: result.pages.map((page) =>
+        remapChunkPage(page, chunk.originalPageNumbers),
+      ),
+      warnings: result.warnings.map((warning) =>
+        remapChunkWarning(warning, chunk.originalPageNumbers),
+      ),
+    };
+  } catch {
+    return {
+      pages: chunk.originalPageNumbers.map(createFailedOcrPage),
+      warnings: [],
+    };
+  }
+}
+
+function remapChunkPage(
+  page: OcrPage,
+  originalPageNumbers: readonly number[],
+): OcrPage {
+  const originalPageNumber = originalPageNumbers[page.pageNumber - 1];
+  return {
+    ...page,
+    pageNumber:
+      originalPageNumber ??
+      (originalPageNumbers[0] ?? 1) + Math.max(1, page.pageNumber) - 1,
+  };
+}
+
+function remapChunkWarning(
+  warning: OcrWarning,
+  originalPageNumbers: readonly number[],
+): OcrWarning {
+  if (warning.pageNumber === undefined) {
+    return warning;
+  }
+  const originalPageNumber = originalPageNumbers[warning.pageNumber - 1];
+  return originalPageNumber === undefined
+    ? { code: warning.code, message: warning.message }
+    : { ...warning, pageNumber: originalPageNumber };
+}
+
+function createNativeTextPage(pageNumber: number, text: string): OcrPage {
+  const lines = text.split("\n");
+  return {
+    pageNumber,
+    status: "text_extracted",
+    method: "native_text",
+    text,
+    blocks: [
+      {
+        id: `page-${pageNumber}-block-1`,
+        order: 0,
+        kind: "block",
+        text,
+        lines: lines.map((line, order) => ({
+          id: `page-${pageNumber}-block-1-line-${order + 1}`,
+          order,
+          text: line,
+        })),
+      },
+    ],
+  };
+}
+
+function createBlankPage(pageNumber: number): OcrPage {
+  return {
+    pageNumber,
+    status: "blank",
+    method: "blank",
+    text: "",
+    blocks: [],
+  };
+}
+
+function createFailedOcrPage(pageNumber: number): OcrPage {
+  return {
+    pageNumber,
+    status: "failed",
+    method: "ocr",
+    failureCategory: "provider_page_error",
+    text: "",
+    blocks: [],
+  };
+}
+
+class ExtractionTimeoutError extends Error {}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new ExtractionTimeoutError();
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new ExtractionTimeoutError()), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
 }
 
 export async function extractWithOcrProvider(

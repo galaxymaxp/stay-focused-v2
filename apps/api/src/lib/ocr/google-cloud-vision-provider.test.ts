@@ -233,6 +233,19 @@ describe("GoogleCloudVisionOcrProvider", () => {
     expect(result.text).toBe("Page one\n\nPage two");
   });
 
+  it("rejects more than five provider-local PDF pages before calling Google", async () => {
+    const client = new FakeGoogleClient(emptyImageResponse(), pdfResponse([]));
+    const provider = new GoogleCloudVisionOcrProvider(client);
+
+    await expect(
+      provider.extract(createPdfInput([1, 2, 3, 4, 5, 6])),
+    ).rejects.toMatchObject({
+      code: "ocr_provider_failed",
+      message: "Google Cloud Vision OCR failed.",
+    });
+    expect(client.lastPdfRequest).toBeUndefined();
+  });
+
   it("preserves PDF line order inside a page", async () => {
     const provider = createPdfProvider(
       pdfResponse([

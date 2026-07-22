@@ -1,6 +1,8 @@
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import { OcrProviderError, type OcrProvider } from "@stay-focused/ocr";
 
+import { OCR_PROVIDER_REQUEST_TIMEOUT_MS } from "./upload-policy";
+
 import {
   GoogleCloudVisionOcrProvider,
   type GoogleVisionDocumentTextClient,
@@ -116,18 +118,21 @@ function createGoogleVisionSdkClient(
     batchAnnotateFiles: async (
       request: GoogleVisionPdfTextRequest,
     ): Promise<GoogleVisionBatchAnnotateFilesResponse> => {
-      const [response] = await client.batchAnnotateFiles({
-        requests: [
-          {
-            inputConfig: {
-              content: Buffer.from(request.inputConfig.content),
-              mimeType: request.inputConfig.mimeType,
+      const [response] = await client.batchAnnotateFiles(
+        {
+          requests: [
+            {
+              inputConfig: {
+                content: Buffer.from(request.inputConfig.content),
+                mimeType: request.inputConfig.mimeType,
+              },
+              features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+              pages: [...request.pages],
             },
-            features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
-            pages: [...request.pages],
-          },
-        ],
-      });
+          ],
+        },
+        { timeout: OCR_PROVIDER_REQUEST_TIMEOUT_MS },
+      );
       return response as unknown as GoogleVisionBatchAnnotateFilesResponse;
     },
     documentTextDetection: async (

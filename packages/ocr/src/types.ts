@@ -13,6 +13,8 @@ export type OcrMimeType = OcrImageMimeType | OcrPdfMimeType;
 
 export type DocumentExtractionStatus = "complete" | "incomplete" | "failed";
 
+export type DocumentExtractionMode = "native_text" | "ocr" | "mixed";
+
 export type PageExtractionStatus = "text_extracted" | "blank" | "failed";
 
 export type PageExtractionMethod = "native_text" | "ocr" | "blank";
@@ -31,6 +33,7 @@ export type DocumentExtractionFailureCategory =
   | "failed_page"
   | "empty_document"
   | "provider_failure"
+  | "timeout"
   | "internal_failure";
 
 export interface OcrPoint {
@@ -94,7 +97,8 @@ export interface OcrPage {
 export type OcrWarningCode =
   | "empty_text"
   | "missing_layout"
-  | "partial_layout";
+  | "partial_layout"
+  | "native_text_unavailable";
 
 export interface OcrWarning {
   readonly code: OcrWarningCode;
@@ -123,6 +127,15 @@ export interface DocumentExtractionDiagnostics {
   readonly invalidPageNumbers: readonly number[];
   readonly affectedPageNumbers: readonly number[];
   readonly failureCategories: readonly DocumentExtractionFailureCategory[];
+  readonly extractionMode?: DocumentExtractionMode;
+  readonly nativeTextPageCount?: number;
+  readonly ocrPageCount?: number;
+  readonly ocrChunkCount?: number;
+  readonly ocrChunks?: readonly OcrChunkDiagnostics[];
+}
+
+export interface OcrChunkDiagnostics {
+  readonly originalPageNumbers: readonly number[];
 }
 
 export interface DocumentExtractionVerification {

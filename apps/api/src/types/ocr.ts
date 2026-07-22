@@ -37,6 +37,7 @@ export type OcrExtractErrorCode =
   | "document_unreadable"
   | "document_extraction_incomplete"
   | "document_extraction_failed"
+  | "document_extraction_timeout"
   | "internal_error";
 
 export interface OcrExtractErrorResponse {
@@ -45,6 +46,7 @@ export interface OcrExtractErrorResponse {
     readonly code: OcrExtractErrorCode;
     readonly message: string;
     readonly extraction?: DocumentExtractionDiagnostics;
+    readonly documentPageLimit?: number;
   };
 }
 

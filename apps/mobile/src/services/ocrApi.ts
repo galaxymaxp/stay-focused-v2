@@ -1,7 +1,4 @@
-import {
-  OCR_MAX_PDF_PAGES,
-  type DocumentExtractionDiagnostics,
-} from "@stay-focused/ocr";
+import type { DocumentExtractionDiagnostics } from "@stay-focused/ocr";
 
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
 
@@ -11,7 +8,6 @@ const OCR_IMAGE_FORM_FIELD = "image";
 const OCR_PDF_FORM_FIELD = "pdf";
 export const OCR_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const OCR_MAX_PDF_BYTES = 10 * 1024 * 1024;
-export { OCR_MAX_PDF_PAGES };
 const MAX_ERROR_MESSAGE_CHARS = 300;
 
 export const SUPPORTED_OCR_IMAGE_MIME_TYPES = [
@@ -95,6 +91,7 @@ export type OcrClientErrorCode =
   | "document_unreadable"
   | "document_extraction_incomplete"
   | "document_extraction_failed"
+  | "document_extraction_timeout"
   | "network_error"
   | "request_cancelled"
   | "invalid_response"
@@ -106,6 +103,7 @@ export interface OcrClientError {
   readonly status?: number;
   readonly apiCode?: string;
   readonly extraction?: DocumentExtractionDiagnostics;
+  readonly documentPageLimit?: number;
 }
 
 export interface OcrExtractData {
@@ -130,6 +128,7 @@ interface OcrExtractErrorResponse {
     readonly code: string;
     readonly message: string;
     readonly extraction?: DocumentExtractionDiagnostics;
+    readonly documentPageLimit?: number;
   };
 }
 
@@ -625,6 +624,9 @@ function apiError(
         ...(parsed.error.extraction
           ? { extraction: parsed.error.extraction }
           : {}),
+        ...(isPositiveInteger(parsed.error.documentPageLimit)
+          ? { documentPageLimit: parsed.error.documentPageLimit }
+          : {}),
         ...(code === "unknown_error" ? { apiCode: parsed.error.code } : {}),
       },
     };
@@ -674,6 +676,7 @@ function mapApiErrorCode(code: string): OcrClientErrorCode {
     case "document_unreadable":
     case "document_extraction_incomplete":
     case "document_extraction_failed":
+    case "document_extraction_timeout":
     case "internal_error":
       return code === "internal_error" ? "unknown_error" : code;
     default:
@@ -760,6 +763,10 @@ function safeApiErrorMessage(
     return statusToClientErrorMessage(status, sourceKind);
   }
   return normalized;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function normalizeMimeType(value: string): string {
