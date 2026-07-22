@@ -1,6 +1,11 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
-import { useEffect, useReducer, useRef, useState } from "react";
 import {
+  isActiveProcessingJobStatus,
+  type ProcessingJobStatusView,
+} from "@stay-focused/shared";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import {
+  AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -17,8 +22,6 @@ import { TextField } from "../../components/TextField";
 import { colors, spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
-  generateReviewer,
-  type GenerateReviewerError,
 } from "../../services/reviewerApi";
 import {
   saveReviewer,
@@ -27,7 +30,25 @@ import {
   type SavedReviewerSourceMode,
   type SavedReviewerSummary,
 } from "../../services/reviewerLibraryApi";
-import { extractOcrText, extractPdfOcrText } from "../../services/ocrApi";
+import {
+  cancelProcessingJob,
+  createExtractionJob,
+  createProcessingJobIdempotencyKey,
+  createReviewerJob,
+  getExtractionJobResult,
+  getProcessingJobStatus,
+  getReviewerJobResult,
+  listActiveProcessingJobs,
+  MOBILE_JOB_POLL_INTERVAL_MS,
+  retryProcessingJob,
+  type ProcessingJobApiError,
+} from "../../services/processingJobsApi";
+import {
+  readActiveProcessingJobs,
+  removeActiveProcessingJob,
+  upsertActiveProcessingJob,
+} from "../../services/activeProcessingJobStore";
+import type { OcrClientError } from "../../services/ocrApi";
 import {
   captureImageWithCamera,
   chooseImageFromGallery,
@@ -86,26 +107,29 @@ export function ReviewerGenerateScreen({
   const [saveTitle, setSaveTitle] = useState("");
   const [savedReviewer, setSavedReviewer] =
     useState<SavedReviewerSummary | null>(null);
+  const [recoveredReviewerSource, setRecoveredReviewerSource] = useState<{
+    readonly sourceSnapshotId: string;
+    readonly sourceCharacterCount: number;
+    readonly sourceLabel: string;
+  } | null>(null);
   const [saveError, setSaveError] = useState<GenerationDisplayError | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingReviewer, setIsSavingReviewer] = useState(false);
-  const reviewerAbortControllerRef = useRef<AbortController | null>(null);
-  const ocrAbortControllerRef = useRef<AbortController | null>(null);
+  const [activeExtractionJob, setActiveExtractionJob] =
+    useState<ProcessingJobStatusView | null>(null);
+  const [activeReviewerJob, setActiveReviewerJob] =
+    useState<ProcessingJobStatusView | null>(null);
+  const [appIsActive, setAppIsActive] = useState(
+    AppState.currentState === "active",
+  );
+  const extractionIdempotencyKeyRef = useRef<string | null>(null);
+  const reviewerIdempotencyKeyRef = useRef<string | null>(null);
+  const extractionSubmissionInFlightRef = useRef(false);
+  const reviewerSubmissionInFlightRef = useRef(false);
 
   const email = session?.user.email ?? "No email on this account";
   const visibleSourceText = getCurrentSourceText(sourceState);
   const sourceCharacterCount = getSourceCharacterCount(sourceState);
-
-  useEffect(() => {
-    return () => {
-      const reviewerAbortController = reviewerAbortControllerRef.current;
-      const ocrAbortController = ocrAbortControllerRef.current;
-      reviewerAbortControllerRef.current = null;
-      ocrAbortControllerRef.current = null;
-      reviewerAbortController?.abort();
-      ocrAbortController?.abort();
-    };
-  }, []);
 
   useEffect(() => {
     const previewUri = sourceState.selectedImage?.uri;
@@ -121,7 +145,136 @@ export function ReviewerGenerateScreen({
     };
   }, [sourceState.selectedPdf?.uri]);
 
+  const applyObservedJob = useCallback(
+    async (job: ProcessingJobStatusView): Promise<void> => {
+      const ownerUserId = session?.user.id;
+      const accessToken = session?.accessToken.trim();
+      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+      if (!ownerUserId || !accessToken || !apiBaseUrl) return;
+
+      await upsertActiveProcessingJob(ownerUserId, job);
+      if (job.jobType === "document_extraction") {
+        setActiveExtractionJob(job);
+      } else {
+        setActiveReviewerJob(job);
+      }
+
+      if (job.status !== "succeeded" || !job.resultAvailable) return;
+
+      if (job.jobType === "document_extraction") {
+        const result = await getExtractionJobResult({
+          apiBaseUrl,
+          accessToken,
+          jobId: job.id,
+        });
+        if (!result.ok) {
+          setGenerationError(formatProcessingJobApiError(result.error));
+          return;
+        }
+        dispatchSource({
+          type: "restore_ocr_result",
+          mode: job.source.sourceKind === "pdf" ? "pdf" : "image",
+          text: result.data.text,
+          pageCount: result.data.pageCount,
+        });
+        setActiveExtractionJob(null);
+      } else {
+        const result = await getReviewerJobResult({
+          apiBaseUrl,
+          accessToken,
+          jobId: job.id,
+        });
+        if (!result.ok) {
+          setGenerationError(formatProcessingJobApiError(result.error));
+          return;
+        }
+        setReviewer(result.data.reviewer);
+        setRecoveredReviewerSource(
+          result.data.sourceSnapshotId
+            ? {
+                sourceSnapshotId: result.data.sourceSnapshotId,
+                sourceCharacterCount: job.source.characterCount ?? 0,
+                sourceLabel: job.source.displayName,
+              }
+            : null,
+        );
+        setSaveTitle(
+          defaultReviewerSaveTitle(result.data.reviewer, job.source.displayName),
+        );
+        setActiveReviewerJob(null);
+      }
+      await removeActiveProcessingJob(job.id);
+    },
+    [session?.accessToken, session?.user.id],
+  );
+
+  const reconcileProcessingJobs = useCallback(async (): Promise<void> => {
+    const ownerUserId = session?.user.id;
+    const accessToken = session?.accessToken.trim();
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    if (!ownerUserId || !accessToken || !apiBaseUrl) return;
+
+    const localReferences = await readActiveProcessingJobs(ownerUserId);
+    const serverActive = await listActiveProcessingJobs({ apiBaseUrl, accessToken });
+    const jobIds = new Set(localReferences.map((job) => job.jobId));
+    if (serverActive.ok) {
+      for (const job of serverActive.data) {
+        jobIds.add(job.id);
+        await upsertActiveProcessingJob(ownerUserId, job);
+      }
+    }
+
+    for (const jobId of jobIds) {
+      const status = await getProcessingJobStatus({
+        apiBaseUrl,
+        accessToken,
+        jobId,
+      });
+      if (status.ok) {
+        await applyObservedJob(status.data);
+      } else if (status.error.code === "unauthorized") {
+        setGenerationError({
+          title: "Sign in again",
+          message: "Your processing job is still on the server. Sign in again to retrieve it.",
+        });
+        return;
+      }
+    }
+  }, [applyObservedJob, session?.accessToken, session?.user.id]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      const active = state === "active";
+      setAppIsActive(active);
+      if (active) void reconcileProcessingJobs();
+    });
+    void reconcileProcessingJobs();
+    return () => subscription.remove();
+  }, [reconcileProcessingJobs]);
+
+  useEffect(() => {
+    const hasActiveJob = [activeExtractionJob, activeReviewerJob].some(
+      (job) => job && isActiveProcessingJobStatus(job.status),
+    );
+    if (!appIsActive || !hasActiveJob) return;
+    const timer = setInterval(() => {
+      void reconcileProcessingJobs();
+    }, MOBILE_JOB_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [
+    activeExtractionJob,
+    activeReviewerJob,
+    appIsActive,
+    reconcileProcessingJobs,
+  ]);
+
   const handleGenerate = async () => {
+    if (
+      reviewerSubmissionInFlightRef.current ||
+      (activeReviewerJob && isActiveProcessingJobStatus(activeReviewerJob.status))
+    ) {
+      return;
+    }
     const trimmedSourceText = visibleSourceText.trim();
     const trimmedSourceTitle = sourceTitle.trim();
 
@@ -157,7 +310,8 @@ export function ReviewerGenerateScreen({
     }
 
     const accessToken = session?.accessToken.trim();
-    if (!accessToken) {
+    const ownerUserId = session?.user.id;
+    if (!accessToken || !ownerUserId) {
       setGenerationError({
         title: "Session check failed",
         message:
@@ -166,38 +320,38 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    reviewerAbortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    reviewerAbortControllerRef.current = abortController;
-
     setReviewer(null);
+    setRecoveredReviewerSource(null);
     setSavedReviewer(null);
     setSaveError(null);
     setSaveTitle("");
     setIsGenerating(true);
+    reviewerSubmissionInFlightRef.current = true;
+    const idempotencyKey =
+      reviewerIdempotencyKeyRef.current ??
+      createProcessingJobIdempotencyKey("reviewer_generation");
+    reviewerIdempotencyKeyRef.current = idempotencyKey;
 
     try {
-      const result = await generateReviewer({
+      const result = await createReviewerJob({
         apiBaseUrl,
         accessToken,
+        idempotencyKey,
         sourceText: trimmedSourceText,
         ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
-        signal: abortController.signal,
       });
 
       if (result.ok) {
-        setReviewer(result.reviewer);
-        setSaveTitle(
-          defaultReviewerSaveTitle(result.reviewer, trimmedSourceTitle),
-        );
+        reviewerIdempotencyKeyRef.current = null;
+        setActiveReviewerJob(result.data);
+        await upsertActiveProcessingJob(ownerUserId, result.data);
       } else {
-        setGenerationError(formatGenerateReviewerError(result.error));
+        setGenerationError(formatProcessingJobApiError(result.error));
+        if (!result.error.retryable) reviewerIdempotencyKeyRef.current = null;
       }
     } finally {
-      if (reviewerAbortControllerRef.current === abortController) {
-        reviewerAbortControllerRef.current = null;
-        setIsGenerating(false);
-      }
+      reviewerSubmissionInFlightRef.current = false;
+      setIsGenerating(false);
     }
   };
 
@@ -278,18 +432,20 @@ export function ReviewerGenerateScreen({
   };
 
   const handleClearImage = () => {
-    ocrAbortControllerRef.current?.abort();
-    ocrAbortControllerRef.current = null;
     dispatchSource({ type: "clear_image" });
   };
 
   const handleClearPdf = () => {
-    ocrAbortControllerRef.current?.abort();
-    ocrAbortControllerRef.current = null;
     dispatchSource({ type: "clear_pdf" });
   };
 
   const handleExtractText = async () => {
+    if (
+      extractionSubmissionInFlightRef.current ||
+      (activeExtractionJob && isActiveProcessingJobStatus(activeExtractionJob.status))
+    ) {
+      return;
+    }
     const selectedImage = sourceState.selectedImage;
     if (!selectedImage) {
       dispatchSource({
@@ -315,7 +471,8 @@ export function ReviewerGenerateScreen({
     }
 
     const accessToken = session?.accessToken.trim();
-    if (!accessToken) {
+    const ownerUserId = session?.user.id;
+    if (!accessToken || !ownerUserId) {
       dispatchSource({
         type: "ocr_failed",
         error: {
@@ -327,34 +484,45 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    ocrAbortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    ocrAbortControllerRef.current = abortController;
-
     dispatchSource({ type: "ocr_started" });
+    extractionSubmissionInFlightRef.current = true;
+    const idempotencyKey =
+      extractionIdempotencyKeyRef.current ??
+      createProcessingJobIdempotencyKey("document_extraction");
+    extractionIdempotencyKeyRef.current = idempotencyKey;
 
     try {
-      const result = await extractOcrText({
+      const result = await createExtractionJob({
         apiBaseUrl,
         accessToken,
-        image: selectedImage,
+        idempotencyKey,
+        source: { kind: "image", value: selectedImage },
         platformOS: Platform.OS,
-        signal: abortController.signal,
       });
 
       if (result.ok) {
-        dispatchSource({ type: "ocr_succeeded", text: result.data.text });
+        extractionIdempotencyKeyRef.current = null;
+        setActiveExtractionJob(result.data);
+        await upsertActiveProcessingJob(ownerUserId, result.data);
       } else {
-        dispatchSource({ type: "ocr_failed", error: result.error });
+        dispatchSource({
+          type: "ocr_failed",
+          error: toOcrCompatibleJobError(result.error),
+        });
+        if (!result.error.retryable) extractionIdempotencyKeyRef.current = null;
       }
     } finally {
-      if (ocrAbortControllerRef.current === abortController) {
-        ocrAbortControllerRef.current = null;
-      }
+      extractionSubmissionInFlightRef.current = false;
     }
   };
 
   const handleExtractPdfText = async () => {
+    if (
+      extractionSubmissionInFlightRef.current ||
+      (activeExtractionJob && isActiveProcessingJobStatus(activeExtractionJob.status))
+    ) {
+      return;
+    }
     const selectedPdf = sourceState.selectedPdf;
     if (!selectedPdf) {
       dispatchSource({
@@ -380,7 +548,8 @@ export function ReviewerGenerateScreen({
     }
 
     const accessToken = session?.accessToken.trim();
-    if (!accessToken) {
+    const ownerUserId = session?.user.id;
+    if (!accessToken || !ownerUserId) {
       dispatchSource({
         type: "ocr_failed",
         error: {
@@ -392,36 +561,92 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    ocrAbortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    ocrAbortControllerRef.current = abortController;
-
     dispatchSource({ type: "ocr_started" });
+    extractionSubmissionInFlightRef.current = true;
+    const idempotencyKey =
+      extractionIdempotencyKeyRef.current ??
+      createProcessingJobIdempotencyKey("document_extraction");
+    extractionIdempotencyKeyRef.current = idempotencyKey;
 
     try {
-      const result = await extractPdfOcrText({
+      const result = await createExtractionJob({
         apiBaseUrl,
         accessToken,
-        pdf: selectedPdf,
+        idempotencyKey,
+        source: { kind: "pdf", value: selectedPdf },
         platformOS: Platform.OS,
-        signal: abortController.signal,
       });
 
       if (result.ok) {
-        dispatchSource({
-          type: "ocr_succeeded",
-          text: result.data.text,
-          ...(result.data.pageCount !== undefined
-            ? { pageCount: result.data.pageCount }
-            : {}),
-        });
+        extractionIdempotencyKeyRef.current = null;
+        setActiveExtractionJob(result.data);
+        await upsertActiveProcessingJob(ownerUserId, result.data);
       } else {
-        dispatchSource({ type: "ocr_failed", error: result.error });
+        dispatchSource({
+          type: "ocr_failed",
+          error: toOcrCompatibleJobError(result.error),
+        });
+        if (!result.error.retryable) extractionIdempotencyKeyRef.current = null;
       }
     } finally {
-      if (ocrAbortControllerRef.current === abortController) {
-        ocrAbortControllerRef.current = null;
-      }
+      extractionSubmissionInFlightRef.current = false;
+    }
+  };
+
+  const handleCancelJob = async (job: ProcessingJobStatusView) => {
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const accessToken = session?.accessToken.trim();
+    if (!apiBaseUrl || !accessToken) return;
+    const result = await cancelProcessingJob({
+      apiBaseUrl,
+      accessToken,
+      jobId: job.id,
+    });
+    if (result.ok) {
+      await applyObservedJob(result.data);
+    } else {
+      setGenerationError(formatProcessingJobApiError(result.error));
+    }
+  };
+
+  const handleRetryJob = async (job: ProcessingJobStatusView) => {
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const accessToken = session?.accessToken.trim();
+    const ownerUserId = session?.user.id;
+    if (!apiBaseUrl || !accessToken || !ownerUserId) return;
+    const result = await retryProcessingJob({
+      apiBaseUrl,
+      accessToken,
+      jobId: job.id,
+      idempotencyKey: createProcessingJobIdempotencyKey(job.jobType),
+    });
+    if (!result.ok) {
+      setGenerationError(formatProcessingJobApiError(result.error));
+      return;
+    }
+    await removeActiveProcessingJob(job.id);
+    await upsertActiveProcessingJob(ownerUserId, result.data);
+    if (job.jobType === "document_extraction") {
+      setActiveExtractionJob(result.data);
+      dispatchSource({ type: "ocr_started" });
+    } else {
+      setActiveReviewerJob(result.data);
+    }
+  };
+
+  const handleReturnFromJob = async (job: ProcessingJobStatusView) => {
+    await removeActiveProcessingJob(job.id);
+    if (job.jobType === "document_extraction") {
+      setActiveExtractionJob(null);
+      dispatchSource({
+        type: "ocr_failed",
+        error: {
+          code: "request_cancelled",
+          message: job.safeErrorMessage ?? "Extraction did not complete.",
+        },
+      });
+    } else {
+      setActiveReviewerJob(null);
     }
   };
 
@@ -467,13 +692,23 @@ export function ReviewerGenerateScreen({
         apiBaseUrl,
         accessToken,
         title: trimmedSaveTitle,
-        sourceMetadata: createSavedReviewerSourceMetadata({
-          imageSourceMode,
-          sourceCharacterCount,
-          sourceState,
-          sourceTitle,
-        }),
+        sourceMetadata: recoveredReviewerSource
+          ? {
+              sourceCharacterCount:
+                recoveredReviewerSource.sourceCharacterCount,
+              sourceLabel: recoveredReviewerSource.sourceLabel,
+              sourceMode: "canvas",
+            }
+          : createSavedReviewerSourceMetadata({
+              imageSourceMode,
+              sourceCharacterCount,
+              sourceState,
+              sourceTitle,
+            }),
         reviewerOutput: reviewer,
+        ...(recoveredReviewerSource
+          ? { sourceSnapshotId: recoveredReviewerSource.sourceSnapshotId }
+          : {}),
       });
 
       if (result.ok) {
@@ -541,6 +776,11 @@ export function ReviewerGenerateScreen({
 
           {sourceState.mode === "image" ? (
             <ImageImportPanel
+              acceptedJob={
+                activeExtractionJob?.source.sourceKind === "image"
+                  ? activeExtractionJob
+                  : null
+              }
               canExtract={canExtractOcrText(sourceState)}
               error={sourceState.ocrError}
               isSmokeFixtureEnabled={OCR_SMOKE_FIXTURE_ENABLED}
@@ -556,6 +796,11 @@ export function ReviewerGenerateScreen({
 
           {sourceState.mode === "pdf" ? (
             <PdfImportPanel
+              acceptedJob={
+                activeExtractionJob?.source.sourceKind === "pdf"
+                  ? activeExtractionJob
+                  : null
+              }
               canExtract={canExtractPdfText(sourceState)}
               error={sourceState.ocrError}
               onChoosePdf={handleChoosePdf}
@@ -605,6 +850,10 @@ export function ReviewerGenerateScreen({
           ) : null}
 
           <Button
+            disabled={Boolean(
+              activeReviewerJob &&
+                isActiveProcessingJobStatus(activeReviewerJob.status),
+            )}
             fullWidth
             loading={isGenerating}
             onPress={handleGenerate}
@@ -646,12 +895,31 @@ export function ReviewerGenerateScreen({
           ) : null}
         </Card>
 
-        {isGenerating ? (
+        {activeExtractionJob ? (
+          <ProcessingJobCard
+            job={activeExtractionJob}
+            onCancel={() => void handleCancelJob(activeExtractionJob)}
+            onRetry={() => void handleRetryJob(activeExtractionJob)}
+            onReturn={() => void handleReturnFromJob(activeExtractionJob)}
+            onView={() => void applyObservedJob(activeExtractionJob)}
+          />
+        ) : null}
+
+        {activeReviewerJob ? (
+          <ProcessingJobCard
+            job={activeReviewerJob}
+            onCancel={() => void handleCancelJob(activeReviewerJob)}
+            onRetry={() => void handleRetryJob(activeReviewerJob)}
+            onReturn={() => void handleReturnFromJob(activeReviewerJob)}
+            onView={() => void applyObservedJob(activeReviewerJob)}
+          />
+        ) : null}
+
+        {isGenerating && !activeReviewerJob ? (
           <Card style={styles.statusCard}>
-            <Text style={styles.statusTitle}>Generating reviewer...</Text>
+            <Text style={styles.statusTitle}>Starting reviewer...</Text>
             <Text style={styles.statusText}>
-              This may take 10-45 seconds. Stay Focused is turning your source
-              into readable study cards.
+              Keep Stay Focused open until the server accepts the job.
             </Text>
           </Card>
         ) : null}
@@ -679,7 +947,98 @@ export function ReviewerGenerateScreen({
   );
 }
 
+function ProcessingJobCard({
+  job,
+  onCancel,
+  onRetry,
+  onReturn,
+  onView,
+}: {
+  readonly job: ProcessingJobStatusView;
+  readonly onCancel: () => void;
+  readonly onRetry: () => void;
+  readonly onReturn: () => void;
+  readonly onView: () => void;
+}) {
+  const isActive = isActiveProcessingJobStatus(job.status);
+  const hasUnits =
+    job.progress.completedUnits !== null &&
+    job.progress.totalUnits !== null &&
+    job.progress.unitLabel !== null;
+
+  return (
+    <Card style={styles.statusCard}>
+      <Text style={styles.statusTitle}>{processingJobLabel(job)}</Text>
+      <Text style={styles.statusText}>{job.progress.message}</Text>
+      {hasUnits ? (
+        <Text style={styles.statusText}>
+          {job.progress.completedUnits} of {job.progress.totalUnits}{" "}
+          {job.progress.unitLabel} processed
+        </Text>
+      ) : null}
+      {isActive ? (
+        <Text style={styles.statusText}>
+          You can switch apps. Processing will continue on the server.
+        </Text>
+      ) : null}
+      {job.safeErrorMessage ? (
+        <Text style={styles.errorText}>{job.safeErrorMessage}</Text>
+      ) : null}
+      <Text style={styles.helperText}>
+        Latest update: {new Date(job.updatedAt).toLocaleString()}
+      </Text>
+      {job.status === "queued" || job.status === "running" ? (
+        <Button fullWidth onPress={onCancel} variant="secondary">
+          Cancel
+        </Button>
+      ) : null}
+      {job.status === "succeeded" ? (
+        <Button fullWidth onPress={onView} variant="primary">
+          View completed result
+        </Button>
+      ) : null}
+      {job.status === "failed" && job.retryable ? (
+        <Button fullWidth onPress={onRetry} variant="primary">
+          Retry
+        </Button>
+      ) : null}
+      {!isActive && job.status !== "succeeded" ? (
+        <Button fullWidth onPress={onReturn} variant="secondary">
+          Return to source
+        </Button>
+      ) : null}
+    </Card>
+  );
+}
+
+function processingJobLabel(job: ProcessingJobStatusView): string {
+  if (job.status === "queued") return "Waiting to start";
+  if (job.status === "succeeded") return "Complete";
+  if (job.status === "failed" || job.status === "expired") return "Needs attention";
+  if (job.status === "cancelled") return "Cancelled";
+  if (job.status === "cancellation_requested") return "Stopping safely";
+  switch (job.stage) {
+    case "inspecting_document": return "Inspecting document";
+    case "extracting_native_text":
+    case "preparing_ocr_chunks":
+    case "extracting_ocr": return "Reading pages";
+    case "verifying_pages": return "Checking extraction";
+    case "preparing_source":
+    case "normalizing_source": return "Preparing source";
+    case "detecting_outline":
+    case "planning_sections": return "Organizing topics";
+    case "generating_sections": return "Creating reviewer sections";
+    case "verifying_coverage":
+    case "retrying_sections": return "Checking coverage";
+    default:
+      return job.jobType === "document_extraction"
+        ? "Finishing extraction"
+        : "Finishing reviewer";
+  }
+}
+
 function ImageImportPanel({
+  acceptedJob,
   canExtract,
   error,
   isSmokeFixtureEnabled,
@@ -691,6 +1050,7 @@ function ImageImportPanel({
   selectedImage,
   status,
 }: {
+  readonly acceptedJob: ProcessingJobStatusView | null;
   readonly canExtract: boolean;
   readonly error: SourceFlowError | null;
   readonly isSmokeFixtureEnabled: boolean;
@@ -792,10 +1152,13 @@ function ImageImportPanel({
 
       {isUploading ? (
         <View style={styles.infoBox} testID="reviewer-ocr-loading">
-          <Text style={styles.statusTitle}>Extracting text...</Text>
+          <Text style={styles.statusTitle}>
+            {acceptedJob ? "Extraction started" : "Uploading source…"}
+          </Text>
           <Text style={styles.statusText}>
-            The image is uploaded to the protected OCR API. You can edit the
-            extracted text before reviewer generation.
+            {acceptedJob
+              ? "You can switch apps. Processing will continue on the server."
+              : "Keep Stay Focused open until the upload is accepted."}
           </Text>
         </View>
       ) : null}
@@ -819,6 +1182,7 @@ function ImageImportPanel({
 }
 
 function PdfImportPanel({
+  acceptedJob,
   canExtract,
   error,
   onChoosePdf,
@@ -828,6 +1192,7 @@ function PdfImportPanel({
   selectedPdf,
   status,
 }: {
+  readonly acceptedJob: ProcessingJobStatusView | null;
   readonly canExtract: boolean;
   readonly error: SourceFlowError | null;
   readonly onChoosePdf: () => void;
@@ -898,10 +1263,13 @@ function PdfImportPanel({
 
       {isUploading ? (
         <View style={styles.infoBox} testID="reviewer-pdf-ocr-loading">
-          <Text style={styles.statusTitle}>Extracting text...</Text>
+          <Text style={styles.statusTitle}>
+            {acceptedJob ? "Extraction started" : "Uploading source…"}
+          </Text>
           <Text style={styles.statusText}>
-            The PDF is uploaded to the protected OCR API. You can edit the
-            extracted text before reviewer generation.
+            {acceptedJob
+              ? "You can switch apps. Processing will continue on the server."
+              : "Keep Stay Focused open until the upload is accepted."}
           </Text>
         </View>
       ) : null}
@@ -1019,85 +1387,67 @@ function formatFileSize(bytes: number): string {
   return `${bytes} bytes`;
 }
 
-function formatGenerateReviewerError(
-  error: GenerateReviewerError,
+function formatProcessingJobApiError(
+  error: ProcessingJobApiError,
 ): GenerationDisplayError {
-  const detail = formatTechnicalDetail(error);
-
-  if (error.code === "reviewer_validation_failed" || error.status === 422) {
+  const detail = error.status !== undefined
+    ? `Details: HTTP ${error.status}, code ${error.code}.`
+    : `Details: code ${error.code}.`;
+  if (error.code === "unauthorized" || error.code === "missing_access_token") {
     return {
-      title: "Reviewer needs a clearer source",
+      title: "Sign in again",
       message:
-        "The reviewer could not pass validation from this source. Try a clearer or longer source.",
+        "The server job continues independently. Sign in again to retrieve its status.",
       detail,
     };
   }
-
-  if (error.code === "invalid_api_base_url") {
+  if (error.code === "request_timeout" || error.code === "network_error") {
     return {
-      title: "API address needs setup",
+      title: "Status temporarily unavailable",
+      message:
+        "The connection was interrupted. Any accepted server job was not cancelled; reconnect to check it.",
+      detail,
+    };
+  }
+  if (error.code === "processing_job_idempotency_conflict") {
+    return {
+      title: "Request could not be replayed",
       message: error.message,
       detail,
     };
   }
-
-  if (error.code === "network_error") {
-    return {
-      title: "Could not reach the API",
-      message:
-        "Check EXPO_PUBLIC_API_BASE_URL, the host, and the port. The API must be reachable from the current test surface.",
-      detail,
-    };
-  }
-
-  if (error.code === "request_timeout") {
-    return {
-      title: "Reviewer took too long",
-      message:
-        "The API took too long to finish. Try again, or use a shorter source for now.",
-      detail,
-    };
-  }
-
-  if (error.code === "unauthorized") {
-    return {
-      title: "Login session expired",
-      message:
-        "Your login session was rejected by the API. Sign out and sign in again before generating another reviewer.",
-      detail,
-    };
-  }
-
-  if (isValidationRequestError(error)) {
-    return {
-      title: "Reviewer request needs a change",
-      message: error.message,
-      detail,
-    };
-  }
-
-  if (isPayloadTooLargeError(error)) {
-    return {
-      title: "Source is too large",
-      message: error.message,
-      detail,
-    };
-  }
-
-  if (isServerGenerationError(error)) {
-    return {
-      title: "Reviewer generation failed",
-      message:
-        "The API could not generate the reviewer. Try again, or check the API server if this is local testing.",
-      detail,
-    };
-  }
-
   return {
-    title: "Reviewer generation failed",
-    message:
-      "Something went wrong while generating the reviewer. Try again in a moment.",
+    title: error.retryable ? "Processing needs attention" : "Request needs a change",
+    message: error.message,
     detail,
+  };
+}
+
+function toOcrCompatibleJobError(error: ProcessingJobApiError): OcrClientError {
+  const code: OcrClientError["code"] = (() => {
+    switch (error.code) {
+      case "unauthorized": return "unauthorized";
+      case "missing_access_token": return "missing_access_token";
+      case "invalid_api_base_url": return "invalid_api_base_url";
+      case "invalid_pdf": return "invalid_pdf";
+      case "pdf_encrypted": return "pdf_encrypted";
+      case "pdf_page_limit_exceeded": return "pdf_page_limit_exceeded";
+      case "file_too_large": return "file_too_large";
+      case "image_too_large": return "image_too_large";
+      case "empty_file": return "empty_file";
+      case "empty_image": return "empty_image";
+      case "unsupported_file_type": return "unsupported_file_type";
+      case "unsupported_media_type": return "unsupported_media_type";
+      case "request_timeout":
+      case "network_error": return "network_error";
+      default: return "unknown_error";
+    }
+  })();
+  return {
+    code,
+    message: error.message,
+    ...(error.status !== undefined ? { status: error.status } : {}),
+    apiCode: error.code,
   };
 }
 
@@ -1183,47 +1533,6 @@ function createSavedReviewerSourceMetadata({
       : {}),
     ...(sourceLabel ? { sourceLabel } : {}),
   };
-}
-
-function isValidationRequestError(error: GenerateReviewerError): boolean {
-  return (
-    error.status === 400 ||
-    error.code === "invalid_json" ||
-    error.code === "invalid_request"
-  );
-}
-
-function isPayloadTooLargeError(error: GenerateReviewerError): boolean {
-  return (
-    error.status === 413 ||
-    error.code === "payload_too_large" ||
-    error.code === "source_text_too_large"
-  );
-}
-
-function isServerGenerationError(error: GenerateReviewerError): boolean {
-  return (
-    (error.status !== undefined && error.status >= 500) ||
-    error.code === "provider_configuration_error" ||
-    error.code === "reviewer_generation_failed"
-  );
-}
-
-function formatTechnicalDetail(error: GenerateReviewerError): string {
-  const details = [
-    error.status !== undefined ? `HTTP ${error.status}` : null,
-    `code ${error.apiCode ?? error.code}`,
-  ].filter(isString);
-
-  if (details.length === 0) {
-    return `Details: ${error.message}`;
-  }
-
-  return `Details: ${details.join(", ")}. ${error.message}`;
-}
-
-function isString(value: string | null): value is string {
-  return value !== null;
 }
 
 function isOcrSmokeFixtureEnabled(): boolean {

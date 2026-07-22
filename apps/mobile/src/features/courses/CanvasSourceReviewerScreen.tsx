@@ -1,5 +1,9 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
 import {
+  isActiveProcessingJobStatus,
+  type ProcessingJobStatusView,
+} from "@stay-focused/shared";
+import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
@@ -20,6 +24,7 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Pressable,
   StyleSheet,
   Text,
@@ -43,10 +48,20 @@ import {
   type CanvasReviewerSourceType,
 } from "../../services/canvasApi";
 import {
-  API_BASE_URL_SETUP_HINT,
-  generateReviewer,
-  type GenerateReviewerError,
-} from "../../services/reviewerApi";
+  cancelProcessingJob,
+  createProcessingJobIdempotencyKey,
+  createReviewerJob,
+  getProcessingJobStatus,
+  getReviewerJobResult,
+  MOBILE_JOB_POLL_INTERVAL_MS,
+  retryProcessingJob,
+  type ProcessingJobApiError,
+} from "../../services/processingJobsApi";
+import {
+  removeActiveProcessingJob,
+  upsertActiveProcessingJob,
+} from "../../services/activeProcessingJobStore";
+import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
 import {
   saveReviewer,
   type ReviewerLibraryError,
@@ -117,12 +132,16 @@ export function CanvasSourceReviewerScreen({
   const [isPreparing, setIsPreparing] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeReviewerJob, setActiveReviewerJob] =
+    useState<ProcessingJobStatusView | null>(null);
+  const [appIsActive, setAppIsActive] = useState(
+    AppState.currentState === "active",
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const inventoryAbortRef = useRef<AbortController | null>(null);
   const preparationAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
-  const generationAbortRef = useRef<AbortController | null>(null);
   const saveAbortRef = useRef<AbortController | null>(null);
   const inventoryTokenRef = useRef(0);
   const preparationTokenRef = useRef(0);
@@ -133,6 +152,14 @@ export function CanvasSourceReviewerScreen({
   const previewLockRef = useRef(false);
   const generationLockRef = useRef(false);
   const saveLockRef = useRef(false);
+  const generationIdempotencyKeyRef = useRef<string | null>(null);
+  const pendingGenerationRef = useRef<{
+    readonly requestToken: number;
+    readonly selectionKey: string;
+    readonly sourceText: string;
+    readonly resolutionFingerprint: string;
+    readonly sourceTitle: string;
+  } | null>(null);
 
   const selectedSource = useMemo(
     () =>
@@ -151,11 +178,11 @@ export function CanvasSourceReviewerScreen({
   const hasUnsavedReviewer = Boolean(reviewer && !savedReviewer);
 
   const invalidateGeneratedOutput = useCallback(() => {
-    generationAbortRef.current?.abort();
     saveAbortRef.current?.abort();
-    generationAbortRef.current = null;
     saveAbortRef.current = null;
     generationLockRef.current = false;
+    generationIdempotencyKeyRef.current = null;
+    pendingGenerationRef.current = null;
     saveLockRef.current = false;
     resolutionTokenRef.current += 1;
     setReviewer(null);
@@ -308,12 +335,10 @@ export function CanvasSourceReviewerScreen({
       inventoryAbortRef.current?.abort();
       preparationAbortRef.current?.abort();
       previewAbortRef.current?.abort();
-      generationAbortRef.current?.abort();
       saveAbortRef.current?.abort();
       inventoryAbortRef.current = null;
       preparationAbortRef.current = null;
       previewAbortRef.current = null;
-      generationAbortRef.current = null;
       saveAbortRef.current = null;
       generationLockRef.current = false;
       saveLockRef.current = false;
@@ -523,10 +548,133 @@ export function CanvasSourceReviewerScreen({
   };
 
   const handleSourceTextChange = (value: string) => {
+    if (activeReviewerJob && !isActiveProcessingJobStatus(activeReviewerJob.status)) {
+      void removeActiveProcessingJob(activeReviewerJob.id);
+      setActiveReviewerJob(null);
+    }
     dispatchResolution({ sourceText: value, type: "edited" });
     invalidateGeneratedOutput();
     setError(null);
   };
+
+  const handleReturnToCanvasSource = () => {
+    if (activeReviewerJob && !isActiveProcessingJobStatus(activeReviewerJob.status)) {
+      void removeActiveProcessingJob(activeReviewerJob.id);
+      setActiveReviewerJob(null);
+    }
+    clearDependentState(selectedSourceId);
+  };
+
+  const applyObservedReviewerJob = useCallback(
+    async (job: ProcessingJobStatusView): Promise<void> => {
+      const context = createRequestContext(session?.accessToken);
+      const ownerUserId = session?.user.id;
+      if (!context.ok || !ownerUserId) return;
+
+      setActiveReviewerJob(job);
+      await upsertActiveProcessingJob(ownerUserId, job);
+      if (isActiveProcessingJobStatus(job.status)) {
+        setIsGenerating(true);
+        return;
+      }
+
+      finishCanvasSingleFlight(generationLockRef);
+      setIsGenerating(false);
+      if (job.status !== "succeeded" || !job.resultAvailable) {
+        if (job.status === "failed" || job.status === "expired") {
+          setError({
+            message: job.safeErrorMessage ?? "The reviewer job could not finish safely.",
+            title: "Reviewer needs attention",
+          });
+        } else if (job.status === "cancelled") {
+          setError({
+            message: "No partial reviewer was published.",
+            title: "Reviewer generation cancelled",
+          });
+        }
+        return;
+      }
+
+      const result = await getReviewerJobResult({
+        ...context.value,
+        jobId: job.id,
+      });
+      if (!result.ok) {
+        setError(formatProcessingJobError(result.error));
+        return;
+      }
+
+      const pending = pendingGenerationRef.current;
+      if (
+        pending &&
+        (resolutionTokenRef.current !== pending.requestToken ||
+          createCanvasSelectionKey(
+            selectedSourceIdRef.current ? [selectedSourceIdRef.current] : [],
+          ) !== pending.selectionKey)
+      ) {
+        return;
+      }
+
+      setReviewer(result.data.reviewer);
+      setSourceSnapshotId(result.data.sourceSnapshotId ?? null);
+      if (pending) {
+        setGeneratedBinding({
+          fingerprint: pending.resolutionFingerprint,
+          selectionKey: pending.selectionKey,
+          sourceText: pending.sourceText,
+        });
+        setSaveTitle(
+          pending.sourceTitle.trim() ||
+            result.data.reviewer.title.trim() ||
+            "Canvas reviewer",
+        );
+      } else {
+        setSaveTitle(result.data.reviewer.title.trim() || "Canvas reviewer");
+      }
+      setActiveReviewerJob(null);
+      pendingGenerationRef.current = null;
+      generationIdempotencyKeyRef.current = null;
+      await removeActiveProcessingJob(job.id);
+    },
+    [session?.accessToken, session?.user.id],
+  );
+
+  const reconcileReviewerJob = useCallback(async (): Promise<void> => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok || !activeReviewerJob) return;
+    const result = await getProcessingJobStatus({
+      ...context.value,
+      jobId: activeReviewerJob.id,
+    });
+    if (result.ok) {
+      await applyObservedReviewerJob(result.data);
+    } else {
+      setError(formatProcessingJobError(result.error));
+    }
+  }, [activeReviewerJob, applyObservedReviewerJob, session?.accessToken]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      const active = state === "active";
+      setAppIsActive(active);
+      if (active) void reconcileReviewerJob();
+    });
+    return () => subscription.remove();
+  }, [reconcileReviewerJob]);
+
+  useEffect(() => {
+    if (
+      !appIsActive ||
+      !activeReviewerJob ||
+      !isActiveProcessingJobStatus(activeReviewerJob.status)
+    ) {
+      return;
+    }
+    const timer = setInterval(() => {
+      void reconcileReviewerJob();
+    }, MOBILE_JOB_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [activeReviewerJob, appIsActive, reconcileReviewerJob]);
 
   const handleGenerate = async () => {
     if (isGenerating || !tryBeginCanvasSingleFlight(generationLockRef)) return;
@@ -563,11 +711,19 @@ export function CanvasSourceReviewerScreen({
       return;
     }
 
-    generationAbortRef.current?.abort();
-    const controller = new AbortController();
-    generationAbortRef.current = controller;
     const requestToken = resolutionTokenRef.current;
     const activeSelectionKey = selectionKey;
+    const idempotencyKey =
+      generationIdempotencyKeyRef.current ??
+      createProcessingJobIdempotencyKey("reviewer_generation");
+    generationIdempotencyKeyRef.current = idempotencyKey;
+    pendingGenerationRef.current = {
+      requestToken,
+      resolutionFingerprint: preview.resolutionFingerprint,
+      selectionKey: activeSelectionKey,
+      sourceText: finalSourceText,
+      sourceTitle: resolution.sourceTitle,
+    };
     setIsGenerating(true);
     setError(null);
     setReviewer(null);
@@ -575,14 +731,15 @@ export function CanvasSourceReviewerScreen({
     setGeneratedBinding(null);
     setSavedReviewer(null);
 
+    let accepted = false;
     try {
-      const result = await generateReviewer({
+      const result = await createReviewerJob({
         ...context.value,
         canvasCourseId: courseId,
         canvasItemIds: preview.sources.map((source) => source.id),
         canvasPreviewSessionId: preview.previewSessionId,
         canvasResolutionFingerprint: preview.resolutionFingerprint,
-        signal: controller.signal,
+        idempotencyKey,
         sourceText: finalSourceText,
         sourceTitle: resolution.sourceTitle,
       });
@@ -595,26 +752,57 @@ export function CanvasSourceReviewerScreen({
         return;
       }
       if (result.ok) {
-        setReviewer(result.reviewer);
-        setSourceSnapshotId(result.sourceSnapshotId ?? null);
-        setGeneratedBinding({
-          fingerprint: preview.resolutionFingerprint,
-          selectionKey: activeSelectionKey,
-          sourceText: finalSourceText,
-        });
-        setSaveTitle(
-          resolution.sourceTitle.trim() || result.reviewer.title.trim() || "Canvas reviewer",
-        );
+        accepted = true;
+        const ownerUserId = session?.user.id;
+        if (ownerUserId) {
+          await upsertActiveProcessingJob(ownerUserId, result.data);
+        }
+        setActiveReviewerJob(result.data);
+        generationIdempotencyKeyRef.current = null;
       } else {
-        setError(formatGenerateError(result.error));
+        setError(formatProcessingJobError(result.error));
+        if (!result.error.retryable) {
+          generationIdempotencyKeyRef.current = null;
+          pendingGenerationRef.current = null;
+        }
       }
     } finally {
-      if (resolutionTokenRef.current === requestToken) {
-        generationAbortRef.current = null;
+      if (resolutionTokenRef.current === requestToken && !accepted) {
         finishCanvasSingleFlight(generationLockRef);
         setIsGenerating(false);
       }
     }
+  };
+
+  const handleCancelReviewerJob = async () => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok || !activeReviewerJob) return;
+    const result = await cancelProcessingJob({
+      ...context.value,
+      jobId: activeReviewerJob.id,
+    });
+    if (result.ok) await applyObservedReviewerJob(result.data);
+    else setError(formatProcessingJobError(result.error));
+  };
+
+  const handleRetryReviewerJob = async () => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok || !ownerUserId || !activeReviewerJob) return;
+    const result = await retryProcessingJob({
+      ...context.value,
+      jobId: activeReviewerJob.id,
+      idempotencyKey: createProcessingJobIdempotencyKey("reviewer_generation"),
+    });
+    if (!result.ok) {
+      setError(formatProcessingJobError(result.error));
+      return;
+    }
+    await removeActiveProcessingJob(activeReviewerJob.id);
+    await upsertActiveProcessingJob(ownerUserId, result.data);
+    setActiveReviewerJob(result.data);
+    setIsGenerating(true);
+    setError(null);
   };
 
   const handleSave = async () => {
@@ -727,10 +915,13 @@ export function CanvasSourceReviewerScreen({
         </View>
       ) : preview ? (
         <PreviewStage
+          activeJob={activeReviewerJob}
           isGenerating={isGenerating}
-          onBack={() => clearDependentState(selectedSourceId)}
+          onBack={handleReturnToCanvasSource}
+          onCancel={() => void handleCancelReviewerJob()}
           onChangeText={handleSourceTextChange}
           onGenerate={() => void handleGenerate()}
+          onRetry={() => void handleRetryReviewerJob()}
           source={selectedSource}
           sourceText={resolution.sourceText}
         />
@@ -1029,17 +1220,23 @@ function SelectionAction({
 }
 
 function PreviewStage({
+  activeJob,
   isGenerating,
   onBack,
+  onCancel,
   onChangeText,
   onGenerate,
+  onRetry,
   source,
   sourceText,
 }: {
+  readonly activeJob: ProcessingJobStatusView | null;
   readonly isGenerating: boolean;
   readonly onBack: () => void;
+  readonly onCancel: () => void;
   readonly onChangeText: (value: string) => void;
   readonly onGenerate: () => void;
+  readonly onRetry: () => void;
   readonly source: CanvasReviewerSourceDescriptor | null;
   readonly sourceText: string;
 }) {
@@ -1078,28 +1275,87 @@ function PreviewStage({
             ? "Ready to create a reviewer."
             : "Keep at least one readable line to continue."}
         </Text>
-        <Button
-          disabled={!sourceText.trim()}
-          fullWidth
-          loading={isGenerating}
-          onPress={onGenerate}
-          testID="canvas-generate-reviewer-button"
-          variant="primary"
-        >
-          Create reviewer
-        </Button>
+        {!activeJob ? (
+          <Button
+            disabled={!sourceText.trim()}
+            fullWidth
+            loading={isGenerating}
+            onPress={onGenerate}
+            testID="canvas-generate-reviewer-button"
+            variant="primary"
+          >
+            Create reviewer
+          </Button>
+        ) : null}
         <Button disabled={isGenerating} fullWidth onPress={onBack} variant="secondary">
           Change source
         </Button>
       </Card>
-      {isGenerating ? (
+      {isGenerating && !activeJob ? (
         <StatusCard
-          message="Stay Focused is creating a reviewer from the text above."
+          message="Keep Stay Focused open until the reviewer job is accepted."
           loading
-          title="Creating reviewer"
+          title="Starting reviewer generation"
+        />
+      ) : null}
+      {activeJob ? (
+        <CanvasReviewerJobCard
+          job={activeJob}
+          onCancel={onCancel}
+          onRetry={onRetry}
         />
       ) : null}
     </View>
+  );
+}
+
+function CanvasReviewerJobCard({
+  job,
+  onCancel,
+  onRetry,
+}: {
+  readonly job: ProcessingJobStatusView;
+  readonly onCancel: () => void;
+  readonly onRetry: () => void;
+}) {
+  const active = isActiveProcessingJobStatus(job.status);
+  const hasUnits =
+    job.progress.completedUnits !== null &&
+    job.progress.totalUnits !== null &&
+    job.progress.unitLabel !== null;
+  return (
+    <Card style={styles.previewCard} testID="canvas-reviewer-job-status">
+      <Text style={styles.cardTitle}>{processingJobLabel(job)}</Text>
+      <Text style={styles.statusText}>{job.progress.message}</Text>
+      {hasUnits ? (
+        <Text style={styles.statusText}>
+          {job.progress.completedUnits} of {job.progress.totalUnits}{" "}
+          {job.progress.unitLabel} processed
+        </Text>
+      ) : null}
+      {active ? (
+        <Text style={styles.bodyText}>
+          Reviewer generation started. You can switch apps; processing will continue on
+          the server.
+        </Text>
+      ) : null}
+      {job.safeErrorMessage ? (
+        <Text style={styles.errorText}>{job.safeErrorMessage}</Text>
+      ) : null}
+      <Text style={styles.characterCount}>
+        Latest update: {new Date(job.updatedAt).toLocaleString()}
+      </Text>
+      {job.status === "queued" || job.status === "running" ? (
+        <Button fullWidth onPress={onCancel} variant="secondary">
+          Cancel
+        </Button>
+      ) : null}
+      {job.status === "failed" && job.retryable ? (
+        <Button fullWidth onPress={onRetry} variant="primary">
+          Retry
+        </Button>
+      ) : null}
+    </Card>
   );
 }
 
@@ -1296,12 +1552,27 @@ function formatCanvasSourceError(
   }
 }
 
-function formatGenerateError(error: GenerateReviewerError): CanvasSourceDisplayError {
+function formatProcessingJobError(
+  error: ProcessingJobApiError,
+): CanvasSourceDisplayError {
   if (error.code === "source_text_too_large" || error.status === 413) {
-    return { message: "Shorten the edited preview, then try again.", title: "Preview is too long" };
+    return {
+      message: "Shorten the edited preview, then try again.",
+      title: "Preview is too long",
+    };
   }
-  if (error.code === "unauthorized") {
-    return { message: "Sign in again before continuing.", title: "Session expired" };
+  if (error.code === "unauthorized" || error.code === "missing_access_token") {
+    return {
+      message: "The server job continues independently. Sign in again to retrieve it.",
+      title: "Session expired",
+    };
+  }
+  if (error.code === "request_timeout" || error.code === "network_error") {
+    return {
+      message:
+        "The connection was interrupted. Any accepted server job was not cancelled; reconnect to check it.",
+      title: "Status temporarily unavailable",
+    };
   }
   if (
     error.code === "canvas_preview_session_expired" ||
@@ -1311,9 +1582,32 @@ function formatGenerateError(error: GenerateReviewerError): CanvasSourceDisplayE
     return { message: "Check the current source again before retrying.", title: "Source preview expired" };
   }
   return {
-    message: "Review the source text and try again. If it still fails, choose another source.",
-    title: "Reviewer could not be created",
+    message: error.message,
+    title: error.retryable ? "Reviewer needs attention" : "Request needs a change",
   };
+}
+
+function processingJobLabel(job: ProcessingJobStatusView): string {
+  if (job.status === "queued") return "Waiting to start";
+  if (job.status === "succeeded") return "Complete";
+  if (job.status === "failed" || job.status === "expired") return "Needs attention";
+  if (job.status === "cancelled") return "Cancelled";
+  if (job.status === "cancellation_requested") return "Stopping safely";
+  switch (job.stage) {
+    case "preparing_source":
+    case "normalizing_source":
+      return "Preparing source";
+    case "detecting_outline":
+    case "planning_sections":
+      return "Organizing topics";
+    case "generating_sections":
+      return "Creating reviewer sections";
+    case "verifying_coverage":
+    case "retrying_sections":
+      return "Checking coverage";
+    default:
+      return "Finishing reviewer";
+  }
 }
 
 function formatLibraryError(error: ReviewerLibraryError): CanvasSourceDisplayError {

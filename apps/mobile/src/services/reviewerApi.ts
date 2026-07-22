@@ -446,10 +446,22 @@ function logReviewerApiErrorBody(parsed: unknown): void {
 }
 
 function logReviewerApiThrownError(error: unknown, startedAt: number): void {
-  console.error("reviewer_api.request_error", {
+  const details = {
     durationMs: Date.now() - startedAt,
     ...getThrownErrorDetails(error),
-  });
+  };
+  if (
+    isRecord(error) &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  ) {
+    console.info("reviewer_api.request_interrupted", details);
+    return;
+  }
+  if (error instanceof TypeError) {
+    console.warn("reviewer_api.network_unavailable", details);
+    return;
+  }
+  console.error("reviewer_api.unexpected_error", details);
 }
 
 function describeParsedResponse(parsed: unknown): {

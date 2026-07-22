@@ -72,6 +72,12 @@ export type ReviewerSourceAction =
       readonly pageCount?: number;
     }
   | {
+      readonly type: "restore_ocr_result";
+      readonly mode: "image" | "pdf";
+      readonly text: string;
+      readonly pageCount?: number;
+    }
+  | {
       readonly type: "ocr_failed";
       readonly error: OcrClientError;
     }
@@ -211,6 +217,19 @@ export function reviewerSourceReducer(
             ? action.pageCount
             : state.pdfPageCount,
         ocrStatus: text.trim().length === 0 ? "failed" : "ready",
+      };
+    }
+
+    case "restore_ocr_result": {
+      const text = action.text.replace(/\r\n?/g, "\n");
+      return {
+        ...state,
+        mode: action.mode,
+        ocrText: text,
+        ocrError: null,
+        pdfPageCount:
+          action.mode === "pdf" ? action.pageCount ?? null : null,
+        ocrStatus: text.trim() ? "ready" : "failed",
       };
     }
 
