@@ -1826,3 +1826,12 @@ Current route status:
 - Mobile now reports the actual configured document limit, retains affected-page details for incomplete extraction, and no longer describes five pages as the product limit.
 - Synthetic coverage includes 1/5/6/12-page scans, native, mixed, blank, failed/incomplete chunks, limit validation, provider-boundary enforcement, concurrency, and cross-domain reviewer checks for biology, history, and mathematics.
 - Black-box fixture result: the 32-page example extracted completely in mixed mode (31 native pages, 1 OCR page, 1 OCR chunk, 6,622 characters); live reviewer generation produced 13 sections with coverage, grounding, and leakage all passing at 1.00/zero issues. Physical iPhone interaction was not performed in this run.
+
+### 2026-07-23 durable processing-job foundation
+- Added Supabase-backed extraction and reviewer jobs with strict states/stages, ownership RLS, private source snapshots, transactional result publication, idempotency fingerprints, cancellation, terminal events, leases, heartbeat, bounded retry/backoff, and stale-worker recovery.
+- Added authenticated `/api/jobs` creation/status/result/cancel/retry routes. HTTP 202 is returned only after durable staging and persistence; no route launches an unawaited background promise.
+- Added `npm run worker --workspace @stay-focused/api` plus bounded claim/heartbeat/recovery processing through the existing generalized OCR and Stage 0-6 reviewer engines.
+- Mobile now persists safe active-job references, stops polling while backgrounded, reconciles on foreground/restart/sign-in, and treats handled timeout/network events without `console.error`. Both normal and Canvas reviewer flows use job creation rather than the 120-second request.
+- Production logic remains subject-neutral; normalization removes only strongly evidenced repeated page-edge templates and retains audit metrics. No fixture-specific vocabulary or headings were added.
+- Production status is PARTIAL until a continuously available worker is deployed. Expo Go can test switch-away/reconnect, but native background upload, push delivery, and terminated-app integration require an Expo/EAS development build.
+- Architecture and limitations: `docs/architecture/ADR-010-durable-processing-jobs.md`.
