@@ -13,6 +13,7 @@ import {
 import {
   createProcessingJobServiceClient,
   listOwnedActiveProcessingJobs,
+  listOwnedProcessingJobs,
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
 import {
@@ -74,7 +75,10 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof ProcessingJobCreationError) {
       const status =
         error.code === "processing_job_idempotency_conflict" ? 409 :
-          error.code === "invalid_idempotency_key" ? 400 : 503;
+          error.code === "invalid_idempotency_key" ? 400 :
+            error.code.includes("_limit_reached") ||
+              error.code === "processing_job_rate_limit_reached" ? 429 :
+              error.code === "processing_source_version_not_found" ? 404 : 503;
       return errorResponse(
         status,
         error.code,
@@ -106,6 +110,46 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
+    const url = new URL(request.url);
+    if (url.searchParams.get("scope") === "all") {
+      const limit = readListLimit(url.searchParams.get("limit"));
+      const cursor = decodeJobCursor(url.searchParams.get("cursor"));
+      if (cursor === false) {
+        return errorResponse(
+          400,
+          "invalid_processing_job_cursor",
+          "The processing history cursor is invalid.",
+          false,
+          request,
+        );
+      }
+      const rows = await listOwnedProcessingJobs(
+        createProcessingJobServiceClient(),
+        user.id,
+        {
+          scope: "all",
+          limit: limit + 1,
+          ...(cursor ? { cursor } : {}),
+        },
+      );
+      const page = rows.slice(0, limit);
+      const last = page.at(-1);
+      return jsonResponse(
+        {
+          ok: true,
+          data: {
+            jobs: page.map(toProcessingJobStatusView),
+            nextCursor:
+              rows.length > limit && last
+                ? encodeJobCursor(last.created_at, last.id)
+                : null,
+          },
+        },
+        200,
+        request,
+      );
+    }
+
     const jobs = await listOwnedActiveProcessingJobs(
       createProcessingJobServiceClient(),
       user.id,
@@ -271,8 +315,18 @@ async function createReviewerJob(
     );
   }
 
+  const sourceVersionId = readOptionalString(body.sourceVersionId);
+  if (sourceVersionId && !isUuid(sourceVersionId)) {
+    return errorResponse(
+      400,
+      "invalid_source_version_id",
+      "sourceVersionId must be a UUID.",
+      false,
+      request,
+    );
+  }
   const sourceText = typeof body.sourceText === "string" ? body.sourceText.trim() : "";
-  if (!sourceText) {
+  if (!sourceText && !sourceVersionId) {
     return errorResponse(400, "missing_source_text", "Source text is required.", false, request);
   }
   if (sourceText.length > REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS) {
@@ -280,6 +334,16 @@ async function createReviewerJob(
       413,
       "source_text_too_large",
       `Source text must be at most ${REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS} characters.`,
+      false,
+      request,
+    );
+  }
+  const reuseMode = body.reuseMode ?? "fresh";
+  if (reuseMode !== "fresh" && reuseMode !== "reuse_existing") {
+    return errorResponse(
+      400,
+      "invalid_reuse_mode",
+      "reuseMode must be fresh or reuse_existing.",
       false,
       request,
     );
@@ -311,6 +375,10 @@ async function createReviewerJob(
     source: {
       sourceText,
       ...(sourceTitle ? { sourceTitle } : {}),
+      ...(sourceVersionId ? { sourceVersionId } : {}),
+      language: readOptionalString(body.language) ?? "auto",
+      outputMode: readOptionalString(body.outputMode) ?? "standard",
+      reuseMode,
       ...(canvasContext.metadata
         ? { sourcePrivateMetadata: canvasContext.metadata }
         : {}),
@@ -433,6 +501,46 @@ function readOptionalString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function readListLimit(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 ? Math.min(parsed, 50) : 20;
+}
+
+function encodeJobCursor(createdAt: string, id: string): string {
+  return Buffer.from(JSON.stringify({ createdAt, id }), "utf8").toString(
+    "base64url",
+  );
+}
+
+function decodeJobCursor(
+  value: string | null,
+): { readonly createdAt: string; readonly id: string } | null | false {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as unknown;
+    if (
+      !isRecord(parsed) ||
+      typeof parsed.createdAt !== "string" ||
+      !Number.isFinite(Date.parse(parsed.createdAt)) ||
+      typeof parsed.id !== "string" ||
+      !isUuid(parsed.id)
+    ) {
+      return false;
+    }
+    return { createdAt: parsed.createdAt, id: parsed.id };
+  } catch {
+    return false;
+  }
 }
 
 function isOversizedContentLength(value: string | null): boolean {

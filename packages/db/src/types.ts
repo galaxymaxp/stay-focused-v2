@@ -365,6 +365,27 @@ export type ProcessingJobDatabaseRow = {
   readonly lease_owner: string | null;
   readonly lease_expires_at: string | null;
   readonly heartbeat_at: string | null;
+  readonly source_version_id: string | null;
+  readonly artifact_type:
+    | "reviewer"
+    | "flashcards"
+    | "quiz"
+    | "summary"
+    | "practice_test"
+    | "study_guide"
+    | null;
+  readonly generation_policy_version: string | null;
+  readonly engine_version: string | null;
+  readonly schema_version: string | null;
+  readonly provider_id: string | null;
+  readonly settings_fingerprint: string | null;
+  readonly language: string | null;
+  readonly output_mode: string | null;
+  readonly reuse_mode: "fresh" | "reuse_existing";
+  readonly reuse_of_job_id: string | null;
+  readonly reuse_candidate_artifact_version_id: string | null;
+  readonly scheduled_for: string;
+  readonly priority_class: number;
 };
 
 export type ProcessingJobRow =
@@ -373,6 +394,16 @@ export type ProcessingJobSourceRow =
   Database["public"]["Tables"]["processing_job_sources"]["Row"];
 export type ProcessingJobResultRow =
   Database["public"]["Tables"]["processing_job_results"]["Row"];
+export type DocumentAssetRow =
+  Database["public"]["Tables"]["document_assets"]["Row"];
+export type ExtractionResultRow =
+  Database["public"]["Tables"]["extraction_results"]["Row"];
+export type SourceVersionRow =
+  Database["public"]["Tables"]["source_versions"]["Row"];
+export type GeneratedArtifactRow =
+  Database["public"]["Tables"]["generated_artifacts"]["Row"];
+export type GeneratedArtifactVersionRow =
+  Database["public"]["Tables"]["generated_artifact_versions"]["Row"];
 
 export interface Database {
   public: {
@@ -2681,6 +2712,330 @@ export interface Database {
           },
         ];
       };
+      processing_policy_config: {
+        Row: {
+          id: string;
+          max_active_jobs_per_user: number;
+          max_queued_extraction_jobs_per_user: number;
+          max_queued_generation_jobs_per_user: number;
+          max_jobs_created_per_hour: number;
+          max_daily_extraction_jobs: number;
+          max_daily_generation_jobs: number;
+          max_daily_ocr_pages_per_user: number;
+          max_running_jobs_per_user: number;
+          max_source_versions_per_document: number;
+          failed_job_retention_days: number;
+          completed_job_retention_days: number;
+          event_retention_days: number;
+          idempotency_retention_days: number;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          max_active_jobs_per_user: number;
+          max_queued_extraction_jobs_per_user: number;
+          max_queued_generation_jobs_per_user: number;
+          max_jobs_created_per_hour: number;
+          max_daily_extraction_jobs: number;
+          max_daily_generation_jobs: number;
+          max_daily_ocr_pages_per_user?: number;
+          max_running_jobs_per_user: number;
+          max_source_versions_per_document: number;
+          failed_job_retention_days: number;
+          completed_job_retention_days: number;
+          event_retention_days: number;
+          idempotency_retention_days: number;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["processing_policy_config"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      document_assets: {
+        Row: {
+          id: string;
+          user_id: string;
+          original_file_name: string;
+          safe_display_name: string;
+          mime_type: string;
+          byte_size: number;
+          content_sha256: string | null;
+          storage_bucket: string;
+          storage_object_path: string;
+          upload_status: "available" | "deleted" | "cleanup_pending";
+          latest_extraction_result_id: string | null;
+          selected_source_version_id: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          original_file_name: string;
+          safe_display_name: string;
+          mime_type: string;
+          byte_size: number;
+          content_sha256?: string | null;
+          storage_bucket: string;
+          storage_object_path: string;
+          upload_status?: "available" | "deleted" | "cleanup_pending";
+          latest_extraction_result_id?: string | null;
+          selected_source_version_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["document_assets"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      extraction_results: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_asset_id: string;
+          extraction_job_id: string | null;
+          parser_policy_version: string;
+          ocr_policy_version: string;
+          normalization_version: string;
+          status: "succeeded" | "failed" | "cancelled";
+          raw_character_count: number;
+          normalized_character_count: number;
+          page_count: number;
+          diagnostics: Json;
+          raw_source_version_id: string | null;
+          normalized_source_version_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_asset_id: string;
+          extraction_job_id?: string | null;
+          parser_policy_version: string;
+          ocr_policy_version: string;
+          normalization_version: string;
+          status: "succeeded" | "failed" | "cancelled";
+          raw_character_count: number;
+          normalized_character_count: number;
+          page_count: number;
+          diagnostics?: Json;
+          raw_source_version_id?: string | null;
+          normalized_source_version_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["extraction_results"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      source_versions: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_asset_id: string | null;
+          extraction_result_id: string | null;
+          parent_source_version_id: string | null;
+          revision_kind:
+            | "extracted_raw"
+            | "normalized"
+            | "user_edited"
+            | "regenerated"
+            | "imported_text"
+            | "canvas_resolved";
+          content_sha256: string;
+          source_text: string;
+          character_count: number;
+          normalization_version: string | null;
+          created_by: "system" | "user";
+          created_at: string;
+          superseded_at: string | null;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_asset_id?: string | null;
+          extraction_result_id?: string | null;
+          parent_source_version_id?: string | null;
+          revision_kind:
+            | "extracted_raw"
+            | "normalized"
+            | "user_edited"
+            | "regenerated"
+            | "imported_text"
+            | "canvas_resolved";
+          content_sha256: string;
+          source_text: string;
+          character_count: number;
+          normalization_version?: string | null;
+          created_by: "system" | "user";
+          created_at?: string;
+          superseded_at?: string | null;
+          metadata?: Json;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["source_versions"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      generated_artifacts: {
+        Row: {
+          id: string;
+          user_id: string;
+          artifact_type:
+            | "reviewer"
+            | "flashcards"
+            | "quiz"
+            | "summary"
+            | "practice_test"
+            | "study_guide";
+          safe_title: string;
+          source_version_id: string;
+          latest_version_id: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          artifact_type:
+            | "reviewer"
+            | "flashcards"
+            | "quiz"
+            | "summary"
+            | "practice_test"
+            | "study_guide";
+          safe_title: string;
+          source_version_id: string;
+          latest_version_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["generated_artifacts"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      generated_artifact_versions: {
+        Row: {
+          id: string;
+          user_id: string;
+          artifact_id: string;
+          version_number: number;
+          source_version_id: string;
+          source_content_sha256: string;
+          artifact_type:
+            | "reviewer"
+            | "flashcards"
+            | "quiz"
+            | "summary"
+            | "practice_test"
+            | "study_guide";
+          payload: Json;
+          generation_policy_version: string;
+          engine_version: string;
+          schema_version: string;
+          provider_id: string;
+          settings_fingerprint: string;
+          generation_job_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          artifact_id: string;
+          version_number: number;
+          source_version_id: string;
+          source_content_sha256: string;
+          artifact_type:
+            | "reviewer"
+            | "flashcards"
+            | "quiz"
+            | "summary"
+            | "practice_test"
+            | "study_guide";
+          payload: Json;
+          generation_policy_version: string;
+          engine_version: string;
+          schema_version: string;
+          provider_id: string;
+          settings_fingerprint: string;
+          generation_job_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["generated_artifact_versions"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      processing_cleanup_queue: {
+        Row: {
+          id: string;
+          owner_user_id: string | null;
+          storage_bucket: string;
+          storage_object_path: string;
+          reason: "document_deleted" | "account_deleted" | "orphaned_staging";
+          not_before: string;
+          status: "pending" | "running" | "completed" | "failed";
+          attempt_count: number;
+          last_error_code: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          owner_user_id?: string | null;
+          storage_bucket: string;
+          storage_object_path: string;
+          reason: "document_deleted" | "account_deleted" | "orphaned_staging";
+          not_before: string;
+          status?: "pending" | "running" | "completed" | "failed";
+          attempt_count?: number;
+          last_error_code?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["processing_cleanup_queue"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      processing_worker_heartbeats: {
+        Row: {
+          worker_id: string;
+          status: "running" | "stopped" | "error";
+          capacity: number;
+          active_job_count: number;
+          build_revision: string | null;
+          started_at: string;
+          last_seen_at: string;
+          stopped_at: string | null;
+        };
+        Insert: {
+          worker_id: string;
+          status: "running" | "stopped" | "error";
+          capacity: number;
+          active_job_count: number;
+          build_revision?: string | null;
+          started_at?: string;
+          last_seen_at?: string;
+          stopped_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["processing_worker_heartbeats"]["Insert"]
+        >;
+        Relationships: [];
+      };
       processing_job_sources: {
         Row: {
           id: string;
@@ -2696,6 +3051,12 @@ export interface Database {
           page_count: number | null;
           metadata: Json;
           created_at: string;
+          document_asset_id: string | null;
+          source_version_id: string | null;
+          content_sha256: string | null;
+          parser_policy_version: string | null;
+          ocr_policy_version: string | null;
+          normalization_version: string | null;
         };
         Insert: {
           id?: string;
@@ -2711,6 +3072,12 @@ export interface Database {
           page_count?: number | null;
           metadata?: Json;
           created_at?: string;
+          document_asset_id?: string | null;
+          source_version_id?: string | null;
+          content_sha256?: string | null;
+          parser_policy_version?: string | null;
+          ocr_policy_version?: string | null;
+          normalization_version?: string | null;
         };
         Update: {
           id?: string;
@@ -2726,6 +3093,12 @@ export interface Database {
           page_count?: number | null;
           metadata?: Json;
           created_at?: string;
+          document_asset_id?: string | null;
+          source_version_id?: string | null;
+          content_sha256?: string | null;
+          parser_policy_version?: string | null;
+          ocr_policy_version?: string | null;
+          normalization_version?: string | null;
         };
         Relationships: [];
       };
@@ -2766,6 +3139,27 @@ export interface Database {
           lease_owner?: string | null;
           lease_expires_at?: string | null;
           heartbeat_at?: string | null;
+          source_version_id?: string | null;
+          artifact_type?:
+            | "reviewer"
+            | "flashcards"
+            | "quiz"
+            | "summary"
+            | "practice_test"
+            | "study_guide"
+            | null;
+          generation_policy_version?: string | null;
+          engine_version?: string | null;
+          schema_version?: string | null;
+          provider_id?: string | null;
+          settings_fingerprint?: string | null;
+          language?: string | null;
+          output_mode?: string | null;
+          reuse_mode?: "fresh" | "reuse_existing";
+          reuse_of_job_id?: string | null;
+          reuse_candidate_artifact_version_id?: string | null;
+          scheduled_for?: string;
+          priority_class?: number;
         };
         Update: Partial<ProcessingJobDatabaseRow>;
         Relationships: [];
@@ -2780,6 +3174,8 @@ export interface Database {
           payload: Json;
           metrics: Json;
           created_at: string;
+          extraction_result_id: string | null;
+          artifact_version_id: string | null;
         };
         Insert: {
           id?: string;
@@ -2790,6 +3186,8 @@ export interface Database {
           payload: Json;
           metrics?: Json;
           created_at?: string;
+          extraction_result_id?: string | null;
+          artifact_version_id?: string | null;
         };
         Update: {
           id?: string;
@@ -2800,6 +3198,8 @@ export interface Database {
           payload?: Json;
           metrics?: Json;
           created_at?: string;
+          extraction_result_id?: string | null;
+          artifact_version_id?: string | null;
         };
         Relationships: [];
       };
@@ -2816,6 +3216,10 @@ export interface Database {
           payload: Json;
           created_at: string;
           delivered_at: string | null;
+          artifact_version_id: string | null;
+          safe_label: string | null;
+          delivery_key: string;
+          delivery_eligible: boolean;
         };
         Insert: {
           id?: string;
@@ -2829,6 +3233,10 @@ export interface Database {
           payload?: Json;
           created_at?: string;
           delivered_at?: string | null;
+          artifact_version_id?: string | null;
+          safe_label?: string | null;
+          delivery_key: string;
+          delivery_eligible?: boolean;
         };
         Update: {
           id?: string;
@@ -2842,6 +3250,10 @@ export interface Database {
           payload?: Json;
           created_at?: string;
           delivered_at?: string | null;
+          artifact_version_id?: string | null;
+          safe_label?: string | null;
+          delivery_key?: string;
+          delivery_eligible?: boolean;
         };
         Relationships: [];
       };
@@ -2920,7 +3332,39 @@ export interface Database {
         };
         Returns: ProcessingJobDatabaseRow[];
       };
+      create_processing_job_v2: {
+        Args: {
+          p_user_id: string;
+          p_job_type: string;
+          p_idempotency_key: string;
+          p_request_fingerprint: string;
+          p_source_kind: string;
+          p_display_name: string;
+          p_mime_type: string;
+          p_storage_bucket: string | null;
+          p_storage_object_path: string | null;
+          p_source_text: string | null;
+          p_byte_size: number | null;
+          p_source_character_count: number | null;
+          p_page_count: number | null;
+          p_source_metadata: Json;
+          p_source_private_metadata: Json;
+          p_contract: Json;
+          p_expires_at?: string | null;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       claim_processing_jobs: {
+        Args: {
+          p_worker_id: string;
+          p_job_types: string[];
+          p_limit?: number;
+          p_lease_seconds?: number;
+          p_now?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      claim_processing_jobs_v2: {
         Args: {
           p_worker_id: string;
           p_job_types: string[];
@@ -2963,6 +3407,17 @@ export interface Database {
         };
         Returns: ProcessingJobDatabaseRow[];
       };
+      complete_processing_job_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_result_type: string;
+          p_payload: Json;
+          p_metrics?: Json;
+          p_completed_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       fail_processing_job: {
         Args: {
           p_job_id: string;
@@ -2994,6 +3449,57 @@ export interface Database {
       recover_stale_processing_jobs: {
         Args: { p_now?: string };
         Returns: number;
+      };
+      create_source_version_revision: {
+        Args: {
+          p_user_id: string;
+          p_parent_source_version_id: string;
+          p_expected_parent_sha256: string;
+          p_source_text: string;
+          p_select_as_active?: boolean;
+          p_created_at?: string;
+        };
+        Returns: Array<{
+          source_version_id: string;
+          content_sha256: string;
+          conflict_detected: boolean;
+          selected_as_active: boolean;
+        }>;
+      };
+      soft_delete_document_asset: {
+        Args: {
+          p_user_id: string;
+          p_document_asset_id: string;
+          p_dependent_artifact_policy?: string;
+          p_deleted_at?: string;
+        };
+        Returns: boolean;
+      };
+      soft_delete_generated_artifact: {
+        Args: {
+          p_user_id: string;
+          p_artifact_id: string;
+          p_deleted_at?: string;
+        };
+        Returns: boolean;
+      };
+      run_processing_lifecycle_cleanup: {
+        Args: {
+          p_now?: string;
+          p_dry_run?: boolean;
+        };
+        Returns: Json;
+      };
+      record_processing_worker_heartbeat: {
+        Args: {
+          p_worker_id: string;
+          p_status: "running" | "stopped" | "error";
+          p_capacity: number;
+          p_active_job_count: number;
+          p_build_revision?: string | null;
+          p_seen_at?: string;
+        };
+        Returns: undefined;
       };
       create_reviewer_source_snapshot: {
         Args: {

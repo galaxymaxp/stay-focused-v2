@@ -11,6 +11,8 @@
     "smoke:openai": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.smoke.js",
     "worker": "tsx scripts/job-worker.ts",
     "worker:once": "tsx scripts/job-worker.ts --once",
+    "cleanup:processing": "tsx scripts/processing-cleanup.ts",
+    "ops:processing": "tsx scripts/processing-ops-report.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next"
   },

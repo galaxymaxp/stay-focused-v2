@@ -9,6 +9,7 @@ import { processClaimedJob } from "./processor";
 import { createProcessingJobServiceClient } from "./repository";
 import {
   claimProcessingJobs,
+  recordProcessingWorkerHeartbeat,
   recoverStaleProcessingJobs,
 } from "./worker-repository";
 
@@ -27,35 +28,71 @@ export async function runProcessingWorker(
   const workerId = options.workerId ?? `worker-${randomUUID()}`;
   const client = createProcessingJobServiceClient();
   const active = new Set<Promise<void>>();
+  const buildRevision =
+    process.env.PROCESSING_WORKER_BUILD_REVISION?.trim() || undefined;
+  let terminalStatus: "stopped" | "error" = "stopped";
 
-  await recoverStaleProcessingJobs(client);
-
-  do {
-    if (options.signal?.aborted) break;
-    const capacity = Math.max(0, concurrency - active.size);
-    if (capacity > 0) {
-      const jobs = await claimProcessingJobs(client, workerId, capacity);
-      for (const job of jobs) {
-        const task: Promise<void> = processClaimedJob({ client, job, workerId })
-          .then(() => undefined)
-          .finally(() => active.delete(task));
-        active.add(task);
-      }
-    }
-
-    if (once) break;
-    if (active.size > 0) {
-      await Promise.race([
-        ...active,
-        waitForNextPoll(options.signal),
-      ]);
-    } else {
-      await waitForNextPoll(options.signal);
-    }
+  try {
     await recoverStaleProcessingJobs(client);
-  } while (!options.signal?.aborted);
+    await recordProcessingWorkerHeartbeat(client, {
+      activeJobCount: 0,
+      ...(buildRevision ? { buildRevision } : {}),
+      capacity: concurrency,
+      status: "running",
+      workerId,
+    });
 
-  await Promise.allSettled(active);
+    do {
+      if (options.signal?.aborted) break;
+      const capacity = Math.max(0, concurrency - active.size);
+      if (capacity > 0) {
+        const jobs = await claimProcessingJobs(client, workerId, capacity);
+        for (const job of jobs) {
+          const task: Promise<void> = processClaimedJob({ client, job, workerId })
+            .then(() => undefined)
+            .finally(() => active.delete(task));
+          active.add(task);
+        }
+      }
+
+      await recordProcessingWorkerHeartbeat(client, {
+        activeJobCount: active.size,
+        ...(buildRevision ? { buildRevision } : {}),
+        capacity: concurrency,
+        status: "running",
+        workerId,
+      });
+
+      if (once) break;
+      if (active.size > 0) {
+        await Promise.race([
+          ...active,
+          waitForNextPoll(options.signal),
+        ]);
+      } else {
+        await waitForNextPoll(options.signal);
+      }
+      await recoverStaleProcessingJobs(client);
+    } while (!options.signal?.aborted);
+
+    await Promise.allSettled(active);
+  } catch (error) {
+    terminalStatus = "error";
+    await Promise.allSettled(active);
+    throw error;
+  } finally {
+    try {
+      await recordProcessingWorkerHeartbeat(client, {
+        activeJobCount: Math.min(active.size, concurrency),
+        ...(buildRevision ? { buildRevision } : {}),
+        capacity: concurrency,
+        status: terminalStatus,
+        workerId,
+      });
+    } catch (heartbeatError) {
+      if (terminalStatus !== "error") throw heartbeatError;
+    }
+  }
 }
 
 function normalizeConcurrency(value: number | undefined): number {

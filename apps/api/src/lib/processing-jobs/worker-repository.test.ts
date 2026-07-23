@@ -4,6 +4,7 @@ import {
   claimProcessingJobs,
   completeProcessingJob,
   heartbeatProcessingJob,
+  recordProcessingWorkerHeartbeat,
   recoverStaleProcessingJobs,
   updateProcessingJobProgress,
 } from "./worker-repository";
@@ -13,7 +14,7 @@ describe("processing job worker repository", () => {
     const rpc = vi.fn(async () => ({ data: [], error: null }));
     await claimProcessingJobs({ rpc } as never, "worker-a", 2);
 
-    expect(rpc).toHaveBeenCalledWith("claim_processing_jobs", {
+    expect(rpc).toHaveBeenCalledWith("claim_processing_jobs_v2", {
       p_job_types: ["document_extraction", "reviewer_generation"],
       p_lease_seconds: 90,
       p_limit: 2,
@@ -30,6 +31,25 @@ describe("processing job worker repository", () => {
       heartbeatProcessingJob(client, "job-a", "worker-a"),
     ).rejects.toMatchObject({
       code: "processing_job_lease_lost",
+    });
+  });
+
+  it("records an idle-capable worker heartbeat without exposing host metadata", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    await recordProcessingWorkerHeartbeat({ rpc } as never, {
+      activeJobCount: 0,
+      buildRevision: "release-abc",
+      capacity: 2,
+      status: "running",
+      workerId: "worker-a",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("record_processing_worker_heartbeat", {
+      p_active_job_count: 0,
+      p_build_revision: "release-abc",
+      p_capacity: 2,
+      p_status: "running",
+      p_worker_id: "worker-a",
     });
   });
 
@@ -71,7 +91,7 @@ describe("processing job worker repository", () => {
       }),
     ).resolves.toBe(completed);
     expect(rpc).toHaveBeenCalledWith(
-      "complete_processing_job",
+      "complete_processing_job_v2",
       expect.objectContaining({ p_job_id: "job-a", p_worker_id: "worker-a" }),
     );
   });

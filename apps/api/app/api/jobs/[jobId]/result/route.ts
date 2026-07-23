@@ -41,6 +41,9 @@ export async function GET(
     if (!result) {
       return error(503, "processing_job_result_unavailable", "The completed result is unavailable.", true);
     }
+    const sourceContentSha256 = job.source_version_id
+      ? await readSourceContentSha256(client, user.id, job.source_version_id)
+      : null;
 
     return NextResponse.json(
       {
@@ -49,8 +52,30 @@ export async function GET(
           jobId: result.job_id,
           jobType: result.result_type,
           sourceSnapshotId: result.source_snapshot_id,
+          sourceVersionId: job.source_version_id,
+          sourceContentSha256,
+          extractionResultId: result.extraction_result_id,
+          artifactVersionId: result.artifact_version_id,
           result: result.payload,
           metrics: result.metrics,
+          provenance:
+            job.generation_policy_version &&
+            job.engine_version &&
+            job.schema_version &&
+            job.provider_id &&
+            job.settings_fingerprint &&
+            job.language &&
+            job.output_mode
+              ? {
+                  generationPolicyVersion: job.generation_policy_version,
+                  engineVersion: job.engine_version,
+                  schemaVersion: job.schema_version,
+                  providerId: job.provider_id,
+                  settingsFingerprint: job.settings_fingerprint,
+                  language: job.language,
+                  outputMode: job.output_mode,
+                }
+              : null,
           createdAt: result.created_at,
         },
       },
@@ -59,6 +84,20 @@ export async function GET(
   } catch {
     return error(503, "processing_job_result_unavailable", "The result is temporarily unavailable.", true);
   }
+}
+
+async function readSourceContentSha256(
+  client: ReturnType<typeof createProcessingJobServiceClient>,
+  userId: string,
+  sourceVersionId: string,
+): Promise<string | null> {
+  const { data, error: readError } = await client
+    .from("source_versions")
+    .select("content_sha256")
+    .eq("id", sourceVersionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return readError ? null : data?.content_sha256 ?? null;
 }
 
 export function OPTIONS(): Response {

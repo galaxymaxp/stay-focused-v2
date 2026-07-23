@@ -275,6 +275,9 @@ async function processExtractionJob({
   return {
     payload: {
       text: normalized.text,
+      rawText: extraction.result.pages
+        .map((page) => page.text)
+        .join("\n\n"),
       rawPages: extraction.result.pages,
       mimeType: extraction.result.mimeType,
       pageCount: extraction.extraction.expectedPageCount,
@@ -533,11 +536,23 @@ function mapWorkerFailure(error: unknown): WorkerJobError {
       true,
     );
   }
+  if (isProviderRateLimitError(error)) {
+    return new WorkerJobError(
+      "provider_rate_limited",
+      "The processing provider is temporarily rate limited.",
+      true,
+    );
+  }
   return new WorkerJobError(
     "processing_provider_failed",
     "A processing provider was temporarily unavailable.",
     true,
   );
+}
+
+function isProviderRateLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(?:429|rate[ -]?limit|too many requests)\b/i.test(message);
 }
 
 function toJson(value: unknown): Json {

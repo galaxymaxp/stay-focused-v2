@@ -15,12 +15,32 @@ export async function recoverStaleProcessingJobs(
   return data ?? 0;
 }
 
+export async function recordProcessingWorkerHeartbeat(
+  client: ProcessingJobServiceClient,
+  input: {
+    readonly workerId: string;
+    readonly status: "running" | "stopped" | "error";
+    readonly capacity: number;
+    readonly activeJobCount: number;
+    readonly buildRevision?: string;
+  },
+): Promise<void> {
+  const { error } = await client.rpc("record_processing_worker_heartbeat", {
+    p_worker_id: input.workerId,
+    p_status: input.status,
+    p_capacity: input.capacity,
+    p_active_job_count: input.activeJobCount,
+    p_build_revision: input.buildRevision ?? null,
+  });
+  if (error) throw new WorkerRepositoryError("processing_worker_heartbeat_failed");
+}
+
 export async function claimProcessingJobs(
   client: ProcessingJobServiceClient,
   workerId: string,
   limit: number,
 ): Promise<readonly ProcessingJobDatabaseRow[]> {
-  const { data, error } = await client.rpc("claim_processing_jobs", {
+  const { data, error } = await client.rpc("claim_processing_jobs_v2", {
     p_worker_id: workerId,
     p_job_types: ["document_extraction", "reviewer_generation"],
     p_limit: limit,
@@ -92,7 +112,7 @@ export async function completeProcessingJob(
     readonly metrics: Json;
   },
 ): Promise<ProcessingJobDatabaseRow> {
-  const { data, error } = await client.rpc("complete_processing_job", {
+  const { data, error } = await client.rpc("complete_processing_job_v2", {
     p_job_id: input.jobId,
     p_worker_id: input.workerId,
     p_result_type: input.resultType,

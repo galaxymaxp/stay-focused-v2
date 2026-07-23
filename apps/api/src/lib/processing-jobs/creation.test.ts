@@ -132,7 +132,19 @@ describe("durable processing job creation", () => {
   it("removes an unreferenced staged object after a different-payload race", async () => {
     const remove = vi.fn(async () => ({ data: [], error: null }));
     const upload = vi.fn(async () => ({ data: { path: "staged" }, error: null }));
+    const assetQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+    };
+    assetQuery.select.mockReturnValue(assetQuery);
+    assetQuery.eq.mockReturnValue(assetQuery);
+    assetQuery.is.mockReturnValue(assetQuery);
+    assetQuery.limit.mockReturnValue(assetQuery);
     const client = {
+      from: vi.fn(() => assetQuery),
       storage: { from: vi.fn(() => ({ remove, upload })) },
     } as never;
     repositoryMocks.find
@@ -162,6 +174,61 @@ describe("durable processing job creation", () => {
     expect(remove).toHaveBeenCalledTimes(1);
   });
 
+  it("queues orphan cleanup when an unreferenced staged object cannot be removed", async () => {
+    const remove = vi.fn(async () => ({
+      data: null,
+      error: { message: "temporary storage failure" },
+    }));
+    const upload = vi.fn(async () => ({ data: { path: "staged" }, error: null }));
+    const upsert = vi.fn(async () => ({ data: null, error: null }));
+    const assetQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+    };
+    assetQuery.select.mockReturnValue(assetQuery);
+    assetQuery.eq.mockReturnValue(assetQuery);
+    assetQuery.is.mockReturnValue(assetQuery);
+    assetQuery.limit.mockReturnValue(assetQuery);
+    const client = {
+      from: vi.fn((table: string) =>
+        table === "processing_cleanup_queue" ? { upsert } : assetQuery,
+      ),
+      storage: { from: vi.fn(() => ({ remove, upload })) },
+    } as never;
+    repositoryMocks.find.mockResolvedValue(null);
+    repositoryMocks.create.mockRejectedValueOnce(new Error("database unavailable"));
+
+    await expect(
+      createExtractionProcessingJob({
+        client,
+        idempotencyKey: "extraction:orphan:1",
+        source: {
+          bytes: new Uint8Array([3, 2, 1]),
+          displayName: "neutral.pdf",
+          mimeType: "application/pdf",
+          sourceKind: "pdf",
+        },
+        userId: "user-a",
+      }),
+    ).rejects.toMatchObject({ code: "processing_job_persistence_failed" });
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner_user_id: "user-a",
+        reason: "orphaned_staging",
+        status: "pending",
+        storage_bucket: "processing-job-sources",
+      }),
+      {
+        ignoreDuplicates: true,
+        onConflict: "storage_bucket,storage_object_path,reason",
+      },
+    );
+  });
+
   it("validates the bounded safe idempotency-key format", () => {
     expect(validateIdempotencyKey("mobile:key_123")).toBe("mobile:key_123");
     expect(() => validateIdempotencyKey("short")).toThrow(ProcessingJobCreationError);
@@ -186,6 +253,20 @@ function makeJob(
     expires_at: "2026-07-24T00:00:00.000Z",
     failed_at: null,
     heartbeat_at: null,
+    source_version_id: null,
+    artifact_type: "reviewer",
+    generation_policy_version: "reviewer-policy-v1",
+    engine_version: "engine-stage0-6-v1",
+    schema_version: "reviewer-output-v1",
+    provider_id: "openai:gpt-4o",
+    settings_fingerprint: "a".repeat(64),
+    language: "auto",
+    output_mode: "standard",
+    reuse_mode: "fresh",
+    reuse_of_job_id: null,
+    reuse_candidate_artifact_version_id: null,
+    scheduled_for: now,
+    priority_class: 100,
     id: "job-default",
     idempotency_expires_at: "2026-08-22T00:00:00.000Z",
     idempotency_key: "reviewer:default:1",

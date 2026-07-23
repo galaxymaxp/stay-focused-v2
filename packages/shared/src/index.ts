@@ -26,6 +26,28 @@ export const STUDENT_CONTENT_LEAKAGE_DENYLIST = [
 
 export type Identifier = string;
 
+export const GENERATED_ARTIFACT_TYPES = [
+  "reviewer",
+  "flashcards",
+  "quiz",
+  "summary",
+  "practice_test",
+  "study_guide",
+] as const;
+
+export type GeneratedArtifactType = (typeof GENERATED_ARTIFACT_TYPES)[number];
+
+export const SOURCE_REVISION_KINDS = [
+  "extracted_raw",
+  "normalized",
+  "user_edited",
+  "regenerated",
+  "imported_text",
+  "canvas_resolved",
+] as const;
+
+export type SourceRevisionKind = (typeof SOURCE_REVISION_KINDS)[number];
+
 export const PROCESSING_JOB_TYPES = [
   "document_extraction",
   "reviewer_generation",
@@ -109,11 +131,63 @@ export interface ProcessingJobStatusView {
   readonly attemptCount: number;
   readonly resultAvailable: boolean;
   readonly retryOfJobId: string | null;
+  readonly sourceVersionId: string | null;
+  readonly artifactType: GeneratedArtifactType | null;
+  readonly reuseMode: "fresh" | "reuse_existing";
+  readonly reusedFromJobId: string | null;
+  readonly reuseCandidateArtifactVersionId: string | null;
+  readonly provenance: ProcessingJobProvenance | null;
+}
+
+export interface ProcessingJobProvenance {
+  readonly generationPolicyVersion: string;
+  readonly engineVersion: string;
+  readonly schemaVersion: string;
+  readonly providerId: string;
+  readonly settingsFingerprint: string;
+  readonly language: string;
+  readonly outputMode: string;
 }
 
 export interface AcceptedProcessingJobResponse {
   readonly ok: true;
   readonly data: ProcessingJobStatusView;
+}
+
+export interface ProcessingJobListPage {
+  readonly jobs: readonly ProcessingJobStatusView[];
+  readonly nextCursor: string | null;
+}
+
+export interface SourceVersionSummary {
+  readonly id: string;
+  readonly documentAssetId: string | null;
+  readonly parentSourceVersionId: string | null;
+  readonly revisionKind: SourceRevisionKind;
+  readonly contentSha256: string;
+  readonly characterCount: number;
+  readonly normalizationVersion: string | null;
+  readonly createdBy: "system" | "user";
+  readonly createdAt: string;
+  readonly supersededAt: string | null;
+}
+
+export interface SourceVersionRevisionResult extends SourceVersionSummary {
+  readonly conflictDetected: boolean;
+  readonly selectedAsActive: boolean;
+}
+
+export interface GeneratedArtifactProvenance {
+  readonly sourceVersionId: string;
+  readonly sourceContentSha256: string;
+  readonly artifactType: GeneratedArtifactType;
+  readonly generationPolicyVersion: string;
+  readonly engineVersion: string;
+  readonly schemaVersion: string;
+  readonly providerId: string;
+  readonly settingsFingerprint: string;
+  readonly generationJobId: string | null;
+  readonly createdAt: string;
 }
 
 export interface ProcessingJobErrorResponse {
