@@ -1856,3 +1856,14 @@ Current route status:
 - npm audit triage: `npm audit` still reports 21 findings (14 moderate, 6 high, 1 critical). The critical `tar` issue is transitive through Expo CLI tooling, not the API worker runtime. Production runtime follow-up is still recommended for `next` and `@google-cloud/vision` transitive packages (`protobufjs`, `brace-expansion`, `sharp`) before production traffic.
 - Remaining blockers: hosted worker deployment credentials, hosted queue-processing acceptance, physical iPhone acceptance, cleanup scheduling, and explicit approval to push the branch with migrations to GitHub.
 - Next task: deploy exactly one Railway worker from the current branch, configure server-only secrets, verify hosted heartbeat/queue/restart behavior with synthetic jobs, then run the physical iPhone background-switch suite before pushing `main`.
+
+### 2026-07-23 R3A push-safety and dependency audit remediation
+- Starting state: `main` at `89655dc`, 8 commits ahead of `origin/main`, with the same unrelated dirty files preserved (`apps/api/next-env.d.ts`, `apps/mobile/expo-env.d.ts`, `.vscode/`, `apps/mobile/.gitignore`).
+- Push readiness: READY_TO_PUSH. The linked Supabase development project has migrations through `20260723091627_processing_lifecycle_batching`; every applied processing migration exists locally and is committed in `HEAD`, while `origin/main` still lacks the processing migration commits until push.
+- Dependency audit before remediation: 21 findings (14 moderate, 6 high, 1 critical).
+- Safe remediation applied: `next` moved within the current major to `15.5.21`; lockfile patched `protobufjs` to `7.6.5`, `brace-expansion` to fixed 1.x/2.x/5.x releases, `tar` to `7.5.21`, `undici` to `6.27.0`, `shell-quote` to `1.10.0`, and `js-yaml` to fixed 3.x/4.x releases where npm could resolve safely.
+- Dependency audit after remediation: 15 findings (13 moderate, 2 high, 0 critical). The critical `tar` finding and OCR/provider `protobufjs` finding are resolved.
+- Deferred findings: `next` still reports high through bundled `postcss@8.4.31` and optional `sharp@0.34.5`; npm's listed fix path is a breaking downgrade to `next@9.3.3`, and the latest current Next major still carries the flagged transitive dependency shape. Expo, `expo-constants`, `expo-linking`, `expo-router`, `@expo/*`, `xcode`, and `uuid` remain in the Expo 57 major-upgrade chain and were intentionally not forced.
+- Expo major upgrade was avoided as requested.
+- Verification result: shared/db/ocr/api/mobile/engine typechecks and tests passed; API and engine builds passed; engine eval passed (290/290); `worker:once`, cleanup dry-run, ops report, and `git diff --check` passed after dependency changes. `npm audit` remains nonzero only for the deferred findings above.
+- Next task: evaluate a safe Next remediation path for the `postcss`/`sharp` advisories and plan the Expo 57 upgrade separately, then push `main` after explicit approval.
