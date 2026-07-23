@@ -39,6 +39,47 @@ describe("active processing job persistence", () => {
     await expect(readActiveProcessingJobs("user-b")).resolves.toEqual([]);
   });
 
+  it("persists multiple active jobs independently across restart", async () => {
+    await upsertActiveProcessingJob("user-a", jobView({ id: "job-1" }));
+    await upsertActiveProcessingJob(
+      "user-a",
+      jobView({
+        id: "job-2",
+        jobType: "document_extraction",
+        artifactType: null,
+        sourceVersionId: null,
+      }),
+    );
+    const restored = await readActiveProcessingJobs("user-a");
+    expect(restored.map((job) => job.jobId).sort()).toEqual(["job-1", "job-2"]);
+  });
+
+  it("keeps one failed job from altering unrelated running work", async () => {
+    await upsertActiveProcessingJob("user-a", jobView({ id: "job-running" }));
+    await upsertActiveProcessingJob(
+      "user-a",
+      jobView({
+        id: "job-failed",
+        status: "failed",
+        safeErrorMessage: "Provider unavailable.",
+        retryable: true,
+      }),
+    );
+    const restored = await readActiveProcessingJobs("user-a");
+    expect(restored).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          jobId: "job-running",
+          lastKnownStatus: "running",
+        }),
+        expect.objectContaining({
+          jobId: "job-failed",
+          lastKnownStatus: "failed",
+        }),
+      ]),
+    );
+  });
+
   it("keeps terminal work recoverable until the result is consumed", async () => {
     await upsertActiveProcessingJob(
       "user-a",
@@ -73,6 +114,20 @@ function jobView(
     resultAvailable: false,
     retryable: false,
     retryOfJobId: null,
+    sourceVersionId: "source-version-1",
+    artifactType: "reviewer",
+    reuseMode: "fresh",
+    reusedFromJobId: null,
+    reuseCandidateArtifactVersionId: null,
+    provenance: {
+      generationPolicyVersion: "reviewer-policy-v1",
+      engineVersion: "engine-stage0-6-v1",
+      schemaVersion: "reviewer-output-v1",
+      providerId: "openai:gpt-4o",
+      settingsFingerprint: "a".repeat(64),
+      language: "auto",
+      outputMode: "standard",
+    },
     safeErrorMessage: null,
     source: {
       characterCount: 100,

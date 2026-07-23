@@ -18,6 +18,10 @@ import type {
   AuthResult,
   MobileAuthSession,
 } from "./authTypes";
+import {
+  pauseOfflineProcessingIntents,
+  resumeOfflineProcessingIntents,
+} from "../services/processingOutboxStore";
 
 export type AuthStatus = "restoring" | "signedOut" | "signedIn";
 
@@ -53,6 +57,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const applySession = useCallback((nextSession: MobileAuthSession | null) => {
     setSession(nextSession);
     setStatus(nextSession ? "signedIn" : "signedOut");
+    if (nextSession) {
+      void resumeOfflineProcessingIntents(nextSession.user.id);
+    }
   }, []);
 
   const applySessionResult = useCallback(
@@ -139,8 +146,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
+      const ownerUserId = session?.user.id;
       const result = await signOutSession();
       if (result.ok) {
+        if (ownerUserId) {
+          await pauseOfflineProcessingIntents(ownerUserId);
+        }
         applySession(null);
       } else {
         setError(result.error);
@@ -150,7 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsSigningOut(false);
     }
-  }, [applySession]);
+  }, [applySession, session?.user.id]);
 
   const clearError = useCallback(() => {
     setError(null);

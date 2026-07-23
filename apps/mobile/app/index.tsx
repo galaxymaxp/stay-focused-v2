@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -18,7 +19,11 @@ import { CanvasSourceReviewerScreen } from "../src/features/courses/CanvasSource
 import { CanvasGradeScreen } from "../src/features/courses/CanvasGradeScreen";
 import { CoursesScreen } from "../src/features/courses/CoursesScreen";
 import { StudyLibraryScreen } from "../src/features/library/StudyLibraryScreen";
+import { ProcessingScreen } from "../src/features/processing/ProcessingScreen";
 import { ReviewerGenerateScreen } from "../src/features/reviewer/ReviewerGenerateScreen";
+import { reconcileReviewerProcessingOutbox } from "../src/services/processingOutboxReconciliation";
+
+const OUTBOX_RECONCILIATION_INTERVAL_MS = 10_000;
 
 export default function IndexScreen() {
   const auth = useAuth();
@@ -35,9 +40,11 @@ export default function IndexScreen() {
 }
 
 function AuthenticatedApp() {
+  const { session } = useAuth();
   const [activeView, setActiveView] = useState<
     | { readonly name: "generate" }
     | { readonly name: "library" }
+    | { readonly name: "processing" }
     | { readonly name: "courses" }
     | {
         readonly name: "canvas-reviewer";
@@ -51,10 +58,43 @@ function AuthenticatedApp() {
       }
   >({ name: "generate" });
 
+  const reconcileOutbox = useCallback(async () => {
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const accessToken = session?.accessToken.trim();
+    const ownerUserId = session?.user.id;
+    if (!apiBaseUrl || !accessToken || !ownerUserId) return;
+    await reconcileReviewerProcessingOutbox({
+      accessToken,
+      apiBaseUrl,
+      ownerUserId,
+    });
+  }, [session?.accessToken, session?.user.id]);
+
+  useEffect(() => {
+    const triggerReconciliation = () => {
+      void reconcileOutbox().catch(() => undefined);
+    };
+    triggerReconciliation();
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") triggerReconciliation();
+    }, OUTBOX_RECONCILIATION_INTERVAL_MS);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") triggerReconciliation();
+    });
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [reconcileOutbox]);
+
   if (activeView.name === "library") {
     return (
       <StudyLibraryScreen onCreateReviewer={() => setActiveView({ name: "generate" })} />
     );
+  }
+
+  if (activeView.name === "processing") {
+    return <ProcessingScreen onBack={() => setActiveView({ name: "generate" })} />;
   }
 
   if (activeView.name === "courses") {
@@ -97,6 +137,7 @@ function AuthenticatedApp() {
     <ReviewerGenerateScreen
       onOpenCourses={() => setActiveView({ name: "courses" })}
       onOpenLibrary={() => setActiveView({ name: "library" })}
+      onOpenProcessing={() => setActiveView({ name: "processing" })}
     />
   );
 }

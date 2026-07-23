@@ -4,6 +4,7 @@ import {
   cancelProcessingJob,
   createReviewerJob,
   getProcessingJobStatus,
+  listProcessingJobsPage,
 } from "./processingJobsApi";
 
 const BASE_INPUT = {
@@ -99,6 +100,28 @@ describe("processing jobs mobile API", () => {
       /\/api\/jobs\/job-1\/cancel$/,
     );
     expect(fetchImpl.mock.calls[0]?.[1]?.method).toBe("POST");
+  });
+
+  it("requests bounded processing history with an opaque cursor", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (url) => {
+      expect(String(url)).toContain("scope=all");
+      expect(String(url)).toContain("limit=20");
+      expect(String(url)).toContain("cursor=opaque-next");
+      return jsonResponse({
+        ok: true,
+        data: { jobs: [jobView()], nextCursor: null },
+      });
+    });
+    const result = await listProcessingJobsPage({
+      ...BASE_INPUT,
+      cursor: "opaque-next",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      limit: 20,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      data: { jobs: [{ id: "job-1" }], nextCursor: null },
+    });
   });
 });
 

@@ -48,6 +48,9 @@ import {
   removeActiveProcessingJob,
   upsertActiveProcessingJob,
 } from "../../services/activeProcessingJobStore";
+import { cacheCompletedArtifact } from "../../services/completedArtifactCache";
+import { saveProcessingDraft } from "../../services/processingDraftStore";
+import { enqueueOfflineProcessingIntent } from "../../services/processingOutboxStore";
 import type { OcrClientError } from "../../services/ocrApi";
 import {
   captureImageWithCamera,
@@ -80,6 +83,7 @@ const OCR_SMOKE_FIXTURE_ENABLED = isOcrSmokeFixtureEnabled();
 interface ReviewerGenerateScreenProps {
   readonly onOpenCourses?: () => void;
   readonly onOpenLibrary?: () => void;
+  readonly onOpenProcessing?: () => void;
 }
 
 interface GenerationDisplayError {
@@ -91,6 +95,7 @@ interface GenerationDisplayError {
 export function ReviewerGenerateScreen({
   onOpenCourses,
   onOpenLibrary,
+  onOpenProcessing,
 }: ReviewerGenerateScreenProps) {
   const { isSigningOut, session, signOut } = useAuth();
   const [sourceTitle, setSourceTitle] = useState("");
@@ -187,6 +192,23 @@ export function ReviewerGenerateScreen({
         if (!result.ok) {
           setGenerationError(formatProcessingJobApiError(result.error));
           return;
+        }
+        if (
+          result.data.artifactVersionId &&
+          result.data.sourceVersionId &&
+          result.data.sourceContentSha256
+        ) {
+          await cacheCompletedArtifact({
+            artifactVersionId: result.data.artifactVersionId,
+            processingJobId: job.id,
+            ownerUserId,
+            artifactType: "reviewer",
+            sourceVersionId: result.data.sourceVersionId,
+            sourceContentSha256: result.data.sourceContentSha256,
+            title: result.data.reviewer.title,
+            createdAt: job.completedAt ?? job.updatedAt,
+            payload: result.data.reviewer,
+          });
         }
         setReviewer(result.data.reviewer);
         setRecoveredReviewerSource(
@@ -346,7 +368,44 @@ export function ReviewerGenerateScreen({
         setActiveReviewerJob(result.data);
         await upsertActiveProcessingJob(ownerUserId, result.data);
       } else {
-        setGenerationError(formatProcessingJobApiError(result.error));
+        if (
+          result.error.code === "network_error" ||
+          result.error.code === "request_timeout"
+        ) {
+          const localReference = `reviewer-draft:${idempotencyKey}`;
+          const saved = await saveProcessingDraft({
+            localReference,
+            ownerUserId,
+            sourceText: trimmedSourceText,
+            ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
+          });
+          if (saved) {
+            await enqueueOfflineProcessingIntent({
+              ownerUserId,
+              operation: "artifact_generation",
+              sourceLocalReference: localReference,
+              artifactType: "reviewer",
+              idempotencyKey,
+              settings: {
+                language: "auto",
+                outputMode: "standard",
+              },
+            });
+            setGenerationError({
+              title: "Waiting for connection",
+              message:
+                "This request is saved locally. It is not a server job yet; Processing will submit it with the same idempotency key when the API is reachable.",
+            });
+          } else {
+            setGenerationError({
+              title: "Offline draft is too large",
+              message:
+                "Keep this screen open and reconnect before submitting this source.",
+            });
+          }
+        } else {
+          setGenerationError(formatProcessingJobApiError(result.error));
+        }
         if (!result.error.retryable) reviewerIdempotencyKeyRef.current = null;
       }
     } finally {
@@ -880,6 +939,17 @@ export function ReviewerGenerateScreen({
               variant="secondary"
             >
               Study Library
+            </Button>
+          ) : null}
+
+          {onOpenProcessing ? (
+            <Button
+              fullWidth
+              onPress={onOpenProcessing}
+              testID="processing-open-button"
+              variant="secondary"
+            >
+              Processing
             </Button>
           ) : null}
 

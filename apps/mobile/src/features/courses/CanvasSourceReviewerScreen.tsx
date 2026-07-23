@@ -61,6 +61,7 @@ import {
   removeActiveProcessingJob,
   upsertActiveProcessingJob,
 } from "../../services/activeProcessingJobStore";
+import { cacheCompletedArtifact } from "../../services/completedArtifactCache";
 import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
 import {
   saveReviewer,
@@ -602,6 +603,23 @@ export function CanvasSourceReviewerScreen({
       if (!result.ok) {
         setError(formatProcessingJobError(result.error));
         return;
+      }
+      if (
+        result.data.artifactVersionId &&
+        result.data.sourceVersionId &&
+        result.data.sourceContentSha256
+      ) {
+        await cacheCompletedArtifact({
+          artifactVersionId: result.data.artifactVersionId,
+          processingJobId: job.id,
+          ownerUserId,
+          artifactType: "reviewer",
+          sourceVersionId: result.data.sourceVersionId,
+          sourceContentSha256: result.data.sourceContentSha256,
+          title: result.data.reviewer.title,
+          createdAt: job.completedAt ?? job.updatedAt,
+          payload: result.data.reviewer,
+        });
       }
 
       const pending = pendingGenerationRef.current;

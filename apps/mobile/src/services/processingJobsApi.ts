@@ -1,5 +1,7 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
 import type {
+  ProcessingJobListPage,
+  ProcessingJobProvenance,
   ProcessingJobStatusView,
   ProcessingJobType,
 } from "@stay-focused/shared";
@@ -51,6 +53,10 @@ export interface CreateReviewerJobInput extends ProcessingJobApiInput {
   readonly canvasCourseId?: string;
   readonly canvasItemIds?: readonly string[];
   readonly canvasResolutionFingerprint?: string;
+  readonly sourceVersionId?: string;
+  readonly language?: string;
+  readonly outputMode?: string;
+  readonly reuseMode?: "fresh" | "reuse_existing";
 }
 
 export interface ExtractionJobResult {
@@ -59,11 +65,17 @@ export interface ExtractionJobResult {
   readonly processedPageCount: number;
   readonly extraction?: unknown;
   readonly normalization?: unknown;
+  readonly sourceVersionId?: string;
+  readonly extractionResultId?: string;
 }
 
 export interface ReviewerJobResult {
   readonly reviewer: ReviewerOutput;
   readonly sourceSnapshotId?: string;
+  readonly sourceVersionId?: string;
+  readonly sourceContentSha256?: string;
+  readonly artifactVersionId?: string;
+  readonly provenance?: ProcessingJobProvenance;
 }
 
 export type ProcessingJobApiResult<T> =
@@ -130,6 +142,10 @@ export async function createReviewerJob(
       jobType: "reviewer_generation",
       sourceText,
       ...(input.sourceTitle?.trim() ? { sourceTitle: input.sourceTitle.trim() } : {}),
+      ...(input.sourceVersionId ? { sourceVersionId: input.sourceVersionId } : {}),
+      language: input.language ?? "auto",
+      outputMode: input.outputMode ?? "standard",
+      reuseMode: input.reuseMode ?? "fresh",
       ...(input.canvasPreviewSessionId
         ? {
             canvasPreviewSessionId: input.canvasPreviewSessionId,
@@ -177,6 +193,30 @@ export async function listActiveProcessingJobs(
     timeoutMs: MOBILE_JOB_STATUS_TIMEOUT_MS,
     operation: "active job check",
     parse: parseJobList,
+  });
+}
+
+export async function listProcessingJobsPage(
+  input: ProcessingJobApiInput & {
+    readonly limit?: number;
+    readonly cursor?: string;
+  },
+): Promise<ProcessingJobApiResult<ProcessingJobListPage>> {
+  const setup = validateApiInput(input);
+  if (!setup.ok) return setup;
+  const parameters = new URLSearchParams({
+    scope: "all",
+    limit: String(Math.min(Math.max(input.limit ?? 20, 1), 50)),
+  });
+  if (input.cursor) parameters.set("cursor", input.cursor);
+  return await requestJson({
+    ...setup.data,
+    fetchImpl: input.fetchImpl,
+    method: "GET",
+    path: `${JOBS_PATH}?${parameters.toString()}`,
+    timeoutMs: MOBILE_JOB_STATUS_TIMEOUT_MS,
+    operation: "processing history check",
+    parse: parseJobPage,
   });
 }
 
@@ -236,7 +276,7 @@ export function createProcessingJobIdempotencyKey(
 async function getJobResult<T>(
   input: ProcessingJobApiInput & { readonly jobId: string },
   expectedType: ProcessingJobType,
-  parseResult: (value: unknown) => T | null,
+  parseResult: (value: unknown, envelope: Record<string, unknown>) => T | null,
 ): Promise<ProcessingJobApiResult<T>> {
   const setup = validateApiInput(input);
   if (!setup.ok) return setup;
@@ -250,7 +290,7 @@ async function getJobResult<T>(
     parse: (value) => {
       if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
       if (value.data.jobType !== expectedType) return null;
-      return parseResult(value.data.result);
+      return parseResult(value.data.result, value.data);
     },
   });
 }
@@ -367,6 +407,23 @@ function parseJobList(value: unknown): readonly ProcessingJobStatusView[] | null
   return value.data.every(isJobStatusView) ? value.data : null;
 }
 
+function parseJobPage(value: unknown): ProcessingJobListPage | null {
+  if (
+    !isRecord(value) ||
+    value.ok !== true ||
+    !isRecord(value.data) ||
+    !Array.isArray(value.data.jobs) ||
+    !value.data.jobs.every(isJobStatusView) ||
+    !(typeof value.data.nextCursor === "string" || value.data.nextCursor === null)
+  ) {
+    return null;
+  }
+  return {
+    jobs: value.data.jobs,
+    nextCursor: value.data.nextCursor,
+  };
+}
+
 function isJobStatusView(value: unknown): value is ProcessingJobStatusView {
   return (
     isRecord(value) &&
@@ -382,7 +439,10 @@ function isJobStatusView(value: unknown): value is ProcessingJobStatusView {
   );
 }
 
-function parseExtractionResult(value: unknown): ExtractionJobResult | null {
+function parseExtractionResult(
+  value: unknown,
+  envelope: Record<string, unknown>,
+): ExtractionJobResult | null {
   if (!isRecord(value) || typeof value.text !== "string") return null;
   return {
     text: value.text,
@@ -391,17 +451,53 @@ function parseExtractionResult(value: unknown): ExtractionJobResult | null {
       typeof value.processedPageCount === "number" ? value.processedPageCount : 1,
     ...(value.extraction !== undefined ? { extraction: value.extraction } : {}),
     ...(value.normalization !== undefined ? { normalization: value.normalization } : {}),
+    ...(typeof envelope.sourceVersionId === "string"
+      ? { sourceVersionId: envelope.sourceVersionId }
+      : {}),
+    ...(typeof envelope.sourceContentSha256 === "string"
+      ? { sourceContentSha256: envelope.sourceContentSha256 }
+      : {}),
+    ...(typeof envelope.extractionResultId === "string"
+      ? { extractionResultId: envelope.extractionResultId }
+      : {}),
   };
 }
 
-function parseReviewerResult(value: unknown): ReviewerJobResult | null {
+function parseReviewerResult(
+  value: unknown,
+  envelope: Record<string, unknown>,
+): ReviewerJobResult | null {
   if (!isRecord(value) || !isReviewerOutput(value.reviewer)) return null;
   return {
     reviewer: value.reviewer,
     ...(typeof value.sourceSnapshotId === "string"
       ? { sourceSnapshotId: value.sourceSnapshotId }
       : {}),
+    ...(typeof envelope.sourceVersionId === "string"
+      ? { sourceVersionId: envelope.sourceVersionId }
+      : {}),
+    ...(typeof envelope.artifactVersionId === "string"
+      ? { artifactVersionId: envelope.artifactVersionId }
+      : {}),
+    ...(isProcessingJobProvenance(envelope.provenance)
+      ? { provenance: envelope.provenance }
+      : {}),
   };
+}
+
+function isProcessingJobProvenance(
+  value: unknown,
+): value is ProcessingJobProvenance {
+  return (
+    isRecord(value) &&
+    typeof value.generationPolicyVersion === "string" &&
+    typeof value.engineVersion === "string" &&
+    typeof value.schemaVersion === "string" &&
+    typeof value.providerId === "string" &&
+    typeof value.settingsFingerprint === "string" &&
+    typeof value.language === "string" &&
+    typeof value.outputMode === "string"
+  );
 }
 
 function isReviewerOutput(value: unknown): value is ReviewerOutput {

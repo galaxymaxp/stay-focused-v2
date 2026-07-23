@@ -1,0 +1,641 @@
+import type { ReviewerOutput } from "@stay-focused/engine";
+import {
+  isActiveProcessingJobStatus,
+  type ProcessingJobStatusView,
+} from "@stay-focused/shared";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AppState, StyleSheet, Text, View } from "react-native";
+
+import { useAuth } from "../../auth";
+import { Button } from "../../components/Button";
+import { Card } from "../../components/Card";
+import { Screen } from "../../components/Screen";
+import { colors, spacing, typography } from "../../design/tokens";
+import {
+  readActiveProcessingJobs,
+  removeActiveProcessingJob,
+  upsertActiveProcessingJob,
+  type ActiveProcessingJobReference,
+} from "../../services/activeProcessingJobStore";
+import {
+  cacheCompletedArtifact,
+  listCachedArtifactMetadata,
+  readCachedArtifact,
+} from "../../services/completedArtifactCache";
+import {
+  dismissProcessingJob,
+  readDismissedProcessingJobIds,
+} from "../../services/dismissedProcessingJobStore";
+import { getSourceVersion } from "../../services/processingAssetsApi";
+import {
+  reconcileReviewerProcessingOutbox,
+} from "../../services/processingOutboxReconciliation";
+import {
+  cancelProcessingJob,
+  createProcessingJobIdempotencyKey,
+  getExtractionJobResult,
+  getProcessingJobStatus,
+  getReviewerJobResult,
+  listProcessingJobsPage,
+  retryProcessingJob,
+} from "../../services/processingJobsApi";
+import {
+  cancelOfflineProcessingIntent,
+  readOfflineProcessingIntents,
+  type OfflineProcessingIntent,
+} from "../../services/processingOutboxStore";
+import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
+import { ReviewerPreview } from "../reviewer/ReviewerPreview";
+
+interface ProcessingScreenProps {
+  readonly onBack: () => void;
+}
+
+type ProcessingGroup =
+  | "Running"
+  | "Waiting"
+  | "Needs attention"
+  | "Recently completed";
+
+export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
+  const { session } = useAuth();
+  const [jobs, setJobs] = useState<readonly ProcessingJobStatusView[]>([]);
+  const [offlineIntents, setOfflineIntents] =
+    useState<readonly OfflineProcessingIntent[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openedReviewer, setOpenedReviewer] = useState<ReviewerOutput | null>(null);
+  const [openedSource, setOpenedSource] = useState<{
+    readonly title: string;
+    readonly text: string;
+  } | null>(null);
+
+  const refresh = useCallback(async () => {
+    const ownerUserId = session?.user.id;
+    const accessToken = session?.accessToken.trim();
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    if (!ownerUserId) return;
+
+    setIsRefreshing(true);
+    setError(null);
+    try {
+      const [local, outbox, dismissed] = await Promise.all([
+        readActiveProcessingJobs(ownerUserId),
+        readOfflineProcessingIntents(ownerUserId),
+        readDismissedProcessingJobIds(ownerUserId),
+      ]);
+      if (!accessToken || !apiBaseUrl) {
+        setOfflineIntents(outbox);
+        setJobs(local.map(referenceToStatusView));
+        setError(API_BASE_URL_SETUP_HINT);
+        return;
+      }
+
+      const flushed = await reconcileReviewerProcessingOutbox({
+        ownerUserId,
+        accessToken,
+        apiBaseUrl,
+      });
+      setOfflineIntents(flushed.remaining);
+
+      const page = await listProcessingJobsPage({
+        apiBaseUrl,
+        accessToken,
+        limit: 50,
+      });
+      const byId = new Map<string, ProcessingJobStatusView>();
+      if (page.ok) {
+        for (const job of page.data.jobs) {
+          if (
+            isActiveProcessingJobStatus(job.status) ||
+            !dismissed.has(job.id)
+          ) {
+            byId.set(job.id, job);
+            await upsertActiveProcessingJob(ownerUserId, job);
+          }
+        }
+      } else {
+        setError(page.error.message);
+      }
+
+      for (const reference of local) {
+        if (byId.has(reference.jobId) || dismissed.has(reference.jobId)) continue;
+        const status = await getProcessingJobStatus({
+          apiBaseUrl,
+          accessToken,
+          jobId: reference.jobId,
+        });
+        if (status.ok) {
+          byId.set(status.data.id, status.data);
+          await upsertActiveProcessingJob(ownerUserId, status.data);
+        } else if (status.error.code === "processing_job_not_found") {
+          await removeActiveProcessingJob(reference.jobId);
+        } else {
+          byId.set(reference.jobId, referenceToStatusView(reference));
+        }
+      }
+
+      setJobs(
+        [...byId.values()].sort((left, right) =>
+          right.createdAt.localeCompare(left.createdAt),
+        ),
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [session?.accessToken, session?.user.id]);
+
+  useEffect(() => {
+    void refresh();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refresh();
+    });
+    return () => subscription.remove();
+  }, [refresh]);
+
+  const groups = useMemo(() => groupJobs(jobs), [jobs]);
+
+  const updateJob = async (job: ProcessingJobStatusView) => {
+    const ownerUserId = session?.user.id;
+    if (ownerUserId) await upsertActiveProcessingJob(ownerUserId, job);
+    setJobs((current) => [
+      job,
+      ...current.filter((item) => item.id !== job.id),
+    ]);
+  };
+
+  const handleCancel = async (job: ProcessingJobStatusView) => {
+    const context = requestContext(session?.accessToken);
+    if (!context) return;
+    const result = await cancelProcessingJob({ ...context, jobId: job.id });
+    if (result.ok) await updateJob(result.data);
+    else setError(result.error.message);
+  };
+
+  const handleRetry = async (job: ProcessingJobStatusView) => {
+    const context = requestContext(session?.accessToken);
+    if (!context) return;
+    const result = await retryProcessingJob({
+      ...context,
+      jobId: job.id,
+      idempotencyKey: createProcessingJobIdempotencyKey(job.jobType),
+    });
+    if (result.ok) await updateJob(result.data);
+    else setError(result.error.message);
+  };
+
+  const handleDismiss = async (job: ProcessingJobStatusView) => {
+    const ownerUserId = session?.user.id;
+    if (!ownerUserId) return;
+    await dismissProcessingJob(ownerUserId, job.id);
+    await removeActiveProcessingJob(job.id);
+    setJobs((current) => current.filter((item) => item.id !== job.id));
+  };
+
+  const handleRemoveLocal = async (job: ProcessingJobStatusView) => {
+    await removeActiveProcessingJob(job.id);
+    setError("Local recovery reference removed. Server data was not deleted.");
+  };
+
+  const handleOpenResult = async (job: ProcessingJobStatusView) => {
+    const context = requestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!ownerUserId) return;
+
+    if (job.jobType === "document_extraction") {
+      if (!context) return;
+      const result = await getExtractionJobResult({ ...context, jobId: job.id });
+      if (result.ok) {
+        setOpenedSource({ title: job.source.displayName, text: result.data.text });
+      } else {
+        setError(result.error.message);
+      }
+      return;
+    }
+
+    if (context) {
+      const result = await getReviewerJobResult({ ...context, jobId: job.id });
+      if (result.ok) {
+        if (
+          result.data.artifactVersionId &&
+          result.data.sourceVersionId &&
+          result.data.sourceContentSha256
+        ) {
+          await cacheCompletedArtifact({
+            artifactVersionId: result.data.artifactVersionId,
+            processingJobId: job.id,
+            ownerUserId,
+            artifactType: "reviewer",
+            sourceVersionId: result.data.sourceVersionId,
+            sourceContentSha256: result.data.sourceContentSha256,
+            title: result.data.reviewer.title,
+            createdAt: job.completedAt ?? job.updatedAt,
+            payload: result.data.reviewer,
+          });
+        }
+        setOpenedReviewer(result.data.reviewer);
+        return;
+      }
+    }
+
+    const metadata = (await listCachedArtifactMetadata(ownerUserId)).find(
+      (item) => item.processingJobId === job.id && item.payloadAvailable,
+    );
+    const cached = metadata
+      ? await readCachedArtifact(ownerUserId, metadata.artifactVersionId)
+      : null;
+    if (cached && isReviewerOutput(cached.payload)) {
+      setOpenedReviewer(cached.payload);
+    } else {
+      setError("This result is not available offline on this device.");
+    }
+  };
+
+  const handleViewSource = async (job: ProcessingJobStatusView) => {
+    const context = requestContext(session?.accessToken);
+    if (!context || !job.sourceVersionId) return;
+    const result = await getSourceVersion({
+      ...context,
+      sourceVersionId: job.sourceVersionId,
+    });
+    if (result.ok) {
+      setOpenedSource({ title: job.source.displayName, text: result.data.sourceText });
+    } else {
+      setError(result.error.message);
+    }
+  };
+
+  if (openedReviewer) {
+    return (
+      <Screen>
+        <Button onPress={() => setOpenedReviewer(null)} variant="secondary">
+          Back to Processing
+        </Button>
+        <ReviewerPreview reviewer={openedReviewer} />
+      </Screen>
+    );
+  }
+
+  if (openedSource) {
+    return (
+      <Screen>
+        <Button onPress={() => setOpenedSource(null)} variant="secondary">
+          Back to Processing
+        </Button>
+        <Card elevated style={styles.sourceCard}>
+          <Text style={styles.title}>{openedSource.title}</Text>
+          <Text selectable style={styles.sourceText}>
+            {openedSource.text}
+          </Text>
+        </Card>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen>
+      <View style={styles.header}>
+        <Text style={styles.kicker}>Account processing</Text>
+        <Text style={styles.title}>Processing</Text>
+        <Text style={styles.subtitle}>
+          Server jobs continue after you switch apps. Local offline requests are
+          shown separately until accepted.
+        </Text>
+      </View>
+
+      <View style={styles.actions}>
+        <Button onPress={onBack} variant="secondary">Back</Button>
+        <Button loading={isRefreshing} onPress={() => void refresh()} variant="secondary">
+          Refresh
+        </Button>
+      </View>
+
+      {error ? (
+        <Card style={styles.errorCard}>
+          <Text style={styles.errorText}>{error}</Text>
+        </Card>
+      ) : null}
+
+      {offlineIntents.length > 0 ? (
+        <JobSection title="Waiting for connection">
+          {offlineIntents.map((intent) => (
+            <Card key={intent.localRequestId} style={styles.jobCard}>
+              <Text style={styles.jobTitle}>{intent.sourceLocalReference}</Text>
+              <Text style={styles.meta}>
+                Local request · {formatOperation(intent.operation)}
+              </Text>
+              <Text style={styles.status}>{formatOutboxStatus(intent)}</Text>
+              <Button
+                onPress={() => {
+                  void cancelOfflineProcessingIntent(
+                    intent.ownerUserId,
+                    intent.localRequestId,
+                  ).then(refresh);
+                }}
+                variant="danger"
+              >
+                Cancel local request
+              </Button>
+            </Card>
+          ))}
+        </JobSection>
+      ) : null}
+
+      {([...groups.entries()] as readonly [ProcessingGroup, readonly ProcessingJobStatusView[]][])
+        .map(([title, items]) =>
+          items.length > 0 ? (
+            <JobSection key={title} title={title}>
+              {items.map((job) => (
+                <ProcessingJobCard
+                  job={job}
+                  key={job.id}
+                  onCancel={() => void handleCancel(job)}
+                  onDismiss={() => void handleDismiss(job)}
+                  onOpenResult={() => void handleOpenResult(job)}
+                  onRemoveLocal={() => void handleRemoveLocal(job)}
+                  onRetry={() => void handleRetry(job)}
+                  onViewSource={() => void handleViewSource(job)}
+                />
+              ))}
+            </JobSection>
+          ) : null,
+        )}
+
+      {jobs.length === 0 && offlineIntents.length === 0 ? (
+        <Card>
+          <Text style={styles.status}>No processing work to show.</Text>
+        </Card>
+      ) : null}
+    </Screen>
+  );
+}
+
+function JobSection({
+  children,
+  title,
+}: {
+  readonly children: React.ReactNode;
+  readonly title: string;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function ProcessingJobCard({
+  job,
+  onCancel,
+  onDismiss,
+  onOpenResult,
+  onRemoveLocal,
+  onRetry,
+  onViewSource,
+}: {
+  readonly job: ProcessingJobStatusView;
+  readonly onCancel: () => void;
+  readonly onDismiss: () => void;
+  readonly onOpenResult: () => void;
+  readonly onRemoveLocal: () => void;
+  readonly onRetry: () => void;
+  readonly onViewSource: () => void;
+}) {
+  const hasProgress =
+    job.progress.completedUnits !== null &&
+    job.progress.totalUnits !== null &&
+    job.progress.unitLabel !== null;
+  const terminal = !isActiveProcessingJobStatus(job.status);
+  return (
+    <Card style={styles.jobCard} testID={`processing-job-${job.id}`}>
+      <Text style={styles.jobTitle}>{job.source.displayName}</Text>
+      <Text style={styles.meta}>
+        {formatJobType(job)} · Created {formatTime(job.createdAt)}
+      </Text>
+      <Text style={styles.status}>{job.progress.message}</Text>
+      {job.reuseMode === "reuse_existing" ? (
+        <Text style={styles.meta}>Reused an exact prior artifact by request.</Text>
+      ) : job.reuseCandidateArtifactVersionId ? (
+        <Text style={styles.meta}>
+          An exact prior artifact exists; this request is generating a fresh version.
+        </Text>
+      ) : null}
+      {hasProgress ? (
+        <Text style={styles.meta}>
+          {job.progress.completedUnits} of {job.progress.totalUnits}{" "}
+          {job.progress.unitLabel}
+        </Text>
+      ) : null}
+      <Text style={styles.meta}>Updated {formatTime(job.updatedAt)}</Text>
+      {job.safeErrorMessage ? (
+        <Text style={styles.errorText}>{job.safeErrorMessage}</Text>
+      ) : null}
+      <View style={styles.cardActions}>
+        {job.resultAvailable ? (
+          <Button onPress={onOpenResult}>Open result</Button>
+        ) : null}
+        {job.sourceVersionId ? (
+          <Button onPress={onViewSource} variant="secondary">View source</Button>
+        ) : null}
+        {job.status === "queued" || job.status === "running" ? (
+          <Button onPress={onCancel} variant="danger">Cancel</Button>
+        ) : null}
+        {job.retryable && (job.status === "failed" || job.status === "expired") ? (
+          <Button onPress={onRetry} variant="secondary">Retry</Button>
+        ) : null}
+        {terminal ? (
+          <Button onPress={onDismiss} variant="ghost">Dismiss from recent</Button>
+        ) : null}
+        <Button onPress={onRemoveLocal} variant="ghost">Remove local reference</Button>
+      </View>
+    </Card>
+  );
+}
+
+function groupJobs(
+  jobs: readonly ProcessingJobStatusView[],
+): Map<ProcessingGroup, readonly ProcessingJobStatusView[]> {
+  const groups = new Map<ProcessingGroup, ProcessingJobStatusView[]>([
+    ["Running", []],
+    ["Waiting", []],
+    ["Needs attention", []],
+    ["Recently completed", []],
+  ]);
+  for (const job of jobs) {
+    const group: ProcessingGroup =
+      job.status === "running" || job.status === "cancellation_requested"
+        ? "Running"
+        : job.status === "queued"
+          ? "Waiting"
+          : job.status === "failed" || job.status === "expired"
+            ? "Needs attention"
+            : "Recently completed";
+    groups.get(group)?.push(job);
+  }
+  return groups;
+}
+
+function referenceToStatusView(
+  reference: ActiveProcessingJobReference,
+): ProcessingJobStatusView {
+  return {
+    id: reference.jobId,
+    jobType: reference.jobType,
+    status: reference.lastKnownStatus,
+    stage:
+      reference.jobType === "document_extraction"
+        ? "inspecting_document"
+        : "preparing_source",
+    progress: {
+      completedUnits: reference.completedUnits,
+      totalUnits: reference.totalUnits,
+      unitLabel: reference.unitLabel,
+      message: reference.progressMessage,
+    },
+    source: {
+      displayName: reference.sourceDisplayName,
+      sourceKind: reference.sourceKind,
+      mimeType:
+        reference.sourceKind === "pdf"
+          ? "application/pdf"
+          : reference.sourceKind === "image"
+            ? "image/jpeg"
+            : "text/plain",
+    },
+    createdAt: reference.createdAt,
+    acceptedAt: reference.createdAt,
+    startedAt: null,
+    updatedAt: reference.updatedAt,
+    completedAt: reference.completedAt,
+    failedAt: null,
+    cancellationRequestedAt: null,
+    errorCode: reference.errorCode,
+    safeErrorMessage: reference.safeErrorMessage,
+    retryable: reference.retryable,
+    attemptCount: 0,
+    resultAvailable: reference.resultAvailable,
+    retryOfJobId: null,
+    sourceVersionId: null,
+    artifactType:
+      reference.jobType === "reviewer_generation" ? "reviewer" : null,
+    reuseMode: "fresh",
+    reusedFromJobId: null,
+    reuseCandidateArtifactVersionId: null,
+    provenance: null,
+  };
+}
+
+function requestContext(accessToken: string | undefined) {
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const token = accessToken?.trim();
+  return apiBaseUrl && token ? { apiBaseUrl, accessToken: token } : null;
+}
+
+function formatJobType(job: ProcessingJobStatusView): string {
+  return job.jobType === "document_extraction"
+    ? "Document extraction"
+    : "Reviewer generation";
+}
+
+function formatOperation(operation: OfflineProcessingIntent["operation"]): string {
+  return operation === "document_extraction"
+    ? "Document extraction"
+    : "Artifact generation";
+}
+
+function formatOutboxStatus(intent: OfflineProcessingIntent): string {
+  if (intent.status === "blocked") return "Needs attention before it can be submitted";
+  if (intent.status === "paused") return "Paused after logout";
+  if (intent.status === "submitting") return "Submitting with the saved idempotency key";
+  return "Waiting for connection — no server job exists yet";
+}
+
+function formatTime(value: string): string {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp)
+    ? new Date(timestamp).toLocaleString()
+    : "unknown time";
+}
+
+function isReviewerOutput(value: unknown): value is ReviewerOutput {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "title" in value &&
+    typeof value.title === "string" &&
+    "sections" in value &&
+    Array.isArray(value.sections) &&
+    "metadata" in value &&
+    typeof value.metadata === "object" &&
+    value.metadata !== null
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { gap: spacing[2] },
+  kicker: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.kicker,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+  },
+  title: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.h1,
+    fontWeight: "800",
+  },
+  subtitle: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    lineHeight: 22,
+  },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing[2] },
+  section: { gap: spacing[3] },
+  sectionTitle: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.h2,
+    fontWeight: "800",
+  },
+  jobCard: { gap: spacing[2] },
+  jobTitle: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.h3,
+    fontWeight: "800",
+  },
+  status: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    lineHeight: 21,
+  },
+  meta: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  cardActions: { gap: spacing[2] },
+  errorCard: { backgroundColor: colors.errorSurface },
+  errorText: {
+    color: colors.error,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  sourceCard: { gap: spacing[4] },
+  sourceText: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    lineHeight: 23,
+  },
+});
