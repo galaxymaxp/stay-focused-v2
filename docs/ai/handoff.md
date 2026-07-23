@@ -1835,3 +1835,11 @@ Current route status:
 - Production logic remains subject-neutral; normalization removes only strongly evidenced repeated page-edge templates and retains audit metrics. No fixture-specific vocabulary or headings were added.
 - Production status is PARTIAL until a continuously available worker is deployed. Expo Go can test switch-away/reconnect, but native background upload, push delivery, and terminated-app integration require an Expo/EAS development build.
 - Architecture and limitations: `docs/architecture/ADR-010-durable-processing-jobs.md`.
+
+### 2026-07-23 durable processing R2 reusable assets and multi-job operation
+- Added owner-scoped `document_assets`, `extraction_results`, immutable `source_versions`, generic `generated_artifacts`, immutable `generated_artifact_versions`, cleanup queue/policy, exact reuse fingerprints, source-edit conflict detection, fair claims, quotas, rate-limit backoff, and transactional artifact publication.
+- Applied eight additive development Supabase migrations from `20260723084329_reusable_processing_assets` through `20260723091627_processing_lifecycle_batching`; existing durable rows were backfilled, quota admission is serialized, cleanup is batch-bounded, and rolled-back fixtures verified account deletion/Storage queueing plus artifact soft-delete without source deletion.
+- Added bounded all-job cursor retrieval, canonical source/result provenance routes, idle worker heartbeats, dry-run-first lifecycle/Storage cleanup tooling, and a privacy-safe aggregate operations report.
+- Mobile now has a central multi-job Processing screen, independent actions, bounded account-scoped job history, idempotent offline reviewer outbox/drafts with sign-in/foreground/interval reconciliation, and a bounded native SecureStore artifact cache with stale/unsynced protection. Offline document-upload staging, immediate OS reachability callbacks, push delivery, and real two-device edit resolution remain pending.
+- Production remains PARTIAL until the separate worker is deployed. Railway is the recommended initial target; configuration and rollout/rollback guidance are in `docs/architecture/ADR-013-processing-worker-deployment.md`.
+- Full architecture, reuse/privacy boundaries, fairness, retention/deletion, offline/cache behavior, and known limitations: `docs/architecture/ADR-012-reusable-processing-assets.md`.
