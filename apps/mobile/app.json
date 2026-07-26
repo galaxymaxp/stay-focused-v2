@@ -5,10 +5,14 @@
     "version": "2.0.0",
     "orientation": "portrait",
     "scheme": "stayfocused",
+    "ios": {
+      "bundleIdentifier": "com.galaxymaxp.stayfocusedv2"
+    },
     "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-notifications",
       [
         "expo-image-picker",
         {

@@ -23,6 +23,7 @@ import { StudyLibraryScreen } from "../src/features/library/StudyLibraryScreen";
 import { ProcessingScreen } from "../src/features/processing/ProcessingScreen";
 import { ReviewerGenerateScreen } from "../src/features/reviewer/ReviewerGenerateScreen";
 import { reconcileReviewerProcessingOutbox } from "../src/services/processingOutboxReconciliation";
+import { subscribeToProcessingNotificationResponses } from "../src/services/completionNotifications";
 
 const OUTBOX_RECONCILIATION_INTERVAL_MS = 10_000;
 
@@ -87,6 +88,13 @@ function AuthenticatedApp() {
       subscription.remove();
     };
   }, [reconcileOutbox]);
+
+  useEffect(() => {
+    const subscription = subscribeToProcessingNotificationResponses(() => {
+      setActiveView({ name: "processing" });
+    });
+    return () => subscription.remove();
+  }, []);
 
   if (activeView.name === "library") {
     return (

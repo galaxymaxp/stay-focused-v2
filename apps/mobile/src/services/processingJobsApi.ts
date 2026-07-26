@@ -5,27 +5,25 @@ import type {
   ProcessingJobStatusView,
   ProcessingJobType,
 } from "@stay-focused/shared";
+import { Upload } from "tus-js-client";
 
 import type {
   OcrImageUpload,
   OcrPdfUpload,
   OcrUploadPlatform,
-  ValidatedOcrImageUpload,
-  ValidatedOcrPdfUpload,
 } from "./ocrApi";
-import {
-  createNativeOcrPdfUploadPart,
-  createNativeOcrUploadPart,
-  validateOcrImageUpload,
-  validateOcrPdfUpload,
-} from "./ocrApi";
+import { validateOcrImageUpload, validateOcrPdfUpload } from "./ocrApi";
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import { getSupabaseMobileConfig } from "../auth/supabaseClient";
 
 const JOBS_PATH = "/api/jobs";
+const JOB_UPLOADS_PATH = "/api/job-uploads";
 
 // Upload is the only phase that must finish before the user may leave the app.
 // Accepted work uses short, independent status/result request timeouts.
 export const MOBILE_SOURCE_UPLOAD_TIMEOUT_MS = 60_000;
+export const MOBILE_UPLOAD_INTENT_TIMEOUT_MS = 15_000;
+export const MOBILE_UPLOAD_ACCEPTANCE_TIMEOUT_MS = 45_000;
 export const MOBILE_JOB_CREATION_TIMEOUT_MS = 20_000;
 export const MOBILE_JOB_STATUS_TIMEOUT_MS = 10_000;
 export const MOBILE_JOB_RESULT_TIMEOUT_MS = 15_000;
@@ -43,6 +41,11 @@ export interface CreateExtractionJobInput extends ProcessingJobApiInput {
     | { readonly kind: "image"; readonly value: OcrImageUpload }
     | { readonly kind: "pdf"; readonly value: OcrPdfUpload };
   readonly platformOS?: OcrUploadPlatform;
+  readonly onUploadProgress?: (
+    completedBytes: number,
+    totalBytes: number,
+  ) => void;
+  readonly tusUploadImpl?: typeof uploadSourceWithTus;
 }
 
 export interface CreateReviewerJobInput extends ProcessingJobApiInput {
@@ -95,7 +98,6 @@ export async function createExtractionJob(
   const setup = validateApiInput(input);
   if (!setup.ok) return setup;
 
-  const formData = new FormData();
   const validated = input.source.kind === "pdf"
     ? validateOcrPdfUpload(input.source.value)
     : validateOcrImageUpload(input.source.value);
@@ -103,29 +105,68 @@ export async function createExtractionJob(
     return failure(validated.error.code, validated.error.message, false, validated.error.status);
   }
 
+  let blob: Blob;
   try {
-    await appendSourceFile({
-      fetchImpl: input.fetchImpl ?? fetch,
-      formData,
-      platformOS: input.platformOS ?? defaultPlatform(),
-      sourceKind: input.source.kind,
-      source: validated.value,
-    });
+    blob = validated.value.webFile ??
+      await (input.fetchImpl ?? fetch)(validated.value.uri).then((response) => {
+        if (!response.ok) throw new Error("source_read_failed");
+        return response.blob();
+      });
   } catch {
     return failure("source_read_failed", "The selected source could not be read.", true);
   }
-  formData.append("displayName", validated.value.fileName);
-  formData.append("jobType", "document_extraction");
-
+  const intent = await requestJson({
+    ...setup.data,
+    body: JSON.stringify({
+      displayName: validated.value.fileName,
+      mimeType: validated.value.mimeType,
+      byteSize: blob.size,
+    }),
+    contentType: "application/json",
+    fetchImpl: input.fetchImpl,
+    method: "POST",
+    path: JOB_UPLOADS_PATH,
+    timeoutMs: MOBILE_UPLOAD_INTENT_TIMEOUT_MS,
+    operation: "upload preparation",
+    parse: parseUploadIntent,
+  });
+  if (!intent.ok) return intent;
+  const supabaseConfig = getSupabaseMobileConfig();
+  if (!supabaseConfig.ok) {
+    return failure(
+      "upload_service_unavailable",
+      "Supabase mobile upload configuration is missing.",
+      false,
+    );
+  }
+  try {
+    await (input.tusUploadImpl ?? uploadSourceWithTus)({
+      accessToken: setup.data.accessToken,
+      anonKey: supabaseConfig.data.supabaseAnonKey,
+      blob,
+      fileName: validated.value.fileName,
+      mimeType: validated.value.mimeType,
+      intent: intent.data,
+      onProgress: input.onUploadProgress,
+    });
+  } catch {
+    console.warn("processing_job_upload.interrupted", {
+      operation: "source upload",
+    });
+    return failure(
+      "source_upload_interrupted",
+      "The upload was interrupted. Keep Stay Focused open and try again.",
+      true,
+    );
+  }
   return await requestJobStatusView({
     ...setup.data,
-    body: formData,
     fetchImpl: input.fetchImpl,
     idempotencyKey: input.idempotencyKey,
     method: "POST",
-    path: JOBS_PATH,
-    timeoutMs: MOBILE_SOURCE_UPLOAD_TIMEOUT_MS,
-    operation: "job creation",
+    path: `${JOB_UPLOADS_PATH}/${encodeURIComponent(intent.data.uploadId)}/accept`,
+    timeoutMs: MOBILE_UPLOAD_ACCEPTANCE_TIMEOUT_MS,
+    operation: "upload acceptance",
   });
 }
 
@@ -315,6 +356,15 @@ interface RequestInput {
   readonly fetchImpl?: typeof fetch;
 }
 
+interface ProcessingUploadIntent {
+  readonly uploadId: string;
+  readonly bucket: string;
+  readonly objectPath: string;
+  readonly tusEndpoint: string;
+  readonly chunkSize: number;
+  readonly expiresAt: string;
+}
+
 async function requestJson<T>(
   input: RequestInput & { readonly parse: (value: unknown) => T | null },
 ): Promise<ProcessingJobApiResult<T>> {
@@ -372,29 +422,66 @@ function validateApiInput(
   return { ok: true, data: { baseUrl, accessToken } };
 }
 
-async function appendSourceFile({
-  fetchImpl,
-  formData,
-  platformOS,
-  source,
-  sourceKind,
-}: {
-  readonly fetchImpl: typeof fetch;
-  readonly formData: FormData;
-  readonly platformOS: OcrUploadPlatform;
-  readonly source: ValidatedOcrImageUpload | ValidatedOcrPdfUpload;
-  readonly sourceKind: "image" | "pdf";
+async function uploadSourceWithTus(input: {
+  readonly accessToken: string;
+  readonly anonKey: string;
+  readonly blob: Blob;
+  readonly fileName: string;
+  readonly mimeType: string;
+  readonly intent: ProcessingUploadIntent;
+  readonly onProgress?: (completedBytes: number, totalBytes: number) => void;
 }): Promise<void> {
-  if (platformOS === "web") {
-    const blob = source.webFile ?? await fetchImpl(source.uri).then((response) => response.blob());
-    if (!blob) throw new Error("Selected source did not provide file data.");
-    formData.append("source", blob, source.fileName);
-    return;
-  }
-  const part = sourceKind === "pdf"
-    ? createNativeOcrPdfUploadPart(source as ValidatedOcrPdfUpload)
-    : createNativeOcrUploadPart(source as ValidatedOcrImageUpload);
-  formData.append("source", part as unknown as Blob);
+  await new Promise<void>((resolve, reject) => {
+    const upload = new Upload(input.blob, {
+      endpoint: input.intent.tusEndpoint,
+      retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+        apikey: input.anonKey,
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      chunkSize: input.intent.chunkSize,
+      metadata: {
+        bucketName: input.intent.bucket,
+        objectName: input.intent.objectPath,
+        contentType: input.mimeType,
+        cacheControl: "0",
+        filename: input.fileName,
+      },
+      onProgress: input.onProgress,
+      onError: reject,
+      onSuccess: () => resolve(),
+    });
+    void upload.findPreviousUploads().then((previous) => {
+      const resumable = previous.find((item) =>
+        item.metadata.objectName === input.intent.objectPath
+      );
+      if (resumable) upload.resumeFromPreviousUpload(resumable);
+      upload.start();
+    }, reject);
+  });
+}
+
+function parseUploadIntent(value: unknown): ProcessingUploadIntent | null {
+  if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
+  const data = value.data;
+  if (
+    typeof data.uploadId !== "string" ||
+    typeof data.bucket !== "string" ||
+    typeof data.objectPath !== "string" ||
+    typeof data.tusEndpoint !== "string" ||
+    typeof data.chunkSize !== "number" ||
+    typeof data.expiresAt !== "string"
+  ) return null;
+  return {
+    uploadId: data.uploadId,
+    bucket: data.bucket,
+    objectPath: data.objectPath,
+    tusEndpoint: data.tusEndpoint,
+    chunkSize: data.chunkSize,
+    expiresAt: data.expiresAt,
+  };
 }
 
 function parseJobStatusResponse(value: unknown): ProcessingJobStatusView | null {
@@ -548,8 +635,4 @@ function isAbortError(error: unknown): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function defaultPlatform(): OcrUploadPlatform {
-  return typeof document === "undefined" ? "native" : "web";
 }

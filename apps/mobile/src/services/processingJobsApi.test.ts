@@ -1,5 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("tus-js-client", () => ({
+  Upload: class TestUpload {},
+}));
+
+vi.mock("../auth/supabaseClient", () => ({
+  getSupabaseMobileConfig: () => ({
+    ok: true,
+    data: {
+      supabaseAnonKey: "test-anon-key",
+      supabaseUrl: "https://example.supabase.co",
+    },
+  }),
+}));
+
 import {
   cancelProcessingJob,
   createExtractionJob,
@@ -38,12 +52,30 @@ describe("processing jobs mobile API", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it("sends the exact source display name separately from native multipart filename encoding", async () => {
-    const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
-      const body = init?.body;
-      expect(body).toBeInstanceOf(FormData);
-      expect((body as FormData).get("displayName")).toBe(
-        "Neutral Notes + Appendix.pdf",
+  it("stages bytes directly before accepting a durable extraction job", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (url, init) => {
+      const path = String(url);
+      if (path.endsWith("/api/job-uploads")) {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          displayName: "Neutral Notes + Appendix.pdf",
+          mimeType: "application/pdf",
+          byteSize: 4,
+        });
+        return jsonResponse({
+          ok: true,
+          data: {
+            uploadId: "upload-1",
+            bucket: "processing-job-sources",
+            objectPath: "user/uploads/upload-1.pdf",
+            tusEndpoint: "https://project.storage.supabase.co/storage/v1/upload/resumable",
+            chunkSize: 6291456,
+            expiresAt: "2026-07-27T08:00:00.000Z",
+          },
+        }, 201);
+      }
+      expect(path).toContain("/api/job-uploads/upload-1/accept");
+      expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(
+        "extraction:display-name:1",
       );
       return jsonResponse({
         ok: true,
@@ -57,12 +89,14 @@ describe("processing jobs mobile API", () => {
         }),
       }, 202);
     });
+    const tusUploadImpl = vi.fn(async () => undefined);
 
     const result = await createExtractionJob({
       ...BASE_INPUT,
       fetchImpl: fetchImpl as unknown as typeof fetch,
       idempotencyKey: "extraction:display-name:1",
       platformOS: "web",
+      tusUploadImpl,
       source: {
         kind: "pdf",
         value: {
@@ -81,6 +115,13 @@ describe("processing jobs mobile API", () => {
         source: { displayName: "Neutral Notes + Appendix.pdf" },
       },
     });
+    expect(tusUploadImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileName: "Neutral Notes + Appendix.pdf",
+        mimeType: "application/pdf",
+      }),
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it("treats temporary network loss as operational and never calls console.error", async () => {

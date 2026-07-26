@@ -41,6 +41,11 @@ import {
   retryProcessingJob,
 } from "../../services/processingJobsApi";
 import {
+  disableCompletionNotifications,
+  enableCompletionNotifications,
+  sendCompletionNotificationTest,
+} from "../../services/completionNotifications";
+import {
   cancelOfflineProcessingIntent,
   readOfflineProcessingIntents,
   type OfflineProcessingIntent,
@@ -70,6 +75,10 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
     readonly title: string;
     readonly text: string;
   } | null>(null);
+  const [notificationMessage, setNotificationMessage] = useState(
+    "Enable completion notifications for extraction and reviewer jobs.",
+  );
+  const [notificationBusy, setNotificationBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     const ownerUserId = session?.user.id;
@@ -198,6 +207,52 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
     setError("Local recovery reference removed. Server data was not deleted.");
   };
 
+  const notificationContext = () => {
+    const apiBaseUrl = getApiBaseUrl();
+    const accessToken = session?.accessToken.trim();
+    return apiBaseUrl && accessToken ? { apiBaseUrl, accessToken } : null;
+  };
+
+  const handleEnableNotifications = async () => {
+    const context = notificationContext();
+    if (!context) {
+      setNotificationMessage("Sign in and connect to the API first.");
+      return;
+    }
+    setNotificationBusy(true);
+    const result = await enableCompletionNotifications(context);
+    setNotificationMessage(
+      result.ok
+        ? "Notifications enabled. Send a test before starting a long job."
+        : result.message,
+    );
+    setNotificationBusy(false);
+  };
+
+  const handleTestNotification = async () => {
+    const context = notificationContext();
+    if (!context) return;
+    setNotificationBusy(true);
+    const result = await sendCompletionNotificationTest(context);
+    setNotificationMessage(
+      result.ok
+        ? "Test queued. It will arrive after the server worker sends it."
+        : result.message,
+    );
+    setNotificationBusy(false);
+  };
+
+  const handleDisableNotifications = async () => {
+    const context = notificationContext();
+    if (!context) return;
+    setNotificationBusy(true);
+    const result = await disableCompletionNotifications(context);
+    setNotificationMessage(
+      result.ok ? "Completion notifications disabled on this account." : result.message,
+    );
+    setNotificationBusy(false);
+  };
+
   const handleOpenResult = async (job: ProcessingJobStatusView) => {
     const context = requestContext(session?.accessToken);
     const ownerUserId = session?.user.id;
@@ -310,6 +365,34 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
           Refresh
         </Button>
       </View>
+
+      <Card style={styles.jobCard}>
+        <Text style={styles.jobTitle}>Completion notifications</Text>
+        <Text style={styles.meta}>{notificationMessage}</Text>
+        <View style={styles.cardActions}>
+          <Button
+            disabled={notificationBusy}
+            onPress={() => void handleEnableNotifications()}
+            variant="secondary"
+          >
+            Enable
+          </Button>
+          <Button
+            disabled={notificationBusy}
+            onPress={() => void handleTestNotification()}
+            variant="secondary"
+          >
+            Send test
+          </Button>
+          <Button
+            disabled={notificationBusy}
+            onPress={() => void handleDisableNotifications()}
+            variant="ghost"
+          >
+            Disable
+          </Button>
+        </View>
+      </Card>
 
       {error ? (
         <Card style={styles.errorCard}>

@@ -37,6 +37,7 @@ export interface ExtractionJobSourceInput {
   readonly mimeType: "application/pdf" | "image/png" | "image/jpeg";
   readonly sourceKind: "pdf" | "image";
   readonly pageCount?: number;
+  readonly stagedObjectPath?: string;
 }
 
 export interface ReviewerJobSourceInput {
@@ -77,7 +78,19 @@ export async function createExtractionProcessingJob({
     idempotencyKey,
   );
   if (existing) {
-    return verifyExisting(existing, "document_extraction", requestFingerprint);
+    const verified = verifyExisting(
+      existing,
+      "document_extraction",
+      requestFingerprint,
+    );
+    if (source.stagedObjectPath) {
+      await removeOrQueueOrphanedStaging(
+        client,
+        userId,
+        source.stagedObjectPath,
+      );
+    }
+    return verified;
   }
 
   const extension = source.sourceKind === "pdf"
@@ -85,7 +98,7 @@ export async function createExtractionProcessingJob({
     : source.mimeType === "image/png"
       ? "png"
       : "jpg";
-  const objectPath = createPrivateObjectPath({
+  const objectPath = source.stagedObjectPath ?? createPrivateObjectPath({
     extension,
     contentSha256,
     userId,
@@ -98,8 +111,8 @@ export async function createExtractionProcessingJob({
     source.mimeType,
     source.bytes.byteLength,
   );
-  let stagedNewObject = false;
-  if (!existingAsset) {
+  let stagedNewObject = source.stagedObjectPath !== undefined;
+  if (!existingAsset && !source.stagedObjectPath) {
     const upload = await client.storage
       .from(PROCESSING_JOB_SOURCE_BUCKET)
       .upload(objectPath, source.bytes, {
@@ -126,7 +139,7 @@ export async function createExtractionProcessingJob({
   };
 
   try {
-    return await createProcessingJobRecord(client, {
+    const job = await createProcessingJobRecord(client, {
       userId,
       jobType: "document_extraction",
       idempotencyKey,
@@ -150,6 +163,11 @@ export async function createExtractionProcessingJob({
       },
       expiresAt: new Date(Date.now() + EXTRACTION_JOB_DEADLINE_MS).toISOString(),
     });
+    if (existingAsset && source.stagedObjectPath) {
+      await removeOrQueueOrphanedStaging(client, userId, objectPath);
+      stagedNewObject = false;
+    }
+    return job;
   } catch (error) {
     const raced = await findProcessingJobByIdempotencyKey(
       client,

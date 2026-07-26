@@ -17,6 +17,7 @@ async function main(): Promise<void> {
   }
 
   const client = createProcessingJobServiceClient();
+  const expiredUploadCount = await expireUploadIntents(client, execute);
   const { data: lifecycle, error: lifecycleError } = await client.rpc(
     "run_processing_lifecycle_cleanup",
     { p_dry_run: !execute },
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
   if (!execute) {
     console.info("processing_cleanup.dry_run", {
       dueStorageObjectCount: dueObjects.length,
+      expiredUploadIntentCount: expiredUploadCount,
       lifecycle,
     });
     return;
@@ -110,9 +112,54 @@ async function main(): Promise<void> {
 
   console.info("processing_cleanup.completed", {
     completedStorageObjectCount: completed,
+    expiredUploadIntentCount: expiredUploadCount,
     failedStorageObjectCount: failed,
     lifecycle,
   });
+}
+
+async function expireUploadIntents(
+  client: ReturnType<typeof createProcessingJobServiceClient>,
+  execute: boolean,
+): Promise<number> {
+  const now = new Date().toISOString();
+  const { data: expired, error } = await client
+    .from("processing_upload_intents")
+    .select("id,user_id,storage_bucket,storage_object_path")
+    .eq("status", "pending")
+    .lte("expires_at", now)
+    .order("expires_at", { ascending: true })
+    .limit(MAX_STORAGE_OBJECTS_PER_RUN);
+  if (error) throw new Error("processing_upload_intent_cleanup_read_failed");
+  if (!execute || expired.length === 0) return expired.length;
+
+  for (const upload of expired) {
+    const { data: marked, error: markError } = await client
+      .from("processing_upload_intents")
+      .update({ status: "expired", updated_at: now })
+      .eq("id", upload.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (markError || !marked) continue;
+    await client
+      .from("processing_cleanup_queue")
+      .upsert(
+        {
+          owner_user_id: upload.user_id,
+          storage_bucket: upload.storage_bucket,
+          storage_object_path: upload.storage_object_path,
+          reason: "orphaned_staging",
+          not_before: now,
+          status: "pending",
+        },
+        {
+          ignoreDuplicates: true,
+          onConflict: "storage_bucket,storage_object_path,reason",
+        },
+      );
+  }
+  return expired.length;
 }
 
 async function markStorageCleanupFailure(

@@ -404,6 +404,12 @@ export type GeneratedArtifactRow =
   Database["public"]["Tables"]["generated_artifacts"]["Row"];
 export type GeneratedArtifactVersionRow =
   Database["public"]["Tables"]["generated_artifact_versions"]["Row"];
+export type ProcessingUploadIntentRow =
+  Database["public"]["Tables"]["processing_upload_intents"]["Row"];
+export type PushNotificationDeviceRow =
+  Database["public"]["Tables"]["push_notification_devices"]["Row"];
+export type ProcessingNotificationDeliveryRow =
+  Database["public"]["Tables"]["processing_notification_deliveries"]["Row"];
 
 export interface Database {
   public: {
@@ -3257,6 +3263,140 @@ export interface Database {
         };
         Relationships: [];
       };
+      processing_upload_intents: {
+        Row: {
+          id: string;
+          user_id: string;
+          status: "pending" | "accepted" | "expired";
+          source_kind: "pdf" | "image";
+          display_name: string;
+          mime_type: "application/pdf" | "image/png" | "image/jpeg";
+          expected_byte_size: number;
+          storage_bucket: string;
+          storage_object_path: string;
+          job_id: string | null;
+          created_at: string;
+          updated_at: string;
+          expires_at: string;
+          accepted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          status?: "pending" | "accepted" | "expired";
+          source_kind: "pdf" | "image";
+          display_name: string;
+          mime_type: "application/pdf" | "image/png" | "image/jpeg";
+          expected_byte_size: number;
+          storage_bucket: string;
+          storage_object_path: string;
+          job_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          expires_at: string;
+          accepted_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["processing_upload_intents"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      push_notification_devices: {
+        Row: {
+          id: string;
+          user_id: string;
+          installation_id: string;
+          expo_push_token: string;
+          platform: "ios" | "android";
+          project_id: string;
+          permission_status: "granted" | "denied" | "undetermined";
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+          last_registered_at: string;
+          invalidated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          installation_id: string;
+          expo_push_token: string;
+          platform: "ios" | "android";
+          project_id: string;
+          permission_status: "granted" | "denied" | "undetermined";
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          last_registered_at?: string;
+          invalidated_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["push_notification_devices"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      processing_notification_deliveries: {
+        Row: {
+          id: string;
+          user_id: string;
+          processing_event_id: string | null;
+          device_id: string;
+          delivery_key: string;
+          notification_kind:
+            | "test"
+            | "extraction_ready"
+            | "reviewer_ready"
+            | "processing_needs_attention";
+          status:
+            | "queued"
+            | "sending"
+            | "ticketed"
+            | "delivered"
+            | "failed"
+            | "invalid_device";
+          attempt_count: number;
+          next_attempt_at: string;
+          lease_owner: string | null;
+          lease_expires_at: string | null;
+          expo_ticket_id: string | null;
+          receipt_due_at: string | null;
+          safe_error_code: string | null;
+          created_at: string;
+          updated_at: string;
+          sent_at: string | null;
+          delivered_at: string | null;
+          failed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          processing_event_id?: string | null;
+          device_id: string;
+          delivery_key: string;
+          notification_kind:
+            | "test"
+            | "extraction_ready"
+            | "reviewer_ready"
+            | "processing_needs_attention";
+          status?: "queued" | "sending" | "ticketed" | "delivered" | "failed" | "invalid_device";
+          attempt_count?: number;
+          next_attempt_at?: string;
+          lease_owner?: string | null;
+          lease_expires_at?: string | null;
+          expo_ticket_id?: string | null;
+          receipt_due_at?: string | null;
+          safe_error_code?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          sent_at?: string | null;
+          delivered_at?: string | null;
+          failed_at?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["processing_notification_deliveries"]["Insert"]
+        >;
+        Relationships: [];
+      };
       reviewers: {
         Row: {
           id: string;
@@ -3311,6 +3451,24 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_processing_notification_deliveries: {
+        Args: {
+          p_worker_id: string;
+          p_limit?: number;
+          p_lease_seconds?: number;
+          p_now?: string;
+        };
+        Returns: ProcessingNotificationDeliveryRow[];
+      };
+      claim_processing_notification_receipts: {
+        Args: {
+          p_worker_id: string;
+          p_limit?: number;
+          p_lease_seconds?: number;
+          p_now?: string;
+        };
+        Returns: ProcessingNotificationDeliveryRow[];
+      };
       create_processing_job: {
         Args: {
           p_user_id: string;

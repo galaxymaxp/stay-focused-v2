@@ -23,9 +23,12 @@
     "@supabase/supabase-js": "^2.49.4",
     "expo": "~54.0.36",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
+    "expo-device": "~8.0.10",
     "expo-document-picker": "~14.0.8",
     "expo-image-picker": "~17.0.11",
     "expo-linking": "~8.0.12",
+    "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
     "expo-secure-store": "~15.0.8",
     "lucide-react-native": "^1.24.0",
@@ -36,7 +39,8 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "^15.12.1",
     "react-native-url-polyfill": "^3.0.0",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",

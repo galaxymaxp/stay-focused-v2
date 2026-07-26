@@ -23,6 +23,7 @@
     "@stay-focused/engine": "*",
     "@stay-focused/ocr": "*",
     "@supabase/supabase-js": "^2.49.4",
+    "expo-server-sdk": "^6.1.0",
     "next": "^15.5.21",
     "openai": "^6.42.0",
     "parse5": "^8.0.1",

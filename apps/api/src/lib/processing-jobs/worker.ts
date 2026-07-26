@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { processNotificationWork } from "@/lib/notifications/worker";
+
 import {
   JOB_WORKER_DEFAULT_CONCURRENCY,
   JOB_WORKER_IDLE_POLL_INTERVAL_MS,
@@ -62,6 +64,14 @@ export async function runProcessingWorker(
         status: "running",
         workerId,
       });
+      try {
+        await processNotificationWork(client, `${workerId}:notifications`);
+      } catch {
+        console.warn("processing_worker.notification_cycle_failed", {
+          errorCode: "notification_cycle_failed",
+          workerId,
+        });
+      }
 
       if (once) break;
       if (active.size > 0) {

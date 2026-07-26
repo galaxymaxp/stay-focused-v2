@@ -61,6 +61,7 @@ Required secrets:
 - `OPENAI_API_KEY`
 - `GOOGLE_CLOUD_PROJECT_ID` and `GOOGLE_CLOUD_CREDENTIALS_JSON` (or the
   equivalent supported Google project/credential pair)
+- `EXPO_ACCESS_TOKEN` when Expo enhanced push security is enabled
 
 Operational values:
 
