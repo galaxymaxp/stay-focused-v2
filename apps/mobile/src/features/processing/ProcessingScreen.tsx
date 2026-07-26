@@ -10,6 +10,7 @@ import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { colors, spacing, typography } from "../../design/tokens";
 import {
   readActiveProcessingJobs,
@@ -73,7 +74,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
   const refresh = useCallback(async () => {
     const ownerUserId = session?.user.id;
     const accessToken = session?.accessToken.trim();
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     if (!ownerUserId) return;
 
     setIsRefreshing(true);
@@ -527,7 +528,7 @@ function referenceToStatusView(
 }
 
 function requestContext(accessToken: string | undefined) {
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const apiBaseUrl = getApiBaseUrl();
   const token = accessToken?.trim();
   return apiBaseUrl && token ? { apiBaseUrl, accessToken: token } : null;
 }

@@ -244,3 +244,53 @@ only the Next.js API is insufficient. Vercel request functions must not use
 `void processJob()` after returning. Vercel Workflow DevKit is a possible future
 durable executor, but it was not added to this foundation and should be adopted
 only with production deployment and replay testing.
+
+## July 2026 completion-repair validation
+
+Two 32-page extraction jobs had reached `storing_result` and then exhausted
+three attempts. The database functions used a deliberately restricted
+`search_path`, while calling `digest(...)` without qualifying the extension
+schema. In the linked Supabase project, `pgcrypto.digest` is installed as
+`extensions.digest`, so result publication failed with SQLSTATE `42883`. The
+phone connection and page extraction were healthy; the failure was inside the
+transaction that publishes the result.
+
+Migration `20260726214339_harden_processing_digest_and_retry_policy` qualifies
+all three affected calls as `extensions.digest(...)` and preserves their fixed
+security-definer search paths. It also separates:
+
+- **manual retryability**, which controls whether the authenticated user may
+  create a child retry after the service has been repaired; and
+- **automatic retryability**, which controls whether the current worker should
+  repeat an attempt without operator action.
+
+Known database contract/configuration failures remain manually retryable but
+are not automatically retried. This prevents a deterministic SQL error from
+repeating expensive OCR or generation work. Transient repository/provider
+failures retain bounded automatic retry behavior. Only a safe database code is
+retained internally; raw database messages are not returned or logged.
+
+Multipart extraction creation now carries an explicit validated `displayName`
+field in addition to the file transport name. This prevents the platform
+multipart encoder from turning a filename such as `Notes + Appendix.pdf` into
+an encoded UI label, without guessing whether literal plus signs or percent
+sequences should be decoded.
+
+The repair was validated against the linked development project with:
+
+- a neutral three-page extraction fixture covering biology, history, and
+  mathematics, including replay of one idempotency key;
+- deliberate client disconnect immediately after HTTP 202 followed by status
+  and result reconciliation;
+- source-revision publication and reviewer generation through the existing
+  subject-neutral Stage 0-6 engine;
+- a child retry of the previously failed 32-page extraction;
+- explicit cancellation while a reviewer worker was running, with result
+  publication rejected after cancellation; and
+- remote catalog checks confirming fixed search paths and service-role-only
+  execution for the repaired functions.
+
+All of those checks passed locally. This does not change the production status:
+the API, worker, and Expo server are running on the development laptop, but no
+hosted continuous worker was deployed because the available Vercel and Railway
+CLIs were not authenticated.

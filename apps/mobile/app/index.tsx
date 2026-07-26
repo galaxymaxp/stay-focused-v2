@@ -14,6 +14,7 @@ import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
+import { getApiBaseUrl } from "../src/config/apiBaseUrl";
 import { colors, spacing, typography } from "../src/design/tokens";
 import { CanvasSourceReviewerScreen } from "../src/features/courses/CanvasSourceReviewerScreen";
 import { CanvasGradeScreen } from "../src/features/courses/CanvasGradeScreen";
@@ -59,7 +60,7 @@ function AuthenticatedApp() {
   >({ name: "generate" });
 
   const reconcileOutbox = useCallback(async () => {
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     const accessToken = session?.accessToken.trim();
     const ownerUserId = session?.user.id;
     if (!apiBaseUrl || !accessToken || !ownerUserId) return;

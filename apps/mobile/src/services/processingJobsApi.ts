@@ -114,6 +114,7 @@ export async function createExtractionJob(
   } catch {
     return failure("source_read_failed", "The selected source could not be read.", true);
   }
+  formData.append("displayName", validated.value.fileName);
   formData.append("jobType", "document_extraction");
 
   return await requestJobStatusView({

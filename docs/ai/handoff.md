@@ -1867,3 +1867,11 @@ Current route status:
 - Expo major upgrade was avoided as requested.
 - Verification result: shared/db/ocr/api/mobile/engine typechecks and tests passed; API and engine builds passed; engine eval passed (290/290); `worker:once`, cleanup dry-run, ops report, and `git diff --check` passed after dependency changes. `npm audit` remains nonzero only for the deferred findings above.
 - Next task: evaluate a safe Next remediation path for the `postcss`/`sharp` advisories and plan the Expo 57 upgrade separately, then push `main` after explicit approval.
+
+### 2026-07-27 durable processing completion repair and LAN portability
+- Root cause of the pictured 32-page failures was the result-publication transaction, not OCR or the changed Wi-Fi: hardened database functions called `digest(...)` without the Supabase `extensions` schema and failed with SQLSTATE `42883` after all pages were processed.
+- Applied migration `20260726214339_harden_processing_digest_and_retry_policy`, qualified the three affected digest calls, preserved service-only execution, and separated manual retry eligibility from same-job automatic retry. Deterministic database contract failures now stop without repeating costly OCR.
+- Multipart jobs now send a validated display name separately, preserving filenames such as `Notes + Appendix.pdf` without transport encoding artifacts.
+- Mobile local API resolution now supports `EXPO_PUBLIC_API_BASE_URL=auto`, derives the current Expo LAN host, keeps the API port configurable, and rejects the incorrect assumption that an Expo tunnel also exposes the API.
+- Linked development Supabase validation passed: neutral 3-page extraction, idempotent duplicate creation, disconnect/reconciliation, source revision, reviewer generation, retry of the prior 32-page job (32/32, zero failed/blank pages), and explicit cancellation with no published result.
+- Full OCR/API/mobile/engine checks passed; API, worker, and Expo were left running locally. Production remains PARTIAL because neither Vercel nor Railway was authenticated, so no hosted continuous worker or physical-iPhone acceptance run was completed.

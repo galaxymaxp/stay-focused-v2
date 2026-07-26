@@ -11,7 +11,12 @@ export async function recoverStaleProcessingJobs(
   client: ProcessingJobServiceClient,
 ): Promise<number> {
   const { data, error } = await client.rpc("recover_stale_processing_jobs", {});
-  if (error) throw new WorkerRepositoryError("processing_job_recovery_failed");
+  if (error) {
+    throw new WorkerRepositoryError(
+      "processing_job_recovery_failed",
+      readSafeDatabaseCode(error),
+    );
+  }
   return data ?? 0;
 }
 
@@ -32,7 +37,12 @@ export async function recordProcessingWorkerHeartbeat(
     p_active_job_count: input.activeJobCount,
     p_build_revision: input.buildRevision ?? null,
   });
-  if (error) throw new WorkerRepositoryError("processing_worker_heartbeat_failed");
+  if (error) {
+    throw new WorkerRepositoryError(
+      "processing_worker_heartbeat_failed",
+      readSafeDatabaseCode(error),
+    );
+  }
 }
 
 export async function claimProcessingJobs(
@@ -46,7 +56,12 @@ export async function claimProcessingJobs(
     p_limit: limit,
     p_lease_seconds: JOB_WORKER_LEASE_SECONDS,
   });
-  if (error) throw new WorkerRepositoryError("processing_job_claim_failed");
+  if (error) {
+    throw new WorkerRepositoryError(
+      "processing_job_claim_failed",
+      readSafeDatabaseCode(error),
+    );
+  }
   return data ?? [];
 }
 
@@ -60,7 +75,12 @@ export async function heartbeatProcessingJob(
     p_worker_id: workerId,
     p_lease_seconds: JOB_WORKER_LEASE_SECONDS,
   });
-  if (error || !data?.[0]) throw new WorkerRepositoryError("processing_job_lease_lost");
+  if (error || !data?.[0]) {
+    throw new WorkerRepositoryError(
+      "processing_job_lease_lost",
+      readSafeDatabaseCode(error),
+    );
+  }
 }
 
 export async function updateProcessingJobProgress(
@@ -86,7 +106,12 @@ export async function updateProcessingJobProgress(
     p_unit_label: input.unitLabel ?? null,
     p_metrics: input.metrics ?? {},
   });
-  if (error || !data?.[0]) throw new WorkerRepositoryError("processing_job_progress_rejected");
+  if (error || !data?.[0]) {
+    throw new WorkerRepositoryError(
+      "processing_job_progress_rejected",
+      readSafeDatabaseCode(error),
+    );
+  }
 }
 
 export async function readProcessingJobState(
@@ -98,7 +123,12 @@ export async function readProcessingJobState(
     .select("*")
     .eq("id", jobId)
     .single();
-  if (error || !data) throw new WorkerRepositoryError("processing_job_read_failed");
+  if (error || !data) {
+    throw new WorkerRepositoryError(
+      "processing_job_read_failed",
+      readSafeDatabaseCode(error),
+    );
+  }
   return data;
 }
 
@@ -119,7 +149,12 @@ export async function completeProcessingJob(
     p_payload: input.payload,
     p_metrics: input.metrics,
   });
-  if (error || !data?.[0]) throw new WorkerRepositoryError("processing_job_completion_rejected");
+  if (error || !data?.[0]) {
+    throw new WorkerRepositoryError(
+      "processing_job_completion_rejected",
+      readSafeDatabaseCode(error),
+    );
+  }
   return data[0];
 }
 
@@ -131,25 +166,47 @@ export async function failProcessingJob(
     readonly errorCode: string;
     readonly safeErrorMessage: string;
     readonly retryable: boolean;
+    readonly automaticRetryable: boolean;
   },
 ): Promise<ProcessingJobDatabaseRow> {
-  const { data, error } = await client.rpc("fail_processing_job", {
+  const { data, error } = await client.rpc("fail_processing_job_v2", {
     p_job_id: input.jobId,
     p_worker_id: input.workerId,
     p_error_code: input.errorCode,
     p_safe_error_message: input.safeErrorMessage,
     p_retryable: input.retryable,
+    p_automatic_retryable: input.automaticRetryable,
   });
-  if (error || !data?.[0]) throw new WorkerRepositoryError("processing_job_failure_rejected");
+  if (error || !data?.[0]) {
+    throw new WorkerRepositoryError(
+      "processing_job_failure_rejected",
+      readSafeDatabaseCode(error),
+    );
+  }
   return data[0];
 }
 
 export class WorkerRepositoryError extends Error {
   public readonly code: string;
+  public readonly databaseCode?: string;
 
-  public constructor(code: string) {
+  public constructor(code: string, databaseCode?: string) {
     super(code);
     this.name = "WorkerRepositoryError";
     this.code = code;
+    this.databaseCode = databaseCode;
   }
+}
+
+function readSafeDatabaseCode(error: unknown): string | undefined {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("code" in error) ||
+    typeof error.code !== "string"
+  ) {
+    return undefined;
+  }
+  const normalized = error.code.trim().toUpperCase();
+  return /^[A-Z0-9]{5,12}$/.test(normalized) ? normalized : undefined;
 }

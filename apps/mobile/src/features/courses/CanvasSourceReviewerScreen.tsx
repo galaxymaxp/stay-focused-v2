@@ -36,6 +36,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
 import {
   listCanvasReviewerSources,
@@ -1494,7 +1495,7 @@ function createRequestContext(accessToken: string | undefined):
       readonly value: { readonly apiBaseUrl: string; readonly accessToken: string };
     }
   | { readonly ok: false; readonly error: CanvasSourceDisplayError } {
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     return {
       error: { message: API_BASE_URL_SETUP_HINT, title: "API address needs setup" },

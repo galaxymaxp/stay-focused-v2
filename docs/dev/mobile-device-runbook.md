@@ -56,41 +56,35 @@ Mobile env, normally in `apps/mobile/.env.local`:
 ```text
 EXPO_PUBLIC_SUPABASE_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY
-EXPO_PUBLIC_API_BASE_URL
+EXPO_PUBLIC_API_BASE_URL=auto
 ```
 
-## Find the Device API URL
+## Local API Address
 
 The iPhone cannot use `localhost` to reach the laptop. On the phone,
 `localhost` means the phone itself.
 
-Find the laptop Wi-Fi IPv4 address:
-
-```powershell
-Get-NetIPAddress -AddressFamily IPv4 |
-  Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
-  Sort-Object InterfaceMetric |
-  Select-Object -First 8 InterfaceAlias,IPAddress,AddressState
-```
-
-On this validation machine, the Wi-Fi address was:
+For same-network Expo Go and development-build testing, use:
 
 ```text
-192.168.68.102
+EXPO_PUBLIC_API_BASE_URL=auto
 ```
 
-For a local API running on port `3000`, set the mobile value to:
+In development, the app reads the current Metro host from Expo and uses the
+same laptop host on API port `3000`. Moving between Wi-Fi networks therefore
+does not require changing an IP address in source or `.env.local`. If the API
+uses another local port, set:
 
 ```text
-EXPO_PUBLIC_API_BASE_URL=http://192.168.68.102:3000
+EXPO_PUBLIC_LOCAL_API_PORT=<port>
 ```
 
-If the laptop changes networks, re-run the command and update
-`EXPO_PUBLIC_API_BASE_URL`.
-
-Optional only: a tunnel such as ngrok can be used later when the phone cannot be
-placed on the same network. In that case, use the HTTPS tunnel origin as
-`EXPO_PUBLIC_API_BASE_URL`.
+Auto mode requires Expo LAN mode and phone-to-laptop network reachability. An
+Expo tunnel carries the Metro bundle only; it does not expose the separate API.
+When the phone cannot reach the laptop directly, expose the API with a trusted
+HTTPS tunnel and set that explicit tunnel origin as
+`EXPO_PUBLIC_API_BASE_URL`. Preview and production builds likewise require an
+explicit deployed HTTPS API origin.
 
 ## Run the API Locally
 
@@ -121,8 +115,8 @@ From a second terminal at the repository root:
 npm run dev --workspace apps/mobile
 ```
 
-After changing `apps/mobile/.env.local`, restart Expo so the
-`EXPO_PUBLIC_` values are reloaded.
+After changing `apps/mobile/.env.local`, fully reload the Expo app so changed
+`EXPO_PUBLIC_` values are applied.
 
 In the Expo terminal, choose the QR code that Expo Go can open, then scan it
 with the iPhone camera or from Expo Go.
@@ -131,8 +125,8 @@ with the iPhone camera or from Expo Go.
 
 1. Start the API with `--hostname 0.0.0.0 --port 3000`.
 2. Confirm the iPhone and laptop are on the same Wi-Fi network.
-3. Set `EXPO_PUBLIC_API_BASE_URL` to `http://<laptop-lan-ip>:3000`.
-4. Restart the Expo dev server after changing env values.
+3. Keep `EXPO_PUBLIC_API_BASE_URL=auto` for Expo LAN development.
+4. Fully reload Expo after changing env values.
 5. Open the app in Expo Go.
 6. Sign in with a Supabase test account.
 7. Open the reviewer generator screen.
@@ -148,7 +142,7 @@ Use only fictional or disposable test images. Do not use private notes,
 personal photos, credentials, IDs, or school documents.
 
 1. Start the API with Google OCR credentials available in the API environment.
-2. Start Expo Go with `EXPO_PUBLIC_API_BASE_URL` pointing to the laptop LAN API.
+2. Start Expo Go in LAN mode with `EXPO_PUBLIC_API_BASE_URL=auto`.
 3. Sign in with a Supabase test account.
 4. Open the reviewer generator screen.
 5. Tap `Import image`.
@@ -171,7 +165,7 @@ Use only fictional or disposable paper notes. Do not photograph private notes,
 personal documents, credentials, IDs, or school documents.
 
 1. Start the API with Google OCR credentials available in the API environment.
-2. Start Expo Go with `EXPO_PUBLIC_API_BASE_URL` pointing to the laptop LAN API.
+2. Start Expo Go in LAN mode with `EXPO_PUBLIC_API_BASE_URL=auto`.
 3. Sign in with a Supabase test account.
 4. Open the reviewer generator screen.
 5. Tap `Import image`.
@@ -189,7 +183,32 @@ personal documents, credentials, IDs, or school documents.
 17. Tap `Clear image` and confirm the captured image and OCR text are removed.
 18. Confirm the captured image is not saved to storage or a database.
 
-Scanned PDFs remain pending Phase 3D.
+Scanned and mixed PDFs now use the durable `/api/jobs` flow. The user must keep
+the app open until upload acceptance returns a job ID; after acceptance the
+separate worker owns extraction.
+
+## Durable Processing Mobile Checklist
+
+1. Start the API on `0.0.0.0:3000`, the continuous worker, and Expo in LAN mode.
+2. Confirm the app's API diagnostic resolves `auto` to the current Metro laptop
+   host on port `3000`.
+3. Select a disposable PDF and start extraction.
+4. Keep the app open while it says `Uploading source...`.
+5. After the app reports durable acceptance, switch to another app.
+6. Return later and confirm the same job ID is reconciled, without a duplicate.
+7. Confirm completed text is restored into the editable source field.
+8. Start reviewer generation, wait for acceptance, and switch apps for longer
+   than two minutes.
+9. Return and confirm the same reviewer job is still running or its persisted
+   result is available; a polling timeout must not cancel it.
+10. Repeat once with an Expo reload, once with temporary Wi-Fi loss after
+    acceptance, and once with explicit Cancel.
+
+For laptop-hosted validation, accepted jobs continue only while the laptop is
+awake, the API and worker processes remain running, and the database/providers
+are reachable. If the phone leaves the laptop's LAN, `auto` cannot make the
+local API publicly reachable; use a trusted HTTPS tunnel or a deployed API and
+worker instead.
 
 ## Common Errors and Fixes
 
@@ -211,8 +230,9 @@ Fixes:
 ### Wrong Localhost Usage
 
 `localhost` works from a laptop browser but not from Expo Go on a phone. On the
-iPhone, `localhost` resolves to the iPhone. Replace it with the laptop LAN IP in
-`EXPO_PUBLIC_API_BASE_URL`.
+iPhone, `localhost` resolves to the iPhone. Use
+`EXPO_PUBLIC_API_BASE_URL=auto` in Expo LAN development so the app derives the
+current laptop host, or set an explicit reachable HTTPS API origin.
 
 ### Missing Supabase Env
 

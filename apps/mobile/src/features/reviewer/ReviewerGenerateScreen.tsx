@@ -19,6 +19,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { colors, spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
@@ -154,7 +155,7 @@ export function ReviewerGenerateScreen({
     async (job: ProcessingJobStatusView): Promise<void> => {
       const ownerUserId = session?.user.id;
       const accessToken = session?.accessToken.trim();
-      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+      const apiBaseUrl = getApiBaseUrl();
       if (!ownerUserId || !accessToken || !apiBaseUrl) return;
 
       await upsertActiveProcessingJob(ownerUserId, job);
@@ -233,7 +234,7 @@ export function ReviewerGenerateScreen({
   const reconcileProcessingJobs = useCallback(async (): Promise<void> => {
     const ownerUserId = session?.user.id;
     const accessToken = session?.accessToken.trim();
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     if (!ownerUserId || !accessToken || !apiBaseUrl) return;
 
     const localReferences = await readActiveProcessingJobs(ownerUserId);
@@ -322,7 +323,7 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     if (!apiBaseUrl) {
       setGenerationError({
         title: "API base URL missing",
@@ -517,7 +518,7 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     if (!apiBaseUrl) {
       dispatchSource({
         type: "ocr_failed",
@@ -594,7 +595,7 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     if (!apiBaseUrl) {
       dispatchSource({
         type: "ocr_failed",
@@ -653,7 +654,7 @@ export function ReviewerGenerateScreen({
   };
 
   const handleCancelJob = async (job: ProcessingJobStatusView) => {
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     const accessToken = session?.accessToken.trim();
     if (!apiBaseUrl || !accessToken) return;
     const result = await cancelProcessingJob({
@@ -669,7 +670,7 @@ export function ReviewerGenerateScreen({
   };
 
   const handleRetryJob = async (job: ProcessingJobStatusView) => {
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     const accessToken = session?.accessToken.trim();
     const ownerUserId = session?.user.id;
     if (!apiBaseUrl || !accessToken || !ownerUserId) return;
@@ -725,7 +726,7 @@ export function ReviewerGenerateScreen({
       return;
     }
 
-    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+    const apiBaseUrl = getApiBaseUrl();
     if (!apiBaseUrl) {
       setSaveError({
         title: "API address needs setup",

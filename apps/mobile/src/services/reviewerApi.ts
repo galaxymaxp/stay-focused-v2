@@ -4,7 +4,7 @@ const REVIEWER_GENERATE_PATH = "/api/reviewer/generate";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_ERROR_MESSAGE_CHARS = 300;
 export const API_BASE_URL_SETUP_HINT =
-  "Set EXPO_PUBLIC_API_BASE_URL. For Expo Web, use http://localhost:3000. For phone testing, use http://<LAN_IP>:3000.";
+  "Use EXPO_PUBLIC_API_BASE_URL=auto for same-network local Expo development, or set an explicit HTTP(S) API URL for a tunnel, preview, or production build.";
 
 export interface GenerateReviewerInput {
   readonly apiBaseUrl: string;

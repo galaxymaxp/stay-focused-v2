@@ -95,6 +95,7 @@ export async function processClaimedJob({
         errorCode: failure.code,
         safeErrorMessage: failure.safeMessage,
         retryable: failure.retryable,
+        automaticRetryable: failure.automaticRetryable,
       });
       const status =
         result.status === "queued" ? "queued" :
@@ -510,7 +511,7 @@ function mapExtractionFailure(code: string): WorkerJobError {
   return new WorkerJobError(code, safeMessage, retryable);
 }
 
-function mapWorkerFailure(error: unknown): WorkerJobError {
+export function mapWorkerFailure(error: unknown): WorkerJobError {
   if (
     error instanceof PipelineCancellationError ||
     error instanceof DocumentExtractionCancellationError
@@ -530,6 +531,14 @@ function mapWorkerFailure(error: unknown): WorkerJobError {
     );
   }
   if (error instanceof WorkerRepositoryError) {
+    if (isDatabaseContractError(error.databaseCode)) {
+      return new WorkerJobError(
+        "processing_result_storage_configuration_error",
+        "Processing could not store its result. Retry after the service is updated.",
+        true,
+        false,
+      );
+    }
     return new WorkerJobError(
       error.code,
       "Processing was interrupted and will be recovered.",
@@ -553,6 +562,16 @@ function mapWorkerFailure(error: unknown): WorkerJobError {
 function isProviderRateLimitError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /\b(?:429|rate[ -]?limit|too many requests)\b/i.test(message);
+}
+
+function isDatabaseContractError(code: string | undefined): boolean {
+  return (
+    code === "42883" ||
+    code === "42P01" ||
+    code === "42703" ||
+    code === "3F000" ||
+    code === "PGRST202"
+  );
 }
 
 function toJson(value: unknown): Json {
@@ -595,12 +614,19 @@ export class WorkerJobError extends Error {
   public readonly code: string;
   public readonly safeMessage: string;
   public readonly retryable: boolean;
+  public readonly automaticRetryable: boolean;
 
-  public constructor(code: string, safeMessage: string, retryable: boolean) {
+  public constructor(
+    code: string,
+    safeMessage: string,
+    retryable: boolean,
+    automaticRetryable = retryable,
+  ) {
     super(code);
     this.name = "WorkerJobError";
     this.code = code;
     this.safeMessage = safeMessage;
     this.retryable = retryable;
+    this.automaticRetryable = automaticRetryable;
   }
 }

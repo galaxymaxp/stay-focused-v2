@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelProcessingJob,
+  createExtractionJob,
   createReviewerJob,
   getProcessingJobStatus,
   listProcessingJobsPage,
@@ -35,6 +36,51 @@ describe("processing jobs mobile API", () => {
     ]);
     expect(first).toEqual(replay);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends the exact source display name separately from native multipart filename encoding", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
+      const body = init?.body;
+      expect(body).toBeInstanceOf(FormData);
+      expect((body as FormData).get("displayName")).toBe(
+        "Neutral Notes + Appendix.pdf",
+      );
+      return jsonResponse({
+        ok: true,
+        data: jobView({
+          jobType: "document_extraction",
+          source: {
+            displayName: "Neutral Notes + Appendix.pdf",
+            mimeType: "application/pdf",
+            sourceKind: "pdf",
+          },
+        }),
+      }, 202);
+    });
+
+    const result = await createExtractionJob({
+      ...BASE_INPUT,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      idempotencyKey: "extraction:display-name:1",
+      platformOS: "web",
+      source: {
+        kind: "pdf",
+        value: {
+          fileName: "Neutral Notes + Appendix.pdf",
+          fileSize: 4,
+          mimeType: "application/pdf",
+          uri: "blob:neutral-pdf",
+          webFile: new Blob(["%PDF"], { type: "application/pdf" }),
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        source: { displayName: "Neutral Notes + Appendix.pdf" },
+      },
+    });
   });
 
   it("treats temporary network loss as operational and never calls console.error", async () => {

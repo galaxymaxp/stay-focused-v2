@@ -11,6 +11,7 @@ import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { colors, hitTarget, spacing, typography } from "../../design/tokens";
 import {
   CANVAS_GRADE_LIST_DEFAULT_LIMIT,
@@ -906,7 +907,7 @@ function createRequestContext(accessToken: string | undefined):
       };
     }
   | { readonly ok: false; readonly error: CanvasGradeDisplayError } {
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     return {
       ok: false,

@@ -12,6 +12,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { colors, spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
@@ -602,7 +603,7 @@ function createRequestContext(accessToken: string | undefined):
       };
     }
   | { readonly ok: false; readonly error: LibraryDisplayError } {
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     return {
       ok: false,

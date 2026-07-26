@@ -3429,6 +3429,18 @@ export interface Database {
         };
         Returns: ProcessingJobDatabaseRow[];
       };
+      fail_processing_job_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_error_code: string;
+          p_safe_error_message: string;
+          p_retryable: boolean;
+          p_automatic_retryable: boolean;
+          p_failed_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       request_processing_job_cancellation: {
         Args: {
           p_user_id: string;

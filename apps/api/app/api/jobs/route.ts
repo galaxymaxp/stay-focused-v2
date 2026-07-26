@@ -16,6 +16,7 @@ import {
   listOwnedProcessingJobs,
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
+import { readUploadDisplayName } from "@/lib/processing-jobs/source-display-name";
 import {
   validateImageOcrBytes,
   validatePdfOcrBytes,
@@ -37,6 +38,7 @@ export const runtime = "nodejs";
 export const maxDuration = 45;
 
 const SOURCE_FORM_FIELD = "source";
+const SOURCE_DISPLAY_NAME_FORM_FIELD = "displayName";
 const IDEMPOTENCY_HEADER = "idempotency-key";
 const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
 const CORS_ALLOWED_HEADERS =
@@ -211,6 +213,10 @@ async function createExtractionJob(
       request,
     );
   }
+  const displayName = readUploadDisplayName(
+    formData.get(SOURCE_DISPLAY_NAME_FORM_FIELD),
+    file.name || (file.type === OCR_PDF_MIME_TYPE ? "Document.pdf" : "Image"),
+  );
 
   const mimeType = file.type.trim().toLowerCase();
   const maxBytes = mimeType === OCR_PDF_MIME_TYPE
@@ -227,7 +233,7 @@ async function createExtractionJob(
   if (mimeType === OCR_PDF_MIME_TYPE) {
     const validation = await validatePdfOcrBytes({
       bytes,
-      fileName: file.name,
+      fileName: displayName,
       mimeType,
     });
     if (!validation.ok) {
@@ -245,7 +251,7 @@ async function createExtractionJob(
       idempotencyKey,
       source: {
         bytes,
-        displayName: file.name || "Document.pdf",
+        displayName,
         mimeType: OCR_PDF_MIME_TYPE,
         sourceKind: "pdf",
         pageCount: validation.pageCount,
@@ -257,7 +263,7 @@ async function createExtractionJob(
 
   const imageValidation = validateImageOcrBytes({
     bytes,
-    fileName: file.name,
+    fileName: displayName,
     mimeType,
   });
   if (!imageValidation.ok) {
@@ -275,7 +281,7 @@ async function createExtractionJob(
     idempotencyKey,
     source: {
       bytes,
-      displayName: file.name || "Image",
+      displayName,
       mimeType: imageValidation.input.mimeType,
       sourceKind: "image",
       pageCount: 1,

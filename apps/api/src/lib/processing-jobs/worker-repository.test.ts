@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   claimProcessingJobs,
   completeProcessingJob,
+  failProcessingJob,
   heartbeatProcessingJob,
   recordProcessingWorkerHeartbeat,
   recoverStaleProcessingJobs,
@@ -94,6 +95,54 @@ describe("processing job worker repository", () => {
       "complete_processing_job_v2",
       expect.objectContaining({ p_job_id: "job-a", p_worker_id: "worker-a" }),
     );
+  });
+
+  it("preserves only a safe database code when result publication fails", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: {
+        code: "42883",
+        message: "function digest(bytea, unknown) does not exist",
+      },
+    }));
+
+    await expect(
+      completeProcessingJob({ rpc } as never, {
+        jobId: "job-a",
+        metrics: {},
+        payload: { text: "Neutral text" },
+        resultType: "document_extraction",
+        workerId: "worker-a",
+      }),
+    ).rejects.toMatchObject({
+      code: "processing_job_completion_rejected",
+      databaseCode: "42883",
+      message: "processing_job_completion_rejected",
+    });
+  });
+
+  it("passes independent manual and automatic retry decisions to the database", async () => {
+    const failed = { id: "job-a", retryable: true, status: "failed" };
+    const rpc = vi.fn(async () => ({ data: [failed], error: null }));
+
+    await expect(
+      failProcessingJob({ rpc } as never, {
+        automaticRetryable: false,
+        errorCode: "processing_result_storage_configuration_error",
+        jobId: "job-a",
+        retryable: true,
+        safeErrorMessage: "Retry after the service is updated.",
+        workerId: "worker-a",
+      }),
+    ).resolves.toBe(failed);
+    expect(rpc).toHaveBeenCalledWith("fail_processing_job_v2", {
+      p_automatic_retryable: false,
+      p_error_code: "processing_result_storage_configuration_error",
+      p_job_id: "job-a",
+      p_retryable: true,
+      p_safe_error_message: "Retry after the service is updated.",
+      p_worker_id: "worker-a",
+    });
   });
 
   it("runs stale-lease recovery at the explicit database boundary", async () => {
