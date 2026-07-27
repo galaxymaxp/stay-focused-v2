@@ -43,6 +43,7 @@ import {
 import {
   disableCompletionNotifications,
   enableCompletionNotifications,
+  isCompletionNotificationAvailable,
   sendCompletionNotificationTest,
 } from "../../services/completionNotifications";
 import {
@@ -164,6 +165,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
   }, [refresh]);
 
   const groups = useMemo(() => groupJobs(jobs), [jobs]);
+  const notificationsAvailable = isCompletionNotificationAvailable();
 
   const updateJob = async (job: ProcessingJobStatusView) => {
     const ownerUserId = session?.user.id;
@@ -366,33 +368,35 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
         </Button>
       </View>
 
-      <Card style={styles.jobCard}>
-        <Text style={styles.jobTitle}>Completion notifications</Text>
-        <Text style={styles.meta}>{notificationMessage}</Text>
-        <View style={styles.cardActions}>
-          <Button
-            disabled={notificationBusy}
-            onPress={() => void handleEnableNotifications()}
-            variant="secondary"
-          >
-            Enable
-          </Button>
-          <Button
-            disabled={notificationBusy}
-            onPress={() => void handleTestNotification()}
-            variant="secondary"
-          >
-            Send test
-          </Button>
-          <Button
-            disabled={notificationBusy}
-            onPress={() => void handleDisableNotifications()}
-            variant="ghost"
-          >
-            Disable
-          </Button>
-        </View>
-      </Card>
+      {notificationsAvailable ? (
+        <Card style={styles.jobCard}>
+          <Text style={styles.jobTitle}>Completion notifications</Text>
+          <Text style={styles.meta}>{notificationMessage}</Text>
+          <View style={styles.cardActions}>
+            <Button
+              disabled={notificationBusy}
+              onPress={() => void handleEnableNotifications()}
+              variant="secondary"
+            >
+              Enable
+            </Button>
+            <Button
+              disabled={notificationBusy}
+              onPress={() => void handleTestNotification()}
+              variant="secondary"
+            >
+              Send test
+            </Button>
+            <Button
+              disabled={notificationBusy}
+              onPress={() => void handleDisableNotifications()}
+              variant="ghost"
+            >
+              Disable
+            </Button>
+          </View>
+        </Card>
+      ) : null}
 
       {error ? (
         <Card style={styles.errorCard}>

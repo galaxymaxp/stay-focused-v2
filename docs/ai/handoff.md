@@ -1882,3 +1882,13 @@ Current route status:
 - Mobile now supports explicit notification permission, device registration, a server-verified test notification, notification-tap navigation, and an EAS iOS development-build configuration. Local `EXPO_PUBLIC_API_BASE_URL=auto` remains the Wi-Fi-portable development default; hosted builds require an HTTPS API origin.
 - Applied linked development migration `20260726230833_hosted_processing_uploads_and_notifications`; service access, private bucket availability, claim RPC access, and anonymous denial passed. Existing database-advisor warnings are unrelated legacy functions/policies; no new-table warning was reported.
 - Real push receipt and app-switch acceptance still require an EAS project/Apple credentials and a continuously deployed Railway worker. Architecture and limitations: `docs/architecture/ADR-014-hosted-processing-and-completion-notifications.md`.
+
+## 2026-07-27 — Expo Go hosted stability prototype preparation
+
+- Added a Railway production API service boundary alongside the existing
+  durable worker, SDK-matched Expo Updates support, explicit EAS environments,
+  and an Expo Go capability gate that hides unsupported push controls.
+- Local `EXPO_PUBLIC_API_BASE_URL=auto` remains unchanged. Hosted Expo Go
+  publication still requires Railway and Expo account authentication, a stable
+  Railway HTTPS domain, EAS preview public variables, and a 24-hour soak before
+  device acceptance.

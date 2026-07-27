@@ -4,6 +4,8 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
+import { canUseCompletionNotifications } from "./completionNotificationCapability";
+
 const INSTALLATION_ID_KEY = "stay-focused-v2.notification-installation-id";
 const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -20,14 +22,25 @@ export type CompletionNotificationResult =
   | { readonly ok: true; readonly installationId: string }
   | { readonly ok: false; readonly message: string };
 
+export function isCompletionNotificationAvailable(): boolean {
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ??
+    Constants.easConfig?.projectId;
+  return canUseCompletionNotifications({
+    executionEnvironment: Constants.executionEnvironment,
+    isDevice: Device.isDevice,
+    platform: Platform.OS,
+    projectId,
+  });
+}
+
 export async function enableCompletionNotifications(input: {
   readonly apiBaseUrl: string;
   readonly accessToken: string;
 }): Promise<CompletionNotificationResult> {
-  if (!Device.isDevice || (Platform.OS !== "ios" && Platform.OS !== "android")) {
+  if (!isCompletionNotificationAvailable()) {
     return {
       ok: false,
-      message: "Push notifications require an iOS or Android development build on a device.",
+      message: "Push notifications require a linked app-specific build on a physical device.",
     };
   }
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ??

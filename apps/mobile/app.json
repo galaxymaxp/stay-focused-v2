@@ -3,6 +3,9 @@
     "name": "Stay Focused V2",
     "slug": "stay-focused-v2",
     "version": "2.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "scheme": "stayfocused",
     "ios": {
