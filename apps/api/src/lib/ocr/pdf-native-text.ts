@@ -1,7 +1,3 @@
-import {
-  OPS,
-  getDocument,
-} from "pdfjs-dist/legacy/build/pdf.mjs";
 import type {
   TextContent,
   TextItem,
@@ -21,28 +17,28 @@ export type PdfPageInspection =
       readonly text: "";
     };
 
-const VISIBLE_OPERATOR_IDS = new Set<number>([
-  OPS.showText,
-  OPS.showSpacedText,
-  OPS.nextLineShowText,
-  OPS.nextLineSetSpacingShowText,
-  OPS.shadingFill,
-  OPS.paintXObject,
-  OPS.paintImageMaskXObject,
-  OPS.paintImageMaskXObjectGroup,
-  OPS.paintImageXObject,
-  OPS.paintInlineImageXObject,
-  OPS.paintInlineImageXObjectGroup,
-  OPS.paintImageXObjectRepeat,
-  OPS.paintImageMaskXObjectRepeat,
-  OPS.paintSolidColorImageMask,
-  OPS.constructPath,
-]);
-
 export async function inspectPdfTextPages(
   bytes: Uint8Array,
   expectedPageCount: number,
 ): Promise<readonly PdfPageInspection[]> {
+  const { getDocument, OPS } = await loadPdfJs();
+  const visibleOperatorIds = new Set<number>([
+    OPS.showText,
+    OPS.showSpacedText,
+    OPS.nextLineShowText,
+    OPS.nextLineSetSpacingShowText,
+    OPS.shadingFill,
+    OPS.paintXObject,
+    OPS.paintImageMaskXObject,
+    OPS.paintImageMaskXObjectGroup,
+    OPS.paintImageXObject,
+    OPS.paintInlineImageXObject,
+    OPS.paintInlineImageXObjectGroup,
+    OPS.paintImageXObjectRepeat,
+    OPS.paintImageMaskXObjectRepeat,
+    OPS.paintSolidColorImageMask,
+    OPS.constructPath,
+  ]);
   const loadingTask = getDocument({
     data: bytes.slice(),
     isEvalSupported: false,
@@ -71,7 +67,7 @@ export async function inspectPdfTextPages(
 
         const operatorList = await page.getOperatorList();
         const hasVisibleContent = operatorList.fnArray.some((operatorId) =>
-          VISIBLE_OPERATOR_IDS.has(operatorId),
+          visibleOperatorIds.has(operatorId),
         );
         pages.push({
           pageNumber,
@@ -87,6 +83,36 @@ export async function inspectPdfTextPages(
   } finally {
     await loadingTask.destroy();
   }
+}
+
+let pdfJsPromise:
+  | Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")>
+  | undefined;
+
+async function loadPdfJs(): Promise<
+  typeof import("pdfjs-dist/legacy/build/pdf.mjs")
+> {
+  if (!pdfJsPromise) {
+    pdfJsPromise = initializePdfRuntime();
+  }
+  return pdfJsPromise;
+}
+
+async function initializePdfRuntime(): Promise<
+  typeof import("pdfjs-dist/legacy/build/pdf.mjs")
+> {
+  const canvas = await import("@napi-rs/canvas");
+  const graphicsGlobals = globalThis as unknown as {
+    DOMMatrix?: unknown;
+    ImageData?: unknown;
+    Path2D?: unknown;
+  };
+
+  graphicsGlobals.DOMMatrix ??= canvas.DOMMatrix;
+  graphicsGlobals.ImageData ??= canvas.ImageData;
+  graphicsGlobals.Path2D ??= canvas.Path2D;
+
+  return import("pdfjs-dist/legacy/build/pdf.mjs");
 }
 
 export function assembleNativePageText(textContent: TextContent): string {
