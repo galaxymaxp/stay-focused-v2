@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
 import { config as loadEnv } from "dotenv";
@@ -43,15 +45,36 @@ async function main(): Promise<void> {
     await validateExistingRetry(accessToken, retryJobId);
     return;
   }
-  const pdfBytes = await createNeutralNativeTextPdf();
+  const privateFixturePath =
+    process.env.PROCESSING_VALIDATION_PDF_PATH?.trim();
+  const pdfBytes = privateFixturePath
+    ? new Uint8Array(await readFile(privateFixturePath))
+    : await createNeutralNativeTextPdf();
+  const displayName = privateFixturePath
+    ? basename(privateFixturePath)
+    : "Neutral Notes + Appendix.pdf";
   const extractionKey = `validation:extraction:${randomUUID()}`;
-  const first = await createExtraction(accessToken, pdfBytes, extractionKey);
-  const replay = await createExtraction(accessToken, pdfBytes, extractionKey);
+  const first = await createExtraction(
+    accessToken,
+    pdfBytes,
+    extractionKey,
+    displayName,
+  );
+  const replay = await createExtraction(
+    accessToken,
+    pdfBytes,
+    extractionKey,
+    displayName,
+  );
   assert(first.id === replay.id, "idempotent extraction replay");
-  assert(first.source?.displayName === "Neutral Notes + Appendix.pdf", "display name");
+  assert(first.source?.displayName === displayName, "display name");
 
   await delay(4_000);
-  const extraction = await waitForTerminalJob(accessToken, first.id, 180_000);
+  const extraction = await waitForTerminalJob(
+    accessToken,
+    first.id,
+    privateFixturePath ? 20 * 60_000 : 180_000,
+  );
   assert(extraction.status === "succeeded", "extraction success");
   const extractionResult = await getResult(accessToken, first.id);
   const extractedText = readNestedString(extractionResult, ["result", "text"]);
@@ -61,19 +84,25 @@ async function main(): Promise<void> {
   assert(isUuid(sourceVersionId), "extraction source version");
   assert(/^[a-f0-9]{64}$/.test(sourceContentSha256), "source content hash");
 
-  const revision = await createRevision(accessToken, {
-    expectedParentSha256: sourceContentSha256,
-    parentSourceVersionId: sourceVersionId,
-    sourceText: `${extractedText}\n\nRevision note: Compare evidence before drawing a conclusion.`,
-  });
-  const revisedSourceVersionId = readString(revision.id);
-  assert(isUuid(revisedSourceVersionId), "revised source version");
+  let reviewerSourceVersionId = sourceVersionId;
+  let sourceRevisionCreated = false;
+  if (!privateFixturePath) {
+    const revision = await createRevision(accessToken, {
+      expectedParentSha256: sourceContentSha256,
+      parentSourceVersionId: sourceVersionId,
+      sourceText: `${extractedText}\n\nRevision note: Compare evidence before drawing a conclusion.`,
+    });
+    reviewerSourceVersionId = readString(revision.id);
+    assert(isUuid(reviewerSourceVersionId), "revised source version");
+    sourceRevisionCreated = true;
+  }
 
   const reviewerKey = `validation:reviewer:${randomUUID()}`;
   const reviewer = await createReviewer(
     accessToken,
     reviewerKey,
-    revisedSourceVersionId,
+    reviewerSourceVersionId,
+    displayName,
   );
   await delay(4_000);
   const reviewerTerminal = await waitForTerminalJob(
@@ -105,7 +134,7 @@ async function main(): Promise<void> {
         "processedPageCount",
       ]),
       pageCount: readNestedNumber(extractionResult, ["result", "pageCount"]),
-      sourceRevisionCreated: true,
+      sourceRevisionCreated,
     },
     reviewer: {
       jobId: reviewer.id,
@@ -322,12 +351,14 @@ async function createExtraction(
   accessToken: string,
   pdfBytes: Uint8Array,
   idempotencyKey: string,
+  displayName: string,
 ): Promise<JobView> {
   if (!/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/)/i.test(apiBaseUrl)) {
     return await createHostedExtraction(
       accessToken,
       pdfBytes,
       idempotencyKey,
+      displayName,
     );
   }
   const formData = new FormData();
@@ -336,7 +367,7 @@ async function createExtraction(
     new Blob([toArrayBuffer(pdfBytes)], { type: "application/pdf" }),
     "transport-encoded-name.pdf",
   );
-  formData.append("displayName", "Neutral Notes + Appendix.pdf");
+  formData.append("displayName", displayName);
   formData.append("jobType", "document_extraction");
   return await requestJob("/api/jobs", accessToken, {
     body: formData,
@@ -350,8 +381,8 @@ async function createHostedExtraction(
   accessToken: string,
   pdfBytes: Uint8Array,
   idempotencyKey: string,
+  displayName: string,
 ): Promise<JobView> {
-  const displayName = "Neutral Notes + Appendix.pdf";
   const intentResponse = await fetch(`${apiBaseUrl}/api/job-uploads`, {
     method: "POST",
     headers: {
@@ -422,13 +453,14 @@ async function createReviewer(
   accessToken: string,
   idempotencyKey: string,
   sourceVersionId: string,
+  sourceTitle = "Neutral multi-subject study notes",
 ): Promise<JobView> {
   return await requestJob("/api/jobs", accessToken, {
     body: JSON.stringify({
       jobType: "reviewer_generation",
       outputMode: "standard",
       reuseMode: "fresh",
-      sourceTitle: "Neutral multi-subject study notes",
+      sourceTitle,
       sourceVersionId,
     }),
     headers: {
