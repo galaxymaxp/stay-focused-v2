@@ -1892,3 +1892,25 @@ Current route status:
   publication still requires Railway and Expo account authentication, a stable
   Railway HTTPS domain, EAS preview public variables, and a 24-hour soak before
   device acceptance.
+
+## 2026-07-27 — Vercel Workflow no-spend prototype
+
+- Replaced the prototype's continuously hosted Railway requirement with
+  Vercel Workflow 4.3.1 while preserving Supabase as the job/source/result
+  authority and retaining Railway/local polling-worker support.
+- Added workflow run metadata, service-only durable checkpoints, atomic
+  workflow-by-ID claims, backend-separated polling claims/recovery, replay-safe
+  OCR chunks and reviewer sections, cancellation checks, and transactional
+  result finalization.
+- Added a truthful Expo Go foreground completion notice after a persisted
+  extraction/reviewer result is reconciled. Local API resolution remains
+  `auto`; hosted testing uses the new Vercel HTTPS origin.
+- Applied and verified `vercel_workflow_processing` and
+  `vercel_workflow_dispatch_recovery` on the linked `stay-focused-v2`
+  Supabase project. Workflow RPCs are service-only and checkpoints deny direct
+  anonymous/authenticated reads.
+- The existing Vercel project `stay-focused` is V1 and was not changed. V2 must
+  use a separate `stay-focused-v2-prototype` project.
+- Local API/mobile/OCR/engine suites pass. Hosted Workflow replay, private live
+  fixture, and physical iPhone switch-away validation remain pending until the
+  new Vercel project is deployed.

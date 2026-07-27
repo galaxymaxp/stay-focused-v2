@@ -8,6 +8,10 @@ import {
   retryProcessingJob,
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
+import {
+  dispatchAcceptedProcessingJob,
+  ProcessingWorkflowDispatchError,
+} from "@/lib/processing-jobs/workflow-dispatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -34,15 +38,17 @@ export async function POST(
   }
 
   try {
+    const client = createProcessingJobServiceClient();
     const job = await retryProcessingJob(
-      createProcessingJobServiceClient(),
+      client,
       user.id,
       jobId,
       idempotencyKey,
     );
     if (!job) return notFound();
+    const dispatchedJob = await dispatchAcceptedProcessingJob(job, { client });
     return NextResponse.json(
-      { ok: true, data: toProcessingJobStatusView(job) },
+      { ok: true, data: toProcessingJobStatusView(dispatchedJob) },
       { status: 202, headers: corsHeaders() },
     );
   } catch (caught) {
@@ -57,6 +63,9 @@ export async function POST(
       caught.code === "processing_job_idempotency_conflict"
     ) {
       return error(409, caught.code, "This idempotency key was used for another retry.", false);
+    }
+    if (caught instanceof ProcessingWorkflowDispatchError) {
+      return error(503, caught.code, caught.safeMessage, caught.retryable);
     }
     return error(503, "processing_job_retry_failed", "The retry could not be accepted.", true);
   }

@@ -16,6 +16,10 @@ import {
   listOwnedProcessingJobs,
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
+import {
+  dispatchAcceptedProcessingJob,
+  ProcessingWorkflowDispatchError,
+} from "@/lib/processing-jobs/workflow-dispatch";
 import { readUploadDisplayName } from "@/lib/processing-jobs/source-display-name";
 import {
   validateImageOcrBytes,
@@ -83,6 +87,15 @@ export async function POST(request: Request): Promise<Response> {
               error.code === "processing_source_version_not_found" ? 404 : 503;
       return errorResponse(
         status,
+        error.code,
+        error.safeMessage,
+        error.retryable,
+        request,
+      );
+    }
+    if (error instanceof ProcessingWorkflowDispatchError) {
+      return errorResponse(
+        503,
         error.code,
         error.safeMessage,
         error.retryable,
@@ -258,7 +271,10 @@ async function createExtractionJob(
       },
       userId,
     });
-    return acceptedResponse(job, request);
+    return acceptedResponse(
+      await dispatchAcceptedProcessingJob(job),
+      request,
+    );
   }
 
   const imageValidation = validateImageOcrBytes({
@@ -288,7 +304,10 @@ async function createExtractionJob(
     },
     userId,
   });
-  return acceptedResponse(job, request);
+  return acceptedResponse(
+    await dispatchAcceptedProcessingJob(job),
+    request,
+  );
 }
 
 async function createReviewerJob(
@@ -391,7 +410,10 @@ async function createReviewerJob(
     },
     userId,
   });
-  return acceptedResponse(job, request);
+  return acceptedResponse(
+    await dispatchAcceptedProcessingJob(job),
+    request,
+  );
 }
 
 async function validateAndSnapshotCanvasContext({

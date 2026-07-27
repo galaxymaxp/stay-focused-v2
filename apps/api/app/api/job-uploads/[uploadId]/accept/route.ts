@@ -17,6 +17,10 @@ import {
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
 import {
+  dispatchAcceptedProcessingJob,
+  ProcessingWorkflowDispatchError,
+} from "@/lib/processing-jobs/workflow-dispatch";
+import {
   findOwnedProcessingUploadIntent,
   markProcessingUploadAccepted,
   ProcessingUploadIntentError,
@@ -130,12 +134,13 @@ export async function POST(
       },
       userId: user.id,
     });
+    const dispatchedJob = await dispatchAcceptedProcessingJob(job, { client });
     await markProcessingUploadAccepted(client, {
       uploadId,
       userId: user.id,
-      jobId: job.id,
+      jobId: dispatchedJob.id,
     });
-    return accepted(job);
+    return accepted(dispatchedJob);
   } catch (caught) {
     if (caught instanceof ProcessingJobCreationError) {
       return error(
@@ -146,6 +151,9 @@ export async function POST(
       );
     }
     if (caught instanceof ProcessingUploadIntentError) {
+      return error(503, caught.code, caught.safeMessage, caught.retryable);
+    }
+    if (caught instanceof ProcessingWorkflowDispatchError) {
       return error(503, caught.code, caught.safeMessage, caught.retryable);
     }
     return error(

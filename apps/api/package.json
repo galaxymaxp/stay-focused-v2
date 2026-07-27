@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@google-cloud/vision": "^5.3.7",
+    "@napi-rs/canvas": "^0.1.100",
     "@stay-focused/canvas": "*",
     "@stay-focused/db": "*",
     "@stay-focused/engine": "*",
@@ -31,7 +32,8 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.1.91",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "workflow": "^4.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

@@ -109,6 +109,12 @@ export interface DocumentExtractionProgress {
   readonly ocrChunkCount?: number;
 }
 
+export interface PreparedPdfOcrChunkResult {
+  readonly pages: readonly OcrPage[];
+  readonly warnings: readonly OcrWarning[];
+  readonly providerId: string;
+}
+
 export class DocumentExtractionCancellationError extends Error {
   public constructor() {
     super("Document extraction was cancelled.");
@@ -260,6 +266,55 @@ export async function extractPdfDocument({
   }
 }
 
+export function createInspectedPdfPages(
+  inspections: readonly PdfPageInspection[],
+): readonly OcrPage[] {
+  return inspections.flatMap((page) => {
+    if (page.kind === "native_text") {
+      return [createNativeTextPage(page.pageNumber, page.text)];
+    }
+    if (page.kind === "blank") {
+      return [createBlankPage(page.pageNumber)];
+    }
+    return [];
+  });
+}
+
+export async function extractPreparedPdfOcrChunk({
+  bytes,
+  fileName,
+  getProvider,
+  originalPageNumbers,
+  timeoutMs,
+}: {
+  readonly bytes: Uint8Array;
+  readonly fileName?: string;
+  readonly getProvider: () => OcrProvider;
+  readonly originalPageNumbers: readonly number[];
+  readonly timeoutMs: number;
+}): Promise<PreparedPdfOcrChunkResult> {
+  const chunks = await createPdfOcrChunks({
+    bytes,
+    pageNumbers: originalPageNumbers,
+    pagesPerChunk: Math.max(1, originalPageNumbers.length),
+  });
+  const chunk = chunks[0];
+  if (!chunk) {
+    return { pages: [], warnings: [], providerId: "none" };
+  }
+  const provider = getProvider();
+  const result = await extractOcrChunk({
+    chunk,
+    fileName,
+    provider,
+    timeoutMs,
+  });
+  return {
+    ...result,
+    providerId: provider.id,
+  };
+}
+
 async function extractPdfDocumentWithinDeadline({
   chunkConcurrency,
   getProvider,
@@ -311,15 +366,7 @@ async function extractPdfDocumentWithinDeadline({
     totalPages: pageCount,
   });
 
-  const pages: OcrPage[] = inspections.flatMap((page) => {
-    if (page.kind === "native_text") {
-      return [createNativeTextPage(page.pageNumber, page.text)];
-    }
-    if (page.kind === "blank") {
-      return [createBlankPage(page.pageNumber)];
-    }
-    return [];
-  });
+  const pages: OcrPage[] = [...createInspectedPdfPages(inspections)];
   const ocrPageNumbers = inspections
     .filter((page) => page.kind === "ocr")
     .map((page) => page.pageNumber);

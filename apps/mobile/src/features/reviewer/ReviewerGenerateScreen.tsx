@@ -5,6 +5,7 @@ import {
 } from "@stay-focused/shared";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
+  Alert,
   AppState,
   Image,
   KeyboardAvoidingView,
@@ -52,6 +53,7 @@ import {
 import { cacheCompletedArtifact } from "../../services/completedArtifactCache";
 import { saveProcessingDraft } from "../../services/processingDraftStore";
 import { enqueueOfflineProcessingIntent } from "../../services/processingOutboxStore";
+import { getProcessingCompletionNotice } from "../../services/processingCompletionNotice";
 import type { OcrClientError } from "../../services/ocrApi";
 import {
   captureImageWithCamera,
@@ -158,6 +160,13 @@ export function ReviewerGenerateScreen({
       const apiBaseUrl = getApiBaseUrl();
       if (!ownerUserId || !accessToken || !apiBaseUrl) return;
 
+      const previousReference = (
+        await readActiveProcessingJobs(ownerUserId)
+      ).find((reference) => reference.jobId === job.id);
+      const completionNotice = getProcessingCompletionNotice(
+        previousReference,
+        job,
+      );
       await upsertActiveProcessingJob(ownerUserId, job);
       if (job.jobType === "document_extraction") {
         setActiveExtractionJob(job);
@@ -227,6 +236,9 @@ export function ReviewerGenerateScreen({
         setActiveReviewerJob(null);
       }
       await removeActiveProcessingJob(job.id);
+      if (completionNotice) {
+        Alert.alert(completionNotice.title, completionNotice.message);
+      }
     },
     [session?.accessToken, session?.user.id],
   );

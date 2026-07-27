@@ -69,11 +69,12 @@ export async function heartbeatProcessingJob(
   client: ProcessingJobServiceClient,
   jobId: string,
   workerId: string,
+  leaseSeconds = JOB_WORKER_LEASE_SECONDS,
 ): Promise<void> {
   const { data, error } = await client.rpc("heartbeat_processing_job", {
     p_job_id: jobId,
     p_worker_id: workerId,
-    p_lease_seconds: JOB_WORKER_LEASE_SECONDS,
+    p_lease_seconds: leaseSeconds,
   });
   if (error || !data?.[0]) {
     throw new WorkerRepositoryError(

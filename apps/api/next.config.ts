@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
+  // Workflow selects the Vercel world at runtime. Keeping the local queue
+  // implementation external prevents Next from evaluating its CLI-only path
+  // discovery code while collecting production route metadata on Windows.
+  serverExternalPackages: [
+    "@vercel/queue",
+    "@workflow/world-local",
+  ],
   transpilePackages: [
     "@stay-focused/db",
     "@stay-focused/engine",
@@ -17,4 +25,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);

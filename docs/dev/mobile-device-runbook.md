@@ -210,6 +210,30 @@ are reachable. If the phone leaves the laptop's LAN, `auto` cannot make the
 local API publicly reachable; use a trusted HTTPS tunnel or a deployed API and
 worker instead.
 
+## Hosted Expo Go prototype
+
+The Vercel Workflow prototype removes the LAN API from the accepted-job path.
+Start Expo Go from Metro with the Vercel HTTPS origin in the process
+environment; do not replace the local `auto` default:
+
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL='https://<stay-focused-v2-prototype-domain>'
+npm run dev --workspace @stay-focused/mobile -- --tunnel
+```
+
+The tunnel carries Metro's JavaScript bundle. OCR/reviewer calls go directly
+from the phone to Vercel. Changing Wi-Fi does not require changing a source
+file or LAN IP.
+
+Keep Expo Go open while the source uploads and until a durable job ID is shown.
+After the UI says processing started, switching apps is safe. Return or reopen
+Expo Go to reconcile; a completed result is restored before the app displays
+the completion notice.
+
+Before device handoff, hosted validation must show extraction and reviewer jobs
+finishing while the laptop API and local worker are stopped. Expo Go does not
+provide remote push or native background upload.
+
 ## Common Errors and Fixes
 
 ### Phone Cannot Reach API

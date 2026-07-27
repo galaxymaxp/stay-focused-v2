@@ -1,6 +1,10 @@
 # ADR-015: Expo Go hosted stability prototype
 
-Status: repository-ready; Railway and Expo account linkage pending
+Status: superseded by ADR-016 for the no-spend Vercel Workflow prototype
+
+ADR-016 replaces the immediate Railway deployment choice. Railway
+configuration remains a supported alternative; it is not required for the
+current prototype.
 
 ## Decision
 

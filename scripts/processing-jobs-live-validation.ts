@@ -323,6 +323,13 @@ async function createExtraction(
   pdfBytes: Uint8Array,
   idempotencyKey: string,
 ): Promise<JobView> {
+  if (!/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/)/i.test(apiBaseUrl)) {
+    return await createHostedExtraction(
+      accessToken,
+      pdfBytes,
+      idempotencyKey,
+    );
+  }
   const formData = new FormData();
   formData.append(
     "source",
@@ -337,6 +344,78 @@ async function createExtraction(
     method: "POST",
     expectedStatus: 202,
   });
+}
+
+async function createHostedExtraction(
+  accessToken: string,
+  pdfBytes: Uint8Array,
+  idempotencyKey: string,
+): Promise<JobView> {
+  const displayName = "Neutral Notes + Appendix.pdf";
+  const intentResponse = await fetch(`${apiBaseUrl}/api/job-uploads`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      displayName,
+      mimeType: "application/pdf",
+      byteSize: pdfBytes.byteLength,
+    }),
+  });
+  const intentBody = await readJson(intentResponse);
+  const intent = readRecord(intentBody.data);
+  const uploadId = readString(intent?.uploadId);
+  const bucket = readString(intent?.bucket);
+  const objectPath = readString(intent?.objectPath);
+  if (
+    intentResponse.status !== 201 ||
+    intentBody.ok !== true ||
+    !isUuid(uploadId) ||
+    !bucket ||
+    !objectPath
+  ) {
+    throw new Error(`validation_upload_intent_http_${intentResponse.status}`);
+  }
+
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("validation_upload_config_missing");
+  }
+  const storage = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  });
+  const uploaded = await storage.storage
+    .from(bucket)
+    .upload(objectPath, pdfBytes, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+  if (uploaded.error) {
+    throw new Error("validation_source_upload_failed");
+  }
+
+  return await requestJob(
+    `/api/job-uploads/${encodeURIComponent(uploadId)}/accept`,
+    accessToken,
+    {
+      headers: { "Idempotency-Key": idempotencyKey },
+      method: "POST",
+      expectedStatus: 202,
+    },
+  );
 }
 
 async function createReviewer(

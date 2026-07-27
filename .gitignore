@@ -1,6 +1,8 @@
 node_modules/
 .turbo/
 .next/
+.next-*/
+.vercel/
 dist/
 .expo/
 .local/
@@ -28,3 +30,6 @@ docs/ai/handoff.md
 docs/ai/*.local.md
 .phase-1.2-handoff.patch
 docs/ai/live-outputs/
+
+.vercel
+.env*

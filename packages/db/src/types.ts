@@ -365,6 +365,9 @@ export type ProcessingJobDatabaseRow = {
   readonly lease_owner: string | null;
   readonly lease_expires_at: string | null;
   readonly heartbeat_at: string | null;
+  readonly execution_backend: "database_worker" | "vercel_workflow";
+  readonly workflow_run_id: string | null;
+  readonly workflow_dispatched_at: string | null;
   readonly source_version_id: string | null;
   readonly artifact_type:
     | "reviewer"
@@ -394,6 +397,8 @@ export type ProcessingJobSourceRow =
   Database["public"]["Tables"]["processing_job_sources"]["Row"];
 export type ProcessingJobResultRow =
   Database["public"]["Tables"]["processing_job_results"]["Row"];
+export type ProcessingJobCheckpointRow =
+  Database["public"]["Tables"]["processing_job_checkpoints"]["Row"];
 export type DocumentAssetRow =
   Database["public"]["Tables"]["document_assets"]["Row"];
 export type ExtractionResultRow =
@@ -3145,6 +3150,9 @@ export interface Database {
           lease_owner?: string | null;
           lease_expires_at?: string | null;
           heartbeat_at?: string | null;
+          execution_backend?: "database_worker" | "vercel_workflow";
+          workflow_run_id?: string | null;
+          workflow_dispatched_at?: string | null;
           source_version_id?: string | null;
           artifact_type?:
             | "reviewer"
@@ -3168,6 +3176,33 @@ export interface Database {
           priority_class?: number;
         };
         Update: Partial<ProcessingJobDatabaseRow>;
+        Relationships: [];
+      };
+      processing_job_checkpoints: {
+        Row: {
+          id: string;
+          job_id: string;
+          checkpoint_key: string;
+          payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          checkpoint_key: string;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          job_id?: string;
+          checkpoint_key?: string;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
         Relationships: [];
       };
       processing_job_results: {
@@ -3529,6 +3564,37 @@ export interface Database {
           p_limit?: number;
           p_lease_seconds?: number;
           p_now?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      attach_processing_job_workflow_v1: {
+        Args: {
+          p_job_id: string;
+          p_workflow_run_id: string;
+          p_dispatched_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      prepare_processing_job_workflow_dispatch_v1: {
+        Args: {
+          p_job_id: string;
+          p_prepared_at?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      claim_processing_job_by_id_v1: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_lease_seconds?: number;
+          p_now?: string;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      mark_processing_job_dispatch_failed_v1: {
+        Args: {
+          p_job_id: string;
+          p_failed_at?: string;
         };
         Returns: ProcessingJobDatabaseRow[];
       };
