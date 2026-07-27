@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname, "../.."),
+  outputFileTracingIncludes: {
+    "/*": [
+      "../../node_modules/@napi-rs/canvas/**/*",
+      "../../node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
+    ],
+  },
   // Workflow selects the Vercel world at runtime. Keeping the local queue
   // implementation external prevents Next from evaluating its CLI-only path
   // discovery code while collecting production route metadata on Windows.
