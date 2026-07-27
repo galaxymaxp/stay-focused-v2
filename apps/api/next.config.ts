@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // implementation external prevents Next from evaluating its CLI-only path
   // discovery code while collecting production route metadata on Windows.
   serverExternalPackages: [
+    "@napi-rs/canvas",
     "@vercel/queue",
     "@workflow/world-local",
   ],
