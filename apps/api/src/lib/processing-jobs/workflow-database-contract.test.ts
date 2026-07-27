@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync(
   resolve(
     process.cwd(),
-    "../../packages/db/migrations/20260727101256_vercel_workflow_processing.sql",
+    "../../packages/db/migrations/20260727103552_vercel_workflow_processing.sql",
   ),
   "utf8",
 );

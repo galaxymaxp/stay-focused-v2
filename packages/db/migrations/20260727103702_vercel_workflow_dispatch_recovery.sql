@@ -1,4 +1,4 @@
--- A client may safely replay the same idempotent creation request after a
+-- A client can safely replay the same idempotent creation request after a
 -- workflow-start outage. Requeue only the narrowly identified dispatch
 -- failure; no provider or processing failure is retried through this boundary.
 create or replace function public.prepare_processing_job_workflow_dispatch_v1(

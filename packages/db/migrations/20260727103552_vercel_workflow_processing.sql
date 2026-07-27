@@ -1,3 +1,4 @@
+-- Durable Vercel Workflow execution metadata and checkpoint contracts.
 alter table public.processing_jobs
   add column execution_backend text not null default 'database_worker',
   add column workflow_run_id text,
