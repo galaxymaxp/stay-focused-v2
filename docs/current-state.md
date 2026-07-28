@@ -51,8 +51,15 @@ outcome. Synchronization remains manual.
 
 The V2 Supabase migration is applied and its grants/functions are verified.
 Local Canvas/API/mobile/OCR/workflow tests, all workspace typechecks and builds,
-and the 290-case reviewer evaluation pass. Hosted V2 content/grade execution
-and fault/recovery validation remain the active rollout gate. Architecture:
+and the 290-case reviewer evaluation pass. Hosted V2 validation also passes:
+content completed as a usable `partial` with independent scope health, grades
+completed `unchanged`, idempotent replay returned the same job, and explicit
+cancellation published no result. Private staging and checkpoints were removed
+from every terminal validation job.
+
+The first hosted creation attempt exposed and repaired a service-role guard
+that used a legacy JWT claim GUC. The forward repair uses `auth.role()` for the
+already authenticated server boundary and is applied only to V2. Architecture:
 `docs/architecture/ADR-017-incremental-resumable-canvas-sync.md`.
 
 ## Product Recovery R6 - Partial Device Acceptance

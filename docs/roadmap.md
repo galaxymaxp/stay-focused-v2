@@ -4,8 +4,7 @@ Last refreshed: 2026-07-28, Asia/Manila.
 
 ## Phase 5F.2 - Incremental, Resumable Canvas Synchronization
 
-Status: Implemented and locally validated; hosted rollout validation in
-progress.
+Status: Complete and hosted validated.
 
 - Content and grade jobs expand into database-owned list-page, item-detail,
   announcement, file, assignment, submission, and grade-summary units. Vercel
@@ -27,8 +26,13 @@ progress.
 - Release reminder: before the next mobile release, physically spot-check Expo
   Go reload recovery, temporary network loss, and explicit cancellation.
 
-Next task: complete hosted Phase 5F.2 content/grade fault and recovery
-validation, then perform the three-item physical Expo Go release spot-check.
+Hosted content produced a safe `partial` outcome when one Canvas list endpoint
+was unavailable, while independent announcements advanced and no deletion was
+inferred. Grade synchronization returned `unchanged`, idempotent replay reused
+the same content job, and explicit cancellation published no result.
+
+Next task: perform the three-item physical Expo Go reload, temporary-network,
+and cancellation release spot-check.
 
 ## Phase 5F.1 - Durable Canvas Synchronization
 

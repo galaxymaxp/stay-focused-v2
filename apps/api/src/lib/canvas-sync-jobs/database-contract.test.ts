@@ -145,11 +145,16 @@ describe("durable Canvas sync database contract", () => {
       "job.stage not in ('promoting_scopes', 'storing_result', 'complete')",
     );
     expect(cancellation).toContain("auth.uid() is distinct from p_user_id");
+    expect(cancellation).toContain(
+      "coalesce(auth.role(), '') <> 'service_role'",
+    );
   });
 
   it("accepts only owner-created jobs without inventing an initial total", () => {
     const creation = sliceIncrementalFunction("create_canvas_sync_job_v1");
     expect(creation).toContain("auth.uid() is distinct from p_user_id");
+    expect(creation).toContain("coalesce(auth.role(), '') <> 'service_role'");
+    expect(creation).not.toContain("request.jwt.claim.role");
     expect(creation).toContain("progress_total_known");
     expect(creation).toContain("null,\n      false,");
   });

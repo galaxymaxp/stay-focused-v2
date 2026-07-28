@@ -528,7 +528,7 @@ declare
   v_job public.canvas_sync_jobs%rowtype;
 begin
   if auth.uid() is distinct from p_user_id
-    and coalesce(current_setting('request.jwt.claim.role', true), '') <> 'service_role' then
+    and coalesce(auth.role(), '') <> 'service_role' then
     return;
   end if;
 
@@ -1329,7 +1329,7 @@ declare
   v_job public.canvas_sync_jobs%rowtype;
 begin
   if auth.uid() is distinct from p_user_id
-    and coalesce(current_setting('request.jwt.claim.role', true), '') <> 'service_role' then
+    and coalesce(auth.role(), '') <> 'service_role' then
     return;
   end if;
 
@@ -1736,7 +1736,7 @@ declare
   v_staging_expired boolean;
 begin
   if auth.uid() is distinct from p_user_id
-    and coalesce(current_setting('request.jwt.claim.role', true), '') <> 'service_role' then
+    and coalesce(auth.role(), '') <> 'service_role' then
     return;
   end if;
 

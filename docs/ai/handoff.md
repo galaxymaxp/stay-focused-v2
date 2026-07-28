@@ -1989,3 +1989,16 @@ Current route status:
   to `stay-focused-v2-prototype`.
 - Keep the later physical Expo Go reload, temporary-network-loss, and explicit
   cancellation spot-check on the next mobile release checklist.
+- Hosted V2 validation found and fixed a job-creation authorization regression:
+  server routes use a service-role Supabase client after bearer verification,
+  while the first guard read a legacy per-claim GUC. The forward repair now
+  uses `auth.role()` for create, cancel, and retry and is applied only to V2.
+- Post-repair content job `18d55d36-0026-4c90-89dc-52e9287abfe5` succeeded
+  with outcome `partial`; one non-retryable page-list endpoint was unavailable,
+  announcements remained healthy, last-known-good content/files were retained,
+  and zero deletions were inferred. Grade job
+  `eb6d966c-6d92-4d9a-a4b6-b48f8ab9d7f5` succeeded `unchanged`.
+- Idempotent replay returned the same content job. Cancellation job
+  `79ce6ab7-6346-4bf4-bc8e-de9c28cd191e` ended `cancelled`, recorded explicit
+  cancellation, and published no result. All three terminal jobs had zero
+  staging rows, zero running units, and zero private checkpoints retained.

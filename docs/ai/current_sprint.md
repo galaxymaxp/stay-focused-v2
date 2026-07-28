@@ -2,7 +2,7 @@
 
 Last refreshed: 2026-07-28, Asia/Manila.
 
-## Active objective - Phase 5F.2 hosted rollout validation
+## Active objective - Phase 5F.2 closeout and physical release spot-check
 
 - Durable extraction/reviewer resilience validation is complete: runtime
   recreation, temporary client disconnection, and explicit cancellation pass
@@ -32,9 +32,17 @@ Last refreshed: 2026-07-28, Asia/Manila.
 - The V2 migration is applied and verified. Local Canvas/API/mobile/OCR tests,
   Workflow runtime tests, root typecheck/build, and all 290 reviewer
   evaluations pass.
-- Current gate: deploy the task-only build to `stay-focused-v2-prototype`, then
-  validate one private content sync and one grade sync plus interruption,
-  retry, cancellation, and deletion safety with sanitized evidence.
+- Hosted V2 validation passes. Content returned a usable `partial` after one
+  Canvas page-list endpoint returned not-found; announcements advanced,
+  last-known-good content/files remained protected, and no deletion was
+  inferred. Grades returned `unchanged`.
+- Idempotent replay reused the content job. Cancellation recorded the request,
+  produced no result, and terminal jobs retained no staging or private
+  checkpoints.
+- A service-role authorization regression found on the first hosted creation
+  was repaired with Supabase `auth.role()` and a forward-only V2 migration.
+- Current gate: the later physical Expo Go reload, temporary-network-loss, and
+  cancellation spot-check remains on the next mobile release checklist.
 - Release reminder: later physically spot-check Expo Go reload, temporary
   network loss, and explicit cancellation. This reminder is not a timed
   notification and does not block current development.
