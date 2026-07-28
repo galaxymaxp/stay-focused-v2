@@ -33,7 +33,7 @@ import type {
   CanvasConnectionSummary,
 } from "@/types/canvas";
 
-const CORS_ALLOWED_HEADERS = "authorization, content-type";
+const CORS_ALLOWED_HEADERS = "authorization, content-type, idempotency-key";
 const CORS_MAX_AGE_SECONDS = "600";
 const MAX_CONNECT_BODY_BYTES = 16 * 1024;
 const MAX_CANVAS_BASE_URL_CHARS = 2048;
@@ -406,6 +406,7 @@ export function jsonResponse(
   body: CanvasApiResponse,
   status:
     | 200
+    | 202
     | 400
     | 401
     | 403

@@ -8,9 +8,10 @@ const mocks = vi.hoisted(() => ({
       user: { id: "user-1" },
     },
   } as unknown,
-  loadSelectedSyncCourse: vi.fn(),
+  createCanvasSyncJob: vi.fn(),
+  dispatchAcceptedCanvasSyncJob: vi.fn(),
   requireCanvasAuth: vi.fn(),
-  syncSelectedCanvasCourse: vi.fn(),
+  validateCanvasSyncIdempotencyKey: vi.fn(),
 }));
 
 vi.mock("@/lib/canvas-routes", () => ({
@@ -21,14 +22,36 @@ vi.mock("@/lib/canvas-routes", () => ({
   requireCanvasAuth: mocks.requireCanvasAuth,
 }));
 
-vi.mock("@/lib/canvas-course-selection", () => ({
-  loadSelectedSyncCourse: mocks.loadSelectedSyncCourse,
+vi.mock("@/lib/canvas-sync-jobs/contracts", () => ({
+  toCanvasSyncJobStatusView: (job: unknown) => job,
 }));
 
-vi.mock("@/lib/canvas-sync", () => ({
-  syncSelectedCanvasCourse: mocks.syncSelectedCanvasCourse,
-}));
+vi.mock("@/lib/canvas-sync-jobs/repository", () => {
+  class CanvasSyncJobRepositoryError extends Error {
+    public constructor(
+      public readonly code: string,
+      public readonly safeMessage: string,
+      public readonly retryable: boolean,
+    ) {
+      super(code);
+    }
+  }
+  return {
+    CanvasSyncJobRepositoryError,
+    createCanvasSyncJob: mocks.createCanvasSyncJob,
+    validateCanvasSyncIdempotencyKey: mocks.validateCanvasSyncIdempotencyKey,
+  };
+});
 
+vi.mock("@/lib/canvas-sync-jobs/workflow-dispatch", () => {
+  class CanvasSyncWorkflowDispatchError extends Error {}
+  return {
+    CanvasSyncWorkflowDispatchError,
+    dispatchAcceptedCanvasSyncJob: mocks.dispatchAcceptedCanvasSyncJob,
+  };
+});
+
+const repository = await import("@/lib/canvas-sync-jobs/repository");
 const route = await import("./route");
 
 describe("POST /api/canvas/courses/[courseId]/sync", () => {
@@ -42,113 +65,84 @@ describe("POST /api/canvas/courses/[courseId]/sync", () => {
       },
     };
     mocks.requireCanvasAuth.mockImplementation(async () => mocks.authResult);
-    mocks.loadSelectedSyncCourse.mockResolvedValue({
-      ok: true,
-      value: {
-        connection: { id: "connection-1" },
-        course: { id: "canvas-course-1", name: "Private Course Name" },
-        courseRow: { id: "00000000-0000-4000-8000-000000000001" },
-      },
-    });
-    mocks.syncSelectedCanvasCourse.mockResolvedValue({
-      ok: true,
-      summary: courseSummary("success"),
-    });
+    mocks.validateCanvasSyncIdempotencyKey.mockReturnValue("content-sync-key-1");
+    mocks.createCanvasSyncJob.mockResolvedValue({ id: "job-1" });
+    mocks.dispatchAcceptedCanvasSyncJob.mockResolvedValue(acceptedJob());
   });
 
   it("requires Canvas API authentication", async () => {
-    const authResponse = Response.json(
-      { ok: false, error: { code: "unauthorized" } },
-      { status: 401 },
-    );
-    mocks.authResult = { ok: false, response: authResponse };
+    mocks.authResult = {
+      ok: false,
+      response: Response.json(
+        { ok: false, error: { code: "unauthorized" } },
+        { status: 401 },
+      ),
+    };
 
-    const response = await route.POST(createRequest(), createContext("course-1"));
+    const response = await route.POST(createRequest(), createContext(COURSE_ID));
 
     expect(response.status).toBe(401);
-    expect(mocks.loadSelectedSyncCourse).not.toHaveBeenCalled();
-    expect(mocks.syncSelectedCanvasCourse).not.toHaveBeenCalled();
+    expect(mocks.createCanvasSyncJob).not.toHaveBeenCalled();
   });
 
-  it("rejects blank route course IDs before reading Canvas state", async () => {
-    const response = await route.POST(createRequest(), createContext("   "));
+  it("rejects invalid internal course IDs before creating a job", async () => {
+    const response = await route.POST(createRequest(), createContext("course-1"));
 
     expect(response.status).toBe(404);
     await expectError(response, "canvas_course_not_found");
-    expect(mocks.loadSelectedSyncCourse).not.toHaveBeenCalled();
+    expect(mocks.createCanvasSyncJob).not.toHaveBeenCalled();
   });
 
-  it("requires the selected course to belong to the authenticated user", async () => {
-    mocks.loadSelectedSyncCourse.mockResolvedValue({
-      ok: false,
-      status: 400,
-      code: "canvas_course_not_selected",
-      message: "Select the Canvas course before synchronizing it.",
-    });
+  it("durably accepts one subject-neutral content-sync job", async () => {
+    const response = await route.POST(createRequest(), createContext(COURSE_ID));
+    const body = await response.json();
 
-    const response = await route.POST(
-      createRequest({ body: { userId: "attacker-user" } }),
-      createContext("00000000-0000-4000-8000-000000000001"),
+    expect(response.status).toBe(202);
+    expect(body).toMatchObject({
+      ok: true,
+      data: {
+        id: "job-1",
+        jobType: "course_content",
+        status: "queued",
+      },
+    });
+    expect(mocks.validateCanvasSyncIdempotencyKey).toHaveBeenCalledWith(
+      "content-sync-key-1",
     );
+    expect(mocks.createCanvasSyncJob).toHaveBeenCalledWith(currentAuthClient(), {
+      courseId: COURSE_ID,
+      idempotencyKey: "content-sync-key-1",
+      jobType: "course_content",
+      userId: "user-1",
+    });
+    expect(mocks.dispatchAcceptedCanvasSyncJob).toHaveBeenCalledWith(
+      { id: "job-1" },
+      { client: currentAuthClient() },
+    );
+  });
+
+  it("returns the same accepted job when an idempotent replay is dispatched", async () => {
+    const first = await route.POST(createRequest(), createContext(COURSE_ID));
+    const second = await route.POST(createRequest(), createContext(COURSE_ID));
+
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
+    expect(await first.json()).toEqual(await second.json());
+  });
+
+  it("maps ownership and selection failures without exposing internals", async () => {
+    mocks.createCanvasSyncJob.mockRejectedValue(
+      new repository.CanvasSyncJobRepositoryError(
+        "canvas_course_not_selected",
+        "Select the Canvas course before synchronizing it.",
+        false,
+      ),
+    );
+
+    const response = await route.POST(createRequest(), createContext(COURSE_ID));
 
     expect(response.status).toBe(400);
     await expectError(response, "canvas_course_not_selected");
-    expect(mocks.loadSelectedSyncCourse).toHaveBeenCalledWith({
-      client: currentAuthClient(),
-      courseId: "00000000-0000-4000-8000-000000000001",
-      userId: "user-1",
-    });
-    expect(mocks.syncSelectedCanvasCourse).not.toHaveBeenCalled();
-  });
-
-  it("synchronizes one selected course and returns only safe aggregate counts", async () => {
-    const response = await route.POST(
-      createRequest(),
-      createContext("00000000-0000-4000-8000-000000000001"),
-    );
-    const text = await response.text();
-    const body = JSON.parse(text) as unknown;
-
-    expect(response.status).toBe(200);
-    expect(body).toMatchObject({
-      ok: true,
-      status: "success",
-      courses: { discovered: 1, succeeded: 1, failed: 0 },
-      plannerItems: { discovered: 0 },
-    });
-    expect(text).not.toContain("Private Course Name");
-    expect(text).not.toContain("canvas-course-1");
-    expect(mocks.syncSelectedCanvasCourse).toHaveBeenCalledWith({
-      client: currentAuthClient(),
-      connection: { id: "connection-1" },
-      course: { id: "canvas-course-1", name: "Private Course Name" },
-      courseRow: { id: "00000000-0000-4000-8000-000000000001" },
-      userId: "user-1",
-    });
-  });
-
-  it("propagates safe course-scoped sync failures with a summary", async () => {
-    mocks.syncSelectedCanvasCourse.mockResolvedValue({
-      ok: false,
-      status: 502,
-      code: "canvas_unavailable",
-      message: "Canvas academic data could not be synchronized.",
-      summary: courseSummary("failed"),
-    });
-
-    const response = await route.POST(
-      createRequest(),
-      createContext("00000000-0000-4000-8000-000000000001"),
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(502);
-    expect(body).toMatchObject({
-      ok: false,
-      error: { code: "canvas_unavailable" },
-      sync: { status: "failed" },
-    });
-    expect(JSON.stringify(body).toLowerCase()).not.toContain("stack");
   });
 
   it("allows CORS preflight for per-course sync", () => {
@@ -159,10 +153,14 @@ describe("POST /api/canvas/courses/[courseId]/sync", () => {
   });
 });
 
-function createRequest(options: { readonly body?: unknown } = {}): Request {
-  return new Request("http://localhost/api/canvas/courses/course-1/sync", {
-    body: JSON.stringify(options.body ?? {}),
-    headers: { authorization: "Bearer token" },
+const COURSE_ID = "00000000-0000-4000-8000-000000000001";
+
+function createRequest(): Request {
+  return new Request(`http://localhost/api/canvas/courses/${COURSE_ID}/sync`, {
+    headers: {
+      authorization: "Bearer token",
+      "idempotency-key": "content-sync-key-1",
+    },
     method: "POST",
   });
 }
@@ -178,73 +176,17 @@ function currentAuthClient(): unknown {
     .value.client;
 }
 
-function courseSummary(status: "success" | "failed") {
+function acceptedJob() {
   return {
-    mode: "course",
-    status,
-    startedAt: "2026-07-06T01:00:00.000Z",
-    completedAt: "2026-07-06T01:00:05.000Z",
-    courses: {
-      discovered: 1,
-      succeeded: status === "success" ? 1 : 0,
-      changed: status === "success" ? 1 : 0,
-      unchanged: 0,
-      failed: status === "success" ? 0 : 1,
-    },
-    resources: {
-      modules: status === "success" ? 1 : 0,
-      moduleItems: 0,
-      pages: 0,
-      assignmentGroups: 0,
-      assignments: 0,
-      plannerItems: 0,
-      announcements: 0,
-      files: 0,
-      fileReferences: 0,
-    },
-    plannerItems: {
-      discovered: 0,
-      inserted: 0,
-      updated: 0,
-      unchanged: 0,
-      pruned: 0,
-      failed: 0,
-    },
-    announcements: {
-      discovered: 0,
-      inserted: 0,
-      updated: 0,
-      unchanged: 0,
-      pruned: 0,
-      failed: 0,
-      coursesSucceeded: status === "success" ? 1 : 0,
-      coursesFailed: status === "success" ? 0 : 1,
-    },
-    files: {
-      discovered: 0,
-      inserted: 0,
-      updated: 0,
-      unchanged: 0,
-      blocked: 0,
-      metadataOnly: 0,
-      references: 0,
-      referencesDeleted: 0,
-      failed: 0,
-    },
-    failures:
-      status === "success"
-        ? []
-        : [{ code: "canvas_course_fetch_failed", count: 1 }],
-    retryAttempts: 0,
-    sanitizedFailures: [],
+    acceptedAt: "2026-07-28T00:00:00.000Z",
+    id: "job-1",
+    jobType: "course_content",
+    status: "queued",
   };
 }
 
 async function expectError(response: Response, code: string): Promise<void> {
   const body = await response.json();
-  expect(body).toMatchObject({
-    ok: false,
-    error: { code },
-  });
+  expect(body).toMatchObject({ ok: false, error: { code } });
   expect(JSON.stringify(body).toLowerCase()).not.toContain("stack");
 }

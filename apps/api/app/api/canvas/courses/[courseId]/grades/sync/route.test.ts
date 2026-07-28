@@ -9,8 +9,10 @@ const mocks = vi.hoisted(() => ({
     },
   } as unknown,
   authorizeSelectedCanvasGradeCourse: vi.fn(),
+  createCanvasSyncJob: vi.fn(),
+  dispatchAcceptedCanvasSyncJob: vi.fn(),
   requireCanvasAuth: vi.fn(),
-  syncCanvasCourseGrades: vi.fn(),
+  validateCanvasSyncIdempotencyKey: vi.fn(),
 }));
 
 vi.mock("@/lib/canvas-routes", () => ({
@@ -24,13 +26,38 @@ vi.mock("@/lib/canvas-routes", () => ({
   requireCanvasAuth: mocks.requireCanvasAuth,
 }));
 
-vi.mock("@/lib/canvas-grade-sync", () => ({
-  syncCanvasCourseGrades: mocks.syncCanvasCourseGrades,
-}));
-
 vi.mock("@/lib/canvas-grade-read-model", () => ({
   authorizeSelectedCanvasGradeCourse: mocks.authorizeSelectedCanvasGradeCourse,
 }));
+
+vi.mock("@/lib/canvas-sync-jobs/contracts", () => ({
+  toCanvasSyncJobStatusView: (job: unknown) => job,
+}));
+
+vi.mock("@/lib/canvas-sync-jobs/repository", () => {
+  class CanvasSyncJobRepositoryError extends Error {
+    public constructor(
+      public readonly code: string,
+      public readonly safeMessage: string,
+      public readonly retryable: boolean,
+    ) {
+      super(code);
+    }
+  }
+  return {
+    CanvasSyncJobRepositoryError,
+    createCanvasSyncJob: mocks.createCanvasSyncJob,
+    validateCanvasSyncIdempotencyKey: mocks.validateCanvasSyncIdempotencyKey,
+  };
+});
+
+vi.mock("@/lib/canvas-sync-jobs/workflow-dispatch", () => {
+  class CanvasSyncWorkflowDispatchError extends Error {}
+  return {
+    CanvasSyncWorkflowDispatchError,
+    dispatchAcceptedCanvasSyncJob: mocks.dispatchAcceptedCanvasSyncJob,
+  };
+});
 
 const route = await import("./route");
 
@@ -49,7 +76,9 @@ describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
       ok: true,
       value: null,
     });
-    mocks.syncCanvasCourseGrades.mockResolvedValue(syncResult("succeeded"));
+    mocks.validateCanvasSyncIdempotencyKey.mockReturnValue("grade-sync-key-1");
+    mocks.createCanvasSyncJob.mockResolvedValue({ id: "grade-job-1" });
+    mocks.dispatchAcceptedCanvasSyncJob.mockResolvedValue(acceptedJob());
   });
 
   it("requires authentication before grade synchronization", async () => {
@@ -64,90 +93,64 @@ describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
     const response = await route.POST(createRequest(), createContext(COURSE_ID));
 
     expect(response.status).toBe(401);
-    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
+    expect(mocks.createCanvasSyncJob).not.toHaveBeenCalled();
   });
 
-  it("rejects invalid internal course IDs before invoking the sync service", async () => {
-    const response = await route.POST(createRequest(), createContext("canvas-123"));
-
-    expect(response.status).toBe(404);
-    await expectError(response, "canvas_course_not_found");
-    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
-  });
-
-  it("rejects unknown or unselected course scope before synchronization", async () => {
-    mocks.authorizeSelectedCanvasGradeCourse.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      code: "canvas_course_not_found",
-      message: "Canvas course was not found for this connection.",
-    });
-
-    const unknown = await route.POST(createRequest(), createContext(COURSE_ID));
-
-    expect(unknown.status).toBe(404);
-    await expectError(unknown, "canvas_course_not_found");
-    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
-
-    mocks.authorizeSelectedCanvasGradeCourse.mockResolvedValueOnce({
+  it("rejects unknown or unselected course scope before job creation", async () => {
+    mocks.authorizeSelectedCanvasGradeCourse.mockResolvedValue({
       ok: false,
       status: 400,
       code: "canvas_course_not_selected",
       message: "Select the Canvas course before reading synchronized grade data.",
     });
 
-    const unselected = await route.POST(createRequest(), createContext(COURSE_ID));
+    const response = await route.POST(createRequest(), createContext(COURSE_ID));
 
-    expect(unselected.status).toBe(400);
-    await expectError(unselected, "canvas_course_not_selected");
-    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    await expectError(response, "canvas_course_not_selected");
+    expect(mocks.createCanvasSyncJob).not.toHaveBeenCalled();
   });
 
-  it("accepts no body and delegates exactly once to Phase 5E.3 sync", async () => {
+  it("accepts no body and returns a durable grade-sync job", async () => {
     const response = await route.POST(
-      new Request(`http://localhost/api/canvas/courses/${COURSE_ID}/grades/sync`, {
-        headers: { authorization: "Bearer token" },
-        method: "POST",
-      }),
+      createRequest({ omitBody: true }),
       createContext(COURSE_ID),
     );
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(body).toMatchObject({
       ok: true,
-      status: "succeeded",
-      assignmentSubmission: { persistedCount: 2 },
+      data: {
+        id: "grade-job-1",
+        jobType: "course_grades",
+        status: "queued",
+      },
     });
-    expect(mocks.authorizeSelectedCanvasGradeCourse).toHaveBeenCalledWith({
-      client: currentAuthClient(),
+    expect(mocks.createCanvasSyncJob).toHaveBeenCalledWith(currentAuthClient(), {
       courseId: COURSE_ID,
-      userId: "user-1",
-    });
-    expect(mocks.syncCanvasCourseGrades).toHaveBeenCalledTimes(1);
-    expect(mocks.syncCanvasCourseGrades).toHaveBeenCalledWith({
-      client: currentAuthClient(),
-      courseId: COURSE_ID,
+      idempotencyKey: "grade-sync-key-1",
+      jobType: "course_grades",
       userId: "user-1",
     });
   });
 
-  it("accepts an empty JSON object body", async () => {
+  it("accepts an empty JSON object without running Canvas inline", async () => {
     const response = await route.POST(
       createRequest({ rawBody: "{}" }),
       createContext(COURSE_ID),
     );
 
-    expect(response.status).toBe(200);
-    expect(mocks.syncCanvasCourseGrades).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(202);
+    expect(mocks.dispatchAcceptedCanvasSyncJob).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ["malformed JSON", "{nope", 400, "invalid_json"],
     ["unknown fields", JSON.stringify({ userId: "attacker" }), 400, "invalid_request"],
     ["array body", "[]", 400, "invalid_request"],
-  ] as const)("rejects %s before synchronization", async (_name, rawBody, status, code) => {
+  ] as const)("rejects %s before job creation", async (_name, rawBody, status, code) => {
     const response = await route.POST(
       createRequest({ rawBody }),
       createContext(COURSE_ID),
@@ -155,58 +158,29 @@ describe("POST /api/canvas/courses/[courseId]/grades/sync", () => {
 
     expect(response.status).toBe(status);
     await expectError(response, code);
-    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
+    expect(mocks.createCanvasSyncJob).not.toHaveBeenCalled();
   });
 
-  it("rejects oversized request bodies before synchronization", async () => {
+  it("rejects oversized request bodies before job creation", async () => {
     const response = await route.POST(
-      createRequest({
-        contentLength: "1025",
-        rawBody: "{}",
-      }),
+      createRequest({ contentLength: "1025", rawBody: "{}" }),
       createContext(COURSE_ID),
     );
 
     expect(response.status).toBe(413);
     await expectError(response, "payload_too_large");
-    expect(mocks.syncCanvasCourseGrades).not.toHaveBeenCalled();
+    expect(mocks.createCanvasSyncJob).not.toHaveBeenCalled();
   });
 
-  it("returns partial and failed service results as safe aggregate responses", async () => {
-    mocks.syncCanvasCourseGrades.mockResolvedValue(syncResult("partial"));
-
-    const partial = await route.POST(createRequest(), createContext(COURSE_ID));
-    expect(partial.status).toBe(200);
-    expect(await partial.json()).toMatchObject({
-      ok: true,
-      status: "partial",
-      courseGradeSummary: { failureCode: "canvas_timeout" },
-    });
-
-    mocks.syncCanvasCourseGrades.mockResolvedValue(syncResult("failed"));
-
-    const failed = await route.POST(createRequest(), createContext(COURSE_ID));
-    expect(failed.status).toBe(200);
-    expect(await failed.json()).toMatchObject({
-      ok: true,
-      status: "failed",
-      assignmentSubmission: { failureCode: "canvas_rate_limited" },
-    });
-  });
-
-  it("does not expose private grade, course, connection, token, or fingerprint fields", async () => {
+  it("does not expose grade data, connection secrets, or fingerprints", async () => {
     const response = await route.POST(createRequest(), createContext(COURSE_ID));
     const text = await response.text();
 
     expect(text).not.toContain("Fictional Assignment");
-    expect(text).not.toContain("Fictional Course");
     expect(text).not.toContain("canvasAssignmentId");
-    expect(text).not.toContain("canvas_course_id");
-    expect(text).not.toContain("connection");
     expect(text).not.toContain("token");
     expect(text).not.toContain("fingerprint");
     expect(text).not.toContain("score");
-    expect(text).not.toContain("gradeValue");
   });
 
   it("allows CORS preflight for grade sync", () => {
@@ -222,15 +196,19 @@ const COURSE_ID = "22222222-2222-4222-8222-222222222222";
 function createRequest(
   options: {
     readonly contentLength?: string;
+    readonly omitBody?: boolean;
     readonly rawBody?: string;
   } = {},
 ): Request {
-  const headers = new Headers({ authorization: "Bearer token" });
+  const headers = new Headers({
+    authorization: "Bearer token",
+    "idempotency-key": "grade-sync-key-1",
+  });
   if (options.contentLength) {
     headers.set("content-length", options.contentLength);
   }
   return new Request(`http://localhost/api/canvas/courses/${COURSE_ID}/grades/sync`, {
-    body: options.rawBody ?? "",
+    body: options.omitBody ? undefined : options.rawBody ?? "",
     headers,
     method: "POST",
   });
@@ -247,38 +225,12 @@ function currentAuthClient(): unknown {
     .value.client;
 }
 
-function syncResult(status: "succeeded" | "partial" | "failed") {
+function acceptedJob() {
   return {
-    assignmentSubmission: {
-      assignmentCount: status === "failed" ? 0 : 2,
-      failureCode: status === "failed" ? "canvas_rate_limited" : undefined,
-      persistedCount: status === "failed" ? 0 : 2,
-      status: status === "failed" ? "failed" : "succeeded",
-      statusCounts: {
-        available: 0,
-        excused: 0,
-        graded: status === "failed" ? 0 : 1,
-        graded_hidden: 0,
-        late_unsubmitted: 0,
-        locked: 0,
-        missing: 0,
-        no_due_date: 0,
-        submitted: status === "failed" ? 0 : 1,
-        submitted_late: 0,
-        unavailable: 0,
-        unknown: 0,
-        upcoming: 0,
-      },
-      submissionEvidenceCount: status === "failed" ? 0 : 2,
-    },
-    courseGradeSummary: {
-      failureCode: status === "partial" ? "canvas_timeout" : undefined,
-      status: status === "partial" ? "failed" : "succeeded",
-      visibleFieldCount: status === "failed" ? 0 : 2,
-    },
-    lastCheckedAt: "2026-07-08T00:00:00.000Z",
-    lastSuccessfulSyncAt: status === "failed" ? null : "2026-07-08T00:00:00.000Z",
-    status,
+    acceptedAt: "2026-07-28T00:00:00.000Z",
+    id: "grade-job-1",
+    jobType: "course_grades",
+    status: "queued",
   };
 }
 

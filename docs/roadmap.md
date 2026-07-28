@@ -1,6 +1,29 @@
 # Roadmap
 
-Last refreshed: 2026-07-15, Asia/Manila.
+Last refreshed: 2026-07-28, Asia/Manila.
+
+## Phase 5F.1 - Durable Canvas Synchronization
+
+Status: Implementation complete; hosted Canvas-account smoke pending.
+
+- Course-content and grade synchronization are now separate Supabase-owned
+  jobs started through Vercel Workflow after HTTP 202 durable acceptance.
+- Job creation is owner-scoped and idempotent. Workflow run IDs, progress,
+  retryability, cancellation, bounded attempts, and stale underlying sync
+  recovery are persisted without exposing Canvas source or grade content.
+- Expo Go persists the creation intent before submission, replays the same key
+  if acceptance is lost, stops relying on background JavaScript, and reconciles
+  on launch or foreground return. Grade jobs expose Cancel and Retry.
+- The user has physically passed OCR and reviewer-generation switch-away tests.
+  Agent-led hosted reload recovery, temporary client disconnection, and
+  explicit cancellation also pass for the existing extraction/reviewer jobs.
+- Release reminder: before the next mobile release, physically spot-check Expo
+  Go reload recovery, temporary network loss, and explicit cancellation.
+
+Next task: run one hosted content-sync and one hosted grade-sync job against a
+connected non-sensitive Canvas test course, including foreground recovery and
+cancellation. The current validation token is expired/revoked, so replace it
+with a fresh test-account Canvas token first.
 
 ## Product Recovery Phase R6 - Partial
 

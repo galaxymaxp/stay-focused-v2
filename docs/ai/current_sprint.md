@@ -1,6 +1,24 @@
 # Current Sprint
 
-Last refreshed: 2026-07-15, Asia/Manila.
+Last refreshed: 2026-07-28, Asia/Manila.
+
+## Active objective - Phase 5F.1 hosted Canvas acceptance
+
+- Durable extraction/reviewer resilience validation is complete: runtime
+  recreation, temporary client disconnection, and explicit cancellation pass
+  against the hosted V2 API. The user separately confirmed OCR and reviewer
+  switch-away behavior on iPhone Expo Go.
+- Dedicated `course_content` and `course_grades` Supabase jobs, authenticated
+  status/cancel/retry APIs, and a bounded Vercel Workflow are implemented.
+- Mobile persists pre-acceptance idempotency intent plus accepted job state,
+  reconciles only while foregrounded, and never treats app backgrounding or a
+  polling timeout as cancellation.
+- Before roadmap advancement, run content and grade jobs using a connected
+  neutral Canvas test course and record only safe job IDs, states, counts, and
+  durations.
+- Release reminder: later physically spot-check Expo Go reload, temporary
+  network loss, and explicit cancellation. This reminder is not a timed
+  notification and does not block current development.
 
 ## Product Recovery R6 Automated Acceptance
 

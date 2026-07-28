@@ -323,6 +323,54 @@ export interface CanvasGradeSyncPayload {
   readonly lastSuccessfulSyncAt: string | null;
 }
 
+export type CanvasSyncJobType = "course_content" | "course_grades";
+export type CanvasSyncJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancellation_requested"
+  | "cancelled"
+  | "expired";
+export type CanvasSyncJobStage =
+  | "waiting_to_start"
+  | "preparing_course"
+  | "synchronizing_content"
+  | "synchronizing_grades"
+  | "storing_result"
+  | "complete";
+
+export interface CanvasSyncJobStatusView {
+  readonly id: string;
+  readonly jobType: CanvasSyncJobType;
+  readonly status: CanvasSyncJobStatus;
+  readonly stage: CanvasSyncJobStage;
+  readonly progress: {
+    readonly completedUnits: number | null;
+    readonly totalUnits: number | null;
+    readonly unitLabel: "operations" | null;
+    readonly message: string;
+  };
+  readonly course: {
+    readonly id: string;
+    readonly displayName: string;
+    readonly courseCode: string | null;
+  };
+  readonly createdAt: string;
+  readonly acceptedAt: string;
+  readonly startedAt: string | null;
+  readonly updatedAt: string;
+  readonly completedAt: string | null;
+  readonly failedAt: string | null;
+  readonly cancellationRequestedAt: string | null;
+  readonly errorCode: string | null;
+  readonly safeErrorMessage: string | null;
+  readonly retryable: boolean;
+  readonly attemptCount: number;
+  readonly resultAvailable: boolean;
+  readonly resultSummary: unknown;
+}
+
 export interface ListCanvasCourseGradesInput extends CanvasApiBaseInput {
   readonly courseId: string;
   readonly limit?: number;
@@ -866,6 +914,15 @@ export async function syncCanvasCourse(
   });
 }
 
+export async function startCanvasCourseSyncJob(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly idempotencyKey: string;
+  },
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  return startCanvasSyncJob(input, "sync");
+}
+
 export async function syncCanvasCourseGrades(
   input: CanvasCourseGradeInput,
 ): Promise<CanvasApiResult<CanvasGradeSyncPayload>> {
@@ -888,6 +945,36 @@ export async function syncCanvasCourseGrades(
     method: "POST",
     parseSuccess: parseCanvasGradeSyncResponse,
   });
+}
+
+export async function startCanvasCourseGradeSyncJob(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly idempotencyKey: string;
+  },
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  return startCanvasSyncJob(input, "grades/sync");
+}
+
+export async function getCanvasSyncJob(
+  input: CanvasApiBaseInput & { readonly jobId: string },
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  return requestCanvasSyncJob(input, "GET");
+}
+
+export async function cancelCanvasSyncJob(
+  input: CanvasApiBaseInput & { readonly jobId: string },
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  return requestCanvasSyncJob(input, "POST", "cancel");
+}
+
+export async function retryCanvasSyncJob(
+  input: CanvasApiBaseInput & {
+    readonly idempotencyKey: string;
+    readonly jobId: string;
+  },
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  return requestCanvasSyncJob(input, "POST", "retry", input.idempotencyKey);
 }
 
 export async function listCanvasCourseGrades(
@@ -1305,12 +1392,14 @@ function createEndpoint(
 async function requestJson<TData>({
   body,
   endpoint,
+  headers,
   input,
   method,
   parseSuccess,
 }: {
   readonly body?: unknown;
   readonly endpoint: string;
+  readonly headers?: Readonly<Record<string, string>>;
   readonly input: CanvasApiBaseInput;
   readonly method: "GET" | "PUT" | "POST" | "DELETE";
   readonly parseSuccess: (parsed: unknown) => CanvasApiResult<TData>;
@@ -1331,6 +1420,7 @@ async function requestJson<TData>({
       headers: {
         Authorization: `Bearer ${accessToken}`,
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...headers,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: input.signal,
@@ -1352,6 +1442,66 @@ async function requestJson<TData>({
       `Canvas request failed before receiving a response. ${API_BASE_URL_SETUP_HINT}`,
     );
   }
+}
+
+async function startCanvasSyncJob(
+  input: CanvasApiBaseInput & {
+    readonly courseId: string;
+    readonly idempotencyKey: string;
+  },
+  suffix: "sync" | "grades/sync",
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  const courseId = input.courseId.trim();
+  const idempotencyKey = input.idempotencyKey.trim();
+  if (!courseId) {
+    return clientError("course_not_found", "Choose a Canvas course to sync.");
+  }
+  if (idempotencyKey.length < 8) {
+    return clientError(
+      "invalid_request",
+      "Canvas synchronization needs a valid retry key.",
+    );
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/${suffix}`,
+  );
+  if (!endpoint.ok) return endpoint;
+  return requestJson({
+    endpoint: endpoint.url,
+    headers: { "Idempotency-Key": idempotencyKey },
+    input,
+    method: "POST",
+    parseSuccess: parseCanvasSyncJobResponse,
+  });
+}
+
+async function requestCanvasSyncJob(
+  input: CanvasApiBaseInput & { readonly jobId: string },
+  method: "GET" | "POST",
+  action?: "cancel" | "retry",
+  idempotencyKey?: string,
+): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  const jobId = input.jobId.trim();
+  if (!jobId) {
+    return clientError("invalid_request", "Canvas synchronization job is missing.");
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/sync-jobs/${encodeURIComponent(jobId)}${
+      action ? `/${action}` : ""
+    }`,
+  );
+  if (!endpoint.ok) return endpoint;
+  return requestJson({
+    endpoint: endpoint.url,
+    ...(idempotencyKey
+      ? { headers: { "Idempotency-Key": idempotencyKey } }
+      : {}),
+    input,
+    method,
+    parseSuccess: parseCanvasSyncJobResponse,
+  });
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -1542,6 +1692,22 @@ function parseCanvasGradeSyncResponse(
   return clientError(
     "invalid_response",
     "Canvas returned an invalid grade synchronization response.",
+  );
+}
+
+function parseCanvasSyncJobResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasSyncJobStatusView> {
+  if (
+    isRecord(parsed) &&
+    parsed.ok === true &&
+    isCanvasSyncJobStatusView(parsed.data)
+  ) {
+    return { ok: true, data: parsed.data };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned an invalid synchronization job response.",
   );
 }
 
@@ -2454,6 +2620,65 @@ function isCanvasGradeStatusCounts(
   }
   return CANVAS_NORMALIZED_STATUSES.every((status) =>
     isNonNegativeInteger(value[status]),
+  );
+}
+
+function isCanvasSyncJobStatusView(
+  value: unknown,
+): value is CanvasSyncJobStatusView {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    (value.jobType === "course_content" || value.jobType === "course_grades") &&
+    isCanvasSyncJobStatus(value.status) &&
+    isCanvasSyncJobStage(value.stage) &&
+    isRecord(value.progress) &&
+    isNonNegativeIntegerOrNull(value.progress.completedUnits) &&
+    isNonNegativeIntegerOrNull(value.progress.totalUnits) &&
+    (value.progress.unitLabel === "operations" ||
+      value.progress.unitLabel === null) &&
+    typeof value.progress.message === "string" &&
+    isRecord(value.course) &&
+    typeof value.course.id === "string" &&
+    typeof value.course.displayName === "string" &&
+    (value.course.courseCode === null ||
+      typeof value.course.courseCode === "string") &&
+    isTimestamp(value.createdAt) &&
+    isTimestamp(value.acceptedAt) &&
+    isTimestampOrNull(value.startedAt) &&
+    isTimestamp(value.updatedAt) &&
+    isTimestampOrNull(value.completedAt) &&
+    isTimestampOrNull(value.failedAt) &&
+    isTimestampOrNull(value.cancellationRequestedAt) &&
+    isSafeFailureCodeOrNull(value.errorCode) &&
+    (value.safeErrorMessage === null ||
+      typeof value.safeErrorMessage === "string") &&
+    typeof value.retryable === "boolean" &&
+    isNonNegativeInteger(value.attemptCount) &&
+    typeof value.resultAvailable === "boolean"
+  );
+}
+
+function isCanvasSyncJobStatus(value: unknown): value is CanvasSyncJobStatus {
+  return (
+    value === "queued" ||
+    value === "running" ||
+    value === "succeeded" ||
+    value === "failed" ||
+    value === "cancellation_requested" ||
+    value === "cancelled" ||
+    value === "expired"
+  );
+}
+
+function isCanvasSyncJobStage(value: unknown): value is CanvasSyncJobStage {
+  return (
+    value === "waiting_to_start" ||
+    value === "preparing_course" ||
+    value === "synchronizing_content" ||
+    value === "synchronizing_grades" ||
+    value === "storing_result" ||
+    value === "complete"
   );
 }
 

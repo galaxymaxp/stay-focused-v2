@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
   StyleSheet,
   Text,
@@ -19,15 +20,20 @@ import {
   getCanvasCourseGradeSummary,
   getCanvasCourseGradeSyncStatus,
   listCanvasCourseGrades,
-  syncCanvasCourseGrades,
   type CanvasApiClientError,
   type CanvasCourseGradeSummary,
   type CanvasGradeAssignmentDetail,
   type CanvasGradeAssignmentListItem,
   type CanvasGradeAssignmentListPayload,
-  type CanvasGradeSyncPayload,
+  type CanvasSyncJobStatusView,
   type CanvasGradeSyncStatusPayload,
 } from "../../services/canvasApi";
+import {
+  cancelDurableCanvasSync,
+  reconcileCanvasSyncJobs,
+  retryDurableCanvasSync,
+  startDurableCanvasSync,
+} from "../../services/canvasSyncJobCoordinator";
 import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
 import {
   formatDate,
@@ -40,9 +46,7 @@ import {
   getAssignmentStatusPresentation,
   isNetworkGradeError,
   mergeGradeAssignmentPages,
-  POST_SYNC_REFRESH_REQUESTS,
   shouldApplyGradeRequest,
-  shouldReplaceAssignmentsAfterSync,
 } from "./canvasGradePresentation";
 
 interface CanvasGradeScreenProps {
@@ -76,9 +80,7 @@ export function CanvasGradeScreen({
   const [warning, setWarning] = useState<CanvasGradeDisplayError | null>(null);
   const [loadMoreError, setLoadMoreError] =
     useState<CanvasGradeDisplayError | null>(null);
-  const [syncResult, setSyncResult] = useState<CanvasGradeSyncPayload | null>(
-    null,
-  );
+  const [syncJob, setSyncJob] = useState<CanvasSyncJobStatusView | null>(null);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isReloading, setIsReloading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -236,7 +238,7 @@ export function CanvasGradeScreen({
     setInitialError(null);
     setWarning(null);
     setLoadMoreError(null);
-    setSyncResult(null);
+    setSyncJob(null);
     setSelectedAssignmentId(null);
     void loadGrades({ reason: "initial" });
     return () => {
@@ -244,6 +246,47 @@ export function CanvasGradeScreen({
       abortControllerRef.current = null;
     };
   }, [courseId, loadGrades]);
+
+  const reconcileGradeJobs = useCallback(async () => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok || !ownerUserId) return;
+    const reconciliation = await reconcileCanvasSyncJobs({
+      ...context.value,
+      ownerUserId,
+    });
+    const job = reconciliation.jobs.find(
+      (item) =>
+        item.jobType === "course_grades" && item.course.id === courseId,
+    );
+    if (job) setSyncJob(job);
+    if (
+      reconciliation.newlyCompleted.some(
+        (item) =>
+          item.jobType === "course_grades" && item.course.id === courseId,
+      )
+    ) {
+      setWarning({
+        title: "Grade synchronization complete",
+        message: "Your latest Canvas grades are ready.",
+      });
+      await loadGrades({ reason: "post-sync", replaceAssignments: true });
+    }
+  }, [courseId, loadGrades, session?.accessToken, session?.user.id]);
+
+  useEffect(() => {
+    void reconcileGradeJobs();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void reconcileGradeJobs();
+    });
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") void reconcileGradeJobs();
+    }, 5_000);
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
+  }, [reconcileGradeJobs]);
 
   const handleReload = () => {
     void loadGrades({ reason: "reload" });
@@ -262,12 +305,17 @@ export function CanvasGradeScreen({
     setIsSyncing(true);
     setWarning(null);
     setInitialError(null);
-    setSyncResult(null);
+    setSyncJob(null);
 
     try {
-      const result = await syncCanvasCourseGrades({
+      const ownerUserId = session?.user.id;
+      if (!ownerUserId) return;
+      const result = await startDurableCanvasSync({
         ...context.value,
+        courseDisplayName: courseName,
         courseId,
+        jobType: "course_grades",
+        ownerUserId,
       });
       if (!isMountedRef.current) {
         return;
@@ -277,38 +325,43 @@ export function CanvasGradeScreen({
         return;
       }
 
-      setSyncResult(result.data);
-      const shouldReplaceAssignments = shouldReplaceAssignmentsAfterSync({
-        loadedAssignmentCount: assignments.length,
-        syncStatus: result.data.status,
+      setSyncJob(result.data);
+      setWarning({
+        title: "Grade synchronization started",
+        message: "You can switch apps. Synchronization will continue.",
       });
-      if (POST_SYNC_REFRESH_REQUESTS.length > 0) {
-        await loadGrades({
-          reason: "post-sync",
-          replaceAssignments: shouldReplaceAssignments,
-        });
-      }
-      if (!isMountedRef.current) {
-        return;
-      }
-      if (result.data.status === "partial") {
-        setWarning({
-          title: "Grade sync was partial",
-          message: "Some synchronized grade information may be incomplete.",
-        });
-      }
-      if (result.data.status === "failed") {
-        setWarning({
-          title: "Grade sync failed",
-          message:
-            "Already loaded grade data remains visible. Try syncing again after a short wait.",
-        });
-      }
     } finally {
       if (isMountedRef.current) {
         setIsSyncing(false);
       }
     }
+  };
+
+  const handleCancelSync = async () => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok || !ownerUserId || !syncJob) return;
+    const result = await cancelDurableCanvasSync({
+      ...context.value,
+      jobId: syncJob.id,
+      ownerUserId,
+    });
+    if (result.ok) setSyncJob(result.data);
+    else setWarning(formatCanvasGradeError(result.error));
+  };
+
+  const handleRetrySync = async () => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok || !ownerUserId || !syncJob) return;
+    const result = await retryDurableCanvasSync({
+      ...context.value,
+      jobId: syncJob.id,
+      jobType: syncJob.jobType,
+      ownerUserId,
+    });
+    if (result.ok) setSyncJob(result.data);
+    else setWarning(formatCanvasGradeError(result.error));
   };
 
   const handleLoadMore = async () => {
@@ -420,7 +473,13 @@ export function CanvasGradeScreen({
         />
       ) : null}
       {warning ? <WarningCard error={warning} /> : null}
-      {syncResult ? <SyncResultCard result={syncResult} /> : null}
+      {syncJob ? (
+        <CanvasSyncJobCard
+          job={syncJob}
+          onCancel={() => void handleCancelSync()}
+          onRetry={() => void handleRetrySync()}
+        />
+      ) : null}
 
       {syncStatus?.status === "never_synced" ? (
         <Card style={styles.statusCard} testID="canvas-grades-never-synced">
@@ -848,19 +907,44 @@ function StatusPill({
   );
 }
 
-function SyncResultCard({ result }: { readonly result: CanvasGradeSyncPayload }) {
-  if (result.status === "succeeded") {
-    return null;
-  }
+function CanvasSyncJobCard({
+  job,
+  onCancel,
+  onRetry,
+}: {
+  readonly job: CanvasSyncJobStatusView;
+  readonly onCancel: () => void;
+  readonly onRetry: () => void;
+}) {
+  const active =
+    job.status === "queued" ||
+    job.status === "running" ||
+    job.status === "cancellation_requested";
   return (
     <Card style={styles.statusCard} testID="canvas-grade-sync-result">
       <Text style={styles.statusTitle}>
-        {result.status === "partial" ? "Grade sync partial" : "Grade sync failed"}
+        {job.status === "succeeded"
+          ? "Grade synchronization complete"
+          : active
+            ? "Grade synchronization running"
+            : job.status === "cancelled"
+              ? "Grade synchronization cancelled"
+              : "Grade synchronization needs attention"}
       </Text>
+      <Text style={styles.statusText}>{job.progress.message}</Text>
       <Text style={styles.statusText}>
-        Assignment sync {result.assignmentSubmission.status}; course summary sync{" "}
-        {result.courseGradeSummary.status}.
+        Updated {formatDateTime(job.updatedAt)}
       </Text>
+      {active && job.status !== "cancellation_requested" ? (
+        <Button onPress={onCancel} variant="secondary">
+          Cancel
+        </Button>
+      ) : null}
+      {job.status === "failed" && job.retryable ? (
+        <Button onPress={onRetry} variant="secondary">
+          Retry
+        </Button>
+      ) : null}
     </Card>
   );
 }

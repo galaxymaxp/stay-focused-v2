@@ -1,6 +1,34 @@
 # Current State
 
-Last refreshed: 2026-07-15, Asia/Manila.
+Last refreshed: 2026-07-28, Asia/Manila.
+
+## Hosted durability and Canvas Phase 5F.1
+
+The V2 prototype uses the separate `stay-focused-v2-prototype` Vercel project;
+the existing Stay Focused V1 project remains untouched. Supabase is
+authoritative for processing jobs, Canvas sync jobs, sources, and results.
+
+Physical Expo Go switch-away behavior is confirmed for PDF extraction and
+reviewer generation. Agent-led hosted validation also passed process/runtime
+recreation, disconnect-after-acceptance with later reconciliation, and explicit
+cancellation without result publication. These tests do not claim native
+background execution: Expo Go pauses polling while backgrounded and reads the
+server-owned job on return.
+
+Phase 5F.1 now routes selected-course content and grade sync through separate
+durable jobs and bounded Vercel Workflow steps. The mobile app stores a safe
+owner/course/job reference and the pre-acceptance idempotency key, reconciles on
+launch and foreground return, and presents truthful started/completed status.
+The user must keep the app open until HTTP 202 acceptance. Native background
+upload and remote push still require a development build; Expo Go provides an
+in-app notice only after foreground reconciliation.
+
+Remaining acceptance is a hosted smoke using an authenticated test account
+with a selected Canvas course, followed by the recorded physical reminder for
+reload, network-loss, and cancellation spot-checks. The V2 API deployment and
+health check pass, but the current stored/local Canvas validation token is
+expired or revoked; a fresh non-sensitive test token is required for that
+Canvas-account smoke.
 
 ## Product Recovery R6 - Partial Device Acceptance
 

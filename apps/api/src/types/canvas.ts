@@ -3,6 +3,7 @@ import type {
   CanvasCapabilityStatus,
   CanvasCourse,
 } from "@stay-focused/canvas";
+import type { CanvasSyncJobStatusView } from "@/lib/canvas-sync-jobs/contracts";
 
 export interface CanvasConnectionSummary {
   readonly id: string;
@@ -561,11 +562,17 @@ export interface CanvasDeleteResponse {
   readonly ok: true;
 }
 
+export interface CanvasSyncJobResponse {
+  readonly ok: true;
+  readonly data: CanvasSyncJobStatusView;
+}
+
 export interface CanvasApiErrorResponse {
   readonly ok: false;
   readonly error: {
     readonly code: CanvasApiErrorCode;
     readonly message: string;
+    readonly retryable?: boolean;
     readonly details?: {
       readonly selectedSourceCount?: number;
       readonly maximumSourceCount?: number;
@@ -618,6 +625,24 @@ export type CanvasApiErrorCode =
   | "canvas_assignment_not_found"
   | "canvas_grade_data_unavailable"
   | "canvas_grade_sync_failed"
+  | "invalid_idempotency_key"
+  | "canvas_sync_job_creation_failed"
+  | "canvas_sync_job_idempotency_conflict"
+  | "canvas_sync_job_in_progress"
+  | "canvas_sync_job_not_found"
+  | "canvas_sync_job_status_unavailable"
+  | "canvas_sync_job_cancel_failed"
+  | "canvas_sync_job_not_retryable"
+  | "canvas_sync_job_retry_failed"
+  | "canvas_sync_storage_failed"
+  | "canvas_sync_workflow_dispatch_failed"
+  | "canvas_sync_workflow_prepare_failed"
+  | "canvas_sync_workflow_attach_failed"
+  | "canvas_sync_workflow_dispatch_failure_record_failed"
+  | "canvas_sync_job_claim_failed"
+  | "canvas_sync_job_progress_failed"
+  | "canvas_sync_job_complete_failed"
+  | "canvas_sync_job_failure_record_failed"
   | "canvas_source_block_selection_empty"
   | "canvas_source_block_selection_duplicate"
   | "canvas_source_block_selection_invalid"
@@ -645,5 +670,6 @@ export type CanvasApiResponse =
   | CanvasUsableContentResolutionResponse
   | CanvasReviewerSourcePrepareResponse
   | CanvasFileIngestionResponse
+  | CanvasSyncJobResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;

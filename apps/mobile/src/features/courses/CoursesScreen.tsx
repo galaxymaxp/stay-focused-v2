@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Pressable,
   StyleSheet,
   Text,
@@ -26,14 +27,17 @@ import {
   listCanvasCapabilities,
   listCanvasCourses,
   saveCanvasCoursePreferences,
-  syncSelectedCanvasCourses,
   type CanvasApiClientError,
   type CanvasCapabilitySummary,
   type CanvasCourseInventoryItem,
-  type CanvasSelectedCourseSyncSummary,
   type CanvasCourseSyncSummary,
   type CanvasConnectionSummary,
+  type CanvasSyncJobStatusView,
 } from "../../services/canvasApi";
+import {
+  reconcileCanvasSyncJobs,
+  startDurableCanvasSync,
+} from "../../services/canvasSyncJobCoordinator";
 
 interface CoursesScreenProps {
   readonly onCreateReviewer: () => void;
@@ -61,6 +65,7 @@ const SUMMARY_CAPABILITIES: readonly CanvasCapability[] = [
 
 interface CourseSyncDisplayState {
   readonly status: "running" | "success" | "partial" | "failed";
+  readonly progressMessage?: string;
   readonly summary?: CanvasCourseSyncSummary;
   readonly error?: CanvasApiClientError;
 }
@@ -94,6 +99,49 @@ export function CoursesScreen({
   const [isSyncingSelected, setIsSyncingSelected] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const reconcileContentJobs = useCallback(async () => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok || !ownerUserId) return;
+    const reconciliation = await reconcileCanvasSyncJobs({
+      ...context.value,
+      ownerUserId,
+    });
+    const contentJobs = reconciliation.jobs.filter(
+      (job) => job.jobType === "course_content",
+    );
+    if (contentJobs.length > 0) {
+      setCourseSyncStates((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          contentJobs.map((job) => [job.course.id, displayStateForJob(job)]),
+        ),
+      }));
+    }
+    if (
+      reconciliation.newlyCompleted.some(
+        (job) => job.jobType === "course_content",
+      )
+    ) {
+      setSuccessMessage("Canvas course synchronization is complete.");
+      await refreshConnectedCanvas(context.value);
+    }
+  }, [session?.accessToken, session?.user.id]);
+
+  useEffect(() => {
+    void reconcileContentJobs();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void reconcileContentJobs();
+    });
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") void reconcileContentJobs();
+    }, 5_000);
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
+  }, [reconcileContentJobs]);
 
   const loadCanvas = useCallback(async () => {
     const context = createRequestContext(session?.accessToken);
@@ -336,34 +384,43 @@ export function CoursesScreen({
     }));
 
     try {
-      const result = await syncSelectedCanvasCourses({
-        ...context.value,
-        selectedCourseIds: savedSelectedCourseIds,
-      });
-      if (!result.ok) {
-        setError(formatCanvasError(result.error));
-        return;
-      }
-
+      const ownerUserId = session?.user.id;
+      if (!ownerUserId) return;
+      const courseById = new Map(courses.map((course) => [course.id, course]));
+      const results = await Promise.all(
+        savedSelectedCourseIds.map(async (courseId) => {
+          const course = courseById.get(courseId);
+          const result = await startDurableCanvasSync({
+            ...context.value,
+            courseDisplayName: course?.displayName ?? "Canvas course",
+            courseId,
+            jobType: "course_content",
+            ownerUserId,
+          });
+          return { courseId, result };
+        }),
+      );
       setCourseSyncStates((current) => ({
         ...current,
         ...Object.fromEntries(
-          result.data.results.map((courseResult) => [
-            courseResult.courseId,
-            courseResult.ok && courseResult.summary
-              ? {
-                  status: courseResult.summary.status,
-                  summary: courseResult.summary,
-                }
+          results.map(({ courseId, result }) => [
+            courseId,
+            result.ok
+              ? displayStateForJob(result.data)
               : {
                   status: "failed" as const,
-                  error: courseResult.error,
+                  error: result.error,
                 },
           ]),
         ),
       }));
-      setSuccessMessage(formatSelectedSyncMessage(result.data));
-      await refreshConnectedCanvas(context.value);
+      const accepted = results.filter(({ result }) => result.ok).length;
+      const failed = results.length - accepted;
+      setSuccessMessage(
+        failed === 0
+          ? `${accepted} Canvas synchronization job${accepted === 1 ? "" : "s"} started. You can switch apps.`
+          : `${accepted} started; ${failed} need attention.`,
+      );
     } finally {
       setIsSyncingSelected(false);
     }
@@ -1033,7 +1090,7 @@ function formatCourseSyncState(
   course: CanvasCourseInventoryItem,
 ): string {
   if (syncState?.status === "running") {
-    return "Sync running";
+    return syncState.progressMessage ?? "Sync running";
   }
   if (syncState?.summary) {
     return `Sync ${syncState.summary.status} | ${formatDuration(syncState.summary.durationMs)}`;
@@ -1068,13 +1125,30 @@ function formatDuration(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
-function formatSelectedSyncMessage(
-  summary: CanvasSelectedCourseSyncSummary,
-): string {
-  if (summary.attempted === 0) {
-    return "No selected courses to sync.";
+function displayStateForJob(
+  job: CanvasSyncJobStatusView,
+): CourseSyncDisplayState {
+  if (
+    job.status === "queued" ||
+    job.status === "running" ||
+    job.status === "cancellation_requested"
+  ) {
+    return { status: "running", progressMessage: job.progress.message };
   }
-  return `${summary.successful} synced, ${summary.partial} partial, ${summary.failed} failed.`;
+  if (job.status === "succeeded") {
+    return { status: "success", progressMessage: "Synchronization complete" };
+  }
+  return {
+    status: "failed",
+    error: {
+      code: "storage_failed",
+      message:
+        job.safeErrorMessage ??
+        (job.status === "cancelled"
+          ? "Canvas synchronization was cancelled."
+          : "Canvas synchronization needs attention."),
+    },
+  };
 }
 
 function sameStringSet(

@@ -1914,3 +1914,34 @@ Current route status:
 - Local API/mobile/OCR/engine suites pass. Hosted Workflow replay, private live
   fixture, and physical iPhone switch-away validation remain pending until the
   new Vercel project is deployed.
+
+## 2026-07-28 — resilience closeout and durable Canvas synchronization
+
+- Physical iPhone Expo Go switch-away passed for PDF extraction and reviewer
+  generation. Agent-led hosted V2 validation passed runtime recreation,
+  disconnect-after-acceptance with later reconciliation, and explicit
+  cancellation with no result publication. Keep a physical reload,
+  network-loss, and cancellation spot-check on the next mobile release list.
+- Added owner-scoped `course_content` and `course_grades` jobs with strict
+  state/stage constraints, 30-day idempotency scope, workflow run metadata,
+  bounded attempts, service-only mutation RPCs, explicit cancellation, and
+  five-minute stale underlying-sync recovery.
+- Canvas content and grade POST routes now return HTTP 202 only after job
+  persistence and Vercel Workflow acceptance. Status, cancel, and retry routes
+  enforce the authenticated owner and never return raw Canvas or grade content.
+- Expo Go stores the intent before submission, reuses the same idempotency key
+  after a lost response or runtime restart, reconciles accepted jobs on launch
+  and foreground return, and exposes truthful in-app completion, Cancel, and
+  Retry states. Background timers are not required.
+- Applied `add_durable_canvas_sync_jobs` to the `stay-focused-v2` Supabase
+  project only. Authenticated users can select through RLS but cannot update
+  worker state; no new `canvas_sync_jobs` security advisory was reported.
+- The existing V1 Vercel project remains untouched. Remaining acceptance is one
+  hosted content job and one hosted grade job using a connected, non-sensitive
+  Canvas test course.
+- V2 production deployment and `/api/health` passed. The first hosted Canvas
+  smoke found and fixed a missing Production `CANVAS_TOKEN_ENCRYPTION_KEY`
+  without exposing or committing it. The rerun reached Canvas and then stopped
+  safely because both the stored and local validation personal-access tokens
+  are expired/revoked (`invalid_canvas_token`). A fresh Canvas test token is
+  required for the remaining live content/grade smoke.
