@@ -7,7 +7,15 @@ const compat = new FlatCompat({ baseDirectory });
 
 const eslintConfig = [
   {
-    ignores: [".next/**", "dist/**", "node_modules/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      ".workflow-test-artifacts/**",
+      "app/.well-known/workflow/**",
+      "dist/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "workflow-tests/.workflow-test-artifacts/**",
+    ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {

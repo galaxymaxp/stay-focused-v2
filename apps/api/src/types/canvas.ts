@@ -4,6 +4,7 @@ import type {
   CanvasCourse,
 } from "@stay-focused/canvas";
 import type { CanvasSyncJobStatusView } from "@/lib/canvas-sync-jobs/contracts";
+import type { CanvasCourseSyncHealthView } from "@/lib/canvas-sync-health";
 
 export interface CanvasConnectionSummary {
   readonly id: string;
@@ -66,6 +67,16 @@ export interface CanvasCourseInventoryItem {
     readonly lastSuccessfulSyncAt: string | null;
     readonly failureCode: string | null;
   } | null;
+  readonly syncHealth?: {
+    readonly overallHealth:
+      | "not_synced"
+      | "syncing"
+      | "healthy"
+      | "needs_attention"
+      | "stale";
+    readonly attentionScopeCount: number;
+    readonly staleScopeCount: number;
+  };
 }
 
 export interface CanvasCourseInventoryCounts {
@@ -567,6 +578,11 @@ export interface CanvasSyncJobResponse {
   readonly data: CanvasSyncJobStatusView;
 }
 
+export interface CanvasCourseSyncHealthResponse {
+  readonly ok: true;
+  readonly data: CanvasCourseSyncHealthView;
+}
+
 export interface CanvasApiErrorResponse {
   readonly ok: false;
   readonly error: {
@@ -631,6 +647,7 @@ export type CanvasApiErrorCode =
   | "canvas_sync_job_in_progress"
   | "canvas_sync_job_not_found"
   | "canvas_sync_job_status_unavailable"
+  | "canvas_sync_health_unavailable"
   | "canvas_sync_job_cancel_failed"
   | "canvas_sync_job_not_retryable"
   | "canvas_sync_job_retry_failed"
@@ -671,5 +688,6 @@ export type CanvasApiResponse =
   | CanvasReviewerSourcePrepareResponse
   | CanvasFileIngestionResponse
   | CanvasSyncJobResponse
+  | CanvasCourseSyncHealthResponse
   | CanvasDeleteResponse
   | CanvasApiErrorResponse;

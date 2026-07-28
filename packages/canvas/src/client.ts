@@ -23,6 +23,7 @@ import {
   type CanvasModule,
   type CanvasModuleItem,
   type CanvasOwnSubmission,
+  type CanvasPaginatedPage,
   type CanvasPageDetail,
   type CanvasPageSummary,
   type CanvasPlannerItem,
@@ -41,7 +42,7 @@ const DEFAULT_MAX_PAGES = 10;
 const DEFAULT_PER_PAGE = 50;
 const PROBE_PER_PAGE = 1;
 const INTEGRATION_VERSION = "phase5a";
-const MAX_RETRY_AFTER_MS = 30_000;
+const MAX_RETRY_AFTER_MS = 5 * 60_000;
 const MAX_CANVAS_ID_LENGTH = 80;
 const MAX_CANVAS_TITLE_LENGTH = 500;
 const MAX_CANVAS_STATUS_LENGTH = 80;
@@ -200,27 +201,61 @@ export class CanvasClient {
   }
 
   public async listModules(courseId: string): Promise<readonly CanvasModule[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       `/courses/${encodeCanvasPathSegment(courseId)}/modules?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeModule,
     );
-    return parsed.map(normalizeModule);
+  }
+
+  public async listModulesPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasModule>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        `/courses/${encodeCanvasPathSegment(courseId)}/modules?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeModule,
+    );
   }
 
   public async listModuleItems(
     courseId: string,
     moduleId: string,
   ): Promise<readonly CanvasModuleItem[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeModuleItem,
     );
-    return parsed.map(normalizeModuleItem);
+  }
+
+  public async listModuleItemsPage(
+    courseId: string,
+    moduleId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasModuleItem>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeModuleItem,
+    );
   }
 
   public async listPages(courseId: string): Promise<readonly CanvasPageSummary[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       `/courses/${encodeCanvasPathSegment(courseId)}/pages?per_page=${DEFAULT_PER_PAGE}`,
+      normalizePageSummary,
     );
-    return parsed.map(normalizePageSummary);
+  }
+
+  public async listPagesPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasPageSummary>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        `/courses/${encodeCanvasPathSegment(courseId)}/pages?per_page=${DEFAULT_PER_PAGE}`,
+      normalizePageSummary,
+    );
   }
 
   public async getPage(
@@ -236,43 +271,93 @@ export class CanvasClient {
   public async listAssignmentGroups(
     courseId: string,
   ): Promise<readonly CanvasAssignmentGroup[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       `/courses/${encodeCanvasPathSegment(courseId)}/assignment_groups?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeAssignmentGroup,
     );
-    return parsed.map(normalizeAssignmentGroup);
+  }
+
+  public async listAssignmentGroupsPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasAssignmentGroup>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        `/courses/${encodeCanvasPathSegment(courseId)}/assignment_groups?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeAssignmentGroup,
+    );
   }
 
   public async listAssignments(
     courseId: string,
   ): Promise<readonly CanvasAssignment[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       `/courses/${encodeCanvasPathSegment(courseId)}/assignments?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeAssignment,
     );
-    return parsed.map(normalizeAssignment);
+  }
+
+  public async listAssignmentsPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasAssignment>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        `/courses/${encodeCanvasPathSegment(courseId)}/assignments?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeAssignment,
+    );
   }
 
   public async listCourseAssignments(
     courseId: string,
   ): Promise<readonly CanvasGradeAssignment[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       createPathWithQuery(
         `/courses/${encodeCanvasPathSegment(courseId)}/assignments`,
         [["per_page", String(DEFAULT_PER_PAGE)]],
       ),
+      normalizeGradeAssignment,
     );
-    return parsed.map(normalizeGradeAssignment);
+  }
+
+  public async listCourseAssignmentsPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasGradeAssignment>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        createPathWithQuery(
+          `/courses/${encodeCanvasPathSegment(courseId)}/assignments`,
+          [["per_page", String(DEFAULT_PER_PAGE)]],
+        ),
+      normalizeGradeAssignment,
+    );
   }
 
   public async listOwnCourseSubmissions(
     courseId: string,
   ): Promise<readonly CanvasOwnSubmission[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       createPathWithQuery(
         `/courses/${encodeCanvasPathSegment(courseId)}/students/submissions`,
         [["per_page", String(DEFAULT_PER_PAGE)]],
       ),
+      normalizeOwnSubmission,
     );
-    return parsed.map(normalizeOwnSubmission);
+  }
+
+  public async listOwnCourseSubmissionsPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasOwnSubmission>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        createPathWithQuery(
+          `/courses/${encodeCanvasPathSegment(courseId)}/students/submissions`,
+          [["per_page", String(DEFAULT_PER_PAGE)]],
+        ),
+      normalizeOwnSubmission,
+    );
   }
 
   public async getOwnCourseGradeSummary(
@@ -289,6 +374,27 @@ export class CanvasClient {
       ),
     );
     return normalizeOwnCourseGradeSummary(parsed);
+  }
+
+  public async getOwnCourseGradeSummaryPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasCourseGradeSummary>> {
+    const page = await this.requestPaginatedJsonPage(
+      cursor ??
+        createPathWithQuery(
+          `/courses/${encodeCanvasPathSegment(courseId)}/enrollments`,
+          [
+            ["per_page", String(DEFAULT_PER_PAGE)],
+            ["user_id", "self"],
+            ["type[]", "StudentEnrollment"],
+          ],
+        ),
+    );
+    return {
+      items: [normalizeOwnCourseGradeSummary(page.items)],
+      nextCursor: page.nextCursor,
+    };
   }
 
   public async listPlannerItems({
@@ -315,22 +421,54 @@ export class CanvasClient {
     startDate,
   }: CanvasAnnouncementsListOptions): Promise<readonly CanvasAnnouncement[]> {
     const contextCode = `course_${encodeCanvasContextCodeId(courseId)}`;
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       createPathWithQuery("/announcements", [
         ["per_page", String(DEFAULT_PER_PAGE)],
         ["context_codes[]", contextCode],
         ["start_date", normalizeQueryDate(startDate, "start_date")],
         ["end_date", normalizeQueryDate(endDate, "end_date")],
       ]),
+      normalizeAnnouncement,
     );
-    return parsed.map(normalizeAnnouncement);
+  }
+
+  public async listAnnouncementsPage(
+    {
+      courseId,
+      endDate,
+      startDate,
+    }: CanvasAnnouncementsListOptions,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasAnnouncement>> {
+    const contextCode = `course_${encodeCanvasContextCodeId(courseId)}`;
+    return this.requestNormalizedPage(
+      cursor ??
+        createPathWithQuery("/announcements", [
+          ["per_page", String(DEFAULT_PER_PAGE)],
+          ["context_codes[]", contextCode],
+          ["start_date", normalizeQueryDate(startDate, "start_date")],
+          ["end_date", normalizeQueryDate(endDate, "end_date")],
+        ]),
+      normalizeAnnouncement,
+    );
   }
 
   public async listCourseFiles(courseId: string): Promise<readonly CanvasFile[]> {
-    const parsed = await this.requestPaginatedJson(
+    return this.collectPaginatedItems(
       `/courses/${encodeCanvasPathSegment(courseId)}/files?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeFile,
     );
-    return parsed.map(normalizeFile);
+  }
+
+  public async listCourseFilesPage(
+    courseId: string,
+    cursor: string | null = null,
+  ): Promise<CanvasPaginatedPage<CanvasFile>> {
+    return this.requestNormalizedPage(
+      cursor ??
+        `/courses/${encodeCanvasPathSegment(courseId)}/files?per_page=${DEFAULT_PER_PAGE}`,
+      normalizeFile,
+    );
   }
 
   public async getCourseFile(
@@ -484,11 +622,15 @@ export class CanvasClient {
   }
 
   private async requestPaginatedJson(pathAndQuery: string): Promise<readonly unknown[]> {
-    let nextUrl = this.createApiUrl(pathAndQuery);
+    let nextCursor: string | null = pathAndQuery;
     const rows: unknown[] = [];
     const seenUrls = new Set<string>();
 
     for (let page = 0; page < this.maxPages; page += 1) {
+      if (nextCursor === null) {
+        return rows;
+      }
+      const nextUrl = this.resolvePageUrl(nextCursor);
       if (seenUrls.has(nextUrl.toString())) {
         throw new CanvasClientError(
           "canvas_pagination_rejected",
@@ -497,28 +639,61 @@ export class CanvasClient {
       }
       seenUrls.add(nextUrl.toString());
 
-      const response = await this.fetchJson(nextUrl);
-      if (!Array.isArray(response.parsed)) {
-        throw new CanvasClientError(
-          "canvas_invalid_response",
-          "Canvas returned an invalid paginated response.",
-          { status: response.status },
-        );
-      }
-      rows.push(...response.parsed);
-
-      const next = readNextLink(response.headers.get("link"));
-      if (!next) {
+      const response = await this.requestPaginatedJsonPage(nextUrl.toString());
+      rows.push(...response.items);
+      nextCursor = response.nextCursor;
+      if (nextCursor === null) {
         return rows;
       }
-
-      nextUrl = this.validatePaginationUrl(next);
     }
 
     throw new CanvasClientError(
       "canvas_pagination_rejected",
       "Canvas pagination exceeded the configured page limit.",
     );
+  }
+
+  private async collectPaginatedItems<TItem>(
+    pathAndQuery: string,
+    normalize: (value: unknown) => TItem,
+  ): Promise<readonly TItem[]> {
+    const parsed = await this.requestPaginatedJson(pathAndQuery);
+    return parsed.map(normalize);
+  }
+
+  private async requestNormalizedPage<TItem>(
+    pathOrCursor: string,
+    normalize: (value: unknown) => TItem,
+  ): Promise<CanvasPaginatedPage<TItem>> {
+    const page = await this.requestPaginatedJsonPage(pathOrCursor);
+    return {
+      items: page.items.map(normalize),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  private async requestPaginatedJsonPage(
+    pathOrCursor: string,
+  ): Promise<CanvasPaginatedPage<unknown>> {
+    const response = await this.fetchJson(this.resolvePageUrl(pathOrCursor));
+    if (!Array.isArray(response.parsed)) {
+      throw new CanvasClientError(
+        "canvas_invalid_response",
+        "Canvas returned an invalid paginated response.",
+        { status: response.status },
+      );
+    }
+    const next = readNextLink(response.headers.get("link"));
+    return {
+      items: response.parsed,
+      nextCursor: next ? this.validatePaginationUrl(next).toString() : null,
+    };
+  }
+
+  private resolvePageUrl(pathOrCursor: string): URL {
+    return /^https?:\/\//i.test(pathOrCursor)
+      ? this.validatePaginationUrl(pathOrCursor)
+      : this.createApiUrl(pathOrCursor);
   }
 
   private async requestJson(pathAndQuery: string): Promise<unknown> {

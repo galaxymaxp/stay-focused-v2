@@ -75,6 +75,20 @@ export interface CanvasCourseInventoryItem {
     readonly lastSuccessfulSyncAt: string | null;
     readonly failureCode: string | null;
   } | null;
+  readonly syncHealth?: CanvasCourseInventoryHealthSummary;
+}
+
+export type CanvasCourseSyncOverallHealth =
+  | "not_synced"
+  | "syncing"
+  | "healthy"
+  | "needs_attention"
+  | "stale";
+
+export interface CanvasCourseInventoryHealthSummary {
+  readonly overallHealth: CanvasCourseSyncOverallHealth;
+  readonly attentionScopeCount: number;
+  readonly staleScopeCount: number;
 }
 
 export interface CanvasCourseInventoryPayload {
@@ -335,21 +349,42 @@ export type CanvasSyncJobStatus =
 export type CanvasSyncJobStage =
   | "waiting_to_start"
   | "preparing_course"
+  | "planning_sync"
+  | "fetching_pages"
+  | "reading_item_details"
+  | "checking_changes"
+  | "promoting_scopes"
   | "synchronizing_content"
   | "synchronizing_grades"
   | "storing_result"
   | "complete";
+
+export type CanvasSyncJobOutcome =
+  | "success"
+  | "unchanged"
+  | "partial"
+  | "failed"
+  | "cancelled";
 
 export interface CanvasSyncJobStatusView {
   readonly id: string;
   readonly jobType: CanvasSyncJobType;
   readonly status: CanvasSyncJobStatus;
   readonly stage: CanvasSyncJobStage;
+  readonly outcome?: CanvasSyncJobOutcome | null;
   readonly progress: {
     readonly completedUnits: number | null;
     readonly totalUnits: number | null;
     readonly unitLabel: "operations" | null;
     readonly message: string;
+    readonly isTotalKnown?: boolean;
+  };
+  readonly scopeSummary?: {
+    readonly healthy: number;
+    readonly syncing: number;
+    readonly needsAttention: number;
+    readonly stale: number;
+    readonly notSynced: number;
   };
   readonly course: {
     readonly id: string;
@@ -369,6 +404,42 @@ export interface CanvasSyncJobStatusView {
   readonly attemptCount: number;
   readonly resultAvailable: boolean;
   readonly resultSummary: unknown;
+}
+
+export type CanvasSyncScope = "content" | "announcements" | "files" | "grades";
+
+export interface CanvasCourseSyncScopeHealth {
+  readonly scope: CanvasSyncScope;
+  readonly health: CanvasCourseSyncOverallHealth;
+  readonly lastCheckedAt: string | null;
+  readonly lastSuccessfulAt: string | null;
+  readonly counts: {
+    readonly synced: number;
+    readonly metadataOnly: number;
+    readonly temporarilyFailed: number;
+    readonly stale: number;
+    readonly deleted: number;
+  };
+  readonly safeMessage: string | null;
+  readonly safeErrorCode: string | null;
+  readonly retryable: boolean;
+}
+
+export interface CanvasCourseSyncHealth {
+  readonly courseId: string;
+  readonly overallHealth: CanvasCourseSyncOverallHealth;
+  readonly lastCheckedAt: string | null;
+  readonly lastSuccessfulAt: string | null;
+  readonly activeJob: {
+    readonly id: string;
+    readonly jobType: CanvasSyncJobType;
+    readonly status: CanvasSyncJobStatus;
+    readonly stage: CanvasSyncJobStage;
+  } | null;
+  readonly scopes: Readonly<Record<CanvasSyncScope, CanvasCourseSyncScopeHealth>>;
+  readonly attentionScopeCount: number;
+  readonly staleScopeCount: number;
+  readonly retryGuidance: string | null;
 }
 
 export interface ListCanvasCourseGradesInput extends CanvasApiBaseInput {
@@ -960,6 +1031,26 @@ export async function getCanvasSyncJob(
   input: CanvasApiBaseInput & { readonly jobId: string },
 ): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
   return requestCanvasSyncJob(input, "GET");
+}
+
+export async function getCanvasCourseSyncHealth(
+  input: CanvasApiBaseInput & { readonly courseId: string },
+): Promise<CanvasApiResult<CanvasCourseSyncHealth>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) {
+    return clientError("course_not_found", "Choose a Canvas course.");
+  }
+  const endpoint = createEndpoint(
+    input.apiBaseUrl,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sync-health`,
+  );
+  if (!endpoint.ok) return endpoint;
+  return requestJson({
+    endpoint: endpoint.url,
+    input,
+    method: "GET",
+    parseSuccess: parseCanvasCourseSyncHealthResponse,
+  });
 }
 
 export async function cancelCanvasSyncJob(
@@ -1708,6 +1799,22 @@ function parseCanvasSyncJobResponse(
   return clientError(
     "invalid_response",
     "Canvas returned an invalid synchronization job response.",
+  );
+}
+
+function parseCanvasCourseSyncHealthResponse(
+  parsed: unknown,
+): CanvasApiResult<CanvasCourseSyncHealth> {
+  if (
+    isRecord(parsed) &&
+    parsed.ok === true &&
+    isCanvasCourseSyncHealth(parsed.data)
+  ) {
+    return { ok: true, data: parsed.data };
+  }
+  return clientError(
+    "invalid_response",
+    "Canvas returned invalid synchronization health.",
   );
 }
 
@@ -2632,12 +2739,19 @@ function isCanvasSyncJobStatusView(
     (value.jobType === "course_content" || value.jobType === "course_grades") &&
     isCanvasSyncJobStatus(value.status) &&
     isCanvasSyncJobStage(value.stage) &&
+    (value.outcome === undefined ||
+      value.outcome === null ||
+      isCanvasSyncJobOutcome(value.outcome)) &&
     isRecord(value.progress) &&
     isNonNegativeIntegerOrNull(value.progress.completedUnits) &&
     isNonNegativeIntegerOrNull(value.progress.totalUnits) &&
     (value.progress.unitLabel === "operations" ||
       value.progress.unitLabel === null) &&
     typeof value.progress.message === "string" &&
+    (value.progress.isTotalKnown === undefined ||
+      typeof value.progress.isTotalKnown === "boolean") &&
+    (value.scopeSummary === undefined ||
+      isCanvasSyncScopeSummary(value.scopeSummary)) &&
     isRecord(value.course) &&
     typeof value.course.id === "string" &&
     typeof value.course.displayName === "string" &&
@@ -2675,10 +2789,99 @@ function isCanvasSyncJobStage(value: unknown): value is CanvasSyncJobStage {
   return (
     value === "waiting_to_start" ||
     value === "preparing_course" ||
+    value === "planning_sync" ||
+    value === "fetching_pages" ||
+    value === "reading_item_details" ||
+    value === "checking_changes" ||
+    value === "promoting_scopes" ||
     value === "synchronizing_content" ||
     value === "synchronizing_grades" ||
     value === "storing_result" ||
     value === "complete"
+  );
+}
+
+function isCanvasSyncJobOutcome(value: unknown): value is CanvasSyncJobOutcome {
+  return (
+    value === "success" ||
+    value === "unchanged" ||
+    value === "partial" ||
+    value === "failed" ||
+    value === "cancelled"
+  );
+}
+
+function isCanvasSyncScopeSummary(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNonNegativeInteger(value.healthy) &&
+    isNonNegativeInteger(value.syncing) &&
+    isNonNegativeInteger(value.needsAttention) &&
+    isNonNegativeInteger(value.stale) &&
+    isNonNegativeInteger(value.notSynced)
+  );
+}
+
+function isCanvasCourseSyncHealth(value: unknown): value is CanvasCourseSyncHealth {
+  return (
+    isRecord(value) &&
+    typeof value.courseId === "string" &&
+    isCanvasCourseSyncOverallHealth(value.overallHealth) &&
+    isTimestampOrNull(value.lastCheckedAt) &&
+    isTimestampOrNull(value.lastSuccessfulAt) &&
+    (value.activeJob === null || isCanvasSyncHealthActiveJob(value.activeJob)) &&
+    isRecord(value.scopes) &&
+    isCanvasCourseSyncScopeHealth(value.scopes.content, "content") &&
+    isCanvasCourseSyncScopeHealth(value.scopes.announcements, "announcements") &&
+    isCanvasCourseSyncScopeHealth(value.scopes.files, "files") &&
+    isCanvasCourseSyncScopeHealth(value.scopes.grades, "grades") &&
+    isNonNegativeInteger(value.attentionScopeCount) &&
+    isNonNegativeInteger(value.staleScopeCount) &&
+    (value.retryGuidance === null || typeof value.retryGuidance === "string")
+  );
+}
+
+function isCanvasSyncHealthActiveJob(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    (value.jobType === "course_content" || value.jobType === "course_grades") &&
+    isCanvasSyncJobStatus(value.status) &&
+    isCanvasSyncJobStage(value.stage)
+  );
+}
+
+function isCanvasCourseSyncScopeHealth(
+  value: unknown,
+  scope: CanvasSyncScope,
+): boolean {
+  return (
+    isRecord(value) &&
+    value.scope === scope &&
+    isCanvasCourseSyncOverallHealth(value.health) &&
+    isTimestampOrNull(value.lastCheckedAt) &&
+    isTimestampOrNull(value.lastSuccessfulAt) &&
+    isRecord(value.counts) &&
+    isNonNegativeInteger(value.counts.synced) &&
+    isNonNegativeInteger(value.counts.metadataOnly) &&
+    isNonNegativeInteger(value.counts.temporarilyFailed) &&
+    isNonNegativeInteger(value.counts.stale) &&
+    isNonNegativeInteger(value.counts.deleted) &&
+    (value.safeMessage === null || typeof value.safeMessage === "string") &&
+    isSafeFailureCodeOrNull(value.safeErrorCode) &&
+    typeof value.retryable === "boolean"
+  );
+}
+
+function isCanvasCourseSyncOverallHealth(
+  value: unknown,
+): value is CanvasCourseSyncOverallHealth {
+  return (
+    value === "not_synced" ||
+    value === "syncing" ||
+    value === "healthy" ||
+    value === "needs_attention" ||
+    value === "stale"
   );
 }
 
@@ -2869,7 +3072,20 @@ function isCanvasCourseInventoryItem(
     (value.unavailableReason === null ||
       typeof value.unavailableReason === "string") &&
     typeof value.selected === "boolean" &&
-    (value.lastSync === null || isCanvasCourseLastSync(value.lastSync))
+    (value.lastSync === null || isCanvasCourseLastSync(value.lastSync)) &&
+    (value.syncHealth === undefined ||
+      isCanvasCourseInventoryHealthSummary(value.syncHealth))
+  );
+}
+
+function isCanvasCourseInventoryHealthSummary(
+  value: unknown,
+): value is CanvasCourseInventoryHealthSummary {
+  return (
+    isRecord(value) &&
+    isCanvasCourseSyncOverallHealth(value.overallHealth) &&
+    isNonNegativeInteger(value.attentionScopeCount) &&
+    isNonNegativeInteger(value.staleScopeCount)
   );
 }
 

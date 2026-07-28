@@ -8,6 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:workflow": "cd workflow-tests && vitest run --config ../vitest.workflow.config.ts",
     "provider:contract": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.contract.test.js",
     "smoke:openai": "tsc -p tsconfig.providers.json && node dist/provider-contract/apps/api/src/providers/openai-provider.smoke.js",
     "worker": "tsx scripts/job-worker.ts",
@@ -33,12 +34,13 @@
     "pdfjs-dist": "^5.1.91",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "workflow": "^4.3.1"
+    "workflow": "^4.6.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@workflow/vitest": "4.0.14",
     "rimraf": "^6.0.1",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3",

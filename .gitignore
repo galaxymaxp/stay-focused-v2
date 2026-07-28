@@ -20,6 +20,9 @@ apps/mobile/.env.local
 *.log
 *.tsbuildinfo
 coverage/
+.workflow-data/
+.workflow-vitest/
+.workflow-test-artifacts/
 .DS_Store
 
 # Generated live-run output

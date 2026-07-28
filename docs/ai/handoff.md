@@ -1966,3 +1966,26 @@ Current route status:
 - Phase 5F.1 is complete and hosted validated. Keep the physical Expo Go
   reload/network-loss/cancellation spot-check as a next-release reminder; plan
   Phase 5F.2 next around incremental checkpoints and user-visible sync health.
+
+## 2026-07-28 — Phase 5F.2 incremental, resumable Canvas synchronization
+
+- Added service-owned Canvas page/item units, private staging, scope health,
+  item evidence, recoverable 90-second leases, atomic connection-level
+  concurrency limits, same-job retry, and bounded stale-checkpoint cleanup.
+- Refactored Vercel Workflow to one Canvas provider request per durable step.
+  Rate-limit waits use Workflow scheduling, not function sleep; content jobs
+  allow three active connection units and grade jobs allow two.
+- Preserved last-known-good scope data. Core content is atomic; announcements,
+  files, and grades advance independently. Incomplete traversals never infer
+  deletion.
+- Added owner-checked aggregate sync health APIs and Expo overall/scope health,
+  nullable expanding totals, truthful partial outcomes, Sync again, and Cancel.
+  Units, cursors, source bodies, provider messages, and private identifiers are
+  never returned to mobile.
+- Applied `canvas_incremental_resumable_sync` only to the V2 Supabase project.
+  Schema/grant verification passed. Canvas/API/mobile/OCR tests, Workflow
+  runtime tests, root typecheck/build, and reviewer eval 290/290 pass locally.
+- The existing V1 Vercel project remains untouched. Deployment is restricted
+  to `stay-focused-v2-prototype`.
+- Keep the later physical Expo Go reload, temporary-network-loss, and explicit
+  cancellation spot-check on the next mobile release checklist.

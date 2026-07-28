@@ -1,33 +1,40 @@
-import type { Json } from "@stay-focused/db";
-import { getWorkflowMetadata, RetryableError } from "workflow";
+import type { CanvasSyncJobUnitRow } from "@stay-focused/db";
+import {
+  getWorkflowMetadata,
+  RetryableError,
+  sleep,
+} from "workflow";
 
-import { loadSelectedSyncCourse } from "@/lib/canvas-course-selection";
-import { syncCanvasCourseGrades } from "@/lib/canvas-grade-sync";
+import {
+  CANVAS_SYNC_CONTENT_CONCURRENCY,
+  claimCanvasSyncUnitBatch,
+  createInitialCanvasSyncUnits,
+  failCheckpointedCanvasSyncJob,
+  initializeCanvasSyncPlan,
+  readCanvasSyncPlanState,
+} from "@/lib/canvas-sync-jobs/checkpoints";
+import { finalizeCheckpointedCanvasSync } from "@/lib/canvas-sync-jobs/finalize";
 import {
   attachCanvasSyncJobWorkflow,
   claimCanvasSyncJob,
-  completeCanvasSyncJob,
   createCanvasSyncJobServiceClient,
-  failCanvasSyncJob,
   findCanvasSyncJob,
-  recoverStaleCanvasSyncOperation,
-  updateCanvasSyncJobProgress,
 } from "@/lib/canvas-sync-jobs/repository";
-import { syncSelectedCanvasCourse } from "@/lib/canvas-sync";
+import { executeCanvasSyncUnit } from "@/lib/canvas-sync-jobs/unit-executor";
 
 type CanvasWorkflowOutcome =
   | { readonly status: "succeeded"; readonly jobId: string }
   | { readonly status: "failed"; readonly jobId: string }
+  | { readonly status: "cancelled"; readonly jobId: string }
   | { readonly status: "skipped"; readonly jobId: string };
 
-type CanvasExecutionResult =
-  | { readonly ok: true; readonly summary: Json }
-  | {
-      readonly ok: false;
-      readonly code: string;
-      readonly message: string;
-      readonly retryable: boolean;
-    };
+interface CanvasClaimedBatch {
+  readonly status: "claimed" | "ready" | "cancelled" | "wait" | "stopped";
+  readonly unitIds: readonly string[];
+  readonly wakeAt: string | null;
+}
+
+const EMPTY_BATCH_WAIT_MS = 1_000;
 
 export async function canvasSyncJobWorkflow(
   jobId: string,
@@ -45,21 +52,54 @@ export async function canvasSyncJobWorkflow(
     );
     if (!claimed) return { status: "skipped", jobId };
 
-    const result = await executeCanvasSyncJobStep(jobId, workerId);
-    if (!result.ok) {
-      await failCanvasSyncJobStep(jobId, workerId, result);
-      return { status: "failed", jobId };
-    }
+    const initialized = await initializeCanvasSyncPlanStep(jobId, workerId);
+    if (!initialized) return { status: "skipped", jobId };
 
-    await completeCanvasSyncJobStep(jobId, workerId, result.summary);
-    return { status: "succeeded", jobId };
-  } catch {
-    await failCanvasSyncJobStep(jobId, workerId, {
-      ok: false,
-      code: "canvas_sync_interrupted",
-      message: "Canvas synchronization was interrupted and can be retried.",
-      retryable: true,
-    });
+    while (true) {
+      const batch = await claimCanvasSyncUnitBatchStep(jobId, workerId);
+
+      if (batch.status === "cancelled" || batch.status === "ready") {
+        const final = await finalizeCanvasSyncJobStep(jobId, workerId);
+        if (final.status === "pending") {
+          await sleep(EMPTY_BATCH_WAIT_MS);
+          continue;
+        }
+        if (final.status === "cancelled") {
+          return { status: "cancelled", jobId };
+        }
+        return {
+          status: final.status === "succeeded" ? "succeeded" : "failed",
+          jobId,
+        };
+      }
+
+      if (batch.status === "stopped") {
+        return { status: "skipped", jobId };
+      }
+
+      if (batch.status === "wait") {
+        if (batch.wakeAt) {
+          await sleep(new Date(batch.wakeAt));
+        } else {
+          await sleep(EMPTY_BATCH_WAIT_MS);
+        }
+        continue;
+      }
+
+      await Promise.all(
+        batch.unitIds.map((unitId) =>
+          executeCanvasSyncUnitStep(unitId, workerId)
+        ),
+      );
+    }
+  } catch (error) {
+    await failInterruptedCanvasSyncJobStep(jobId, workerId);
+    safeLog(
+      "workflow",
+      "interrupted",
+      jobId,
+      safeErrorCode(error),
+    );
     return { status: "failed", jobId };
   }
 }
@@ -70,190 +110,183 @@ async function claimCanvasSyncJobStep(
   workflowRunId: string,
 ): Promise<boolean> {
   "use step";
-  safeLog("claim", "start", jobId);
   const client = createCanvasSyncJobServiceClient();
   await attachCanvasSyncJobWorkflow(client, jobId, workflowRunId);
   const job = await claimCanvasSyncJob(client, jobId, workerId);
-  safeLog("claim", job ? "done" : "skipped", jobId);
+  safeLog("claim_parent", job ? "done" : "skipped", jobId);
   return job !== null;
 }
 
-async function executeCanvasSyncJobStep(
+async function initializeCanvasSyncPlanStep(
   jobId: string,
   workerId: string,
-): Promise<CanvasExecutionResult> {
+): Promise<boolean> {
+  "use step";
+  const client = createCanvasSyncJobServiceClient();
+  const job = await findCanvasSyncJob(client, jobId);
+  if (
+    !job ||
+    job.worker_id !== workerId ||
+    (job.status !== "running" && job.status !== "cancellation_requested")
+  ) {
+    return false;
+  }
+  if (job.status === "cancellation_requested") return true;
+  const initialized = await initializeCanvasSyncPlan(client, {
+    jobId,
+    units: createInitialCanvasSyncUnits(job),
+    workerId,
+  });
+  safeLog("initialize_plan", initialized ? "done" : "skipped", jobId);
+  return initialized !== null;
+}
+
+async function claimCanvasSyncUnitBatchStep(
+  jobId: string,
+  workerId: string,
+): Promise<CanvasClaimedBatch> {
   "use step";
   const client = createCanvasSyncJobServiceClient();
   const job = await findCanvasSyncJob(client, jobId);
   if (!job || job.worker_id !== workerId) {
-    return permanentFailure(
-      "canvas_sync_job_not_claimed",
-      "Canvas synchronization could not be claimed.",
-    );
+    return { status: "stopped", unitIds: [], wakeAt: null };
   }
   if (job.status === "cancellation_requested") {
-    return permanentFailure("canvas_sync_cancelled", "Cancellation requested.");
+    return { status: "cancelled", unitIds: [], wakeAt: null };
   }
   if (job.status !== "running") {
-    return permanentFailure(
-      "canvas_sync_job_not_running",
-      "Canvas synchronization is no longer running.",
-    );
+    return { status: "stopped", unitIds: [], wakeAt: null };
   }
 
-  await recoverStaleCanvasSyncOperation(client, jobId, workerId);
-
-  const stage = job.job_type === "course_content"
-    ? "synchronizing_content"
-    : "synchronizing_grades";
-  const message = job.job_type === "course_content"
-    ? "Synchronizing Canvas course content"
-    : "Synchronizing Canvas grades";
-  await updateCanvasSyncJobProgress(client, {
-    completedUnits: 0,
+  const units = await claimCanvasSyncUnitBatch(client, {
     jobId,
-    message,
-    stage,
-    totalUnits: 1,
+    limit: CANVAS_SYNC_CONTENT_CONCURRENCY,
     workerId,
   });
-
-  safeLog(job.job_type, "start", jobId);
-  if (job.job_type === "course_content") {
-    const selected = await loadSelectedSyncCourse({
-      client,
-      courseId: job.course_id,
-      userId: job.user_id,
-    });
-    if (!selected.ok) {
-      return mapCanvasFailure(
-        selected.code,
-        selected.message,
-        selected.status,
-      );
-    }
-    const current = await findCanvasSyncJob(client, jobId);
-    if (current?.status === "cancellation_requested") {
-      return permanentFailure("canvas_sync_cancelled", "Cancellation requested.");
-    }
-    const result = await syncSelectedCanvasCourse({
-      client,
-      connection: selected.value.connection,
-      course: selected.value.course,
-      courseRow: selected.value.courseRow,
-      userId: job.user_id,
-    });
-    if (!result.ok) {
-      return mapCanvasFailure(result.code, result.message, result.status);
-    }
-    safeLog(job.job_type, "done", jobId);
+  if (units.length > 0) {
+    safeLog("claim_units", "done", jobId, undefined, units.length);
     return {
-      ok: true,
-      summary: toJson({
-        outcome: result.summary.status,
-        kind: "course_content",
-        summary: result.summary,
-      }),
+      status: "claimed",
+      unitIds: units.map((unit) => unit.id),
+      wakeAt: null,
     };
   }
 
-  const result = await syncCanvasCourseGrades({
-    client,
-    courseId: job.course_id,
-    userId: job.user_id,
-  });
-  safeLog(job.job_type, "done", jobId);
-  return {
-    ok: true,
-    summary: toJson({
-      outcome: result.status,
-      kind: "course_grades",
-      summary: result,
-    }),
-  };
+  const state = await readCanvasSyncPlanState(client, jobId);
+  const active = state.units.filter(isActiveUnit);
+  if (active.length === 0) {
+    return { status: "ready", unitIds: [], wakeAt: null };
+  }
+  const wakeAt = earliestWakeAt(active, state.nextAvailableAt);
+  return { status: "wait", unitIds: [], wakeAt };
 }
-executeCanvasSyncJobStep.maxRetries = 2;
 
-async function completeCanvasSyncJobStep(
-  jobId: string,
+async function executeCanvasSyncUnitStep(
+  unitId: string,
   workerId: string,
-  summary: Json,
 ): Promise<void> {
   "use step";
   const client = createCanvasSyncJobServiceClient();
-  await updateCanvasSyncJobProgress(client, {
-    completedUnits: 1,
-    jobId,
-    message: "Finishing Canvas synchronization",
-    stage: "storing_result",
-    totalUnits: 1,
-    workerId,
-  });
-  await completeCanvasSyncJob(client, {
-    jobId,
-    resultSummary: summary,
-    workerId,
-  });
-  safeLog("complete", "done", jobId);
-}
-
-async function failCanvasSyncJobStep(
-  jobId: string,
-  workerId: string,
-  failure: Extract<CanvasExecutionResult, { readonly ok: false }>,
-): Promise<void> {
-  "use step";
-  const client = createCanvasSyncJobServiceClient();
-  await failCanvasSyncJob(client, {
-    code: failure.code,
-    jobId,
-    message: failure.message,
-    retryable: failure.retryable,
-    workerId,
-  });
-  safeLog("failure", "done", jobId, failure.code);
-}
-failCanvasSyncJobStep.maxRetries = 1;
-
-function mapCanvasFailure(
-  code: string,
-  message: string,
-  status: number,
-): CanvasExecutionResult {
-  const retryable =
-    status === 408 ||
-    status === 409 ||
-    status === 429 ||
-    status >= 500;
-  if (retryable) {
-    throw new RetryableError(code, {
-      retryAfter: status === 409 ? "5m" : "30s",
+  const result = await executeCanvasSyncUnit(client, { unitId, workerId });
+  if (result.status === "retry") {
+    throw new RetryableError(result.code, {
+      retryAfter: result.retryAfterMs,
     });
   }
-  return permanentFailure(code, message);
+  safeLog(
+    "execute_unit",
+    result.status,
+    unitId,
+    result.status === "failed" ? result.code : undefined,
+  );
+}
+executeCanvasSyncUnitStep.maxRetries = 3;
+
+async function finalizeCanvasSyncJobStep(
+  jobId: string,
+  workerId: string,
+): ReturnType<typeof finalizeCheckpointedCanvasSync> {
+  "use step";
+  const client = createCanvasSyncJobServiceClient();
+  const result = await finalizeCheckpointedCanvasSync(client, {
+    jobId,
+    workerId,
+  });
+  safeLog(
+    "finalize",
+    result.status,
+    jobId,
+    result.status === "failed" ? "canvas_sync_failed" : undefined,
+  );
+  return result;
 }
 
-function permanentFailure(
-  code: string,
-  message: string,
-): CanvasExecutionResult {
-  return { ok: false, code, message, retryable: false };
+async function failInterruptedCanvasSyncJobStep(
+  jobId: string,
+  workerId: string,
+): Promise<void> {
+  "use step";
+  const client = createCanvasSyncJobServiceClient();
+  await failCheckpointedCanvasSyncJob(client, {
+    code: "canvas_sync_interrupted",
+    jobId,
+    message: "Canvas synchronization was interrupted and can be retried.",
+    retryable: true,
+    workerId,
+  });
+}
+failInterruptedCanvasSyncJobStep.maxRetries = 1;
+
+function isActiveUnit(unit: CanvasSyncJobUnitRow): boolean {
+  return (
+    unit.status === "queued" ||
+    unit.status === "running" ||
+    unit.status === "retry_wait"
+  );
 }
 
-function toJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value)) as Json;
+function earliestWakeAt(
+  units: readonly CanvasSyncJobUnitRow[],
+  retryAt: string | null,
+): string {
+  const candidates = [
+    retryAt,
+    ...units.map((unit) =>
+      unit.status === "running"
+        ? unit.lease_expires_at
+        : unit.status === "retry_wait"
+          ? unit.available_at
+          : null
+    ),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => Date.parse(value))
+    .filter(Number.isFinite);
+  const next = candidates.length > 0
+    ? Math.min(...candidates)
+    : Date.now() + EMPTY_BATCH_WAIT_MS;
+  return new Date(Math.max(next, Date.now() + EMPTY_BATCH_WAIT_MS)).toISOString();
+}
+
+function safeErrorCode(error: unknown): string {
+  if (error instanceof Error && /^[a-z0-9_]{3,80}$/.test(error.message)) {
+    return error.message;
+  }
+  return "canvas_sync_interrupted";
 }
 
 function safeLog(
   step: string,
   event: string,
-  jobId: string,
+  jobOrUnitId: string,
   code?: string,
+  count?: number,
 ): void {
   console.info("canvas_sync_workflow", {
     ...(code ? { code } : {}),
+    ...(count === undefined ? {} : { count }),
     event,
-    jobId,
+    id: jobOrUnitId,
     step,
   });
 }

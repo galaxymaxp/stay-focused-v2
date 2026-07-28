@@ -1,7 +1,9 @@
 import { jsonResponse, optionsResponse, requireCanvasAuth } from "@/lib/canvas-routes";
 import { toCanvasSyncJobStatusView } from "@/lib/canvas-sync-jobs/contracts";
+import { readCanvasCourseSyncScopeStates } from "@/lib/canvas-sync-jobs/checkpoints";
 import {
   CanvasSyncJobRepositoryError,
+  createCanvasSyncJobServiceClient,
   findOwnedCanvasSyncJob,
 } from "@/lib/canvas-sync-jobs/repository";
 
@@ -29,8 +31,18 @@ export async function GET(
       jobId,
     );
     if (!job) return notFound(request);
+    let scopes: readonly CanvasCourseSyncScopeStateRow[] = [];
+    try {
+      scopes = await readCanvasCourseSyncScopeStates(
+        createCanvasSyncJobServiceClient(),
+        { courseId: job.course_id, userId: auth.value.user.id },
+      );
+    } catch {
+      // Job status remains useful if the additive health view is temporarily
+      // unavailable during a rolling migration or deployment.
+    }
     return jsonResponse(
-      { ok: true, data: toCanvasSyncJobStatusView(job) },
+      { ok: true, data: toCanvasSyncJobStatusView(job, scopes) },
       200,
       request,
     );
@@ -77,3 +89,4 @@ function isUuid(value: string): boolean {
     value,
   );
 }
+import type { CanvasCourseSyncScopeStateRow } from "@stay-focused/db";

@@ -2,7 +2,7 @@
 
 Last refreshed: 2026-07-28, Asia/Manila.
 
-## Hosted durability and Canvas Phase 5F.1
+## Hosted durability and Canvas Phase 5F.2
 
 The V2 prototype uses the separate `stay-focused-v2-prototype` Vercel project;
 the existing Stay Focused V1 project remains untouched. Supabase is
@@ -33,6 +33,27 @@ Vercel Workflow run references. No Vercel error or fatal runtime logs appeared
 during the validation window. The remaining physical Expo Go reload,
 network-loss, and cancellation checks stay on the next-release reminder list;
 they do not block continued development.
+
+Phase 5F.2 adds resumable, service-owned operation units beneath those same
+logical jobs. A connection can run no more than three active Canvas requests,
+with grade jobs capped at two. Each unit has a 90-second recoverable lease,
+one provider request, up to four calls including retries, durable
+`Retry-After` handling, and a sanitized checkpoint. Parent jobs keep the
+existing three-attempt limit and a 30-minute deadline.
+
+Content core, announcements, files, and grades now have independent persisted
+health. Incomplete pagination or item access never infers deletion and never
+replaces a last-known-good scope. The API exposes aggregate owner-checked
+health only; units, private staging, provider cursors, and identifiers remain
+service-only. Expo Go displays overall and per-scope health, real operation
+counts with an unknown total while discovery expands, and a truthful partial
+outcome. Synchronization remains manual.
+
+The V2 Supabase migration is applied and its grants/functions are verified.
+Local Canvas/API/mobile/OCR/workflow tests, all workspace typechecks and builds,
+and the 290-case reviewer evaluation pass. Hosted V2 content/grade execution
+and fault/recovery validation remain the active rollout gate. Architecture:
+`docs/architecture/ADR-017-incremental-resumable-canvas-sync.md`.
 
 ## Product Recovery R6 - Partial Device Acceptance
 

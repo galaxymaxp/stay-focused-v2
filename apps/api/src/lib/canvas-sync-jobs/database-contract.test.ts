@@ -17,6 +17,13 @@ const retryMigration = readFileSync(
   ),
   "utf8",
 ).toLowerCase();
+const incrementalMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "../../packages/db/migrations/20260728201000_canvas_incremental_resumable_sync.sql",
+  ),
+  "utf8",
+).toLowerCase();
 
 describe("durable Canvas sync database contract", () => {
   it("persists strict job state with owner-only reads", () => {
@@ -66,10 +73,120 @@ describe("durable Canvas sync database contract", () => {
       "if v_job.retry_idempotency_key = v_key then",
     );
   });
+
+  it("keeps checkpoint units and staging service-owned under RLS", () => {
+    for (const table of [
+      "canvas_sync_job_units",
+      "canvas_sync_job_staging",
+      "canvas_course_sync_scope_states",
+      "canvas_course_item_sync_states",
+    ]) {
+      expect(incrementalMigration).toContain(`create table public.${table}`);
+      expect(incrementalMigration).toContain(
+        `alter table public.${table} enable row level security`,
+      );
+      expect(incrementalMigration).toMatch(
+        new RegExp(
+          `revoke all on table public\\.${table}\\s+from public, anon, authenticated`,
+        ),
+      );
+      expect(incrementalMigration).toMatch(
+        new RegExp(
+          `grant select, insert, update, delete on table public\\.${table}\\s+to service_role`,
+        ),
+      );
+    }
+  });
+
+  it("claims units atomically with connection limits and recoverable leases", () => {
+    const claim = sliceIncrementalFunction("claim_canvas_sync_job_units_v2");
+    expect(claim).toContain("pg_advisory_xact_lock");
+    expect(claim).toContain("for update skip locked");
+    expect(claim).toContain("3 - v_active");
+    expect(claim).toContain("case when v_job_type = 'course_grades' then 2 else 3 end");
+    expect(claim).toContain("unit.lease_expires_at <= now()");
+    expect(claim).toContain("status = 'queued'");
+  });
+
+  it("records observed items before authoritative deletion inference", () => {
+    const health = sliceIncrementalFunction(
+      "record_canvas_course_sync_health_v2",
+    );
+    expect(health.indexOf("for v_item in")).toBeLessThan(
+      health.indexOf("for v_scope in"),
+    );
+    expect(health).toContain("state.last_seen_job_id is distinct from v_job.id");
+    expect(health).toContain("item_state = 'deleted_from_canvas'");
+    expect(health).toContain("get diagnostics v_affected_count = row_count");
+  });
+
+  it("stores health and typed results before making a job terminal", () => {
+    const completion = sliceIncrementalFunction("complete_canvas_sync_job_v2");
+    expect(completion).toContain("result_outcome = p_outcome");
+    expect(completion).toContain("result_summary = p_result_summary");
+    expect(completion).toContain("status = 'succeeded'");
+    expect(completion.indexOf("result_summary = p_result_summary")).toBeLessThan(
+      completion.indexOf("where job.id = p_job_id"),
+    );
+    expect(incrementalMigration).toContain(
+      "delete from public.canvas_sync_job_staging stage",
+    );
+  });
+
+  it("serializes cancellation against the promotion boundary", () => {
+    const promotion = sliceIncrementalFunction(
+      "begin_canvas_sync_promotion_v2",
+    );
+    const cancellation = sliceIncrementalFunction(
+      "request_canvas_sync_job_cancellation_v1",
+    );
+    expect(promotion).toContain("stage = 'promoting_scopes'");
+    expect(cancellation).toContain(
+      "job.stage not in ('promoting_scopes', 'storing_result', 'complete')",
+    );
+    expect(cancellation).toContain("auth.uid() is distinct from p_user_id");
+  });
+
+  it("accepts only owner-created jobs without inventing an initial total", () => {
+    const creation = sliceIncrementalFunction("create_canvas_sync_job_v1");
+    expect(creation).toContain("auth.uid() is distinct from p_user_id");
+    expect(creation).toContain("progress_total_known");
+    expect(creation).toContain("null,\n      false,");
+  });
+
+  it("reuses fresh successful checkpoints and rebuilds expired retry plans", () => {
+    const retry = sliceIncrementalFunction("retry_canvas_sync_job_v2");
+    expect(retry).toContain("v_staging_expired");
+    expect(retry).toContain("checkpoint_version = 'expired'");
+    expect(retry).toContain("attempt_count = 0");
+    expect(retry).toContain("status = 'queued'");
+    expect(retry).toContain("completed_units = (");
+    expect(retry).toContain("unit.status in ('succeeded', 'skipped')");
+    expect(retry).toContain("progress_total_known = false");
+  });
+
+  it("purges expired private staging and sanitizes retained unit audits", () => {
+    const purge = sliceIncrementalFunction(
+      "purge_expired_canvas_sync_staging_v2",
+    );
+    expect(purge).toContain("stage.expires_at <= now()");
+    expect(purge).toContain("checkpoint_version = 'expired'");
+    expect(purge).toContain("checkpoint = '{}'::jsonb");
+    expect(purge).toContain("delete from public.canvas_sync_job_staging");
+    expect(incrementalMigration).not.toContain(
+      "grant execute on function public.purge_expired_canvas_sync_staging_v2(integer) to authenticated",
+    );
+  });
 });
 
 function sliceFunction(name: string): string {
   const start = migration.indexOf(`function public.${name}`);
   const end = migration.indexOf("\n$$;", start);
   return migration.slice(start, end);
+}
+
+function sliceIncrementalFunction(name: string): string {
+  const start = incrementalMigration.indexOf(`function public.${name}`);
+  const end = incrementalMigration.indexOf("\n$$;", start);
+  return incrementalMigration.slice(start, end);
 }

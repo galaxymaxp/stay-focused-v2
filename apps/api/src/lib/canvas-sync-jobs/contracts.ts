@@ -1,5 +1,7 @@
 import type {
   CanvasSyncJobDatabaseRow,
+  CanvasCourseSyncScopeStateRow,
+  CanvasSyncJobOutcome,
   CanvasSyncJobStage,
   CanvasSyncJobStatus,
   CanvasSyncJobType,
@@ -11,11 +13,20 @@ export interface CanvasSyncJobStatusView {
   readonly jobType: CanvasSyncJobType;
   readonly status: CanvasSyncJobStatus;
   readonly stage: CanvasSyncJobStage;
+  readonly outcome: CanvasSyncJobOutcome | null;
   readonly progress: {
     readonly completedUnits: number | null;
     readonly totalUnits: number | null;
     readonly unitLabel: "operations" | null;
     readonly message: string;
+    readonly isTotalKnown: boolean;
+  };
+  readonly scopeSummary: {
+    readonly healthy: number;
+    readonly syncing: number;
+    readonly needsAttention: number;
+    readonly stale: number;
+    readonly notSynced: number;
   };
   readonly course: {
     readonly id: string;
@@ -39,6 +50,7 @@ export interface CanvasSyncJobStatusView {
 
 export function toCanvasSyncJobStatusView(
   job: CanvasSyncJobDatabaseRow,
+  scopes: readonly CanvasCourseSyncScopeStateRow[] = [],
 ): CanvasSyncJobStatusView {
   const source = readRecord(job.source_metadata);
   return {
@@ -46,11 +58,22 @@ export function toCanvasSyncJobStatusView(
     jobType: job.job_type,
     status: job.status,
     stage: job.stage,
+    outcome: job.result_outcome,
     progress: {
       completedUnits: job.completed_units,
       totalUnits: job.total_units,
       unitLabel: job.unit_label,
       message: job.status_message,
+      isTotalKnown: job.progress_total_known,
+    },
+    scopeSummary: {
+      healthy: scopes.filter((scope) => scope.health_status === "healthy").length,
+      syncing: scopes.filter((scope) => scope.health_status === "syncing").length,
+      needsAttention: scopes.filter((scope) =>
+        scope.health_status === "partial" || scope.health_status === "failed"
+      ).length,
+      stale: scopes.filter((scope) => scope.health_status === "stale").length,
+      notSynced: scopes.filter((scope) => scope.health_status === "not_synced").length,
     },
     course: {
       id: job.course_id,

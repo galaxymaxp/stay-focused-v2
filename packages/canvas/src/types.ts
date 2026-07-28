@@ -6,6 +6,11 @@ export interface CanvasProfile {
   readonly shortName: string | null;
 }
 
+export interface CanvasPaginatedPage<TItem> {
+  readonly items: readonly TItem[];
+  readonly nextCursor: string | null;
+}
+
 export interface CanvasCourse {
   readonly id: string;
   readonly name: string;

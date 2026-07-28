@@ -110,6 +110,18 @@ interface CanvasSyncRetryPolicyInput {
   readonly sleep?: (durationMs: number) => Promise<void>;
 }
 
+export type CanvasCourseSyncProvider = Pick<
+  CanvasClient,
+  | "listModules"
+  | "listModuleItems"
+  | "listPages"
+  | "getPage"
+  | "listAssignmentGroups"
+  | "listAssignments"
+  | "listAnnouncements"
+  | "listCourseFiles"
+>;
+
 export interface CanvasAcademicSyncSummary {
   readonly status: CanvasAcademicSyncStatus;
   readonly mode: CanvasAcademicSyncMode;
@@ -149,6 +161,11 @@ export type CanvasAcademicSyncResult =
 
 export interface CanvasCourseScopedSyncSummary {
   readonly status: "success" | "partial" | "failed";
+  readonly scopeOutcomes: {
+    readonly content: "succeeded" | "failed";
+    readonly announcements: "succeeded" | "failed";
+    readonly files: "succeeded" | "failed";
+  };
   readonly startedAt: string;
   readonly completedAt: string;
   readonly durationMs: number;
@@ -751,6 +768,7 @@ export async function syncCanvasAcademicGraph({
 }
 
 export async function syncSelectedCanvasCourse({
+  canvasClient,
   client,
   connection,
   course,
@@ -758,6 +776,7 @@ export async function syncSelectedCanvasCourse({
   retryPolicy: retryPolicyInput,
   userId,
 }: {
+  readonly canvasClient?: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourse;
@@ -822,7 +841,7 @@ export async function syncSelectedCanvasCourse({
     };
   }
 
-  const canvas = createCanvasClient(connection.base_url, token);
+  const canvas = canvasClient ?? createCanvasClient(connection.base_url, token);
   const limiters: CanvasSyncLimiters = {
     moduleItems: createConcurrencyLimiter(MODULE_ITEM_CONCURRENCY_LIMIT),
     pageDetails: createConcurrencyLimiter(PAGE_DETAIL_CONCURRENCY_LIMIT),
@@ -876,27 +895,29 @@ export async function syncSelectedCanvasCourse({
   let announcements = emptyAnnouncementsSyncSummary() as CanvasAnnouncementsSyncResult;
   let files = emptyFilesSyncSummary() as CanvasFilesSyncResult;
 
-  if (coreResult.ok) {
-    announcements = await syncAnnouncements({
-      canvas,
-      client,
-      connection,
-      courses: [course],
-      retryPolicy,
-      runId: run.row.id,
-      syncedAt: startedAt,
-      syncWindow,
-      userId,
-    });
-    retryAttempts += announcements.retryCount;
-    for (const failureCode of announcements.failureCodes) {
-      failures.set(failureCode, (failures.get(failureCode) ?? 0) + 1);
-    }
-    resourceCounts = addResourceCounts(resourceCounts, {
-      ...emptyResourceCounts(),
-      announcements: announcements.discovered,
-    });
+  // Announcements are an independent atomic scope. A failed core traversal must
+  // not prevent a complete announcements traversal from advancing.
+  announcements = await syncAnnouncements({
+    canvas,
+    client,
+    connection,
+    courses: [course],
+    retryPolicy,
+    runId: run.row.id,
+    syncedAt: startedAt,
+    syncWindow,
+    userId,
+  });
+  retryAttempts += announcements.retryCount;
+  for (const failureCode of announcements.failureCodes) {
+    failures.set(failureCode, (failures.get(failureCode) ?? 0) + 1);
+  }
+  resourceCounts = addResourceCounts(resourceCounts, {
+    ...emptyResourceCounts(),
+    announcements: announcements.discovered,
+  });
 
+  if (coreResult.ok && announcements.coursesFailed === 0) {
     files = await syncCourseFiles({
       announcementsByCourse: new Map(
         announcements.announcementsByCourse.map((courseAnnouncements) => [
@@ -972,7 +993,7 @@ async function syncOneCourse({
   runId,
   userId,
 }: {
-  readonly canvas: CanvasClient;
+  readonly canvas: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourse;
@@ -1265,7 +1286,7 @@ async function syncOneCourse({
 }
 
 async function fetchCourseSnapshot(
-  canvas: CanvasClient,
+  canvas: CanvasCourseSyncProvider,
   course: CanvasCourse,
   limiters: CanvasSyncLimiters,
   retryPolicy: CanvasSyncRetryPolicy,
@@ -1466,7 +1487,7 @@ async function syncCourseFiles({
   userId,
 }: {
   readonly announcementsByCourse: ReadonlyMap<string, readonly CanvasAnnouncement[]>;
-  readonly canvas: CanvasClient;
+  readonly canvas: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly courseResults: readonly CourseSyncSuccess[];
@@ -1543,7 +1564,7 @@ async function syncOneCourseFiles({
   syncedAt,
   userId,
 }: {
-  readonly canvas: CanvasClient;
+  readonly canvas: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly courseAnnouncements: readonly CanvasAnnouncement[];
@@ -1640,7 +1661,7 @@ async function syncAnnouncements({
   syncWindow,
   userId,
 }: {
-  readonly canvas: CanvasClient;
+  readonly canvas: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly courses: readonly CanvasCourse[];
@@ -1691,7 +1712,7 @@ async function syncOneCourseAnnouncements({
   syncWindow,
   userId,
 }: {
-  readonly canvas: CanvasClient;
+  readonly canvas: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourse;
@@ -3103,7 +3124,7 @@ function courseScopedStatus({
   readonly files: CanvasFilesSyncSummary;
 }): CanvasCourseScopedSyncSummary["status"] {
   if (!coreResult.ok) {
-    return "failed";
+    return announcements.coursesSucceeded > 0 ? "partial" : "failed";
   }
   if (announcements.coursesFailed > 0 || files.coursesFailed > 0) {
     return "partial";
@@ -3172,6 +3193,18 @@ function createCourseScopedSummary({
 
   return {
     status,
+    scopeOutcomes: {
+      content: coreResult ? "succeeded" : "failed",
+      announcements:
+        announcements.coursesSucceeded > 0 &&
+          announcements.coursesFailed === 0
+          ? "succeeded"
+          : "failed",
+      files:
+        files.coursesSucceeded > 0 && files.coursesFailed === 0
+          ? "succeeded"
+          : "failed",
+    },
     startedAt,
     completedAt,
     durationMs: Math.max(0, Date.parse(completedAt) - Date.parse(startedAt)),

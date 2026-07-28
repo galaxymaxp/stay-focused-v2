@@ -260,15 +260,20 @@ export function CanvasGradeScreen({
         item.jobType === "course_grades" && item.course.id === courseId,
     );
     if (job) setSyncJob(job);
-    if (
-      reconciliation.newlyCompleted.some(
-        (item) =>
-          item.jobType === "course_grades" && item.course.id === courseId,
-      )
-    ) {
+    const newlyCompleted = reconciliation.newlyCompleted.find(
+      (item) =>
+        item.jobType === "course_grades" && item.course.id === courseId,
+    );
+    if (newlyCompleted) {
       setWarning({
-        title: "Grade synchronization complete",
-        message: "Your latest Canvas grades are ready.",
+        title:
+          newlyCompleted.outcome === "partial"
+            ? "Grade sync needs attention"
+            : "Grade synchronization complete",
+        message:
+          newlyCompleted.outcome === "partial"
+            ? "Available grades were updated, but one grade area could not be refreshed."
+            : "Your latest Canvas grades are ready.",
       });
       await loadGrades({ reason: "post-sync", replaceAssignments: true });
     }
@@ -924,7 +929,9 @@ function CanvasSyncJobCard({
     <Card style={styles.statusCard} testID="canvas-grade-sync-result">
       <Text style={styles.statusTitle}>
         {job.status === "succeeded"
-          ? "Grade synchronization complete"
+          ? job.outcome === "partial"
+            ? "Grade sync completed with warnings"
+            : "Grade synchronization complete"
           : active
             ? "Grade synchronization running"
             : job.status === "cancelled"
@@ -935,7 +942,10 @@ function CanvasSyncJobCard({
       <Text style={styles.statusText}>
         Updated {formatDateTime(job.updatedAt)}
       </Text>
-      {active && job.status !== "cancellation_requested" ? (
+      {active &&
+      job.status !== "cancellation_requested" &&
+      job.stage !== "promoting_scopes" &&
+      job.stage !== "storing_result" ? (
         <Button onPress={onCancel} variant="secondary">
           Cancel
         </Button>

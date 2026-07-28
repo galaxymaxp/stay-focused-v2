@@ -2,6 +2,34 @@
 
 Last refreshed: 2026-07-28, Asia/Manila.
 
+## Phase 5F.2 - Incremental, Resumable Canvas Synchronization
+
+Status: Implemented and locally validated; hosted rollout validation in
+progress.
+
+- Content and grade jobs expand into database-owned list-page, item-detail,
+  announcement, file, assignment, submission, and grade-summary units. Vercel
+  Workflow executes one Canvas request per step and resumes from persisted
+  units rather than replaying a whole course.
+- Atomic connection-scoped claims cap provider work at three concurrent units,
+  or two for grade jobs. Ninety-second leases, bounded provider retries,
+  durable `Retry-After` scheduling, a 30-minute parent deadline, and same-job
+  retry prevent unsafe request races and unbounded work.
+- Relational course content promotes atomically. Announcements, files, and
+  grades maintain independent health so usable scopes can advance while an
+  incomplete scope keeps its last-known-good snapshot.
+- Expo Go now shows course and scope health, nullable expanding totals,
+  truthful partial completion, Sync again, and Cancel. Synchronization remains
+  manual and still requires HTTP 202 acceptance before the app may switch away.
+- Private staging is service-only, is removed on success/cancellation, and
+  expires after 24 hours for failed jobs. Sanitized job/unit audit records stay
+  within the existing 30-day idempotency window.
+- Release reminder: before the next mobile release, physically spot-check Expo
+  Go reload recovery, temporary network loss, and explicit cancellation.
+
+Next task: complete hosted Phase 5F.2 content/grade fault and recovery
+validation, then perform the three-item physical Expo Go release spot-check.
+
 ## Phase 5F.1 - Durable Canvas Synchronization
 
 Status: Complete and hosted validated.
@@ -24,10 +52,7 @@ Status: Complete and hosted validated.
   restored, successful results were persisted before terminal status, and the
   cancelled job published no result.
 
-Next task: plan Phase 5F.2 around incremental per-item checkpoints,
-retry-after-aware low-concurrency synchronization, stale/deleted item handling,
-and user-visible sync health while preserving the Phase 5F.1 durable-job
-boundary.
+Phase 5F.2 builds on this completed server-owned acceptance boundary.
 
 ## Product Recovery Phase R6 - Partial
 

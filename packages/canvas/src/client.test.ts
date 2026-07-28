@@ -266,6 +266,45 @@ describe("CanvasClient", () => {
     );
   });
 
+  it("returns one validated module page with an opaque next cursor", async () => {
+    const next =
+      "https://canvas.test/api/v1/courses/7/modules?page=2&per_page=50";
+    const fetchImpl = createFetch([
+      jsonResponse([{ id: 1, name: "Cell structure" }], {
+        link: `<${next}>; rel="next"`,
+      }),
+      jsonResponse([{ id: 2, name: "Cell division" }]),
+    ]);
+    const client = createClient(fetchImpl);
+
+    const first = await client.listModulesPage("7");
+    expect(first).toMatchObject({
+      items: [{ id: "1", name: "Cell structure" }],
+      nextCursor: next,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    const second = await client.listModulesPage("7", first.nextCursor);
+    expect(second).toMatchObject({
+      items: [{ id: "2", name: "Cell division" }],
+      nextCursor: null,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a cross-origin next cursor from a single-page method", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse([{ id: 1, name: "Cell structure" }], {
+        link: '<https://evil.test/api/v1/courses/7/modules?page=2>; rel="next"',
+      }),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(client.listModulesPage("7")).rejects.toMatchObject({
+      code: "canvas_pagination_rejected",
+    });
+  });
+
   it("encodes module item IDs and preserves polymorphic fields", async () => {
     const fetchImpl = createFetch([
       jsonResponse([{ id: 1, title: "Read Page", type: "Page" }], {
@@ -1592,6 +1631,30 @@ describe("CanvasClient", () => {
       status: 429,
     });
     await expect(client.getCurrentUser()).rejects.not.toThrow(/private-body/);
+  });
+
+  it("parses HTTP-date Retry-After and caps provider delays at five minutes", async () => {
+    const now = new Date("2026-07-28T00:00:00.000Z");
+    const fetchImpl = createFetch([
+      new Response(JSON.stringify({ busy: true }), {
+        status: 503,
+        headers: {
+          "retry-after": new Date(now.getTime() + 10 * 60_000).toUTCString(),
+        },
+      }),
+    ]);
+    const client = new CanvasClient({
+      allowHttpForTesting: true,
+      baseUrl: "https://canvas.test",
+      fetchImpl,
+      now: () => now,
+      personalAccessToken: "token",
+    });
+
+    await expect(client.getCurrentUser()).rejects.toMatchObject({
+      code: "canvas_unavailable",
+      retryAfterMs: 5 * 60_000,
+    });
   });
 
   it("classifies network failures separately from HTTP failures", async () => {

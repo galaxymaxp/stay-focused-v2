@@ -23,6 +23,7 @@ import {
 import {
   connectCanvas,
   disconnectCanvas,
+  getCanvasCourseSyncHealth,
   getCanvasConnection,
   listCanvasCapabilities,
   listCanvasCourses,
@@ -30,11 +31,13 @@ import {
   type CanvasApiClientError,
   type CanvasCapabilitySummary,
   type CanvasCourseInventoryItem,
+  type CanvasCourseSyncHealth,
   type CanvasCourseSyncSummary,
   type CanvasConnectionSummary,
   type CanvasSyncJobStatusView,
 } from "../../services/canvasApi";
 import {
+  cancelDurableCanvasSync,
   reconcileCanvasSyncJobs,
   startDurableCanvasSync,
 } from "../../services/canvasSyncJobCoordinator";
@@ -68,6 +71,7 @@ interface CourseSyncDisplayState {
   readonly progressMessage?: string;
   readonly summary?: CanvasCourseSyncSummary;
   readonly error?: CanvasApiClientError;
+  readonly job?: CanvasSyncJobStatusView;
 }
 
 export function CoursesScreen({
@@ -89,6 +93,9 @@ export function CoursesScreen({
     useState<readonly CanvasCapabilitySummary[]>([]);
   const [courseSyncStates, setCourseSyncStates] = useState<
     Readonly<Record<string, CourseSyncDisplayState>>
+  >({});
+  const [courseHealthStates, setCourseHealthStates] = useState<
+    Readonly<Record<string, CanvasCourseSyncHealth>>
   >({});
   const [error, setError] = useState<CoursesDisplayError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -119,12 +126,15 @@ export function CoursesScreen({
         ),
       }));
     }
-    if (
-      reconciliation.newlyCompleted.some(
-        (job) => job.jobType === "course_content",
-      )
-    ) {
-      setSuccessMessage("Canvas course synchronization is complete.");
+    const newlyCompletedContent = reconciliation.newlyCompleted.filter(
+      (job) => job.jobType === "course_content",
+    );
+    if (newlyCompletedContent.length > 0) {
+      setSuccessMessage(
+        newlyCompletedContent.some((job) => job.outcome === "partial")
+          ? "Canvas sync completed, but some areas need attention."
+          : "Canvas course synchronization is complete.",
+      );
       await refreshConnectedCanvas(context.value);
     }
   }, [session?.accessToken, session?.user.id]);
@@ -283,6 +293,7 @@ export function CoursesScreen({
         setSelectedCourseIds([]);
         setSavedSelectedCourseIds([]);
         setCourseSyncStates({});
+        setCourseHealthStates({});
         setCapabilities([]);
         setPersonalAccessToken("");
         setSuccessMessage("Canvas disconnected.");
@@ -307,6 +318,24 @@ export function CoursesScreen({
       setCourses(courseResult.data.courses);
       setSelectedCourseIds(courseResult.data.selectedCourseIds);
       setSavedSelectedCourseIds(courseResult.data.selectedCourseIds);
+      const healthResults = await Promise.all(
+        courseResult.data.courses
+          .filter((course) => course.selected)
+          .map(async (course) => ({
+            courseId: course.id,
+            result: await getCanvasCourseSyncHealth({
+              ...context,
+              courseId: course.id,
+            }),
+          })),
+      );
+      setCourseHealthStates(
+        Object.fromEntries(
+          healthResults.flatMap(({ courseId, result }) =>
+            result.ok ? [[courseId, result.data] as const] : []
+          ),
+        ),
+      );
     } else {
       setError(formatCanvasError(courseResult.error));
     }
@@ -426,6 +455,70 @@ export function CoursesScreen({
     }
   };
 
+  const handleSyncCourse = async (courseId: string) => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+    if (!ownerUserId) return;
+    const course = courses.find((item) => item.id === courseId);
+    setError(null);
+    setSuccessMessage(null);
+    setCourseSyncStates((current) => ({
+      ...current,
+      [courseId]: { status: "running", progressMessage: "Waiting to start" },
+    }));
+    const result = await startDurableCanvasSync({
+      ...context.value,
+      courseDisplayName: course?.displayName ?? "Canvas course",
+      courseId,
+      jobType: "course_content",
+      ownerUserId,
+    });
+    setCourseSyncStates((current) => ({
+      ...current,
+      [courseId]: result.ok
+        ? displayStateForJob(result.data)
+        : { error: result.error, status: "failed" },
+    }));
+    setSuccessMessage(
+      result.ok
+        ? "Canvas synchronization started. You can switch apps."
+        : null,
+    );
+  };
+
+  const handleCancelCourseSync = async (courseId: string) => {
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    const job = courseSyncStates[courseId]?.job;
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+    if (!ownerUserId || !job) return;
+    const result = await cancelDurableCanvasSync({
+      ...context.value,
+      jobId: job.id,
+      ownerUserId,
+    });
+    if (result.ok) {
+      setCourseSyncStates((current) => ({
+        ...current,
+        [courseId]: displayStateForJob(result.data),
+      }));
+      setSuccessMessage(
+        result.data.status === "cancellation_requested"
+          ? "Cancellation requested."
+          : "Canvas synchronization was cancelled.",
+      );
+    } else {
+      setError(formatCanvasError(result.error));
+    }
+  };
+
   return (
     <Screen contentContainerStyle={styles.content}>
       <View style={styles.header} testID="courses-screen">
@@ -460,6 +553,7 @@ export function CoursesScreen({
         <ConnectedCanvasState
           capabilities={capabilities}
           connection={connection}
+          courseHealthStates={courseHealthStates}
           courseSyncStates={courseSyncStates}
           courses={courses}
           isDisconnecting={isDisconnecting}
@@ -471,6 +565,8 @@ export function CoursesScreen({
           onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
           onOpenGrades={onOpenGrades}
           onRefresh={handleRefresh}
+          onCancelCourseSync={handleCancelCourseSync}
+          onSyncCourse={handleSyncCourse}
           onSyncSelected={handleSyncSelected}
           onToggleCourse={handleToggleCourse}
           savedSelectedCourseIds={savedSelectedCourseIds}
@@ -560,6 +656,7 @@ function DisconnectedCanvasState({
 function ConnectedCanvasState({
   capabilities,
   connection,
+  courseHealthStates,
   courseSyncStates,
   courses,
   isDisconnecting,
@@ -568,9 +665,11 @@ function ConnectedCanvasState({
   isSyncingSelected,
   onDisconnect,
   onCreateReviewerFromCanvas,
+  onCancelCourseSync,
   onOpenGrades,
   onRefresh,
   onSaveSelection,
+  onSyncCourse,
   onSyncSelected,
   onToggleCourse,
   savedSelectedCourseIds,
@@ -578,6 +677,7 @@ function ConnectedCanvasState({
 }: {
   readonly capabilities: readonly CanvasCapabilitySummary[];
   readonly connection: CanvasConnectionSummary;
+  readonly courseHealthStates: Readonly<Record<string, CanvasCourseSyncHealth>>;
   readonly courseSyncStates: Readonly<Record<string, CourseSyncDisplayState>>;
   readonly courses: readonly CanvasCourseInventoryItem[];
   readonly isDisconnecting: boolean;
@@ -589,9 +689,11 @@ function ConnectedCanvasState({
     courseId: string,
     courseName: string,
   ) => void;
+  readonly onCancelCourseSync: (courseId: string) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
   readonly onRefresh: () => void;
   readonly onSaveSelection: () => void;
+  readonly onSyncCourse: (courseId: string) => void;
   readonly onSyncSelected: () => void;
   readonly onToggleCourse: (courseId: string) => void;
   readonly savedSelectedCourseIds: readonly string[];
@@ -681,11 +783,14 @@ function ConnectedCanvasState({
             {selectedCourses.map((course) => (
               <CourseSelectionRow
                 course={course}
+                health={courseHealthStates[course.id]}
                 isSelected={selectedCourseIds.includes(course.id)}
                 key={course.id}
                 onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+                onCancelSync={onCancelCourseSync}
                 onOpenGrades={onOpenGrades}
                 onToggle={onToggleCourse}
+                onSyncAgain={onSyncCourse}
                 syncState={courseSyncStates[course.id]}
               />
             ))}
@@ -698,37 +803,49 @@ function ConnectedCanvasState({
 
       <CourseSection
         courses={likelyCurrent}
+        courseHealthStates={courseHealthStates}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onCancelCourseSync={onCancelCourseSync}
         onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
+        onSyncCourse={onSyncCourse}
         selectedCourseIds={selectedCourseIds}
         title="Likely current"
       />
       <CourseSection
         courses={past}
+        courseHealthStates={courseHealthStates}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onCancelCourseSync={onCancelCourseSync}
         onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
+        onSyncCourse={onSyncCourse}
         selectedCourseIds={selectedCourseIds}
         title="Past or concluded"
       />
       <CourseSection
         courses={uncertain}
+        courseHealthStates={courseHealthStates}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onCancelCourseSync={onCancelCourseSync}
         onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
+        onSyncCourse={onSyncCourse}
         selectedCourseIds={selectedCourseIds}
         title="Other or uncertain"
       />
       <CourseSection
         courses={unavailable}
+        courseHealthStates={courseHealthStates}
         courseSyncStates={courseSyncStates}
         onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+        onCancelCourseSync={onCancelCourseSync}
         onOpenGrades={onOpenGrades}
         onToggleCourse={onToggleCourse}
+        onSyncCourse={onSyncCourse}
         selectedCourseIds={selectedCourseIds}
         title="Unavailable"
       />
@@ -738,20 +855,26 @@ function ConnectedCanvasState({
 
 function CourseSection({
   courses,
+  courseHealthStates,
   courseSyncStates,
+  onCancelCourseSync,
   onCreateReviewerFromCanvas,
   onOpenGrades,
+  onSyncCourse,
   onToggleCourse,
   selectedCourseIds,
   title,
 }: {
   readonly courses: readonly CanvasCourseInventoryItem[];
+  readonly courseHealthStates: Readonly<Record<string, CanvasCourseSyncHealth>>;
   readonly courseSyncStates: Readonly<Record<string, CourseSyncDisplayState>>;
+  readonly onCancelCourseSync: (courseId: string) => void;
   readonly onCreateReviewerFromCanvas: (
     courseId: string,
     courseName: string,
   ) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
+  readonly onSyncCourse: (courseId: string) => void;
   readonly onToggleCourse: (courseId: string) => void;
   readonly selectedCourseIds: readonly string[];
   readonly title: string;
@@ -767,11 +890,14 @@ function CourseSection({
         {courses.map((course) => (
           <CourseSelectionRow
             course={course}
+            health={courseHealthStates[course.id]}
             isSelected={selectedCourseIds.includes(course.id)}
             key={course.id}
             onCreateReviewerFromCanvas={onCreateReviewerFromCanvas}
+            onCancelSync={onCancelCourseSync}
             onOpenGrades={onOpenGrades}
             onToggle={onToggleCourse}
+            onSyncAgain={onSyncCourse}
             syncState={courseSyncStates[course.id]}
           />
         ))}
@@ -782,19 +908,25 @@ function CourseSection({
 
 function CourseSelectionRow({
   course,
+  health,
   isSelected,
+  onCancelSync,
   onCreateReviewerFromCanvas,
   onOpenGrades,
+  onSyncAgain,
   onToggle,
   syncState,
 }: {
   readonly course: CanvasCourseInventoryItem;
+  readonly health: CanvasCourseSyncHealth | undefined;
   readonly isSelected: boolean;
+  readonly onCancelSync: (courseId: string) => void;
   readonly onCreateReviewerFromCanvas: (
     courseId: string,
     courseName: string,
   ) => void;
   readonly onOpenGrades: (courseId: string, courseName: string) => void;
+  readonly onSyncAgain: (courseId: string) => void;
   readonly onToggle: (courseId: string) => void;
   readonly syncState: CourseSyncDisplayState | undefined;
 }) {
@@ -824,6 +956,44 @@ function CourseSelectionRow({
         <Text style={styles.summaryMeta}>
           {formatCourseSyncState(syncState, course)}
         </Text>
+        <Text style={styles.summaryMeta}>
+          Health: {formatSyncHealth(health?.overallHealth ?? course.syncHealth?.overallHealth)}
+        </Text>
+        {health ? (
+          <View style={styles.scopeHealthList} testID={`canvas-sync-health-${course.id}`}>
+            {(["content", "announcements", "files", "grades"] as const).map(
+              (scope) => (
+                <Text key={scope} style={styles.scopeHealthText}>
+                  {formatScopeName(scope)}: {formatSyncHealth(health.scopes[scope].health)}
+                </Text>
+              ),
+            )}
+          </View>
+        ) : null}
+        {syncState?.status === "running" && syncState.job &&
+        syncState.job.stage !== "promoting_scopes" &&
+        syncState.job.stage !== "storing_result" ? (
+          <Button
+            onPress={() => onCancelSync(course.id)}
+            testID={`canvas-cancel-sync-${course.id}`}
+            variant="danger"
+          >
+            Cancel
+          </Button>
+        ) : null}
+        {syncState?.status !== "running" &&
+        (
+          health?.overallHealth === "needs_attention" ||
+          health?.overallHealth === "stale"
+        ) ? (
+          <Button
+            onPress={() => onSyncAgain(course.id)}
+            testID={`canvas-sync-again-${course.id}`}
+            variant="secondary"
+          >
+            Sync again
+          </Button>
+        ) : null}
         {canCreateReviewer ? (
           <Button
             onPress={() =>
@@ -1133,12 +1303,30 @@ function displayStateForJob(
     job.status === "running" ||
     job.status === "cancellation_requested"
   ) {
-    return { status: "running", progressMessage: job.progress.message };
+    return {
+      job,
+      status: "running",
+      progressMessage: job.progress.message,
+    };
   }
   if (job.status === "succeeded") {
-    return { status: "success", progressMessage: "Synchronization complete" };
+    return job.outcome === "partial"
+      ? {
+          job,
+          status: "partial",
+          progressMessage: "Sync completed, but some areas need attention",
+        }
+      : {
+          job,
+          status: "success",
+          progressMessage:
+            job.outcome === "unchanged"
+              ? "Already up to date"
+              : "Synchronization complete",
+        };
   }
   return {
+    job,
     status: "failed",
     error: {
       code: "storage_failed",
@@ -1149,6 +1337,29 @@ function displayStateForJob(
           : "Canvas synchronization needs attention."),
     },
   };
+}
+
+function formatSyncHealth(
+  health: CanvasCourseSyncHealth["overallHealth"] | undefined,
+): string {
+  switch (health) {
+    case "not_synced":
+      return "Not synced";
+    case "syncing":
+      return "Syncing";
+    case "healthy":
+      return "Healthy";
+    case "needs_attention":
+      return "Needs attention";
+    case "stale":
+      return "Stale";
+    default:
+      return "Not checked";
+  }
+}
+
+function formatScopeName(scope: keyof CanvasCourseSyncHealth["scopes"]): string {
+  return scope.charAt(0).toUpperCase() + scope.slice(1);
 }
 
 function sameStringSet(
@@ -1250,6 +1461,17 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
+  },
+  scopeHealthList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[2],
+  },
+  scopeHealthText: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 17,
   },
   capabilityList: {
     gap: spacing[2],

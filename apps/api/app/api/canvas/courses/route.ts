@@ -4,6 +4,7 @@ import {
   requireCanvasAuth,
 } from "@/lib/canvas-routes";
 import { loadCanvasCourseInventory } from "@/lib/canvas-course-selection";
+import { loadCanvasCourseInventoryHealth } from "@/lib/canvas-sync-health";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,10 +33,21 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
+  const health = await loadCanvasCourseInventoryHealth({
+      courseIds: inventory.value.courses.map((course) => course.id),
+      userId: auth.value.user.id,
+    }).catch(() => new Map());
   return jsonResponse(
     {
       ok: true,
-      courses: inventory.value.courses,
+      courses: inventory.value.courses.map((course) => ({
+        ...course,
+        syncHealth: health.get(course.id) ?? {
+          attentionScopeCount: 0,
+          overallHealth: "not_synced",
+          staleScopeCount: 0,
+        },
+      })),
       counts: inventory.value.counts,
       selectedCourseIds: inventory.value.selectedCourseIds,
     },

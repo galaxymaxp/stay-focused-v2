@@ -2,7 +2,7 @@
 
 Last refreshed: 2026-07-28, Asia/Manila.
 
-## Active objective - Phase 5F.1 closeout and Phase 5F.2 planning
+## Active objective - Phase 5F.2 hosted rollout validation
 
 - Durable extraction/reviewer resilience validation is complete: runtime
   recreation, temporary client disconnection, and explicit cancellation pass
@@ -22,9 +22,19 @@ Last refreshed: 2026-07-28, Asia/Manila.
   `succeeded`, the cancelled job has no result, and every validation job has a
   Vercel Workflow run reference. Vercel returned no error/fatal runtime logs in
   the validation window.
-- The next development task is a focused Phase 5F.2 plan for incremental
-  per-item checkpoints, bounded retry-after behavior, stale/deleted item
-  handling, and user-visible synchronization health.
+- Phase 5F.2 is implemented: content and grade jobs now use deterministic
+  database-owned page/item units, private staging, recoverable leases,
+  connection-level concurrency limits, durable rate-limit waits, atomic scope
+  promotion, same-job retry, and course/scope health.
+- Mobile supports nullable expanding totals, typed partial outcomes, aggregate
+  scope health, Sync again, Cancel, and foreground/restart reconciliation
+  without exposing source bodies or Canvas identifiers.
+- The V2 migration is applied and verified. Local Canvas/API/mobile/OCR tests,
+  Workflow runtime tests, root typecheck/build, and all 290 reviewer
+  evaluations pass.
+- Current gate: deploy the task-only build to `stay-focused-v2-prototype`, then
+  validate one private content sync and one grade sync plus interruption,
+  retry, cancellation, and deletion safety with sanitized evidence.
 - Release reminder: later physically spot-check Expo Go reload, temporary
   network loss, and explicit cancellation. This reminder is not a timed
   notification and does not block current development.

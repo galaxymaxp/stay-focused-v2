@@ -257,16 +257,70 @@ export type CanvasSyncJobStatus =
 export type CanvasSyncJobStage =
   | "waiting_to_start"
   | "preparing_course"
+  | "planning_sync"
+  | "fetching_pages"
+  | "reading_item_details"
+  | "checking_changes"
+  | "promoting_scopes"
   | "synchronizing_content"
   | "synchronizing_grades"
   | "storing_result"
   | "complete";
+export type CanvasSyncJobOutcome =
+  | "success"
+  | "unchanged"
+  | "partial"
+  | "failed"
+  | "cancelled";
+export type CanvasSyncJobUnitStatus =
+  | "queued"
+  | "running"
+  | "retry_wait"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "skipped";
+export type CanvasSyncScope =
+  | "content"
+  | "announcements"
+  | "files"
+  | "grades";
+export type CanvasSyncScopeHealthStatus =
+  | "not_synced"
+  | "syncing"
+  | "healthy"
+  | "partial"
+  | "stale"
+  | "failed";
+export type CanvasSyncItemState =
+  | "discovered"
+  | "synced"
+  | "metadata_only"
+  | "locked"
+  | "unpublished"
+  | "permission_denied"
+  | "external"
+  | "unsupported_format"
+  | "download_failed"
+  | "parse_failed"
+  | "ocr_failed"
+  | "stale"
+  | "deleted_from_canvas"
+  | "temporarily_failed";
 export type CanvasSyncJobDatabaseRow =
   Database["public"]["Tables"]["canvas_sync_jobs"]["Row"];
 export type CanvasSyncJobInsert =
   Database["public"]["Tables"]["canvas_sync_jobs"]["Insert"];
 export type CanvasSyncJobUpdate =
   Database["public"]["Tables"]["canvas_sync_jobs"]["Update"];
+export type CanvasSyncJobUnitRow =
+  Database["public"]["Tables"]["canvas_sync_job_units"]["Row"];
+export type CanvasSyncJobStagingRow =
+  Database["public"]["Tables"]["canvas_sync_job_staging"]["Row"];
+export type CanvasCourseSyncScopeStateRow =
+  Database["public"]["Tables"]["canvas_course_sync_scope_states"]["Row"];
+export type CanvasCourseItemSyncStateRow =
+  Database["public"]["Tables"]["canvas_course_item_sync_states"]["Row"];
 export type CanvasCourseSyncStateRow =
   Database["public"]["Tables"]["canvas_course_sync_states"]["Row"];
 export type CanvasCourseSyncStateInsert =
@@ -1550,8 +1604,12 @@ export interface Database {
           completed_units: number | null;
           total_units: number | null;
           unit_label: "operations" | null;
+          progress_total_known: boolean;
+          checkpoint_version: string | null;
+          deadline_at: string | null;
           source_metadata: Json;
           result_summary: Json | null;
+          result_outcome: CanvasSyncJobOutcome | null;
           idempotency_key: string;
           request_fingerprint: string;
           retry_idempotency_key: string | null;
@@ -1585,8 +1643,12 @@ export interface Database {
           completed_units?: number | null;
           total_units?: number | null;
           unit_label?: "operations" | null;
+          progress_total_known?: boolean;
+          checkpoint_version?: string | null;
+          deadline_at?: string | null;
           source_metadata?: Json;
           result_summary?: Json | null;
+          result_outcome?: CanvasSyncJobOutcome | null;
           idempotency_key: string;
           request_fingerprint: string;
           retry_idempotency_key?: string | null;
@@ -1620,8 +1682,12 @@ export interface Database {
           completed_units?: number | null;
           total_units?: number | null;
           unit_label?: "operations" | null;
+          progress_total_known?: boolean;
+          checkpoint_version?: string | null;
+          deadline_at?: string | null;
           source_metadata?: Json;
           result_summary?: Json | null;
+          result_outcome?: CanvasSyncJobOutcome | null;
           idempotency_key?: string;
           request_fingerprint?: string;
           retry_idempotency_key?: string | null;
@@ -1673,6 +1739,221 @@ export interface Database {
             referencedColumns: ["id"];
           },
         ];
+      };
+      canvas_sync_job_units: {
+        Row: {
+          id: string;
+          job_id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          unit_key: string;
+          unit_kind: string;
+          scope: CanvasSyncScope;
+          status: CanvasSyncJobUnitStatus;
+          page_index: number;
+          is_discovery: boolean;
+          checkpoint: Json;
+          attempt_count: number;
+          max_attempts: number;
+          available_at: string;
+          lease_owner: string | null;
+          lease_expires_at: string | null;
+          safe_error_code: string | null;
+          safe_error_message: string | null;
+          retryable: boolean;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          unit_key: string;
+          unit_kind: string;
+          scope: CanvasSyncScope;
+          status?: CanvasSyncJobUnitStatus;
+          page_index?: number;
+          is_discovery?: boolean;
+          checkpoint?: Json;
+          attempt_count?: number;
+          max_attempts?: number;
+          available_at?: string;
+          lease_owner?: string | null;
+          lease_expires_at?: string | null;
+          safe_error_code?: string | null;
+          safe_error_message?: string | null;
+          retryable?: boolean;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["canvas_sync_job_units"]["Insert"]
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "canvas_sync_job_units_job_owner_fkey";
+            columns: ["job_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_sync_jobs";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_sync_job_units_connection_owner_fkey";
+            columns: ["canvas_connection_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_connections";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_sync_job_units_course_owner_fkey";
+            columns: ["course_id", "user_id", "canvas_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_courses";
+            referencedColumns: ["id", "user_id", "canvas_connection_id"];
+          },
+        ];
+      };
+      canvas_sync_job_staging: {
+        Row: {
+          id: string;
+          job_id: string;
+          unit_id: string;
+          user_id: string;
+          scope: CanvasSyncScope;
+          payload_kind: string;
+          payload: Json;
+          expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          unit_id: string;
+          user_id: string;
+          scope: CanvasSyncScope;
+          payload_kind: string;
+          payload: Json;
+          expires_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["canvas_sync_job_staging"]["Insert"]
+        >;
+        Relationships: [
+          {
+            foreignKeyName: "canvas_sync_job_staging_job_owner_fkey";
+            columns: ["job_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_sync_jobs";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "canvas_sync_job_staging_unit_fkey";
+            columns: ["unit_id"];
+            isOneToOne: true;
+            referencedRelation: "canvas_sync_job_units";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      canvas_course_sync_scope_states: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          scope: CanvasSyncScope;
+          health_status: CanvasSyncScopeHealthStatus;
+          last_job_id: string | null;
+          last_checked_at: string | null;
+          last_successful_at: string | null;
+          synced_count: number;
+          metadata_only_count: number;
+          temporarily_failed_count: number;
+          stale_count: number;
+          deleted_count: number;
+          safe_message: string | null;
+          safe_error_code: string | null;
+          retryable: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          scope: CanvasSyncScope;
+          health_status?: CanvasSyncScopeHealthStatus;
+          last_job_id?: string | null;
+          last_checked_at?: string | null;
+          last_successful_at?: string | null;
+          synced_count?: number;
+          metadata_only_count?: number;
+          temporarily_failed_count?: number;
+          stale_count?: number;
+          deleted_count?: number;
+          safe_message?: string | null;
+          safe_error_code?: string | null;
+          retryable?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["canvas_course_sync_scope_states"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      canvas_course_item_sync_states: {
+        Row: {
+          id: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          scope: CanvasSyncScope;
+          item_kind: string;
+          item_key_hash: string;
+          item_state: CanvasSyncItemState;
+          source_updated_at: string | null;
+          source_fingerprint: string | null;
+          last_seen_job_id: string | null;
+          last_seen_at: string;
+          last_successful_at: string | null;
+          safe_error_code: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          canvas_connection_id: string;
+          course_id: string;
+          scope: CanvasSyncScope;
+          item_kind: string;
+          item_key_hash: string;
+          item_state?: CanvasSyncItemState;
+          source_updated_at?: string | null;
+          source_fingerprint?: string | null;
+          last_seen_job_id?: string | null;
+          last_seen_at?: string;
+          last_successful_at?: string | null;
+          safe_error_code?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["canvas_course_item_sync_states"]["Insert"]
+        >;
+        Relationships: [];
       };
       canvas_sync_runs: {
         Row: {
@@ -3964,7 +4245,7 @@ export interface Database {
           p_stage: string;
           p_status_message: string;
           p_completed_units: number;
-          p_total_units: number;
+          p_total_units: number | null;
         };
         Returns: CanvasSyncJobDatabaseRow[];
       };
@@ -4015,6 +4296,103 @@ export interface Database {
           p_stale_after_seconds?: number;
         };
         Returns: number;
+      };
+      initialize_canvas_sync_job_plan_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_checkpoint_version: string;
+          p_units: Json;
+        };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      claim_canvas_sync_job_units_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_limit?: number;
+          p_lease_seconds?: number;
+        };
+        Returns: CanvasSyncJobUnitRow[];
+      };
+      begin_canvas_sync_job_unit_attempt_v2: {
+        Args: {
+          p_unit_id: string;
+          p_worker_id: string;
+          p_lease_seconds?: number;
+        };
+        Returns: CanvasSyncJobUnitRow[];
+      };
+      complete_canvas_sync_job_unit_v2: {
+        Args: {
+          p_unit_id: string;
+          p_worker_id: string;
+          p_payload_kind: string;
+          p_payload: Json | null;
+          p_discovered_units?: Json;
+        };
+        Returns: CanvasSyncJobUnitRow[];
+      };
+      defer_canvas_sync_job_unit_v2: {
+        Args: {
+          p_unit_id: string;
+          p_worker_id: string;
+          p_error_code: string;
+          p_safe_error_message: string;
+          p_available_at: string;
+        };
+        Returns: CanvasSyncJobUnitRow[];
+      };
+      fail_canvas_sync_job_unit_v2: {
+        Args: {
+          p_unit_id: string;
+          p_worker_id: string;
+          p_error_code: string;
+          p_safe_error_message: string;
+          p_retryable: boolean;
+        };
+        Returns: CanvasSyncJobUnitRow[];
+      };
+      cancel_canvas_sync_job_plan_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+        };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      begin_canvas_sync_promotion_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+        };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      record_canvas_course_sync_health_v2: {
+        Args: {
+          p_job_id: string;
+          p_scopes: Json;
+          p_items: Json;
+        };
+        Returns: boolean;
+      };
+      complete_canvas_sync_job_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_outcome: CanvasSyncJobOutcome;
+          p_result_summary: Json;
+        };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      fail_canvas_sync_job_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_error_code: string;
+          p_safe_error_message: string;
+          p_retryable: boolean;
+        };
+        Returns: CanvasSyncJobDatabaseRow[];
       };
       begin_canvas_sync_run: {
         Args: {
