@@ -24,80 +24,111 @@ async function main(): Promise<void> {
     await refreshCanvasConnection(accessToken);
   }
   const inventory = await request("/api/canvas/courses", accessToken);
-  const selectedCourseIds = readStrings(inventory.selectedCourseIds);
+  const originalSelectedCourseIds = readStrings(inventory.selectedCourseIds);
+  let selectedCourseIds = originalSelectedCourseIds;
+  let usedTemporarySelection = false;
+  if (
+    selectedCourseIds.length === 0 &&
+    process.env.CANVAS_SYNC_VALIDATION_ALLOW_TEMPORARY_SELECTION === "1"
+  ) {
+    const courseId = chooseTemporaryCourseId(inventory.courses);
+    await saveCoursePreferences(accessToken, [courseId]);
+    selectedCourseIds = [courseId];
+    usedTemporarySelection = true;
+  }
   if (selectedCourseIds.length === 0) {
-    throw new Error("No selected Canvas course is available for validation.");
+    throw new Error(
+      "No selected Canvas course is available for validation. Select a course or explicitly allow a temporary selection.",
+    );
   }
   const courseId = selectedCourseIds[0]!;
+  let summary: Record<string, unknown> | null = null;
 
-  const contentKey = `validation:canvas-content:${randomUUID()}`;
-  const contentStartedAt = Date.now();
-  const content = await createJob(
-    accessToken,
-    courseId,
-    "sync",
-    contentKey,
-  );
-  const replay = await createJob(
-    accessToken,
-    courseId,
-    "sync",
-    contentKey,
-  );
-  assert(content.id === replay.id, "content idempotent replay");
+  try {
+    const contentKey = `validation:canvas-content:${randomUUID()}`;
+    const contentStartedAt = Date.now();
+    const content = await createJob(
+      accessToken,
+      courseId,
+      "sync",
+      contentKey,
+    );
+    const replay = await createJob(
+      accessToken,
+      courseId,
+      "sync",
+      contentKey,
+    );
+    assert(content.id === replay.id, "content idempotent replay");
 
-  // Simulate a destroyed client runtime: retain only the durable ID and do not
-  // poll until a later reconciliation.
-  await delay(3_000);
-  const contentFinal = await waitForTerminal(accessToken, content.id);
-  assert(contentFinal.status === "succeeded", "content job success");
+    // Simulate a destroyed client runtime: retain only the durable ID and do not
+    // poll until a later reconciliation.
+    await delay(3_000);
+    const contentFinal = await waitForTerminal(accessToken, content.id);
+    assert(contentFinal.status === "succeeded", "content job success");
 
-  const gradeStartedAt = Date.now();
-  const grade = await createJob(
-    accessToken,
-    courseId,
-    "grades/sync",
-    `validation:canvas-grades:${randomUUID()}`,
-  );
-  await delay(3_000);
-  const gradeFinal = await waitForTerminal(accessToken, grade.id);
-  assert(gradeFinal.status === "succeeded", "grade job success");
+    const gradeStartedAt = Date.now();
+    const grade = await createJob(
+      accessToken,
+      courseId,
+      "grades/sync",
+      `validation:canvas-grades:${randomUUID()}`,
+    );
+    await delay(3_000);
+    const gradeFinal = await waitForTerminal(accessToken, grade.id);
+    assert(gradeFinal.status === "succeeded", "grade job success");
 
-  const cancellation = await createJob(
-    accessToken,
-    courseId,
-    "sync",
-    `validation:canvas-cancel:${randomUUID()}`,
-  );
-  const cancellationResponse = await request(
-    `/api/canvas/sync-jobs/${encodeURIComponent(cancellation.id)}/cancel`,
-    accessToken,
-    { method: "POST" },
-  );
-  const cancelledFinal = terminal.has(String(cancellationResponse.status))
-    ? cancellationResponse
-    : await waitForTerminal(accessToken, cancellation.id);
-  assert(cancelledFinal.status === "cancelled", "explicit cancellation");
-  assert(cancelledFinal.resultAvailable === false, "cancelled result hidden");
+    const cancellation = await createJob(
+      accessToken,
+      courseId,
+      "sync",
+      `validation:canvas-cancel:${randomUUID()}`,
+    );
+    const cancellationResponse = await request(
+      `/api/canvas/sync-jobs/${encodeURIComponent(cancellation.id)}/cancel`,
+      accessToken,
+      { method: "POST" },
+    );
+    const cancelledFinal = terminal.has(String(cancellationResponse.status))
+      ? cancellationResponse
+      : await waitForTerminal(accessToken, cancellation.id);
+    assert(cancelledFinal.status === "cancelled", "explicit cancellation");
+    assert(cancelledFinal.resultAvailable === false, "cancelled result hidden");
 
+    summary = {
+      cancellation: {
+        jobId: cancellation.id,
+        resultAvailable: cancelledFinal.resultAvailable,
+        status: cancelledFinal.status,
+      },
+      content: {
+        attemptCount: contentFinal.attemptCount,
+        durationMs: Date.now() - contentStartedAt,
+        jobId: content.id,
+        replayedSameJob: content.id === replay.id,
+        status: contentFinal.status,
+      },
+      courseSelection: {
+        temporary: usedTemporarySelection,
+      },
+      grade: {
+        attemptCount: gradeFinal.attemptCount,
+        durationMs: Date.now() - gradeStartedAt,
+        jobId: grade.id,
+        status: gradeFinal.status,
+      },
+    };
+  } finally {
+    if (usedTemporarySelection) {
+      await saveCoursePreferences(accessToken, originalSelectedCourseIds);
+    }
+  }
+  assert(summary !== null, "validation summary");
   console.info(JSON.stringify({
-    cancellation: {
-      jobId: cancellation.id,
-      resultAvailable: cancelledFinal.resultAvailable,
-      status: cancelledFinal.status,
-    },
-    content: {
-      attemptCount: contentFinal.attemptCount,
-      durationMs: Date.now() - contentStartedAt,
-      jobId: content.id,
-      replayedSameJob: content.id === replay.id,
-      status: contentFinal.status,
-    },
-    grade: {
-      attemptCount: gradeFinal.attemptCount,
-      durationMs: Date.now() - gradeStartedAt,
-      jobId: grade.id,
-      status: gradeFinal.status,
+    ...summary,
+    courseSelection: {
+      restoredAfterValidation: usedTemporarySelection,
+      temporary: usedTemporarySelection,
     },
   }));
 }
@@ -111,6 +142,50 @@ async function refreshCanvasConnection(accessToken: string): Promise<void> {
     headers: { "Content-Type": "application/json" },
     method: "PUT",
   });
+}
+
+async function saveCoursePreferences(
+  accessToken: string,
+  selectedCourseIds: readonly string[],
+): Promise<void> {
+  await request("/api/canvas/course-preferences", accessToken, {
+    body: JSON.stringify({ selectedCourseIds }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT",
+  });
+}
+
+function chooseTemporaryCourseId(value: unknown): string {
+  const courses = Array.isArray(value)
+    ? value.filter(
+        (course): course is Record<string, unknown> =>
+          typeof course === "object" &&
+          course !== null &&
+          !Array.isArray(course),
+      )
+    : [];
+  const configured = process.env.CANVAS_SYNC_VALIDATION_COURSE_ID?.trim();
+  if (configured) {
+    const found = courses.find((course) => course.id === configured);
+    if (!found) {
+      throw new Error(
+        "The configured Canvas validation course is unavailable for this connection.",
+      );
+    }
+    return configured;
+  }
+  const likelyCurrent = courses.find(
+    (course) =>
+      course.classification === "likely_current" &&
+      typeof course.id === "string",
+  );
+  const fallback = likelyCurrent ?? courses.find(
+    (course) => typeof course.id === "string",
+  );
+  if (!fallback || typeof fallback.id !== "string") {
+    throw new Error("No usable Canvas course is available for validation.");
+  }
+  return fallback.id;
 }
 
 async function signIn(): Promise<string> {

@@ -23,12 +23,16 @@ The user must keep the app open until HTTP 202 acceptance. Native background
 upload and remote push still require a development build; Expo Go provides an
 in-app notice only after foreground reconciliation.
 
-Remaining acceptance is a hosted smoke using an authenticated test account
-with a selected Canvas course, followed by the recorded physical reminder for
-reload, network-loss, and cancellation spot-checks. The V2 API deployment and
-health check pass, but the current stored/local Canvas validation token is
-expired or revoked; a fresh non-sensitive test token is required for that
-Canvas-account smoke.
+Hosted Canvas acceptance now passes using the user-refreshed encrypted
+connection. A temporary likely-current course selection was used and restored
+after validation. The content job succeeded in 46.6 seconds, its idempotent
+replay returned the same job, the grade job succeeded in 20.3 seconds, and the
+explicitly cancelled job published no result. Supabase confirms both successful
+jobs stored their result summaries before completion and all three jobs have
+Vercel Workflow run references. No Vercel error or fatal runtime logs appeared
+during the validation window. The remaining physical Expo Go reload,
+network-loss, and cancellation checks stay on the next-release reminder list;
+they do not block continued development.
 
 ## Product Recovery R6 - Partial Device Acceptance
 

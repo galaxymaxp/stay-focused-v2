@@ -2,7 +2,7 @@
 
 Last refreshed: 2026-07-28, Asia/Manila.
 
-## Active objective - Phase 5F.1 hosted Canvas acceptance
+## Active objective - Phase 5F.1 closeout and Phase 5F.2 planning
 
 - Durable extraction/reviewer resilience validation is complete: runtime
   recreation, temporary client disconnection, and explicit cancellation pass
@@ -13,9 +13,18 @@ Last refreshed: 2026-07-28, Asia/Manila.
 - Mobile persists pre-acceptance idempotency intent plus accepted job state,
   reconciles only while foregrounded, and never treats app backgrounding or a
   polling timeout as cancellation.
-- Before roadmap advancement, run content and grade jobs using a connected
-  neutral Canvas test course and record only safe job IDs, states, counts, and
-  durations.
+- Hosted Canvas content and grade jobs now pass using the refreshed encrypted
+  connection. Content completed in 46.6 seconds, grades completed in 20.3
+  seconds, idempotent replay returned the same content job, and explicit
+  cancellation published no result. The temporary course selection was
+  restored afterward.
+- Supabase confirms the successful results were stored before the jobs reached
+  `succeeded`, the cancelled job has no result, and every validation job has a
+  Vercel Workflow run reference. Vercel returned no error/fatal runtime logs in
+  the validation window.
+- The next development task is a focused Phase 5F.2 plan for incremental
+  per-item checkpoints, bounded retry-after behavior, stale/deleted item
+  handling, and user-visible synchronization health.
 - Release reminder: later physically spot-check Expo Go reload, temporary
   network loss, and explicit cancellation. This reminder is not a timed
   notification and does not block current development.

@@ -4,7 +4,7 @@ Last refreshed: 2026-07-28, Asia/Manila.
 
 ## Phase 5F.1 - Durable Canvas Synchronization
 
-Status: Implementation complete; hosted Canvas-account smoke pending.
+Status: Complete and hosted validated.
 
 - Course-content and grade synchronization are now separate Supabase-owned
   jobs started through Vercel Workflow after HTTP 202 durable acceptance.
@@ -19,11 +19,15 @@ Status: Implementation complete; hosted Canvas-account smoke pending.
   explicit cancellation also pass for the existing extraction/reviewer jobs.
 - Release reminder: before the next mobile release, physically spot-check Expo
   Go reload recovery, temporary network loss, and explicit cancellation.
+- Hosted Canvas validation passed content sync, grade sync, idempotent replay,
+  and explicit cancellation. The temporary validation course selection was
+  restored, successful results were persisted before terminal status, and the
+  cancelled job published no result.
 
-Next task: run one hosted content-sync and one hosted grade-sync job against a
-connected non-sensitive Canvas test course, including foreground recovery and
-cancellation. The current validation token is expired/revoked, so replace it
-with a fresh test-account Canvas token first.
+Next task: plan Phase 5F.2 around incremental per-item checkpoints,
+retry-after-aware low-concurrency synchronization, stale/deleted item handling,
+and user-visible sync health while preserving the Phase 5F.1 durable-job
+boundary.
 
 ## Product Recovery Phase R6 - Partial
 

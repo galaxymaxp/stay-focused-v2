@@ -1945,3 +1945,24 @@ Current route status:
   safely because both the stored and local validation personal-access tokens
   are expired/revoked (`invalid_canvas_token`). A fresh Canvas test token is
   required for the remaining live content/grade smoke.
+
+## 2026-07-28 — hosted Canvas durable-job acceptance passed
+
+- The user refreshed the per-user Canvas personal access token through the
+  mobile connection screen. No token, Canvas source content, grade content, or
+  user identity was printed or committed.
+- Hosted content job `24c20f16-2ad1-4fa2-8a14-a90eb226bd47` succeeded on its
+  first attempt in 46.6 seconds. Replaying the same idempotency key returned
+  that same job.
+- Hosted grade job `55c36bf3-a892-4bf3-a8fb-182f81297beb` succeeded on its
+  first attempt in 20.3 seconds.
+- Cancellation job `00ec52c5-1df7-4e5a-86ff-39ded9a69984` reached `cancelled`
+  with `cancellation_requested` recorded and no result published.
+- Validation temporarily selected one likely-current course because the
+  original selection was empty, then restored the original empty selection.
+- Supabase confirms both successful result summaries were persisted before
+  terminal completion and all three jobs have Workflow run references. Vercel
+  runtime logs contained no error/fatal entries during the validation window.
+- Phase 5F.1 is complete and hosted validated. Keep the physical Expo Go
+  reload/network-loss/cancellation spot-check as a next-release reminder; plan
+  Phase 5F.2 next around incremental checkpoints and user-visible sync health.
