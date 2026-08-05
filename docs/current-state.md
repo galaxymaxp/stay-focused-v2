@@ -33,9 +33,9 @@ Last refreshed: 2026-08-06, Asia/Manila.
   total pages.
 - API and mobile errors are sanitized, native text is inspected before OCR,
   OCR fan-out remains bounded, and Vercel Workflow owns accepted processing.
-- EAS preview configuration targets the hosted API and requests an internal
-  Android APK. No APK exists locally; building/installing it is blocked on EAS
-  account/credential interaction and a physical Android device.
+- The EAS preview APK was built and installed on a physical Android device.
+  Android authentication and hosted API connectivity passed. The specific
+  durable 41-100-page native-text and >40-OCR-required-page matrix remains.
 
 ## Deterministic test baseline
 
@@ -51,8 +51,9 @@ Last refreshed: 2026-08-06, Asia/Manila.
 ## Migration status
 
 - The feature branch contains 41 ordered, uniquely prefixed migrations.
-- `origin/main` has the first 23; the feature remote has 37; local HEAD has all
-  41, including the four newest Canvas migrations.
+- Local HEAD has all 41, including the four newest Canvas migrations.
+  `origin/codex/hosted-processing-prototype` also has all 41. `origin/main` has
+  only the first 23 and is 18 migrations behind the feature branch.
 - Linked Supabase has equivalent history through all 41 schema changes.
   Workflow versions align exactly. The four newest Canvas changes were applied
   remotely under generated versions `20260728022127`, `20260728024021`,
@@ -62,13 +63,15 @@ Last refreshed: 2026-08-06, Asia/Manila.
 
 ## Known blockers and immediate task
 
-- Physical-device acceptance debt remains for Product R6 and the Android APK.
+- Physical-device acceptance debt remains for Product R6 and the durable
+  long-document Android matrix. APK installation, authentication, and hosted
+  API connectivity are no longer blockers.
 - `npm audit` reports 0 critical, 6 high, and 32 moderate findings; the direct
   production high is `next`, and remediation is a separate recovery task.
 - Provenance of tracked historical academic live-output artifacts is not
   established; preserve them and complete a privacy review before removal.
-- Immediate task: authenticate EAS, build/install the preview APK, and run the
-  durable-document Android acceptance matrix without beginning Phase 6.
+- Immediate task: run and record the durable-document Android acceptance matrix
+  with the installed preview build without beginning Phase 6.
 
 ## Authoritative documentation
 

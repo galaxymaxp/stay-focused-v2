@@ -24,8 +24,8 @@ and deterministic mobile retention-test repair are committed.
 
 ## Scope
 
-- Authenticate the existing EAS project and build the `preview` Android APK.
-- Install it on a physical Android device and confirm hosted API connectivity.
+- Preserve the verified EAS `preview` APK build/install evidence; Android
+  authentication and hosted API connectivity already pass.
 - Accept a native-text PDF between 41 and 100 pages without OCR provider use.
 - Confirm a PDF with more than 40 OCR-required pages fails safely before OCR.
 - Confirm accepted work reconciles after switch-away, network interruption, and
@@ -38,7 +38,7 @@ and deterministic mobile retention-test repair are committed.
 - Raising the 100-total-page or 40-OCR-page limits.
 - Automatic/scheduled Canvas synchronization, native background upload, or
   push-notification redesign.
-- Dependency upgrades, migration-history repair, or Claude-specific setup.
+- Dependency upgrades or migration-history repair.
 
 ## Required verification
 
@@ -46,23 +46,24 @@ and deterministic mobile retention-test repair are committed.
 - `npm run test --workspace @stay-focused/api`
 - `npm run test:workflow --workspace @stay-focused/api`
 - `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check`
-- EAS build result, APK installation result, hosted health, and each physical
-  acceptance item recorded as PASS, FAIL, NOT RUN, or BLOCKED.
+- Preserve the EAS build, APK installation, Android authentication, and hosted
+  connectivity evidence; record each remaining physical acceptance item as
+  PASS, FAIL, NOT RUN, or BLOCKED.
 
 ## Known blockers
 
-- No EAS CLI/session token or local APK is available in the reconciled
-  workspace; account/credential interaction is required.
-- No Android device is connected to ADB.
+- The physical Android device must be available again for the remaining matrix;
+  a currently active ADB session is not assumed.
 - Four linked Canvas migrations use remote-generated version aliases; do not
   mutate migration history as part of this sprint.
 - Product Recovery R6 physical iPhone checks remain separate acceptance debt.
 
 ## Completion criteria
 
-The preview APK is reproducibly built and installed, the durable-document
-matrix is recorded truthfully, deterministic checks remain green, no private
-source content is committed, and canonical documentation is reconciled.
+The existing preview build/install evidence remains preserved, the
+durable-document matrix is recorded truthfully, deterministic checks remain
+green, no private source content is committed, and canonical documentation is
+reconciled.
 
 ## Next action after completion
 

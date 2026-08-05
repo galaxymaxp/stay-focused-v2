@@ -315,7 +315,8 @@ Working locally:
 Pending:
 
 - Product Recovery R6 physical iPhone acceptance
-- EAS preview APK build and physical Android durable-document acceptance
+- Physical Android durable-document matrix (preview APK install,
+  authentication, and hosted API connectivity already passed)
 - Remaining secondary Canvas resources and broader parser families
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
@@ -505,8 +506,9 @@ tests do not run that opt-in provider smoke.
 
 ## Next Milestone
 
-Phase 5 is complete through hosted-validated Phase 5F.2. The immediate
-closeout milestone is to build and install the configured EAS preview APK and
-validate durable 41-100-page native-text processing plus safe rejection above
-the 40-OCR-page allowance on a physical Android device. Product Recovery R6
-physical iPhone acceptance remains separate debt. Phase 6 has not started.
+Phase 5 is complete through hosted-validated Phase 5F.2. The EAS preview APK is
+installed and Android authentication plus hosted API connectivity passed. The
+immediate closeout milestone is to validate durable 41-100-page native-text
+processing plus safe rejection above the 40-OCR-page allowance on that physical
+Android path. Product Recovery R6 physical iPhone acceptance remains separate
+debt. Phase 6 has not started.

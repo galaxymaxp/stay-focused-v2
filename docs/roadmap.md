@@ -58,7 +58,7 @@ Status: Complete and hosted validated.
 
 Phase 5F.2 builds on this completed server-owned acceptance boundary.
 
-## Durable-document Android closeout - Implemented, acceptance pending
+## Durable-document Android closeout - Device smoke passed, matrix pending
 
 - Durable processing accepts up to 100 total PDF pages while allowing at most
   40 pages that actually require OCR. Native-text and confirmed blank pages do
@@ -66,11 +66,12 @@ Phase 5F.2 builds on this completed server-owned acceptance boundary.
 - Synchronous and Canvas extraction retain the existing 40-total-page ceiling.
 - Native text is inspected before OCR; an oversized scanned document fails
   safely before provider dispatch, and mobile presents sanitized guidance.
-- EAS preview configuration targets the hosted V2 API and requests an internal
-  Android APK. No APK/device acceptance has run because EAS authentication and
-  a physical Android device are unavailable in the reconciled workspace.
+- The EAS preview APK was built and installed on a physical Android device.
+  Authentication and hosted V2 API connectivity passed. Those checks do not
+  yet prove the durable long-document limits or interruption/reconciliation
+  behavior.
 
-Current acceptance task: build/install the preview APK and validate the
+Current acceptance task: use the installed preview build to validate the
 durable-document matrix on a physical Android device. This is a closeout task,
 not Phase 6.
 
