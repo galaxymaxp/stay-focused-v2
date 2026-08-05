@@ -4,11 +4,12 @@ Stay Focused V2 is a mobile-first, schedule-first student productivity app for
 turning school source material into useful study work. The current product is
 an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
 authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
-Google Cloud OCR-backed source intake. Canvas Phase 5 is complete through the
-hosted-validated Phase 5F.2 durable, incremental, resumable synchronization
-slice. The mobile app includes read-only selected-course grades, Canvas source
-selection, exact reviewer-source preview, durable processing status, and Study
-Library persistence. Canvas access remains manual and user-scoped; there is no
+Google Cloud OCR-backed source intake. Canvas Phase 5 implementation is complete
+through the hosted-validated Phase 5F.2 durable, incremental, resumable
+synchronization slice. The mobile app includes read-only selected-course
+grades, Canvas source selection, exact reviewer-source preview, durable
+processing status, and Study Library persistence. Canvas access remains manual
+and user-scoped; there is no
 scheduled synchronization, submission mutation, local grade calculation, or
 grade-to-reviewer prompt integration. Durable document jobs accept up to 100
 total PDF pages with at most 40 OCR-required pages, while synchronous and

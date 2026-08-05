@@ -306,9 +306,9 @@ complete.
 
 ## Phase 5 - Canvas Synchronization Foundation
 
-Status: Complete through Phase 5F.2, with Phase 5E.6 and Product Recovery R6
-remaining partial only for named physical-device acceptance. Phase 5A is
-complete and live validated; Phase 5B.1
+Status: Implementation complete through Phase 5F.2. Phase 5E.6 and Product
+Recovery R6 acceptance remain partial only for named physical-device checks.
+Phase 5A is complete and live validated; Phase 5B.1
 academic graph foundation is complete; Phase 5B.2 initial full academic graph
 synchronization is complete and live validated; Phase 5B.3A course recovery
 hardening is complete and live validated; Phase 5B.3B incremental persistence
