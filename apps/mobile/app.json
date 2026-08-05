@@ -11,6 +11,12 @@
     "ios": {
       "bundleIdentifier": "com.galaxymaxp.stayfocusedv2"
     },
+    "android": {
+      "package": "com.galaxymaxp.stayfocusedv2",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
     "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-router",
@@ -26,6 +32,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2b3a9db6-3712-4ed0-8365-17d9936562dd"
+      }
+    },
+    "owner": "galaxymaxp"
   }
 }
