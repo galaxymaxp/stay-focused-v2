@@ -42,7 +42,7 @@ Last refreshed: 2026-08-06, Asia/Manila.
 - Mobile: 200/200; API: 548/548; OCR: 27/27; Canvas: 72/72; shared: 6/6.
 - Reviewer engine: 290/290 deterministic evaluations.
 - Root typecheck, lint, and build pass. Turbo reused six of seven typecheck and
-  lint tasks and five of seven build tasks; affected mobile tasks were fresh.
+  lint tasks and six of seven build tasks; affected mobile tasks were fresh.
 - Direct API and mobile typecheck/lint/build checks also pass fresh; mobile lint
   retains four existing import-order warnings and no errors.
 - Workflow runtime: 1/1 passed on isolated rerun. The first run exposed a
