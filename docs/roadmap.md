@@ -31,8 +31,8 @@ was unavailable, while independent announcements advanced and no deletion was
 inferred. Grade synchronization returned `unchanged`, idempotent replay reused
 the same content job, and explicit cancellation published no result.
 
-Next task: perform the three-item physical Expo Go reload, temporary-network,
-and cancellation release spot-check.
+Release acceptance debt: perform the three-item physical Expo Go reload,
+temporary-network, and cancellation spot-check before the next mobile release.
 
 ## Phase 5F.1 - Durable Canvas Synchronization
 
@@ -58,6 +58,22 @@ Status: Complete and hosted validated.
 
 Phase 5F.2 builds on this completed server-owned acceptance boundary.
 
+## Durable-document Android closeout - Implemented, acceptance pending
+
+- Durable processing accepts up to 100 total PDF pages while allowing at most
+  40 pages that actually require OCR. Native-text and confirmed blank pages do
+  not consume the OCR allowance.
+- Synchronous and Canvas extraction retain the existing 40-total-page ceiling.
+- Native text is inspected before OCR; an oversized scanned document fails
+  safely before provider dispatch, and mobile presents sanitized guidance.
+- EAS preview configuration targets the hosted V2 API and requests an internal
+  Android APK. No APK/device acceptance has run because EAS authentication and
+  a physical Android device are unavailable in the reconciled workspace.
+
+Current acceptance task: build/install the preview APK and validate the
+durable-document matrix on a physical Android device. This is a closeout task,
+not Phase 6.
+
 ## Product Recovery Phase R6 - Partial
 
 Automated R6 acceptance passed on 2026-07-15, but physical-device acceptance
@@ -68,8 +84,8 @@ changed, and the R5 automated/protected gates remain green: Canvas 69/69, OCR
 R3/R4/R5 protected validations, PDF OCR web smoke, root lint/typecheck, and
 root production build.
 
-Immediate next task: complete Product Recovery Phase R6 on a physical iPhone
-with Expo Go before starting the next product phase.
+Remaining recovery debt: complete Product Recovery Phase R6 on a physical
+iPhone with Expo Go before claiming R6 complete.
 
 ## Product Recovery Phase R5 — Complete
 
@@ -290,7 +306,9 @@ complete.
 
 ## Phase 5 - Canvas Synchronization Foundation
 
-Status: In progress. Phase 5A is complete and live validated; Phase 5B.1
+Status: Complete through Phase 5F.2, with Phase 5E.6 and Product Recovery R6
+remaining partial only for named physical-device acceptance. Phase 5A is
+complete and live validated; Phase 5B.1
 academic graph foundation is complete; Phase 5B.2 initial full academic graph
 synchronization is complete and live validated; Phase 5B.3A course recovery
 hardening is complete and live validated; Phase 5B.3B incremental persistence
@@ -450,8 +468,8 @@ Validation status as of 2026-07-05:
 
 ### Phase 5B - Academic Graph Synchronization
 
-Status: In progress. Phase 5B.1 is complete as a database and typed Canvas API
-foundation. Phase 5B.2 initial full synchronization is complete as a manual,
+Status: Complete through Phase 5B.4A. Phase 5B.1 is complete as a database and
+typed Canvas API foundation. Phase 5B.2 initial full synchronization is complete as a manual,
 synchronous route with atomic per-course persistence. Phase 5B.3A recovery
 hardening and Phase 5B.3B deterministic incremental persistence are complete.
 Phase 5B.3C1 found no useful 304 support for the currently synchronized
@@ -755,8 +773,8 @@ Deferred from Phase 5B.4A:
 
 ### Phase 5C - File, Attachment, And Media Ingestion
 
-Status: In progress. Phase 5C.1 secure file inventory and bounded selected-file
-ingestion is remotely and live validated for backend behavior, private Storage,
+Status: Complete through Phase 5C.2B. Phase 5C.1 secure file inventory and
+bounded selected-file ingestion is remotely and live validated for backend behavior, private Storage,
 and second-run stability. The account-wide synchronous metadata sync route
 remains over its configured runtime budget in local production-build
 measurement, so deployed production-runtime readiness is not claimed for that
@@ -769,9 +787,9 @@ private Storage OCR preview, edited reviewer handoff, and Study Library
 cleanup. Phase 5D.1 immutable source snapshots, Phase 5D.2 structured
 normalized blocks, and Phase 5D.3 duplicate relationships, source freshness,
 and regeneration readiness are implemented, remotely verified, and
-protected-live validated. Phase 5E planning, Phase 5E.1 data contract and
-database foundation, and Phase 5E.2 read-only Canvas grade client support are
-complete; next roadmap step: Phase 5E.3 explicit synchronized import.
+protected-live validated. The historical Phase 5E next-step text is superseded:
+Phase 5E.1 through 5E.5 are implemented, and Phase 5E.6 remains partial only
+for physical-device acceptance.
 
 #### Phase 5C.1 - Secure File Inventory And Bounded Ingestion Foundation
 
@@ -1059,7 +1077,7 @@ Exit criteria:
 
 ### Phase 5D - Source Normalization, Provenance, And Selective Import
 
-Status: Implemented through Phase 5D.3 and protected-live validated for Phase
+Status: Complete through Phase 5D.3 and protected-live validated for Phase
 5D.1 through Phase 5D.3 on 2026-07-08. Phase 5D.1 is implemented and remotely
 verified as the immutable source-snapshot and exact reviewer-provenance
 foundation. Phase 5D.2 is implemented and remotely verified as the structured
@@ -1149,7 +1167,9 @@ Exit criteria:
 
 ### Phase 5E - Grades, Submissions, Rubrics, And Feedback Foundation
 
-Status: In progress. The implementation-ready plan is recorded in
+Status: Implemented through Phase 5E.5. Phase 5E.6 automated, protected API,
+and Expo Web validation is complete; physical iPhone acceptance remains
+partial. The implementation-ready plan is recorded in
 `docs/ai/phase5e-grades-submissions-plan-20260708.md`. Phase 5E.1 is complete
 in `docs/ai/phase5e1-grades-submissions-foundation-20260708.md`: database
 tables, normalized data contracts, DB types, remote migration verification, and
@@ -1183,7 +1203,7 @@ network-failure preservation. Synchronization is manual and per selected course
 only, Canvas access remains read-only, and no background job, notification,
 durable grade cache, local grade calculation, submission write, private
 submission-content storage, or reviewer prompt integration exists.
-Phase 5E.6 is in progress in
+Phase 5E.6 is partial in
 `docs/ai/phase5e6-mobile-grade-protected-live-validation-20260708.md`:
 automated baseline checks, protected API preflight, Expo Web protected smoke,
 session-only smoke, controlled fictional edge validation, authorization
@@ -1241,15 +1261,18 @@ MVP subphases:
 - Phase 5E.3 - Explicit synchronized import (complete and remotely verified)
 - Phase 5E.4 - Protected API read model (complete and live validated)
 - Phase 5E.5 - Mobile assignment and grade experience (complete and locally validated)
-- Phase 5E.6 - Protected live validation and hardening (in progress)
+- Phase 5E.6 - Protected live validation and hardening (automated/protected
+  validation complete; physical iPhone acceptance pending)
 
-Roadmap result: Phase 5E.6 - in progress. Product Recovery Phases R1, R2, and
+Roadmap result: Phase 5E.6 - partial for physical-device acceptance only.
+Product Recovery Phases R1, R2, and
 R3 are complete and documented in
 `docs/ai/product-recovery-r1-v1-audit-20260713.md`,
 `docs/ai/product-recovery-r2-reviewer-reliability-20260713.md`, and
 `docs/ai/product-recovery-r3-full-document-ocr-20260713.md`.
 
-Next: Product Recovery Phase R4 - Canvas usable-content resolution
+Historical next step at that checkpoint was Product Recovery Phase R4; R4 and
+R5 are now complete and R6 remains partial.
 
 Exit criteria:
 
@@ -1262,7 +1285,8 @@ Exit criteria:
 
 ## Product Recovery
 
-Status: In progress. Phases R1 through R5 are complete.
+Status: Partial. Phases R1 through R5 are complete; R6 automated acceptance is
+complete and its physical-device matrix remains open.
 
 Product Recovery Phase R5 - Complete.
 
@@ -1323,16 +1347,20 @@ Recovery roadmap:
 - Phase R3 - Full-document OCR with page completeness (complete; exact page coverage enforced, OCR 25/25, API 391/391, mobile 130/130, protected five-page extraction 5/5 with reviewer validation passing).
 - Phase R4 - Canvas usable-content resolution (complete; typed terminal states, exact content-only normalization, current fingerprint gate, and zero reviewer calls for non-usable sources).
 - Phase R5 - Simplified student workflow (complete; module ordering, safe capability presentation, staged single-source preview/generation/save, pagination, stale invalidation, and protected end-to-end validation).
-- Phase R6 - Real-device product acceptance.
+- Phase R6 - Real-device product acceptance (partial; automated checks pass,
+  physical iPhone checks remain).
 
-Immediate next task: Phase R6 - Real-device product acceptance.
+Remaining recovery task: Phase R6 physical iPhone acceptance.
 
-Phase 5F remains pending until the reviewer, OCR, and Canvas usefulness
-regressions exposed during physical-device validation have a recovery path.
+Historical note: Phase 5F was pending when this recovery roadmap was written.
+Phase 5F.1 and 5F.2 are now complete and hosted validated as recorded at the
+top of this roadmap.
 
 ### Phase 5F - Incremental And Resilient Synchronization
 
-Status: Pending.
+Status: Complete through Phase 5F.2 and hosted validated. The original scope
+below is retained as the planning record; physical release spot-checks remain
+acceptance debt rather than implementation work.
 
 Scope:
 

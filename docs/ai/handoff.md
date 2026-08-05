@@ -1,5 +1,14 @@
 # Stay Focused V2 - Local Agent Handoff
 
+> **HISTORICAL LOG — NOT AUTHORITATIVE CURRENT STATE**
+>
+> New agents should use `docs/current-state.md`, `docs/roadmap.md`, and
+> `docs/ai/current_sprint.md`, then the relevant ADR. This tracked file is an
+> append-only historical log and is not required default context. The older
+> `handoff.example.md` records the former local-only convention; current policy
+> keeps this log tracked as evidence while current state lives in the three
+> concise documents above.
+
 This handoff is tracked in the repository and must not contain secrets,
 credential values, tokens, or machine-specific local paths beyond repository
 paths.
@@ -1834,7 +1843,7 @@ Current route status:
 - Mobile now persists safe active-job references, stops polling while backgrounded, reconciles on foreground/restart/sign-in, and treats handled timeout/network events without `console.error`. Both normal and Canvas reviewer flows use job creation rather than the 120-second request.
 - Production logic remains subject-neutral; normalization removes only strongly evidenced repeated page-edge templates and retains audit metrics. No fixture-specific vocabulary or headings were added.
 - Production status is PARTIAL until a continuously available worker is deployed. Expo Go can test switch-away/reconnect, but native background upload, push delivery, and terminated-app integration require an Expo/EAS development build.
-- Architecture and limitations: `docs/architecture/ADR-010-durable-processing-jobs.md`.
+- Architecture and limitations: `docs/architecture/ADR-018-durable-processing-jobs.md`.
 
 ### 2026-07-23 durable processing R2 reusable assets and multi-job operation
 - Added owner-scoped `document_assets`, `extraction_results`, immutable `source_versions`, generic `generated_artifacts`, immutable `generated_artifact_versions`, cleanup queue/policy, exact reuse fingerprints, source-edit conflict detection, fair claims, quotas, rate-limit backoff, and transactional artifact publication.

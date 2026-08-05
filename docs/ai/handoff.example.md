@@ -1,11 +1,14 @@
 # Stay Focused V2 - Agent Handoff Template
 
-This file is only a template and a committed example. Real working handoff
-notes belong in `docs/ai/handoff.md`, which is intentionally gitignored.
+This file is a historical template and committed example. Its former policy
+said that `docs/ai/handoff.md` was local-only; that is no longer the repository
+policy. The tracked handoff is now an append-only historical log, while current
+state belongs in `docs/current-state.md`, `docs/roadmap.md`, and
+`docs/ai/current_sprint.md`.
 
-Agents should update the local handoff after every meaningful coding session.
-Do not put current working notes, secrets, or machine-specific details in this
-template.
+Do not update this template with working notes, secrets, or machine-specific
+details. Reconcile the three canonical current-state documents after a
+completed slice and append historical evidence only when it remains useful.
 
 ## Suggested Structure
 

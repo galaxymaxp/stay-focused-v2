@@ -1,4 +1,4 @@
-# ADR-010: Durable processing jobs
+# ADR-018: Durable processing jobs
 
 Status: accepted foundation; production worker deployment pending
 

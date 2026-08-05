@@ -4,59 +4,16 @@ Stay Focused V2 is a mobile-first, schedule-first student productivity app for
 turning school source material into useful study work. The current product is
 an Expo/React Native app backed by a Next.js 15 App Router API, Supabase
 authentication, OpenAI-backed reviewer generation, TypeScript workspaces, and
-Google Cloud OCR-backed source intake. Canvas LMS Phase 5A is implemented,
-live validated, and hardened as a per-user connection foundation. Phase 5B.1
-adds the academic graph schema and typed Canvas retrieval contracts. Phase 5B.2
-adds manually triggered synchronous initial full synchronization into that
-graph with atomic per-course persistence. Phase 5B.3A hardens that sync path
-with operation-specific course failure diagnostics and bounded transient
-retries. Phase 5B.3B adds deterministic incremental persistence: unchanged
-courses still fetch complete Canvas snapshots, but skip database graph
-replacement when the versioned snapshot fingerprint is unchanged. Phase 5B.3C1
-audited conditional-request support and found no useful 304 behavior for the
-currently synchronized Canvas endpoint families. Phase 5B.4A adds backend
-Canvas planner-item and course-announcement synchronization over a bounded
-30-day past and 120-day future window, with no mobile UI yet. Phase 5C.1 adds
-secure Canvas file metadata inventory and a bounded backend ingestion route for
-selected eligible files. Its migration, private Storage posture, protected live
-ingestion, and second-run stability are validated, but the synchronous sync
-route still exceeds its configured runtime budget in local production-build
-measurement. It does not yet parse, OCR, preview, or generate reviewers from
-Canvas file contents. Phase 5C.2A1 adds user-facing Canvas course selection
-and runtime-safe selected-course synchronization: students explicitly select
-eligible courses, preferences persist separately from course inventory, normal
-mobile sync calls independent course-scoped requests with maximum concurrency
-two, and the account-wide route stays available only for diagnostics and future
-background-sync foundations. Phase 5C.2A2 adds the first student-facing
-Canvas source-selection reviewer flow: selected synchronized courses can list
-Pages, assignment descriptions, announcements, and Canvas file metadata;
-students can prepare eligible PDFs/images, preview one ready OCR-backed file
-with stored text sources, edit selected source text; generation reuses the
-existing reviewer API; and saving reuses the existing Study Library. Phase
-5D.1 adds immutable server-side Canvas source provenance for that flow: preview
-sessions, exact edited source snapshots, ordered source items, reviewer
-linkage, and safe Study Library provenance summaries. Protected live
-validation for Phase 5D.1 is blocked until previously exposed local
-credentials are rotated. Phase 5D.2 adds structured normalized blocks and
-selective import: Canvas HTML/OCR sources become bounded server-held blocks,
-students choose exact blocks before preview generation, and selected-block
-provenance is copied into immutable snapshots. Phase 5D.3 adds exact duplicate
-source analysis, repeated-reference provenance, conservative current-source
-status checks, and regeneration-readiness assessment without implementing
-actual reviewer regeneration. Phase 5E planning is complete, Phase 5E.1 adds
-the service-role-only database foundation for read-only Canvas assignment
-submission state and visible grade summaries, Phase 5E.2 adds strictly
-read-only typed Canvas client support for assignment grade metadata, the
-current user's own submissions, and Canvas-provided visible course grade
-summaries, and Phase 5E.3 adds the internal explicit per-selected-course grade
-synchronization service. Phase 5E.4 exposes protected grade API routes for
-explicit selected-course grade synchronization and DB-only assignment,
-submission, visible summary, and sync-status reads. Canvas access remains
-GET-only and manual, and only the explicit sync route can call Canvas. No
-mobile grade UI, background synchronization, notification, local grade
-calculation, submission action, private submission-content storage, or reviewer
-integration exists yet.
-Protected live validation remains blocked pending credential rotation.
+Google Cloud OCR-backed source intake. Canvas Phase 5 is complete through the
+hosted-validated Phase 5F.2 durable, incremental, resumable synchronization
+slice. The mobile app includes read-only selected-course grades, Canvas source
+selection, exact reviewer-source preview, durable processing status, and Study
+Library persistence. Canvas access remains manual and user-scoped; there is no
+scheduled synchronization, submission mutation, local grade calculation, or
+grade-to-reviewer prompt integration. Durable document jobs accept up to 100
+total PDF pages with at most 40 OCR-required pages, while synchronous and
+Canvas extraction remain capped at 40 total pages. Phase 6 and Phase 7 have
+not started. See the concise current-state documents below for live status.
 
 Expo Web is the fast laptop-browser development and regression surface for the
 mobile app. It is not a replacement for the mobile-primary product.
@@ -294,13 +251,13 @@ Working locally:
   visibility, and deleted the validation reviewer. An exploratory generation
   attempt that included the very short/noisy live OCR preview text returned the
   existing `reviewer_validation_failed` response.
-- Phase 5D.2 automated and remote database verification passed for structured
-  normalized blocks and selective import. Migration `202607070004` is applied
+- Phase 5D.2 automated, remote database, and protected live verification passed
+  for structured normalized blocks and selective import. Migration
+  `202607070004` is applied
   remotely; rollback-safe SQL verification passed for private structure
   sessions, selected-block manifests, snapshot block copying, immutability,
   direct grant revocation, service-role grants, RLS, expired cleanup, snapshot
-  reuse, and historical preview compatibility. Protected live validation is
-  blocked pending credential rotation.
+  reuse, and historical preview compatibility.
 - Phase 5D.3 adds duplicate/repeated relationship provenance and reviewer
   source status. Migrations
   `202607080001_add_canvas_source_relationships_freshness.sql` and
@@ -310,7 +267,7 @@ Working locally:
   SQL verification passed with 18/18 checks. The protected source-status API
   compares current synchronized rows to immutable snapshots without Canvas,
   Storage, OCR, PAT decryption, or OpenAI calls. Protected live validation is
-  blocked pending credential rotation.
+  complete.
 - Phase 5E.1 adds the read-only Canvas grades/submissions database
   foundation. Migrations
   `202607080003_add_canvas_grades_submissions_foundation.sql` and
@@ -356,9 +313,9 @@ Working locally:
 
 Pending:
 
-- Phase 5E.5 mobile assignment and grade experience
-- Remaining secondary Canvas resources, broader parser families, and
-  background/resumable sync for larger accounts
+- Product Recovery R6 physical iPhone acceptance
+- EAS preview APK build and physical Android durable-document acceptance
+- Remaining secondary Canvas resources and broader parser families
 - Canvas OAuth production authorization with an institution-approved Developer
   Key before broad public multi-user deployment
 - Task generation and study scheduling
@@ -372,7 +329,7 @@ See [Current State](docs/current-state.md), [Roadmap](docs/roadmap.md), and
 
 The provider-agnostic Stage 0 through Stage 6 pipeline and end-to-end
 `runPipeline` integration are complete. The deterministic engine evaluation
-harness currently reports **266 passed and 0 failed**.
+harness currently reports **290 passed and 0 failed**.
 
 Default visible reviewer content is source-faithful: validation checks visible
 titles, explanations, and key points, while unsupported enrichment is excluded
@@ -520,14 +477,16 @@ tests do not run that opt-in provider smoke.
   partial, failed, old, or ambiguous sync evidence remains `unknown`. Broader
   parser families, source and block diff UI, cross-course bundles, background
   sync, and actual reviewer regeneration remain deferred.
-- Phase 5E.4 exposes protected grade APIs only. The explicit
+- Phase 5E exposes protected grade APIs and a read-only selected-course mobile
+  grade experience. The explicit
   `POST /api/canvas/courses/:courseId/grades/sync` route may call Canvas
   through the Phase 5E.3 service; the grade list, assignment detail, summary,
-  and sync-status GET routes read synchronized database state only. No mobile
-  UI, background synchronization, notifications, local grade estimates,
-  submission actions, private submission content, or reviewer prompt
-  integration exists yet.
-- No background or scheduled Canvas synchronization exists yet.
+  and sync-status GET routes read synchronized database state only. Grade sync
+  may run as a durable user-initiated job; there are no notifications, local
+  grade estimates, submission actions, private submission-content storage, or
+  reviewer-prompt integration.
+- Canvas synchronization runs in durable server-owned background workflows
+  after explicit HTTP 202 acceptance. It is not automatic or scheduled.
 - Phase 5A uses per-user Canvas personal access tokens. There is no
   school-wide Canvas token, and successful validation for one user does not
   prove access for every user, course, role, or institution.
@@ -535,36 +494,18 @@ tests do not run that opt-in provider smoke.
   Live second-user Canvas validation was not run.
 - Canvas OAuth is not implemented yet and is required before presenting the
   integration as broadly deployable public production authorization.
-- Discussions, quiz metadata, file parsing/OCR, endpoint validators,
-  grade/submission/rubric data, announcement attachment content import, and
+- Discussions, quiz metadata, announcement attachment content import, and
   broader Canvas source support are deferred.
 - Task and schedule generation are not implemented.
 - Google and Microsoft OAuth helpers exist, but completed mobile OAuth redirect
   flows are not validated as a finished feature.
-- Production deployment and iPhone production readiness are not complete.
+- The separate V2 prototype deployment is healthy; production mobile and
+  physical-device release acceptance are not complete.
 
 ## Next Milestone
 
-Phase 5A hardening is complete, Phase 5B.1 academic graph foundation is in
-place, Phase 5B.2 initial full academic graph synchronization is live
-validated, and Phase 5B.3A course recovery hardening is live validated. The
-Phase 5B.3B incremental academic graph synchronization foundation is complete
-and live validated. Phase 5B.3C1 conditional-request capability audit is
-complete and does not support Phase 5B.3C2 for the audited endpoints. The
-Phase 5B.4A planner-item and announcement synchronization slice is complete
-with documented live Canvas limitations. Phase 5C.1 file inventory and bounded
-ingestion foundation is remotely and live validated with a documented
-synchronous route-duration limitation. Phase 5C.2A1 selected-course
-synchronization is complete and runtime-safe in local production validation.
-Phase 5C.2A2 Canvas source selection and reviewer handoff is complete and live
-validated. Phase 5C.2B Canvas PDF and image OCR integration is complete and
-live validated for preparation, private Storage OCR preview, edited reviewer
-handoff, and Study Library cleanup. Phase 5D.1 immutable source snapshots and
-exact reviewer provenance is implemented and remotely verified, with protected
-live validation blocked pending credential rotation. Phase 5D.2 structured
-normalized blocks and selective import is implemented and remotely verified,
-with protected live validation blocked pending credential rotation. Phase 5D.3
-duplicate relationships, source freshness, and regeneration readiness is
-implemented, with protected live validation blocked pending credential
-rotation. Phase 5E.4 protected grade APIs are implemented; Phase 5E.5 mobile
-assignment and grade UI is next. Canvas OAuth remains a future phase.
+Phase 5 is complete through hosted-validated Phase 5F.2. The immediate
+closeout milestone is to build and install the configured EAS preview APK and
+validate durable 41-100-page native-text processing plus safe rejection above
+the 40-OCR-page allowance on a physical Android device. Product Recovery R6
+physical iPhone acceptance remains separate debt. Phase 6 has not started.
