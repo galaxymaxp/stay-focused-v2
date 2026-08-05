@@ -83,6 +83,7 @@ export type OcrClientErrorCode =
   | "empty_file"
   | "pdf_encrypted"
   | "pdf_page_limit_exceeded"
+  | "pdf_ocr_page_limit_exceeded"
   | "no_text_detected"
   | "unauthorized"
   | "ocr_not_configured"
@@ -669,6 +670,7 @@ function mapApiErrorCode(code: string): OcrClientErrorCode {
     case "empty_file":
     case "pdf_encrypted":
     case "pdf_page_limit_exceeded":
+    case "pdf_ocr_page_limit_exceeded":
     case "no_text_detected":
     case "ocr_not_configured":
     case "ocr_provider_failed":

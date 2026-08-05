@@ -428,6 +428,13 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
           ? `Choose a PDF with ${error.documentPageLimit} pages or fewer.`
           : "Choose a shorter PDF and try again.",
       };
+    case "pdf_ocr_page_limit_exceeded":
+      return {
+        code: error.code,
+        title: "Too many scanned pages",
+        message:
+          "Use a PDF with selectable text, or split the scanned document into shorter files.",
+      };
     case "pdf_encrypted":
       return {
         code: error.code,

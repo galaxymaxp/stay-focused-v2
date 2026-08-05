@@ -26,6 +26,7 @@ import {
   validatePdfOcrBytes,
 } from "@/lib/ocr/extraction-service";
 import {
+  getConfiguredDurableDocumentMaxPdfPages,
   OCR_MAX_IMAGE_BYTES,
   OCR_MAX_PDF_BYTES,
 } from "@/lib/ocr/upload-policy";
@@ -246,6 +247,7 @@ async function createExtractionJob(
   if (mimeType === OCR_PDF_MIME_TYPE) {
     const validation = await validatePdfOcrBytes({
       bytes,
+      documentMaxPages: getConfiguredDurableDocumentMaxPdfPages(),
       fileName: displayName,
       mimeType,
     });

@@ -1515,6 +1515,7 @@ function toOcrCompatibleJobError(error: ProcessingJobApiError): OcrClientError {
       case "invalid_pdf": return "invalid_pdf";
       case "pdf_encrypted": return "pdf_encrypted";
       case "pdf_page_limit_exceeded": return "pdf_page_limit_exceeded";
+      case "pdf_ocr_page_limit_exceeded": return "pdf_ocr_page_limit_exceeded";
       case "file_too_large": return "file_too_large";
       case "image_too_large": return "image_too_large";
       case "empty_file": return "empty_file";

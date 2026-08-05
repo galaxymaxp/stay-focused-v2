@@ -6,6 +6,7 @@ import {
   validateImageOcrBytes,
   validatePdfOcrBytes,
 } from "@/lib/ocr/extraction-service";
+import { getConfiguredDurableDocumentMaxPdfPages } from "@/lib/ocr/upload-policy";
 import {
   createExtractionProcessingJob,
   ProcessingJobCreationError,
@@ -91,6 +92,7 @@ export async function POST(
     if (intent.mime_type === OCR_PDF_MIME_TYPE) {
       const validation = await validatePdfOcrBytes({
         bytes,
+        documentMaxPages: getConfiguredDurableDocumentMaxPdfPages(),
         fileName: intent.display_name,
         mimeType: intent.mime_type,
       });
@@ -100,7 +102,9 @@ export async function POST(
           validation.code,
           validation.code === "pdf_encrypted"
             ? "Choose a PDF that does not require a password."
-            : "Choose a valid PDF within the configured page limit.",
+            : validation.code === "pdf_page_limit_exceeded"
+              ? `Choose a PDF with ${validation.documentPageLimit ?? 100} pages or fewer.`
+              : "Choose a valid PDF within the configured page limit.",
           false,
         );
       }

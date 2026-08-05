@@ -27,6 +27,7 @@ export type OcrExtractErrorCode =
   | "image_too_large"
   | "pdf_encrypted"
   | "pdf_page_limit_exceeded"
+  | "pdf_ocr_page_limit_exceeded"
   | "file_too_large"
   | "empty_image"
   | "empty_file"

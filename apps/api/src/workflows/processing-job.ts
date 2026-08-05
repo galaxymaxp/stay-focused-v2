@@ -39,6 +39,7 @@ import {
   extractPreparedPdfOcrChunk,
   extractWithOcrProvider,
 } from "@/lib/ocr/extraction-service";
+import { getConfiguredDurableDocumentMaxOcrPages } from "@/lib/ocr/upload-policy";
 import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
 import {
   OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
@@ -284,7 +285,12 @@ async function prepareExtractionStep(
     const warnings: OcrWarning[] = [];
     try {
       inspections = await inspectPdfTextPages(bytes, source.page_count);
-    } catch {
+    } catch (error) {
+      console.warn("processing_workflow.native_text_inspection_unavailable", {
+        jobId,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorCode: readSafeErrorCode(error),
+      });
       inspections = Array.from({ length: source.page_count }, (_, index) => ({
         pageNumber: index + 1,
         kind: "ocr" as const,
@@ -299,6 +305,16 @@ async function prepareExtractionStep(
     const ocrPageNumbers = inspections
       .filter((page) => page.kind === "ocr")
       .map((page) => page.pageNumber);
+    const maxOcrPages = getConfiguredDurableDocumentMaxOcrPages();
+    if (ocrPageNumbers.length > maxOcrPages) {
+      await failKnownWorkflowJob(client, jobId, workerId, {
+        code: "pdf_ocr_page_limit_exceeded",
+        message:
+          "This PDF has too many pages that require OCR. Use a text-enabled PDF or split the document.",
+        retryable: false,
+      });
+      throw new FatalError("pdf_ocr_page_limit_exceeded");
+    }
     const chunks = chunkPageNumbers(ocrPageNumbers).map((pageNumbers, index) => ({
       index,
       pageNumbers,
@@ -600,7 +616,7 @@ async function finalizeExtractionStep(
       }),
       metrics: toJson(metrics),
     });
-  });
+  }, { heartbeatAfterOperation: false });
   safeStepLog("finalize_extraction", "done", jobId);
 }
 
@@ -1061,7 +1077,7 @@ async function finalizeReviewerStep(
       }),
       metrics: toJson(metrics),
     });
-  });
+  }, { heartbeatAfterOperation: false });
   safeStepLog("finalize_reviewer", "done", jobId);
 }
 
@@ -1109,6 +1125,9 @@ async function withWorkflowLease<T>(
   jobId: string,
   workerId: string,
   operation: () => Promise<T>,
+  options: {
+    readonly heartbeatAfterOperation?: boolean;
+  } = {},
 ): Promise<T> {
   await heartbeatProcessingJob(
     client,
@@ -1131,12 +1150,14 @@ async function withWorkflowLease<T>(
   try {
     const result = await operation();
     if (heartbeatError) throw heartbeatError;
-    await heartbeatProcessingJob(
-      client,
-      jobId,
-      workerId,
-      WORKFLOW_JOB_LEASE_SECONDS,
-    );
+    if (options.heartbeatAfterOperation !== false) {
+      await heartbeatProcessingJob(
+        client,
+        jobId,
+        workerId,
+        WORKFLOW_JOB_LEASE_SECONDS,
+      );
+    }
     return result;
   } finally {
     clearInterval(timer);
@@ -1521,6 +1542,18 @@ function safeStepLog(
     step,
     ...(unitId ? { unitId } : {}),
   });
+}
+
+function readSafeErrorCode(error: unknown): string | null {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("code" in error) ||
+    typeof error.code !== "string"
+  ) {
+    return null;
+  }
+  return /^[a-z0-9_.-]{1,80}$/i.test(error.code) ? error.code : null;
 }
 
 function toJson(value: unknown): Json {

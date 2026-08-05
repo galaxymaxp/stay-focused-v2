@@ -68,6 +68,83 @@ describe("extractPdfDocument", () => {
     expect(result.result.pages.every((page) => page.method === "native_text")).toBe(true);
   });
 
+  it("accepts a 54-page native-text deck without consuming the durable OCR allowance", async () => {
+    const pageTexts = Array.from(
+      { length: 54 },
+      (_, index) => `Arduino lesson page ${index + 1}`,
+    );
+    const bytes = await nativePdf(pageTexts);
+    const getProvider = vi.fn(() => {
+      throw new Error("provider should not be created");
+    });
+
+    const result = await extractPdfDocument({
+      getProvider,
+      input: pdfInput(bytes, 54),
+      pageCount: 54,
+      options: { maxOcrPages: 40 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(getProvider).not.toHaveBeenCalled();
+    if (!result.ok) return;
+    expect(result.extraction).toMatchObject({
+      expectedPageCount: 54,
+      processedPageCount: 54,
+      extractionMode: "native_text",
+      nativeTextPageCount: 54,
+      ocrPageCount: 0,
+    });
+  });
+
+  it("allows a mixed durable PDF when no more than 40 pages require OCR", async () => {
+    const bytes = await mixedPdf({ nativePageCount: 10, ocrPageCount: 40 });
+    const provider = sequentialProvider();
+
+    const result = await extractPdfDocument({
+      getProvider: () => provider,
+      input: pdfInput(bytes, 50),
+      pageCount: 50,
+      options: { maxOcrPages: 40 },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.extraction).toMatchObject({
+      expectedPageCount: 50,
+      extractionMode: "mixed",
+      nativeTextPageCount: 10,
+      ocrPageCount: 40,
+      ocrChunkCount: 8,
+    });
+  });
+
+  it("rejects more than 40 OCR-required pages before creating a provider", async () => {
+    const bytes = await scannedPdf(41);
+    const getProvider = vi.fn(() => sequentialProvider());
+
+    const result = await extractPdfDocument({
+      getProvider,
+      input: pdfInput(bytes, 41),
+      pageCount: 41,
+      options: { maxOcrPages: 40 },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(getProvider).not.toHaveBeenCalled();
+    if (result.ok) return;
+    expect(result.failure).toMatchObject({
+      code: "pdf_ocr_page_limit_exceeded",
+      extraction: {
+        status: "failed",
+        expectedPageCount: 41,
+        ocrPageCount: 41,
+        ocrChunkCount: 0,
+        failureCategories: ["ocr_page_limit_exceeded"],
+      },
+    });
+  });
+
   it("merges native, OCR, and confirmed blank pages in original order", async () => {
     const document = await PDFDocument.create();
     const font = await document.embedFont(StandardFonts.Helvetica);
@@ -209,6 +286,28 @@ describe("validatePdfOcrBytes", () => {
       documentPageLimit: 6,
     });
   });
+
+  it("supports a separate 100-page durable acceptance limit", async () => {
+    const accepted = await validatePdfOcrBytes({
+      bytes: await nativePdf(
+        Array.from({ length: 100 }, (_, index) => `Lecture page ${index + 1}`),
+      ),
+      documentMaxPages: 100,
+      mimeType: "application/pdf",
+    });
+    const rejected = await validatePdfOcrBytes({
+      bytes: await scannedPdf(101),
+      documentMaxPages: 100,
+      mimeType: "application/pdf",
+    });
+
+    expect(accepted.ok).toBe(true);
+    expect(rejected).toEqual({
+      ok: false,
+      code: "pdf_page_limit_exceeded",
+      documentPageLimit: 100,
+    });
+  });
 });
 
 async function runExtraction(
@@ -312,6 +411,34 @@ async function nativePdf(pageTexts: readonly string[]): Promise<Uint8Array> {
   const font = await document.embedFont(StandardFonts.Helvetica);
   for (const text of pageTexts) {
     document.addPage().drawText(text, { x: 40, y: 700, font, size: 14 });
+  }
+  return await document.save({ useObjectStreams: false });
+}
+
+async function mixedPdf({
+  nativePageCount,
+  ocrPageCount,
+}: {
+  readonly nativePageCount: number;
+  readonly ocrPageCount: number;
+}): Promise<Uint8Array> {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  for (let index = 0; index < nativePageCount; index += 1) {
+    document.addPage().drawText(`Native page ${index + 1}`, {
+      x: 40,
+      y: 700,
+      font,
+      size: 14,
+    });
+  }
+  for (let index = 0; index < ocrPageCount; index += 1) {
+    document.addPage().drawRectangle({
+      x: 30 + index,
+      y: 600,
+      width: 200,
+      height: 80,
+    });
   }
   return await document.save({ useObjectStreams: false });
 }

@@ -33,6 +33,7 @@ export type DocumentExtractionFailureCategory =
   | "failed_page"
   | "empty_document"
   | "provider_failure"
+  | "ocr_page_limit_exceeded"
   | "timeout"
   | "internal_failure";
 

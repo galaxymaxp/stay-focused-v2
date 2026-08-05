@@ -4,6 +4,7 @@ import type {
 } from "pdfjs-dist/types/src/display/api";
 
 import { normalizeOcrText } from "@stay-focused/ocr";
+import * as pdfJsRuntime from "./pdfjs-runtime";
 
 export type PdfPageInspection =
   | {
@@ -21,7 +22,7 @@ export async function inspectPdfTextPages(
   bytes: Uint8Array,
   expectedPageCount: number,
 ): Promise<readonly PdfPageInspection[]> {
-  const { getDocument, OPS } = await loadPdfJs();
+  const { getDocument, OPS } = pdfJsRuntime;
   const visibleOperatorIds = new Set<number>([
     OPS.showText,
     OPS.showSpacedText,
@@ -83,36 +84,6 @@ export async function inspectPdfTextPages(
   } finally {
     await loadingTask.destroy();
   }
-}
-
-let pdfJsPromise:
-  | Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")>
-  | undefined;
-
-async function loadPdfJs(): Promise<
-  typeof import("pdfjs-dist/legacy/build/pdf.mjs")
-> {
-  if (!pdfJsPromise) {
-    pdfJsPromise = initializePdfRuntime();
-  }
-  return pdfJsPromise;
-}
-
-async function initializePdfRuntime(): Promise<
-  typeof import("pdfjs-dist/legacy/build/pdf.mjs")
-> {
-  const canvas = await import("@napi-rs/canvas");
-  const graphicsGlobals = globalThis as unknown as {
-    DOMMatrix?: unknown;
-    ImageData?: unknown;
-    Path2D?: unknown;
-  };
-
-  graphicsGlobals.DOMMatrix ??= canvas.DOMMatrix;
-  graphicsGlobals.ImageData ??= canvas.ImageData;
-  graphicsGlobals.Path2D ??= canvas.Path2D;
-
-  return import("pdfjs-dist/legacy/build/pdf.mjs");
 }
 
 export function assembleNativePageText(textContent: TextContent): string {

@@ -42,6 +42,7 @@ export type OcrProviderFailureCode =
   | "ocr_not_configured"
   | "ocr_provider_failed"
   | "ocr_empty_result"
+  | "pdf_ocr_page_limit_exceeded"
   | "document_extraction_incomplete"
   | "document_unreadable"
   | "document_extraction_timeout"
@@ -219,6 +220,7 @@ export async function extractPdfDocument({
     readonly chunkConcurrency?: number;
     readonly documentTimeoutMs?: number;
     readonly providerRequestTimeoutMs?: number;
+    readonly maxOcrPages?: number;
     readonly onProgress?: (
       progress: DocumentExtractionProgress,
     ) => void | Promise<void>;
@@ -235,6 +237,7 @@ export async function extractPdfDocument({
           options.chunkConcurrency ?? OCR_PDF_CHUNK_CONCURRENCY,
         getProvider,
         input,
+        maxOcrPages: options.maxOcrPages,
         pageCount,
         providerRequestTimeoutMs:
           options.providerRequestTimeoutMs ?? OCR_PROVIDER_REQUEST_TIMEOUT_MS,
@@ -319,6 +322,7 @@ async function extractPdfDocumentWithinDeadline({
   chunkConcurrency,
   getProvider,
   input,
+  maxOcrPages,
   onProgress,
   pageCount,
   providerRequestTimeoutMs,
@@ -327,6 +331,7 @@ async function extractPdfDocumentWithinDeadline({
   readonly chunkConcurrency: number;
   readonly getProvider: () => OcrProvider;
   readonly input: OcrPdfInput;
+  readonly maxOcrPages?: number;
   readonly pageCount: number;
   readonly providerRequestTimeoutMs: number;
   readonly onProgress?: (
@@ -370,6 +375,42 @@ async function extractPdfDocumentWithinDeadline({
   const ocrPageNumbers = inspections
     .filter((page) => page.kind === "ocr")
     .map((page) => page.pageNumber);
+  if (
+    maxOcrPages !== undefined &&
+    ocrPageNumbers.length > maxOcrPages
+  ) {
+    const nativeTextPageCount = inspections.filter(
+      (page) => page.kind === "native_text",
+    ).length;
+    const blankPageCount = inspections.filter(
+      (page) => page.kind === "blank",
+    ).length;
+    return {
+      ok: false,
+      failure: {
+        code: "pdf_ocr_page_limit_exceeded",
+        extraction: {
+          status: "failed",
+          expectedPageCount: pageCount,
+          processedPageCount: nativeTextPageCount + blankPageCount,
+          successfulPageCount: nativeTextPageCount,
+          blankPageCount,
+          failedPageCount: 0,
+          missingPageNumbers: ocrPageNumbers,
+          duplicatePageNumbers: [],
+          outOfRangePageNumbers: [],
+          invalidPageNumbers: [],
+          affectedPageNumbers: ocrPageNumbers,
+          failureCategories: ["ocr_page_limit_exceeded"],
+          extractionMode: nativeTextPageCount > 0 ? "mixed" : "ocr",
+          nativeTextPageCount,
+          ocrPageCount: ocrPageNumbers.length,
+          ocrChunkCount: 0,
+          ocrChunks: [],
+        },
+      },
+    };
+  }
 
   let providerId = "pdfjs-native-text";
   let chunks: readonly PdfOcrChunk[] = [];

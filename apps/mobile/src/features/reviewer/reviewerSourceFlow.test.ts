@@ -399,6 +399,21 @@ describe("reviewer source flow", () => {
     expect(JSON.stringify(state)).not.toContain("raw detail");
   });
 
+  it("explains the durable OCR-page limit without exposing server detail", () => {
+    const state = reviewerSourceReducer(initialReviewerSourceState, {
+      type: "ocr_failed",
+      error: ocrError("pdf_ocr_page_limit_exceeded", "raw provider detail"),
+    });
+
+    expect(state.ocrError).toMatchObject({
+      code: "pdf_ocr_page_limit_exceeded",
+      title: "Too many scanned pages",
+      message:
+        "Use a PDF with selectable text, or split the scanned document into shorter files.",
+    });
+    expect(JSON.stringify(state)).not.toContain("raw provider detail");
+  });
+
   it("shows password-protected PDF errors safely", () => {
     const state = reviewerSourceReducer(initialReviewerSourceState, {
       type: "ocr_failed",

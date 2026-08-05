@@ -8,7 +8,7 @@ const compat = new FlatCompat({ baseDirectory });
 const eslintConfig = [
   {
     ignores: [
-      ".next/**",
+      ".next*/**",
       ".workflow-test-artifacts/**",
       "app/.well-known/workflow/**",
       "dist/**",

@@ -1,6 +1,6 @@
 # Generalized PDF extraction
 
-Last refreshed: 2026-07-23, Asia/Manila.
+Last refreshed: 2026-07-29, Asia/Manila.
 
 Stay Focused treats a PDF as a sequence of pages, not as a subject-specific
 document. The extraction boundary does not recognize course names, expected
@@ -15,6 +15,9 @@ string for the existing general reviewer pipeline.
 - `DOCUMENT_MAX_PDF_PAGES` is 40. It is the current hard synchronous document
   ceiling, not a provider limit. `DOCUMENT_MAX_PDF_PAGES` in the API
   environment may lower this value but cannot raise it above the hard ceiling.
+- Durable processing jobs accept up to 100 total pages. After embedded-text
+  inspection, at most 40 pages may require OCR. Native-text and confirmed blank
+  pages do not consume that OCR allowance.
 - `OCR_MAX_PDF_BYTES` remains 10 MiB. The existing limit was retained because
   the reproduced defect concerned page count, not upload memory.
 - OCR chunk concurrency is 2. A 40-page all-scan document creates at most eight
@@ -23,10 +26,9 @@ string for the existing general reviewer pipeline.
   operation has a 50-second deadline inside the route's 60-second maximum.
   A document deadline returns a retryable `503` response with `Retry-After`.
 
-These limits intentionally do not claim unlimited PDF support. Forty pages is
-a conservative synchronous ceiling for the current local and Vercel runtime:
-it bounds memory, provider use, and worst-case OCR fan-out while allowing
-documents substantially larger than one provider request.
+These limits intentionally do not claim unlimited PDF support. Forty pages
+remains the conservative synchronous ceiling. Durable Workflow jobs may inspect
+longer classroom decks without increasing worst-case OCR fan-out.
 
 ## Inspection and page classification
 
@@ -91,8 +93,7 @@ internal page/chunk markers do not enter that text.
 
 ## Expansion path
 
-Supporting larger worst-case scanned documents requires an asynchronous
-architecture: durable upload storage, queued OCR jobs, persisted per-page job
-state, retry/idempotency keys, progress polling, and result expiry. Raising the
-synchronous page constant without that architecture would reintroduce timeout
-and provider-usage risk, so it is intentionally out of scope for this route.
+The durable path now provides upload storage, queued jobs, checkpoints,
+idempotency, polling, and result expiry. Raising the 40-page OCR allowance still
+requires separate cost/runtime evidence; a durable document above that limit
+fails before any OCR provider call with `pdf_ocr_page_limit_exceeded`.

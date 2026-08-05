@@ -21,6 +21,7 @@ import {
   extractWithOcrProvider,
   type OcrExtractionResult,
 } from "@/lib/ocr/extraction-service";
+import { getConfiguredDurableDocumentMaxOcrPages } from "@/lib/ocr/upload-policy";
 import { createServerOpenAIProvider } from "@/providers";
 
 import {
@@ -176,6 +177,7 @@ async function processExtractionJob({
       pageCount,
       options: {
         documentTimeoutMs: EXTRACTION_JOB_DEADLINE_MS - 60_000,
+        maxOcrPages: getConfiguredDurableDocumentMaxOcrPages(),
         providerRequestTimeoutMs: OCR_PROVIDER_CALL_TIMEOUT_MS,
         shouldCancel: async () =>
           !(await jobMayContinue(client, job.id, workerId, heartbeat)),
@@ -505,6 +507,8 @@ function mapExtractionFailure(code: string): WorkerJobError {
     code === "document_extraction_incomplete";
   const safeMessage = code === "document_extraction_incomplete"
     ? "Not every page could be read. Retry the extraction."
+    : code === "pdf_ocr_page_limit_exceeded"
+      ? "This PDF has too many pages that require OCR. Use a text-enabled PDF or split the document."
     : code === "document_extraction_timeout"
       ? "Document extraction exceeded its worker deadline."
       : "Document extraction could not be completed.";

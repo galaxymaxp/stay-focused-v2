@@ -406,6 +406,14 @@ function mapOcrError(error: OcrProviderFailure): MappedOcrError {
         message: "OCR provider failed.",
         extraction: error.extraction,
       };
+    case "pdf_ocr_page_limit_exceeded":
+      return {
+        status: 422,
+        code: "pdf_ocr_page_limit_exceeded",
+        message:
+          "This PDF has too many pages that require OCR. Use a text-enabled PDF or split the document.",
+        extraction: error.extraction,
+      };
     case "document_unreadable":
       return {
         status: 422,

@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "/*": [
       "../../node_modules/@napi-rs/canvas/**/*",
       "../../node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
+      "../../node_modules/pdfjs-dist/**/*",
     ],
   },
   // Workflow selects the Vercel world at runtime. Keeping the local queue
@@ -15,6 +16,7 @@ const nextConfig: NextConfig = {
   // discovery code while collecting production route metadata on Windows.
   serverExternalPackages: [
     "@napi-rs/canvas",
+    "pdfjs-dist",
     "@vercel/queue",
     "@workflow/world-local",
   ],

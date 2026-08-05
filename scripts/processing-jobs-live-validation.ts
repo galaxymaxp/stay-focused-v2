@@ -84,6 +84,82 @@ async function main(): Promise<void> {
   assert(isUuid(sourceVersionId), "extraction source version");
   assert(/^[a-f0-9]{64}$/.test(sourceContentSha256), "source content hash");
 
+  if (process.env.PROCESSING_EXTRACTION_ONLY === "1") {
+    const expectedPageCount = Number.parseInt(
+      process.env.PROCESSING_EXPECTED_PAGE_COUNT ?? "",
+      10,
+    );
+    const pageCount = readNestedNumber(extractionResult, [
+      "result",
+      "pageCount",
+    ]);
+    const processedPageCount = readNestedNumber(extractionResult, [
+      "result",
+      "processedPageCount",
+    ]);
+    const extractionStatus = readNestedString(extractionResult, [
+      "result",
+      "extraction",
+      "status",
+    ]);
+    const nativeTextPageCount = readNestedNumber(extractionResult, [
+      "result",
+      "extraction",
+      "nativeTextPageCount",
+    ]);
+    const ocrPageCount = readNestedNumber(extractionResult, [
+      "result",
+      "extraction",
+      "ocrPageCount",
+    ]);
+    const ocrChunkCount = readNestedNumber(extractionResult, [
+      "result",
+      "extraction",
+      "ocrChunkCount",
+    ]);
+    const missingPageCount = readNestedArrayLength(extractionResult, [
+      "result",
+      "extraction",
+      "missingPageNumbers",
+    ]);
+    const failedPageCount = readNestedNumber(extractionResult, [
+      "result",
+      "extraction",
+      "failedPageCount",
+    ]);
+
+    assert(Number.isInteger(expectedPageCount), "expected page count setting");
+    assert(pageCount === expectedPageCount, "page count");
+    assert(processedPageCount === expectedPageCount, "processed page count");
+    assert(extractionStatus === "complete", "extraction completeness");
+    assert(nativeTextPageCount === expectedPageCount, "native text page count");
+    assert(ocrPageCount === 0, "OCR page count");
+    assert(ocrChunkCount === 0, "OCR chunk count");
+    assert(missingPageCount === 0, "missing page count");
+    assert(failedPageCount === 0, "failed page count");
+
+    console.info(JSON.stringify({
+      status: "passed",
+      extraction: {
+        jobId: first.id,
+        finalStatus: extraction.status,
+        attemptCount: extraction.attemptCount,
+        displayName: first.source?.displayName,
+        extractedCharacterCount: extractedText.length,
+        pageCount,
+        processedPageCount,
+        extractionStatus,
+        nativeTextPageCount,
+        ocrPageCount,
+        ocrChunkCount,
+        missingPageCount,
+        failedPageCount,
+      },
+      disconnectedAfterAcceptance: true,
+    }));
+    return;
+  }
+
   let reviewerSourceVersionId = sourceVersionId;
   let sourceRevisionCreated = false;
   if (!privateFixturePath) {
@@ -523,7 +599,12 @@ async function requestJob(
   const body = await readJson(response);
   const job = parseJob(body.data);
   if (response.status !== input.expectedStatus || body.ok !== true || !job) {
-    throw new Error(`validation_job_creation_http_${response.status}`);
+    const errorCode = readString(readRecord(body.error)?.code);
+    throw new Error(
+      `validation_job_creation_http_${response.status}${
+        /^[a-z0-9_]+$/i.test(errorCode) ? `_${errorCode}` : ""
+      }`,
+    );
   }
   return job;
 }
@@ -731,6 +812,15 @@ function readNestedNumber(
   return typeof current === "number" && Number.isFinite(current)
     ? current
     : null;
+}
+
+function readNestedArrayLength(
+  value: Record<string, unknown>,
+  path: readonly string[],
+): number | null {
+  let current: unknown = value;
+  for (const key of path) current = readRecord(current)?.[key];
+  return Array.isArray(current) ? current.length : null;
 }
 
 function readSafeStatus(value: unknown): string {

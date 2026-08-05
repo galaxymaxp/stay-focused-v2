@@ -1,7 +1,7 @@
 # ADR-016: Vercel Workflow processing prototype
 
-Status: implemented and database-migrated; hosted and physical-device
-acceptance pending
+Status: implemented, database-migrated, and hosted; Android APK acceptance
+pending
 
 ## Decision
 
@@ -62,10 +62,13 @@ The workflow uses the existing subject-neutral extraction implementation:
 - normalization uses repeated page-edge/layout evidence and retains removal
   diagnostics; it has no topic vocabulary or fixture-specific correction.
 
-The configured document limit remains 40 pages and the source limit remains
-10 MiB. Direct private Supabase resumable upload remains the Vercel-compatible
-path for mobile sources; the user must keep the app open until upload and
-acceptance finish.
+Synchronous and Canvas extraction retain a 40-page ceiling. Durable jobs accept
+up to 100 total pages, then allow at most 40 pages that actually require OCR.
+Longer native-text classroom decks therefore avoid Google Vision entirely,
+while oversized scanned documents fail before provider dispatch. The source
+limit remains 10 MiB. Direct private Supabase resumable upload remains the
+Vercel-compatible path for mobile sources; the user must keep the app open
+until upload and acceptance finish.
 
 ## Reviewer behavior
 
@@ -117,6 +120,11 @@ current Metro LAN host and avoids a committed IP. Hosted Expo Go uses the
 explicit Vercel HTTPS origin supplied to Metro. A Metro tunnel carries the
 JavaScript bundle, not a local API; the hosted API removes the changing Wi-Fi
 address from the processing path.
+
+EAS preview and production profiles compile
+`https://stay-focused-v2-prototype.vercel.app` into the public client
+configuration. The Android preview profile emits an internally distributed APK;
+server credentials never enter the application bundle.
 
 ## Timeout hierarchy
 

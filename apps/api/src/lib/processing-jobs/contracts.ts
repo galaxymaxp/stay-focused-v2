@@ -1,8 +1,8 @@
 import type { GeneratedArtifactType } from "@stay-focused/shared";
 import { createHash } from "node:crypto";
 
-export const DOCUMENT_PARSER_POLICY_VERSION = "document-parser-v2";
-export const OCR_POLICY_VERSION = "ocr-policy-v2";
+export const DOCUMENT_PARSER_POLICY_VERSION = "document-parser-v7";
+export const OCR_POLICY_VERSION = "ocr-policy-v3";
 export const DOCUMENT_NORMALIZATION_VERSION = "document-normalization-v1";
 
 export const REVIEWER_GENERATION_POLICY_VERSION = "reviewer-policy-v1";
