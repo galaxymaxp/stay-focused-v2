@@ -1,5 +1,5 @@
 import type { ProcessingJobStatusView } from "@stay-focused/shared";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const values = vi.hoisted(() => new Map<string, string>());
 
@@ -18,7 +18,13 @@ import {
 } from "./activeProcessingJobStore";
 
 describe("active processing job persistence", () => {
-  beforeEach(() => values.clear());
+  beforeEach(() => {
+    values.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-24T00:00:00.000Z"));
+  });
+
+  afterEach(() => vi.useRealTimers());
 
   it("restores the same active job reference after an app restart", async () => {
     await upsertActiveProcessingJob("user-a", jobView());
