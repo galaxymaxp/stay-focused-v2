@@ -47,11 +47,26 @@ export interface SavedReviewerDetail<TReviewerOutput = Json>
   readonly sourceProvenance?: SavedReviewerSourceProvenanceSummary;
 }
 
+export type TaskDatabaseStatus = "pending" | "completed";
+export type TaskDatabasePriority = "low" | "medium" | "high";
+export type TaskDatabaseSourceType = "manual" | "canvas";
+
 export type ReviewerRow = Database["public"]["Tables"]["reviewers"]["Row"];
 export type ReviewerInsert =
   Database["public"]["Tables"]["reviewers"]["Insert"];
 export type ReviewerUpdate =
   Database["public"]["Tables"]["reviewers"]["Update"];
+export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
+export type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
+export type TaskUpdate = Database["public"]["Tables"]["tasks"]["Update"];
+export type StudyPlanRow = Database["public"]["Tables"]["study_plans"]["Row"];
+export type StudyPlanInsert = Database["public"]["Tables"]["study_plans"]["Insert"];
+export type StudySessionRow =
+  Database["public"]["Tables"]["study_sessions"]["Row"];
+export type StudySessionInsert =
+  Database["public"]["Tables"]["study_sessions"]["Insert"];
+export type StudySessionUpdate =
+  Database["public"]["Tables"]["study_sessions"]["Update"];
 export type CanvasSourcePreviewSessionRow =
   Database["public"]["Tables"]["canvas_source_preview_sessions"]["Row"];
 export type CanvasSourcePreviewSessionInsert =
@@ -495,6 +510,171 @@ export type ProcessingNotificationDeliveryRow =
 export interface Database {
   public: {
     Tables: {
+      tasks: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          notes: string | null;
+          status: TaskDatabaseStatus;
+          priority: TaskDatabasePriority;
+          due_at: string | null;
+          estimated_minutes: number;
+          source_type: TaskDatabaseSourceType;
+          canvas_connection_id: string | null;
+          canvas_course_id: string | null;
+          canvas_assignment_id: string | null;
+          canvas_assignment_row_id: string | null;
+          created_at: string;
+          updated_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          notes?: string | null;
+          status?: TaskDatabaseStatus;
+          priority?: TaskDatabasePriority;
+          due_at?: string | null;
+          estimated_minutes?: number;
+          source_type?: TaskDatabaseSourceType;
+          canvas_connection_id?: string | null;
+          canvas_course_id?: string | null;
+          canvas_assignment_id?: string | null;
+          canvas_assignment_row_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          notes?: string | null;
+          status?: TaskDatabaseStatus;
+          priority?: TaskDatabasePriority;
+          due_at?: string | null;
+          estimated_minutes?: number;
+          source_type?: TaskDatabaseSourceType;
+          canvas_connection_id?: string | null;
+          canvas_course_id?: string | null;
+          canvas_assignment_id?: string | null;
+          canvas_assignment_row_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tasks_canvas_assignment_row_id_fkey";
+            columns: ["canvas_assignment_row_id"];
+            isOneToOne: false;
+            referencedRelation: "canvas_assignments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tasks_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      study_plans: {
+        Row: {
+          id: string;
+          user_id: string;
+          planning_starts_at: string;
+          planning_ends_at: string;
+          algorithm_version: "deterministic-v1";
+          input_hash: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          planning_starts_at: string;
+          planning_ends_at: string;
+          algorithm_version: "deterministic-v1";
+          input_hash: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          planning_starts_at?: string;
+          planning_ends_at?: string;
+          algorithm_version?: "deterministic-v1";
+          input_hash?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "study_plans_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      study_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          study_plan_id: string | null;
+          task_id: string;
+          starts_at: string;
+          ends_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          study_plan_id?: string | null;
+          task_id: string;
+          starts_at: string;
+          ends_at: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          study_plan_id?: string | null;
+          task_id?: string;
+          starts_at?: string;
+          ends_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_plan_owner_fkey";
+            columns: ["study_plan_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "study_plans";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "study_sessions_task_owner_fkey";
+            columns: ["task_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "study_sessions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       canvas_source_preview_sessions: {
         Row: {
           id: string;
@@ -3926,6 +4106,27 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      import_canvas_assignments_as_tasks_v1: {
+        Args: {
+          p_user_id: string;
+          p_assignment_ids: string[];
+        };
+        Returns: TaskRow[];
+      };
+      apply_study_plan_v1: {
+        Args: {
+          p_user_id: string;
+          p_planning_starts_at: string;
+          p_planning_ends_at: string;
+          p_algorithm_version: "deterministic-v1";
+          p_input_hash: string;
+          p_sessions: Json;
+        };
+        Returns: Array<{
+          study_plan_id: string;
+          session_count: number;
+        }>;
+      };
       claim_processing_notification_deliveries: {
         Args: {
           p_worker_id: string;
