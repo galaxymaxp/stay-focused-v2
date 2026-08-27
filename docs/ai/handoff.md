@@ -2076,3 +2076,35 @@ Current route status:
 - `main` is now the trusted capstone development baseline. Next recommended
   task: audit the remaining capstone scope and define the final development
   sequence from this reconciled baseline.
+
+## 2026-08-27 — R4 capstone scope audit and final development sequence
+
+- Audited trusted `main` baseline `cd070eb` without changing application code,
+  prompts, schemas, migrations, dependencies, or the known CRLF-sensitive
+  assertion. Full report: `docs/ai/capstone-scope-audit-r4.md`.
+- Remote preservation is `SAFE_TO_PUSH`: after a fresh fetch, `origin/main`
+  remained `bad5b55`; local `main` was 35 commits ahead and 0 behind before
+  this R4 documentation commit. No push was performed.
+- The existing product core is capstone-credible and should be protected:
+  email auth/session restore, Stage 0-6 reviewer validation, R2 live OpenAI
+  evidence, image/PDF OCR, Study Library persistence, durable Vercel Workflow
+  processing, encrypted owner-scoped Canvas access, hosted incremental content
+  and grade sync, and the EAS Android preview path.
+- Readiness gaps: P0 = 1, P1 = 7, P2 = 4. The sole P0 is the absent task and
+  study-schedule vertical slice: no task/session schema, API, planning contract,
+  or mobile agenda exists despite the schedule-first product promise.
+- P1 work covers remote preservation, safe reconciliation of four linked
+  migration version aliases before new schema, coherent cached-reviewer
+  offline access, final physical-device acceptance, deployment-to-commit
+  provenance, canonical/thesis reconciliation, and live-artifact privacy review.
+- Final sequence: R5 task/study-plan domain foundation; R6 mobile task/schedule
+  experience; R7 limited offline study access; R8 navigation/accessibility
+  hardening; R9 final hosted/device acceptance; R10 thesis/privacy/demo
+  hardening; R11 final release baseline.
+- R4 fresh verification: clean starting Git state, preservation refs retained,
+  `git fetch --prune`, `git diff --check`, and `git fsck --full` passed; hosted
+  V2 `/api/health` returned HTTP 200 with version `2.0.0`. Expensive R3 suites
+  and paid OpenAI generation were intentionally not rerun.
+- Next recommended phase: R5 task and study-plan domain foundation, gated first
+  by an approved normal push of `main` and deliberate linked-migration alias
+  reconciliation without editing or replaying applied migrations.
