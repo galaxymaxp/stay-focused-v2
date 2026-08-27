@@ -2045,3 +2045,34 @@ Current route status:
   contract assertion requires an LF substring while the clean Windows checkout
   supplies the equivalent CRLF SQL. The targeted file passed 11/12 assertions;
   runtime SQL content is intact.
+
+## 2026-08-27 — R3 reconciled capstone development baseline
+
+- Started from clean recovery branch `recovery/r1-onedrive` at validated R2
+  commit `e5f3255`. `git fsck --full` passed, and local `main` matched
+  `origin/main` at `bad5b55` before reconciliation.
+- Preserved the validated recovery commit before moving `main`: backup branch
+  `recovery/r2-validated-baseline`, annotated tag
+  `recovery-r2-validated-baseline`, and the original
+  `recovery/r1-onedrive` branch all retain `e5f3255`.
+- History was unambiguous Case A: `bad5b55` was the merge base and an ancestor
+  of the recovery branch. Recovery was 34 commits ahead and 0 behind both local
+  and origin `main`; local `main` and `origin/main` had no unique commits.
+- Reconciled with `git merge --ff-only recovery/r1-onedrive` while on `main`.
+  The operation fast-forwarded `main` from `bad5b55` to `e5f3255` without a
+  merge commit, conflict, rebase, reset, or other destructive rewrite.
+- Post-reconciliation verification passed: engine typecheck/build and eval
+  290/290; mobile typecheck and tests 204/204; OCR typecheck and tests 27/27;
+  Canvas typecheck and tests 72/72; reviewer web smoke 51/51; DB
+  typecheck/build; API typecheck/build; and API health HTTP 200 with
+  `{"status":"ok","version":"2.0.0"}`.
+- The full API suite remains 547/548 only because the pre-existing Windows CRLF
+  checkout does not match one LF-only SQL substring assertion. Runtime SQL is
+  unchanged, and this non-blocking line-ending test issue was not modified.
+- The ignored repo-root `.env.local` remains present, untracked, and
+  uncommitted. No secret values were printed or written. The R2 live OpenAI
+  validation was not rerun; its committed passing artifacts remain the trusted
+  provider evidence.
+- `main` is now the trusted capstone development baseline. Next recommended
+  task: audit the remaining capstone scope and define the final development
+  sequence from this reconciled baseline.
