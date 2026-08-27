@@ -2011,3 +2011,37 @@ Current route status:
   `79ce6ab7-6346-4bf4-bc8e-de9c28cd191e` ended `cancelled`, recorded explicit
   cancellation, and published no result. All three terminal jobs had zero
   staging rows, zero running units, and zero private checkpoints retained.
+
+## 2026-08-27 — R2 recovered baseline and live reviewer validation
+
+- Active recovered repository: `C:\Projects\stay-focused-v2`, branch
+  `recovery/r1-onedrive`, starting from R1 recovery commit `16a4742` outside
+  OneDrive with a clean worktree and passing `git fsck --full`.
+- The separately recovered environment was restored to the ignored repo-root
+  `.env.local`. The direct live harness required only `OPENAI_API_KEY`; no
+  environment values were printed, written to evidence, staged, or committed.
+- Existing command: `npm run live-run --workspace @stay-focused/engine -- it-security`.
+  It used the existing IT Security fixture and OpenAI `gpt-4o`; no new harness
+  or generation behavior was added.
+- Live artifacts:
+  `docs/ai/live-output-it-security-r2-recovered-baseline.txt` and
+  `docs/ai/live-output-it-security-r2-recovered-baseline.json`.
+- Live result: PASS. Structured output parsed; coverage passed 18/18 at 1.00;
+  grounding passed at 1.00 with 0 issues and 0 phase-1 fabrication failures;
+  leakage passed with 0 issues; all 18 sections assembled; unsupported visible
+  content was 0; all enrichment values were null and enrichment was not visible.
+- Student-visible quality remained source-faithful and materially useful as an
+  organized key-point reviewer. Seventeen list-oriented cards intentionally
+  have empty explanations under the current anti-fabrication/list-only policy.
+  `Domains of IT Security`, `Definition of Terms`, and the infiltration
+  procedure remain structurally thin because the flattened source groups some
+  adjacent list text, but no source topic text was lost and no outside facts
+  were added.
+- Verification before and after the provider run: engine typecheck PASS, build
+  PASS, aggregate eval PASS (290/290). Relevant mobile verification: typecheck
+  PASS and tests PASS (204/204). Public Supabase client construction passed
+  without a network request or data mutation.
+- Known API issue remains unchanged and non-blocking: one Canvas sync database
+  contract assertion requires an LF substring while the clean Windows checkout
+  supplies the equivalent CRLF SQL. The targeted file passed 11/12 assertions;
+  runtime SQL content is intact.
