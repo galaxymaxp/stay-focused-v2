@@ -1,71 +1,66 @@
 # Current Sprint
 
-Last refreshed: 2026-08-06, Asia/Manila.
+Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Current objective
 
-Complete Android acceptance for durable long-document processing using an EAS
-preview APK and the hosted V2 API.
+Close the capstone R5 task/study-plan foundation and prepare R6 mobile task and
+schedule implementation against the accepted backend contracts.
 
 ## Why it matters
 
-The implementation is deterministic and preserved, but a handoff must not
-confuse local coverage with installed-device acceptance. This closes the active
-durable-document/APK slice without starting Phase 6.
+The schedule-first product promise now has a secure persistent backend and a
+deterministic planner. The next slice can focus on the student-facing mobile
+experience without reopening Canvas sync or reviewer-engine architecture.
 
 ## Current branch
 
-`codex/hosted-processing-prototype`
+`main`
 
 ## Baseline commit
 
-`1848805` — durable-document implementation, Android preview configuration,
-and deterministic mobile retention-test repair are committed.
+`31522d840fd415267b048408ba0317587d4cafab` was the R5 starting point.
+Implementation commit `3b5f21f` contains the R5 domain, API, planner, tests,
+and forward migration.
 
 ## Scope
 
-- Preserve the verified EAS `preview` APK build/install evidence; Android
-  authentication and hosted API connectivity already pass.
-- Accept a native-text PDF between 41 and 100 pages without OCR provider use.
-- Confirm a PDF with more than 40 OCR-required pages fails safely before OCR.
-- Confirm accepted work reconciles after switch-away, network interruption, and
-  app restart, and that result/save behavior remains owner-scoped.
-- Record safe evidence without source bodies, credentials, or private files.
+- Preserve the R5 planner and API contracts while preparing R6.
+- Apply and runtime-validate the forward R5 migration only with explicit linked
+  project authorization.
+- Build the R6 mobile task list, Canvas import selection, plan preview/apply,
+  and study-session agenda on the authenticated R5 APIs.
+- Preserve owner isolation, deterministic output, and explicit unscheduled work.
 
 ## Explicit non-goals
 
-- Phase 6 or Phase 7 implementation.
-- Raising the 100-total-page or 40-OCR-page limits.
-- Automatic/scheduled Canvas synchronization, native background upload, or
-  push-notification redesign.
-- Dependency upgrades or migration-history repair.
+- Migration-history repair or edits to applied migrations.
+- New Canvas network collection behavior.
+- AI-based planning or reviewer-engine changes.
+- OCR/PDF, durable processing, notifications, offline study, or EAS redesign.
 
 ## Required verification
 
-- `npm run test --workspace @stay-focused/mobile`
-- `npm run test --workspace @stay-focused/api`
-- `npm run test:workflow --workspace @stay-focused/api`
-- `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check`
-- Preserve the EAS build, APK installation, Android authentication, and hosted
-  connectivity evidence; record each remaining physical acceptance item as
-  PASS, FAIL, NOT RUN, or BLOCKED.
+- Preserve shared planner, R5 API/database/acceptance, and two-user isolation
+  suites.
+- Preserve the 290/290 deterministic reviewer regression.
+- Run mobile tests/typecheck/build for the R6 UI and API integration.
+- Runtime-validate the forward R5 migration separately from static SQL checks.
 
 ## Known blockers
 
-- The physical Android device must be available again for the remaining matrix;
-  a currently active ADB session is not assumed.
-- Four linked Canvas migrations use remote-generated version aliases; do not
-  mutate migration history as part of this sprint.
-- Product Recovery R6 physical iPhone checks remain separate acceptance debt.
+- Supabase CLI and Docker are unavailable in the current local environment, so
+  R5 migration runtime validation is blocked locally.
+- Four linked Canvas migrations retain metadata-only aliases; do not repair or
+  mutate linked history as part of R6.
+- No R5 push or linked migration application has been performed.
 
 ## Completion criteria
 
-The existing preview build/install evidence remains preserved, the
-durable-document matrix is recorded truthfully, deterministic checks remain
-green, no private source content is committed, and canonical documentation is
-reconciled.
+The forward R5 migration is applied and runtime-validated in an approved
+environment, and the R6 mobile experience consumes the existing R5 APIs without
+weakening owner isolation or planner determinism.
 
 ## Next action after completion
 
-Complete the deferred Product Recovery R6 physical iPhone accessibility,
-interruption, navigation/reconciliation, and Study Library save checks.
+Implement R6 - Mobile task and schedule experience.

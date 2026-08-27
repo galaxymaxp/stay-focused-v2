@@ -2108,3 +2108,56 @@ Current route status:
 - Next recommended phase: R5 task and study-plan domain foundation, gated first
   by an approved normal push of `main` and deliberate linked-migration alias
   reconciliation without editing or replaying applied migrations.
+
+## 2026-08-28 - R5 task and deterministic study-plan foundation
+
+- R5 resumed from the interrupted working tree on `main`; original starting
+  commit `31522d840fd415267b048408ba0317587d4cafab`. Implementation commit:
+  `3b5f21f` (`feat(planning): add task and study-plan foundation`). No push was
+  performed.
+- Migration preflight retained the four Canvas differences as Case A
+  metadata-only aliases. No historical migration was edited, no migration
+  repair ran, and linked Supabase state was not mutated.
+- Added forward-only migration
+  `20260827155438_task_study_plan_foundation.sql` for owner-scoped `tasks`,
+  `study_plans`, and `study_sessions`. It includes validation constraints,
+  composite owner-safe foreign keys, supporting FK/query indexes, RLS CRUD
+  policies, explicit grants, and service-only security-invoker import/apply
+  RPCs.
+- Manual task APIs cover create/list/read/update/complete/delete. Canvas import
+  reads only persisted synchronized `canvas_assignments`/`canvas_courses`,
+  performs no provider request, rejects missing/foreign assignment rows, and
+  uses the partial unique key `(user_id, canvas_connection_id,
+  canvas_course_id, canvas_assignment_id)` with `ON CONFLICT DO NOTHING`.
+  Re-import returns the existing user-owned task and does not overwrite edits.
+- The pure shared planner is deterministic-v1 and does not call OpenAI. It
+  normalizes/clips/merges availability, orders work by deadline, priority,
+  creation timestamp, then UUID, splits sessions at 90 minutes, marks late
+  sessions, and returns explicit scheduled/unscheduled minutes when capacity is
+  insufficient.
+- Preview performs no persistence. Apply accepts only the normalized planning
+  request, reloads owned pending tasks, reruns the planner, hashes normalized
+  output, and atomically persists the plan plus validated sessions through
+  `apply_study_plan_v1`; arbitrary client session records are not accepted.
+- Study sessions persist across a fresh request/client context and support
+  owner-scoped list/edit/delete. Both the route layer and database constraints
+  reject invalid intervals and cross-owner task/plan/session relationships.
+- The stateful persistence acceptance covers manual creation, owned Canvas
+  import, user customization and idempotent re-import, non-mutating preview,
+  apply, session edit, fresh-context task/session reads, completion/deletion,
+  and all eight User A to User B denial attacks.
+- Fresh verification: shared tests 30/30; targeted R5 API/database/acceptance
+  11/11; shared, DB, and API typechecks pass; DB and API builds pass; protected
+  reviewer deterministic regression 290/290. Full API is 558/559 only because
+  the known pre-existing Windows CRLF-sensitive Canvas SQL assertion expects LF
+  text. It was not modified and is not an R5 product defect.
+- Local migration static/RLS contract validation passes. Local Supabase runtime
+  validation is blocked because Supabase CLI and Docker are unavailable. No
+  linked `db push` or runtime migration validation was attempted.
+- Protected audit: no Stage 0-6 reviewer, OCR/PDF, durable processing, Canvas
+  synchronization, auth architecture, Study Library, notification, or mobile/EAS
+  behavior changed. The only lockfile change records the API workspace's
+  existing shared-workspace dependency; no external package was added.
+- Remaining R5 risk is runtime application/validation of the new migration in
+  an approved environment. Recommended next phase: R6 - Mobile task and
+  schedule experience.

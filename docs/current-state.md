@@ -1,17 +1,17 @@
 # Current State
 
-Last refreshed: 2026-08-06, Asia/Manila.
+Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Repository
 
-- Authoritative branch: `codex/hosted-processing-prototype`.
-- Reconciled implementation checkpoint: `1848805` (durable documents, EAS
-  Android configuration, and deterministic mobile retention tests).
-- The authoritative remote is the same feature branch after the reconciliation
-  commit is pushed. `main` is not the handoff branch.
-- Intentionally uncommitted local tooling noise is limited to generated
-  Next/Expo declarations, Expo's generated mobile `.gitignore`, and local VS
-  Code color settings. None is required by a clean clone.
+- Authoritative branch: `main` in `C:\Projects\stay-focused-v2`.
+- R5 started from `31522d840fd415267b048408ba0317587d4cafab`; implementation
+  commit `3b5f21f` adds the owner-scoped task and deterministic study-plan
+  foundation.
+- Local `main` is 38 commits ahead and 0 behind `origin/main` before the R5
+  documentation commit. No push was performed.
+- Recovery branches/tags remain preserved. Generated Next build drift was
+  removed before the R5 implementation commit.
 
 ## Deployment and completed development phase
 
@@ -24,6 +24,10 @@ Last refreshed: 2026-08-06, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Capstone development R5 is implementation-complete: manual task CRUD,
+  persisted Canvas-assignment import, deterministic preview/apply planning,
+  study-session persistence/edit/delete, and two-user denial coverage are in
+  place. R6 is the mobile task and schedule experience.
 - Product Recovery R1-R5 is complete. R6 is partial: automated checks pass,
   while Dynamic Type, VoiceOver, interruption, navigation/reconciliation, and
   save-flow behavior still require physical iPhone observation.
@@ -39,30 +43,31 @@ Last refreshed: 2026-08-06, Asia/Manila.
 
 ## Deterministic test baseline
 
-- Mobile: 200/200; API: 548/548; OCR: 27/27; Canvas: 72/72; shared: 6/6.
-- Reviewer engine: 290/290 deterministic evaluations.
-- Root typecheck, lint, and build pass. Turbo reused six of seven typecheck and
-  lint tasks and six of seven build tasks; affected mobile tasks were fresh.
-- Direct API and mobile typecheck/lint/build checks also pass fresh; mobile lint
-  retains four existing import-order warnings and no errors.
-- Workflow runtime: 1/1 passed on isolated rerun. The first run exposed a
-  known 1 ms Workflow test-runtime replay-timestamp flake and is not hidden.
+- Shared: 30/30, including the deterministic planner; targeted R5 API/database
+  acceptance: 11/11; reviewer engine: 290/290 deterministic evaluations.
+- Shared, DB, and API typechecks pass. DB and API production builds pass.
+- Full API regression is 558/559. The only failure is the known pre-existing
+  Windows CRLF-sensitive Canvas SQL substring assertion; the SQL semantics and
+  all R5 tests pass, so it is not an R5 product defect.
 
 ## Migration status
 
-- The feature branch contains 41 ordered, uniquely prefixed migrations.
-- Local HEAD has all 41, including the four newest Canvas migrations.
-  `origin/codex/hosted-processing-prototype` also has all 41. `origin/main` has
-  only the first 23 and is 18 migrations behind the feature branch.
-- Linked Supabase has equivalent history through all 41 schema changes.
-  Workflow versions align exactly. The four newest Canvas changes were applied
-  remotely under generated versions `20260728022127`, `20260728024021`,
-  `20260728131529`, and `20260728133821`, not the four committed filenames.
-- Do not push migrations, repair history, or edit applied migration files until
-  that four-version alias is deliberately reconciled with user approval.
+- The four linked Canvas version differences remain classified as metadata-only
+  aliases based on the completed R5 preflight. No historical migration was
+  edited and no migration repair was performed.
+- Forward-only migration
+  `20260827155438_task_study_plan_foundation.sql` is last in local order and
+  creates `tasks`, `study_plans`, and `study_sessions` with owner-safe foreign
+  keys, RLS policies, service-only RPCs, and supporting indexes.
+- Static migration/RLS contract validation passes. Supabase CLI and Docker are
+  unavailable locally, so local runtime validation is blocked. No linked
+  Supabase mutation or `db push` was performed.
 
 ## Known blockers and immediate task
 
+- Apply and runtime-validate the forward R5 migration in an approved Supabase
+  environment before depending on the endpoints outside deterministic tests.
+- Begin R6 mobile task/schedule work only against the accepted R5 contracts.
 - Physical-device acceptance debt remains for Product R6 and the durable
   long-document Android matrix. APK installation, authentication, and hosted
   API connectivity are no longer blockers.
@@ -70,8 +75,6 @@ Last refreshed: 2026-08-06, Asia/Manila.
   production high is `next`, and remediation is a separate recovery task.
 - Provenance of tracked historical academic live-output artifacts is not
   established; preserve them and complete a privacy review before removal.
-- Immediate task: run and record the durable-document Android acceptance matrix
-  with the installed preview build without beginning Phase 6.
 
 ## Authoritative documentation
 

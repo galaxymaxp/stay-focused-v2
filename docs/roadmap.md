@@ -1,6 +1,32 @@
 # Roadmap
 
-Last refreshed: 2026-07-28, Asia/Manila.
+Last refreshed: 2026-08-28, Asia/Manila.
+
+## Capstone Development Phase R5 - Task And Study-Plan Foundation
+
+Status: Implementation accepted; local migration runtime validation blocked.
+
+- Added owner-scoped `tasks`, `study_plans`, and `study_sessions` with RLS,
+  owner-safe foreign keys, service-only atomic import/apply functions, and a
+  forward-only migration after the existing local/linked versions.
+- Manual task CRUD and persisted synchronized Canvas-assignment import are
+  exposed through authenticated APIs. Import makes a user-owned task, is
+  idempotent, performs no Canvas request, and preserves user edits on re-import.
+- The shared planner is deterministic and non-AI. It orders by deadline,
+  priority, creation time, then task ID; bounds sessions to 90 minutes; and
+  reports every unscheduled minute when capacity is insufficient.
+- Preview is read-only. Apply accepts the normalized planning request, reruns
+  the planner, validates owned pending tasks, and persists the plan/sessions in
+  one RPC transaction rather than trusting arbitrary client session records.
+- Targeted R5 API/database/acceptance tests pass 11/11, shared tests pass 30/30,
+  reviewer regression passes 290/290, and shared/DB/API typechecks plus DB/API
+  builds pass. Full API regression remains 558/559 only because of the known
+  pre-existing Windows CRLF Canvas assertion.
+- Supabase CLI and Docker are unavailable locally. Static migration validation
+  passes; no linked mutation, migration repair, or push was performed.
+
+Immediate next phase: R6 mobile task and schedule experience, after approved
+runtime application/validation of the R5 migration.
 
 ## Phase 5F.2 - Incremental, Resumable Canvas Synchronization
 
