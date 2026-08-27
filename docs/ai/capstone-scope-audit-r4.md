@@ -1,7 +1,9 @@
 # Stay Focused V2 — R4 Capstone Scope Audit
 
-Audit date: 2026-08-27, Asia/Manila  
-Baseline commit: `cd070eb059134c23a95c136cfb47530d0393c90b`  
+Audit date: 2026-08-27, Asia/Manila
+
+Baseline commit: `cd070eb059134c23a95c136cfb47530d0393c90b`
+
 Mode: audit, verification, and planning only
 
 ## Executive conclusion
@@ -677,4 +679,3 @@ without editing or replaying applied migrations.
 | API tests | 547/548, known CRLF-only assertion | R3 BASELINE; NOT RERUN IN R4 |
 | Paid OpenAI generation | NOT RUN | Existing R2 evidence accepted |
 | New EAS build/device test | NOT RUN | Configuration inspection only |
-
