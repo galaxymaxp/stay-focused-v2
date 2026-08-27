@@ -30,6 +30,7 @@ export type SourceFlowError = {
     | "unknown_error";
   readonly title: string;
   readonly message: string;
+  readonly detail?: string;
 };
 
 export type ReviewerSourceAction =
@@ -499,16 +500,59 @@ export function formatOcrClientError(error: OcrClientError): SourceFlowError {
         title: "OCR cancelled",
         message: "The OCR request was cancelled.",
       };
+    case "upload_incomplete":
+    case "upload_size_mismatch":
+      return {
+        code: error.code,
+        title: "Upload did not finish",
+        message:
+          "The document was not fully uploaded. Keep Stay Focused open and try again.",
+        ...withErrorDetail(error),
+      };
+    case "upload_intent_expired":
+      return {
+        code: error.code,
+        title: "Upload expired",
+        message: "This upload expired before it was accepted. Select the document again.",
+        ...withErrorDetail(error),
+      };
+    case "upload_acceptance_failed":
+      return {
+        code: error.code,
+        title: "Upload could not be accepted",
+        message:
+          "The server could not accept this upload durably. Try again in a moment.",
+        ...withErrorDetail(error),
+      };
     case "invalid_api_base_url":
     case "invalid_image":
     case "invalid_response":
     case "unknown_error":
       return {
         code: error.code,
-        title: "OCR failed",
+        title: "Text extraction failed",
         message: "Text extraction could not be completed. Try again.",
+        ...withErrorDetail(error),
       };
   }
+}
+
+// Surfaces the safe server code alongside generic copy so a transient upload or
+// transport failure is not mistaken for a document problem. Mirrors the detail
+// line the reviewer save path already shows.
+function withErrorDetail(
+  error: OcrClientError,
+): { readonly detail?: string } {
+  const apiCode = error.apiCode ?? error.code;
+  if (!apiCode) {
+    return {};
+  }
+  return {
+    detail:
+      error.status !== undefined
+        ? `Details: HTTP ${error.status}, code ${apiCode}.`
+        : `Details: code ${apiCode}.`,
+  };
 }
 
 function formatIncompleteDocumentMessage(error: OcrClientError): string {

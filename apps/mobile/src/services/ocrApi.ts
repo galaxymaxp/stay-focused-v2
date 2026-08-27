@@ -96,6 +96,12 @@ export type OcrClientErrorCode =
   | "network_error"
   | "request_cancelled"
   | "invalid_response"
+  // Durable upload-lifecycle failures surfaced through the shared extraction
+  // presenter. They are not OCR failures and must not be described as such.
+  | "upload_incomplete"
+  | "upload_size_mismatch"
+  | "upload_intent_expired"
+  | "upload_acceptance_failed"
   | "unknown_error";
 
 export interface OcrClientError {

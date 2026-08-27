@@ -1258,6 +1258,9 @@ function ImageImportPanel({
         <View style={styles.errorBox} testID="reviewer-ocr-error">
           <Text style={styles.errorTitle}>{error.title}</Text>
           <Text style={styles.errorText}>{error.message}</Text>
+          {error.detail ? (
+            <Text style={styles.errorDetail}>{error.detail}</Text>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -1369,6 +1372,9 @@ function PdfImportPanel({
         <View style={styles.errorBox} testID="reviewer-pdf-ocr-error">
           <Text style={styles.errorTitle}>{error.title}</Text>
           <Text style={styles.errorText}>{error.message}</Text>
+          {error.detail ? (
+            <Text style={styles.errorDetail}>{error.detail}</Text>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -1524,6 +1530,10 @@ function toOcrCompatibleJobError(error: ProcessingJobApiError): OcrClientError {
       case "unsupported_media_type": return "unsupported_media_type";
       case "request_timeout":
       case "network_error": return "network_error";
+      case "upload_incomplete": return "upload_incomplete";
+      case "upload_size_mismatch": return "upload_size_mismatch";
+      case "upload_intent_expired": return "upload_intent_expired";
+      case "upload_acceptance_failed": return "upload_acceptance_failed";
       default: return "unknown_error";
     }
   })();

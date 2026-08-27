@@ -5,6 +5,7 @@ import type { SelectedGalleryImage } from "./galleryImage";
 import type { SelectedPdfDocument } from "./pdfDocument";
 import {
   canExtractPdfText,
+  formatOcrClientError,
   getCurrentSourceText,
   initialReviewerSourceState,
   isReviewerSourceReadyForGeneration,
@@ -488,3 +489,50 @@ function ocrError(
 ): OcrClientError {
   return { code, message };
 }
+
+describe("durable upload failure presentation", () => {
+  it("does not describe an incomplete upload as an OCR failure", () => {
+    const formatted = formatOcrClientError({
+      code: "upload_incomplete",
+      message: "The upload has not finished. Keep Stay Focused open and try again.",
+      status: 409,
+      apiCode: "upload_incomplete",
+    });
+
+    expect(formatted.title).toBe("Upload did not finish");
+    expect(formatted.title).not.toMatch(/OCR/i);
+    expect(formatted.detail).toBe("Details: HTTP 409, code upload_incomplete.");
+  });
+
+  it("reports an expired upload intent without blaming the document", () => {
+    const formatted = formatOcrClientError({
+      code: "upload_intent_expired",
+      message: "This upload expired. Select the source again.",
+      status: 410,
+      apiCode: "upload_intent_expired",
+    });
+
+    expect(formatted.title).toBe("Upload expired");
+    expect(formatted.detail).toBe("Details: HTTP 410, code upload_intent_expired.");
+  });
+
+  it("keeps the server code visible for unmapped durable failures", () => {
+    const formatted = formatOcrClientError({
+      code: "unknown_error",
+      message: "The upload could not be accepted durably.",
+      status: 503,
+      apiCode: "processing_workflow_dispatch_failed",
+    });
+
+    expect(formatted.title).toBe("Text extraction failed");
+    expect(formatted.detail).toBe(
+      "Details: HTTP 503, code processing_workflow_dispatch_failed.",
+    );
+  });
+
+  it("omits the detail line when no code is available", () => {
+    const formatted = formatOcrClientError(ocrError("invalid_response", "Bad payload"));
+
+    expect(formatted.detail).toBe("Details: code invalid_response.");
+  });
+});
