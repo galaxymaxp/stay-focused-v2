@@ -15,6 +15,7 @@ export const APP_ROUTES = {
   generate: "/generate",
   processing: "/processing",
   settings: "/settings",
+  task: "/task",
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
@@ -24,6 +25,7 @@ export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
  * pre-built string, so the router owns escaping and Expo Router's generated
  * route types can check both halves.
  */
+export const TASK_EDITOR_PATHNAME = "/task" as const;
 export const COURSE_REVIEWER_PATHNAME = "/courses/[courseId]/reviewer" as const;
 export const COURSE_GRADES_PATHNAME = "/courses/[courseId]/grades" as const;
 

@@ -21,6 +21,7 @@ export default function AppLayout() {
       <Stack.Screen name="generate" options={{ presentation: "modal" }} />
       <Stack.Screen name="processing" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="task" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
