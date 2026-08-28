@@ -4,67 +4,60 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Completed objective
 
-Close R6 backend Gap B locally so repeated plan application replaces active
-sessions instead of accumulating duplicate overlapping schedules.
+Runtime-accept R6 backend Gap B against linked Supabase so repeated plan
+application replaces active sessions without losing terminal history.
 
-## Why it matters
+## Baseline
 
-The mobile plan flow needs one deterministic apply contract: active sessions in
-the requested range are replaceable, terminal history survives, and repeated
-or concurrent applies cannot append duplicate active blocks.
-
-## Current branch
-
-`main`
-
-## Baseline commit
-
-Gap B started from clean `26ae471cdc8bc560f4420ced5f23c3f8672af833`
-after the Expo Router migration, with local `main` 44 commits ahead of origin.
+Hosted acceptance started from clean `792205d27f9a89f06084e889071734c55f4a841d`
+on `main`, 45 commits ahead and 0 behind `origin/main`.
 
 ## Completed scope
 
-- Added a forward-only session-lifecycle migration without editing the applied
-  R5 foundation migration.
-- Replaced the apply RPC with one owner-scoped advisory-lock transaction that
-  removes only intersecting `planned` rows, preserves `completed`/`skipped`,
-  rejects proposal overlap, and inserts the replacement plan and sessions.
-- Exposed session lifecycle in typed API reads and owner-scoped PATCH updates.
-- Added database-contract and stateful repeated-replan acceptance coverage.
+- Reviewed the forward migration's lifecycle schema, validation order,
+  owner-scoped advisory lock, range replacement, overlap rejection,
+  transaction behavior, function grants/security, and retained RLS.
+- Confirmed linked history through the R5 foundation, dry-ran exactly
+  `20260828173643_replace_planned_study_sessions_on_replan.sql`, applied it, and
+  verified final local/remote history alignment.
+- Inspected the deployed catalog rather than relying on migration metadata:
+  status/default/check, partial index, function definition markers, safe search
+  path, service-role-only execute privilege, RLS, and owner policies all match.
+- Reused and extended the ignored R5 live helper with dedicated two-user
+  fixtures. First apply/reapply, duplicate absence, outside-range preservation,
+  completed/skipped preservation, owner-scoped status PATCH persistence,
+  overlap atomicity, cross-owner denial, and two concurrent RPC applies passed.
+- Verified the Gap A live embedded task fields, independently completed task
+  status, nullable `task` contract key, and full PATCH response shape.
+- Deleted both acceptance users and all dependent fixtures; R5 table counts
+  returned from 0/0/0 to 0/0/0.
 
-## Explicit non-goals
+## Verification
 
-- Applying the new migration to linked Supabase without a separate runtime
-  acceptance task.
-- New Canvas network collection behavior.
-- AI-based planning or reviewer-engine changes.
-- OCR/PDF, durable processing, notifications, offline study, or EAS redesign.
-- Task, Work, Today, or plan-flow UI implementation.
+- Hosted Gap B runtime acceptance: PASS.
+- Targeted Gap A/Gap B API/database/session tests: 27/27.
+- Shared: 32/32; mobile: 216/216; reviewer: 290/290.
+- Forced root typecheck and lint: 7/7 packages, zero cached tasks; lint has only
+  the four known mobile import-order warnings.
+- DB build: PASS. API production build: PASS.
+- Full API: 574/575. The sole failure matches the documented Windows
+  CRLF-sensitive Canvas SQL substring baseline; all planning tests pass.
+- Performance advisors report only the four known legacy `reviewers` RLS
+  init-plan warnings; no Gap B performance warning was introduced.
+- Security advisors report only older function/Auth warnings and none for the
+  Gap B apply function, lifecycle schema, index, grants, or RLS policies.
+- First attempts recorded: the live helper initially received HTTP 401 because
+  the local API process lacked the established `SUPABASE_URL` alias; cleanup
+  passed, and a process-only alias made the full rerun pass. The first security
+  advisor call hit a temporary-role authentication error; one retry succeeded.
 
-## Required verification
+## Result
 
-- Shared 32/32; targeted Gap B planning/database/session tests 27/27; mobile
-  216/216; reviewer 290/290.
-- Shared, DB, API, and mobile typechecks; root lint with only four pre-existing
-  mobile warnings; DB/API builds; `git diff --check`.
-- Full API 574/575 with only the accepted pre-existing Windows CRLF assertion.
+PASS: Gap B is applied and hosted runtime accepted without unrelated database
+changes, duplicate active schedules, terminal-history loss, owner-isolation
+regression, or fixture residue.
 
-## Result and residual risks
+## Next action
 
-- LOCAL PASS: typed, static, stateful, regression, lint, and build gates pass.
-- Runtime migration verification is pending. The isolated local Supabase stack
-  could not start because Docker Desktop's Linux engine was unavailable; the
-  linked project was intentionally not mutated.
-- The partial index supports the range replacement predicate for active rows;
-  retain the existing advisor discipline and evaluate it after live rollout.
-
-## Completion criteria
-
-Met locally. Gap B is implemented without weakening owner isolation or planner
-determinism. Linked Supabase execution remains a deployment acceptance gate.
-
-## Next action after completion
-
-Apply and runtime-validate
-`20260828173643_replace_planned_study_sessions_on_replan.sql` against linked
-Supabase, then continue R6 mobile Tasks and Study Schedule integration.
+Continue R6 mobile Tasks and Study Schedule integration against the accepted
+Gap A/Gap B backend contracts.

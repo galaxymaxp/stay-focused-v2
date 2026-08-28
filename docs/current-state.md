@@ -8,9 +8,9 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - R5 started from `31522d840fd415267b048408ba0317587d4cafab`; implementation
   commit `3b5f21f` adds the owner-scoped task and deterministic study-plan
   foundation.
-- Local `main` contains the R5 implementation and documentation commits and
-  remains unpushed. R5.1 began at `20ae205` with a clean tree, 40 commits ahead
-  and 0 behind `origin/main`.
+- Local `main` contains the R5 implementation, Gap A/Gap B, and acceptance
+  documentation commits and remains unpushed. Gap B hosted acceptance began at
+  `792205d` with a clean tree, 45 commits ahead and 0 behind `origin/main`.
 - Recovery branches/tags remain preserved. Generated Next build drift was
   removed before the R5 implementation commit.
 
@@ -29,11 +29,11 @@ Last refreshed: 2026-08-28, Asia/Manila.
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
   place and passed against linked Supabase. Final verdict: PASS.
-- The R6 replanning prerequisite (Gap B) is implemented locally. Study sessions
-  now have `planned`, `completed`, and `skipped` lifecycle state; applying a
-  range serializes per owner and atomically replaces only intersecting planned
-  rows, preserves terminal history, and rejects overlapping new proposals.
-  The forward migration is not yet applied to linked Supabase.
+- The R6 replanning prerequisite (Gap B) is implemented and hosted accepted.
+  Study sessions have `planned`, `completed`, and `skipped` lifecycle state;
+  applying a range serializes per owner and atomically replaces only
+  intersecting planned rows, preserves terminal history, and rejects
+  overlapping new proposals.
 - Live acceptance exposed one R5 runtime defect: PostgreSQL returned persisted
   timestamps with microsecond precision while the shared ISO validator allowed
   at most milliseconds. The parser now accepts valid fractional precision and
@@ -54,12 +54,15 @@ Last refreshed: 2026-08-28, Asia/Manila.
 ## Deterministic test baseline
 
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
-  targeted Gap B API/database/session coverage: 27/27; mobile: 216/216;
-  reviewer engine: 290/290 deterministic evaluations.
-- Shared, DB, and API typechecks pass. DB and API production builds pass.
-- Full API regression is 574/575. The only failure is the known pre-existing
-  Windows CRLF-sensitive Canvas SQL substring assertion; the SQL semantics and
-  all planning tests pass, so it is not a Gap B product defect.
+  targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
+  reviewer engine: 290/290 deterministic evaluations. These suites were rerun
+  after hosted acceptance.
+- Forced root typecheck and lint pass fresh for 7/7 packages with zero cached
+  tasks; lint retains only the four known mobile import-order warnings. DB and
+  API production builds pass.
+- Full API regression is 574/575. The only failure matches the documented
+  pre-existing Windows CRLF-sensitive Canvas SQL substring baseline; the SQL
+  semantics and all planning tests pass, so it is not a Gap B product defect.
 
 ## Migration status
 
@@ -74,11 +77,20 @@ Last refreshed: 2026-08-28, Asia/Manila.
   It creates `tasks`, `study_plans`, and `study_sessions` with owner-safe
   foreign keys, RLS policies, service-only RPCs, and supporting indexes.
 - Forward-only migration
-  `20260828173643_replace_planned_study_sessions_on_replan.sql` is the new local
-  tip. It adds session lifecycle state and replaces the service-only apply RPC
-  with owner-serialized, range-scoped replacement semantics. Static contracts
-  and stateful API acceptance pass; local database execution was blocked by a
-  stopped Docker engine, and the linked project was not mutated.
+  `20260828173643_replace_planned_study_sessions_on_replan.sql` is applied to
+  linked Supabase. A CLI 2.116.0 dry-run proposed only this migration; final
+  local/remote history matches through `20260828173643`.
+- Hosted catalog inspection confirmed the non-null `planned` status default and
+  lifecycle check, partial planned-session index, owner-serialized replacement
+  function, safe search path, `SECURITY INVOKER`, service-role-only execution,
+  enabled RLS, and unchanged owner policies.
+- Dedicated two-user runtime acceptance passed first apply, same-window
+  reapply, no duplicate active schedule, completed/skipped preservation,
+  owner-scoped status PATCH persistence, overlap rejection with no partial
+  writes, cross-owner API/RLS denial, two concurrent RPC applies, and the Gap A
+  embedded-task/full-PATCH response contract. Temporary users and rows were
+  removed; `tasks`, `study_plans`, and `study_sessions` counts returned from
+  0/0/0 to 0/0/0.
 - Supabase CLI 2.116.0 dry-run proposed only the R5 migration. The linked push
   applied only `20260827155438`, and final linked history records it as
   `task_study_plan_foundation`.
@@ -91,12 +103,12 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: apply and runtime-validate the Gap B migration in the
-  linked Supabase project, then continue R6 mobile Tasks and Study Schedule UI.
-- Supabase performance advisors report informational composite-FK coverage
-  notices for `study_sessions`; no R5 security advisory was reported. Address
-  performance only from measured query evidence through a future forward-only
-  migration.
+- Recommended next task: continue R6 mobile Tasks and Study Schedule
+  integration against the accepted Gap A/Gap B backend contracts.
+- Supabase warn-level advisors report only legacy non-Gap-B findings: four
+  `reviewers` RLS init-plan performance warnings plus older function/Auth
+  security warnings. No warning names the Gap B status/index/apply objects.
+  Address unrelated findings only through separately scoped work.
 - Physical-device acceptance debt remains for Product R6 and the durable
   long-document Android matrix. APK installation, authentication, and hosted
   API connectivity are no longer blockers.

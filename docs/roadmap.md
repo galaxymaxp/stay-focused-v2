@@ -37,7 +37,7 @@ Status: Complete and live accepted.
 
 ### R6 prerequisite - deterministic replanning replacement
 
-Status: Implemented locally; linked migration acceptance pending.
+Status: Complete and hosted accepted.
 
 - Study sessions expose `planned`, `completed`, and `skipped` lifecycle state.
 - Applying a plan serializes per owner, deletes only active sessions that
@@ -47,12 +47,24 @@ Status: Implemented locally; linked migration acceptance pending.
   range. Shared, targeted planning, mobile, reviewer, typecheck, lint, and build
   gates pass. The full API suite remains green except for its known Windows
   CRLF Canvas assertion.
-- `20260828173643_replace_planned_study_sessions_on_replan.sql` has not been
-  applied to linked Supabase. Local SQL execution was unavailable because the
-  Docker engine was stopped, so runtime acceptance remains explicit debt.
+- Supabase CLI 2.116.0 dry-run proposed only
+  `20260828173643_replace_planned_study_sessions_on_replan.sql`; the linked push
+  applied it and local/remote migration history now matches.
+- Hosted catalog inspection verified lifecycle schema, the partial planned-row
+  index, advisory locking, replacement/overlap markers, `SECURITY INVOKER`,
+  service-role-only execution, RLS, and owner policies.
+- Dedicated two-user live acceptance passed first apply, same-window reapply,
+  active-duplicate absence, completed/skipped preservation, status PATCH
+  persistence, atomic proposed-overlap rejection, cross-owner denial, two
+  concurrent RPC applies, unaffected outside-range data, and the Gap A embedded
+  task/full PATCH response contract. All fixtures were removed and R5 table
+  counts returned to zero.
+- Fresh verification passed targeted Gap A/Gap B 27/27, shared 32/32, mobile
+  216/216, reviewer 290/290, forced root typecheck/lint for 7/7 packages, and
+  DB/API builds. Full API is 574/575 with only the documented Windows
+  CRLF-sensitive Canvas SQL assertion.
 
-Immediate next task: apply and runtime-validate the Gap B migration, then
-continue R6 mobile Tasks and Study Schedule integration.
+Immediate next task: continue R6 mobile Tasks and Study Schedule integration.
 
 ## Phase 5F.2 - Incremental, Resumable Canvas Synchronization
 
@@ -1569,8 +1581,8 @@ quiz questions, grades, outcomes, or external-tool content.
 
 ## Phase 6 - Tasks And Study Schedules
 
-Status: In progress; route foundation and replanning prerequisite are local,
-with task/schedule surfaces and linked Gap B migration acceptance remaining.
+Status: In progress; route foundation and replanning backend are hosted
+accepted, with task/schedule mobile surfaces remaining.
 
 Purpose: Expand from reviewer generation into schedule-first planning and
 actionable study sessions.
