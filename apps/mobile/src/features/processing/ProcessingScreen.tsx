@@ -10,6 +10,7 @@ import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
+import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { colors, spacing, typography } from "../../design/tokens";
 import {
@@ -52,10 +53,18 @@ import {
   type OfflineProcessingIntent,
 } from "../../services/processingOutboxStore";
 import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
+import { saveReviewer } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
+import { createProcessingReviewerSourceMetadata } from "./processingReviewerSave";
 
 interface ProcessingScreenProps {
   readonly onBack: () => void;
+}
+
+interface OpenedReviewerResult {
+  readonly job: ProcessingJobStatusView;
+  readonly reviewer: ReviewerOutput;
+  readonly sourceSnapshotId?: string;
 }
 
 type ProcessingGroup =
@@ -71,7 +80,11 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
     useState<readonly OfflineProcessingIntent[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openedReviewer, setOpenedReviewer] = useState<ReviewerOutput | null>(null);
+  const [openedReviewer, setOpenedReviewer] =
+    useState<OpenedReviewerResult | null>(null);
+  const [reviewerSaveTitle, setReviewerSaveTitle] = useState("");
+  const [reviewerSaveMessage, setReviewerSaveMessage] = useState<string | null>(null);
+  const [isSavingReviewer, setIsSavingReviewer] = useState(false);
   const [openedSource, setOpenedSource] = useState<{
     readonly title: string;
     readonly text: string;
@@ -291,7 +304,17 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
             payload: result.data.reviewer,
           });
         }
-        setOpenedReviewer(result.data.reviewer);
+        setOpenedReviewer({
+          job,
+          reviewer: result.data.reviewer,
+          ...(result.data.sourceSnapshotId
+            ? { sourceSnapshotId: result.data.sourceSnapshotId }
+            : {}),
+        });
+        setReviewerSaveTitle(
+          result.data.reviewer.title.trim() || job.source.displayName,
+        );
+        setReviewerSaveMessage(null);
         return;
       }
     }
@@ -303,9 +326,50 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
       ? await readCachedArtifact(ownerUserId, metadata.artifactVersionId)
       : null;
     if (cached && isReviewerOutput(cached.payload)) {
-      setOpenedReviewer(cached.payload);
+      setOpenedReviewer({ job, reviewer: cached.payload });
+      setReviewerSaveTitle(cached.payload.title.trim() || job.source.displayName);
+      setReviewerSaveMessage(null);
     } else {
       setError("This result is not available offline on this device.");
+    }
+  };
+
+  const handleSaveOpenedReviewer = async () => {
+    if (!openedReviewer || isSavingReviewer) return;
+    const context = requestContext(session?.accessToken);
+    if (!context) {
+      setReviewerSaveMessage("Sign in and connect to the API before saving.");
+      return;
+    }
+    const title = reviewerSaveTitle.trim();
+    if (!title) {
+      setReviewerSaveMessage("Enter a title before saving this reviewer.");
+      return;
+    }
+
+    setIsSavingReviewer(true);
+    setReviewerSaveMessage(null);
+    try {
+      const result = await saveReviewer({
+        ...context,
+        reviewerOutput: openedReviewer.reviewer,
+        sourceMetadata: createProcessingReviewerSourceMetadata(
+          openedReviewer.job,
+          openedReviewer.sourceSnapshotId,
+        ),
+        ...(openedReviewer.sourceSnapshotId
+          ? { sourceSnapshotId: openedReviewer.sourceSnapshotId }
+          : {}),
+        title,
+      });
+      setReviewerSaveMessage(
+        result.ok
+          ? `Saved as ${result.data.title}. Open it later from Study Library.`
+          : result.error.message,
+      );
+      if (result.ok) setReviewerSaveTitle(result.data.title);
+    } finally {
+      setIsSavingReviewer(false);
     }
   };
 
@@ -326,10 +390,40 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
   if (openedReviewer) {
     return (
       <Screen>
-        <Button onPress={() => setOpenedReviewer(null)} variant="secondary">
+        <Button
+          onPress={() => {
+            setOpenedReviewer(null);
+            setReviewerSaveMessage(null);
+          }}
+          variant="secondary"
+        >
           Back to Processing
         </Button>
-        <ReviewerPreview reviewer={openedReviewer} />
+        <ReviewerPreview reviewer={openedReviewer.reviewer} />
+        <Card style={styles.jobCard} testID="processing-reviewer-save-card">
+          <Text style={styles.jobTitle}>Save to Study Library</Text>
+          <TextField
+            label="Reviewer title"
+            onChangeText={(value) => {
+              setReviewerSaveTitle(value);
+              setReviewerSaveMessage(null);
+            }}
+            testID="processing-reviewer-save-title"
+            value={reviewerSaveTitle}
+          />
+          {reviewerSaveMessage ? (
+            <Text style={styles.meta} testID="processing-reviewer-save-message">
+              {reviewerSaveMessage}
+            </Text>
+          ) : null}
+          <Button
+            loading={isSavingReviewer}
+            onPress={() => void handleSaveOpenedReviewer()}
+            testID="processing-reviewer-save-button"
+          >
+            Save reviewer
+          </Button>
+        </Card>
       </Screen>
     );
   }

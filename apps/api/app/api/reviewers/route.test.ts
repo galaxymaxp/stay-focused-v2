@@ -163,6 +163,57 @@ describe("/api/reviewers", () => {
     expect(JSON.stringify(client.insertPayload)).not.toContain("user-2");
   });
 
+  it("saves reviewer metadata for every supported durable PDF page count", async () => {
+    const client = createInsertClient({ row: reviewerRow() });
+    mocks.createReviewerUserClient.mockReturnValue(client);
+
+    const response = await POST(
+      createRequest({
+        body: {
+          title: "Long PDF reviewer",
+          sourceMetadata: {
+            sourceMode: "pdf",
+            sourceCharacterCount: 42,
+            pdfPageCount: 100,
+          },
+          reviewerOutput: reviewerOutput(),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(client.insertPayload).toMatchObject({
+      source_metadata: {
+        sourceMode: "pdf",
+        sourceCharacterCount: 42,
+        pdfPageCount: 100,
+      },
+    });
+  });
+
+  it("rejects PDF page metadata above the durable document limit", async () => {
+    mocks.createReviewerUserClient.mockReturnValue(
+      createInsertClient({ row: reviewerRow() }),
+    );
+
+    const response = await POST(
+      createRequest({
+        body: {
+          title: "Oversized PDF reviewer",
+          sourceMetadata: {
+            sourceMode: "pdf",
+            sourceCharacterCount: 42,
+            pdfPageCount: 101,
+          },
+          reviewerOutput: reviewerOutput(),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expectError(response, "invalid_source_metadata");
+  });
+
   it("saves a Canvas reviewer only after verifying an owned source snapshot", async () => {
     const client = createInsertClient({ row: reviewerRow({ sourceMode: "canvas" }) });
     mocks.createReviewerUserClient.mockReturnValue(client);

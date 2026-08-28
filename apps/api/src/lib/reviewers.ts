@@ -10,6 +10,8 @@ import type {
   SavedReviewerSummary,
 } from "@stay-focused/db";
 
+import { DURABLE_DOCUMENT_MAX_PDF_PAGES } from "./ocr/upload-policy";
+
 export const MAX_REVIEWER_TITLE_LENGTH = 120;
 
 const REVIEWER_ID_PATTERN =
@@ -291,12 +293,12 @@ function validateSourceMetadata(
     (typeof pdfPageCount !== "number" ||
       !Number.isInteger(pdfPageCount) ||
       pdfPageCount < 1 ||
-      pdfPageCount > 5)
+      pdfPageCount > DURABLE_DOCUMENT_MAX_PDF_PAGES)
   ) {
     return {
       ok: false,
       code: "invalid_source_metadata",
-      message: "sourceMetadata.pdfPageCount must be between 1 and 5.",
+      message: `sourceMetadata.pdfPageCount must be between 1 and ${DURABLE_DOCUMENT_MAX_PDF_PAGES}.`,
     };
   }
 
