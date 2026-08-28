@@ -4,14 +4,14 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Current objective
 
-Close the capstone R5 task/study-plan foundation and prepare R6 mobile task and
-schedule implementation against the accepted backend contracts.
+Complete R5.1 live Supabase migration and domain acceptance for the committed
+R5 task/study-plan foundation before beginning R6.
 
 ## Why it matters
 
-The schedule-first product promise now has a secure persistent backend and a
-deterministic planner. The next slice can focus on the student-facing mobile
-experience without reopening Canvas sync or reviewer-engine architecture.
+Local, static, and stateful-double validation cannot prove that the forward R5
+migration and owner-isolation contracts execute correctly in the linked
+Supabase environment. R5.1 closes that acceptance gap.
 
 ## Current branch
 
@@ -25,12 +25,12 @@ and forward migration.
 
 ## Scope
 
-- Preserve the R5 planner and API contracts while preparing R6.
-- Apply and runtime-validate the forward R5 migration only with explicit linked
-  project authorization.
-- Build the R6 mobile task list, Canvas import selection, plan preview/apply,
-  and study-session agenda on the authenticated R5 APIs.
-- Preserve owner isolation, deterministic output, and explicit unscheduled work.
+- Obtain explicit linked-project authorization before any mutation.
+- Apply the forward R5 migration without repairing or rewriting migration
+  history.
+- Runtime-validate tables, constraints, grants, RLS, import/apply RPCs,
+  persistence, and all eight two-user denial attacks.
+- Preserve the accepted planner/API contracts and record sanitized evidence.
 
 ## Explicit non-goals
 
@@ -38,29 +38,30 @@ and forward migration.
 - New Canvas network collection behavior.
 - AI-based planning or reviewer-engine changes.
 - OCR/PDF, durable processing, notifications, offline study, or EAS redesign.
+- R6 mobile task/schedule implementation.
 
 ## Required verification
 
 - Preserve shared planner, R5 API/database/acceptance, and two-user isolation
   suites.
 - Preserve the 290/290 deterministic reviewer regression.
-- Run mobile tests/typecheck/build for the R6 UI and API integration.
-- Runtime-validate the forward R5 migration separately from static SQL checks.
+- Confirm the linked migration executes and the new domain behaves correctly
+  against real Supabase RLS/RPC semantics.
 
 ## Known blockers
 
 - Supabase CLI and Docker are unavailable in the current local environment, so
   R5 migration runtime validation is blocked locally.
 - Four linked Canvas migrations retain metadata-only aliases; do not repair or
-  mutate linked history as part of R6.
+  mutate linked history as part of R5.1.
 - No R5 push or linked migration application has been performed.
 
 ## Completion criteria
 
 The forward R5 migration is applied and runtime-validated in an approved
-environment, and the R6 mobile experience consumes the existing R5 APIs without
+environment, including persistence and all eight cross-user denials, without
 weakening owner isolation or planner determinism.
 
 ## Next action after completion
 
-Implement R6 - Mobile task and schedule experience.
+Begin R6 — Mobile task and schedule experience.

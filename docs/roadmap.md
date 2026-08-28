@@ -4,7 +4,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Capstone Development Phase R5 - Task And Study-Plan Foundation
 
-Status: Implementation accepted; local migration runtime validation blocked.
+Status: PARTIAL — R5 implementation accepted but environment/migration runtime
+validation remains blocked.
 
 - Added owner-scoped `tasks`, `study_plans`, and `study_sessions` with RLS,
   owner-safe foreign keys, service-only atomic import/apply functions, and a
@@ -25,8 +26,9 @@ Status: Implementation accepted; local migration runtime validation blocked.
 - Supabase CLI and Docker are unavailable locally. Static migration validation
   passes; no linked mutation, migration repair, or push was performed.
 
-Immediate next phase: R6 mobile task and schedule experience, after approved
-runtime application/validation of the R5 migration.
+Immediate next task: R5.1 — Live Supabase migration and domain acceptance.
+R6 mobile task and schedule work begins only after R5.1 accepts the database
+vertical slice.
 
 ## Phase 5F.2 - Incremental, Resumable Canvas Synchronization
 

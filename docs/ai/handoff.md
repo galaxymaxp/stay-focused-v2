@@ -2161,3 +2161,21 @@ Current route status:
 - Remaining R5 risk is runtime application/validation of the new migration in
   an approved environment. Recommended next phase: R6 - Mobile task and
   schedule experience.
+
+## 2026-08-28 - R5 final validation clarification
+
+- Git was authoritative when final validation resumed: both intended R5
+  commits already existed, the working tree was clean, and no duplicate
+  implementation or documentation commit was created.
+- Fresh final validation reproduced shared 30/30 (planner 12/12), targeted R5
+  API/database/acceptance 11/11, reviewer 290/290, and passing shared/DB/API
+  typechecks plus DB/API builds. Full API remained 558/559 with only the known
+  Windows CRLF-sensitive Canvas SQL assertion.
+- Static SQL, repository-double, and stateful integration coverage do not
+  substitute for executing the migration and owner-isolation matrix against a
+  real linked Supabase project. No linked mutation was performed during final
+  validation.
+- Final verdict: PARTIAL — R5 implementation accepted but
+  environment/migration runtime validation remains blocked.
+- Corrected next task: R5.1 — Live Supabase migration and domain acceptance.
+  R6 begins only after R5.1 accepts the database vertical slice.

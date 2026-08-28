@@ -8,8 +8,9 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - R5 started from `31522d840fd415267b048408ba0317587d4cafab`; implementation
   commit `3b5f21f` adds the owner-scoped task and deterministic study-plan
   foundation.
-- Local `main` is 38 commits ahead and 0 behind `origin/main` before the R5
-  documentation commit. No push was performed.
+- Local `main` contains the R5 implementation and documentation commits and
+  remains unpushed. It was 39 commits ahead and 0 behind `origin/main` when
+  final R5 validation began.
 - Recovery branches/tags remain preserved. Generated Next build drift was
   removed before the R5 implementation commit.
 
@@ -27,7 +28,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - Capstone development R5 is implementation-complete: manual task CRUD,
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
-  place. R6 is the mobile task and schedule experience.
+  place. Final verdict: PARTIAL — R5 implementation accepted but
+  environment/migration runtime validation remains blocked.
 - Product Recovery R1-R5 is complete. R6 is partial: automated checks pass,
   while Dynamic Type, VoiceOver, interruption, navigation/reconciliation, and
   save-flow behavior still require physical iPhone observation.
@@ -67,7 +69,9 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 - Apply and runtime-validate the forward R5 migration in an approved Supabase
   environment before depending on the endpoints outside deterministic tests.
-- Begin R6 mobile task/schedule work only against the accepted R5 contracts.
+- Recommended next task: R5.1 — Live Supabase migration and domain acceptance.
+  Begin R6 mobile task/schedule work only after R5.1 accepts the database
+  vertical slice.
 - Physical-device acceptance debt remains for Product R6 and the durable
   long-document Android matrix. APK installation, authentication, and hosted
   API connectivity are no longer blockers.
