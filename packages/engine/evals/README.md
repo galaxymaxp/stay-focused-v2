@@ -8,13 +8,13 @@ expectations, and reports passed and failed cases with useful issue messages.
 ## Current Status
 
 Stage 0 through Stage 6 plus end-to-end pipeline integration are covered. The
-current aggregate result is **266 passed, 0 failed**. The harness is
+current aggregate result is **290 passed, 0 failed**. The harness is
 deterministic and dependency-free; provider-facing cases use fake providers
 only. LLM quality, latency, and cost evaluation remain separate from these
 deterministic contract evals.
 
 API-layer provider adapter contract checks are maintained separately from these
-266 engine evals. They use injected fake clients where possible and do not
+290 engine evals. They use injected fake clients where possible and do not
 replace the engine's fake-provider suites.
 
 ## Why Evals Come Before Each Stage
@@ -49,6 +49,11 @@ Stage 4 is deterministic coverage verification. Its evals compare generated
 outputs with planned schema kinds, required fields, and required source-block
 coverage before retry or reviewer assembly. This prevents weak, incomplete, or
 misrouted reviewer sections from silently passing into later pipeline stages.
+
+Stage 5a validates student-visible grounding against source items and rejects
+fabrication, terminology drift, and weak source support before retry or final
+assembly. The leakage guard independently rejects provider/instruction residue
+and default visible enrichment that is not supported by the source.
 
 Stage 5 performs bounded retries only. Its evals verify that passed outputs are
 preserved, only retryable weak or failed sections are regenerated, policy

@@ -25,6 +25,16 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Recovery and active implementation
 
+- The R6 reviewer-core capstone audit is accepted. The complete supported path
+  is source intake or synchronized Canvas selection, editable preparation,
+  grounded Stage 0-6 generation, durable progress, reviewer reading, save, and
+  Study Library reopen. A fresh linked-project Canvas run passed selection,
+  OpenAI generation, immutable provenance, persistence, source health, owner
+  isolation, and zero-residue cleanup.
+- Two reviewer defects were hardened: saved PDF metadata now matches the
+  durable 100-total-page policy instead of rejecting page counts above five,
+  and reviewer results opened from completion routing can be titled and saved
+  from Processing, including their Canvas snapshot.
 - Capstone development R5 is complete and live accepted: manual task CRUD,
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
@@ -60,7 +70,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - Forced root typecheck and lint pass fresh for 7/7 packages with zero cached
   tasks; lint retains only the four known mobile import-order warnings. DB and
   API production builds pass.
-- Full API regression is 574/575. The only failure matches the documented
+- Full API regression is 576/577 after two new reviewer-save boundary tests.
+  The only failure matches the documented
   pre-existing Windows CRLF-sensitive Canvas SQL substring baseline; the SQL
   semantics and all planning tests pass, so it is not a Gap B product defect.
 
@@ -103,8 +114,14 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: continue R6 mobile Tasks and Study Schedule
-  integration against the accepted Gap A/Gap B backend contracts.
+- Recommended next task: run one deployed-build physical-device rehearsal of
+  the primary Canvas reviewer demo, including durable worker completion,
+  notification routing, save, and Study Library reopen.
+- Reviewer-core limitations are documented in
+  `docs/ai/reviewer-core-capstone-acceptance-20260828.md`; notably, fresh camera
+  and long-document device acceptance was not repeated, and a cold-start
+  non-Canvas result conservatively loses its gallery/camera/PDF mode label when
+  saved from Processing. Content and reopen behavior remain intact.
 - Supabase warn-level advisors report only legacy non-Gap-B findings: four
   `reviewers` RLS init-plan performance warnings plus older function/Auth
   security warnings. No warning names the Gap B status/index/apply objects.
