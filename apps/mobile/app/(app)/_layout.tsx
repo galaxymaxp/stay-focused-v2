@@ -20,6 +20,7 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="generate" options={{ presentation: "modal" }} />
       <Stack.Screen name="processing" />
+      <Stack.Screen name="settings" />
     </Stack>
   );
 }
