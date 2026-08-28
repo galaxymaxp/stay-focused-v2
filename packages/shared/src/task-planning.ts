@@ -56,6 +56,39 @@ export interface PatchTaskInput {
   readonly estimatedMinutes?: number;
 }
 
+/**
+ * The minimum owned task information a schedule surface needs to render a
+ * persisted study session. Deliberately narrower than {@link TaskView}: notes,
+ * estimates, and Canvas identifiers are excluded so a 200-session response
+ * cannot carry hundreds of kilobytes of task bodies. `/api/tasks/:taskId`
+ * remains the canonical task resource.
+ */
+export interface StudySessionTaskSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly status: TaskStatus;
+  readonly priority: TaskPriority;
+  readonly dueAt: string | null;
+  readonly canvasCourseId: string | null;
+}
+
+export interface StudySessionView {
+  readonly id: string;
+  readonly studyPlanId: string | null;
+  readonly taskId: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /**
+   * Null only when the owned task could not be resolved alongside the session.
+   * The owner-scoped foreign key makes that an invariant violation rather than
+   * an expected state, so schedule surfaces should treat it as a degraded row
+   * instead of hiding the block.
+   */
+  readonly task: StudySessionTaskSummary | null;
+}
+
 export interface AvailabilityWindow {
   readonly startsAt: string;
   readonly endsAt: string;

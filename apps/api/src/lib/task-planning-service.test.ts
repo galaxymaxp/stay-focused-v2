@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/task-planning-repository", () => ({
   loadOwnedPlannerTasks: mocks.loadOwnedPlannerTasks,
   persistOwnedStudyPlan: mocks.persistOwnedStudyPlan,
-  toStudySessionView: (row: StudySessionRow) => ({
+  toStudySessionView: (row: StudySessionRow & { task?: unknown }) => ({
     id: row.id,
     studyPlanId: row.study_plan_id,
     taskId: row.task_id,
@@ -18,6 +18,7 @@ vi.mock("@/lib/task-planning-repository", () => ({
     endsAt: row.ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    task: row.task ?? null,
   }),
 }));
 
@@ -86,6 +87,8 @@ describe("owned study planning service", () => {
 
     expect(applied.studyPlanId).toBe("00000000-0000-4000-8000-000000000099");
     expect(applied.sessions).toHaveLength(1);
+    // Apply publishes the same session shape the schedule read does.
+    expect(applied.sessions[0]).toHaveProperty("task");
     expect(mocks.persistOwnedStudyPlan).toHaveBeenCalledOnce();
     expect(mocks.persistOwnedStudyPlan.mock.calls[0]?.[3]).toMatch(/^[a-f0-9]{64}$/);
   });

@@ -170,6 +170,29 @@ describe("R5 API persistence and two-user acceptance", () => {
       endsAt: "2026-09-01T10:15:00.000Z",
     });
 
+    // Gap A: a schedule read renders without a second paginated task walk.
+    for (const row of persistedSessionRows) {
+      expect(row.task).not.toBeNull();
+      expect(row.task?.title).toBeTruthy();
+      expect(Object.keys(row.task ?? {}).sort()).toEqual([
+        "canvasCourseId",
+        "dueAt",
+        "id",
+        "priority",
+        "status",
+        "title",
+      ]);
+    }
+    expect(persistedSessionRows.map((row) => row.task?.title).sort()).toEqual([
+      "My customized Canvas task",
+      "Prepare defense notes",
+    ]);
+    expect(
+      persistedSessionRows.find((row) => row.task?.id === canvasTask.id)?.task,
+    ).toMatchObject({ canvasCourseId: "canvas-course-1", dueAt: "2026-09-03T12:00:00.000Z" });
+    // The summary stays a summary: no notes or Canvas assignment identifiers.
+    expect(JSON.stringify(persistedSessionRows)).not.toContain("canvas-101");
+
     await expectDenied(taskRoute.GET(
       getRequest(`/api/tasks/${manualTask.id}`, USER_B),
       context("taskId", manualTask.id),
@@ -205,6 +228,15 @@ describe("R5 API persistence and two-user acceptance", () => {
     expect(readData<TaskView>(await completed.json())).toMatchObject({
       status: "completed",
     });
+
+    // Gap C is now legible from the schedule read alone: a block whose task was
+    // completed elsewhere reports it, so Today can render it without guessing.
+    const afterCompletion = await sessionsRoute.GET(getRequest("/api/study-sessions", USER_A));
+    const afterCompletionRows =
+      (await afterCompletion.json() as { data: { sessions: SessionView[] } }).data.sessions;
+    expect(
+      afterCompletionRows.find((row) => row.task?.id === manualTask.id)?.task?.status,
+    ).toBe("completed");
     const deletedSession = await sessionRoute.DELETE(
       getRequest(`/api/study-sessions/${session?.id}`, USER_A, "DELETE"),
       context("sessionId", session?.id ?? ""),
@@ -344,12 +376,14 @@ function installStatefulRepository(): void {
         ends_at: session.endsAt,
       });
       mocks.sessionRows.set(row.id, row);
-      return row;
+      return withOwnedTask(row);
     });
     return { studyPlanId: planId, sessions };
   });
   mocks.listOwnedStudySessions.mockImplementation(async (_client: unknown, userId: string) =>
-    [...mocks.sessionRows.values()].filter((row) => row.user_id === userId));
+    [...mocks.sessionRows.values()]
+      .filter((row) => row.user_id === userId)
+      .map(withOwnedTask));
   mocks.findOwnedStudySession.mockImplementation(async (
     _client: unknown,
     userId: string,
@@ -368,7 +402,7 @@ function installStatefulRepository(): void {
     if (!row || row.user_id !== userId) return null;
     const updated = { ...row, ...update, updated_at: new Date().toISOString() };
     mocks.sessionRows.set(sessionId, updated);
-    return updated;
+    return withOwnedTask(updated);
   });
   mocks.deleteOwnedStudySession.mockImplementation(async (
     _client: unknown,
@@ -390,6 +424,14 @@ interface SessionView {
   readonly id: string;
   readonly startsAt: string;
   readonly endsAt: string;
+  readonly task: {
+    readonly id: string;
+    readonly title: string;
+    readonly status: string;
+    readonly priority: string;
+    readonly dueAt: string | null;
+    readonly canvasCourseId: string | null;
+  } | null;
 }
 
 function taskRow(overrides: Partial<TaskRow> & Pick<TaskRow, "id" | "user_id" | "title">): TaskRow {
@@ -442,7 +484,8 @@ function toTaskView(row: TaskRow) {
   };
 }
 
-function toStudySessionView(row: StudySessionRow) {
+function toStudySessionView(row: StudySessionRow & { task?: TaskRow | null }) {
+  const task = row.task ?? null;
   return {
     id: row.id,
     studyPlanId: row.study_plan_id,
@@ -451,7 +494,23 @@ function toStudySessionView(row: StudySessionRow) {
     endsAt: row.ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    task: task
+      ? {
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+          dueAt: task.due_at,
+          canvasCourseId: task.canvas_course_id,
+        }
+      : null,
   };
+}
+
+/** Mirrors the repository decorating sessions with their owned task. */
+function withOwnedTask(row: StudySessionRow): StudySessionRow & { task: TaskRow | null } {
+  const task = mocks.taskRows.get(row.task_id);
+  return { ...row, task: task?.user_id === row.user_id ? task : null };
 }
 
 function jsonRequest(path: string, userId: string, body: unknown): Request {
