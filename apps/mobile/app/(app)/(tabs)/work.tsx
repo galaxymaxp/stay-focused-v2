@@ -1,16 +1,19 @@
-import { UpcomingSurface } from "../../../src/app-shell/UpcomingSurface";
+import { router, useLocalSearchParams } from "expo-router";
+
+import { WorkScreen } from "../../../src/features/work/WorkScreen";
+import { TASK_EDITOR_PATHNAME } from "../../../src/navigation/appRoutes";
 
 export default function WorkRoute() {
+  // The editor sets `reloaded` on return so the backlog refetches without the
+  // tab having to stay mounted or poll.
+  const params = useLocalSearchParams<{ reloaded?: string }>();
+  const reloadToken = Array.isArray(params.reloaded) ? params.reloaded[0] : params.reloaded;
+
   return (
-    <UpcomingSurface
-      title="Work"
-      summary="The cross-course backlog and planning input: everything outstanding, wherever it came from."
-      reads={[
-        "Manual and Canvas-derived tasks, from GET /api/tasks",
-        "Canvas assignments imported as tasks, from POST /api/tasks/import/canvas",
-        "Unscheduled work and the plan preview, from POST /api/study-plan/preview",
-      ]}
-      testID="work-placeholder"
+    <WorkScreen
+      onAddTask={() => router.push(TASK_EDITOR_PATHNAME)}
+      onOpenTask={(taskId) => router.push({ pathname: TASK_EDITOR_PATHNAME, params: { taskId } })}
+      {...(reloadToken ? { reloadToken } : {})}
     />
   );
 }
