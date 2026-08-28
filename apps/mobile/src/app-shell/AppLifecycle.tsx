@@ -4,7 +4,7 @@ import { AppState } from "react-native";
 
 import { useAuth } from "../auth";
 import { getApiBaseUrl } from "../config/apiBaseUrl";
-import { PROCESSING_NOTIFICATION_ROUTE } from "../navigation/appRoutes";
+import { readNotificationDestination } from "../navigation/notificationRoutes";
 import { subscribeToProcessingNotificationResponses } from "../services/completionNotifications";
 import { reconcileReviewerProcessingOutbox } from "../services/processingOutboxReconciliation";
 
@@ -56,11 +56,14 @@ export function AppLifecycle() {
 
   useEffect(() => {
     if (!ownerUserId) return;
-    const subscription = subscribeToProcessingNotificationResponses(() => {
+    const subscription = subscribeToProcessingNotificationResponses((data) => {
       // Real navigation replaces the previous `setActiveView` call, so a
       // notification tap produces a route the user can back out of and that a
-      // cold start can restore.
-      router.push(PROCESSING_NOTIFICATION_ROUTE);
+      // cold start can restore. A payload naming no known destination is
+      // ignored rather than guessed at.
+      const destination = readNotificationDestination(data);
+      if (!destination) return;
+      router.push({ pathname: destination.pathname, params: destination.params });
     });
     return () => subscription.remove();
   }, [ownerUserId]);

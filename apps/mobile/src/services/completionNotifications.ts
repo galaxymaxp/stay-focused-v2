@@ -4,6 +4,7 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
+import type { ProcessingNotificationPayload } from "../navigation/notificationRoutes";
 import { canUseCompletionNotifications } from "./completionNotificationCapability";
 
 const INSTALLATION_ID_KEY = "stay-focused-v2.notification-installation-id";
@@ -121,18 +122,33 @@ export async function disableCompletionNotifications(input: {
     : { ok: false, message: response.message };
 }
 
+/**
+ * Delivers the notification's own payload to the caller instead of a bare
+ * signal, so navigation can use the destination the server actually named
+ * (`screen`, and `jobId` when the notification is about a specific job) rather
+ * than assuming one.
+ */
 export function subscribeToProcessingNotificationResponses(
-  onOpenProcessing: () => void,
+  onNotificationResponse: (data: ProcessingNotificationPayload) => void,
 ): { readonly remove: () => void } {
   void Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (isProcessingResponse(response)) onOpenProcessing();
+    const data = readResponsePayload(response);
+    if (data) onNotificationResponse(data);
   }).catch(() => undefined);
   const subscription = Notifications.addNotificationResponseReceivedListener(
     (response) => {
-      if (isProcessingResponse(response)) onOpenProcessing();
+      const data = readResponsePayload(response);
+      if (data) onNotificationResponse(data);
     },
   );
   return { remove: () => subscription.remove() };
+}
+
+function readResponsePayload(
+  response: Notifications.NotificationResponse | null,
+): ProcessingNotificationPayload | null {
+  const data = response?.notification.request.content.data;
+  return data && typeof data === "object" ? (data as ProcessingNotificationPayload) : null;
 }
 
 async function getOrCreateInstallationId(): Promise<string> {
@@ -141,12 +157,6 @@ async function getOrCreateInstallationId(): Promise<string> {
   const id = createUuid();
   await SecureStore.setItemAsync(INSTALLATION_ID_KEY, id);
   return id;
-}
-
-function isProcessingResponse(
-  response: Notifications.NotificationResponse | null,
-): boolean {
-  return response?.notification.request.content.data?.screen === "processing";
 }
 
 async function requestJson(input: {

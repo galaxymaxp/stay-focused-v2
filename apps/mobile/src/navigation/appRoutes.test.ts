@@ -5,7 +5,6 @@ import {
   COURSE_GRADES_PATHNAME,
   COURSE_REVIEWER_PATHNAME,
   POST_SIGN_IN_ROUTE,
-  PROCESSING_NOTIFICATION_ROUTE,
   courseRouteParams,
   readCourseIdParam,
   readCourseNameParam,
@@ -72,10 +71,6 @@ describe("course route params read back", () => {
 });
 
 describe("shell destinations", () => {
-  it("routes a processing notification to the durable job list", () => {
-    expect(PROCESSING_NOTIFICATION_ROUTE).toBe(APP_ROUTES.processing);
-  });
-
   it("lands an authenticated session on a working surface", () => {
     // Today is the intended landing route but is still a placeholder; this
     // guard fails the moment it is made the default before it renders data.
