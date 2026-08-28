@@ -2179,3 +2179,37 @@ Current route status:
   environment/migration runtime validation remains blocked.
 - Corrected next task: R5.1 — Live Supabase migration and domain acceptance.
   R6 begins only after R5.1 accepts the database vertical slice.
+
+## 2026-08-28 - R5.1 live Supabase acceptance
+
+- Started from clean `main` at `20ae205`, 40 commits ahead and 0 behind
+  `origin/main`; `git fsck --full` passed and both recovery branches plus the
+  recovery tag remained present.
+- Reverified the four Canvas Case A aliases against live tables, columns,
+  constraints, indexes, RLS, policies, triggers, 26 functions, grants,
+  retry/idempotency state, incremental state, durable jobs, and service-role
+  authorization. Reconciled only `20260728022127` to `20260728094421`,
+  `20260728024021` to `20260728104000`, `20260728131529` to
+  `20260728201000`, and `20260728133821` to `20260728213700` with supported
+  migration-history repair commands. No historical SQL ran or changed.
+- The post-repair CLI 2.116.0 dry run proposed exactly
+  `20260827155438_task_study_plan_foundation.sql`. The real push applied only
+  that migration, and final linked history records `20260827155438`.
+- Live schema verification passed for `tasks`, `study_plans`,
+  `study_sessions`, `import_canvas_assignments_as_tasks_v1`, and
+  `apply_study_plan_v1`, including ownership constraints, indexes, RLS,
+  grants, security context, task reload, and atomic plan/session insertion.
+- Dedicated User A/User B acceptance passed manual CRUD, persisted Canvas
+  import with an unreachable `.invalid` provider URL, idempotent re-import,
+  edit preservation, deterministic/non-mutating preview, atomic apply,
+  invalid apply rollback, session edit/constraint/delete, and all eight API
+  plus RLS/database attacks. Cleanup restored tasks/plans/sessions 0 to 0.
+- The first live preview exposed an R5 defect: PostgreSQL microsecond
+  `created_at` precision was rejected by a milliseconds-only ISO regex. The
+  validator now accepts valid fractional precision and a regression covers the
+  live format. The complete live suite then passed.
+- Fresh verification: shared 31/31; targeted R5 11/11; DB typecheck/build,
+  engine typecheck, API typecheck/build all pass. Full API remains 558/559 only
+  for the known Windows CRLF Canvas assertion. No protected subsystem changed.
+- R5.1 verdict: PASS. Next recommended task: R6 — mobile Tasks and Study
+  Schedule integration.

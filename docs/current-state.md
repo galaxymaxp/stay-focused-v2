@@ -9,8 +9,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
   commit `3b5f21f` adds the owner-scoped task and deterministic study-plan
   foundation.
 - Local `main` contains the R5 implementation and documentation commits and
-  remains unpushed. It was 39 commits ahead and 0 behind `origin/main` when
-  final R5 validation began.
+  remains unpushed. R5.1 began at `20ae205` with a clean tree, 40 commits ahead
+  and 0 behind `origin/main`.
 - Recovery branches/tags remain preserved. Generated Next build drift was
   removed before the R5 implementation commit.
 
@@ -25,11 +25,14 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Recovery and active implementation
 
-- Capstone development R5 is implementation-complete: manual task CRUD,
+- Capstone development R5 is complete and live accepted: manual task CRUD,
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
-  place. Final verdict: PARTIAL — R5 implementation accepted but
-  environment/migration runtime validation remains blocked.
+  place and passed against linked Supabase. Final verdict: PASS.
+- Live acceptance exposed one R5 runtime defect: PostgreSQL returned persisted
+  timestamps with microsecond precision while the shared ISO validator allowed
+  at most milliseconds. The parser now accepts valid fractional precision and
+  a regression test covers the live format.
 - Product Recovery R1-R5 is complete. R6 is partial: automated checks pass,
   while Dynamic Type, VoiceOver, interruption, navigation/reconciliation, and
   save-flow behavior still require physical iPhone observation.
@@ -45,7 +48,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Deterministic test baseline
 
-- Shared: 30/30, including the deterministic planner; targeted R5 API/database
+- Shared: 31/31, including the PostgreSQL microsecond timestamp regression;
+  targeted R5 API/database
   acceptance: 11/11; reviewer engine: 290/290 deterministic evaluations.
 - Shared, DB, and API typechecks pass. DB and API production builds pass.
 - Full API regression is 558/559. The only failure is the known pre-existing
@@ -54,24 +58,33 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Migration status
 
-- The four linked Canvas version differences remain classified as metadata-only
-  aliases based on the completed R5 preflight. No historical migration was
-  edited and no migration repair was performed.
+- The four proven Canvas metadata aliases were reconciled through supported
+  `supabase migration repair` metadata operations only:
+  `20260728022127` to `20260728094421`, `20260728024021` to
+  `20260728104000`, `20260728131529` to `20260728201000`, and
+  `20260728133821` to `20260728213700`. No historical SQL was edited or
+  replayed and no Canvas schema object was changed by the repair.
 - Forward-only migration
   `20260827155438_task_study_plan_foundation.sql` is last in local order and
   creates `tasks`, `study_plans`, and `study_sessions` with owner-safe foreign
   keys, RLS policies, service-only RPCs, and supporting indexes.
-- Static migration/RLS contract validation passes. Supabase CLI and Docker are
-  unavailable locally, so local runtime validation is blocked. No linked
-  Supabase mutation or `db push` was performed.
+- Supabase CLI 2.116.0 dry-run proposed only the R5 migration. The linked push
+  applied only `20260827155438`, and final linked history records it as
+  `task_study_plan_foundation`.
+- Live schema checks passed for constraints, indexes, owner RLS, grants,
+  triggers, and service-only security-invoker import/apply RPCs. Live CRUD,
+  Canvas import/idempotency/edit preservation, deterministic preview, atomic
+  apply, study-session behavior, and all eight API plus RLS/database isolation
+  attacks passed. Dedicated test users and rows were removed; R5 table counts
+  returned from 0 to 0.
 
-## Known blockers and immediate task
+## Known risks and immediate task
 
-- Apply and runtime-validate the forward R5 migration in an approved Supabase
-  environment before depending on the endpoints outside deterministic tests.
-- Recommended next task: R5.1 — Live Supabase migration and domain acceptance.
-  Begin R6 mobile task/schedule work only after R5.1 accepts the database
-  vertical slice.
+- Recommended next task: R6 — mobile Tasks and Study Schedule integration.
+- Supabase performance advisors report informational composite-FK coverage
+  notices for `study_sessions`; no R5 security advisory was reported. Address
+  performance only from measured query evidence through a future forward-only
+  migration.
 - Physical-device acceptance debt remains for Product R6 and the durable
   long-document Android matrix. APK installation, authentication, and hosted
   API connectivity are no longer blockers.

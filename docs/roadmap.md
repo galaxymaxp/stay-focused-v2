@@ -4,8 +4,7 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Capstone Development Phase R5 - Task And Study-Plan Foundation
 
-Status: PARTIAL — R5 implementation accepted but environment/migration runtime
-validation remains blocked.
+Status: Complete and live accepted.
 
 - Added owner-scoped `tasks`, `study_plans`, and `study_sessions` with RLS,
   owner-safe foreign keys, service-only atomic import/apply functions, and a
@@ -19,16 +18,24 @@ validation remains blocked.
 - Preview is read-only. Apply accepts the normalized planning request, reruns
   the planner, validates owned pending tasks, and persists the plan/sessions in
   one RPC transaction rather than trusting arbitrary client session records.
-- Targeted R5 API/database/acceptance tests pass 11/11, shared tests pass 30/30,
+- Targeted R5 API/database/acceptance tests pass 11/11, shared tests pass 31/31,
   reviewer regression passes 290/290, and shared/DB/API typechecks plus DB/API
   builds pass. Full API regression remains 558/559 only because of the known
   pre-existing Windows CRLF Canvas assertion.
-- Supabase CLI and Docker are unavailable locally. Static migration validation
-  passes; no linked mutation, migration repair, or push was performed.
+- The four authorized Canvas migration-version aliases were reverified against
+  live tables, constraints, indexes, RLS, functions, grants, retry structures,
+  and service-role protections, then reconciled as metadata only. Historical
+  SQL and Canvas schema objects were not changed or replayed.
+- Supabase CLI 2.116.0 dry-run proposed only
+  `20260827155438_task_study_plan_foundation`; the linked push applied only that
+  migration. Live schema, CRUD, Canvas import, preview/apply, session behavior,
+  atomicity, cleanup, and all eight API plus RLS/database cross-user denials
+  passed.
+- Live preview initially exposed a valid PostgreSQL microsecond timestamp being
+  rejected by the shared validator. R5 now accepts arbitrary valid fractional
+  seconds, the focused regression passes, and the full live suite passes.
 
-Immediate next task: R5.1 — Live Supabase migration and domain acceptance.
-R6 mobile task and schedule work begins only after R5.1 accepts the database
-vertical slice.
+Immediate next task: R6 — mobile Tasks and Study Schedule integration.
 
 ## Phase 5F.2 - Incremental, Resumable Canvas Synchronization
 
