@@ -12,6 +12,8 @@ import {
   onAuthStateChange,
   signInWithEmailPassword as signInWithPassword,
   signOut as signOutSession,
+  signUpWithEmailPassword as signUpWithPassword,
+  type SignUpOutcome,
 } from "./authService";
 import type {
   AuthErrorInfo,
@@ -31,11 +33,16 @@ export interface AuthContextValue {
   readonly error: AuthErrorInfo | null;
   readonly isRestoring: boolean;
   readonly isSigningIn: boolean;
+  readonly isSigningUp: boolean;
   readonly isSigningOut: boolean;
   readonly signInWithEmailPassword: (
     email: string,
     password: string,
   ) => Promise<AuthResult<MobileAuthSession>>;
+  readonly signUpWithEmailPassword: (
+    email: string,
+    password: string,
+  ) => Promise<AuthResult<SignUpOutcome>>;
   readonly signOut: () => Promise<AuthResult<void>>;
   readonly refreshSession: () => Promise<AuthResult<MobileAuthSession | null>>;
   readonly clearError: () => void;
@@ -52,6 +59,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<MobileAuthSession | null>(null);
   const [error, setError] = useState<AuthErrorInfo | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const applySession = useCallback((nextSession: MobileAuthSession | null) => {
@@ -141,6 +149,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [applySession],
   );
 
+  const signUp = useCallback(
+    async (email: string, password: string) => {
+      setIsSigningUp(true);
+      setError(null);
+
+      try {
+        const result = await signUpWithPassword(email, password);
+        if (result.ok && result.data.kind === "signedIn") {
+          // Confirmation is disabled on this project, so the account is usable
+          // now and the shell can route straight through onboarding.
+          applySession(result.data.session);
+        } else if (!result.ok) {
+          setError(result.error);
+        }
+
+        return result;
+      } finally {
+        setIsSigningUp(false);
+      }
+    },
+    [applySession],
+  );
+
   const signOut = useCallback(async () => {
     setIsSigningOut(true);
     setError(null);
@@ -174,8 +205,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       error,
       isRestoring: status === "restoring",
       isSigningIn,
+      isSigningUp,
       isSigningOut,
       signInWithEmailPassword: signIn,
+      signUpWithEmailPassword: signUp,
       signOut,
       refreshSession,
       clearError,
@@ -185,8 +218,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       session,
       error,
       isSigningIn,
+      isSigningUp,
       isSigningOut,
       signIn,
+      signUp,
       signOut,
       refreshSession,
       clearError,

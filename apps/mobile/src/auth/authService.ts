@@ -16,6 +16,7 @@ import type {
   SupabaseSession,
   SupabaseUser,
 } from "./authTypes";
+import { classifySignUpResult } from "./signUpOutcome";
 import { getSupabaseClientResult } from "./supabaseClient";
 
 interface OAuthProviderConfig {
@@ -73,6 +74,71 @@ export async function signInWithEmailPassword(
     return authFailure(
       "network_error",
       "Sign in failed before Supabase returned a response.",
+    );
+  }
+}
+
+export type SignUpOutcome =
+  | { readonly kind: "signedIn"; readonly session: MobileAuthSession }
+  | { readonly kind: "confirmationRequired"; readonly email: string };
+
+/**
+ * Creates an account through the existing Supabase mobile client. No custom
+ * backend route is involved: the anon key and PKCE client already configured
+ * for sign-in support `signUp` directly.
+ *
+ * The caller is told which of the two real outcomes happened so the UI can show
+ * an honest verification state instead of assuming a session exists.
+ */
+export async function signUpWithEmailPassword(
+  email: string,
+  password: string,
+): Promise<AuthResult<SignUpOutcome>> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!isValidEmail(normalizedEmail)) {
+    return authFailure("invalid_email", "A valid email address is required.");
+  }
+  if (!password) {
+    return authFailure("missing_password", "A password is required.");
+  }
+
+  const client = getSupabaseClientResult();
+  if (!client.ok) {
+    return client;
+  }
+
+  try {
+    const { data, error } = await client.data.auth.signUp({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error) {
+      return authFailureFromSupabaseError(error, "email");
+    }
+
+    const outcome = classifySignUpResult({
+      hasSession: data.session !== null,
+      hasUser: data.user !== null,
+    });
+
+    if (outcome === "signedIn" && data.session) {
+      return {
+        ok: true,
+        data: { kind: "signedIn", session: toMobileAuthSession(data.session, "email") },
+      };
+    }
+    if (outcome === "confirmationRequired") {
+      return { ok: true, data: { kind: "confirmationRequired", email: normalizedEmail } };
+    }
+    return authFailure(
+      "session_restore_failed",
+      "Sign up completed, but no account or session was returned.",
+    );
+  } catch {
+    return authFailure(
+      "network_error",
+      "Sign up failed before Supabase returned a response.",
     );
   }
 }

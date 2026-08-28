@@ -8,12 +8,16 @@ import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { colors, spacing, typography } from "../../design/tokens";
 
+interface SignInScreenProps {
+  readonly onCreateAccount: () => void;
+}
+
 /**
- * Moved out of the former `app/index.tsx` switcher unchanged. Behavior, copy,
- * test IDs, and styling are identical; only its location changed so it can be a
- * real route.
+ * Moved out of the former `app/index.tsx` switcher. Behavior, copy, test IDs,
+ * and styling are unchanged; the only addition is the account-creation entry
+ * point, without which the sign-up route would be unreachable.
  */
-export function SignInScreen() {
+export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
   const { clearError, error, isSigningIn, signInWithEmailPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -89,6 +93,9 @@ export function SignInScreen() {
           </Button>
 
           <View style={styles.divider} />
+          <Button fullWidth onPress={onCreateAccount} variant="ghost">
+            Create an account
+          </Button>
           <Text style={styles.oauthNote}>
             Microsoft and Google sign-in are coming later.
           </Text>

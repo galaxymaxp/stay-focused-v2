@@ -6,6 +6,7 @@ export {
   signInWithGoogle,
   signInWithMicrosoft,
   signOut,
+  signUpWithEmailPassword,
 } from "./authService";
 export { AuthProvider } from "./AuthProvider";
 export {
@@ -14,6 +15,7 @@ export {
   getSupabaseMobileConfig,
 } from "./supabaseClient";
 export { useAuth } from "./useAuth";
+export type { SignUpOutcome } from "./authService";
 export type { AuthContextValue, AuthStatus } from "./AuthProvider";
 export type {
   AuthErrorCode,

@@ -7,12 +7,14 @@
  */
 export const APP_ROUTES = {
   signIn: "/sign-in",
+  signUp: "/sign-up",
   today: "/today",
   work: "/work",
   courses: "/courses",
   library: "/library",
   generate: "/generate",
   processing: "/processing",
+  settings: "/settings",
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
@@ -34,9 +36,6 @@ export const COURSE_GRADES_PATHNAME = "/courses/[courseId]/grades" as const;
  * `APP_ROUTES.today` when the Today surface ships.
  */
 export const POST_SIGN_IN_ROUTE: AppRoute = APP_ROUTES.courses;
-
-/** A processing completion notification opens the durable job list. */
-export const PROCESSING_NOTIFICATION_ROUTE: AppRoute = APP_ROUTES.processing;
 
 export interface CourseRouteInput {
   readonly courseId: string;
