@@ -50,6 +50,7 @@ export interface SavedReviewerDetail<TReviewerOutput = Json>
 export type TaskDatabaseStatus = "pending" | "completed";
 export type TaskDatabasePriority = "low" | "medium" | "high";
 export type TaskDatabaseSourceType = "manual" | "canvas";
+export type StudySessionDatabaseStatus = "planned" | "completed" | "skipped";
 
 export type ReviewerRow = Database["public"]["Tables"]["reviewers"]["Row"];
 export type ReviewerInsert =
@@ -628,6 +629,7 @@ export interface Database {
           task_id: string;
           starts_at: string;
           ends_at: string;
+          status: StudySessionDatabaseStatus;
           created_at: string;
           updated_at: string;
         };
@@ -638,6 +640,7 @@ export interface Database {
           task_id: string;
           starts_at: string;
           ends_at: string;
+          status?: StudySessionDatabaseStatus;
           created_at?: string;
           updated_at?: string;
         };
@@ -648,6 +651,7 @@ export interface Database {
           task_id?: string;
           starts_at?: string;
           ends_at?: string;
+          status?: StudySessionDatabaseStatus;
           created_at?: string;
           updated_at?: string;
         };

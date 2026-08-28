@@ -21,7 +21,7 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - Canvas Phase 5F.1 and Phase 5F.2 are complete and hosted validated. Canvas
   content/grade synchronization is server-owned, durable, resumable, bounded,
   owner-scoped, and manually initiated.
-- Phase 6 and Phase 7 have not started.
+- Phase 6 is in progress locally; Phase 7 has not started.
 
 ## Recovery and active implementation
 
@@ -29,6 +29,11 @@ Last refreshed: 2026-08-28, Asia/Manila.
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
   place and passed against linked Supabase. Final verdict: PASS.
+- The R6 replanning prerequisite (Gap B) is implemented locally. Study sessions
+  now have `planned`, `completed`, and `skipped` lifecycle state; applying a
+  range serializes per owner and atomically replaces only intersecting planned
+  rows, preserves terminal history, and rejects overlapping new proposals.
+  The forward migration is not yet applied to linked Supabase.
 - Live acceptance exposed one R5 runtime defect: PostgreSQL returned persisted
   timestamps with microsecond precision while the shared ISO validator allowed
   at most milliseconds. The parser now accepts valid fractional precision and
@@ -48,13 +53,13 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Deterministic test baseline
 
-- Shared: 31/31, including the PostgreSQL microsecond timestamp regression;
-  targeted R5 API/database
-  acceptance: 11/11; reviewer engine: 290/290 deterministic evaluations.
+- Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
+  targeted Gap B API/database/session coverage: 27/27; mobile: 216/216;
+  reviewer engine: 290/290 deterministic evaluations.
 - Shared, DB, and API typechecks pass. DB and API production builds pass.
-- Full API regression is 558/559. The only failure is the known pre-existing
+- Full API regression is 574/575. The only failure is the known pre-existing
   Windows CRLF-sensitive Canvas SQL substring assertion; the SQL semantics and
-  all R5 tests pass, so it is not an R5 product defect.
+  all planning tests pass, so it is not a Gap B product defect.
 
 ## Migration status
 
@@ -65,9 +70,15 @@ Last refreshed: 2026-08-28, Asia/Manila.
   `20260728133821` to `20260728213700`. No historical SQL was edited or
   replayed and no Canvas schema object was changed by the repair.
 - Forward-only migration
-  `20260827155438_task_study_plan_foundation.sql` is last in local order and
-  creates `tasks`, `study_plans`, and `study_sessions` with owner-safe foreign
-  keys, RLS policies, service-only RPCs, and supporting indexes.
+  `20260827155438_task_study_plan_foundation.sql` is the applied R5 foundation.
+  It creates `tasks`, `study_plans`, and `study_sessions` with owner-safe
+  foreign keys, RLS policies, service-only RPCs, and supporting indexes.
+- Forward-only migration
+  `20260828173643_replace_planned_study_sessions_on_replan.sql` is the new local
+  tip. It adds session lifecycle state and replaces the service-only apply RPC
+  with owner-serialized, range-scoped replacement semantics. Static contracts
+  and stateful API acceptance pass; local database execution was blocked by a
+  stopped Docker engine, and the linked project was not mutated.
 - Supabase CLI 2.116.0 dry-run proposed only the R5 migration. The linked push
   applied only `20260827155438`, and final linked history records it as
   `task_study_plan_foundation`.
@@ -80,7 +91,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: R6 — mobile Tasks and Study Schedule integration.
+- Recommended next task: apply and runtime-validate the Gap B migration in the
+  linked Supabase project, then continue R6 mobile Tasks and Study Schedule UI.
 - Supabase performance advisors report informational composite-FK coverage
   notices for `study_sessions`; no R5 security advisory was reported. Address
   performance only from measured query evidence through a future forward-only

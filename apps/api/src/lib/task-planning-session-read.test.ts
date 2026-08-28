@@ -94,6 +94,7 @@ function sessionRow(overrides: Partial<StudySessionRow> = {}): StudySessionRow {
     task_id: TASK_A,
     starts_at: "2026-09-01T09:00:00.000Z",
     ends_at: "2026-09-01T10:00:00.000Z",
+    status: "planned",
     created_at: "2026-09-01T08:00:00.000Z",
     updated_at: "2026-09-01T08:00:00.000Z",
     ...overrides,
@@ -307,6 +308,7 @@ describe("toStudySessionView", () => {
       taskId: TASK_A,
       startsAt: "2026-09-01T09:00:00.000Z",
       endsAt: "2026-09-01T10:00:00.000Z",
+      status: "planned",
       task: null,
     });
   });

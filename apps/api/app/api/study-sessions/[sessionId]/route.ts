@@ -1,5 +1,8 @@
 import type { StudySessionUpdate } from "@stay-focused/db";
-import { isUuid } from "@stay-focused/shared/task-planning";
+import {
+  isUuid,
+  STUDY_SESSION_STATUSES,
+} from "@stay-focused/shared/task-planning";
 
 import {
   deleteOwnedStudySession,
@@ -99,12 +102,17 @@ function readSessionUpdate(value: unknown):
   | { readonly ok: false; readonly message: string } {
   if (!isRecord(value)) return { ok: false, message: "Request body must be a JSON object." };
   const keys = Object.keys(value);
-  if (keys.length === 0 || keys.some((key) => key !== "startsAt" && key !== "endsAt")) {
-    return { ok: false, message: "Provide startsAt and/or endsAt only." };
+  if (keys.length === 0 || keys.some(
+    (key) => key !== "startsAt" && key !== "endsAt" && key !== "status",
+  )) {
+    return { ok: false, message: "Provide startsAt, endsAt, and/or status only." };
   }
   if (("startsAt" in value && !isTimestamp(value.startsAt)) ||
     ("endsAt" in value && !isTimestamp(value.endsAt))) {
     return { ok: false, message: "Session timestamps must be valid ISO timestamps with a timezone." };
+  }
+  if ("status" in value && !STUDY_SESSION_STATUSES.some((status) => status === value.status)) {
+    return { ok: false, message: "Session status must be planned, completed, or skipped." };
   }
   return {
     ok: true,
@@ -114,6 +122,9 @@ function readSessionUpdate(value: unknown):
         : {}),
       ...(typeof value.endsAt === "string"
         ? { ends_at: new Date(value.endsAt).toISOString() }
+        : {}),
+      ...(typeof value.status === "string"
+        ? { status: value.status as StudySessionUpdate["status"] }
         : {}),
     },
   };

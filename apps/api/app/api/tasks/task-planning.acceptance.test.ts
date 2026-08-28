@@ -249,6 +249,69 @@ describe("R5 API persistence and two-user acceptance", () => {
     expect(deletedTask.status).toBe(200);
   });
 
+  it("replaces active sessions on replan while preserving terminal history", async () => {
+    const created = readData<TaskView>(await (await tasksRoute.POST(
+      jsonRequest("/api/tasks", USER_A, {
+        title: "Replan thesis work",
+        estimatedMinutes: 120,
+      }),
+    )).json());
+    const planningBody = {
+      planningRange: {
+        startsAt: "2026-09-01T08:00:00.000Z",
+        endsAt: "2026-09-01T12:00:00.000Z",
+      },
+      availability: [{
+        startsAt: "2026-09-01T09:00:00.000Z",
+        endsAt: "2026-09-01T11:00:00.000Z",
+      }],
+      taskIds: [created.id],
+    };
+
+    const firstApply = await applyRoute.POST(
+      jsonRequest("/api/study-plan/apply", USER_A, planningBody),
+    );
+    const firstSessions =
+      (await firstApply.json() as { data: { sessions: SessionView[] } }).data.sessions;
+    expect(firstSessions).toHaveLength(2);
+
+    const completed = firstSessions[0];
+    const skipped = firstSessions[1];
+    if (!completed || !skipped) throw new Error("Replan fixture did not create two sessions.");
+    expect((await sessionRoute.PATCH(
+      jsonRequest(`/api/study-sessions/${completed.id}`, USER_A, { status: "completed" }),
+      context("sessionId", completed.id),
+    )).status).toBe(200);
+    expect((await sessionRoute.PATCH(
+      jsonRequest(`/api/study-sessions/${skipped.id}`, USER_A, { status: "skipped" }),
+      context("sessionId", skipped.id),
+    )).status).toBe(200);
+    expect((await sessionRoute.PATCH(
+      jsonRequest(`/api/study-sessions/${skipped.id}`, USER_A, { status: "blocked" }),
+      context("sessionId", skipped.id),
+    )).status).toBe(400);
+
+    const secondApply = await applyRoute.POST(
+      jsonRequest("/api/study-plan/apply", USER_A, planningBody),
+    );
+    expect(secondApply.status).toBe(201);
+    const thirdApply = await applyRoute.POST(
+      jsonRequest("/api/study-plan/apply", USER_A, planningBody),
+    );
+    expect(thirdApply.status).toBe(201);
+
+    const stored = await sessionsRoute.GET(getRequest("/api/study-sessions", USER_A));
+    const sessions =
+      (await stored.json() as { data: { sessions: SessionView[] } }).data.sessions;
+    expect(sessions.filter((session) => session.status === "completed")).toHaveLength(1);
+    expect(sessions.filter((session) => session.status === "skipped")).toHaveLength(1);
+    const active = sessions.filter((session) => session.status === "planned");
+    expect(active).toHaveLength(2);
+    expect(active.every((left, index) => active.slice(index + 1).every(
+      (right) => left.startsAt >= right.endsAt || left.endsAt <= right.startsAt,
+    ))).toBe(true);
+  });
+
   it("rejects malformed task input, IDs, dates, status, estimates, and session intervals", async () => {
     expect((await tasksRoute.GET(new Request("http://localhost/api/tasks"))).status).toBe(401);
     for (const body of [
@@ -363,8 +426,18 @@ function installStatefulRepository(): void {
   mocks.persistOwnedStudyPlan.mockImplementation(async (
     _client: unknown,
     userId: string,
-    plan: { sessions: readonly { taskId: string; startsAt: string; endsAt: string }[] },
+    plan: {
+      planningRange: { readonly startsAt: string; readonly endsAt: string };
+      sessions: readonly { taskId: string; startsAt: string; endsAt: string }[];
+    },
   ) => {
+    for (const [sessionId, row] of mocks.sessionRows) {
+      if (row.user_id === userId && row.status === "planned" &&
+        row.starts_at < plan.planningRange.endsAt &&
+        row.ends_at > plan.planningRange.startsAt) {
+        mocks.sessionRows.delete(sessionId);
+      }
+    }
     const planId = uuid(mocks.nextPlan++);
     const sessions = plan.sessions.map((session) => {
       const row = sessionRow({
@@ -424,6 +497,7 @@ interface SessionView {
   readonly id: string;
   readonly startsAt: string;
   readonly endsAt: string;
+  readonly status: string;
   readonly task: {
     readonly id: string;
     readonly title: string;
@@ -459,6 +533,7 @@ function sessionRow(
   return {
     study_plan_id: null,
     task_id: uuid(1),
+    status: "planned",
     created_at: "2026-09-01T08:00:00.000Z",
     updated_at: "2026-09-01T08:00:00.000Z",
     ...overrides,
@@ -492,6 +567,7 @@ function toStudySessionView(row: StudySessionRow & { task?: TaskRow | null }) {
     taskId: row.task_id,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     task: task

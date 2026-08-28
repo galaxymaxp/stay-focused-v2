@@ -16,6 +16,7 @@ vi.mock("@/lib/task-planning-repository", () => ({
     taskId: row.task_id,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     task: row.task ?? null,
@@ -105,6 +106,7 @@ function sessionRow(
     task_id: session.taskId,
     starts_at: session.startsAt,
     ends_at: session.endsAt,
+    status: "planned",
     created_at: "2026-09-01T08:00:00.000Z",
     updated_at: "2026-09-01T08:00:00.000Z",
   };

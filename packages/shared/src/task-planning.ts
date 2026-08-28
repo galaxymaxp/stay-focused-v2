@@ -7,6 +7,9 @@ export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 export const TASK_SOURCE_TYPES = ["manual", "canvas"] as const;
 export type TaskSourceType = (typeof TASK_SOURCE_TYPES)[number];
 
+export const STUDY_SESSION_STATUSES = ["planned", "completed", "skipped"] as const;
+export type StudySessionStatus = (typeof STUDY_SESSION_STATUSES)[number];
+
 export const DEFAULT_MANUAL_TASK_ESTIMATE_MINUTES = 30;
 export const DEFAULT_CANVAS_TASK_ESTIMATE_MINUTES = 60;
 export const DEFAULT_TASK_PRIORITY: TaskPriority = "medium";
@@ -78,6 +81,7 @@ export interface StudySessionView {
   readonly taskId: string;
   readonly startsAt: string;
   readonly endsAt: string;
+  readonly status: StudySessionStatus;
   readonly createdAt: string;
   readonly updatedAt: string;
   /**

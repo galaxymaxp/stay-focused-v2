@@ -20,7 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const TASK_COLUMNS =
   "id,user_id,title,notes,status,priority,due_at,estimated_minutes,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
 const SESSION_COLUMNS =
-  "id,user_id,study_plan_id,task_id,starts_at,ends_at,created_at,updated_at";
+  "id,user_id,study_plan_id,task_id,starts_at,ends_at,status,created_at,updated_at";
 const SESSION_TASK_SUMMARY_COLUMNS =
   "id,title,status,priority,due_at,canvas_course_id";
 
@@ -406,6 +406,7 @@ export function toStudySessionView(row: StudySessionWithTaskRow): StudySessionVi
     taskId: row.task_id,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     task: row.task ? toStudySessionTaskSummary(row.task) : null,
