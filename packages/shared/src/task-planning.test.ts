@@ -96,6 +96,16 @@ describe("deterministic study planner", () => {
     ]);
   });
 
+  it("accepts PostgreSQL microsecond timestamps for persisted planner tasks", () => {
+    const result = plan(
+      [task(1, { createdAt: "2026-08-01T00:00:00.123456+00:00" })],
+      [window("2026-09-01T09:00:00.000Z", "2026-09-01T10:00:00.000Z")],
+    );
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]?.taskId).toBe(id(1));
+  });
+
   it("returns every minute that cannot fit instead of dropping work", () => {
     const result = plan([task(1, { estimatedMinutes: 100 })], [
       window("2026-09-01T09:00:00.000Z", "2026-09-01T09:30:00.000Z"),
