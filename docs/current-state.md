@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-08-28, Asia/Manila.
+Last refreshed: 2026-08-29, Asia/Manila.
 
 ## Repository
 
@@ -11,6 +11,10 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - Local `main` contains the R5 implementation, Gap A/Gap B, and acceptance
   documentation commits and remains unpushed. Gap B hosted acceptance began at
   `792205d` with a clean tree, 45 commits ahead and 0 behind `origin/main`.
+- R8 started from clean `dbf5e039f345f95986d810bb353c83b5b85487ca`,
+  55 commits ahead and 0 behind `origin/main`. Implementation commit
+  `69ea697ee916adb0e928171b4d0afdc792b92da0` exposes the existing Canvas
+  structured-block/selective-preview contract in the Android reviewer flow.
 - Recovery branches/tags remain preserved. Generated Next build drift was
   removed before the R5 implementation commit.
 
@@ -35,6 +39,19 @@ Last refreshed: 2026-08-28, Asia/Manila.
   durable 100-total-page policy instead of rejecting page counts above five,
   and reviewer results opened from completion routing can be titled and saved
   from Processing, including their Canvas snapshot.
+- The R8 Canvas mobile gap is closed and physically accepted. A synchronized
+  source now resolves to server-owned structured blocks, honors the server
+  default selection, supports ordered subset selection and a zero-selection
+  guard, creates an authoritative selective preview, and hands its preview
+  session/fingerprint into the unchanged durable generation path. Changing the
+  selection invalidates the old preview and requires a new one.
+- The physical R8 run selected three of nine returned blocks. The resulting
+  durable job completed 1/1, recovered through Processing after force-stop,
+  saved as `Capstone Selective Canvas Reviewer`, and reopened from Study
+  Library without regeneration. Its immutable snapshot records exactly three
+  ordered paragraph blocks (source block ordinals 5, 6, and 7), the
+  selective-preview parser/normalization versions, hashes, no OCR, and
+  `wasEdited = false`.
 - Capstone development R5 is complete and live accepted: manual task CRUD,
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
@@ -60,6 +77,11 @@ Last refreshed: 2026-08-28, Asia/Manila.
 - The EAS preview APK was built and installed on a physical Android device.
   Android authentication and hosted API connectivity passed. The specific
   durable 41-100-page native-text and >40-OCR-required-page matrix remains.
+- R8 EAS internal preview build `ab67feeb-0f61-4d6c-b24c-a7c5658ac050`
+  (Stay Focused V2 2.0.0, build 1, commit `69ea697`) was installed with
+  `adb install -r` on the realme RMX3151 / Android 13. Authentication and the
+  existing session survived replacement. No API code changed, so the verified
+  production deployment remained in use.
 
 ## Deterministic test baseline
 
@@ -74,6 +96,12 @@ Last refreshed: 2026-08-28, Asia/Manila.
   The only failure matches the documented
   pre-existing Windows CRLF-sensitive Canvas SQL substring baseline; the SQL
   semantics and all planning tests pass, so it is not a Gap B product defect.
+- R8 verification passed: mobile 278/278, Canvas 72/72, targeted Canvas
+  structure/selective-preview/generation/freshness/provenance API tests 43/43,
+  fresh forced root typecheck 7/7, fresh forced root lint 7/7, `git diff
+  --check`, and `git fsck --full`. The four previously accepted mobile
+  import-order warnings did not appear in the R8 lint run and no new warning
+  was introduced.
 
 ## Migration status
 
@@ -114,9 +142,8 @@ Last refreshed: 2026-08-28, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: run one deployed-build physical-device rehearsal of
-  the primary Canvas reviewer demo, including durable worker completion,
-  notification routing, save, and Study Library reopen.
+- Recommended next task: Reviewer UI refinement across Canvas selection,
+  Processing, Reader, and Study Library.
 - Reviewer-core limitations are documented in
   `docs/ai/reviewer-core-capstone-acceptance-20260828.md`; notably, fresh camera
   and long-document device acceptance was not repeated, and a cold-start
@@ -126,9 +153,10 @@ Last refreshed: 2026-08-28, Asia/Manila.
   `reviewers` RLS init-plan performance warnings plus older function/Auth
   security warnings. No warning names the Gap B status/index/apply objects.
   Address unrelated findings only through separately scoped work.
-- Physical-device acceptance debt remains for Product R6 and the durable
-  long-document Android matrix. APK installation, authentication, and hosted
-  API connectivity are no longer blockers.
+- Physical-device acceptance debt remains for Product R6, readable camera OCR,
+  the durable long-document Android matrix, and notification registration,
+  delivery, and routing. Persisted Processing/relaunch recovery is accepted and
+  does not depend on notifications.
 - `npm audit` reports 0 critical, 6 high, and 32 moderate findings; the direct
   production high is `next`, and remediation is a separate recovery task.
 - Provenance of tracked historical academic live-output artifacts is not

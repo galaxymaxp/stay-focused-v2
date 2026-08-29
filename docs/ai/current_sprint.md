@@ -1,65 +1,76 @@
 # Current Sprint
 
-Last refreshed: 2026-08-28, Asia/Manila.
+Last refreshed: 2026-08-29, Asia/Manila.
 
 ## Completed objective
 
-Audit, runtime-accept, and harden the R6 reviewer-maker capstone path from real
-source selection through persisted Study Library reopen.
+Implement and physically accept the missing Canvas structured-block selection
+and server selective-preview flow on Android without changing the reviewer
+engine, generation schemas, or Canvas synchronization semantics.
 
 ## Baseline
 
-The audit started from clean `adcc865d8992b555701f65a2dd77a63ee0861448`
-on `main`, 52 commits ahead and 0 behind `origin/main`.
+R8 started from clean `dbf5e039f345f95986d810bb353c83b5b85487ca`
+on `main`, 55 commits ahead and 0 behind `origin/main`. Repository integrity
+passed before editing.
 
 ## Completed scope
 
-- Traced mobile intake, Canvas source selection, Processing, shared reviewer
-  rendering, Study Library, notification reconciliation, API jobs/OCR/Canvas/
-  reviewer routes, and the current Stage 0-6 engine implementation.
-- Verified paste, gallery image, camera, PDF, and synchronized Canvas source
-  paths against code and tests. Fresh device acceptance was not claimed.
-- Ran the existing live OpenAI IT Security harness: 18/18 source sections,
-  coverage and grounding 1.00, zero grounding/leakage issues, and no visible
-  enrichment.
-- Ran isolated linked-Supabase Canvas acceptance with two users and fictional
-  data. Inventory, ten-block selection, preview, generation, immutable
-  snapshot, save/list/open/rename/delete, source health, and API/RLS owner
-  isolation passed. Both users and all dependent rows were removed with zero
-  residue.
-- Fixed the stale five-page saved-PDF metadata validator and added 100/101-page
-  boundary coverage.
-- Added a save action to the reviewer reader opened from Processing so cold
-  completion routing can finish the SAVE -> REOPEN journey; Canvas snapshot
-  metadata is preserved.
+- Traced the mobile course/source flow through Canvas inventory, preparation,
+  structure, selective preview, durable job handoff, freshness validation, and
+  immutable reviewer-source provenance.
+- Replaced the Canvas full-source-first interaction with server-owned structured
+  blocks, server default selection, ordered select/deselect/clear behavior, a
+  250-block guard, explicit selective preview, and safe loading/error states.
+- Retained editable selective-preview semantics supported by the backend. The
+  exact structure session, selected block IDs, preview session, resolution
+  fingerprint, Canvas source IDs, and preview text now stay bound together;
+  changing selection invalidates the prior preview.
+- Preserved the existing durable reviewer job, Processing recovery, reader,
+  save, and Study Library paths. Paste, gallery, camera, and PDF semantics were
+  not changed.
+- Built EAS internal preview `ab67feeb-0f61-4d6c-b24c-a7c5658ac050` from
+  implementation commit `69ea697ee916adb0e928171b4d0afdc792b92da0`,
+  installed it on the realme RMX3151 / Android 13, and reused the unchanged
+  verified production API.
 
 ## Verification
 
-- Reviewer engine: 290/290; shared: 32/32; OCR: 27/27; Canvas: 72/72;
-  mobile: 269/269; targeted reviewer API: 18/18.
-- Forced root typecheck: 7/7 with zero cached tasks. Forced root lint: 7/7 with
-  only the four pre-existing mobile import-order warnings. API and engine
-  production builds pass; mobile typecheck is included in the root pass.
-- Full API: 576/577 after the two new reviewer-save tests. The sole failure is the
-  documented Windows CRLF-sensitive Canvas SQL substring assertion.
-- First runtime attempt: the local durable route returned 202 and remained
-  queryable, but its Vercel Workflow dev worker did not advance before the
-  240-second harness deadline. Automatic cleanup passed. The protected
-  synchronous Canvas route completed the same hosted data/OpenAI/persistence
-  journey on the rerun. Durable jobs remain automatically covered and have
-  prior hosted acceptance.
-- First mobile typecheck after the Processing change identified an incorrect
-  local component import; it was corrected to the existing `TextField`, and
-  typecheck/tests then passed.
+- Mobile: 278/278 tests; Canvas package: 72/72; targeted Canvas
+  structure/selective-preview/generation/freshness/provenance API: 43/43.
+- Forced root typecheck and lint: 7/7 packages, zero cached tasks. The four
+  previously accepted mobile import-order warnings did not appear; no new
+  warning was introduced. `git diff --check` and `git fsck --full` passed.
+- The first post-change mobile typecheck exposed a readonly-array/Set narrowing
+  error in the new selection helper. It was corrected before the fresh passing
+  verification run.
+- Physical selection returned nine ordered paragraph blocks selected by
+  default. Clear produced zero selected blocks and disabled Preview. Select,
+  deselect, reselect, multiple selection, back-navigation preservation, and a
+  changed three-block preview all passed.
+- The final server preview retained the three selected blocks in original
+  source order. Durable job `1e8d146a-43d7-45cb-9259-cefbaad690ea` completed
+  1/1 with coverage, grounding, and leakage all passed; coverage and grounding
+  scores were 1.00.
+- Processing recovered the completed job after force-stop/relaunch. The result
+  saved as `Capstone Selective Canvas Reviewer` and reopened from Study Library
+  without regeneration.
+- Immutable snapshot `c6446ac2-18a9-4a16-aff5-febad28da396` matches the final
+  preview session and contains exactly three ordered selected block manifests,
+  their hashes and parser version, the selective-preview normalization version,
+  no OCR, and `wasEdited = false`.
 
 ## Result
 
-READY FOR CAPSTONE REVIEWER DEMO: the source -> prepare -> generate -> progress
--> reviewer -> save -> reopen path is implemented, grounded, owner-scoped, and
-accepted without hosted fixture residue. Remaining risks are device/deployment
-rehearsal items, not reviewer-core correctness blockers.
+`READY FOR PHYSICAL CAPSTONE REVIEWER DEMO`
+
+The intended Canvas source -> structured blocks -> subset -> server preview ->
+durable generation -> Processing -> save -> Study Library journey is now
+implemented and physically accepted. Notification registration, delivery, and
+routing remain explicitly outside this result; persisted Processing and
+relaunch recovery passed independently.
 
 ## Next action
 
-Run one deployed-build physical-device rehearsal of the primary Canvas reviewer
-demo, including durable completion notification, save, and Library reopen.
+Reviewer UI refinement across Canvas selection, Processing, Reader, and Study
+Library.
