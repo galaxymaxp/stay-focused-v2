@@ -128,6 +128,54 @@ Reader reports `Grounded` / `Limited grounding` from `groundingStatus` and shows
 no number. A saved or legacy payload with no recognisable grounding status gets
 no status at all.
 
+## What a saved reviewer actually carries
+
+Study Library is not a view of a reviewer job. It reads the persisted reviewer
+record, and that record is narrower than the journey that produced it. The list
+endpoint returns `id`, `title`, `sourceMetadata` (`sourceMode`,
+`sourceCharacterCount`, an optional `pdfPageCount`, an optional `sourceLabel`),
+`sectionCount`, `createdAt`, and `updatedAt` - nothing more. Opening one adds
+`reviewerOutput` and, for Canvas reviewers only, a `sourceProvenance` summary
+(`sourceSnapshotId`, `sourceTitle`, `sourceCount`, `selectedBlockCount`,
+`wasEdited`, `generatedAt`, `parserVersions`, `ocrVersions`). Source health is a
+further, explicitly requested call to `/api/reviewers/:id/source-status`.
+
+Consequences that keep being rediscovered:
+
+**There is no course.** No saved-reviewer field carries one, on the client or in
+`packages/db`. A Library card cannot show course context without a schema
+change.
+
+**There is no grounding in the list.** Grounding lives inside `reviewerOutput`,
+which the list endpoint does not return, so a grounding badge on a list card
+would have to be fabricated. Grounding belongs to the Reader.
+
+**The selected-block count is detail-only.** It is real, but it arrives with the
+opened reviewer, not the list, so it reaches the student through the Reader's
+`context` rather than through a list card.
+
+**`createdAt` is the saved time.** `updatedAt` moves when a reviewer is renamed,
+which answers no question a student asks of a shelf, so `createdAt` is the
+timestamp shown and `updatedAt` is not displayed.
+
+**Legacy and partial records are normal.** A reviewer can be saved with a blank
+title, no `sourceLabel`, no `pdfPageCount`, and no provenance. Presentation must
+degrade by omission - never `Unknown course`, `0 selected blocks`, or `N/A`.
+
+Reopening a saved reviewer is a plain `GET /api/reviewers/:id` handed straight to
+the Reader. No job is created, no Processing screen is involved, and no snapshot
+is mutated. Do not route reopen through generation to simplify UI code.
+
+## Provenance presentation policy
+
+Snapshot identifiers, parser and OCR versions, and synchronized-source health
+are real and are kept in the model. They are debugging material, not study
+material, so they are presented as secondary: collapsed behind a `Source
+details` disclosure below the document, never above it and never as the first
+thing a reopened reviewer shows. Student-facing provenance is the short source
+line (source name and kind) plus, where the Reader has it, the selected-block
+count. Numeric grounding and coverage scores stay out of Study Library entirely.
+
 Surrounding context comes from the screen, and each screen holds a different
 amount. Canvas selection knows the course name, the source title, and the
 selected block count. Study Library knows `sourceMetadata.sourceMode`,
@@ -255,7 +303,9 @@ in text beside the button rather than on it.
 
 **Study Library** should feel like a collection of finished study material.
 Show only fields that actually exist, keep entries scannable, keep them flat
-rather than glass, and make reopen obvious.
+rather than glass, and make reopen obvious. What those fields are, and why
+course and grounding are not among them, is recorded under *What a saved
+reviewer actually carries*.
 
 **States** are product surface, not placeholders. Prefer contextual language:
 `Loading source structure`, `No blocks selected / Select at least one block to
@@ -378,7 +428,34 @@ and are replaced by a single `reviewer-grounding-status`. `reviewer-ready`,
 `reviewer-title`, `reviewer-section`, `reviewer-explanation`,
 `reviewer-key-point`, and `reviewer-quality-notice` are unchanged.
 
+Study Library has now had its pass. The list reads as a shelf: a flat entry per
+saved reviewer carrying title, one source line (`Week 3 announcement · Canvas`),
+one scale-and-date line (`18 sections · from 12 pages · Saved Aug 21`), a primary
+`Open reviewer`, and a quiet right-aligned `Delete` that still routes through the
+existing confirmation. Rename moved off the list into the opened reviewer, where
+the student can see what they are renaming, which halved entry height and keeps
+roughly four entries on a 375×812 screen. Titles wrap to three lines and source
+lines to two before truncating. The header reports a real count instead of the
+signed-in email, and the loading, empty, and error states name what failed
+(`Couldn't load your Study Library`, `Couldn't open this saved reviewer`) while
+keeping the HTTP status and error code on a separate, quieter line. Opening a
+reviewer now shows one back control, the Reader, then a saved date with Rename
+and Delete, then the collapsed `Source details` disclosure. Library metadata uses
+`textSecondary`, never `textMuted`. Presentation logic lives in
+`apps/mobile/src/features/library/studyLibraryPresentation.ts`, and the Reader's
+source-mode vocabulary is shared through the now-exported
+`describeReviewerSourceMode`.
+
+Library test IDs: `study-library-screen`, `study-library-count`,
+`study-library-loading`, `study-library-empty`, `study-library-error`,
+`study-library-success`, `study-library-reviewer` (with
+`study-library-reviewer-title` / `-source` / `-scale`), `study-library-back`,
+`study-library-saved-at`, `study-library-rename-card`,
+`study-library-rename-input`, `study-library-source-provenance`,
+`study-library-source-details-toggle`, `study-library-source-details`,
+`study-library-source-status-summary`, `study-library-source-status-loading`,
+and `study-library-source-readiness`.
+
 All of this work passes the mobile automated checks and was inspected in a
-web-rendered build. **None of it has been physically accepted on Android.**
-Study Library has not yet had a refinement pass. Do not describe any of this as
-accepted until a real device run says so.
+web-rendered build. **None of it has been physically accepted on Android.** Do
+not describe any of this as accepted until a real device run says so.

@@ -102,7 +102,7 @@ export function describeReviewerSource(
   const sourceName =
     trim(context?.sourceLabel) || trim(reviewer.metadata.sourceTitle);
   const kind =
-    describeSourceMode(context?.sourceMode) ??
+    describeReviewerSourceMode(context?.sourceMode) ??
     describeSourceKind(reviewer.metadata.sourceKind);
 
   const parts: string[] = [];
@@ -271,7 +271,12 @@ function readableExplanation(
   return explanation;
 }
 
-function describeSourceMode(
+/**
+ * The student-facing word for a source mode, e.g. `Canvas`, `PDF`, `Photo`.
+ * Exported so Study Library entries name a source exactly as the Reader does
+ * once the same reviewer is open.
+ */
+export function describeReviewerSourceMode(
   mode: ReviewerReaderSourceMode | null | undefined,
 ): string | null {
   switch (mode) {

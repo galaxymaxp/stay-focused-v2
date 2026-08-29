@@ -1,7 +1,9 @@
+import { ChevronDown, ChevronRight } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -13,7 +15,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, spacing, typography } from "../../design/tokens";
+import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
 } from "../../services/reviewerApi";
@@ -24,20 +26,35 @@ import {
   listReviewers,
   renameReviewer,
   type ReviewerLibraryError,
-  type ReviewerSourceStatusAction,
-  type ReviewerSourceStatusItem,
   type ReviewerSourceStatusPayload,
   type SavedReviewerDetail,
   type SavedReviewerSummary,
   type SavedReviewerSourceProvenanceSummary,
-  type SavedReviewerSourceMode,
 } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
-import type { ReviewerReaderContext } from "../reviewer/reviewerReaderPresentation";
+import {
+  describeSavedReviewerCount,
+  describeSavedReviewerSavedAt,
+  describeSavedReviewerTechnicalProvenance,
+  describeSourceReadiness,
+  describeSourceStatusActions,
+  describeSourceStatusItem,
+  describeSourceStatusSummary,
+  presentSavedReviewer,
+  savedReviewerReaderContext,
+  savedReviewerTitle,
+} from "./studyLibraryPresentation";
 
 interface StudyLibraryScreenProps {
   readonly onCreateReviewer: () => void;
 }
+
+type LibraryOperation =
+  | "load"
+  | "open"
+  | "rename"
+  | "delete"
+  | "source-status";
 
 interface LibraryDisplayError {
   readonly title: string;
@@ -55,6 +72,17 @@ interface SourceStatusState {
   readonly status: ReviewerSourceStatusPayload;
 }
 
+/**
+ * Study Library.
+ *
+ * The saved reviewer is the product here, so the list reads as a shelf of
+ * finished study documents rather than a generation log: title, where it came
+ * from, how much of it there is, when it was kept, and one obvious way back
+ * into it. Reopening fetches the persisted reviewer and hands it straight to
+ * the Reader - no job, no regeneration - and the snapshot identifiers and
+ * parser versions that make that traceable stay behind a disclosure so they
+ * never lead the reading experience.
+ */
 export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps) {
   const { isSigningOut, session, signOut } = useAuth();
   const [reviewers, setReviewers] = useState<readonly SavedReviewerSummary[]>([]);
@@ -65,8 +93,9 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
   const [renameState, setRenameState] = useState<RenameState | null>(null);
   const [sourceStatusState, setSourceStatusState] =
     useState<SourceStatusState | null>(null);
+  const [isSourceDetailsOpen, setIsSourceDetailsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOpening, setIsOpening] = useState(false);
+  const [openingReviewerId, setOpeningReviewerId] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isCheckingSourceStatus, setIsCheckingSourceStatus] = useState(false);
   const [deletingReviewerId, setDeletingReviewerId] = useState<string | null>(null);
@@ -95,7 +124,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       if (result.ok) {
         setReviewers(result.data);
       } else {
-        setError(formatLibraryError(result.error));
+        setError(formatLibraryError(result.error, "load"));
       }
     } finally {
       if (abortControllerRef.current === abortController) {
@@ -120,7 +149,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       return;
     }
 
-    setIsOpening(true);
+    setOpeningReviewerId(reviewerId);
     setError(null);
     setSuccessMessage(null);
 
@@ -133,12 +162,22 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       if (result.ok) {
         setOpenedReviewer(result.data);
         setSourceStatusState(null);
+        setIsSourceDetailsOpen(false);
       } else {
-        setError(formatLibraryError(result.error));
+        setError(formatLibraryError(result.error, "open"));
       }
     } finally {
-      setIsOpening(false);
+      setOpeningReviewerId(null);
     }
+  };
+
+  const handleCloseReviewer = () => {
+    setOpenedReviewer(null);
+    setRenameState(null);
+    setSourceStatusState(null);
+    setIsSourceDetailsOpen(false);
+    setError(null);
+    setSuccessMessage(null);
   };
 
   const handleCheckSourceStatus = async () => {
@@ -166,7 +205,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       if (result.ok) {
         setSourceStatusState({ reviewerId, status: result.data });
       } else {
-        setError(formatLibraryError(result.error));
+        setError(formatLibraryError(result.error, "source-status"));
       }
     } finally {
       setIsCheckingSourceStatus(false);
@@ -224,7 +263,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
         setRenameState(null);
         setSuccessMessage("Reviewer renamed.");
       } else {
-        setError(formatLibraryError(result.error));
+        setError(formatLibraryError(result.error, "rename"));
       }
     } finally {
       setIsRenaming(false);
@@ -234,7 +273,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
   const handleRequestDelete = (reviewer: SavedReviewerSummary) => {
     Alert.alert(
       "Delete reviewer?",
-      `Delete "${reviewer.title}" from your Study Library?`,
+      `"${savedReviewerTitle(reviewer)}" will be removed from your Study Library. This cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -277,7 +316,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
         );
         setSuccessMessage("Reviewer deleted.");
       } else {
-        setError(formatLibraryError(result.error));
+        setError(formatLibraryError(result.error, "delete"));
       }
     } finally {
       setDeletingReviewerId(null);
@@ -285,33 +324,23 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
   };
 
   if (openedReviewer) {
+    const savedAt = describeSavedReviewerSavedAt(openedReviewer);
+
     return (
       <Screen contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.kicker}>Study Library</Text>
-          <Text style={styles.subtitle}>
-            Opened from your saved reviewers without regenerating.
-          </Text>
-        </View>
-
-        <View style={styles.actions}>
-          <Button onPress={() => setOpenedReviewer(null)} variant="secondary">
+        <View style={styles.backRow}>
+          <Button
+            onPress={handleCloseReviewer}
+            style={styles.inlineAction}
+            testID="study-library-back"
+            variant="ghost"
+          >
             Back to library
           </Button>
-          <Button
-            onPress={() => handleStartRename(openedReviewer)}
-            variant="secondary"
-          >
-            Rename
-          </Button>
-          <Button
-            loading={deletingReviewerId === openedReviewer.id}
-            onPress={() => handleRequestDelete(openedReviewer)}
-            variant="danger"
-          >
-            Delete
-          </Button>
         </View>
+
+        {error ? <ErrorCard error={error} /> : null}
+        {successMessage ? <SuccessCard message={successMessage} /> : null}
 
         {renameState ? (
           <RenameCard
@@ -327,18 +356,45 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
           />
         ) : null}
 
-        {error ? <ErrorCard error={error} /> : null}
-        {successMessage ? <SuccessCard message={successMessage} /> : null}
-
         <ReviewerPreview
           context={savedReviewerReaderContext(openedReviewer)}
           reviewer={openedReviewer.reviewerOutput}
         />
 
+        <View style={styles.documentFooter}>
+          {savedAt ? (
+            <Text style={styles.footerMeta} testID="study-library-saved-at">
+              {savedAt}
+            </Text>
+          ) : null}
+          <View style={styles.footerActions}>
+            <Button
+              accessibilityLabel={`Rename reviewer ${savedReviewerTitle(openedReviewer)}`}
+              onPress={() => handleStartRename(openedReviewer)}
+              style={styles.inlineAction}
+              variant="ghost"
+            >
+              Rename
+            </Button>
+            <Button
+              accessibilityLabel={`Delete reviewer ${savedReviewerTitle(openedReviewer)}`}
+              loading={deletingReviewerId === openedReviewer.id}
+              onPress={() => handleRequestDelete(openedReviewer)}
+              style={styles.inlineAction}
+              textStyle={styles.destructiveLabel}
+              variant="ghost"
+            >
+              Delete
+            </Button>
+          </View>
+        </View>
+
         {openedReviewer.sourceProvenance ? (
-          <SourceProvenanceCard
+          <SourceDetailsDisclosure
             isCheckingStatus={isCheckingSourceStatus}
+            isOpen={isSourceDetailsOpen}
             onRefreshStatus={handleCheckSourceStatus}
+            onToggle={() => setIsSourceDetailsOpen((current) => !current)}
             status={
               sourceStatusState?.reviewerId === openedReviewer.id
                 ? sourceStatusState.status
@@ -356,19 +412,31 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       <View style={styles.header} testID="study-library-screen">
         <Text style={styles.kicker}>Study Library</Text>
         <Text style={styles.title}>Saved reviewers</Text>
-        <Text style={styles.subtitle}>
-          {session?.user.email ?? "Signed in account"}
-        </Text>
+        {!isLoading && reviewers.length > 0 ? (
+          <Text style={styles.subtitle} testID="study-library-count">
+            {describeSavedReviewerCount(reviewers.length)}
+          </Text>
+        ) : null}
       </View>
 
-      <View style={styles.actions}>
+      <View style={styles.headerActions}>
         <Button onPress={onCreateReviewer} variant="primary">
           New reviewer
         </Button>
-        <Button loading={isLoading} onPress={loadLibrary} variant="secondary">
+        <Button
+          loading={isLoading}
+          onPress={loadLibrary}
+          style={styles.inlineAction}
+          variant="ghost"
+        >
           Refresh
         </Button>
-        <Button loading={isSigningOut} onPress={signOut} variant="secondary">
+        <Button
+          loading={isSigningOut}
+          onPress={signOut}
+          style={styles.inlineAction}
+          variant="ghost"
+        >
           Log out
         </Button>
       </View>
@@ -391,27 +459,27 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       {successMessage ? <SuccessCard message={successMessage} /> : null}
 
       {isLoading ? (
-        <Card style={styles.statusCard} testID="study-library-loading">
+        <Card style={styles.noticeCard} testID="study-library-loading">
           <ActivityIndicator color={colors.accent} />
-          <Text style={styles.statusTitle}>Loading saved reviewers...</Text>
+          <Text style={styles.noticeTitle}>Loading saved reviewers</Text>
         </Card>
       ) : reviewers.length === 0 ? (
-        <Card style={styles.statusCard} testID="study-library-empty">
-          <Text style={styles.statusTitle}>No saved reviewers yet</Text>
-          <Text style={styles.statusText}>
-            Generate a reviewer, then save it here when it is ready.
+        <Card style={styles.noticeCard} testID="study-library-empty">
+          <Text style={styles.noticeTitle}>No saved reviewers yet</Text>
+          <Text style={styles.noticeText}>
+            Save a reviewer once it finishes generating and it will wait here for
+            you to reopen any time.
           </Text>
         </Card>
       ) : (
         <View style={styles.list}>
           {reviewers.map((reviewer) => (
-            <ReviewerSummaryCard
+            <SavedReviewerEntry
               isDeleting={deletingReviewerId === reviewer.id}
-              isOpening={isOpening}
+              isOpening={openingReviewerId === reviewer.id}
               key={reviewer.id}
               onDelete={() => handleRequestDelete(reviewer)}
               onOpen={() => void handleOpenReviewer(reviewer.id)}
-              onRename={() => handleStartRename(reviewer)}
               reviewer={reviewer}
             />
           ))}
@@ -436,18 +504,23 @@ function RenameCard({
 }) {
   return (
     <Card style={styles.formCard} testID="study-library-rename-card">
-      <Text style={styles.statusTitle}>Rename reviewer</Text>
+      <Text style={styles.noticeTitle}>Rename reviewer</Text>
       <TextField
         label="Reviewer title"
         onChangeText={onChangeTitle}
         testID="study-library-rename-input"
         value={title}
       />
-      <View style={styles.actions}>
+      <View style={styles.formActions}>
         <Button loading={isRenaming} onPress={onSubmit} variant="primary">
           Save title
         </Button>
-        <Button disabled={isRenaming} onPress={onCancel} variant="secondary">
+        <Button
+          disabled={isRenaming}
+          onPress={onCancel}
+          style={styles.inlineAction}
+          variant="ghost"
+        >
           Cancel
         </Button>
       </View>
@@ -455,43 +528,69 @@ function RenameCard({
   );
 }
 
-function ReviewerSummaryCard({
+/**
+ * One saved reviewer on the shelf. Flat surface, three lines of recognition
+ * metadata, and a primary way back into the document; Rename lives inside the
+ * opened reviewer so the list stays scannable.
+ */
+function SavedReviewerEntry({
   isDeleting,
   isOpening,
   onDelete,
   onOpen,
-  onRename,
   reviewer,
 }: {
   readonly isDeleting: boolean;
   readonly isOpening: boolean;
   readonly onDelete: () => void;
   readonly onOpen: () => void;
-  readonly onRename: () => void;
   readonly reviewer: SavedReviewerSummary;
 }) {
+  const presentation = presentSavedReviewer(reviewer);
+
   return (
-    <Card style={styles.summaryCard} testID="study-library-reviewer">
-      <View style={styles.summaryHeader}>
-        <Text style={styles.summaryTitle}>{reviewer.title}</Text>
-        <Text style={styles.summaryMeta}>
-          {formatSourceMode(reviewer.sourceMetadata.sourceMode)}
-          {" - "}
-          {formatSectionCount(reviewer.sectionCount)}
+    <Card style={styles.entryCard} testID="study-library-reviewer">
+      <View style={styles.entryText}>
+        <Text
+          numberOfLines={3}
+          style={styles.entryTitle}
+          testID="study-library-reviewer-title"
+        >
+          {presentation.title}
         </Text>
-        <Text style={styles.summaryMeta}>
-          Updated {formatDate(reviewer.updatedAt)}
+        {presentation.sourceLine ? (
+          <Text
+            numberOfLines={2}
+            style={styles.entryMeta}
+            testID="study-library-reviewer-source"
+          >
+            {presentation.sourceLine}
+          </Text>
+        ) : null}
+        <Text style={styles.entryMeta} testID="study-library-reviewer-scale">
+          {presentation.scaleLine}
         </Text>
       </View>
 
-      <View style={styles.actions}>
-        <Button loading={isOpening} onPress={onOpen} variant="primary">
-          Open
+      <View style={styles.entryActions}>
+        <Button
+          accessibilityLabel={presentation.openAccessibilityLabel}
+          loading={isOpening}
+          onPress={onOpen}
+          style={styles.openAction}
+          variant="primary"
+        >
+          Open reviewer
         </Button>
-        <Button onPress={onRename} variant="secondary">
-          Rename
-        </Button>
-        <Button loading={isDeleting} onPress={onDelete} variant="danger">
+        <View style={styles.entrySpacer} />
+        <Button
+          accessibilityLabel={presentation.deleteAccessibilityLabel}
+          loading={isDeleting}
+          onPress={onDelete}
+          style={styles.inlineAction}
+          textStyle={styles.destructiveLabel}
+          variant="ghost"
+        >
           Delete
         </Button>
       </View>
@@ -499,9 +598,133 @@ function ReviewerSummaryCard({
   );
 }
 
+/**
+ * Snapshot identifiers, parser and OCR versions, and synchronized-source
+ * health. All of it is real and worth keeping, and none of it is what a student
+ * opened the reviewer to read, so it stays collapsed until asked for.
+ */
+function SourceDetailsDisclosure({
+  isCheckingStatus,
+  isOpen,
+  onRefreshStatus,
+  onToggle,
+  status,
+  summary,
+}: {
+  readonly isCheckingStatus: boolean;
+  readonly isOpen: boolean;
+  readonly onRefreshStatus: () => void;
+  readonly onToggle: () => void;
+  readonly status: ReviewerSourceStatusPayload | null;
+  readonly summary: SavedReviewerSourceProvenanceSummary;
+}) {
+  const statusActions = status ? describeSourceStatusActions(status.actions) : null;
+
+  return (
+    <View style={styles.disclosure} testID="study-library-source-provenance">
+      <Pressable
+        accessibilityLabel="Source details"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: isOpen }}
+        onPress={onToggle}
+        style={styles.disclosureHeader}
+        testID="study-library-source-details-toggle"
+      >
+        {isOpen ? (
+          <ChevronDown color={colors.textSecondary} size={18} strokeWidth={2.2} />
+        ) : (
+          <ChevronRight color={colors.textSecondary} size={18} strokeWidth={2.2} />
+        )}
+        <Text style={styles.disclosureLabel}>Source details</Text>
+      </Pressable>
+
+      {isOpen ? (
+        <View style={styles.disclosureBody} testID="study-library-source-details">
+          <Text style={styles.noticeText}>
+            Kept so this reviewer can be traced back to the exact source it was
+            made from. None of it is needed to read the reviewer.
+          </Text>
+
+          <View style={styles.detailRows}>
+            {describeSavedReviewerTechnicalProvenance(summary).map((detail) => (
+              <View key={detail.label} style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{detail.label}</Text>
+                <Text style={styles.detailValue}>{detail.value}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.disclosureDivider} />
+
+          <View style={styles.sourceHealthHeader}>
+            <View style={styles.sourceHealthText}>
+              <Text style={styles.detailLabel}>Source health</Text>
+              <Text
+                style={styles.noticeText}
+                testID="study-library-source-status-summary"
+              >
+                {status
+                  ? describeSourceStatusSummary(status)
+                  : "Not checked yet."}
+              </Text>
+            </View>
+            <Button
+              loading={isCheckingStatus}
+              onPress={onRefreshStatus}
+              style={styles.inlineAction}
+              variant="ghost"
+            >
+              {status ? "Check again" : "Check sources"}
+            </Button>
+          </View>
+
+          {isCheckingStatus ? (
+            <Text
+              style={styles.noticeText}
+              testID="study-library-source-status-loading"
+            >
+              Checking synchronized sources
+            </Text>
+          ) : null}
+
+          {status ? (
+            <>
+              <Text
+                style={styles.noticeText}
+                testID="study-library-source-readiness"
+              >
+                {describeSourceReadiness(status.regenerationReadiness)}
+              </Text>
+              {statusActions ? (
+                <Text style={styles.noticeText}>{statusActions}</Text>
+              ) : null}
+              <View style={styles.sourceStatusList}>
+                {status.items.map((item) => (
+                  <View key={item.ordinal} style={styles.sourceStatusItem}>
+                    <Text style={styles.sourceStatusItemTitle}>
+                      {item.ordinal}. {item.title}
+                    </Text>
+                    <Text style={styles.noticeText}>
+                      {describeSourceStatusItem(item)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function ErrorCard({ error }: { readonly error: LibraryDisplayError }) {
   return (
-    <View style={styles.errorBox} testID="study-library-error">
+    <View
+      accessibilityLiveRegion="polite"
+      style={styles.errorBox}
+      testID="study-library-error"
+    >
       <Text style={styles.errorTitle}>{error.title}</Text>
       <Text style={styles.errorText}>{error.message}</Text>
       {error.detail ? <Text style={styles.errorDetail}>{error.detail}</Text> : null}
@@ -511,110 +734,13 @@ function ErrorCard({ error }: { readonly error: LibraryDisplayError }) {
 
 function SuccessCard({ message }: { readonly message: string }) {
   return (
-    <View style={styles.successBox} testID="study-library-success">
+    <View
+      accessibilityLiveRegion="polite"
+      style={styles.successBox}
+      testID="study-library-success"
+    >
       <Text style={styles.successText}>{message}</Text>
     </View>
-  );
-}
-
-/**
- * Reader context for a saved reviewer, built only from fields the saved record
- * actually carries. A reviewer saved without Canvas provenance simply passes
- * fewer fields; it is never given a manufactured source.
- */
-function savedReviewerReaderContext(
-  reviewer: SavedReviewerDetail,
-): ReviewerReaderContext {
-  const provenance = reviewer.sourceProvenance;
-  const sourceLabel =
-    reviewer.sourceMetadata.sourceLabel?.trim() ||
-    provenance?.sourceTitle.trim() ||
-    null;
-
-  return {
-    sourceLabel,
-    sourceMode: reviewer.sourceMetadata.sourceMode,
-    selectedBlockCount: provenance?.selectedBlockCount ?? null,
-  };
-}
-
-function SourceProvenanceCard({
-  isCheckingStatus,
-  onRefreshStatus,
-  status,
-  summary,
-}: {
-  readonly isCheckingStatus: boolean;
-  readonly onRefreshStatus: () => void;
-  readonly status: ReviewerSourceStatusPayload | null;
-  readonly summary: SavedReviewerSourceProvenanceSummary;
-}) {
-  return (
-    <Card style={styles.statusCard} testID="study-library-source-provenance">
-      <Text style={styles.statusTitle}>Canvas source provenance</Text>
-      <Text style={styles.statusText}>
-        {summary.sourceCount} sources - {summary.wasEdited ? "edited" : "unchanged"}
-      </Text>
-      <Text style={styles.statusText}>
-        {summary.selectedBlockCount} selected blocks
-      </Text>
-      <Text style={styles.statusText}>
-        Parsers: {formatVersionList(summary.parserVersions)}
-      </Text>
-      <Text style={styles.statusText}>
-        OCR: {formatVersionList(summary.ocrVersions)}
-      </Text>
-      <View style={styles.statusDivider} />
-      <View style={styles.sourceStatusHeader}>
-        <View style={styles.sourceStatusText}>
-          <Text style={styles.statusTitle}>Source health</Text>
-          <Text
-            style={styles.statusText}
-            testID="study-library-source-status-summary"
-          >
-            {status
-              ? formatSourceStatusCounts(status)
-              : "Source status not checked"}
-          </Text>
-        </View>
-        <Button
-          loading={isCheckingStatus}
-          onPress={onRefreshStatus}
-          variant="secondary"
-        >
-          {status ? "Refresh status" : "Check status"}
-        </Button>
-      </View>
-      {isCheckingStatus ? (
-        <Text style={styles.statusText} testID="study-library-source-status-loading">
-          Checking synchronized sources...
-        </Text>
-      ) : null}
-      {status ? (
-        <>
-          <Text style={styles.statusText} testID="study-library-source-readiness">
-            {formatReadiness(status.regenerationReadiness)}
-          </Text>
-          {status.actions.length > 0 ? (
-            <Text style={styles.statusText}>
-              {formatStatusActions(status.actions)}
-            </Text>
-          ) : null}
-          <View style={styles.sourceStatusList}>
-            {status.items.map((item) => (
-              <View key={item.ordinal} style={styles.sourceStatusItem}>
-                <Text style={styles.sourceStatusItemTitle}>
-                  {item.ordinal}. {item.title}
-                </Text>
-                <Text style={styles.statusText}>
-                  {formatSourceItemStatus(item)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </>
-      ) : null}
-    </Card>
   );
 }
 
@@ -652,7 +778,15 @@ function createRequestContext(accessToken: string | undefined):
   return { ok: true, value: { apiBaseUrl, accessToken: token } };
 }
 
-function formatLibraryError(error: ReviewerLibraryError): LibraryDisplayError {
+/**
+ * Errors name the action that failed, so a student knows whether their library
+ * failed to load or one reviewer failed to open. The technical code stays as a
+ * separate, quieter line because it is what makes a report actionable.
+ */
+function formatLibraryError(
+  error: ReviewerLibraryError,
+  operation: LibraryOperation,
+): LibraryDisplayError {
   const detail =
     error.status !== undefined
       ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
@@ -668,16 +802,17 @@ function formatLibraryError(error: ReviewerLibraryError): LibraryDisplayError {
 
   if (error.code === "reviewer_not_found") {
     return {
-      title: "Reviewer not found",
-      message: "This saved reviewer is no longer available.",
+      title: "Saved reviewer is gone",
+      message:
+        "This reviewer is no longer in your Study Library. Refresh to see what is still saved.",
       detail,
     };
   }
 
   if (error.code === "network_error") {
     return {
-      title: "Could not reach the API",
-      message: "Check the API address and network connection.",
+      title: operationErrorTitle(operation),
+      message: "Check your connection and the API address, then try again.",
       detail,
     };
   }
@@ -691,156 +826,25 @@ function formatLibraryError(error: ReviewerLibraryError): LibraryDisplayError {
   }
 
   return {
-    title: "Study Library action failed",
+    title: operationErrorTitle(operation),
     message: error.message,
     detail,
   };
 }
 
-function formatSourceMode(sourceMode: SavedReviewerSourceMode): string {
-  switch (sourceMode) {
-    case "paste":
-      return "Pasted source";
-    case "gallery":
-      return "Gallery image OCR";
-    case "camera":
-      return "Camera OCR";
-    case "pdf":
-      return "PDF OCR";
-    case "canvas":
-      return "Canvas source";
+function operationErrorTitle(operation: LibraryOperation): string {
+  switch (operation) {
+    case "load":
+      return "Couldn't load your Study Library";
+    case "open":
+      return "Couldn't open this saved reviewer";
+    case "rename":
+      return "Couldn't rename this reviewer";
+    case "delete":
+      return "Couldn't delete this reviewer";
+    case "source-status":
+      return "Couldn't check this reviewer's sources";
   }
-}
-
-function formatSectionCount(sectionCount: number): string {
-  return `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}`;
-}
-
-function formatVersionList(values: readonly string[]): string {
-  return values.length > 0 ? values.join(", ") : "none";
-}
-
-function formatSourceStatusCounts(status: ReviewerSourceStatusPayload): string {
-  const parts = [
-    `${status.counts.current} current`,
-    `${status.counts.changed} changed`,
-    `${status.counts.unavailable} unavailable`,
-    `${status.counts.unsupported} unsupported`,
-    `${status.counts.missingAfterSync} missing`,
-    `${status.counts.unknown} unknown`,
-  ];
-  return `${formatOverallStatus(status.overallStatus)} - ${parts.join(", ")}`;
-}
-
-function formatOverallStatus(
-  status: ReviewerSourceStatusPayload["overallStatus"],
-): string {
-  switch (status) {
-    case "current":
-      return "Sources current";
-    case "changed":
-      return "Changes detected";
-    case "attention_required":
-      return "Sources need attention";
-    case "unknown":
-      return "Source status unknown";
-  }
-}
-
-function formatReadiness(
-  readiness: ReviewerSourceStatusPayload["regenerationReadiness"],
-): string {
-  switch (readiness) {
-    case "ready_current":
-      return "Readiness: ready with current sources";
-    case "ready_with_changes":
-      return "Readiness: ready after reviewing detected changes";
-    case "blocked_missing_sources":
-      return "Readiness: blocked by missing sources";
-    case "blocked_unavailable_sources":
-      return "Readiness: blocked by unavailable sources";
-    case "blocked_unsupported_sources":
-      return "Readiness: blocked by unsupported sources";
-    case "unknown":
-      return "Readiness: unknown";
-  }
-}
-
-function formatStatusActions(
-  actions: readonly ReviewerSourceStatusAction[],
-): string {
-  return `Next action: ${actions.map(formatStatusAction).join(", ")}`;
-}
-
-function formatStatusAction(action: ReviewerSourceStatusAction): string {
-  switch (action) {
-    case "prepare_updated_file":
-      return "prepare updated file";
-    case "sync_canvas_course":
-      return "sync Canvas course";
-    case "choose_replacement_source":
-      return "choose replacement source";
-    case "check_canvas_access":
-      return "check Canvas access";
-    case "unsupported_source_type":
-      return "unsupported source type";
-    case "status_unknown":
-      return "status unknown";
-  }
-}
-
-function formatSourceItemStatus(item: ReviewerSourceStatusItem): string {
-  const kind = item.fileKind ? ` ${item.fileKind}` : "";
-  return `${formatSourceStatusLabel(item.status)} ${formatSourceTypeLabel(
-    item.sourceType,
-  )}${kind} - ${item.message}`;
-}
-
-function formatSourceStatusLabel(
-  status: ReviewerSourceStatusItem["status"],
-): string {
-  switch (status) {
-    case "current":
-      return "Current";
-    case "changed":
-      return "Changed";
-    case "unavailable":
-      return "Unavailable";
-    case "unsupported":
-      return "Unsupported";
-    case "missing_after_sync":
-      return "Missing after sync";
-    case "unknown":
-      return "Unknown";
-  }
-}
-
-function formatSourceTypeLabel(
-  sourceType: ReviewerSourceStatusItem["sourceType"],
-): string {
-  switch (sourceType) {
-    case "page":
-      return "page";
-    case "assignment":
-      return "assignment";
-    case "announcement":
-      return "announcement";
-    case "file":
-      return "file";
-  }
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 const styles = StyleSheet.create({
@@ -851,7 +855,7 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   kicker: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.kicker,
     fontWeight: "800",
@@ -871,10 +875,22 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     lineHeight: 23,
   },
-  actions: {
+  headerActions: {
+    alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing[2],
+  },
+  backRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    marginLeft: -spacing[3],
+  },
+  inlineAction: {
+    paddingHorizontal: spacing[3],
+  },
+  destructiveLabel: {
+    color: colors.error,
   },
   list: {
     gap: spacing[3],
@@ -882,41 +898,125 @@ const styles = StyleSheet.create({
   formCard: {
     gap: spacing[4],
   },
-  summaryCard: {
-    gap: spacing[4],
+  formActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[2],
   },
-  summaryHeader: {
+  entryCard: {
+    elevation: 0,
+    gap: spacing[4],
+    padding: spacing[4],
+    shadowOpacity: 0,
+    shadowRadius: 0,
+  },
+  entryText: {
     gap: spacing[1],
   },
-  summaryTitle: {
+  entryTitle: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.h3,
     fontWeight: "800",
     lineHeight: 22,
   },
-  summaryMeta: {
-    color: colors.textMuted,
+  entryMeta: {
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
   },
-  statusCard: {
-    alignItems: "flex-start",
+  entryActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing[2],
   },
-  sourceStatusHeader: {
+  openAction: {
+    flexShrink: 1,
+  },
+  entrySpacer: {
+    flexGrow: 1,
+  },
+  documentFooter: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: spacing[2],
+    paddingTop: spacing[4],
+  },
+  footerMeta: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  footerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[2],
+    marginLeft: -spacing[3],
+  },
+  disclosure: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    paddingTop: spacing[2],
+  },
+  disclosureHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[2],
+    minHeight: hitTarget.min,
+  },
+  disclosureLabel: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+    lineHeight: 19,
+  },
+  disclosureBody: {
+    gap: spacing[3],
+    paddingBottom: spacing[2],
+  },
+  disclosureDivider: {
+    alignSelf: "stretch",
+    backgroundColor: colors.border,
+    height: 1,
+  },
+  detailRows: {
+    gap: spacing[2],
+  },
+  detailRow: {
+    gap: spacing[1],
+  },
+  detailLabel: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    lineHeight: 17,
+  },
+  detailValue: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  sourceHealthHeader: {
     alignItems: "flex-start",
     alignSelf: "stretch",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing[3],
+    gap: spacing[2],
     justifyContent: "space-between",
   },
-  sourceStatusText: {
+  sourceHealthText: {
     flex: 1,
     gap: spacing[1],
-    minWidth: 220,
+    minWidth: 180,
   },
   sourceStatusList: {
     alignSelf: "stretch",
@@ -925,7 +1025,7 @@ const styles = StyleSheet.create({
   sourceStatusItem: {
     backgroundColor: colors.cardElevated,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.tight,
     borderWidth: 1,
     gap: spacing[1],
     padding: spacing[3],
@@ -937,20 +1037,23 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 19,
   },
-  statusDivider: {
-    alignSelf: "stretch",
-    backgroundColor: colors.border,
-    height: 1,
-    marginVertical: spacing[1],
+  noticeCard: {
+    alignItems: "flex-start",
+    elevation: 0,
+    gap: spacing[2],
+    padding: spacing[4],
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
-  statusTitle: {
+  noticeTitle: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.h3,
     fontWeight: "800",
+    lineHeight: 22,
   },
-  statusText: {
-    color: colors.textMuted,
+  noticeText: {
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 20,
@@ -958,7 +1061,7 @@ const styles = StyleSheet.create({
   errorBox: {
     backgroundColor: colors.errorSurface,
     borderColor: colors.error,
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: 1,
     gap: spacing[2],
     padding: spacing[3],
@@ -977,7 +1080,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   errorDetail: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.caption,
     lineHeight: 17,
@@ -985,7 +1088,7 @@ const styles = StyleSheet.create({
   successBox: {
     backgroundColor: colors.successSurface,
     borderColor: colors.success,
-    borderRadius: 10,
+    borderRadius: radius.tight,
     borderWidth: 1,
     padding: spacing[3],
   },
