@@ -33,6 +33,7 @@ import {
   type SavedReviewerSourceMode,
 } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
+import type { ReviewerReaderContext } from "../reviewer/reviewerReaderPresentation";
 
 interface StudyLibraryScreenProps {
   readonly onCreateReviewer: () => void;
@@ -288,7 +289,6 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       <Screen contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.kicker}>Study Library</Text>
-          <Text style={styles.title}>{openedReviewer.title}</Text>
           <Text style={styles.subtitle}>
             Opened from your saved reviewers without regenerating.
           </Text>
@@ -330,6 +330,11 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
         {error ? <ErrorCard error={error} /> : null}
         {successMessage ? <SuccessCard message={successMessage} /> : null}
 
+        <ReviewerPreview
+          context={savedReviewerReaderContext(openedReviewer)}
+          reviewer={openedReviewer.reviewerOutput}
+        />
+
         {openedReviewer.sourceProvenance ? (
           <SourceProvenanceCard
             isCheckingStatus={isCheckingSourceStatus}
@@ -342,8 +347,6 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
             summary={openedReviewer.sourceProvenance}
           />
         ) : null}
-
-        <ReviewerPreview reviewer={openedReviewer.reviewerOutput} />
       </Screen>
     );
   }
@@ -512,6 +515,27 @@ function SuccessCard({ message }: { readonly message: string }) {
       <Text style={styles.successText}>{message}</Text>
     </View>
   );
+}
+
+/**
+ * Reader context for a saved reviewer, built only from fields the saved record
+ * actually carries. A reviewer saved without Canvas provenance simply passes
+ * fewer fields; it is never given a manufactured source.
+ */
+function savedReviewerReaderContext(
+  reviewer: SavedReviewerDetail,
+): ReviewerReaderContext {
+  const provenance = reviewer.sourceProvenance;
+  const sourceLabel =
+    reviewer.sourceMetadata.sourceLabel?.trim() ||
+    provenance?.sourceTitle.trim() ||
+    null;
+
+  return {
+    sourceLabel,
+    sourceMode: reviewer.sourceMetadata.sourceMode,
+    selectedBlockCount: provenance?.selectedBlockCount ?? null,
+  };
 }
 
 function SourceProvenanceCard({

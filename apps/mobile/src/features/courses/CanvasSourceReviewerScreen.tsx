@@ -1119,7 +1119,15 @@ export function CanvasSourceReviewerScreen({
     <Screen
       contentContainerStyle={styles.content}
       footer={
-        showsPreviewEditor && !activeReviewerJob ? (
+        !isLoadingSources && reviewer ? (
+          <ReviewerSaveFooter
+            isSaving={isSaving}
+            onSave={() => void handleSave()}
+            savedReviewer={savedReviewer}
+            saveTitle={saveTitle}
+            sourceSnapshotReady={sourceSnapshotId !== null}
+          />
+        ) : showsPreviewEditor && !activeReviewerJob ? (
           <PreviewActionFooter
             isGenerating={isGenerating}
             onGenerate={() => void handleGenerate()}
@@ -1151,7 +1159,16 @@ export function CanvasSourceReviewerScreen({
           title="Loading course content"
         />
       ) : reviewer ? (
-        <View style={styles.stack}>
+        <View style={styles.readerStack}>
+          <ReviewerPreview
+            context={{
+              courseName: displayCourseName,
+              sourceLabel: selectedSource?.title ?? null,
+              sourceMode: "canvas",
+              selectedBlockCount: selectedBlockIds.length,
+            }}
+            reviewer={reviewer}
+          />
           <SaveCanvasReviewerPanel
             isSaving={isSaving}
             onChangeTitle={(value) => {
@@ -1159,13 +1176,11 @@ export function CanvasSourceReviewerScreen({
               setSaveError(null);
             }}
             onOpenLibrary={onOpenLibrary}
-            onSave={() => void handleSave()}
             savedReviewer={savedReviewer}
             saveError={saveError}
             saveTitle={saveTitle}
             sourceSnapshotReady={sourceSnapshotId !== null}
           />
-          <ReviewerPreview reviewer={reviewer} />
           <Button onPress={requestChangeSource} variant="secondary">
             Change source
           </Button>
@@ -1865,11 +1880,15 @@ function CanvasReviewerJobCard({
   );
 }
 
+/**
+ * Save details for the reviewer being read. The Save action itself lives in the
+ * shared `Screen` footer so it stays reachable through a long reviewer; this
+ * panel carries only the title, the outcome, and the way onward.
+ */
 function SaveCanvasReviewerPanel({
   isSaving,
   onChangeTitle,
   onOpenLibrary,
-  onSave,
   savedReviewer,
   saveError,
   saveTitle,
@@ -1878,17 +1897,15 @@ function SaveCanvasReviewerPanel({
   readonly isSaving: boolean;
   readonly onChangeTitle: (value: string) => void;
   readonly onOpenLibrary: () => void;
-  readonly onSave: () => void;
   readonly savedReviewer: SavedReviewerSummary | null;
   readonly saveError: CanvasSourceDisplayError | null;
   readonly saveTitle: string;
   readonly sourceSnapshotReady: boolean;
 }) {
   return (
-    <Card accent style={styles.previewCard} testID="canvas-reviewer-save-card">
-      <Text style={styles.sectionLabel}>REVIEWER READY</Text>
-      <Text style={styles.cardTitle}>
-        {savedReviewer ? "Saved to Study Library" : "Save this reviewer"}
+    <Card style={styles.previewCard} testID="canvas-reviewer-save-card">
+      <Text accessibilityRole="header" style={styles.cardTitle}>
+        Save to Study Library
       </Text>
       <Text style={styles.bodyText}>
         {savedReviewer
@@ -1908,17 +1925,60 @@ function SaveCanvasReviewerPanel({
         </Text>
       ) : null}
       {saveError ? <ErrorCard error={saveError} /> : null}
-      {isSaving ? (
-        <View accessibilityLiveRegion="polite" style={styles.progressRow}>
-          <ActivityIndicator color={colors.accent} size="small" />
-          <Text style={styles.statusText}>Saving to Study Library.</Text>
-        </View>
-      ) : null}
       {savedReviewer ? (
         <View accessibilityLiveRegion="polite" style={styles.successBox}>
           <Check color={colors.success} size={18} strokeWidth={2} />
           <Text style={styles.successText}>Reviewer saved.</Text>
         </View>
+      ) : null}
+      <Button disabled={isSaving} fullWidth onPress={onOpenLibrary} variant="secondary">
+        Open Study Library
+      </Button>
+    </Card>
+  );
+}
+
+/**
+ * Pinned Save action for the Reviewer Reader. It states the save state in words
+ * as well as through the disabled control, and it is the only Save control on
+ * the screen.
+ */
+function ReviewerSaveFooter({
+  isSaving,
+  onSave,
+  savedReviewer,
+  saveTitle,
+  sourceSnapshotReady,
+}: {
+  readonly isSaving: boolean;
+  readonly onSave: () => void;
+  readonly savedReviewer: SavedReviewerSummary | null;
+  readonly saveTitle: string;
+  readonly sourceSnapshotReady: boolean;
+}) {
+  return (
+    <>
+      {savedReviewer ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={styles.selectionCount}
+          testID="canvas-reviewer-save-state"
+        >
+          Saved to Study Library.
+        </Text>
+      ) : isSaving ? (
+        <View accessibilityLiveRegion="polite" style={styles.progressRow}>
+          <ActivityIndicator color={colors.accent} size="small" />
+          <Text style={styles.statusText}>Saving to Study Library.</Text>
+        </View>
+      ) : !sourceSnapshotReady ? (
+        <Text style={styles.prerequisiteCopy}>
+          Create the reviewer again before saving.
+        </Text>
+      ) : !saveTitle.trim() ? (
+        <Text style={styles.prerequisiteCopy}>
+          Enter a title before saving this reviewer.
+        </Text>
       ) : null}
       <Button
         disabled={Boolean(savedReviewer) || !saveTitle.trim() || !sourceSnapshotReady}
@@ -1930,10 +1990,7 @@ function SaveCanvasReviewerPanel({
       >
         {savedReviewer ? "Saved" : "Save reviewer"}
       </Button>
-      <Button disabled={isSaving} fullWidth onPress={onOpenLibrary} variant="secondary">
-        Open Study Library
-      </Button>
-    </Card>
+    </>
   );
 }
 
@@ -2201,6 +2258,9 @@ function blockHierarchyIndent(block: CanvasStructuredBlock): { paddingLeft: numb
 const styles = StyleSheet.create({
   content: { gap: spacing[5] },
   stack: { gap: spacing[4] },
+  // Reading stack: the document is followed by its save details with enough
+  // separation that the reviewer keeps reading as one continuous document.
+  readerStack: { gap: spacing[6] },
   header: { alignItems: "flex-start", flexDirection: "row", gap: spacing[3] },
   headerText: { flex: 1, gap: spacing[1] },
   iconButton: {

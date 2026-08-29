@@ -101,6 +101,41 @@ reviewer-source snapshot that carries through generation, the completed
 reviewer, save, and Study Library reopen. Reopening a saved reviewer does not
 regenerate it. Do not weaken this for simpler UI code.
 
+## What the Reviewer Reader can actually show
+
+The Reader renders a `ReviewerOutput` and nothing else is guaranteed. That
+payload carries the reviewer title, ordered sections, and per-section ordered
+items whose `sourceCore` holds an explanation and key points, plus metadata:
+`sourceTitle`, `sourceKind` (`document` / `presentation` / `webpage` /
+`plain-text` / `unknown`), section counts, coverage / grounding / leakage status
+and score, and an optional `reviewerQualityStatus`. It carries **no course, no
+timestamp, and no saved state**, so anything of that kind must be passed in by
+the screen that owns it.
+
+`enrichment` is always `null` by design - stage 3 instructs the model to leave
+it empty - so the Reader has no beyond-source layer to render.
+
+The real shape of generated reviewers is narrower than the schema allows. In
+every recorded live run, each section holds exactly one item whose title equals
+the section title, and most items carry key points with an empty explanation.
+A Reader that renders section title, then item title, then an `Explanation`
+label, therefore repeats itself three times over real data. Design for that
+shape: section heading, optional prose, key points.
+
+Grounding and coverage scores exist but are evaluation data. `Grounding: 1.00`
+reads to a student as a correctness guarantee the system does not make, so the
+Reader reports `Grounded` / `Limited grounding` from `groundingStatus` and shows
+no number. A saved or legacy payload with no recognisable grounding status gets
+no status at all.
+
+Surrounding context comes from the screen, and each screen holds a different
+amount. Canvas selection knows the course name, the source title, and the
+selected block count. Study Library knows `sourceMetadata.sourceMode`,
+`sourceLabel`, and, for Canvas reviewers, `sourceProvenance.selectedBlockCount`.
+Processing knows only `job.source.displayName` - it has no course. The Reader
+takes all of this as one optional `context` object and simply omits what it is
+not given, which is what keeps a reopened saved reviewer from looking degraded.
+
 ## Physical acceptance already recorded
 
 The Canvas selective reviewer was physically accepted on a realme RMX3151 running
@@ -209,6 +244,15 @@ paragraph in a card or let metadata overpower the material.
 (`Save reviewer`, `Saving...`, `Saved`). Do not introduce duplicate saves or
 alter provenance as part of a visual change.
 
+Save is owned by each screen, not by the Reader, and the three paths do not
+share an implementation. Canvas and the PDF generate screen both hold a
+`savedReviewer` summary and disable the control once it is set. Processing held
+no such state until 2026-08-29 and would create a second Study Library entry on
+a second tap; it now holds `savedReviewerId` for the same purpose. Any new Save
+surface needs its own guard - none is inherited. Note that shared `Button`
+replaces its label with a spinner while `loading`, so `Saving...` has to be said
+in text beside the button rather than on it.
+
 **Study Library** should feel like a collection of finished study material.
 Show only fields that actually exist, keep entries scannable, keep them flat
 rather than glass, and make reopen obvious.
@@ -313,7 +357,28 @@ server's safe message from its error code, and restoring is distinguished from
 having nothing to process. Presentation logic lives in
 `apps/mobile/src/features/processing/processingJobPresentation.ts`.
 
-That work passes the mobile automated checks and was inspected in a web-rendered
-build. **It has not been physically accepted on Android.** The Reviewer Reader
-and Study Library have not yet had a refinement pass. Do not
-describe any of this as accepted until a real device run says so.
+The Reviewer Reader has now had its pass. It renders as a flat document on the
+warm canvas rather than nested cards: a masthead of title, one compact source
+line, a section count, and a single grounding chip, then sections separated by a
+hairline and whitespace. Per-section coverage / source / clean chips are gone;
+a section speaks up only when it genuinely failed grounding or was taken
+extractively from the source. Item titles that merely repeat the section title
+are dropped, an explanation that exactly restates the heading or the sole key
+point is not shown twice, and body text moved from 13px to 15px at 1.6 line
+height in `textPrimary` (`textMuted` fails AA on the page background at 4.1:1
+and is not used for Reader text). The Reader is one component shared by Canvas,
+Processing, the PDF generate screen, and Study Library reopen; each passes an
+optional `context` and none of them supplies a header title of its own any more.
+Presentation logic lives in
+`apps/mobile/src/features/reviewer/reviewerReaderPresentation.ts`.
+
+Reader test IDs changed with it: `reviewer-source-faithful-status`,
+`reviewer-coverage-status`, and `reviewer-clean-output-status` no longer exist
+and are replaced by a single `reviewer-grounding-status`. `reviewer-ready`,
+`reviewer-title`, `reviewer-section`, `reviewer-explanation`,
+`reviewer-key-point`, and `reviewer-quality-notice` are unchanged.
+
+All of this work passes the mobile automated checks and was inspected in a
+web-rendered build. **None of it has been physically accepted on Android.**
+Study Library has not yet had a refinement pass. Do not describe any of this as
+accepted until a real device run says so.

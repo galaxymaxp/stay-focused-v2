@@ -1024,7 +1024,27 @@ export function ReviewerGenerateScreen({
           />
         ) : null}
 
-        {reviewer ? <ReviewerPreview reviewer={reviewer} /> : null}
+        {reviewer ? (
+          <ReviewerPreview
+            context={
+              recoveredReviewerSource
+                ? {
+                    sourceLabel: recoveredReviewerSource.sourceLabel,
+                    sourceMode: "canvas",
+                  }
+                : {
+                    sourceLabel: sourceTitle,
+                    sourceMode: createSavedReviewerSourceMetadata({
+                      imageSourceMode,
+                      sourceCharacterCount,
+                      sourceState,
+                      sourceTitle,
+                    }).sourceMode,
+                  }
+            }
+            reviewer={reviewer}
+          />
+        ) : null}
       </KeyboardAvoidingView>
     </Screen>
   );

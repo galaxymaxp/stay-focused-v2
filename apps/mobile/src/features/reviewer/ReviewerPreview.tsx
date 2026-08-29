@@ -1,346 +1,230 @@
-import type {
-  CoverageStatus,
-  GroundingReportStatus,
-  ReviewerOutput,
-  ReviewerSection,
-  SectionOutput,
-} from "@stay-focused/engine";
+import type { ReviewerOutput } from "@stay-focused/engine";
+import { AlertCircle, Check } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 
-import { Card } from "../../components/Card";
 import { colors, radius, spacing, typography } from "../../design/tokens";
+import {
+  describeGroundingStatus,
+  describeReviewerQualityNotice,
+  describeReviewerScale,
+  describeReviewerSource,
+  presentReviewerSections,
+  readerEmptyMessage,
+  readerReviewerTitle,
+  type ReviewerGroundingPresentation,
+  type ReviewerReaderBlock,
+  type ReviewerReaderContext,
+  type ReviewerReaderSection,
+} from "./reviewerReaderPresentation";
 
 interface ReviewerPreviewProps {
   readonly reviewer: ReviewerOutput;
+  /**
+   * Optional context the surrounding screen already holds. Omitted fields are
+   * simply not shown, so a saved reviewer reopened without job context reads
+   * the same as a freshly generated one.
+   */
+  readonly context?: ReviewerReaderContext;
 }
 
-type ReviewStatus = CoverageStatus | GroundingReportStatus | "failed";
-
-export function ReviewerPreview({ reviewer }: ReviewerPreviewProps) {
-  const sectionCount = reviewer.sections.length;
-  const sourceTitle = reviewer.metadata.sourceTitle.trim();
+/**
+ * The Reviewer Reader.
+ *
+ * This is the payoff surface of the reviewer journey, so it is laid out as a
+ * study document rather than a stack of cards: one masthead, then sections
+ * separated by whitespace and a hairline, with the generated material at full
+ * reading size. It renders the accepted reviewer output faithfully and adds no
+ * metadata the payload does not contain.
+ */
+export function ReviewerPreview({ reviewer, context }: ReviewerPreviewProps) {
+  const sections = presentReviewerSections(reviewer);
+  const sourceLine = describeReviewerSource(reviewer, context);
+  const grounding = describeGroundingStatus(reviewer.metadata);
+  const qualityNotice = describeReviewerQualityNotice(reviewer.metadata);
 
   return (
-    <View style={styles.previewStack} testID="reviewer-ready">
-      <Card elevated style={styles.headerCard}>
-        <View style={styles.header}>
-          <Text style={styles.kicker}>Reviewer Ready</Text>
-          <Text style={styles.title} testID="reviewer-title">
-            {formatTitle(reviewer.title, "Untitled reviewer")}
+    <View style={styles.document} testID="reviewer-ready">
+      <View style={styles.masthead}>
+        <Text style={styles.kicker}>Reviewer</Text>
+        <Text
+          accessibilityRole="header"
+          style={styles.title}
+          testID="reviewer-title"
+        >
+          {readerReviewerTitle(reviewer)}
+        </Text>
+        {sourceLine ? (
+          <Text style={styles.meta} testID="reviewer-source-line">
+            {sourceLine}
           </Text>
-          <View style={styles.metaStack}>
-            <Text style={styles.meta}>{formatSectionCount(sectionCount)}</Text>
-            {sourceTitle ? (
-              <Text style={styles.meta}>Source: {sourceTitle}</Text>
-            ) : null}
-          </View>
-        </View>
+        ) : null}
+        <Text style={styles.meta}>{describeReviewerScale(reviewer, context)}</Text>
+        {grounding && sections.length > 0 ? (
+          <GroundingChip grounding={grounding} />
+        ) : null}
+      </View>
 
-        <View style={styles.statusGrid}>
-          <StatusPill
-            label="Source-faithful"
-            status={reviewer.metadata.groundingStatus}
-            testID="reviewer-source-faithful-status"
-          />
-          <StatusPill
-            label="Coverage"
-            status={reviewer.metadata.coverageStatus}
-            testID="reviewer-coverage-status"
-          />
-          <StatusPill
-            label="Clean output"
-            status={reviewer.metadata.leakageStatus}
-            testID="reviewer-clean-output-status"
-          />
-        </View>
-      </Card>
-
-      {reviewer.metadata.reviewerQualityStatus === "complete_with_fallbacks" ||
-      reviewer.metadata.reviewerQualityStatus === "limited" ? (
-        <Card style={styles.qualityNotice}>
-          <Text style={styles.qualityNoticeText} testID="reviewer-quality-notice">
-            Some sections use source-only fallback because generation could not be safely verified.
-          </Text>
-        </Card>
+      {qualityNotice ? (
+        <Text style={styles.notice} testID="reviewer-quality-notice">
+          {qualityNotice}
+        </Text>
       ) : null}
 
-      {sectionCount > 0 ? (
-        <View style={styles.sectionList}>
-          {reviewer.sections.map((section, index) => (
-            <SectionPreview
+      {sections.length > 0 ? (
+        <View>
+          {sections.map((section, index) => (
+            <ReaderSection
               key={section.id}
+              isFirst={index === 0}
               section={section}
-              sectionNumber={index + 1}
             />
           ))}
         </View>
       ) : (
-        <Card style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No sections were returned.</Text>
-        </Card>
+        <Text style={styles.emptyText} testID="reviewer-empty">
+          {readerEmptyMessage()}
+        </Text>
       )}
     </View>
   );
 }
 
-function StatusPill({
-  label,
-  status,
-  testID,
+function GroundingChip({
+  grounding,
 }: {
-  readonly label: string;
-  readonly status: ReviewStatus;
-  readonly testID?: string;
+  readonly grounding: ReviewerGroundingPresentation;
 }) {
+  const isGrounded = grounding.tone === "grounded";
+
   return (
-    <View style={[styles.statusPill, getStatusPillStyle(status)]} testID={testID}>
-      <Text style={styles.statusLabel}>{label}</Text>
-      <Text style={styles.statusValue}>{formatStatus(status)}</Text>
+    <View
+      style={[
+        styles.groundingChip,
+        isGrounded ? styles.groundingGrounded : styles.groundingLimited,
+      ]}
+      testID="reviewer-grounding-status"
+    >
+      {isGrounded ? (
+        <Check color={colors.success} size={15} strokeWidth={2.4} />
+      ) : (
+        <AlertCircle color={colors.accentPressed} size={15} strokeWidth={2.2} />
+      )}
+      <View style={styles.groundingCopy}>
+        <Text style={styles.groundingLabel}>{grounding.label}</Text>
+        <Text style={styles.groundingDetail}>{grounding.detail}</Text>
+      </View>
     </View>
   );
 }
 
-function SectionPreview({
+function ReaderSection({
+  isFirst,
   section,
-  sectionNumber,
 }: {
-  readonly section: ReviewerSection;
-  readonly sectionNumber: number;
+  readonly isFirst: boolean;
+  readonly section: ReviewerReaderSection;
 }) {
-  const itemCount = section.items.length;
-  const keyPointCount = countSectionKeyPoints(section);
-
   return (
-    <Card style={styles.sectionCard} testID="reviewer-section">
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionNumberBadge}>
-          <Text style={styles.sectionNumber}>{sectionNumber}</Text>
-        </View>
-
-        <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>
-            {formatTitle(section.title, "Untitled section")}
-          </Text>
-          <Text style={styles.sectionMeta}>
-            {formatSectionSummary(itemCount, keyPointCount)}
-          </Text>
-        </View>
+    <View
+      style={[styles.section, isFirst ? styles.firstSection : null]}
+      testID="reviewer-section"
+    >
+      <View style={styles.sectionHeading}>
+        <Text style={styles.sectionNumber}>{section.number}</Text>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>
+          {section.title}
+        </Text>
       </View>
 
-      <View style={styles.sectionStatusRow}>
-        <CompactStatus label="Coverage" status={section.coverageStatus} />
-        <CompactStatus label="Source" status={section.groundingStatus} />
-        <CompactStatus label="Clean" status={section.leakageStatus} />
-      </View>
-
-      {itemCount > 0 && keyPointCount === 0 ? (
-        <View style={styles.emptyStateBox}>
-          <Text style={styles.mutedText}>
-            No key points were returned for this section.
-          </Text>
-        </View>
+      {section.notice ? (
+        <Text style={styles.sectionNotice}>{section.notice}</Text>
       ) : null}
 
-      {itemCount > 0 ? (
-        <View style={styles.itemList}>
-          {section.items.map((item, index) => (
-            <StudyCard
-              key={`${section.id}-item-${item.id}`}
-              item={item}
-              itemNumber={index + 1}
-            />
+      {section.emptyMessage ? (
+        <Text style={styles.mutedText}>{section.emptyMessage}</Text>
+      ) : null}
+
+      {section.blocks.length > 0 ? (
+        <View style={styles.blocks}>
+          {section.blocks.map((block) => (
+            <ReaderBlock block={block} key={block.id} />
           ))}
         </View>
-      ) : (
-        <View style={styles.emptyStateBox}>
-          <Text style={styles.mutedText}>
-            No key points were returned for this section.
-          </Text>
-        </View>
-      )}
-    </Card>
-  );
-}
-
-function CompactStatus({
-  label,
-  status,
-}: {
-  readonly label: string;
-  readonly status: ReviewStatus;
-}) {
-  return (
-    <View style={styles.compactStatus}>
-      <Text style={styles.compactStatusLabel}>{label}</Text>
-      <Text style={styles.compactStatusValue}>{formatStatus(status)}</Text>
+      ) : null}
     </View>
   );
 }
 
-function StudyCard({
-  item,
-  itemNumber,
-}: {
-  readonly item: SectionOutput;
-  readonly itemNumber: number;
-}) {
-  const title = formatTitle(item.title, `Study card ${itemNumber}`);
-  const explanation = item.sourceCore.explanation.trim();
-  const keyPoints = item.sourceCore.keyPoints
-    .map((point) => point.trim())
-    .filter((point) => point.length > 0);
-  const showExplanation = shouldShowExplanation(title, explanation, keyPoints);
-
+function ReaderBlock({ block }: { readonly block: ReviewerReaderBlock }) {
   return (
-    <View style={styles.studyCard}>
-      <View style={styles.studyCardHeader}>
-        <Text style={styles.kicker}>Study card {itemNumber}</Text>
-        <Text style={styles.itemTitle}>{title}</Text>
-      </View>
+    <View style={styles.block}>
+      {block.heading ? (
+        <Text accessibilityRole="header" style={styles.blockHeading}>
+          {block.heading}
+        </Text>
+      ) : null}
 
-      {showExplanation ? (
-        <View style={styles.copyBlock}>
-          <Text style={styles.copyLabel}>Explanation</Text>
-          <Text style={styles.explanationText} testID="reviewer-explanation">
-            {explanation}
-          </Text>
+      {block.explanation ? (
+        <Text
+          selectable
+          style={styles.bodyText}
+          testID="reviewer-explanation"
+        >
+          {block.explanation}
+        </Text>
+      ) : null}
+
+      {block.keyPoints.length > 0 ? (
+        <View style={styles.keyPoints}>
+          {block.showKeyPointsLabel ? (
+            <Text style={styles.keyPointsLabel}>Key points</Text>
+          ) : null}
+          {block.keyPoints.map((point, index) => (
+            <View key={`${block.id}-point-${index}`} style={styles.keyPointRow}>
+              <Text style={styles.bullet}>{"•"}</Text>
+              <Text
+                selectable
+                style={styles.keyPointText}
+                testID="reviewer-key-point"
+              >
+                {point}
+              </Text>
+            </View>
+          ))}
         </View>
       ) : null}
 
-      <View style={styles.keyPointGroup}>
-        <Text style={styles.copyLabel}>Key points</Text>
-        {keyPoints.length > 0 ? (
-          <View style={styles.bulletList}>
-            {keyPoints.map((point, index) => (
-              <View key={`${item.id}-point-${index}`} style={styles.bulletRow}>
-                <Text style={styles.bullet}>-</Text>
-                <Text style={styles.bodyText} testID="reviewer-key-point">
-                  {point}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyStateBox}>
-            <Text style={styles.mutedText}>
-              No key points generated for this card.
-            </Text>
-          </View>
-        )}
-      </View>
+      {block.emptyMessage ? (
+        <Text style={styles.mutedText}>{block.emptyMessage}</Text>
+      ) : null}
     </View>
-  );
-}
-
-function formatTitle(value: string, fallback: string): string {
-  const title = value.trim();
-  return title.length > 0 ? title : fallback;
-}
-
-function formatSectionCount(sectionCount: number): string {
-  return `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}`;
-}
-
-function formatItemCount(itemCount: number): string {
-  return `${itemCount} ${itemCount === 1 ? "card" : "cards"}`;
-}
-
-function formatKeyPointCount(keyPointCount: number): string {
-  return `${keyPointCount} ${keyPointCount === 1 ? "key point" : "key points"}`;
-}
-
-function formatSectionSummary(itemCount: number, keyPointCount: number): string {
-  return `${formatItemCount(itemCount)} - ${formatKeyPointCount(keyPointCount)}`;
-}
-
-function formatStatus(status: ReviewStatus): string {
-  switch (status) {
-    case "passed":
-      return "Passed";
-    case "weak":
-      return "Needs review";
-    case "failed":
-      return "Failed";
-  }
-}
-
-function getStatusPillStyle(status: ReviewStatus) {
-  switch (status) {
-    case "passed":
-      return styles.statusPassed;
-    case "weak":
-      return styles.statusWeak;
-    case "failed":
-      return styles.statusFailed;
-  }
-}
-
-function shouldShowExplanation(
-  title: string,
-  explanation: string,
-  keyPoints: readonly string[],
-): boolean {
-  if (explanation.length === 0) {
-    return false;
-  }
-
-  const normalizedExplanation = normalizeForComparison(explanation);
-  const duplicatesTitle = normalizedExplanation === normalizeForComparison(title);
-  const duplicatesOnlyKeyPoint =
-    keyPoints.length === 1 &&
-    normalizedExplanation === normalizeForComparison(keyPoints[0] ?? "");
-
-  return !(duplicatesTitle && duplicatesOnlyKeyPoint);
-}
-
-function normalizeForComparison(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function countSectionKeyPoints(section: ReviewerSection): number {
-  return section.items.reduce(
-    (count, item) =>
-      count +
-      item.sourceCore.keyPoints.filter((point) => point.trim().length > 0)
-        .length,
-    0,
   );
 }
 
 const styles = StyleSheet.create({
-  qualityNotice: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
+  document: {
+    alignSelf: "stretch",
+    gap: spacing[4],
+    maxWidth: 680,
+    width: "100%",
   },
-  qualityNoticeText: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    lineHeight: 20,
-  },
-  previewStack: {
-    gap: spacing[5],
-  },
-  headerCard: {
-    gap: spacing[5],
-  },
-  header: {
+  masthead: {
     gap: spacing[2],
   },
   kicker: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.kicker,
-    fontWeight: "800",
-    letterSpacing: 1.2,
+    fontWeight: "700",
+    letterSpacing: 1.1,
     textTransform: "uppercase",
   },
   title: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
-    fontSize: typography.h2,
-    fontWeight: "800",
-    lineHeight: 24,
+    fontSize: typography.h1,
+    fontWeight: "700",
+    lineHeight: 31,
   },
   meta: {
     color: colors.textSecondary,
@@ -348,195 +232,141 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall,
     lineHeight: 19,
   },
-  metaStack: {
-    gap: spacing[1],
-  },
-  statusGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[2],
-  },
-  statusPill: {
-    borderRadius: radius.control,
+  groundingChip: {
+    alignItems: "flex-start",
+    alignSelf: "flex-start",
+    borderRadius: radius.tight,
     borderWidth: 1,
-    flexGrow: 1,
-    gap: spacing[1],
-    minWidth: 128,
+    flexDirection: "row",
+    gap: spacing[2],
+    marginTop: spacing[1],
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
   },
-  statusPassed: {
+  groundingGrounded: {
     backgroundColor: colors.successSurface,
     borderColor: colors.success,
   },
-  statusWeak: {
-    backgroundColor: "rgba(245, 166, 35, 0.13)",
+  groundingLimited: {
+    backgroundColor: "rgba(215, 170, 56, 0.14)",
     borderColor: colors.accent,
   },
-  statusFailed: {
-    backgroundColor: colors.errorSurface,
-    borderColor: colors.error,
-  },
-  statusLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.kicker,
-    fontWeight: "800",
-  },
-  statusValue: {
-    color: colors.textPrimary,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    fontWeight: "800",
-  },
-  sectionList: {
-    gap: spacing[4],
-  },
-  sectionCard: {
-    gap: spacing[4],
-  },
-  sectionHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: spacing[3],
-  },
-  sectionNumberBadge: {
-    alignItems: "center",
-    backgroundColor: colors.accent,
-    borderRadius: radius.pill,
-    height: 30,
-    justifyContent: "center",
-    width: 30,
-  },
-  sectionNumber: {
-    color: colors.accentText,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    fontWeight: "900",
-  },
-  sectionHeading: {
+  groundingCopy: {
     flex: 1,
     gap: spacing[1],
   },
+  groundingLabel: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  groundingDetail: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 17,
+  },
+  notice: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  section: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: spacing[3],
+    paddingBottom: spacing[2],
+    paddingTop: spacing[6],
+  },
+  firstSection: {
+    borderTopWidth: 0,
+    paddingTop: spacing[2],
+  },
+  sectionHeading: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: spacing[3],
+  },
+  sectionNumber: {
+    color: colors.accent,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.h3,
+    fontWeight: "700",
+    minWidth: 18,
+  },
   sectionTitle: {
+    color: colors.textPrimary,
+    flex: 1,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.h2,
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+  sectionNotice: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
+  blocks: {
+    gap: spacing[5],
+  },
+  block: {
+    gap: spacing[3],
+  },
+  blockHeading: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.h3,
-    fontWeight: "800",
+    fontWeight: "700",
     lineHeight: 22,
   },
-  sectionMeta: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    lineHeight: 19,
-  },
-  sectionStatusRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[2],
-  },
-  compactStatus: {
-    backgroundColor: colors.cardElevated,
-    borderColor: colors.border,
-    borderRadius: radius.tight,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing[2],
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-  },
-  compactStatusLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.kicker,
-    fontWeight: "800",
-  },
-  compactStatusValue: {
-    color: colors.textSecondary,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.kicker,
-    fontWeight: "800",
-  },
-  itemList: {
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-  },
-  studyCard: {
-    gap: spacing[3],
-    paddingVertical: spacing[4],
-  },
-  studyCardHeader: {
-    gap: spacing[1],
-  },
-  copyBlock: {
-    gap: spacing[1],
-  },
-  copyLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily,
-    fontSize: typography.kicker,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  itemTitle: {
+  bodyText: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily,
     fontSize: typography.body,
-    fontWeight: "800",
-    lineHeight: 22,
+    lineHeight: 24,
   },
-  explanationText: {
+  keyPoints: {
+    gap: spacing[2],
+  },
+  keyPointsLabel: {
     color: colors.textSecondary,
     fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    lineHeight: 21,
+    fontSize: typography.caption,
+    fontWeight: "700",
   },
-  keyPointGroup: {
-    gap: spacing[2],
-  },
-  emptyStateBox: {
-    backgroundColor: colors.cardElevated,
-    borderColor: colors.border,
-    borderRadius: radius.tight,
-    borderWidth: 1,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[3],
-  },
-  bulletList: {
-    gap: spacing[2],
-  },
-  bulletRow: {
+  keyPointRow: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: spacing[2],
+    gap: spacing[3],
   },
   bullet: {
     color: colors.accent,
     fontFamily: typography.fontFamily,
     fontSize: typography.body,
-    lineHeight: 23,
+    lineHeight: 24,
   },
-  bodyText: {
-    color: colors.textSecondary,
+  keyPointText: {
+    color: colors.textPrimary,
     flex: 1,
     fontFamily: typography.fontFamily,
-    fontSize: typography.bodySmall,
-    lineHeight: 21,
+    fontSize: typography.body,
+    lineHeight: 24,
   },
   mutedText: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 20,
   },
   emptyText: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.body,
-    lineHeight: 23,
-  },
-  emptyCard: {
-    gap: spacing[2],
+    lineHeight: 24,
   },
 });

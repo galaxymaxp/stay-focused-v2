@@ -93,6 +93,10 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
   const [reviewerSaveTitle, setReviewerSaveTitle] = useState("");
   const [reviewerSaveMessage, setReviewerSaveMessage] = useState<string | null>(null);
   const [isSavingReviewer, setIsSavingReviewer] = useState(false);
+  // Held so a saved reviewer cannot be saved a second time from the same
+  // screen. Save identity and provenance are unchanged; this only stops a
+  // repeated tap from creating a duplicate Study Library entry.
+  const [savedReviewerId, setSavedReviewerId] = useState<string | null>(null);
   const [openedSource, setOpenedSource] = useState<{
     readonly title: string;
     readonly text: string;
@@ -326,6 +330,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
           result.data.reviewer.title.trim() || job.source.displayName,
         );
         setReviewerSaveMessage(null);
+        setSavedReviewerId(null);
         return;
       }
     }
@@ -340,13 +345,14 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
       setOpenedReviewer({ job, reviewer: cached.payload });
       setReviewerSaveTitle(cached.payload.title.trim() || job.source.displayName);
       setReviewerSaveMessage(null);
+      setSavedReviewerId(null);
     } else {
       setError("This reviewer is not stored on this device, so it cannot be opened offline.");
     }
   };
 
   const handleSaveOpenedReviewer = async () => {
-    if (!openedReviewer || isSavingReviewer) return;
+    if (!openedReviewer || isSavingReviewer || savedReviewerId) return;
     const context = requestContext(session?.accessToken);
     if (!context) {
       setReviewerSaveMessage("Sign in and connect to the API before saving.");
@@ -378,7 +384,10 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
           ? `Saved as ${result.data.title}. Open it later from Study Library.`
           : result.error.message,
       );
-      if (result.ok) setReviewerSaveTitle(result.data.title);
+      if (result.ok) {
+        setReviewerSaveTitle(result.data.title);
+        setSavedReviewerId(result.data.id);
+      }
     } finally {
       setIsSavingReviewer(false);
     }
@@ -399,22 +408,35 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
   };
 
   if (openedReviewer) {
+    const isSaved = savedReviewerId !== null;
+
     return (
       <Screen
+        contentContainerStyle={styles.readerContent}
         footer={
           <>
+            {isSavingReviewer ? (
+              <Text accessibilityLiveRegion="polite" style={styles.footerNote}>
+                Saving to Study Library.
+              </Text>
+            ) : null}
             {reviewerSaveMessage ? (
-              <Text style={styles.footerNote} testID="processing-reviewer-save-message">
+              <Text
+                accessibilityLiveRegion="polite"
+                style={styles.footerNote}
+                testID="processing-reviewer-save-message"
+              >
                 {reviewerSaveMessage}
               </Text>
             ) : null}
             <Button
+              disabled={isSaved || reviewerSaveTitle.trim().length === 0}
               fullWidth
               loading={isSavingReviewer}
               onPress={() => void handleSaveOpenedReviewer()}
               testID="processing-reviewer-save-button"
             >
-              Save reviewer
+              {isSaved ? "Saved" : "Save reviewer"}
             </Button>
           </>
         }
@@ -428,7 +450,10 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
         >
           Back to Processing
         </Button>
-        <ReviewerPreview reviewer={openedReviewer.reviewer} />
+        <ReviewerPreview
+          context={{ sourceLabel: openedReviewer.job.source.displayName }}
+          reviewer={openedReviewer.reviewer}
+        />
         <Card style={styles.jobCard} testID="processing-reviewer-save-card">
           <Text accessibilityRole="header" style={styles.jobTitle}>
             Save to Study Library
@@ -437,6 +462,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
             The saved copy keeps the source this reviewer was generated from.
           </Text>
           <TextField
+            editable={!isSaved && !isSavingReviewer}
             label="Reviewer title"
             onChangeText={(value) => {
               setReviewerSaveTitle(value);
@@ -825,6 +851,9 @@ function isReviewerOutput(value: unknown): value is ReviewerOutput {
 }
 
 const styles = StyleSheet.create({
+  // The opened reviewer is a reading surface, so its chrome is spaced apart
+  // from the document instead of stacking flush against it.
+  readerContent: { gap: spacing[6] },
   header: { gap: spacing[2] },
   kicker: {
     color: colors.textMuted,
