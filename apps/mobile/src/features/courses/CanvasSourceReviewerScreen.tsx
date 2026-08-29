@@ -41,12 +41,15 @@ import { colors, hitTarget, radius, spacing, typography } from "../../design/tok
 import {
   listCanvasReviewerSources,
   prepareCanvasReviewerSources,
-  previewCanvasReviewerSources,
+  previewSelectiveCanvasReviewerSources,
+  structureCanvasReviewerSources,
   type CanvasApiClientError,
   type CanvasReviewerSourceDescriptor,
   type CanvasReviewerSourceListPayload,
   type CanvasReviewerSourcePreviewPayload,
   type CanvasReviewerSourceType,
+  type CanvasSourceStructurePayload,
+  type CanvasStructuredBlock,
 } from "../../services/canvasApi";
 import {
   cancelProcessingJob,
@@ -71,6 +74,13 @@ import {
 } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
 import {
+  canvasBlockPreview,
+  createCanvasBlockSelectionKey,
+  createDefaultCanvasBlockSelection,
+  toggleCanvasBlockSelection,
+} from "./canvasBlockSelection";
+import {
+  canvasGenerationNeedsNewPreview,
   canvasResolutionReducer,
   createCanvasResolutionState,
   createCanvasSelectionKey,
@@ -115,6 +125,9 @@ export function CanvasSourceReviewerScreen({
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [preview, setPreview] =
     useState<CanvasReviewerSourcePreviewPayload | null>(null);
+  const [structure, setStructure] =
+    useState<CanvasSourceStructurePayload | null>(null);
+  const [selectedBlockIds, setSelectedBlockIds] = useState<readonly string[]>([]);
   const [resolution, dispatchResolution] = useReducer(
     canvasResolutionReducer,
     undefined,
@@ -132,6 +145,7 @@ export function CanvasSourceReviewerScreen({
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [isLoadingMoreSources, setIsLoadingMoreSources] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isStructuring, setIsStructuring] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeReviewerJob, setActiveReviewerJob] =
@@ -143,18 +157,23 @@ export function CanvasSourceReviewerScreen({
 
   const inventoryAbortRef = useRef<AbortController | null>(null);
   const preparationAbortRef = useRef<AbortController | null>(null);
+  const structureAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const saveAbortRef = useRef<AbortController | null>(null);
   const inventoryTokenRef = useRef(0);
   const preparationTokenRef = useRef(0);
+  const structureTokenRef = useRef(0);
   const resolutionTokenRef = useRef(0);
   const selectedSourceIdRef = useRef<string | null>(null);
   const preparationLockRef = useRef(false);
+  const structureLockRef = useRef(false);
   const loadMoreLockRef = useRef(false);
   const previewLockRef = useRef(false);
   const generationLockRef = useRef(false);
   const saveLockRef = useRef(false);
   const generationIdempotencyKeyRef = useRef<string | null>(null);
+  const currentResolutionSelectionKeyRef = useRef("");
+  const [structureRetryToken, setStructureRetryToken] = useState(0);
   const pendingGenerationRef = useRef<{
     readonly requestToken: number;
     readonly selectionKey: string;
@@ -168,8 +187,14 @@ export function CanvasSourceReviewerScreen({
       sourceList?.sources.find((source) => source.id === selectedSourceId) ?? null,
     [selectedSourceId, sourceList?.sources],
   );
+  const selectedSourceAction = selectedSource
+    ? presentCanvasSourceCapability(selectedSource).action
+    : null;
   const selectionIds = selectedSourceId ? [selectedSourceId] : [];
-  const selectionKey = createCanvasSelectionKey(selectionIds);
+  const sourceSelectionKey = createCanvasSelectionKey(selectionIds);
+  const blockSelectionKey = structure
+    ? createCanvasBlockSelectionKey(structure.structureSessionId, selectedBlockIds)
+    : sourceSelectionKey;
   const sourceGroups = useMemo(
     () => groupCanvasSourcesForSelection(sourceList?.sources ?? []),
     [sourceList?.sources],
@@ -196,22 +221,39 @@ export function CanvasSourceReviewerScreen({
     setIsSaving(false);
   }, []);
 
-  const clearDependentState = useCallback(
-    (nextSourceId: string | null) => {
+  const clearPreviewState = useCallback(
+    (nextSelectionKey: string) => {
       previewAbortRef.current?.abort();
       previewAbortRef.current = null;
       finishCanvasSingleFlight(previewLockRef);
       setPreview(null);
       dispatchResolution({
         type: "selection_changed",
-        selectionKey: createCanvasSelectionKey(nextSourceId ? [nextSourceId] : []),
+        selectionKey: nextSelectionKey,
       });
+      currentResolutionSelectionKeyRef.current = nextSelectionKey;
       invalidateGeneratedOutput();
       setError(null);
       setSaveTitle("");
       setIsPreviewing(false);
     },
     [invalidateGeneratedOutput],
+  );
+
+  const clearDependentState = useCallback(
+    (nextSourceId: string | null) => {
+      structureTokenRef.current += 1;
+      structureAbortRef.current?.abort();
+      structureAbortRef.current = null;
+      finishCanvasSingleFlight(structureLockRef);
+      setStructure(null);
+      setSelectedBlockIds([]);
+      setIsStructuring(false);
+      clearPreviewState(
+        createCanvasSelectionKey(nextSourceId ? [nextSourceId] : []),
+      );
+    },
+    [clearPreviewState],
   );
 
   const loadSources = useCallback(
@@ -333,18 +375,22 @@ export function CanvasSourceReviewerScreen({
     return () => {
       inventoryTokenRef.current += 1;
       preparationTokenRef.current += 1;
+      structureTokenRef.current += 1;
       resolutionTokenRef.current += 1;
       inventoryAbortRef.current?.abort();
       preparationAbortRef.current?.abort();
+      structureAbortRef.current?.abort();
       previewAbortRef.current?.abort();
       saveAbortRef.current?.abort();
       inventoryAbortRef.current = null;
       preparationAbortRef.current = null;
+      structureAbortRef.current = null;
       previewAbortRef.current = null;
       saveAbortRef.current = null;
       generationLockRef.current = false;
       saveLockRef.current = false;
       preparationLockRef.current = false;
+      structureLockRef.current = false;
       previewLockRef.current = false;
       loadMoreLockRef.current = false;
       dispatchResolution({ type: "cleared" });
@@ -362,6 +408,87 @@ export function CanvasSourceReviewerScreen({
     selectedSourceIdRef.current = source.id;
     clearDependentState(source.id);
   };
+
+  useEffect(() => {
+    if (!selectedSourceId || selectedSourceAction !== "preview") return;
+
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      setError(context.error);
+      return;
+    }
+
+    structureAbortRef.current?.abort();
+    finishCanvasSingleFlight(structureLockRef);
+    if (!tryBeginCanvasSingleFlight(structureLockRef)) return;
+    const controller = new AbortController();
+    structureAbortRef.current = controller;
+    const requestToken = structureTokenRef.current + 1;
+    structureTokenRef.current = requestToken;
+    const activeSourceId = selectedSourceId;
+    setStructure(null);
+    setSelectedBlockIds([]);
+    setIsStructuring(true);
+    clearPreviewState(createCanvasSelectionKey([activeSourceId]));
+
+    void (async () => {
+      try {
+        const result = await structureCanvasReviewerSources({
+          ...context.value,
+          courseId,
+          signal: controller.signal,
+          sourceIds: [activeSourceId],
+        });
+        if (
+          structureTokenRef.current !== requestToken ||
+          selectedSourceIdRef.current !== activeSourceId
+        ) {
+          return;
+        }
+        if (!result.ok) {
+          setError(formatCanvasSourceError(result.error));
+          return;
+        }
+
+        const defaultSelection = createDefaultCanvasBlockSelection(result.data);
+        setStructure(result.data);
+        setSelectedBlockIds(defaultSelection);
+        const nextSelectionKey = createCanvasBlockSelectionKey(
+          result.data.structureSessionId,
+          defaultSelection,
+        );
+        currentResolutionSelectionKeyRef.current = nextSelectionKey;
+        dispatchResolution({
+          selectionKey: nextSelectionKey,
+          type: "selection_changed",
+        });
+        if (defaultSelection.length > result.data.limits.maximumSelectedBlocks) {
+          setError({
+            message: `This source defaults to ${defaultSelection.length.toLocaleString()} blocks. Clear or deselect blocks until no more than ${result.data.limits.maximumSelectedBlocks.toLocaleString()} remain.`,
+            title: "Choose fewer blocks",
+          });
+        }
+      } finally {
+        if (structureTokenRef.current === requestToken) {
+          structureAbortRef.current = null;
+          finishCanvasSingleFlight(structureLockRef);
+          setIsStructuring(false);
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      finishCanvasSingleFlight(structureLockRef);
+    };
+  }, [
+    clearPreviewState,
+    courseId,
+    selectedSourceAction,
+    selectedSourceId,
+    session?.accessToken,
+    structureRetryToken,
+  ]);
 
   const requestSourceSelection = (source: CanvasReviewerSourceDescriptor) => {
     if (source.id === selectedSourceId) return;
@@ -395,6 +522,11 @@ export function CanvasSourceReviewerScreen({
   };
 
   const requestChangeSource = () => {
+    const clearSourceSelection = () => {
+      selectedSourceIdRef.current = null;
+      setSelectedSourceId(null);
+      clearDependentState(null);
+    };
     if (hasMeaningfulEdit || hasUnsavedReviewer) {
       Alert.alert(
         "Change source?",
@@ -402,7 +534,7 @@ export function CanvasSourceReviewerScreen({
         [
           { style: "cancel", text: "Keep current source" },
           {
-            onPress: () => clearDependentState(selectedSourceId),
+            onPress: clearSourceSelection,
             style: "destructive",
             text: "Change source",
           },
@@ -410,7 +542,7 @@ export function CanvasSourceReviewerScreen({
       );
       return;
     }
-    clearDependentState(selectedSourceId);
+    clearSourceSelection();
   };
 
   const handlePrepare = async () => {
@@ -438,7 +570,7 @@ export function CanvasSourceReviewerScreen({
     preparationAbortRef.current = controller;
     const requestToken = preparationTokenRef.current + 1;
     preparationTokenRef.current = requestToken;
-    const activeSelectionKey = selectionKey;
+    const activeSelectionKey = sourceSelectionKey;
     clearDependentState(selectedSource.id);
     setIsPreparing(true);
 
@@ -472,12 +604,61 @@ export function CanvasSourceReviewerScreen({
     }
   };
 
+  const applyBlockSelection = (nextSelection: readonly string[]) => {
+    if (!structure) return;
+    const nextSelectionKey = createCanvasBlockSelectionKey(
+      structure.structureSessionId,
+      nextSelection,
+    );
+    setSelectedBlockIds(nextSelection);
+    clearPreviewState(nextSelectionKey);
+  };
+
+  const handleToggleBlock = (block: CanvasStructuredBlock) => {
+    if (!structure || !block.selectable) return;
+    const isSelected = selectedBlockIds.includes(block.id);
+    if (
+      !isSelected &&
+      selectedBlockIds.length >= structure.limits.maximumSelectedBlocks
+    ) {
+      setError({
+        message: `Select at most ${structure.limits.maximumSelectedBlocks.toLocaleString()} Canvas blocks. Deselect one before adding another.`,
+        title: "Block limit reached",
+      });
+      return;
+    }
+    applyBlockSelection(
+      toggleCanvasBlockSelection({
+        blockId: block.id,
+        selectedBlockIds,
+        structure,
+      }),
+    );
+  };
+
   const handlePreview = async () => {
     if (
       !selectedSource ||
+      !structure ||
       isPreviewing ||
       !tryBeginCanvasSingleFlight(previewLockRef)
     ) {
+      return;
+    }
+    if (selectedBlockIds.length === 0) {
+      finishCanvasSingleFlight(previewLockRef);
+      setError({
+        message: "Select at least one Canvas block before previewing.",
+        title: "Choose study material",
+      });
+      return;
+    }
+    if (selectedBlockIds.length > structure.limits.maximumSelectedBlocks) {
+      finishCanvasSingleFlight(previewLockRef);
+      setError({
+        message: `Select at most ${structure.limits.maximumSelectedBlocks.toLocaleString()} Canvas blocks.`,
+        title: "Choose fewer blocks",
+      });
       return;
     }
     if (presentCanvasSourceCapability(selectedSource).action !== "preview") {
@@ -494,7 +675,10 @@ export function CanvasSourceReviewerScreen({
     previewAbortRef.current?.abort();
     const controller = new AbortController();
     previewAbortRef.current = controller;
-    const activeSelectionKey = createCanvasSelectionKey([selectedSource.id]);
+    const activeSelectionKey = createCanvasBlockSelectionKey(
+      structure.structureSessionId,
+      selectedBlockIds,
+    );
     setPreview(null);
     invalidateGeneratedOutput();
     const requestToken = resolutionTokenRef.current + 1;
@@ -508,13 +692,19 @@ export function CanvasSourceReviewerScreen({
     setError(null);
 
     try {
-      const result = await previewCanvasReviewerSources({
+      const result = await previewSelectiveCanvasReviewerSources({
         ...context.value,
         courseId,
         signal: controller.signal,
-        sourceIds: [selectedSource.id],
+        selectedBlockIds,
+        structureSessionId: structure.structureSessionId,
       });
-      if (resolutionTokenRef.current !== requestToken) return;
+      if (
+        resolutionTokenRef.current !== requestToken ||
+        currentResolutionSelectionKeyRef.current !== activeSelectionKey
+      ) {
+        return;
+      }
 
       if (result.ok) {
         setPreview(result.data);
@@ -538,6 +728,14 @@ export function CanvasSourceReviewerScreen({
           status: terminalStatusForCanvasError(result.error),
           type: "terminal",
         });
+        if (
+          result.error.code === "structure_session_invalid" ||
+          result.error.code === "structure_session_not_found" ||
+          result.error.code === "structure_session_expired" ||
+          result.error.code === "block_selection_invalid"
+        ) {
+          clearDependentState(selectedSource.id);
+        }
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
@@ -559,12 +757,12 @@ export function CanvasSourceReviewerScreen({
     setError(null);
   };
 
-  const handleReturnToCanvasSource = () => {
+  const handleReturnToBlockSelection = () => {
     if (activeReviewerJob && !isActiveProcessingJobStatus(activeReviewerJob.status)) {
       void removeActiveProcessingJob(activeReviewerJob.id);
       setActiveReviewerJob(null);
     }
-    clearDependentState(selectedSourceId);
+    clearPreviewState(blockSelectionKey);
   };
 
   const applyObservedReviewerJob = useCallback(
@@ -627,9 +825,7 @@ export function CanvasSourceReviewerScreen({
       if (
         pending &&
         (resolutionTokenRef.current !== pending.requestToken ||
-          createCanvasSelectionKey(
-            selectedSourceIdRef.current ? [selectedSourceIdRef.current] : [],
-          ) !== pending.selectionKey)
+          currentResolutionSelectionKeyRef.current !== pending.selectionKey)
       ) {
         return;
       }
@@ -703,7 +899,10 @@ export function CanvasSourceReviewerScreen({
       setError(context.error);
       return;
     }
-    if (!preview || !isCanvasGenerationCurrent(resolution, selectionIds)) {
+    if (
+      !preview ||
+      !isCanvasGenerationCurrent(resolution, selectionIds, blockSelectionKey)
+    ) {
       setError({
         message: "Check the current source again before creating a reviewer.",
         title: "Source preview changed",
@@ -731,7 +930,7 @@ export function CanvasSourceReviewerScreen({
     }
 
     const requestToken = resolutionTokenRef.current;
-    const activeSelectionKey = selectionKey;
+    const activeSelectionKey = blockSelectionKey;
     const idempotencyKey =
       generationIdempotencyKeyRef.current ??
       createProcessingJobIdempotencyKey("reviewer_generation");
@@ -764,9 +963,7 @@ export function CanvasSourceReviewerScreen({
       });
       if (
         resolutionTokenRef.current !== requestToken ||
-        createCanvasSelectionKey(
-          selectedSourceIdRef.current ? [selectedSourceIdRef.current] : [],
-        ) !== activeSelectionKey
+        currentResolutionSelectionKeyRef.current !== activeSelectionKey
       ) {
         return;
       }
@@ -779,7 +976,11 @@ export function CanvasSourceReviewerScreen({
         setActiveReviewerJob(result.data);
         generationIdempotencyKeyRef.current = null;
       } else {
-        setError(formatProcessingJobError(result.error));
+        const displayError = formatProcessingJobError(result.error);
+        if (canvasGenerationNeedsNewPreview(result.error.code)) {
+          clearPreviewState(activeSelectionKey);
+        }
+        setError(displayError);
         if (!result.error.retryable) {
           generationIdempotencyKeyRef.current = null;
           pendingGenerationRef.current = null;
@@ -840,6 +1041,7 @@ export function CanvasSourceReviewerScreen({
         generatedBinding,
         resolution,
         selectionIds,
+        blockSelectionKey,
       )
     ) {
       setSaveError({
@@ -893,7 +1095,13 @@ export function CanvasSourceReviewerScreen({
   };
 
   const displayCourseName = sourceList?.courseName || courseName;
-  const stage = reviewer ? "REVIEWER READY" : preview ? "CHECK SOURCE" : "CHOOSE SOURCE";
+  const stage = reviewer
+    ? "REVIEWER READY"
+    : preview
+      ? "CHECK SOURCE"
+      : selectedSourceAction === "preview"
+        ? "SELECT BLOCKS"
+        : "CHOOSE SOURCE";
 
   return (
     <Screen contentContainerStyle={styles.content}>
@@ -936,14 +1144,54 @@ export function CanvasSourceReviewerScreen({
         <PreviewStage
           activeJob={activeReviewerJob}
           isGenerating={isGenerating}
-          onBack={handleReturnToCanvasSource}
+          onBack={handleReturnToBlockSelection}
           onCancel={() => void handleCancelReviewerJob()}
           onChangeText={handleSourceTextChange}
           onGenerate={() => void handleGenerate()}
           onRetry={() => void handleRetryReviewerJob()}
+          preview={preview}
           source={selectedSource}
           sourceText={resolution.sourceText}
         />
+      ) : selectedSourceAction === "preview" && selectedSource ? (
+        structure ? (
+          <BlockSelectionStage
+            isPreviewing={isPreviewing}
+            onChangeSource={requestChangeSource}
+            onClear={() => applyBlockSelection([])}
+            onPreview={() => void handlePreview()}
+            onToggleBlock={handleToggleBlock}
+            selectedBlockIds={selectedBlockIds}
+            source={selectedSource}
+            structure={structure}
+          />
+        ) : (
+          <View style={styles.stack} testID="canvas-source-structure-stage">
+            <StatusCard
+              loading={isStructuring}
+              message={
+                isStructuring
+                  ? "Loading the synchronized source structure and selectable study blocks."
+                  : "The source structure did not load. Try again."
+              }
+              testID="canvas-source-structure-loading"
+              title={isStructuring ? "Loading source blocks" : "Blocks unavailable"}
+            />
+            {!isStructuring ? (
+              <Button
+                fullWidth
+                onPress={() => setStructureRetryToken((value) => value + 1)}
+                testID="canvas-source-structure-retry"
+                variant="primary"
+              >
+                Try loading blocks again
+              </Button>
+            ) : null}
+            <Button fullWidth onPress={requestChangeSource} variant="secondary">
+              Change source
+            </Button>
+          </View>
+        )
       ) : (
         <View style={styles.stack}>
           {sourceList ? <CourseFreshnessCard courseSync={sourceList.courseSync} /> : null}
@@ -1238,6 +1486,158 @@ function SelectionAction({
   );
 }
 
+function BlockSelectionStage({
+  isPreviewing,
+  onChangeSource,
+  onClear,
+  onPreview,
+  onToggleBlock,
+  selectedBlockIds,
+  source,
+  structure,
+}: {
+  readonly isPreviewing: boolean;
+  readonly onChangeSource: () => void;
+  readonly onClear: () => void;
+  readonly onPreview: () => void;
+  readonly onToggleBlock: (block: CanvasStructuredBlock) => void;
+  readonly selectedBlockIds: readonly string[];
+  readonly source: CanvasReviewerSourceDescriptor;
+  readonly structure: CanvasSourceStructurePayload;
+}) {
+  const selected = new Set(selectedBlockIds);
+  const exceedsLimit =
+    selectedBlockIds.length > structure.limits.maximumSelectedBlocks;
+
+  return (
+    <View style={styles.stack} testID="canvas-block-selection-stage">
+      <Card accent style={styles.blockSelectionHeader}>
+        <Text style={styles.sectionLabel}>SELECT STUDY MATERIAL</Text>
+        <View style={styles.previewSourceHeader}>
+          <SourceTypeIcon type={source.type} />
+          <View style={styles.sourceBody}>
+            <Text style={styles.cardTitle}>{source.title}</Text>
+            <Text style={styles.statusText}>{formatCanvasSourceType(source.type)}</Text>
+          </View>
+        </View>
+        <Text style={styles.bodyText}>
+          Choose the blocks that should become the reviewer. Selected blocks stay
+          in their original source order.
+        </Text>
+        <View style={styles.selectionActions}>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={exceedsLimit ? styles.selectionCountError : styles.selectionCount}
+            testID="canvas-selected-block-count"
+          >
+            {selectedBlockIds.length.toLocaleString()} of{" "}
+            {structure.limits.maximumSelectedBlocks.toLocaleString()} blocks selected
+          </Text>
+          <Button
+            disabled={selectedBlockIds.length === 0 || isPreviewing}
+            onPress={onClear}
+            testID="canvas-clear-block-selection"
+            variant="ghost"
+          >
+            Clear selection
+          </Button>
+        </View>
+      </Card>
+
+      {structure.sources.map((structuredSource) => (
+        <View key={`${structuredSource.ordinal}:${structuredSource.title}`} style={styles.section}>
+          {structure.sources.length > 1 ? (
+            <Text style={styles.sectionLabel}>{structuredSource.title}</Text>
+          ) : null}
+          <Card style={styles.blockListCard}>
+            {structuredSource.blocks.map((block, index) => {
+              const isSelected = selected.has(block.id);
+              return (
+                <Pressable
+                  accessibilityLabel={`${isSelected ? "Deselect" : "Select"} ${formatCanvasBlockKind(block.kind)} block`}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{
+                    checked: isSelected,
+                    disabled: !block.selectable || isPreviewing,
+                  }}
+                  disabled={!block.selectable || isPreviewing}
+                  key={block.id}
+                  onPress={() => onToggleBlock(block)}
+                  style={({ pressed }) => [
+                    styles.blockRow,
+                    index < structuredSource.blocks.length - 1
+                      ? styles.sourceRowBorder
+                      : null,
+                    blockHierarchyIndent(block),
+                    isSelected ? styles.blockRowSelected : null,
+                    !block.selectable ? styles.sourceRowDisabled : null,
+                    pressed ? styles.pressed : null,
+                  ]}
+                  testID={`canvas-block-${block.id}`}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      isSelected ? styles.checkboxSelected : null,
+                    ]}
+                  >
+                    {isSelected ? (
+                      <Check color={colors.accentText} size={15} strokeWidth={2.5} />
+                    ) : null}
+                  </View>
+                  <View style={styles.blockBody}>
+                    <Text style={styles.blockKind}>
+                      {formatCanvasBlockKind(block.kind)}
+                      {formatCanvasBlockLocation(block)}
+                    </Text>
+                    <Text
+                      numberOfLines={block.kind === "heading" ? 3 : 5}
+                      style={
+                        block.kind === "heading"
+                          ? styles.blockHeadingText
+                          : styles.blockPreviewText
+                      }
+                    >
+                      {canvasBlockPreview(block.text)}
+                    </Text>
+                    {!block.selectable ? (
+                      <Text style={styles.statusText}>Context only</Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </Card>
+        </View>
+      ))}
+
+      <Button
+        disabled={selectedBlockIds.length === 0 || exceedsLimit}
+        fullWidth
+        loading={isPreviewing}
+        onPress={onPreview}
+        testID="canvas-preview-selected-blocks"
+        variant="primary"
+      >
+        Preview selected blocks
+      </Button>
+      {selectedBlockIds.length === 0 ? (
+        <Text style={styles.prerequisiteCopy} testID="canvas-zero-selection-guard">
+          Select at least one block to preview.
+        </Text>
+      ) : null}
+      <Button
+        disabled={isPreviewing}
+        fullWidth
+        onPress={onChangeSource}
+        variant="secondary"
+      >
+        Change source
+      </Button>
+    </View>
+  );
+}
+
 function PreviewStage({
   activeJob,
   isGenerating,
@@ -1246,6 +1646,7 @@ function PreviewStage({
   onChangeText,
   onGenerate,
   onRetry,
+  preview,
   source,
   sourceText,
 }: {
@@ -1256,6 +1657,7 @@ function PreviewStage({
   readonly onChangeText: (value: string) => void;
   readonly onGenerate: () => void;
   readonly onRetry: () => void;
+  readonly preview: CanvasReviewerSourcePreviewPayload;
   readonly source: CanvasReviewerSourceDescriptor | null;
   readonly sourceText: string;
 }) {
@@ -1275,6 +1677,10 @@ function PreviewStage({
         <Text style={styles.bodyText}>
           This is the exact study text the reviewer will use. Edit only what you
           want corrected or removed.
+        </Text>
+        <Text style={styles.selectionSummary} testID="canvas-preview-block-count">
+          {preview.selectedBlockCount?.toLocaleString() ?? "Selected"}{" "}
+          {preview.selectedBlockCount === 1 ? "block" : "blocks"} in this server preview
         </Text>
         <TextField
           editable={!isGenerating}
@@ -1307,7 +1713,7 @@ function PreviewStage({
           </Button>
         ) : null}
         <Button disabled={isGenerating} fullWidth onPress={onBack} variant="secondary">
-          Change source
+          Change selection
         </Button>
       </Card>
       {isGenerating && !activeJob ? (
@@ -1561,6 +1967,21 @@ function formatCanvasSourceError(
     case "ocr_failed":
     case "storage_read_failed":
       return { message: "Try preparation again later or choose another item.", title: "File could not be read" };
+    case "structure_session_invalid":
+    case "structure_session_not_found":
+    case "structure_session_expired":
+      return { message: "Load this source's blocks again before previewing.", title: "Block selection expired" };
+    case "structure_too_large":
+      return { message: error.message, title: "Source has too many blocks" };
+    case "block_selection_empty":
+      return { message: "Select at least one Canvas block.", title: "Choose study material" };
+    case "block_selection_limit_exceeded":
+      return { message: error.message, title: "Choose fewer blocks" };
+    case "block_selection_invalid":
+    case "block_selection_duplicate":
+      return { message: "Choose the Canvas blocks again.", title: "Selection changed" };
+    case "source_preview_too_large":
+      return { message: error.message, title: "Selection is too large" };
     case "unauthorized":
     case "missing_access_token":
       return { message: "Sign in again before continuing.", title: "Session expired" };
@@ -1594,11 +2015,12 @@ function formatProcessingJobError(
     };
   }
   if (
-    error.code === "canvas_preview_session_expired" ||
-    error.code === "canvas_preview_session_not_found" ||
-    error.code === "canvas_preview_session_invalid"
+    canvasGenerationNeedsNewPreview(error.code)
   ) {
-    return { message: "Check the current source again before retrying.", title: "Source preview expired" };
+    return {
+      message: "The Canvas selection changed or expired. Create a new selective preview before generating.",
+      title: "New preview required",
+    };
   }
   return {
     message: error.message,
@@ -1663,6 +2085,36 @@ function resolutionStatusCopy(status: CanvasResolutionStatus): string {
     case "failed":
       return "Stay Focused could not read this item.";
   }
+}
+
+function formatCanvasBlockKind(kind: CanvasStructuredBlock["kind"]): string {
+  switch (kind) {
+    case "heading":
+      return "Heading";
+    case "paragraph":
+      return "Paragraph";
+    case "list_item":
+      return "List item";
+    case "table":
+      return "Table";
+    case "quote":
+      return "Quote";
+    case "code":
+      return "Code";
+  }
+}
+
+function formatCanvasBlockLocation(block: CanvasStructuredBlock): string {
+  if (block.pageNumber) return ` · Page ${block.pageNumber}`;
+  if (block.slideNumber) return ` · Slide ${block.slideNumber}`;
+  return "";
+}
+
+function blockHierarchyIndent(block: CanvasStructuredBlock): { paddingLeft: number } {
+  const headingDepth = block.headingLevel ? Math.max(0, block.headingLevel - 1) : 0;
+  const listDepth = block.listDepth ?? 0;
+  const contentDepth = block.kind === "heading" ? headingDepth : listDepth + 1;
+  return { paddingLeft: spacing[4] + Math.min(contentDepth, 5) * spacing[2] };
 }
 
 const styles = StyleSheet.create({
@@ -1761,6 +2213,70 @@ const styles = StyleSheet.create({
   },
   radioSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
   actionCard: { gap: spacing[3] },
+  blockSelectionHeader: { gap: spacing[3] },
+  selectionActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[2],
+    justifyContent: "space-between",
+  },
+  selectionCount: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  selectionCountError: {
+    color: colors.error,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "800",
+  },
+  blockListCard: { gap: 0, overflow: "hidden", padding: 0 },
+  blockRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: spacing[3],
+    minHeight: hitTarget.min,
+    paddingBottom: spacing[3],
+    paddingRight: spacing[4],
+    paddingTop: spacing[3],
+  },
+  blockRowSelected: { backgroundColor: colors.cardPressed },
+  checkbox: {
+    alignItems: "center",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.tight,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    marginTop: 1,
+    width: 24,
+  },
+  checkboxSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
+  blockBody: { flex: 1, gap: spacing[1] },
+  blockKind: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.kicker,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  blockHeadingText: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.h3,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  blockPreviewText: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    lineHeight: 22,
+  },
   previewCard: { gap: spacing[4] },
   previewSourceHeader: { alignItems: "center", flexDirection: "row", gap: spacing[3] },
   cardTitle: {
@@ -1787,6 +2303,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  selectionSummary: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
     lineHeight: 19,
   },
   statusCard: { alignItems: "center", flexDirection: "row", gap: spacing[3] },

@@ -109,6 +109,7 @@ export function canvasResolutionReducer(
 export function isCanvasGenerationCurrent(
   state: CanvasResolutionState,
   selectedSourceIds: readonly string[],
+  expectedSelectionKey = createCanvasSelectionKey(selectedSourceIds),
 ): boolean {
   if (
     state.status !== "usable" ||
@@ -118,10 +119,10 @@ export function isCanvasGenerationCurrent(
   ) {
     return false;
   }
-  const selectedKey = createCanvasSelectionKey(selectedSourceIds);
   return (
-    state.selectionKey === selectedKey &&
-    createCanvasSelectionKey(state.preview.sourceIds) === selectedKey
+    state.selectionKey === expectedSelectionKey &&
+    createCanvasSelectionKey(state.preview.sourceIds) ===
+      createCanvasSelectionKey(selectedSourceIds)
   );
 }
 
@@ -129,12 +130,12 @@ export function isCanvasGeneratedBindingCurrent(
   binding: CanvasGeneratedBinding | null,
   state: CanvasResolutionState,
   selectedSourceIds: readonly string[],
+  expectedSelectionKey = createCanvasSelectionKey(selectedSourceIds),
 ): boolean {
   if (!binding || !state.preview) return false;
-  const selectionKey = createCanvasSelectionKey(selectedSourceIds);
   return (
-    isCanvasGenerationCurrent(state, selectedSourceIds) &&
-    binding.selectionKey === selectionKey &&
+    isCanvasGenerationCurrent(state, selectedSourceIds, expectedSelectionKey) &&
+    binding.selectionKey === expectedSelectionKey &&
     binding.fingerprint === state.preview.resolutionFingerprint &&
     binding.sourceText === state.sourceText.trim()
   );
@@ -148,6 +149,16 @@ export function tryBeginCanvasSingleFlight(lock: CanvasSingleFlightLock): boolea
 
 export function finishCanvasSingleFlight(lock: CanvasSingleFlightLock): void {
   lock.current = false;
+}
+
+export function canvasGenerationNeedsNewPreview(code: string): boolean {
+  return (
+    code === "canvas_preview_session_expired" ||
+    code === "canvas_preview_session_not_found" ||
+    code === "canvas_preview_session_invalid" ||
+    code === "canvas_resolution_stale" ||
+    code === "invalid_canvas_resolution"
+  );
 }
 
 function isCurrentResponse(

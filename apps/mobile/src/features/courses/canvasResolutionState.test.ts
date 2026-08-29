@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canvasGenerationNeedsNewPreview,
   canvasResolutionReducer,
   createCanvasResolutionState,
   finishCanvasSingleFlight,
@@ -148,6 +149,37 @@ describe("canvasResolutionReducer", () => {
     ).toBe(false);
   });
 
+  it("binds a Canvas preview to the exact structured block selection key", () => {
+    const pending = canvasResolutionReducer(createCanvasResolutionState(), {
+      type: "started",
+      requestToken: 6,
+      selectionKey: "structure-a:block-a,block-b",
+    });
+    const state = canvasResolutionReducer(pending, {
+      type: "resolved",
+      requestToken: 6,
+      selectionKey: "structure-a:block-a,block-b",
+      preview: {
+        previewSessionId: "session-a",
+        resolutionFingerprint: "fingerprint-a",
+        sourceIds: [SELECTION_A],
+      },
+      sourceText: "Selected block text",
+      sourceTitle: "Selected blocks",
+    });
+
+    expect(
+      isCanvasGenerationCurrent(
+        state,
+        [SELECTION_A],
+        "structure-a:block-a,block-b",
+      ),
+    ).toBe(true);
+    expect(
+      isCanvasGenerationCurrent(state, [SELECTION_A], "structure-a:block-a"),
+    ).toBe(false);
+  });
+
   it("clears all resolved content on sign-out or teardown", () => {
     const pending = canvasResolutionReducer(createCanvasResolutionState(), {
       type: "started",
@@ -266,5 +298,13 @@ describe("canvasResolutionReducer", () => {
 
     expect(saveRequests).toBe(1);
     finishCanvasSingleFlight(saveLock);
+  });
+
+  it("requires a new server preview for expired or stale Canvas resolution", () => {
+    expect(canvasGenerationNeedsNewPreview("canvas_preview_session_expired")).toBe(
+      true,
+    );
+    expect(canvasGenerationNeedsNewPreview("canvas_resolution_stale")).toBe(true);
+    expect(canvasGenerationNeedsNewPreview("network_error")).toBe(false);
   });
 });

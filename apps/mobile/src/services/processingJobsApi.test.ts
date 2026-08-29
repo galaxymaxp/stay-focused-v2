@@ -52,6 +52,34 @@ describe("processing jobs mobile API", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it("hands a selective Canvas preview identity to the durable reviewer job", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        jobType: "reviewer_generation",
+        sourceText: "Server-resolved selected block text.",
+        canvasPreviewSessionId: "preview-session-1",
+        canvasCourseId: "course-1",
+        canvasItemIds: ["page:item-1"],
+        canvasResolutionFingerprint: "resolution-fingerprint-1",
+      });
+      return jsonResponse({ ok: true, data: jobView() }, 202);
+    });
+
+    await expect(
+      createReviewerJob({
+        ...BASE_INPUT,
+        canvasCourseId: "course-1",
+        canvasItemIds: ["page:item-1"],
+        canvasPreviewSessionId: "preview-session-1",
+        canvasResolutionFingerprint: "resolution-fingerprint-1",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        idempotencyKey: "reviewer:canvas:selective-1",
+        sourceText: "Server-resolved selected block text.",
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("stages bytes directly before accepting a durable extraction job", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (url, init) => {
       const path = String(url);

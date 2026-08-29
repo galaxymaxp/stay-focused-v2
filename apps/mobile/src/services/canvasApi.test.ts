@@ -731,6 +731,35 @@ describe("Canvas mobile API client", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("surfaces an expired structure session from selective preview safely", async () => {
+    await expect(
+      previewSelectiveCanvasReviewerSources({
+        accessToken: "session-token",
+        apiBaseUrl: API_BASE_URL,
+        courseId: "33333333-3333-4333-8333-333333333333",
+        fetchImpl: createFetch(
+          {
+            ok: false,
+            error: {
+              code: "canvas_source_structure_session_expired",
+              message: "Private server detail",
+            },
+          },
+          409,
+        ),
+        selectedBlockIds: ["88888888-8888-4888-8888-888888888881"],
+        structureSessionId: "77777777-7777-4777-8777-777777777777",
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: "structure_session_expired",
+        message: "Select Canvas sources again before previewing blocks.",
+        status: 409,
+      },
+    });
+  });
+
   it("handles Canvas source count and size validation errors", async () => {
     await expect(
       previewCanvasReviewerSources({
