@@ -156,3 +156,19 @@ export function sourceSelectionHelp(
       return presentation.explanation;
   }
 }
+
+/**
+ * States that the previewed text is what the server resolved from the block
+ * selection, rather than the selection itself. The count is server-reported and
+ * is omitted rather than substituted when the server does not return it.
+ */
+export function describeSelectivePreviewScope(
+  selectedBlockCount: number | undefined,
+): string {
+  if (selectedBlockCount === undefined) {
+    return "Resolved by the server from the blocks you selected, in source order.";
+  }
+  return `Resolved by the server from ${selectedBlockCount.toLocaleString()} selected ${
+    selectedBlockCount === 1 ? "block" : "blocks"
+  }, in source order.`;
+}

@@ -57,6 +57,60 @@ export function toggleCanvasBlockSelection({
   return orderCanvasBlockSelection(structure, nextSelection);
 }
 
+export function countSelectableCanvasBlocks(
+  structure: CanvasSourceStructurePayload,
+): number {
+  return listCanvasBlocksInSourceOrder(structure).filter(
+    ({ block }) => block.selectable,
+  ).length;
+}
+
+export interface CanvasBlockSelectionSummary {
+  readonly summary: string;
+  readonly limitNotice: string | null;
+  readonly exceedsLimit: boolean;
+}
+
+/**
+ * Describes the selection against the material the student can actually choose.
+ * The server-enforced maximum is a safeguard, so it only surfaces once the
+ * selection reaches it.
+ */
+export function describeCanvasBlockSelection({
+  maximumSelectedBlocks,
+  selectableCount,
+  selectedCount,
+}: {
+  readonly maximumSelectedBlocks: number;
+  readonly selectableCount: number;
+  readonly selectedCount: number;
+}): CanvasBlockSelectionSummary {
+  const summary = `${selectedCount.toLocaleString()} of ${selectableCount.toLocaleString()} ${
+    selectableCount === 1 ? "block" : "blocks"
+  } selected`;
+
+  if (selectedCount > maximumSelectedBlocks) {
+    const excess = selectedCount - maximumSelectedBlocks;
+    return {
+      exceedsLimit: true,
+      limitNotice: `Select at most ${maximumSelectedBlocks.toLocaleString()} blocks. Deselect ${excess.toLocaleString()} ${
+        excess === 1 ? "block" : "blocks"
+      } to preview.`,
+      summary,
+    };
+  }
+
+  if (selectedCount >= maximumSelectedBlocks) {
+    return {
+      exceedsLimit: false,
+      limitNotice: `This is the maximum of ${maximumSelectedBlocks.toLocaleString()} blocks. Deselect one before adding another.`,
+      summary,
+    };
+  }
+
+  return { exceedsLimit: false, limitNotice: null, summary };
+}
+
 export function createCanvasBlockSelectionKey(
   structureSessionId: string,
   selectedBlockIds: readonly string[],

@@ -75,8 +75,10 @@ import {
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
 import {
   canvasBlockPreview,
+  countSelectableCanvasBlocks,
   createCanvasBlockSelectionKey,
   createDefaultCanvasBlockSelection,
+  describeCanvasBlockSelection,
   toggleCanvasBlockSelection,
 } from "./canvasBlockSelection";
 import {
@@ -92,6 +94,7 @@ import {
   type CanvasResolutionStatus,
 } from "./canvasResolutionState";
 import {
+  describeSelectivePreviewScope,
   formatCanvasSourceType,
   groupCanvasSourcesForSelection,
   mergeCanvasSourceListPages,
@@ -1103,8 +1106,35 @@ export function CanvasSourceReviewerScreen({
         ? "SELECT BLOCKS"
         : "CHOOSE SOURCE";
 
+  const showsBlockSelection =
+    !isLoadingSources &&
+    !reviewer &&
+    !preview &&
+    selectedSourceAction === "preview" &&
+    Boolean(selectedSource) &&
+    structure !== null;
+  const showsPreviewEditor = !isLoadingSources && !reviewer && preview !== null;
+
   return (
-    <Screen contentContainerStyle={styles.content}>
+    <Screen
+      contentContainerStyle={styles.content}
+      footer={
+        showsPreviewEditor && !activeReviewerJob ? (
+          <PreviewActionFooter
+            isGenerating={isGenerating}
+            onGenerate={() => void handleGenerate()}
+            sourceText={resolution.sourceText}
+          />
+        ) : showsBlockSelection && structure ? (
+          <BlockSelectionFooter
+            isPreviewing={isPreviewing}
+            onPreview={() => void handlePreview()}
+            selectedBlockIds={selectedBlockIds}
+            structure={structure}
+          />
+        ) : null
+      }
+    >
       <Header
         courseName={displayCourseName}
         onBackToCourses={requestBackToCourses}
@@ -1147,7 +1177,6 @@ export function CanvasSourceReviewerScreen({
           onBack={handleReturnToBlockSelection}
           onCancel={() => void handleCancelReviewerJob()}
           onChangeText={handleSourceTextChange}
-          onGenerate={() => void handleGenerate()}
           onRetry={() => void handleRetryReviewerJob()}
           preview={preview}
           source={selectedSource}
@@ -1506,8 +1535,6 @@ function BlockSelectionStage({
   readonly structure: CanvasSourceStructurePayload;
 }) {
   const selected = new Set(selectedBlockIds);
-  const exceedsLimit =
-    selectedBlockIds.length > structure.limits.maximumSelectedBlocks;
 
   return (
     <View style={styles.stack} testID="canvas-block-selection-stage">
@@ -1525,14 +1552,6 @@ function BlockSelectionStage({
           in their original source order.
         </Text>
         <View style={styles.selectionActions}>
-          <Text
-            accessibilityLiveRegion="polite"
-            style={exceedsLimit ? styles.selectionCountError : styles.selectionCount}
-            testID="canvas-selected-block-count"
-          >
-            {selectedBlockIds.length.toLocaleString()} of{" "}
-            {structure.limits.maximumSelectedBlocks.toLocaleString()} blocks selected
-          </Text>
           <Button
             disabled={selectedBlockIds.length === 0 || isPreviewing}
             onPress={onClear}
@@ -1612,21 +1631,6 @@ function BlockSelectionStage({
       ))}
 
       <Button
-        disabled={selectedBlockIds.length === 0 || exceedsLimit}
-        fullWidth
-        loading={isPreviewing}
-        onPress={onPreview}
-        testID="canvas-preview-selected-blocks"
-        variant="primary"
-      >
-        Preview selected blocks
-      </Button>
-      {selectedBlockIds.length === 0 ? (
-        <Text style={styles.prerequisiteCopy} testID="canvas-zero-selection-guard">
-          Select at least one block to preview.
-        </Text>
-      ) : null}
-      <Button
         disabled={isPreviewing}
         fullWidth
         onPress={onChangeSource}
@@ -1638,13 +1642,105 @@ function BlockSelectionStage({
   );
 }
 
+/**
+ * Pinned selection state and the single primary Preview action. The selection
+ * count lives here rather than in the scrolling header so it stays readable
+ * while the student works down a long block list.
+ */
+function BlockSelectionFooter({
+  isPreviewing,
+  onPreview,
+  selectedBlockIds,
+  structure,
+}: {
+  readonly isPreviewing: boolean;
+  readonly onPreview: () => void;
+  readonly selectedBlockIds: readonly string[];
+  readonly structure: CanvasSourceStructurePayload;
+}) {
+  const selection = describeCanvasBlockSelection({
+    maximumSelectedBlocks: structure.limits.maximumSelectedBlocks,
+    selectableCount: countSelectableCanvasBlocks(structure),
+    selectedCount: selectedBlockIds.length,
+  });
+
+  return (
+    <>
+      <Text
+        accessibilityLiveRegion="polite"
+        style={selection.exceedsLimit ? styles.selectionCountError : styles.selectionCount}
+        testID="canvas-selected-block-count"
+      >
+        {selection.summary}
+      </Text>
+      {selection.limitNotice ? (
+        <Text
+          style={selection.exceedsLimit ? styles.errorText : styles.prerequisiteCopy}
+          testID="canvas-block-selection-limit-notice"
+        >
+          {selection.limitNotice}
+        </Text>
+      ) : null}
+      {selectedBlockIds.length === 0 ? (
+        <Text style={styles.prerequisiteCopy} testID="canvas-zero-selection-guard">
+          Select at least one block to preview.
+        </Text>
+      ) : null}
+      <Button
+        disabled={selectedBlockIds.length === 0 || selection.exceedsLimit}
+        fullWidth
+        loading={isPreviewing}
+        onPress={onPreview}
+        testID="canvas-preview-selected-blocks"
+        variant="primary"
+      >
+        Preview selected blocks
+      </Button>
+    </>
+  );
+}
+
+/**
+ * Pinned primary generation action. It mirrors the preview stage's own
+ * precondition, so a stale or missing preview can never present a usable
+ * Create reviewer control.
+ */
+function PreviewActionFooter({
+  isGenerating,
+  onGenerate,
+  sourceText,
+}: {
+  readonly isGenerating: boolean;
+  readonly onGenerate: () => void;
+  readonly sourceText: string;
+}) {
+  return (
+    <>
+      {sourceText.trim() ? null : (
+        <Text style={styles.prerequisiteCopy}>
+          Keep at least one readable line to continue.
+        </Text>
+      )}
+      <Button
+        disabled={!sourceText.trim()}
+        fullWidth
+        loading={isGenerating}
+        onPress={onGenerate}
+        testID="canvas-generate-reviewer-button"
+        variant="primary"
+      >
+        Create reviewer
+      </Button>
+    </>
+  );
+}
+
 function PreviewStage({
   activeJob,
   isGenerating,
   onBack,
   onCancel,
   onChangeText,
-  onGenerate,
   onRetry,
   preview,
   source,
@@ -1655,7 +1751,6 @@ function PreviewStage({
   readonly onBack: () => void;
   readonly onCancel: () => void;
   readonly onChangeText: (value: string) => void;
-  readonly onGenerate: () => void;
   readonly onRetry: () => void;
   readonly preview: CanvasReviewerSourcePreviewPayload;
   readonly source: CanvasReviewerSourceDescriptor | null;
@@ -1664,7 +1759,7 @@ function PreviewStage({
   return (
     <View style={styles.stack} testID="canvas-source-preview-editor">
       <Card style={styles.previewCard}>
-        <Text style={styles.sectionLabel}>SOURCE</Text>
+        <Text style={styles.sectionLabel}>SELECTIVE PREVIEW</Text>
         <View style={styles.previewSourceHeader}>
           <FileText color={colors.textSecondary} size={20} strokeWidth={1.7} />
           <View style={styles.sourceBody}>
@@ -1674,13 +1769,12 @@ function PreviewStage({
             </Text>
           </View>
         </View>
+        <Text style={styles.selectionSummary} testID="canvas-preview-block-count">
+          {describeSelectivePreviewScope(preview.selectedBlockCount)}
+        </Text>
         <Text style={styles.bodyText}>
           This is the exact study text the reviewer will use. Edit only what you
           want corrected or removed.
-        </Text>
-        <Text style={styles.selectionSummary} testID="canvas-preview-block-count">
-          {preview.selectedBlockCount?.toLocaleString() ?? "Selected"}{" "}
-          {preview.selectedBlockCount === 1 ? "block" : "blocks"} in this server preview
         </Text>
         <TextField
           editable={!isGenerating}
@@ -1695,26 +1789,13 @@ function PreviewStage({
         <Text style={styles.characterCount}>
           {sourceText.length.toLocaleString()} characters
         </Text>
-        <Text style={styles.prerequisiteCopy}>
-          {sourceText.trim()
-            ? "Ready to create a reviewer."
-            : "Keep at least one readable line to continue."}
-        </Text>
-        {!activeJob ? (
-          <Button
-            disabled={!sourceText.trim()}
-            fullWidth
-            loading={isGenerating}
-            onPress={onGenerate}
-            testID="canvas-generate-reviewer-button"
-            variant="primary"
-          >
-            Create reviewer
-          </Button>
-        ) : null}
         <Button disabled={isGenerating} fullWidth onPress={onBack} variant="secondary">
           Change selection
         </Button>
+        <Text style={styles.prerequisiteCopy} testID="canvas-preview-binding-note">
+          Changing the selection replaces this preview. You will preview the new
+          selection before creating a reviewer.
+        </Text>
       </Card>
       {isGenerating && !activeJob ? (
         <StatusCard

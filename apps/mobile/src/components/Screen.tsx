@@ -17,6 +17,12 @@ interface ScreenProps {
   readonly scroll?: boolean;
   readonly style?: StyleProp<ViewStyle>;
   readonly contentContainerStyle?: StyleProp<ViewStyle>;
+  /**
+   * Optional chrome pinned below the scrolling content. It is laid out as a
+   * sibling of the scroll area rather than floating above it, so content always
+   * scrolls clear of it. Screens that omit it are unchanged.
+   */
+  readonly footer?: ReactNode;
 }
 
 export function Screen({
@@ -25,6 +31,7 @@ export function Screen({
   scroll = true,
   style,
   contentContainerStyle,
+  footer,
 }: ScreenProps) {
   const contentStyle = [
     styles.content,
@@ -45,6 +52,7 @@ export function Screen({
       ) : (
         <View style={contentStyle}>{children}</View>
       )}
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </SafeAreaView>
   );
 }
@@ -61,5 +69,14 @@ const styles = StyleSheet.create({
   },
   centered: {
     justifyContent: "center",
+  },
+  footer: {
+    backgroundColor: colors.background,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: spacing[2],
+    paddingBottom: spacing[3],
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[3],
   },
 });

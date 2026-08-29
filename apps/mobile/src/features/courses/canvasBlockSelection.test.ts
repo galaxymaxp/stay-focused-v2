@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { CanvasSourceStructurePayload } from "../../services/canvasApi";
 import {
   canvasBlockPreview,
+  countSelectableCanvasBlocks,
   createCanvasBlockSelectionKey,
   createDefaultCanvasBlockSelection,
+  describeCanvasBlockSelection,
   listCanvasBlocksInSourceOrder,
   orderCanvasBlockSelection,
   toggleCanvasBlockSelection,
@@ -60,6 +62,62 @@ describe("Canvas block selection", () => {
   it("creates a concise readable preview without changing short text", () => {
     expect(canvasBlockPreview("  Short\n text  ")).toBe("Short text");
     expect(canvasBlockPreview("1234567890", 7)).toBe("123456…");
+  });
+});
+
+describe("Canvas block selection summary", () => {
+  it("counts only the blocks the student can actually select", () => {
+    expect(countSelectableCanvasBlocks(fixture())).toBe(3);
+  });
+
+  it("reports the selection against the selectable source, not the safeguard", () => {
+    expect(
+      describeCanvasBlockSelection({
+        maximumSelectedBlocks: 250,
+        selectableCount: 9,
+        selectedCount: 3,
+      }),
+    ).toEqual({
+      exceedsLimit: false,
+      limitNotice: null,
+      summary: "3 of 9 blocks selected",
+    });
+  });
+
+  it("uses the singular block unit for a single selectable block", () => {
+    expect(
+      describeCanvasBlockSelection({
+        maximumSelectedBlocks: 250,
+        selectableCount: 1,
+        selectedCount: 1,
+      }).summary,
+    ).toBe("1 of 1 block selected");
+  });
+
+  it("surfaces the limit only once the selection reaches it", () => {
+    const atLimit = describeCanvasBlockSelection({
+      maximumSelectedBlocks: 250,
+      selectableCount: 400,
+      selectedCount: 250,
+    });
+
+    expect(atLimit.exceedsLimit).toBe(false);
+    expect(atLimit.limitNotice).toBe(
+      "This is the maximum of 250 blocks. Deselect one before adding another.",
+    );
+  });
+
+  it("says how many blocks to deselect when the selection exceeds the limit", () => {
+    const overLimit = describeCanvasBlockSelection({
+      maximumSelectedBlocks: 250,
+      selectableCount: 400,
+      selectedCount: 251,
+    });
+
+    expect(overLimit.exceedsLimit).toBe(true);
+    expect(overLimit.limitNotice).toBe(
+      "Select at most 250 blocks. Deselect 1 block to preview.",
+    );
   });
 });
 

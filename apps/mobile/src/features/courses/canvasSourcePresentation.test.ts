@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasReviewerSourceDescriptor } from "../../services/canvasApi";
 import {
+  describeSelectivePreviewScope,
   groupCanvasSourcesForSelection,
   mergeCanvasSourceListPages,
   presentCanvasSourceCapability,
@@ -87,6 +88,23 @@ describe("Canvas source selection presentation", () => {
         pagination: { ...next.pagination, offset: 2 },
       }),
     ).toBeNull();
+  });
+});
+
+describe("Selective preview scope", () => {
+  it("attributes the resolved text to the server and the selected blocks", () => {
+    expect(describeSelectivePreviewScope(3)).toBe(
+      "Resolved by the server from 3 selected blocks, in source order.",
+    );
+    expect(describeSelectivePreviewScope(1)).toBe(
+      "Resolved by the server from 1 selected block, in source order.",
+    );
+  });
+
+  it("omits the count instead of substituting one when the server reports none", () => {
+    expect(describeSelectivePreviewScope(undefined)).toBe(
+      "Resolved by the server from the blocks you selected, in source order.",
+    );
   });
 });
 
