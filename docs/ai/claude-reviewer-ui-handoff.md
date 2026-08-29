@@ -188,6 +188,18 @@ result. Use actual job state. Do not simulate activity, invent ETAs, or add
 cancellation that the system does not really support. Because jobs are durable,
 telling the student that processing continues after leaving is accurate.
 
+What a processing job actually carries is narrower than it looks. `ProcessingJobStatusView`
+exposes status, a server-owned stage, `progress` (`completedUnits`, `totalUnits`,
+`unitLabel` of `pages` or `sections`, and a `message`), `source` (display name,
+`sourceKind`, mime type, and optional byte/character/page counts), timestamps,
+`errorCode` / `safeErrorMessage` / `retryable`, `resultAvailable`, and
+provenance. It carries **no course**: `canvasCourseId` is accepted when a job is
+created but never returned in the status view, so Processing cannot show course
+context without a backend change. Cancel and retry are both real server
+operations (`POST /api/jobs/:id/cancel`, `POST /api/jobs/:id/retry`), so both
+affordances are honest. There is no percentage field — any percentage must be
+computed from the two unit counts or not shown at all.
+
 **Reviewer Reader** is the payoff and should read as a well-designed study
 document. Priority runs title, source and grounding context, section title,
 section explanation, key points, then secondary metadata. Do not wrap every
@@ -236,8 +248,14 @@ screens, or notifications.
 Known limitations outside reviewer UI, which reviewer work should not silently
 absorb: notification registration, delivery, and routing remain incomplete or
 unverified; the Canvas school host still requires an explicit `https://`;
-Processing history may not automatically anchor to the newest result; EAS may
-show the non-blocking Metro `watcher.unstable_workerThreads` warning.
+Processing history may not automatically anchor to the newest result — the
+notification payload carries a `jobId` and `readNotificationDestination` returns
+it, but `app/(app)/processing.tsx` does not read the param, so a notification
+tap opens the list rather than that job. Group ordering now places a finished
+reviewer above jobs that only need acknowledgement, so this does not block the
+capstone journey; deep-linking to a single job remains unbuilt and belongs with
+notification work. EAS may show the non-blocking Metro
+`watcher.unstable_workerThreads` warning.
 
 ## Behaviours that must survive UI changes
 
@@ -284,7 +302,18 @@ count degrades to a countless sentence instead of a fabricated number, the
 preview/selection binding is stated in the UI, and the primary Preview and
 Create reviewer actions are pinned through the shared `Screen` footer.
 
+Processing has also had a presentation pass: every card states its status in
+words before colour, the headline comes from `status` while the live stage
+reaches the student through the server's own `progress.message`, counted
+progress is shown only from server-reported `completedUnits` / `totalUnits`
+with no derived percentage, the durable-processing promise is attached to jobs
+that are genuinely still running, a finished reviewer is grouped above jobs that
+only need acknowledgement so `Open reviewer` is reachable, failure separates the
+server's safe message from its error code, and restoring is distinguished from
+having nothing to process. Presentation logic lives in
+`apps/mobile/src/features/processing/processingJobPresentation.ts`.
+
 That work passes the mobile automated checks and was inspected in a web-rendered
-build. **It has not been physically accepted on Android.** Processing, the
-Reviewer Reader, and Study Library have not yet had a refinement pass. Do not
+build. **It has not been physically accepted on Android.** The Reviewer Reader
+and Study Library have not yet had a refinement pass. Do not
 describe any of this as accepted until a real device run says so.

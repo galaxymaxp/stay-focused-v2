@@ -12,7 +12,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, spacing, typography } from "../../design/tokens";
+import { colors, radius, spacing, typography } from "../../design/tokens";
 import {
   readActiveProcessingJobs,
   removeActiveProcessingJob,
@@ -55,6 +55,13 @@ import {
 import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
 import { saveReviewer } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
+import {
+  groupProcessingJobs,
+  presentProcessingJob,
+  processingEmptyState,
+  processingTimestamp,
+  type ProcessingStatusTone,
+} from "./processingJobPresentation";
 import { createProcessingReviewerSourceMetadata } from "./processingReviewerSave";
 
 interface ProcessingScreenProps {
@@ -67,19 +74,20 @@ interface OpenedReviewerResult {
   readonly sourceSnapshotId?: string;
 }
 
-type ProcessingGroup =
-  | "Running"
-  | "Waiting"
-  | "Needs attention"
-  | "Recently completed";
-
 export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
   const { session } = useAuth();
   const [jobs, setJobs] = useState<readonly ProcessingJobStatusView[]>([]);
   const [offlineIntents, setOfflineIntents] =
     useState<readonly OfflineProcessingIntent[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Distinguishes "still restoring persisted and server state" from "there is
+  // genuinely nothing processing". Without it the screen claims the latter
+  // while a durable job is being recovered.
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Neutral confirmations are kept apart from failures so a successful local
+  // action is not rendered in the error treatment.
+  const [notice, setNotice] = useState<string | null>(null);
   const [openedReviewer, setOpenedReviewer] =
     useState<OpenedReviewerResult | null>(null);
   const [reviewerSaveTitle, setReviewerSaveTitle] = useState("");
@@ -90,7 +98,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
     readonly text: string;
   } | null>(null);
   const [notificationMessage, setNotificationMessage] = useState(
-    "Enable completion notifications for extraction and reviewer jobs.",
+    "Get told when a reviewer or extraction finishes while you are in another app.",
   );
   const [notificationBusy, setNotificationBusy] = useState(false);
 
@@ -166,6 +174,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
       );
     } finally {
       setIsRefreshing(false);
+      setHasLoadedOnce(true);
     }
   }, [session?.accessToken, session?.user.id]);
 
@@ -177,7 +186,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
     return () => subscription.remove();
   }, [refresh]);
 
-  const groups = useMemo(() => groupJobs(jobs), [jobs]);
+  const groups = useMemo(() => groupProcessingJobs(jobs), [jobs]);
   const notificationsAvailable = isCompletionNotificationAvailable();
 
   const updateJob = async (job: ProcessingJobStatusView) => {
@@ -219,7 +228,9 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
 
   const handleRemoveLocal = async (job: ProcessingJobStatusView) => {
     await removeActiveProcessingJob(job.id);
-    setError("Local recovery reference removed. Server data was not deleted.");
+    setNotice(
+      "Removed from this device. The job itself was not deleted from the server.",
+    );
   };
 
   const notificationContext = () => {
@@ -330,7 +341,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
       setReviewerSaveTitle(cached.payload.title.trim() || job.source.displayName);
       setReviewerSaveMessage(null);
     } else {
-      setError("This result is not available offline on this device.");
+      setError("This reviewer is not stored on this device, so it cannot be opened offline.");
     }
   };
 
@@ -389,7 +400,25 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
 
   if (openedReviewer) {
     return (
-      <Screen>
+      <Screen
+        footer={
+          <>
+            {reviewerSaveMessage ? (
+              <Text style={styles.footerNote} testID="processing-reviewer-save-message">
+                {reviewerSaveMessage}
+              </Text>
+            ) : null}
+            <Button
+              fullWidth
+              loading={isSavingReviewer}
+              onPress={() => void handleSaveOpenedReviewer()}
+              testID="processing-reviewer-save-button"
+            >
+              Save reviewer
+            </Button>
+          </>
+        }
+      >
         <Button
           onPress={() => {
             setOpenedReviewer(null);
@@ -401,7 +430,12 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
         </Button>
         <ReviewerPreview reviewer={openedReviewer.reviewer} />
         <Card style={styles.jobCard} testID="processing-reviewer-save-card">
-          <Text style={styles.jobTitle}>Save to Study Library</Text>
+          <Text accessibilityRole="header" style={styles.jobTitle}>
+            Save to Study Library
+          </Text>
+          <Text style={styles.meta}>
+            The saved copy keeps the source this reviewer was generated from.
+          </Text>
           <TextField
             label="Reviewer title"
             onChangeText={(value) => {
@@ -411,18 +445,6 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
             testID="processing-reviewer-save-title"
             value={reviewerSaveTitle}
           />
-          {reviewerSaveMessage ? (
-            <Text style={styles.meta} testID="processing-reviewer-save-message">
-              {reviewerSaveMessage}
-            </Text>
-          ) : null}
-          <Button
-            loading={isSavingReviewer}
-            onPress={() => void handleSaveOpenedReviewer()}
-            testID="processing-reviewer-save-button"
-          >
-            Save reviewer
-          </Button>
         </Card>
       </Screen>
     );
@@ -435,7 +457,9 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
           Back to Processing
         </Button>
         <Card elevated style={styles.sourceCard}>
-          <Text style={styles.title}>{openedSource.title}</Text>
+          <Text accessibilityRole="header" style={styles.title}>
+            {openedSource.title}
+          </Text>
           <Text selectable style={styles.sourceText}>
             {openedSource.text}
           </Text>
@@ -444,14 +468,19 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
     );
   }
 
+  const empty = processingEmptyState(!hasLoadedOnce);
+  const showsEmptyState = jobs.length === 0 && offlineIntents.length === 0;
+
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.kicker}>Account processing</Text>
-        <Text style={styles.title}>Processing</Text>
+        <Text style={styles.kicker}>Processing</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          Your processing jobs
+        </Text>
         <Text style={styles.subtitle}>
-          Server jobs continue after you switch apps. Local offline requests are
-          shown separately until accepted.
+          Reviewers and text extractions run on the server, so they keep going
+          after you leave this screen or close the app.
         </Text>
       </View>
 
@@ -462,39 +491,15 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
         </Button>
       </View>
 
-      {notificationsAvailable ? (
-        <Card style={styles.jobCard}>
-          <Text style={styles.jobTitle}>Completion notifications</Text>
-          <Text style={styles.meta}>{notificationMessage}</Text>
-          <View style={styles.cardActions}>
-            <Button
-              disabled={notificationBusy}
-              onPress={() => void handleEnableNotifications()}
-              variant="secondary"
-            >
-              Enable
-            </Button>
-            <Button
-              disabled={notificationBusy}
-              onPress={() => void handleTestNotification()}
-              variant="secondary"
-            >
-              Send test
-            </Button>
-            <Button
-              disabled={notificationBusy}
-              onPress={() => void handleDisableNotifications()}
-              variant="ghost"
-            >
-              Disable
-            </Button>
-          </View>
-        </Card>
-      ) : null}
-
       {error ? (
         <Card style={styles.errorCard}>
           <Text style={styles.errorText}>{error}</Text>
+        </Card>
+      ) : null}
+
+      {notice ? (
+        <Card style={styles.noticeCard}>
+          <Text style={styles.meta}>{notice}</Text>
         </Card>
       ) : null}
 
@@ -504,7 +509,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
             <Card key={intent.localRequestId} style={styles.jobCard}>
               <Text style={styles.jobTitle}>{intent.sourceLocalReference}</Text>
               <Text style={styles.meta}>
-                Local request · {formatOperation(intent.operation)}
+                {formatOperation(intent.operation)} · Not sent yet
               </Text>
               <Text style={styles.status}>{formatOutboxStatus(intent)}</Text>
               <Button
@@ -516,37 +521,69 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
                 }}
                 variant="danger"
               >
-                Cancel local request
+                Cancel this request
               </Button>
             </Card>
           ))}
         </JobSection>
       ) : null}
 
-      {([...groups.entries()] as readonly [ProcessingGroup, readonly ProcessingJobStatusView[]][])
-        .map(([title, items]) =>
-          items.length > 0 ? (
-            <JobSection key={title} title={title}>
-              {items.map((job) => (
-                <ProcessingJobCard
-                  job={job}
-                  key={job.id}
-                  onCancel={() => void handleCancel(job)}
-                  onDismiss={() => void handleDismiss(job)}
-                  onOpenResult={() => void handleOpenResult(job)}
-                  onRemoveLocal={() => void handleRemoveLocal(job)}
-                  onRetry={() => void handleRetry(job)}
-                  onViewSource={() => void handleViewSource(job)}
-                />
-              ))}
-            </JobSection>
-          ) : null,
-        )}
+      {groups.map((group) => (
+        <JobSection key={group.key} title={group.title}>
+          {group.jobs.map((job) => (
+            <ProcessingJobCard
+              job={job}
+              key={job.id}
+              onCancel={() => void handleCancel(job)}
+              onDismiss={() => void handleDismiss(job)}
+              onOpenResult={() => void handleOpenResult(job)}
+              onRemoveLocal={() => void handleRemoveLocal(job)}
+              onRetry={() => void handleRetry(job)}
+              onViewSource={() => void handleViewSource(job)}
+            />
+          ))}
+        </JobSection>
+      ))}
 
-      {jobs.length === 0 && offlineIntents.length === 0 ? (
-        <Card>
-          <Text style={styles.status}>No processing work to show.</Text>
+      {showsEmptyState ? (
+        <Card testID="processing-empty-state">
+          <Text style={styles.jobTitle}>{empty.title}</Text>
+          <Text style={styles.status}>{empty.message}</Text>
         </Card>
+      ) : null}
+
+      {notificationsAvailable ? (
+        <View style={styles.section}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>
+            Completion notifications
+          </Text>
+          <Card style={styles.jobCard}>
+            <Text style={styles.meta}>{notificationMessage}</Text>
+            <View style={styles.cardActions}>
+              <Button
+                disabled={notificationBusy}
+                onPress={() => void handleEnableNotifications()}
+                variant="secondary"
+              >
+                Enable
+              </Button>
+              <Button
+                disabled={notificationBusy}
+                onPress={() => void handleTestNotification()}
+                variant="secondary"
+              >
+                Send test
+              </Button>
+              <Button
+                disabled={notificationBusy}
+                onPress={() => void handleDisableNotifications()}
+                variant="ghost"
+              >
+                Disable
+              </Button>
+            </View>
+          </Card>
+        </View>
       ) : null}
     </Screen>
   );
@@ -561,12 +598,18 @@ function JobSection({
 }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>
+        {title}
+      </Text>
       {children}
     </View>
   );
 }
 
+/**
+ * A single job, ordered so the student reads what it is, what state it is in,
+ * what real progress exists, and only then the controls.
+ */
 function ProcessingJobCard({
   job,
   onCancel,
@@ -584,18 +627,73 @@ function ProcessingJobCard({
   readonly onRetry: () => void;
   readonly onViewSource: () => void;
 }) {
-  const hasProgress =
-    job.progress.completedUnits !== null &&
-    job.progress.totalUnits !== null &&
-    job.progress.unitLabel !== null;
-  const terminal = !isActiveProcessingJobStatus(job.status);
+  const presentation = presentProcessingJob(job);
+  const timestamp = processingTimestamp(job);
+
   return (
-    <Card style={styles.jobCard} testID={`processing-job-${job.id}`}>
+    <Card
+      accent={presentation.tone === "ready"}
+      style={styles.jobCard}
+      testID={`processing-job-${job.id}`}
+    >
       <Text style={styles.jobTitle}>{job.source.displayName}</Text>
       <Text style={styles.meta}>
-        {formatJobType(job)} · Created {formatTime(job.createdAt)}
+        {presentation.kindLabel} · {presentation.sourceLabel}
       </Text>
-      <Text style={styles.status}>{job.progress.message}</Text>
+
+      <View style={styles.statusBlock}>
+        <Text
+          style={[styles.statusLabel, { color: toneColor[presentation.tone] }]}
+        >
+          {presentation.statusLabel}
+        </Text>
+        {presentation.detail ? (
+          <Text style={styles.status}>{presentation.detail}</Text>
+        ) : null}
+      </View>
+
+      {presentation.progress ? (
+        <View style={styles.progressBlock}>
+          {/*
+            The bar is drawn only while work is still moving. On a stopped job
+            a filling gold bar would read as progress that is still happening,
+            so the honest count carries the same fact on its own.
+          */}
+          {presentation.isActive ? (
+            <View
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                max: presentation.progress.totalUnits,
+                min: 0,
+                now: presentation.progress.completedUnits,
+              }}
+              style={styles.progressTrack}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.round(presentation.progress.ratio * 100)}%` },
+                ]}
+              />
+            </View>
+          ) : null}
+          <Text style={styles.progressLabel}>{presentation.progress.label}</Text>
+        </View>
+      ) : null}
+
+      {presentation.durableNotice ? (
+        <Text style={styles.durableNotice}>{presentation.durableNotice}</Text>
+      ) : null}
+
+      {presentation.failure ? (
+        <View style={styles.failureBlock}>
+          <Text style={styles.errorText}>{presentation.failure.summary}</Text>
+          {presentation.failure.detail ? (
+            <Text style={styles.failureDetail}>{presentation.failure.detail}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {job.reuseMode === "reuse_existing" ? (
         <Text style={styles.meta}>Reused an exact prior artifact by request.</Text>
       ) : job.reuseCandidateArtifactVersionId ? (
@@ -603,59 +701,35 @@ function ProcessingJobCard({
           An exact prior artifact exists; this request is generating a fresh version.
         </Text>
       ) : null}
-      {hasProgress ? (
-        <Text style={styles.meta}>
-          {job.progress.completedUnits} of {job.progress.totalUnits}{" "}
-          {job.progress.unitLabel}
-        </Text>
-      ) : null}
-      <Text style={styles.meta}>Updated {formatTime(job.updatedAt)}</Text>
-      {job.safeErrorMessage ? (
-        <Text style={styles.errorText}>{job.safeErrorMessage}</Text>
-      ) : null}
+
+      <Text style={styles.meta}>
+        {timestamp.label} {formatTime(timestamp.value)}
+      </Text>
+
       <View style={styles.cardActions}>
-        {job.resultAvailable ? (
-          <Button onPress={onOpenResult}>Open result</Button>
+        {presentation.resultActionLabel ? (
+          <Button fullWidth onPress={onOpenResult}>
+            {presentation.resultActionLabel}
+          </Button>
+        ) : null}
+        {presentation.canRetry ? (
+          <Button fullWidth onPress={onRetry}>Try again</Button>
         ) : null}
         {job.sourceVersionId ? (
           <Button onPress={onViewSource} variant="secondary">View source</Button>
         ) : null}
-        {job.status === "queued" || job.status === "running" ? (
-          <Button onPress={onCancel} variant="danger">Cancel</Button>
+        {presentation.canCancel ? (
+          <Button onPress={onCancel} variant="secondary">Stop processing</Button>
         ) : null}
-        {job.retryable && (job.status === "failed" || job.status === "expired") ? (
-          <Button onPress={onRetry} variant="secondary">Retry</Button>
+        {presentation.canDismiss ? (
+          <Button onPress={onDismiss} variant="ghost">Dismiss</Button>
         ) : null}
-        {terminal ? (
-          <Button onPress={onDismiss} variant="ghost">Dismiss from recent</Button>
-        ) : null}
-        <Button onPress={onRemoveLocal} variant="ghost">Remove local reference</Button>
+        <Button onPress={onRemoveLocal} variant="ghost">
+          Remove from this device
+        </Button>
       </View>
     </Card>
   );
-}
-
-function groupJobs(
-  jobs: readonly ProcessingJobStatusView[],
-): Map<ProcessingGroup, readonly ProcessingJobStatusView[]> {
-  const groups = new Map<ProcessingGroup, ProcessingJobStatusView[]>([
-    ["Running", []],
-    ["Waiting", []],
-    ["Needs attention", []],
-    ["Recently completed", []],
-  ]);
-  for (const job of jobs) {
-    const group: ProcessingGroup =
-      job.status === "running" || job.status === "cancellation_requested"
-        ? "Running"
-        : job.status === "queued"
-          ? "Waiting"
-          : job.status === "failed" || job.status === "expired"
-            ? "Needs attention"
-            : "Recently completed";
-    groups.get(group)?.push(job);
-  }
-  return groups;
 }
 
 function referenceToStatusView(
@@ -714,16 +788,10 @@ function requestContext(accessToken: string | undefined) {
   return apiBaseUrl && token ? { apiBaseUrl, accessToken: token } : null;
 }
 
-function formatJobType(job: ProcessingJobStatusView): string {
-  return job.jobType === "document_extraction"
-    ? "Document extraction"
-    : "Reviewer generation";
-}
-
 function formatOperation(operation: OfflineProcessingIntent["operation"]): string {
   return operation === "document_extraction"
-    ? "Document extraction"
-    : "Artifact generation";
+    ? "Text extraction"
+    : "Reviewer";
 }
 
 function formatOutboxStatus(intent: OfflineProcessingIntent): string {
@@ -737,7 +805,7 @@ function formatTime(value: string): string {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp)
     ? new Date(timestamp).toLocaleString()
-    : "unknown time";
+    : "at an unknown time";
 }
 
 function isReviewerOutput(value: unknown): value is ReviewerOutput {
@@ -793,11 +861,55 @@ const styles = StyleSheet.create({
     fontSize: typography.h3,
     fontWeight: "800",
   },
+  statusBlock: { gap: spacing[1] },
+  statusLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.body,
+    fontWeight: "800",
+  },
   status: {
     color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.body,
     lineHeight: 21,
+  },
+  progressBlock: { gap: spacing[1] },
+  progressTrack: {
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 6,
+    overflow: "hidden",
+  },
+  progressFill: {
+    backgroundColor: colors.accent,
+    height: "100%",
+  },
+  progressLabel: {
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+    lineHeight: 19,
+  },
+  durableNotice: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  failureBlock: {
+    backgroundColor: colors.errorSurface,
+    borderRadius: radius.tight,
+    gap: spacing[1],
+    padding: spacing[3],
+  },
+  failureDetail: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.caption,
+    lineHeight: 17,
   },
   meta: {
     color: colors.textMuted,
@@ -807,8 +919,15 @@ const styles = StyleSheet.create({
   },
   cardActions: { gap: spacing[2] },
   errorCard: { backgroundColor: colors.errorSurface },
+  noticeCard: { backgroundColor: colors.cardElevated },
   errorText: {
     color: colors.error,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 19,
+  },
+  footerNote: {
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 19,
@@ -821,3 +940,15 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
 });
+
+/**
+ * Tone reinforces the status word; it never carries the status on its own,
+ * because every card also states its status in text.
+ */
+const toneColor: Record<ProcessingStatusTone, string> = {
+  active: colors.accentPressed,
+  waiting: colors.textSecondary,
+  ready: colors.success,
+  attention: colors.error,
+  neutral: colors.textMuted,
+};
