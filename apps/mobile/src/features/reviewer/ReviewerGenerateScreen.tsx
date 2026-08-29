@@ -138,6 +138,28 @@ export function ReviewerGenerateScreen({
   const email = session?.user.email ?? "No email on this account";
   const visibleSourceText = getCurrentSourceText(sourceState);
   const sourceCharacterCount = getSourceCharacterCount(sourceState);
+  const reviewerJobIsActive = Boolean(
+    activeReviewerJob && isActiveProcessingJobStatus(activeReviewerJob.status),
+  );
+  const sourceIsReadyForGeneration = Boolean(
+    visibleSourceText.trim() &&
+      (sourceState.mode === "paste" || isReviewerSourceReadyForGeneration(sourceState)),
+  );
+
+  const clearGeneratedReviewer = () => {
+    setReviewer(null);
+    setRecoveredReviewerSource(null);
+    setSavedReviewer(null);
+    setSaveTitle("");
+    setSaveError(null);
+  };
+
+  const handleSourceModeChange = (mode: "paste" | "image" | "pdf") => {
+    dispatchSource({ type: "switch_mode", mode });
+    setValidationMessage(null);
+    setGenerationError(null);
+    clearGeneratedReviewer();
+  };
 
   useEffect(() => {
     const previewUri = sourceState.selectedImage?.uri;
@@ -429,6 +451,7 @@ export function ReviewerGenerateScreen({
 
   const handleSourceTextChange = (value: string) => {
     dispatchSource({ type: "edit_source_text", value });
+    clearGeneratedReviewer();
     if (generationError) {
       setGenerationError(null);
     }
@@ -795,7 +818,43 @@ export function ReviewerGenerateScreen({
   };
 
   return (
-    <Screen contentContainerStyle={styles.content}>
+    <Screen
+      contentContainerStyle={styles.content}
+      footer={
+        reviewer ? (
+          <>
+            {isSavingReviewer ? (
+              <Text accessibilityLiveRegion="polite" style={styles.footerNote}>
+                Saving to Study Library.
+              </Text>
+            ) : savedReviewer ? (
+              <Text accessibilityLiveRegion="polite" style={styles.footerNote}>
+                Saved to Study Library as {savedReviewer.title}.
+              </Text>
+            ) : null}
+            <Button
+              disabled={Boolean(savedReviewer) || saveTitle.trim().length === 0}
+              fullWidth
+              loading={isSavingReviewer}
+              onPress={() => void handleSaveReviewer()}
+              testID="reviewer-save-button"
+            >
+              {savedReviewer ? "Saved" : "Save reviewer"}
+            </Button>
+          </>
+        ) : (
+          <Button
+            disabled={!sourceIsReadyForGeneration || reviewerJobIsActive}
+            fullWidth
+            loading={isGenerating}
+            onPress={handleGenerate}
+            testID="reviewer-generate-button"
+          >
+            Generate reviewer
+          </Button>
+        )
+      }
+    >
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.stack}
@@ -809,7 +868,10 @@ export function ReviewerGenerateScreen({
         <Card elevated style={styles.formCard}>
           <TextField
             label="Source title"
-            onChangeText={setSourceTitle}
+            onChangeText={(value) => {
+              setSourceTitle(value);
+              clearGeneratedReviewer();
+            }}
             placeholder="Optional title"
             returnKeyType="next"
             testID="reviewer-title-input"
@@ -820,7 +882,7 @@ export function ReviewerGenerateScreen({
             <Text style={styles.fieldLabel}>Source mode</Text>
             <View style={styles.sourceModeButtons}>
               <Button
-                onPress={() => dispatchSource({ type: "switch_mode", mode: "paste" })}
+                onPress={() => handleSourceModeChange("paste")}
                 style={styles.sourceModeButton}
                 testID="reviewer-source-mode-paste"
                 variant={sourceState.mode === "paste" ? "primary" : "secondary"}
@@ -828,7 +890,7 @@ export function ReviewerGenerateScreen({
                 Paste text
               </Button>
               <Button
-                onPress={() => dispatchSource({ type: "switch_mode", mode: "image" })}
+                onPress={() => handleSourceModeChange("image")}
                 style={styles.sourceModeButton}
                 testID="reviewer-source-mode-image"
                 variant={sourceState.mode === "image" ? "primary" : "secondary"}
@@ -836,7 +898,7 @@ export function ReviewerGenerateScreen({
                 Import image
               </Button>
               <Button
-                onPress={() => dispatchSource({ type: "switch_mode", mode: "pdf" })}
+                onPress={() => handleSourceModeChange("pdf")}
                 style={styles.sourceModeButton}
                 testID="reviewer-source-mode-pdf"
                 variant={sourceState.mode === "pdf" ? "primary" : "secondary"}
@@ -922,20 +984,6 @@ export function ReviewerGenerateScreen({
           ) : null}
 
           <Button
-            disabled={Boolean(
-              activeReviewerJob &&
-                isActiveProcessingJobStatus(activeReviewerJob.status),
-            )}
-            fullWidth
-            loading={isGenerating}
-            onPress={handleGenerate}
-            testID="reviewer-generate-button"
-            variant="primary"
-          >
-            Generate reviewer
-          </Button>
-
-          <Button
             fullWidth
             loading={isSigningOut}
             onPress={signOut}
@@ -1015,9 +1063,6 @@ export function ReviewerGenerateScreen({
               setSaveError(null);
             }}
             onOpenLibrary={onOpenLibrary}
-            onSave={() => {
-              void handleSaveReviewer();
-            }}
             savedReviewer={savedReviewer}
             saveError={saveError}
             saveTitle={saveTitle}
@@ -1405,7 +1450,6 @@ function SaveReviewerPanel({
   isSaving,
   onChangeTitle,
   onOpenLibrary,
-  onSave,
   savedReviewer,
   saveError,
   saveTitle,
@@ -1413,7 +1457,6 @@ function SaveReviewerPanel({
   readonly isSaving: boolean;
   readonly onChangeTitle: (value: string) => void;
   readonly onOpenLibrary?: () => void;
-  readonly onSave: () => void;
   readonly savedReviewer: SavedReviewerSummary | null;
   readonly saveError: GenerationDisplayError | null;
   readonly saveTitle: string;
@@ -1454,30 +1497,17 @@ function SaveReviewerPanel({
         </View>
       ) : null}
 
-      <View style={styles.imageActions}>
+      {onOpenLibrary ? (
         <Button
-          disabled={Boolean(savedReviewer) || saveTitle.trim().length === 0}
-          loading={isSaving}
-          onPress={onSave}
-          style={styles.imageActionButton}
-          testID="reviewer-save-button"
-          variant="primary"
+          disabled={isSaving}
+          fullWidth
+          onPress={onOpenLibrary}
+          testID="reviewer-save-open-library-button"
+          variant="secondary"
         >
-          {savedReviewer ? "Saved" : "Save reviewer"}
+          Open Study Library
         </Button>
-
-        {onOpenLibrary ? (
-          <Button
-            disabled={isSaving}
-            onPress={onOpenLibrary}
-            style={styles.imageActionButton}
-            testID="reviewer-save-open-library-button"
-            variant="secondary"
-          >
-            Open Study Library
-          </Button>
-        ) : null}
-      </View>
+      ) : null}
     </Card>
   );
 }
@@ -1869,6 +1899,12 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: colors.textMuted,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  footerNote: {
+    color: colors.textSecondary,
     fontFamily: typography.fontFamily,
     fontSize: typography.bodySmall,
     lineHeight: 20,

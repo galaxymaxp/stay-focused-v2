@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-08-29, Asia/Manila.
+Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Repository
 
@@ -15,6 +15,9 @@ Last refreshed: 2026-08-29, Asia/Manila.
   55 commits ahead and 0 behind `origin/main`. Implementation commit
   `69ea697ee916adb0e928171b4d0afdc792b92da0` exposes the existing Canvas
   structured-block/selective-preview contract in the Android reviewer flow.
+- Consolidated Reviewer Android acceptance started at `e23ef61` on `main`, 62
+  commits ahead and 0 behind `origin/main`, with three preserved in-scope UI
+  edits already present in the working tree.
 - Recovery branches/tags remain preserved. Generated Next build drift was
   removed before the R5 implementation commit.
 
@@ -52,6 +55,12 @@ Last refreshed: 2026-08-29, Asia/Manila.
   ordered paragraph blocks (source block ordinals 5, 6, and 7), the
   selective-preview parser/normalization versions, hashes, no OCR, and
   `wasEdited = false`.
+- Consolidated Reviewer UI acceptance is complete on realme RMX3151 / Android
+  13. Pasted text, gallery, camera, PDF, Canvas selection/preview, a real durable
+  generation, Processing, Reader, save, immediate Library refresh, reopen,
+  rename, native delete Cancel/Confirm, and both Back paths passed. The run fixed
+  blank-source/footer readiness and saved-Reader Android Back behavior without
+  changing reviewer architecture or persistence semantics.
 - Capstone development R5 is complete and live accepted: manual task CRUD,
   persisted Canvas-assignment import, deterministic preview/apply planning,
   study-session persistence/edit/delete, and two-user denial coverage are in
@@ -82,6 +91,10 @@ Last refreshed: 2026-08-29, Asia/Manila.
   `adb install -r` on the realme RMX3151 / Android 13. Authentication and the
   existing session survived replacement. No API code changed, so the verified
   production deployment remained in use.
+- Reviewer acceptance EAS build `b625303b-943e-45a1-89da-e50c33fbba1b`
+  (Stay Focused V2 2.0.0, build 1) was installed with `adb install -r` on the
+  same device. Authentication and the two pre-existing saved reviewers survived
+  replacement; the hosted preview API remained reachable.
 
 ## Deterministic test baseline
 
@@ -102,6 +115,10 @@ Last refreshed: 2026-08-29, Asia/Manila.
   --check`, and `git fsck --full`. The four previously accepted mobile
   import-order warnings did not appear in the R8 lint run and no new warning
   was introduced.
+- Consolidated Reviewer acceptance verification passes mobile 373/373, focused
+  Reviewer/Library 108/108, mobile and root typecheck/lint, `git diff --check`,
+  and `git fsck --full`. Lint retains only the same four accepted mobile
+  `import/first` warnings.
 
 ## Migration status
 
@@ -142,8 +159,8 @@ Last refreshed: 2026-08-29, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: Reviewer UI refinement across Canvas selection,
-  Processing, Reader, and Study Library.
+- Recommended next task: run the consolidated Reviewer acceptance on a physical
+  iPhone, including Dynamic Type and VoiceOver.
 - Reviewer-core limitations are documented in
   `docs/ai/reviewer-core-capstone-acceptance-20260828.md`; notably, fresh camera
   and long-document device acceptance was not repeated, and a cold-start

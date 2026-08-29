@@ -46,6 +46,7 @@ export function Screen({
         <ScrollView
           contentContainerStyle={contentStyle}
           keyboardShouldPersistTaps="handled"
+          style={styles.scroll}
         >
           {children}
         </ScrollView>
@@ -60,6 +61,9 @@ export function Screen({
 const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: colors.background,
+    flex: 1,
+  },
+  scroll: {
     flex: 1,
   },
   content: {

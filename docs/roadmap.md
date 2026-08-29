@@ -353,6 +353,11 @@ Implemented foundations:
   remained.
 - The Next.js reviewer detail route typing fix aligns `[id]` route params with
   the Promise-based App Router context without changing runtime behavior.
+- Consolidated physical Android acceptance on realme RMX3151 / Android 13 now
+  covers Maker source modes, Canvas selective preview, pinned readiness-gated
+  Generate/Save actions, durable Processing, Reader, save/list/reopen, rename,
+  native delete Cancel/Confirm, and in-app/hardware Back. Reopen remains a plain
+  persisted read with no regeneration.
 
 Exit criteria:
 

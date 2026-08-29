@@ -456,6 +456,25 @@ Library test IDs: `study-library-screen`, `study-library-count`,
 `study-library-source-status-summary`, `study-library-source-status-loading`,
 and `study-library-source-readiness`.
 
-All of this work passes the mobile automated checks and was inspected in a
-web-rendered build. **None of it has been physically accepted on Android.** Do
-not describe any of this as accepted until a real device run says so.
+All of this work now has consolidated physical Android acceptance on the
+realme RMX3151 / Android 13. EAS internal preview build
+`b625303b-943e-45a1-89da-e50c33fbba1b` was installed with `adb install -r`
+and exercised against the hosted preview API on 2026-08-30.
+
+The accepted run covered pasted text, gallery, camera, PDF, and Canvas entry;
+Canvas 9 -> 0 -> 3 block selection and server selective preview; the shared
+footer with disabled, active, loading, Save, and Saved states; one real durable
+generation; Processing completion; the flat Reader; save; immediate Library
+refresh; reopen without generation; a long rename with the original saved date;
+native delete Cancel and Confirm; and both in-app and Android Back behavior.
+The generated disposable reviewer was deleted after persistence checks, leaving
+the two pre-existing capstone reviewers untouched.
+
+Physical acceptance found and closed two Android defects. The pasted-text
+Generate action had remained enabled with an empty source and was still inline
+instead of using the shared footer. An opened saved reviewer also let Android
+Back escape to Today instead of returning to its Library list. The accepted
+implementation pins and readiness-gates Generate/Save through `Screen.footer`,
+reloads Library on focus, and consumes Android Back while a saved reviewer is
+open. Mobile tests remain 373/373 with only the four accepted `import/first`
+lint warnings.

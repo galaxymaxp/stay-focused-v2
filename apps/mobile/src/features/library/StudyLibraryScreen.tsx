@@ -1,8 +1,10 @@
 import { ChevronDown, ChevronRight } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Pressable,
   StyleSheet,
   Text,
@@ -134,13 +136,13 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
     }
   }, [session?.accessToken]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     void loadLibrary();
     return () => {
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
     };
-  }, [loadLibrary]);
+  }, [loadLibrary]));
 
   const handleOpenReviewer = async (reviewerId: string) => {
     const context = createRequestContext(session?.accessToken);
@@ -171,14 +173,32 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
     }
   };
 
-  const handleCloseReviewer = () => {
+  const handleCloseReviewer = useCallback(() => {
     setOpenedReviewer(null);
     setRenameState(null);
     setSourceStatusState(null);
     setIsSourceDetailsOpen(false);
     setError(null);
     setSuccessMessage(null);
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!openedReviewer) {
+        return undefined;
+      }
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          handleCloseReviewer();
+          return true;
+        },
+      );
+
+      return () => subscription.remove();
+    }, [handleCloseReviewer, openedReviewer]),
+  );
 
   const handleCheckSourceStatus = async () => {
     if (!openedReviewer?.sourceProvenance) {
