@@ -1,0 +1,2023 @@
+{
+  "id": "reviewer-yibwba",
+  "title": "2. Firewalls",
+  "sections": [
+    {
+      "id": "reviewer-section-1fb6nex",
+      "sourceSectionId": "source-w4pi6a-section-kisdat",
+      "plannedSectionId": "source-w4pi6a-section-kisdat-planned-1v650ql",
+      "title": "Learning Objectives",
+      "order": 0,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-2-heading",
+        "page-2-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "card-1",
+          "plannedSectionId": "source-w4pi6a-section-kisdat-planned-1v650ql",
+          "title": "Learning Objectives",
+          "sourceBlockIds": [
+            "page-2-heading",
+            "page-2-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Understand the role of physical design in the implementation of a comprehensive security program",
+              "Understand firewall technology and the various approaches to firewall implementation",
+              "Identify the various approaches to remote and dial-up access protection",
+              "Understand content filtering technology",
+              "Describe the technology that enables the use of Virtual Private Networks"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-v0qia4",
+      "sourceSectionId": "source-w4pi6a-section-1d9j2g5",
+      "plannedSectionId": "source-w4pi6a-section-1d9j2g5-planned-xtp6cg",
+      "title": "Introduction",
+      "order": 1,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-3-heading",
+        "page-3-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "78bc739d-1e3c-43b9-8b9d-5b54632b2d3d",
+          "plannedSectionId": "source-w4pi6a-section-1d9j2g5-planned-xtp6cg",
+          "title": "Introduction",
+          "sourceBlockIds": [
+            "page-3-heading",
+            "page-3-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Technical Control",
+              "Hardware and software components that protect a system against cyberattacks",
+              "Can Improve an organization’s ability to balance various objectives in the CIA triad"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1155563",
+      "sourceSectionId": "source-w4pi6a-section-kos3o",
+      "plannedSectionId": "source-w4pi6a-section-kos3o-planned-1dsi487",
+      "title": "Physical Design",
+      "order": 2,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-4-heading",
+        "page-4-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "physical-design-card-001",
+          "plannedSectionId": "source-w4pi6a-section-kos3o-planned-1dsi487",
+          "title": "Physical Design",
+          "sourceBlockIds": [
+            "page-4-heading",
+            "page-4-body"
+          ],
+          "sourceCore": {
+            "explanation": "The physical design of an information security program is made up of two parts:.",
+            "keyPoints": [
+              "Security Technologies",
+              "Physical Security",
+              "Extends to the logical design of the program",
+              "Encompasses the selection and the implementation of technologies"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-5uvae1",
+      "sourceSectionId": "source-w4pi6a-section-18anu3v",
+      "plannedSectionId": "source-w4pi6a-section-18anu3v-planned-1sbq44v",
+      "title": "Physical Design Process",
+      "order": 3,
+      "kind": "process-step",
+      "sourceBlockIds": [
+        "page-5-heading",
+        "page-5-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "f1f61374-cf60-4d65-b009-36c2986c03eb",
+          "plannedSectionId": "source-w4pi6a-section-18anu3v-planned-1sbq44v",
+          "title": "Physical Design Process",
+          "sourceBlockIds": [
+            "page-5-heading",
+            "page-5-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Physical Design Process: 1. Select specific technologies 2. Identify technical solution based on these technologies (deployment, operations, and maintenance) 3. Design Physical Security measures to support the technical solution 4. Prepare project plans for the implementation"
+            ]
+          },
+          "enrichment": null,
+          "kind": "process-step"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-13z2ars",
+      "sourceSectionId": "source-w4pi6a-section-1vndlty",
+      "plannedSectionId": "source-w4pi6a-section-1vndlty-planned-1h02k4h",
+      "title": "Firewalls",
+      "order": 4,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-6-heading",
+        "page-6-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "firewall-concept-card",
+          "plannedSectionId": "source-w4pi6a-section-1vndlty-planned-1h02k4h",
+          "title": "Firewalls",
+          "sourceBlockIds": [
+            "page-6-heading",
+            "page-6-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "An information security program similar that prevents specific types of information from moving between the outside world and the inside world.",
+              "Can be a separate computer system, a software service running on a router or server, or a separate network containing a number of supporting devices"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-444at2",
+      "sourceSectionId": "source-w4pi6a-section-1nbmktq",
+      "plannedSectionId": "source-w4pi6a-section-1nbmktq-planned-w7d0x0",
+      "title": "Firewall Categorization",
+      "order": 5,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-7-heading",
+        "page-7-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "firewall-categorization-card-1",
+          "plannedSectionId": "source-w4pi6a-section-1nbmktq-planned-w7d0x0",
+          "title": "Firewall Categorization",
+          "sourceBlockIds": [
+            "page-7-heading",
+            "page-7-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Can be categorized by:",
+              "Processing Mode",
+              "Development Era",
+              "Structure"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-65vr0a",
+      "sourceSectionId": "source-w4pi6a-section-exqzc5",
+      "plannedSectionId": "source-w4pi6a-section-exqzc5-planned-1jh3l0b",
+      "title": "Categorized by Processing",
+      "order": 6,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-8-heading",
+        "page-8-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "concept-card-01",
+          "plannedSectionId": "source-w4pi6a-section-exqzc5-planned-1jh3l0b",
+          "title": "Categorized by Processing",
+          "sourceBlockIds": [
+            "page-8-heading",
+            "page-8-body"
+          ],
+          "sourceCore": {
+            "explanation": "Categorized by Processing Mode",
+            "keyPoints": [
+              "Categorized by Processing Mode"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1lreguc",
+      "sourceSectionId": "source-w4pi6a-section-17yi4ux",
+      "plannedSectionId": "source-w4pi6a-section-17yi4ux-planned-1imns6e",
+      "title": "Packet Filtering",
+      "order": 7,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-9-heading",
+        "page-9-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "w8f7j9-concept-card-Jd2830",
+          "plannedSectionId": "source-w4pi6a-section-17yi4ux-planned-1imns6e",
+          "title": "Packet Filtering",
+          "sourceBlockIds": [
+            "page-9-heading",
+            "page-9-body"
+          ],
+          "sourceCore": {
+            "explanation": "Examines header information of data packets that come into a network.",
+            "keyPoints": [
+              "Also called filtering firewall",
+              "Inspects packets at the network layer",
+              "Based on: IP address, direction (in or out), TCP/UDP ports"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-uo81z1",
+      "sourceSectionId": "source-w4pi6a-section-yn9ktk",
+      "plannedSectionId": "source-w4pi6a-section-yn9ktk-planned-1rnw5hp",
+      "title": "Application-Level Gateways",
+      "order": 8,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-10-heading",
+        "page-10-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "application-level-gateways-concept-card",
+          "plannedSectionId": "source-w4pi6a-section-yn9ktk-planned-1rnw5hp",
+          "title": "Application-Level Gateways",
+          "sourceBlockIds": [
+            "page-10-heading",
+            "page-10-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Also called proxy firewall",
+              "Uses proxy server to work as mediator",
+              "For organizations that runs a web server can avoid exposing the user to direct traffic"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-b7xsma",
+      "sourceSectionId": "source-w4pi6a-section-10kyf3m",
+      "plannedSectionId": "source-w4pi6a-section-10kyf3m-planned-1gy1dg6",
+      "title": "Circuit-level Gateways",
+      "order": 9,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-11-heading",
+        "page-11-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "concept-card-2341",
+          "plannedSectionId": "source-w4pi6a-section-10kyf3m-planned-1gy1dg6",
+          "title": "Circuit-level Gateways",
+          "sourceBlockIds": [
+            "page-11-heading",
+            "page-11-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Operates at the transport layer and session level",
+              "Acts as the handshaking device between trusted clients or servers to untrusted hosts and vice versa"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1icb4og",
+      "sourceSectionId": "source-w4pi6a-section-1gysrvv",
+      "plannedSectionId": "source-w4pi6a-section-1gysrvv-planned-tr2bwm",
+      "title": "MAC-layer Firewalls",
+      "order": 10,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-12-heading",
+        "page-12-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "mac-layer-firewalls-concept-card",
+          "plannedSectionId": "source-w4pi6a-section-1gysrvv-planned-tr2bwm",
+          "title": "MAC-layer Firewalls",
+          "sourceBlockIds": [
+            "page-12-heading",
+            "page-12-body"
+          ],
+          "sourceCore": {
+            "explanation": "Gives the firewall the ability to consider the specific host identity in filtering decisions.",
+            "keyPoints": [
+              "Operates at the MAC layer",
+              "Linked to ACL entries that identify the specific types of packets that can be sent to each host, and all other traffic is blocked"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-lebf7g",
+      "sourceSectionId": "source-w4pi6a-section-mdednr",
+      "plannedSectionId": "source-w4pi6a-section-mdednr-planned-7hk431",
+      "title": "Hybrids",
+      "order": 11,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-13-heading",
+        "page-13-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "concept-card-hybrids",
+          "plannedSectionId": "source-w4pi6a-section-mdednr-planned-7hk431",
+          "title": "Hybrids",
+          "sourceBlockIds": [
+            "page-13-heading",
+            "page-13-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Combines elements of other types of firewalls",
+              "Packet filtering and proxy services",
+              "Packet filtering and circuit gateways",
+              "May consist of two separate firewall devices but work in tandem"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1w5e5n1",
+      "sourceSectionId": "source-w4pi6a-section-6zog7r",
+      "plannedSectionId": "source-w4pi6a-section-6zog7r-planned-11x4hyw",
+      "title": "Categorized by",
+      "order": 12,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-14-heading",
+        "page-14-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "concept-card-1",
+          "plannedSectionId": "source-w4pi6a-section-6zog7r-planned-11x4hyw",
+          "title": "Categorized by",
+          "sourceBlockIds": [
+            "page-14-heading",
+            "page-14-body"
+          ],
+          "sourceCore": {
+            "explanation": "Categorized by Development Era",
+            "keyPoints": [
+              "Categorized by Development Era"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1k3ivxo",
+      "sourceSectionId": "source-w4pi6a-section-1c23wf6",
+      "plannedSectionId": "source-w4pi6a-section-1c23wf6-planned-1thukuf",
+      "title": "First Generation",
+      "order": 13,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-15-heading",
+        "page-15-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "source-w4pi6a-section-1c23wf6-card-1xzy9v8",
+          "plannedSectionId": "source-w4pi6a-section-1c23wf6-planned-1thukuf",
+          "title": "First Generation",
+          "sourceBlockIds": [
+            "page-15-heading",
+            "page-15-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Packet Filter firewalls",
+              "Stateless",
+              "Each packet it treated in isolation",
+              "It does not recognize packets being part of an existing connection, is trying to establish a new connection, or is just a rogue packet",
+              "Ex. FTP connections opens new connections to random ports by design"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1okv9n6",
+      "sourceSectionId": "source-w4pi6a-section-1r9jceb",
+      "plannedSectionId": "source-w4pi6a-section-1r9jceb-planned-1wa5dma",
+      "title": "Second Generation",
+      "order": 14,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-16-heading",
+        "page-16-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "6dd81885-b4aa-476c-bb1e-f8dfb188aa2d",
+          "plannedSectionId": "source-w4pi6a-section-1r9jceb-planned-1wa5dma",
+          "title": "Second Generation",
+          "sourceBlockIds": [
+            "page-16-heading",
+            "page-16-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Circuit level gateways",
+              "Stateful",
+              "Keeps tracks of network connections",
+              "Holds in memory significant attributes of each connection"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1yxj0tw",
+      "sourceSectionId": "source-w4pi6a-section-6ah30x",
+      "plannedSectionId": "source-w4pi6a-section-6ah30x-planned-xk0rt5",
+      "title": "Third Generation",
+      "order": 15,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-17-heading",
+        "page-17-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "third-generation-cc",
+          "plannedSectionId": "source-w4pi6a-section-6ah30x-planned-xk0rt5",
+          "title": "Third Generation",
+          "sourceBlockIds": [
+            "page-17-heading",
+            "page-17-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Application Firewalls",
+              "a form of firewall that controls input/output or system calls of an application or service",
+              "New Generation Firewall (NGFW)",
+              "Stateful",
+              "Signature based intrusion detection",
+              "Primarily distributed as a connected ecosystem of products"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1p031iy",
+      "sourceSectionId": "source-w4pi6a-section-fudax5",
+      "plannedSectionId": "source-w4pi6a-section-fudax5-planned-fmbtjl",
+      "title": "Categorized by Structure",
+      "order": 16,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-18-heading"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "concept-card-001",
+          "plannedSectionId": "source-w4pi6a-section-fudax5-planned-fmbtjl",
+          "title": "Categorized by Structure",
+          "sourceBlockIds": [
+            "page-18-heading"
+          ],
+          "sourceCore": {
+            "explanation": "Categorized by Structure",
+            "keyPoints": [
+              "Categorized by Structure"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-sepz88",
+      "sourceSectionId": "source-w4pi6a-section-1tp1r1t",
+      "plannedSectionId": "source-w4pi6a-section-1tp1r1t-planned-1yrjs77",
+      "title": "Commercial Grade",
+      "order": 17,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-19-heading",
+        "page-19-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "concept-001",
+          "plannedSectionId": "source-w4pi6a-section-1tp1r1t-planned-1yrjs77",
+          "title": "Commercial Grade",
+          "sourceBlockIds": [
+            "page-19-heading",
+            "page-19-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Firewall application running on a general-purpose computer",
+              "Can also be purchased hardware configured to specs that maximize performance"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-18tngu",
+      "sourceSectionId": "source-w4pi6a-section-hh3nze",
+      "plannedSectionId": "source-w4pi6a-section-hh3nze-planned-9zm1pq",
+      "title": "SOHO Firewall",
+      "order": 18,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-20-heading",
+        "page-20-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "soho-firewall-concept-card",
+          "plannedSectionId": "source-w4pi6a-section-hh3nze-planned-9zm1pq",
+          "title": "SOHO Firewall",
+          "sourceBlockIds": [
+            "page-20-heading",
+            "page-20-body"
+          ],
+          "sourceCore": {
+            "explanation": "Serves as a stateful firewall to enable inside-to- outside access.",
+            "keyPoints": [
+              "Small Office/Home Office",
+              "Connect the user’s local area network or a specific computer system to the internet",
+              "Can be configured by use"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-1iow611",
+      "sourceSectionId": "source-w4pi6a-section-1j63rg0",
+      "plannedSectionId": "source-w4pi6a-section-1j63rg0-planned-1w5kfjx",
+      "title": "Residential Grade",
+      "order": 19,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-21-heading",
+        "page-21-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "source-w4pi6a-section-1j63rg0-concept-1b6jr92",
+          "plannedSectionId": "source-w4pi6a-section-1j63rg0-planned-1w5kfjx",
+          "title": "Residential Grade",
+          "sourceBlockIds": [
+            "page-21-heading",
+            "page-21-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Installed directly into the user’s system",
+              "Some apps combine firewall services with antivirus or intrusion detection features",
+              "Limited configurability"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-t3f8wl",
+      "sourceSectionId": "source-w4pi6a-section-1ts08d2",
+      "plannedSectionId": "source-w4pi6a-section-1ts08d2-planned-ojhi3l",
+      "title": "Packet Filtering Routers",
+      "order": 20,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-23-heading",
+        "page-23-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "packet-filtering-routers-study-review",
+          "plannedSectionId": "source-w4pi6a-section-1ts08d2-planned-ojhi3l",
+          "title": "Packet Filtering Routers",
+          "sourceBlockIds": [
+            "page-23-heading",
+            "page-23-body"
+          ],
+          "sourceCore": {
+            "explanation": "They can be configured to reject packets that the organization does not allow.",
+            "keyPoints": [
+              "Most organizations use a router to connect to the internet",
+              "Disadvantages",
+              "Lack of auditing",
+              "Lack of strong authentication",
+              "Can degrade network performance"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-199kea",
+      "sourceSectionId": "source-w4pi6a-section-sd0lny",
+      "plannedSectionId": "source-w4pi6a-section-sd0lny-planned-1hddqj2",
+      "title": "Screened Host Firewalls",
+      "order": 21,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-24-heading",
+        "page-24-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "c44b6e29-3035-484e-b6ef-b9e8b2c5f240",
+          "plannedSectionId": "source-w4pi6a-section-sd0lny-planned-1hddqj2",
+          "title": "Screened Host Firewalls",
+          "sourceBlockIds": [
+            "page-24-heading",
+            "page-24-body"
+          ],
+          "sourceCore": {
+            "explanation": "Combines packet filtering with a separate dedicated firewall (like a proxy server).",
+            "keyPoints": [
+              "Allows the router to pre-screen packets to minimize network traffic",
+              "Application proxy examines at the application layer",
+              "Separate host = sacrificial host",
+              "Requires external attack to compromise system"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-xw4p6h",
+      "sourceSectionId": "source-w4pi6a-section-7bbnja",
+      "plannedSectionId": "source-w4pi6a-section-7bbnja-planned-o1p7vf",
+      "title": "Dual-homes Firewalls",
+      "order": 22,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-26-heading",
+        "page-26-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "38c7c69d-2cff-43cb-b805-3de6436f91e1",
+          "plannedSectionId": "source-w4pi6a-section-7bbnja-planned-o1p7vf",
+          "title": "Dual-homes Firewalls",
+          "sourceBlockIds": [
+            "page-26-heading",
+            "page-26-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "Two Network Interface Cards: One for external network; one for internal network",
+              "Additional protection: All traffic goes through the firewall",
+              "Implementation makes use of NAT: Method of mapping assigned IP to special ranges of nonroutable IP"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-18vxb26",
+      "sourceSectionId": "source-w4pi6a-section-1nm8kxx",
+      "plannedSectionId": "source-w4pi6a-section-1nm8kxx-planned-iqpbk",
+      "title": "Screened Subnet Firewalls",
+      "order": 23,
+      "kind": "concept-card",
+      "sourceBlockIds": [
+        "page-28-heading",
+        "page-28-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "7e29e6a9-03c5-408b-9e35-403e0e701f7c",
+          "plannedSectionId": "source-w4pi6a-section-1nm8kxx-planned-iqpbk",
+          "title": "Screened Subnet Firewalls",
+          "sourceBlockIds": [
+            "page-28-heading",
+            "page-28-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "The current dominant architecture",
+              "Implemented with a DMZ",
+              "Common Implementation:",
+              "Connections from untrusted networks are routed through an external filtering router",
+              "Connections from the untrusted networks are routed into a separate segment called the DMZ",
+              "Connections from trusted networks are allowed through the DMZ"
+            ]
+          },
+          "enrichment": null,
+          "kind": "concept-card"
+        }
+      ]
+    },
+    {
+      "id": "reviewer-section-12m4hsw",
+      "sourceSectionId": "source-w4pi6a-section-1oazktz",
+      "plannedSectionId": "source-w4pi6a-section-1oazktz-planned-1c18o2v",
+      "title": "BEST PRACTICES FOR FIREWALLS",
+      "order": 24,
+      "kind": "process-step",
+      "sourceBlockIds": [
+        "page-31-heading",
+        "page-31-body",
+        "page-32-body"
+      ],
+      "coverageStatus": "passed",
+      "coverageScore": 1,
+      "groundingStatus": "passed",
+      "groundingScore": 1,
+      "groundingIssues": [],
+      "leakageStatus": "passed",
+      "leakageIssues": [],
+      "qualityStatus": "generated",
+      "items": [
+        {
+          "id": "process-87h3w-fwa8k",
+          "plannedSectionId": "source-w4pi6a-section-1oazktz-planned-1c18o2v",
+          "title": "BEST PRACTICES FOR FIREWALLS",
+          "sourceBlockIds": [
+            "page-31-heading",
+            "page-31-body",
+            "page-32-body"
+          ],
+          "sourceCore": {
+            "explanation": "",
+            "keyPoints": [
+              "BEST PRACTICES FOR FIREWALLS: 1. All traffic from the trusted network is allowed. Filtering and logging of outbound traffic are possible when indicated by specific organizational policies. 2. FW device is never directly accessible from the public network for configuration or management purposes. 3. ICMP should be denied. 4. Remote access to all internal servers from the public networks should be blocked. 5. HTTP traffic should be denied if web services are offered to the internet. 6. Block traffic by default and monitor user access. 7. Establish a firewall configuration change plan. 8. Optimize the firewall rules of your network. 9. Update your firewall software regularly. 10. Conduct regular firewall security audits. 11. Have a centralized management tool for multi-vendor firewalls. 12. Automate the process of firewall updating."
+            ]
+          },
+          "enrichment": null,
+          "kind": "process-step"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "sourceId": "source-w4pi6a",
+    "planId": "plan-141htls",
+    "coverageReportId": "coverage-1qs6u5j",
+    "sourceTitle": "2. Firewalls",
+    "sourceKind": "presentation",
+    "language": "und",
+    "sectionCount": 25,
+    "generatedSectionCount": 25,
+    "originalGeneratedSectionCount": 25,
+    "repairedSectionCount": 0,
+    "fallbackSectionCount": 0,
+    "reviewerQualityStatus": "complete",
+    "fallbackPlanUsed": false,
+    "limitedSource": false,
+    "uncoveredSourceTopics": [],
+    "coverageStatus": "passed",
+    "coverageScore": 1,
+    "coverage": {
+      "id": "coverage-1qs6u5j",
+      "planId": "plan-141htls",
+      "sourceId": "source-w4pi6a",
+      "status": "passed",
+      "score": 1,
+      "coverageScore": 1,
+      "coverageBasis": "source-outline",
+      "sourceSectionsTotal": 25,
+      "sourceSectionsCovered": 25,
+      "sourceSections": [
+        {
+          "sourceSectionId": "source-w4pi6a-section-kisdat",
+          "title": "Learning Objectives",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-kisdat-planned-1v650ql"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1d9j2g5",
+          "title": "Introduction",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1d9j2g5-planned-xtp6cg"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-kos3o",
+          "title": "Physical Design",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-kos3o-planned-1dsi487"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-18anu3v",
+          "title": "Physical Design Process",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-18anu3v-planned-1sbq44v"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1vndlty",
+          "title": "Firewalls",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1vndlty-planned-1h02k4h"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1nbmktq",
+          "title": "Firewall Categorization",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1nbmktq-planned-w7d0x0"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-exqzc5",
+          "title": "Categorized by Processing",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-exqzc5-planned-1jh3l0b"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-17yi4ux",
+          "title": "Packet Filtering",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-17yi4ux-planned-1imns6e"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-yn9ktk",
+          "title": "Application-Level Gateways",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-yn9ktk-planned-1rnw5hp"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-10kyf3m",
+          "title": "Circuit-level Gateways",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-10kyf3m-planned-1gy1dg6"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1gysrvv",
+          "title": "MAC-layer Firewalls",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1gysrvv-planned-tr2bwm"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-mdednr",
+          "title": "Hybrids",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-mdednr-planned-7hk431"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-6zog7r",
+          "title": "Categorized by",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-6zog7r-planned-11x4hyw"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1c23wf6",
+          "title": "First Generation",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1c23wf6-planned-1thukuf"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1r9jceb",
+          "title": "Second Generation",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1r9jceb-planned-1wa5dma"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-6ah30x",
+          "title": "Third Generation",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-6ah30x-planned-xk0rt5"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-fudax5",
+          "title": "Categorized by Structure",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-fudax5-planned-fmbtjl"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1tp1r1t",
+          "title": "Commercial Grade",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1tp1r1t-planned-1yrjs77"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-hh3nze",
+          "title": "SOHO Firewall",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-hh3nze-planned-9zm1pq"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1j63rg0",
+          "title": "Residential Grade",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1j63rg0-planned-1w5kfjx"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1ts08d2",
+          "title": "Packet Filtering Routers",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1ts08d2-planned-ojhi3l"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-sd0lny",
+          "title": "Screened Host Firewalls",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-sd0lny-planned-1hddqj2"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-7bbnja",
+          "title": "Dual-homes Firewalls",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-7bbnja-planned-o1p7vf"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1nm8kxx",
+          "title": "Screened Subnet Firewalls",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1nm8kxx-planned-iqpbk"
+          ]
+        },
+        {
+          "sourceSectionId": "source-w4pi6a-section-1oazktz",
+          "title": "BEST PRACTICES FOR FIREWALLS",
+          "status": "covered",
+          "plannedSectionIds": [
+            "source-w4pi6a-section-1oazktz-planned-1c18o2v"
+          ]
+        }
+      ],
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "source-w4pi6a-section-kisdat-planned-1v650ql",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 5,
+          "coveredSemanticTargetCount": 5,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1d9j2g5-planned-xtp6cg",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 3,
+          "coveredSemanticTargetCount": 3,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-kos3o-planned-1dsi487",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 5,
+          "coveredSemanticTargetCount": 5,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-18anu3v-planned-1sbq44v",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 1,
+          "coveredSemanticTargetCount": 1,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1vndlty-planned-1h02k4h",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 2,
+          "coveredSemanticTargetCount": 2,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1nbmktq-planned-w7d0x0",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 4,
+          "coveredSemanticTargetCount": 4,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-exqzc5-planned-1jh3l0b",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 1,
+          "coveredSemanticTargetCount": 1,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-17yi4ux-planned-1imns6e",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 4,
+          "coveredSemanticTargetCount": 4,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-yn9ktk-planned-1rnw5hp",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 3,
+          "coveredSemanticTargetCount": 3,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-10kyf3m-planned-1gy1dg6",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 2,
+          "coveredSemanticTargetCount": 2,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1gysrvv-planned-tr2bwm",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 3,
+          "coveredSemanticTargetCount": 3,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-mdednr-planned-7hk431",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 4,
+          "coveredSemanticTargetCount": 4,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-6zog7r-planned-11x4hyw",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 1,
+          "coveredSemanticTargetCount": 1,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1c23wf6-planned-1thukuf",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 5,
+          "coveredSemanticTargetCount": 5,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1r9jceb-planned-1wa5dma",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 4,
+          "coveredSemanticTargetCount": 4,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-6ah30x-planned-xk0rt5",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 6,
+          "coveredSemanticTargetCount": 6,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-fudax5-planned-fmbtjl",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 1,
+          "coveredSemanticTargetCount": 1,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1tp1r1t-planned-1yrjs77",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 2,
+          "coveredSemanticTargetCount": 2,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-hh3nze-planned-9zm1pq",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 4,
+          "coveredSemanticTargetCount": 4,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1j63rg0-planned-1w5kfjx",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 3,
+          "coveredSemanticTargetCount": 3,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1ts08d2-planned-ojhi3l",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 6,
+          "coveredSemanticTargetCount": 6,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-sd0lny-planned-1hddqj2",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 5,
+          "coveredSemanticTargetCount": 5,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-7bbnja-planned-o1p7vf",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 3,
+          "coveredSemanticTargetCount": 3,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1nm8kxx-planned-iqpbk",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 6,
+          "coveredSemanticTargetCount": 6,
+          "semanticCoverageScore": 1
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1oazktz-planned-1c18o2v",
+          "status": "passed",
+          "score": 1,
+          "issues": [],
+          "retryable": false,
+          "semanticTargetCount": 1,
+          "coveredSemanticTargetCount": 1,
+          "semanticCoverageScore": 1
+        }
+      ],
+      "semanticTargetCount": 84,
+      "coveredSemanticTargetCount": 84,
+      "semanticCoverageScore": 1
+    },
+    "groundingStatus": "passed",
+    "groundingScore": 1,
+    "grounding": {
+      "id": "grounding-cyetxf",
+      "planId": "plan-141htls",
+      "sourceId": "source-w4pi6a",
+      "status": "passed",
+      "score": 1,
+      "threshold": 0.8,
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "source-w4pi6a-section-kisdat-planned-1v650ql",
+          "sourceSectionId": "source-w4pi6a-section-kisdat",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1d9j2g5-planned-xtp6cg",
+          "sourceSectionId": "source-w4pi6a-section-1d9j2g5",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-kos3o-planned-1dsi487",
+          "sourceSectionId": "source-w4pi6a-section-kos3o",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-18anu3v-planned-1sbq44v",
+          "sourceSectionId": "source-w4pi6a-section-18anu3v",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1vndlty-planned-1h02k4h",
+          "sourceSectionId": "source-w4pi6a-section-1vndlty",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 2,
+          "representedSourceItemCount": 2,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1nbmktq-planned-w7d0x0",
+          "sourceSectionId": "source-w4pi6a-section-1nbmktq",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-exqzc5-planned-1jh3l0b",
+          "sourceSectionId": "source-w4pi6a-section-exqzc5",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-17yi4ux-planned-1imns6e",
+          "sourceSectionId": "source-w4pi6a-section-17yi4ux",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-yn9ktk-planned-1rnw5hp",
+          "sourceSectionId": "source-w4pi6a-section-yn9ktk",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-10kyf3m-planned-1gy1dg6",
+          "sourceSectionId": "source-w4pi6a-section-10kyf3m",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 2,
+          "representedSourceItemCount": 2,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1gysrvv-planned-tr2bwm",
+          "sourceSectionId": "source-w4pi6a-section-1gysrvv",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-mdednr-planned-7hk431",
+          "sourceSectionId": "source-w4pi6a-section-mdednr",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-6zog7r-planned-11x4hyw",
+          "sourceSectionId": "source-w4pi6a-section-6zog7r",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1c23wf6-planned-1thukuf",
+          "sourceSectionId": "source-w4pi6a-section-1c23wf6",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1r9jceb-planned-1wa5dma",
+          "sourceSectionId": "source-w4pi6a-section-1r9jceb",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-6ah30x-planned-xk0rt5",
+          "sourceSectionId": "source-w4pi6a-section-6ah30x",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 6,
+          "representedSourceItemCount": 6,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-fudax5-planned-fmbtjl",
+          "sourceSectionId": "source-w4pi6a-section-fudax5",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 0,
+          "representedSourceItemCount": 0,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1tp1r1t-planned-1yrjs77",
+          "sourceSectionId": "source-w4pi6a-section-1tp1r1t",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 2,
+          "representedSourceItemCount": 2,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-hh3nze-planned-9zm1pq",
+          "sourceSectionId": "source-w4pi6a-section-hh3nze",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 4,
+          "representedSourceItemCount": 4,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1j63rg0-planned-1w5kfjx",
+          "sourceSectionId": "source-w4pi6a-section-1j63rg0",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 3,
+          "representedSourceItemCount": 3,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1ts08d2-planned-ojhi3l",
+          "sourceSectionId": "source-w4pi6a-section-1ts08d2",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 6,
+          "representedSourceItemCount": 6,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-sd0lny-planned-1hddqj2",
+          "sourceSectionId": "source-w4pi6a-section-sd0lny",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 5,
+          "representedSourceItemCount": 5,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-7bbnja-planned-o1p7vf",
+          "sourceSectionId": "source-w4pi6a-section-7bbnja",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 6,
+          "representedSourceItemCount": 6,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1nm8kxx-planned-iqpbk",
+          "sourceSectionId": "source-w4pi6a-section-1nm8kxx",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 6,
+          "representedSourceItemCount": 6,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1oazktz-planned-1c18o2v",
+          "sourceSectionId": "source-w4pi6a-section-1oazktz",
+          "status": "passed",
+          "score": 1,
+          "sourceItemCount": 12,
+          "representedSourceItemCount": 12,
+          "issues": [],
+          "retryable": false,
+          "phase1FabricationFailures": [],
+          "semanticRelationshipIssueCount": 0
+        }
+      ],
+      "phase1FabricationFails": 0,
+      "phase1FabricationFailures": [],
+      "semanticRelationshipIssueCount": 0
+    },
+    "leakageStatus": "passed",
+    "leakage": {
+      "id": "leakage-517le0",
+      "planId": "plan-141htls",
+      "sourceId": "source-w4pi6a",
+      "status": "passed",
+      "issues": [],
+      "sections": [
+        {
+          "plannedSectionId": "source-w4pi6a-section-kisdat-planned-1v650ql",
+          "sourceSectionId": "source-w4pi6a-section-kisdat",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1d9j2g5-planned-xtp6cg",
+          "sourceSectionId": "source-w4pi6a-section-1d9j2g5",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-kos3o-planned-1dsi487",
+          "sourceSectionId": "source-w4pi6a-section-kos3o",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-18anu3v-planned-1sbq44v",
+          "sourceSectionId": "source-w4pi6a-section-18anu3v",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1vndlty-planned-1h02k4h",
+          "sourceSectionId": "source-w4pi6a-section-1vndlty",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1nbmktq-planned-w7d0x0",
+          "sourceSectionId": "source-w4pi6a-section-1nbmktq",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-exqzc5-planned-1jh3l0b",
+          "sourceSectionId": "source-w4pi6a-section-exqzc5",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-17yi4ux-planned-1imns6e",
+          "sourceSectionId": "source-w4pi6a-section-17yi4ux",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-yn9ktk-planned-1rnw5hp",
+          "sourceSectionId": "source-w4pi6a-section-yn9ktk",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-10kyf3m-planned-1gy1dg6",
+          "sourceSectionId": "source-w4pi6a-section-10kyf3m",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1gysrvv-planned-tr2bwm",
+          "sourceSectionId": "source-w4pi6a-section-1gysrvv",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-mdednr-planned-7hk431",
+          "sourceSectionId": "source-w4pi6a-section-mdednr",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-6zog7r-planned-11x4hyw",
+          "sourceSectionId": "source-w4pi6a-section-6zog7r",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1c23wf6-planned-1thukuf",
+          "sourceSectionId": "source-w4pi6a-section-1c23wf6",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1r9jceb-planned-1wa5dma",
+          "sourceSectionId": "source-w4pi6a-section-1r9jceb",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-6ah30x-planned-xk0rt5",
+          "sourceSectionId": "source-w4pi6a-section-6ah30x",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-fudax5-planned-fmbtjl",
+          "sourceSectionId": "source-w4pi6a-section-fudax5",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1tp1r1t-planned-1yrjs77",
+          "sourceSectionId": "source-w4pi6a-section-1tp1r1t",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-hh3nze-planned-9zm1pq",
+          "sourceSectionId": "source-w4pi6a-section-hh3nze",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1j63rg0-planned-1w5kfjx",
+          "sourceSectionId": "source-w4pi6a-section-1j63rg0",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1ts08d2-planned-ojhi3l",
+          "sourceSectionId": "source-w4pi6a-section-1ts08d2",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-sd0lny-planned-1hddqj2",
+          "sourceSectionId": "source-w4pi6a-section-sd0lny",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-7bbnja-planned-o1p7vf",
+          "sourceSectionId": "source-w4pi6a-section-7bbnja",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1nm8kxx-planned-iqpbk",
+          "sourceSectionId": "source-w4pi6a-section-1nm8kxx",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        },
+        {
+          "plannedSectionId": "source-w4pi6a-section-1oazktz-planned-1c18o2v",
+          "sourceSectionId": "source-w4pi6a-section-1oazktz",
+          "status": "passed",
+          "issues": [],
+          "retryable": false
+        }
+      ]
+    }
+  }
+}
