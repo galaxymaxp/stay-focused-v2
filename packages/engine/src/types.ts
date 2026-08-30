@@ -116,6 +116,33 @@ export interface PlannedSectionTarget {
   readonly coverageRules: readonly string[];
 }
 
+export type SectionSemanticKind =
+  | "concept"
+  | "list"
+  | "definition-set"
+  | "category-hierarchy"
+  | "procedure"
+  | "example-group";
+
+export type PlannedSemanticUnitKind =
+  | "point"
+  | "definition"
+  | "group"
+  | "steps"
+  | "examples";
+
+export interface PlannedSemanticUnit {
+  readonly kind: PlannedSemanticUnitKind;
+  readonly label: string;
+  readonly items: readonly string[];
+}
+
+export interface PlannedSectionSemanticPlan {
+  readonly kind: SectionSemanticKind;
+  readonly units: readonly PlannedSemanticUnit[];
+  readonly explanationUseful: boolean;
+}
+
 export interface PlannedSection {
   readonly id: string;
   readonly sourceSectionId: string;
@@ -128,6 +155,7 @@ export interface PlannedSection {
   readonly targetItemCount: number;
   readonly sourceStartOffset: number;
   readonly sourceEndOffset: number;
+  readonly semanticPlan?: PlannedSectionSemanticPlan;
 }
 
 export interface GenerationPlan {

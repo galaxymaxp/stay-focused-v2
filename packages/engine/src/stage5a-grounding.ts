@@ -220,7 +220,10 @@ function validateSectionGrounding(args: {
   const omissionCheck = checkOmissions({
     section: args.section,
     sourceItems,
-    keyPoints: output.sourceCore.keyPoints,
+    visibleCoreTexts: [
+      output.sourceCore.explanation,
+      ...output.sourceCore.keyPoints,
+    ],
   });
   const score = roundScore(
     Math.min(fabricationCheck.score, omissionCheck.score),
@@ -329,7 +332,7 @@ function dedupeTermOccurrences(
 function checkOmissions(args: {
   readonly section: PlannedSection;
   readonly sourceItems: readonly SourceItem[];
-  readonly keyPoints: readonly string[];
+  readonly visibleCoreTexts: readonly string[];
 }): OmissionCheck {
   if (args.sourceItems.length < 2) {
     return {
@@ -341,7 +344,7 @@ function checkOmissions(args: {
   }
 
   const representedItemKeys = new Set(
-    args.keyPoints
+    args.visibleCoreTexts
       .map(normalizeListItemCoverageKey)
       .filter((key) => key.length > 0),
   );
@@ -460,6 +463,10 @@ function sliceBlockForSourceSection(args: {
   readonly blockEndOffset: number;
   readonly sourceSection: SourceOutlineSection;
 }): string | undefined {
+  if (args.block.pageNumber !== undefined) {
+    const text = args.block.text.trim();
+    return text.length > 0 ? text : undefined;
+  }
   const startOffset = Math.max(
     args.blockStartOffset,
     args.sourceSection.startOffset,

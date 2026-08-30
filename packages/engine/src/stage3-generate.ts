@@ -4,6 +4,7 @@ import {
   detectInstructionLeakage,
 } from "./leakage-guard.js";
 import { getSchemaForSectionKind } from "./schemas.js";
+import { serializeSemanticUnits } from "./semantic-structure.js";
 import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
 import {
   extractCleanSourceItems,
@@ -115,10 +116,12 @@ export async function generateSection(
     providerOutput,
     section,
   );
-  const guardedOutput =
-    detectedItems.length >= 2
-      ? applyDetectedListCoreGuard(structurallyValidOutput, detectedItems)
-      : applySparseSourceCoreGuard(structurallyValidOutput, sourceBlocks);
+  const guardedOutput = applySemanticCoreGuard(
+    structurallyValidOutput,
+    section,
+    sourceBlocks,
+    detectedItems,
+  );
   const normalizedOutput = toDefaultStudentVisibleSectionOutput({
     ...guardedOutput,
     title: section.title,
@@ -152,18 +155,19 @@ export function buildSectionPrompt(
     `- Desired point total — ${section.target.itemCount}`,
     "- Content checks:",
     ...section.target.coverageRules.map((rule) => `  - ${rule}`),
+    ...semanticPlanPromptLines(section),
     "PASSAGE:",
     passage,
     ...detectedItemsPromptLines(detectedItems),
     "Requirements:",
     "- Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
-    "- HARD LIST RULE: when the passage is primarily an enumerated list of items or names, sourceCore.keyPoints MUST be exactly the detected passage items: one keyPoint per item, in passage order, using the passage wording verbatim.",
-    "- For a list section, DO NOT summarize the list, replace it with prose, merge items, omit items, or add items.",
-    "- DO NOT elaborate on any list item inside sourceCore. Copy a short or sparse list AS-IS; thinness is never a reason to elaborate.",
-    "- ANTI-META EXPLANATION RULE: sourceCore.explanation must contain passage-derived factual content, be one minimal passage-derived factual sentence, or be empty for a sparse/list-only card.",
+    "- Preserve every detected passage item, but preserve supported relationships instead of flattening related items into peers.",
+    "- Keep one coherent source idea per key point. Never fuse adjacent siblings or a heading with the next item.",
+    "- For definitions, categories, examples, and procedures, keep related content attached using the supplied semantic plan.",
+    "- ANTI-META EXPLANATION RULE: sourceCore.explanation must be one concise passage-derived synthesis sentence when the semantic plan says an explanation is useful; otherwise it may be empty.",
     "- sourceCore.explanation MUST NEVER describe the card itself, describe its purpose, or restate the task.",
     "- Forbidden meta-commentary includes: \"This section lists...\", \"The following are...\", \"These are the steps to...\", \"This section explains...\", and similar framing. Such text is not study content and can trigger instruction-leakage rejection.",
-    "- For a list-only card, the items carry the content through sourceCore.keyPoints. Use an empty explanation.",
+    "- List-heavy content may still have a useful explanation. Do not suppress it merely because key points are present.",
     "- For a heading-only or very short passage, keep sourceCore minimal and use the wording as-is with no filler.",
     "- FAKE FORMAT EXAMPLE: \"Fruit List • Apple • Banana • Cherry\" maps to explanation \"\" and keyPoints [\"Apple\",\"Banana\",\"Cherry\"].",
     "- FAKE FORMAT EXAMPLE: \"Desk Supplies • Pen • Notebook\" maps to explanation \"\" and keyPoints [\"Pen\",\"Notebook\"].",
@@ -172,6 +176,7 @@ export function buildSectionPrompt(
     "- If the passage is only a heading, title, module label, or very short phrase, do not expand it into a general lesson.",
     "- For a heading-only or very short passage, sourceCore must be a minimal restatement of the exact passage with one key point and enrichment must be null.",
     "- For list-only passages, include only the listed items and explanations explicitly present there.",
+    "- Numbering alone does not make a conceptual enumeration into a procedure.",
     "- Never borrow content from other passages.",
     "- Use the exact topic heading as title.",
     "- Set enrichment to null. Outside knowledge and source-external clarifications are not part of the default reviewer.",
@@ -235,6 +240,13 @@ function sliceBlockForSection(
     { readonly startOffset: number; readonly endOffset: number }
   >,
 ): NormalizedSourceBlock | undefined {
+  // Page-aware Stage 1 boundaries already identify whole presentation blocks.
+  // Character offsets are only needed when several inline sections share one
+  // non-paged block; applying them again to a later page truncates continuation
+  // material because the outline's offsets are relative to its filtered view.
+  if (block.pageNumber !== undefined) {
+    return block;
+  }
   if (section.sourceEndOffset <= section.sourceStartOffset) {
     return block;
   }
@@ -286,6 +298,181 @@ function applySparseSourceCoreGuard(
   } as SectionOutput;
 }
 
+function applySemanticCoreGuard(
+  output: SectionOutput,
+  section: PlannedSection,
+  sourceBlocks: readonly NormalizedSourceBlock[],
+  detectedItems: readonly SourceItem[],
+): SectionOutput {
+  const semanticPlan = section.semanticPlan;
+  if (!semanticPlan) {
+    return detectedItems.length >= 2
+      ? applyDetectedListCoreGuard(output, detectedItems)
+      : applySparseSourceCoreGuard(output, sourceBlocks);
+  }
+
+  const sourceText = sourceBlocksToText(sourceBlocks);
+  if (isSparseSourceText(sourceText)) {
+    return applySparseSourceCoreGuard(output, sourceBlocks);
+  }
+
+  const plannedKeyPoints = serializeSemanticUnits(semanticPlan.units);
+  const generatedExplanation = output.sourceCore.explanation.trim();
+  const explanation = semanticPlan.explanationUseful
+    ? semanticPlan.units.length > 0
+      ? selectGroundedExplanation(
+          generatedExplanation,
+          sourceText,
+          section,
+        )
+      : generatedExplanation
+    : "";
+  const visibleKeyPoints = plannedKeyPoints.filter(
+    (point) => normalizeSemanticText(point) !== normalizeSemanticText(explanation),
+  );
+  return {
+    ...output,
+    sourceCore: {
+      explanation,
+      keyPoints:
+        visibleKeyPoints.length > 0
+          ? visibleKeyPoints
+          : output.sourceCore.keyPoints,
+    },
+    enrichment: null,
+  } as SectionOutput;
+}
+
+function selectGroundedExplanation(
+  explanation: string,
+  sourceText: string,
+  section: PlannedSection,
+): string {
+  if (
+    explanation &&
+    isFullySourceGrounded(explanation, sourceText) &&
+    isUsefulDirectSourceExplanation(explanation, sourceText)
+  ) {
+    return explanation;
+  }
+
+  const semanticPlan = section.semanticPlan;
+  if (!semanticPlan) return "";
+  const titleTerms = new Set(extractCanonicalContentTerms(section.title));
+  const candidate = semanticPlan.units
+    .filter((unit) => unit.kind === "point")
+    .map((unit) => unit.label)
+    .find((point) => {
+      const pointTerms = extractCanonicalContentTerms(point);
+      const titleRelated = pointTerms.some((term) => titleTerms.has(term));
+      return (
+        pointTerms.length >= 7 &&
+        (semanticPlan.kind === "example-group" || titleRelated)
+      );
+    });
+  if (!candidate) return "";
+  return /[.!?]$/.test(candidate) ? candidate : `${candidate}.`;
+}
+
+const GROUNDING_STOPWORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "as",
+  "it",
+  "is",
+  "are",
+  "was",
+  "were",
+  "for",
+  "to",
+  "of",
+  "in",
+  "on",
+  "by",
+  "with",
+  "that",
+  "this",
+  "these",
+  "those",
+  "can",
+  "be",
+  "its",
+  "also",
+  "such",
+  "which",
+  "from",
+  "into",
+  "their",
+  "they",
+  "them",
+]);
+
+function isFullySourceGrounded(explanation: string, sourceText: string): boolean {
+  const sourceTerms = new Set(extractCanonicalContentTerms(sourceText));
+  const explanationTerms = extractCanonicalContentTerms(explanation);
+  return (
+    explanationTerms.length > 0 &&
+    explanationTerms.every((term) => sourceTerms.has(term))
+  );
+}
+
+function isUsefulDirectSourceExplanation(
+  explanation: string,
+  sourceText: string,
+): boolean {
+  const explanationWords = explanation.match(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g) ?? [];
+  if (explanationWords.length < 5) return false;
+
+  const normalizedExplanation = normalizeSemanticText(explanation);
+  return (
+    normalizedExplanation.length > 0 &&
+    normalizeSemanticText(sourceText).includes(normalizedExplanation)
+  );
+}
+
+function extractCanonicalContentTerms(value: string): readonly string[] {
+  return (value.match(/[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+)*/g) ?? [])
+    .filter((term) => !GROUNDING_STOPWORDS.has(term.toLocaleLowerCase()))
+    .map(canonicalContentTerm)
+    .filter(Boolean);
+}
+
+function canonicalContentTerm(value: string): string {
+  const normalized = value
+    .toLocaleLowerCase()
+    .replace(/[â€™']/g, "")
+    .replace(/[^a-z0-9/-]+/g, "")
+    .trim();
+  if (normalized.endsWith("ies") && normalized.length > 4) {
+    return `${normalized.slice(0, -3)}y`;
+  }
+  if (normalized.endsWith("ing") && normalized.length > 6) {
+    return normalized.slice(0, -3);
+  }
+  if (normalized.endsWith("ed") && normalized.length > 5) {
+    return normalized.slice(0, -2);
+  }
+  if (
+    normalized.endsWith("s") &&
+    !normalized.endsWith("ss") &&
+    normalized.length > 4
+  ) {
+    return normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+function normalizeSemanticText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
 function applyDetectedListCoreGuard(
   output: SectionOutput,
   detectedItems: readonly SourceItem[],
@@ -312,8 +499,25 @@ function detectedItemsPromptLines(
 
   return [
     "DETECTED PASSAGE ITEMS:",
-    "These entries were mechanically extracted from this card's passage. Preserve this order and wording in sourceCore.keyPoints.",
+    "These entries were mechanically extracted from this card's passage. Preserve their content and order; combine entries only when the semantic plan explicitly relates them.",
     ...detectedItems.map((item, index) => `${index + 1}. ${item.text}`),
+  ];
+}
+
+function semanticPlanPromptLines(section: PlannedSection): readonly string[] {
+  const semanticPlan = section.semanticPlan;
+  if (!semanticPlan) return [];
+
+  return [
+    "SEMANTIC PLAN:",
+    `- Section meaning: ${semanticPlan.kind}`,
+    `- Useful explanation: ${semanticPlan.explanationUseful ? "yes" : "no"}`,
+    ...semanticPlan.units.map(
+      (unit, index) =>
+        `- Unit ${index + 1}: ${unit.kind} | ${unit.label}${
+          unit.items.length > 0 ? ` -> ${unit.items.join(" | ")}` : ""
+        }`,
+    ),
   ];
 }
 

@@ -2,6 +2,28 @@
 
 Last refreshed: 2026-08-30, Asia/Manila.
 
+## Reviewer Benchmark B3 - Complete
+
+The accepted B2 17-section outline is unchanged. Stage 2 now carries a generic,
+optional semantic plan for concepts, lists, definition sets, supported category
+groups, procedures, and example groups. Stage 3 serializes those relationships
+through the compatible key-point surface, retains only useful direct-source
+explanations, keeps sparse facts free of filler, and continues to exclude
+outside enrichment. Page-scoped continuation content remains whole through
+generation and grounding.
+
+The 32-page Intro to IT Security rerun used `gpt-4o`, made 17 calls with zero
+retries and zero fallbacks, emitted the same 17 titles, and passed coverage and
+grounding at 1.00 with leakage passing. Definitions, threat categories,
+infiltration groups and ordered steps, and blended-attack examples remain
+associated. The deterministic engine suite passes 319/319.
+
+Known extraction limits remain: page 10 visual labels are absent and page 14
+attacker hierarchy edges are not reconstructed. The next Reviewer benchmark is
+B4 semantic verification: Stage 4/5 should independently reject incorrect
+relationship flattening/grouping instead of treating lexical 1.00 scores as
+semantic proof.
+
 ## Reviewer Benchmark B2 - Complete
 
 Production PDF review now retains normalized page identity through durable job
@@ -201,16 +223,15 @@ Major deliverables:
 Exit criteria:
 
 - Engine build passes.
-- Aggregate deterministic evals pass with 303 cases.
+- Aggregate deterministic evals pass with 319 cases.
 - Default visible reviewer output is source-faithful.
 - Unsupported enrichment is excluded from default assembly.
 
-Real-course quality note: the 2026-08-30 CIT6 audit and Intro to IT Security B2
-repaired natural course-PDF
-outline detection and retained complete, grounded coverage, but scored 3.75/5
-because flattened tables/process flows and repeated slide banners still produce
-dense extractive key points with little explanation. The next Reviewer quality
-task is Stage 3 study transformation, not UI redesign.
+Real-course quality note: Intro to IT Security B3 preserves the repaired
+course-PDF outline and now retains source-supported definitions, categories,
+procedures, and examples. Semantic relationships are still manually audited;
+the next Reviewer quality task is Stage 4/5 relationship verification, not UI
+redesign.
 
 Immediate dependency: None.
 

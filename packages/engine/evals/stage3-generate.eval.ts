@@ -25,6 +25,7 @@ import {
   type StructuredOutputSchema,
 } from "../src/schemas.js";
 import {
+  collectSectionSourceBlocks,
   generateSection,
   type GenerateSectionArgs,
   validateSectionOutput,
@@ -175,9 +176,117 @@ export const stage3GenerateSuite: EvalSuite = {
     createPromptFixtureNeutralityCase(),
     createMetaExplanationLeakageCase(),
     createEmptyListExplanationCase(),
+    createPagedContinuationBlockCase(),
+    createWeakSemanticExplanationCase(),
     ...validationCases.map(createValidationCase),
   ],
 };
+
+function createWeakSemanticExplanationCase(): EvalCase {
+  return {
+    name: "short grounded fragments do not become semantic explanations",
+    run: async () => {
+      const sourceText = [
+        "Types of Participants",
+        "- Members",
+        "- Guests",
+        "- Amateurs",
+      ].join("\n");
+      const context = createSingleBlockContext({
+        blockId: "participant-types-block",
+        blockKind: "list",
+        sourceId: "participant-types-source",
+        sourceTitle: "Participant Types",
+        sectionId: "participant-types-section",
+        sectionTitle: "Types of Participants",
+        sourceText,
+        targetObjective: "Retain the participant types.",
+        targetFocus: "Types of Participants",
+        targetItemCount: 3,
+      });
+      const section: PlannedSection = {
+        ...context.section,
+        semanticPlan: {
+          kind: "list",
+          explanationUseful: true,
+          units: [
+            { kind: "point", label: "Members", items: [] },
+            { kind: "point", label: "Guests", items: [] },
+            { kind: "point", label: "Amateurs", items: [] },
+          ],
+        },
+      };
+      const plan: GenerationPlan = { ...context.plan, sections: [section] };
+      const provider = new FakeGenerationProvider({
+        kind: "concept-card",
+        id: "participant-types-output",
+        plannedSectionId: section.id,
+        title: section.title,
+        sourceBlockIds: ["participant-types-block"],
+        sourceCore: {
+          explanation: "Amateurs",
+          keyPoints: ["Members", "Guests", "Amateurs"],
+        },
+        enrichment: null,
+      });
+
+      const output = await generateSection({
+        section,
+        plan,
+        source: context.source,
+        provider,
+      });
+      return assertDeepEqual(
+        output.sourceCore,
+        {
+          explanation: "",
+          keyPoints: ["Members", "Guests", "Amateurs"],
+        },
+        "A short grounded fragment displaced a semantic key point.",
+      );
+    },
+  };
+}
+
+function createPagedContinuationBlockCase(): EvalCase {
+  return {
+    name: "paged continuation blocks are not truncated by filtered outline offsets",
+    run: async () => {
+      const context = createContext("concept-card");
+      const section: PlannedSection = {
+        ...context.section,
+        sourceBlockIds: ["page-1-body", "page-2-body"],
+        sourceStartOffset: 25,
+        sourceEndOffset: 55,
+      };
+      const source: NormalizedSource = {
+        ...context.source,
+        blocks: [
+          {
+            id: "page-1-body",
+            kind: "list",
+            order: 0,
+            pageNumber: 1,
+            text: "- Alpha\n- Beta",
+          },
+          {
+            id: "page-2-body",
+            kind: "list",
+            order: 1,
+            pageNumber: 2,
+            text: "- Gamma\n- Delta",
+          },
+        ],
+      };
+
+      return assertDeepEqual(
+        collectSectionSourceBlocks(section, source).map((block) => block.text),
+        ["- Alpha\n- Beta", "- Gamma\n- Delta"],
+        "Stage 3 truncated a page-aware continuation block.",
+      );
+    },
+  };
+}
 
 function createMetaExplanationLeakageCase(): EvalCase {
   return {
@@ -897,7 +1006,7 @@ function createPromptRequirementsStabilityCase(): EvalCase {
         ),
         ...assertIncludes(
           prompt,
-          "HARD LIST RULE: when the passage is primarily an enumerated list of items or names, sourceCore.keyPoints MUST be exactly the detected passage items: one keyPoint per item, in passage order, using the passage wording verbatim.",
+          "Preserve every detected passage item, but preserve supported relationships instead of flattening related items into peers.",
           "Stage 3 detected-item prompt requirement drifted.",
         ),
         ...assertIncludes(

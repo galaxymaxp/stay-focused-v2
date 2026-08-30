@@ -2,6 +2,7 @@ export * from "./generate";
 export * from "./leakage-guard";
 export * from "./provider";
 export * from "./schemas";
+export * from "./semantic-structure";
 export * from "./source-items";
 export * from "./source-token-fidelity";
 export * from "./source-blocks";

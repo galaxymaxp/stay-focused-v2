@@ -32,6 +32,15 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer Benchmark B3 is complete locally. Stage 2 now carries an optional
+  source-derived semantic plan and distinguishes conceptual enumerations from
+  procedures; Stage 3 preserves definitions, supported category groups,
+  ordered steps, and explicit examples while allowing useful direct-source
+  explanations and avoiding filler. The real 32-page Intro to IT Security run
+  retains B2's 17-section outline and passes with 17 calls, 0 retries, 0
+  fallbacks, 1.00 coverage, 1.00 grounding, and leakage passing. Page 10 visual
+  labels and page 14 hierarchy edges remain explicit extraction gaps; see
+  `docs/ai/benchmarks/intro-it-security/benchmark-b3.md`.
 - Reviewer Benchmark B2 is complete locally. Production PDF extraction now
   preserves normalized page blocks through mobile job submission and durable
   worker storage into generic engine source blocks. Page-aware Stage 0/1
@@ -109,8 +118,8 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
   targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
-  reviewer engine: 303/303 deterministic evaluations after the eleven B2
-  page-aware regressions. These suites were rerun
+  reviewer engine: 319/319 deterministic evaluations after B3 semantic,
+  continuation, explanation, and source-item regressions. These suites were rerun
   after hosted acceptance.
 - Forced root typecheck and lint pass fresh for 7/7 packages with zero cached
   tasks; lint retains only the four known mobile import-order warnings. DB and
@@ -169,11 +178,11 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: improve Stage 3 study transformation for flattened
-  tables/processes and repeated slide banners while preserving the corrected
-  outline and strict grounding. The 2026-08-30 CIT6 real-course audit reached
-  3.75/5 after outline repair, below the 4.0 capstone-ready threshold; see
-  `docs/ai/cit6-reviewer-quality-output.md`.
+- Recommended next task: add Stage 4/5 semantic relationship verification so a
+  reviewer cannot receive 1.00 coverage and grounding while definitions,
+  categories, procedures, or examples are incorrectly flattened or grouped.
+  B3 records the lexical-verification limitation and manual semantic audit in
+  `docs/ai/benchmarks/intro-it-security/benchmark-b3.md`.
 - Reviewer-core limitations are documented in
   `docs/ai/reviewer-core-capstone-acceptance-20260828.md`; notably, fresh camera
   and long-document device acceptance was not repeated, and a cold-start

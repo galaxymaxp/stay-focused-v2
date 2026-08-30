@@ -4,9 +4,11 @@ import type {
   PlannedSection,
   PlannedSectionTarget,
   SectionSchemaKind,
+  SectionSemanticKind,
   SourceOutline,
   SourceOutlineSection,
 } from "./types";
+import { analyzeSectionSemanticStructure } from "./semantic-structure.js";
 
 const COVERAGE_RULES: Readonly<
   Record<SectionSchemaKind, readonly string[]>
@@ -112,8 +114,17 @@ function createPlannedSection(
   section: SourceOutlineSection,
   sourceBlockById: ReadonlyMap<string, NormalizedSource["blocks"][number]>,
 ): PlannedSection {
-  const schemaKind = selectSchemaKind(section);
   const sourceBlockIds = blockIdsForSection(section);
+  const sourceBlocks = sourceBlockIds.flatMap((blockId) => {
+    const block = sourceBlockById.get(blockId);
+    return block ? [block] : [];
+  });
+  const semanticPlan = analyzeSectionSemanticStructure({
+    title: section.title,
+    tags: section.tags,
+    sourceBlocks,
+  });
+  const schemaKind = selectSchemaKind(section, semanticPlan.kind);
   const tokenWeight = tokenWeightForSection(section, sourceBlockIds, sourceBlockById);
   const targetItemCount = targetItemCountFor(tokenWeight);
 
@@ -132,11 +143,18 @@ function createPlannedSection(
     targetItemCount,
     sourceStartOffset: finiteNumberOr(section.startOffset, 0),
     sourceEndOffset: finiteNumberOr(section.endOffset, 0),
+    semanticPlan,
   };
 }
 
-function selectSchemaKind(section: SourceOutlineSection): SectionSchemaKind {
-  if (section.tags.includes("process")) {
+function selectSchemaKind(
+  section: SourceOutlineSection,
+  semanticKind: SectionSemanticKind,
+): SectionSchemaKind {
+  if (
+    semanticKind === "procedure" ||
+    (section.tags.includes("process") && semanticKind === "concept")
+  ) {
     return "process-step";
   }
   if (section.tags.includes("example")) {

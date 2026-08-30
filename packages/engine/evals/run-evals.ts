@@ -15,12 +15,14 @@ import { studentVisibleFaithfulnessSuite } from "./student-visible-faithfulness.
 import { pipelineSuite } from "./pipeline.eval.js";
 import { sourceTokenFidelitySuite } from "./source-token-fidelity.eval.js";
 import { reviewerRecoverySuite } from "./reviewer-recovery.eval.js";
+import { semanticStructureSuite } from "./semantic-structure.eval.js";
 
 const suites = [
   stage0NormalizationSuite,
   stage1OutlineSuite,
   stage2PlanSuite,
   stage3GenerateSuite,
+  semanticStructureSuite,
   stage4VerifySuite,
   stage5aGroundingSuite,
   stage5RetrySuite,

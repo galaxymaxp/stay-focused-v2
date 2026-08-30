@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { normalizeSource } from "../src/stage0-normalize.js";
 import { detectOutline, flattenSourceBlocks } from "../src/stage1-outline.js";
 import { extractCleanSourceItems } from "../src/source-items.js";
-import { validateGrounding } from "../src/stage5a-grounding.js";
+import {
+  extractGroundingSourceSectionText,
+  validateGrounding,
+} from "../src/stage5a-grounding.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -28,12 +31,15 @@ export const stage5aGroundingSuite: EvalSuite = {
   name: "Stage 5a grounding validation",
   cases: [
     createRepeatedHeadingSuffixCleanupCase(),
+    createPagedContinuationGroundingSpanCase(),
     createInlineBulletGlyphExtractionCase(),
     createLineAndNumberedBulletExtractionCase(),
     createFixtureDStyleNestedBulletExtractionCase(),
     createFlattenedOcrHyphenStreamExtractionCase(),
     createFlattenedBoundaryNormalProseGuardCase(),
     createFlattenedNestedMethodDedupeCase(),
+    createAdjacentBoundaryLabelSplitCase(),
+    createHyphenatedBoundaryLabelCase(),
     createRepeatedBareMethodLabelDedupeCase(),
     createTableRowExtractionCase(),
     createCleanedFusedItemGroundingCase(),
@@ -53,6 +59,88 @@ export const stage5aGroundingSuite: EvalSuite = {
     createFaithfulSectionsCase(),
   ],
 };
+
+function createAdjacentBoundaryLabelSplitCase(): EvalCase {
+  return {
+    name: "two adjacent recognized labels remain separate source items",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          "- Black hats\n- Grey hats\n- White hats Amateurs",
+          "Types of Attackers",
+        ),
+        ["Black hats", "Grey hats", "White hats", "Amateurs"],
+        "Adjacent recognized labels remained falsely fused.",
+      ),
+  };
+}
+
+function createHyphenatedBoundaryLabelCase(): EvalCase {
+  return {
+    name: "recognized labels inside hyphenated compounds are not split",
+    run: async () =>
+      assertDeepEqual(
+        sourceItemTexts(
+          "- Employees and\nex-employees\n- Contract Staff\n- Trusted Partners",
+          "Types of Attackers",
+        ),
+        ["Employees and ex-employees", "Contract Staff", "Trusted Partners"],
+        "A recognized label inside a hyphenated compound became a false boundary.",
+      ),
+  };
+}
+
+function createPagedContinuationGroundingSpanCase(): EvalCase {
+  return {
+    name: "paged continuation blocks remain inside the grounding span",
+    run: async () => {
+      const source: NormalizedSource = {
+        id: "paged-grounding-source",
+        title: "Paged Grounding",
+        kind: "presentation",
+        language: "en",
+        metadata: {},
+        createdAt: "2026-08-30T00:00:00.000Z",
+        blocks: [
+          {
+            id: "page-1-body",
+            kind: "list",
+            order: 0,
+            pageNumber: 1,
+            text: "- Alpha\n- Beta",
+          },
+          {
+            id: "page-2-body",
+            kind: "list",
+            order: 1,
+            pageNumber: 2,
+            text: "- Gamma\n- Delta",
+          },
+        ],
+      };
+      const section: SourceOutlineSection = {
+        id: "paged-grounding-section",
+        title: "Paged Grounding",
+        order: 0,
+        startOffset: 25,
+        endOffset: 55,
+        tokenWeight: 4,
+        sourceBlockIds: ["page-1-body", "page-2-body"],
+        blockIds: ["page-1-body", "page-2-body"],
+        roughStartBlockId: "page-1-body",
+        roughEndBlockId: "page-2-body",
+        tags: ["concept"],
+        confidence: 1,
+      };
+
+      return assertEqual(
+        extractGroundingSourceSectionText(source, section),
+        "- Alpha\n- Beta\n- Gamma\n- Delta",
+        "Grounding truncated a page-aware continuation block.",
+      );
+    },
+  };
+}
 
 function createInlineBulletGlyphExtractionCase(): EvalCase {
   return {

@@ -37,7 +37,7 @@ const TABLE_HEADER_LABELS = new Set([
   "term",
   "value",
 ]);
-const FLATTENED_LABEL_MIN_MATCHES = 3;
+const FLATTENED_LABEL_MIN_MATCHES = 2;
 const FLATTENED_BOUNDARY_GROUPS = [
   {
     sectionTitleKeys: ["attacker", "actor"],
@@ -463,8 +463,8 @@ function findBoundaryLabelMatches(
       }
       const end = index + label.length;
       if (
-        isWordBoundary(value[index - 1]) &&
-        isWordBoundary(value[end]) &&
+        isBoundaryLabelEdge(value[index - 1]) &&
+        isBoundaryLabelEdge(value[end]) &&
         !matches.some((match) =>
           rangesOverlap(
             index,
@@ -499,8 +499,8 @@ function hasDescriptionAfterBoundaryLabel(itemText: string): boolean {
   );
 }
 
-function isWordBoundary(value: string | undefined): boolean {
-  return value === undefined || !/[A-Za-z0-9]/.test(value);
+function isBoundaryLabelEdge(value: string | undefined): boolean {
+  return value === undefined || !/[A-Za-z0-9/-]/.test(value);
 }
 
 function rangesOverlap(
