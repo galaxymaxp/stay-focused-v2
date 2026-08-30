@@ -112,6 +112,10 @@ export const stage5RetrySuite: EvalSuite = {
     ...basicCases.map(createBasicCase),
     ...policyCases.map(createPolicyCase),
     ...validationCases.map(createValidationCase),
+    {
+      name: "relationship failure retries one section with precise diagnostics",
+      run: runSemanticRetryGuidanceCase,
+    },
   ],
 };
 
@@ -638,6 +642,96 @@ function createCoverage(
     source: context.source,
     outline: context.outline,
   });
+}
+
+async function runSemanticRetryGuidanceCase(): Promise<readonly EvalIssue[]> {
+  const base = createContext(["concept-card"]);
+  const baseSection = requireSection(base.sections[0]);
+  const section: PlannedSection = {
+    ...baseSection,
+    title: "Stored Definitions",
+    semanticPlan: {
+      kind: "definition-set",
+      units: [
+        { kind: "definition", label: "Alpha", items: ["First stored meaning"] },
+        { kind: "definition", label: "Beta", items: ["Second stored meaning"] },
+      ],
+      explanationUseful: false,
+    },
+  };
+  const source: NormalizedSource = {
+    ...base.source,
+    title: section.title,
+    blocks: [
+      { ...base.source.blocks[0]!, text: "Alpha - First stored meaning" },
+      { ...base.source.blocks[1]!, text: "Beta - Second stored meaning" },
+    ],
+  };
+  const outline: SourceOutline = {
+    ...base.outline,
+    title: section.title,
+    sections: base.outline.sections.map((entry) => ({
+      ...entry,
+      title: section.title,
+    })),
+  };
+  const plan: GenerationPlan = {
+    ...base.plan,
+    title: section.title,
+    sections: [section],
+  };
+  const context: Stage5Context = { source, outline, plan, sections: [section] };
+  const badOutput: SectionOutput = {
+    ...createValidOutput(section, "semantic-bad-output"),
+    title: section.title,
+    sourceCore: {
+      explanation: "",
+      keyPoints: [
+        "Alpha - Second stored meaning",
+        "Beta - First stored meaning",
+      ],
+    },
+  };
+  const repairedOutput: SectionOutput = {
+    ...badOutput,
+    id: "semantic-repaired-output",
+    sourceCore: {
+      explanation: "",
+      keyPoints: [
+        "Alpha - First stored meaning",
+        "Beta - Second stored meaning",
+      ],
+    },
+  };
+  const coverage = createCoverage(context, [badOutput]);
+  const grounding = validateGrounding({
+    outputs: [badOutput],
+    plan,
+    source,
+    outline,
+  });
+  const provider = new FakeProvider([outputResponse(repairedOutput)]);
+  const outputs = await retryFailedSections({
+    ...baseArgs(context, [badOutput], provider),
+    coverage,
+    grounding,
+    retryPolicy: policy({ maxRetries: 1 }),
+  });
+  const prompt = provider.requests[0]?.prompt ?? "";
+  return [
+    ...assertEqual(provider.requests.length, 1, "Semantic failure retried more than its affected section."),
+    ...assertIncludes(
+      prompt,
+      "grounding-wrong-definition-association",
+      "Retry prompt omitted the semantic issue class.",
+    ),
+    ...assertIncludes(
+      prompt,
+      "Preserve the source association",
+      "Retry prompt omitted relationship-specific corrective guidance.",
+    ),
+    ...assertEqual(outputs[0]?.id, repairedOutput.id, "Semantic retry did not preserve the repaired section output."),
+  ];
 }
 
 function withRetryable(

@@ -32,6 +32,16 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer Benchmark B4 is complete locally. Stage 4 now scores unique
+  source-derived semantic targets, while Stage 5a independently rejects wrong
+  definition, parent-child, step-order, example, cross-concept, and sibling
+  relationships. Relationship failures remain section-bounded and now produce
+  field/type-specific retry guidance. The exact Intro to IT Security PDF
+  retains B3's 17 titles and all 17 sourceCore payloads, passing 110/110 semantic
+  targets, 1.00 coverage, 1.00 grounding, zero relationship issues, leakage,
+  17 calls, 0 retries, and 0 fallbacks. The Google credential exposed during B3
+  still requires authorized operational rotation; B4 did not inspect or reuse
+  it. See `docs/ai/benchmarks/intro-it-security/benchmark-b4.md`.
 - Reviewer Benchmark B3 is complete locally. Stage 2 now carries an optional
   source-derived semantic plan and distinguishes conceptual enumerations from
   procedures; Stage 3 preserves definitions, supported category groups,
@@ -118,9 +128,9 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
   targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
-  reviewer engine: 319/319 deterministic evaluations after B3 semantic,
-  continuation, explanation, and source-item regressions. These suites were rerun
-  after hosted acceptance.
+  reviewer engine: 343/343 deterministic evaluations after B4 semantic
+  coverage, relationship, fault-injection, and retry-diagnostic regressions.
+  These suites were rerun after hosted acceptance.
 - Forced root typecheck and lint pass fresh for 7/7 packages with zero cached
   tasks; lint retains only the four known mobile import-order warnings. DB and
   API production builds pass.
@@ -178,11 +188,12 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: add Stage 4/5 semantic relationship verification so a
-  reviewer cannot receive 1.00 coverage and grounding while definitions,
-  categories, procedures, or examples are incorrectly flattened or grouped.
-  B3 records the lexical-verification limitation and manual semantic audit in
-  `docs/ai/benchmarks/intro-it-security/benchmark-b3.md`.
+- Recommended next task: run the same reviewer benchmark on the Firewalls PDF
+  to test whether the B3 generation structure and B4 semantic verifier
+  generalize beyond Intro to IT Security.
+- The Google service-account credential exposed during B3 requires authorized
+  operational rotation. Do not inspect, print, copy, or commit the existing
+  value while remediation is pending.
 - Reviewer-core limitations are documented in
   `docs/ai/reviewer-core-capstone-acceptance-20260828.md`; notably, fresh camera
   and long-document device acceptance was not repeated, and a cold-start

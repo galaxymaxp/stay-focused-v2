@@ -1,5 +1,7 @@
 import { COVERAGE_THRESHOLD } from "@stay-focused/shared";
 
+import { verifySemanticCoverage } from "./semantic-verification.js";
+
 import type {
   CoverageIssue,
   CoverageReport,
@@ -78,11 +80,29 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
   const sourceSectionsCovered = sourceSections.filter(
     (section) => section.status === "covered",
   ).length;
-  const coverageScore = roundScore(
-    sourceSectionsTotal === 0
-      ? 0
-      : sourceSectionsCovered / sourceSectionsTotal,
+  const semanticTargetCount = sectionResults.reduce(
+    (total, section) => total + (section.semanticTargetCount ?? 0),
+    0,
   );
+  const coveredSemanticTargetCount = sectionResults.reduce(
+    (total, section) => total + (section.coveredSemanticTargetCount ?? 0),
+    0,
+  );
+  const usesSemanticCoverage = plan.sections.some(
+    (section) => section.semanticPlan !== undefined,
+  );
+  const semanticCoverageScore = roundScore(
+    semanticTargetCount === 0
+      ? 0
+      : coveredSemanticTargetCount / semanticTargetCount,
+  );
+  const coverageScore = usesSemanticCoverage
+    ? semanticCoverageScore
+    : roundScore(
+        sourceSectionsTotal === 0
+          ? 0
+          : sourceSectionsCovered / sourceSectionsTotal,
+      );
   const duplicateGroups = findDuplicateSectionGroups(plan.sections);
   const issues = createCoverageIssues({
     sourceSections,
@@ -138,6 +158,9 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     sourceSections,
     issues,
     sections,
+    semanticTargetCount,
+    coveredSemanticTargetCount,
+    semanticCoverageScore,
   };
 }
 
@@ -222,12 +245,19 @@ function verifyPlannedSection(
 ): SectionCoverageResult {
   const output = outputs[0];
   if (!output) {
+    const semanticTargetCount = Math.max(
+      1,
+      section.semanticPlan?.units.length ?? 0,
+    );
     return {
       plannedSectionId: section.id,
       status: "failed",
       score: 0,
       issues: [`Missing output for planned section "${section.id}".`],
       retryable: true,
+      semanticTargetCount,
+      coveredSemanticTargetCount: 0,
+      semanticCoverageScore: 0,
     };
   }
 
@@ -254,6 +284,29 @@ function verifyPlannedSection(
     score -= 0.2;
   }
 
+  const semanticCheck = verifySemanticCoverage(section, output);
+  const hasSemanticPlan = section.semanticPlan !== undefined;
+  const semanticTargetCount = hasSemanticPlan
+    ? Math.max(1, semanticCheck.targetCount)
+    : 0;
+  const coveredSemanticTargetCount = hasSemanticPlan
+    ? semanticCheck.targetCount === 0
+      ? hasWrongKind ||
+        fieldCheck.hasMissingRequiredField ||
+        sourceCheck.hasUnknownReference ||
+        sourceCheck.score < 1
+        ? 0
+        : 1
+      : semanticCheck.coveredTargetCount
+    : 0;
+  const semanticCoverageScore = hasSemanticPlan
+    ? roundScore(coveredSemanticTargetCount / semanticTargetCount)
+    : 1;
+  if (hasSemanticPlan) {
+    score = Math.min(score, semanticCoverageScore);
+    issues.push(...semanticCheck.issues);
+  }
+
   score = Math.max(0, score);
   if (
     hasWrongKind ||
@@ -266,12 +319,20 @@ function verifyPlannedSection(
   }
   score = roundScore(score);
 
+  const semanticIncomplete =
+    hasSemanticPlan && coveredSemanticTargetCount < semanticTargetCount;
   return {
     plannedSectionId: section.id,
-    status: statusForScore(score),
+    status:
+      semanticIncomplete && score >= WEAK_THRESHOLD
+        ? "weak"
+        : statusForScore(score),
     score,
     issues,
-    retryable: score < PASSED_THRESHOLD,
+    retryable: semanticIncomplete || score < PASSED_THRESHOLD,
+    semanticTargetCount,
+    coveredSemanticTargetCount,
+    semanticCoverageScore,
   };
 }
 

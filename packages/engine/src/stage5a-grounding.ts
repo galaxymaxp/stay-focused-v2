@@ -5,6 +5,7 @@ import {
   type SourceItem,
 } from "./source-items.js";
 import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
+import { verifySemanticRelationships } from "./semantic-verification.js";
 import {
   extractStudentVisibleText,
   type StudentVisibleTextEntry,
@@ -123,6 +124,7 @@ export function validateGrounding(
     }
     return validateSectionGrounding({
       section,
+      allSections: args.plan.sections,
       outputs: outputsBySectionId.get(section.id) ?? [],
       sourceSpan: {
         sourceSection,
@@ -133,6 +135,11 @@ export function validateGrounding(
   const issues = sections.flatMap((section) => section.issues);
   const phase1FabricationFailures = sections.flatMap(
     (section) => section.phase1FabricationFailures,
+  );
+  const semanticRelationshipIssueCount = sections.reduce(
+    (total, section) =>
+      total + (section.semanticRelationshipIssueCount ?? 0),
+    0,
   );
   const score = roundScore(
     sections.length === 0
@@ -171,11 +178,13 @@ export function validateGrounding(
     sections,
     phase1FabricationFails: phase1FabricationFailures.length,
     phase1FabricationFailures,
+    semanticRelationshipIssueCount,
   };
 }
 
 function validateSectionGrounding(args: {
   readonly section: PlannedSection;
+  readonly allSections: readonly PlannedSection[];
   readonly outputs: readonly SectionOutput[];
   readonly sourceSpan: SourceSpan;
 }): InstrumentedSectionGroundingResult {
@@ -191,11 +200,14 @@ function validateSectionGrounding(args: {
       issues: [],
       retryable: true,
       phase1FabricationFailures: [],
+      semanticRelationshipIssueCount: 0,
     };
   }
 
   const visibleEntries = extractStudentVisibleText(output);
-  const sourceTerms = extractTermSet(args.sourceSpan.text);
+  const sourceTerms = extractTermSet(
+    [args.sourceSpan.text, args.section.title].join("\n"),
+  );
   const titleTerms = new Set([
     ...sourceTerms,
     ...extractTermSet(args.sourceSpan.sourceSection.title),
@@ -225,10 +237,54 @@ function validateSectionGrounding(args: {
       ...output.sourceCore.keyPoints,
     ],
   });
-  const score = roundScore(
-    Math.min(fabricationCheck.score, omissionCheck.score),
+  const relationshipIssues = verifySemanticRelationships({
+    section: args.section,
+    output,
+    allSections: args.allSections,
+  }).map(
+    (issue): GroundingIssue => ({
+      type: issue.type,
+      severity: "error",
+      plannedSectionId: args.section.id,
+      sourceSectionId: args.section.sourceSectionId,
+      field: issue.fieldPath.startsWith("sourceCore.explanation")
+        ? "sourceCore.explanation"
+        : "sourceCore.keyPoints",
+      fieldPath: issue.fieldPath,
+      offendingText: issue.offendingText,
+      excerpt: issue.offendingText[0],
+      message: issue.message,
+    }),
   );
-  const issues = [...fabricationCheck.issues, ...omissionCheck.issues];
+  const relationshipTargetCount = Math.max(
+    1,
+    args.section.semanticPlan?.units.filter((unit) => unit.kind !== "point")
+      .length ?? 0,
+  );
+  const relationshipScore =
+    relationshipIssues.length === 0
+      ? 1
+      : Math.min(
+          0.79,
+          roundScore(
+            Math.max(
+              0,
+              1 - relationshipIssues.length / relationshipTargetCount,
+            ),
+          ),
+        );
+  const score = roundScore(
+    Math.min(
+      fabricationCheck.score,
+      omissionCheck.score,
+      relationshipScore,
+    ),
+  );
+  const issues = [
+    ...fabricationCheck.issues,
+    ...omissionCheck.issues,
+    ...relationshipIssues,
+  ];
 
   return {
     plannedSectionId: args.section.id,
@@ -241,6 +297,7 @@ function validateSectionGrounding(args: {
     issues,
     retryable: issues.length > 0,
     phase1FabricationFailures: fabricationCheck.failures,
+    semanticRelationshipIssueCount: relationshipIssues.length,
   };
 }
 
@@ -353,7 +410,8 @@ function checkOmissions(args: {
   for (const item of args.sourceItems) {
     const itemKey = normalizeListItemCoverageKey(item.text);
     const represented = representedItemKeys.has(itemKey) ||
-      (itemKey.length >= 3 && [...representedItemKeys].some((key) => key.includes(itemKey)));
+      (itemKey.length >= 3 && [...representedItemKeys].some((key) => key.includes(itemKey))) ||
+      args.visibleCoreTexts.some((text) => sourceItemTokenRecall(item.text, text) >= 0.8);
     if (!represented) {
       missingItems.push(item);
     }
@@ -389,6 +447,21 @@ function checkOmissions(args: {
       },
     ],
   };
+}
+
+function sourceItemTokenRecall(sourceItem: string, visibleText: string): number {
+  const expectedTerms = new Set(
+    (sourceItem.toLocaleLowerCase().match(/[a-z0-9]+/g) ?? [])
+      .filter((term) => !STOPWORDS.has(term)),
+  );
+  const visibleTerms = new Set(
+    (visibleText.toLocaleLowerCase().match(/[a-z0-9]+/g) ?? [])
+      .filter((term) => !STOPWORDS.has(term)),
+  );
+  if (expectedTerms.size === 0 || visibleTerms.size === 0) return 0;
+  const represented = [...expectedTerms]
+    .filter((term) => visibleTerms.has(term)).length;
+  return represented / expectedTerms.size;
 }
 
 function normalizeListItemCoverageKey(value: string): string {

@@ -13,6 +13,7 @@ import {
 } from "./stage5a-grounding.js";
 import { extractCleanSourceItems } from "./source-items.js";
 import { extractProtectedSourceTokens } from "./source-token-fidelity.js";
+import { serializeSemanticUnits } from "./semantic-structure.js";
 import type {
   CoverageReport,
   CoverageStatus,
@@ -381,6 +382,9 @@ export function createExtractiveSectionFallback(args: {
       );
     },
   );
+  const semanticItems = args.section.semanticPlan?.units.length
+    ? serializeSemanticUnits(args.section.semanticPlan.units)
+    : [];
   const allBlocks = sourceLines.length > 0 ? sourceLines : [normalizeBlockText(sourceText)];
   const contentBlocks = allBlocks.filter(
     (text) => normalizeBlockText(text).toLocaleLowerCase() !== normalizeBlockText(args.section.title).toLocaleLowerCase(),
@@ -393,7 +397,9 @@ export function createExtractiveSectionFallback(args: {
   }
 
   const keyPoints = uniqueExtracts(
-    args.mode === "span"
+    semanticItems.length > 0
+      ? semanticItems
+      : args.mode === "span"
       ? [
           sourceText,
           ...extractiveItems.filter(
@@ -716,7 +722,12 @@ function formatGroundingIssueGuidance(
     issue.sourceItem ? `missingSourceItem=${issue.sourceItem}` : "",
   ].filter((value) => value.length > 0);
 
-  return `Grounding issue: ${details.join(" | ")}`;
+  const relationshipIssue =
+    issue.type !== "grounding-fabrication" &&
+    issue.type !== "grounding-omission";
+  return relationshipIssue
+    ? `Semantic relationship issue (${issue.type}): ${details.join(" | ")}`
+    : `Grounding issue: ${details.join(" | ")}`;
 }
 
 function formatLeakageIssueGuidance(

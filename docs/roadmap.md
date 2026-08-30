@@ -2,6 +2,29 @@
 
 Last refreshed: 2026-08-30, Asia/Manila.
 
+## Reviewer Benchmark B4 - Complete
+
+Stage 4/5 now verifies relationships rather than certifying source-token
+presence alone. Coverage assigns visible rows to unique semantic targets and
+scores covered targets over total targets. Grounding separately rejects wrong
+definition, parent-child, procedure-order, example, cross-concept, and sibling
+associations while retaining lexical fabrication and omission checks. Valid
+conservative paraphrases and ambiguous flat source structures still pass.
+
+The required 16-fixture matrix, seven structured fault injections, and precise
+section-only retry diagnostic pass. The engine suite is 343/343. The exact Intro
+to IT Security PDF rerun preserves B3's 17 titles and every sourceCore payload,
+passes 110/110 semantic targets, coverage and grounding at 1.00, zero semantic
+relationship issues, and leakage, with 17 calls, no retries, and no fallbacks.
+
+Page 10 visual labels, page 14 hierarchy edges, and flat denial-service visual
+relationships remain extraction limits rather than verifier failures. The
+Google service-account credential exposed during B3 requires separate
+authorized operational rotation; B4 did not inspect or reuse it.
+
+Next Reviewer benchmark: apply the same process to the Firewalls PDF to test
+cross-document generalization before making additional engine changes.
+
 ## Reviewer Benchmark B3 - Complete
 
 The accepted B2 17-section outline is unchanged. Stage 2 now carries a generic,
@@ -223,15 +246,14 @@ Major deliverables:
 Exit criteria:
 
 - Engine build passes.
-- Aggregate deterministic evals pass with 319 cases.
+- Aggregate deterministic evals pass with 343 cases.
 - Default visible reviewer output is source-faithful.
 - Unsupported enrichment is excluded from default assembly.
 
-Real-course quality note: Intro to IT Security B3 preserves the repaired
-course-PDF outline and now retains source-supported definitions, categories,
-procedures, and examples. Semantic relationships are still manually audited;
-the next Reviewer quality task is Stage 4/5 relationship verification, not UI
-redesign.
+Real-course quality note: Intro to IT Security B4 preserves B3's repaired
+course-PDF outline and source-supported definitions, categories, procedures,
+and examples. Stage 4/5 now independently verifies those relationships. The
+next quality proof is the Firewalls PDF, not additional Intro-specific tuning.
 
 Immediate dependency: None.
 

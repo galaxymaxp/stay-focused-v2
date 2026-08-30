@@ -242,6 +242,9 @@ export interface SectionCoverageResult {
   readonly score: number;
   readonly issues: readonly string[];
   readonly retryable: boolean;
+  readonly semanticTargetCount?: number;
+  readonly coveredSemanticTargetCount?: number;
+  readonly semanticCoverageScore?: number;
 }
 
 export interface SourceSectionCoverage {
@@ -264,6 +267,9 @@ export interface CoverageReport {
   readonly sourceSections: readonly SourceSectionCoverage[];
   readonly issues: readonly CoverageIssue[];
   readonly sections: readonly SectionCoverageResult[];
+  readonly semanticTargetCount?: number;
+  readonly coveredSemanticTargetCount?: number;
+  readonly semanticCoverageScore?: number;
 }
 
 export type GroundingReportStatus = "passed" | "failed";
@@ -277,7 +283,14 @@ export type ReviewerQualityStatus =
   | "limited";
 export type GroundingIssueType =
   | "grounding-fabrication"
-  | "grounding-omission";
+  | "grounding-omission"
+  | "grounding-unsupported-relationship"
+  | "grounding-wrong-definition-association"
+  | "grounding-wrong-parent-child"
+  | "grounding-wrong-step-order"
+  | "grounding-cross-concept-fusion"
+  | "grounding-sibling-fusion"
+  | "grounding-wrong-example-association";
 
 export interface GroundingIssue {
   readonly type: GroundingIssueType;
@@ -308,6 +321,7 @@ export interface SectionGroundingResult {
   readonly representedSourceItemCount: number;
   readonly issues: readonly GroundingIssue[];
   readonly retryable: boolean;
+  readonly semanticRelationshipIssueCount?: number;
 }
 
 export interface GroundingReport {
@@ -321,6 +335,7 @@ export interface GroundingReport {
   readonly sections: readonly SectionGroundingResult[];
   readonly phase1FabricationFails: number;
   readonly phase1FabricationFailures: readonly Phase1FabricationFailure[];
+  readonly semanticRelationshipIssueCount?: number;
 }
 
 export type StudentFacingSectionField =
