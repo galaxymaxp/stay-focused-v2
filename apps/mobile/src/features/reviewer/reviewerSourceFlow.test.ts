@@ -353,6 +353,7 @@ describe("reviewer source flow", () => {
     const withOcr = reviewerSourceReducer(imageMode, {
       type: "ocr_succeeded",
       text: "OCR source",
+      sourceBlocks: [{ text: "OCR source", pageNumber: 1, order: 0 }],
     });
     const backToPaste = reviewerSourceReducer(withOcr, {
       type: "switch_mode",
@@ -360,6 +361,7 @@ describe("reviewer source flow", () => {
     });
 
     expect(getCurrentSourceText(backToPaste)).toBe("Manual source");
+    expect(backToPaste.sourceBlocks).toEqual([]);
   });
 
   it("switches source modes without carrying stale PDF errors", () => {
@@ -451,8 +453,15 @@ describe("reviewer source flow", () => {
         type: "pdf_selected",
         pdf: pdf(),
       }),
-      { type: "ocr_succeeded", text: "PDF OCR line", pageCount: 1 },
+      {
+        type: "ocr_succeeded",
+        text: "PDF OCR line",
+        pageCount: 1,
+        sourceBlocks: [{ text: "PDF OCR line", pageNumber: 1, order: 0 }],
+      },
     );
+
+    expect(ready.sourceBlocks).toHaveLength(1);
 
     const edited = reviewerSourceReducer(ready, {
       type: "edit_source_text",
@@ -460,6 +469,7 @@ describe("reviewer source flow", () => {
     });
 
     expect(getCurrentSourceText(edited)).toBe("PDF OCR line corrected");
+    expect(edited.sourceBlocks).toEqual([]);
   });
 });
 

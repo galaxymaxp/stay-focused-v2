@@ -1,3 +1,7 @@
+import type {
+  NormalizedSourceKind,
+  SourceNormalizationBlockInput,
+} from "@stay-focused/engine";
 import { sessionStore } from "../auth/sessionStore";
 
 const DRAFT_STORAGE_KEY = "stay-focused-v2.processing-drafts.v1";
@@ -8,6 +12,8 @@ interface ProcessingDraft {
   readonly ownerUserId: string;
   readonly sourceText: string;
   readonly sourceTitle: string;
+  readonly sourceKind?: NormalizedSourceKind;
+  readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
   readonly createdAt: string;
 }
 
@@ -16,12 +22,18 @@ export async function saveProcessingDraft(input: {
   readonly ownerUserId: string;
   readonly sourceText: string;
   readonly sourceTitle?: string;
+  readonly sourceKind?: NormalizedSourceKind;
+  readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
 }): Promise<boolean> {
   const draft: ProcessingDraft = {
     localReference: input.localReference,
     ownerUserId: input.ownerUserId,
     sourceText: input.sourceText,
     sourceTitle: input.sourceTitle?.trim() ?? "",
+    ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
+    ...(input.sourceBlocks && input.sourceBlocks.length > 0
+      ? { sourceBlocks: input.sourceBlocks }
+      : {}),
     createdAt: new Date().toISOString(),
   };
   const all = await readAll();

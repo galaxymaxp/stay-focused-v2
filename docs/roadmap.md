@@ -1,6 +1,21 @@
 # Roadmap
 
-Last refreshed: 2026-08-28, Asia/Manila.
+Last refreshed: 2026-08-30, Asia/Manila.
+
+## Reviewer Benchmark B2 - Complete
+
+Production PDF review now retains normalized page identity through durable job
+submission and feeds generic page-aware blocks to Stage 0/1. Presentation title,
+divider, references, and OCR/logo noise are classified as source evidence but
+excluded from the academic outline; repeated continuation headings merge while
+distinct neighboring concepts remain separate. The unchanged Stage 3 generated
+the Intro to IT Security benchmark from a natural 17-section outline with
+coverage, grounding, and leakage gates passing. Eleven new generic regressions
+raise the deterministic engine suite from 292 to 303 cases.
+
+Known next-layer debt remains explicit: Stage 2/3 must preserve semantic
+relationships and write useful explanations, and extraction still cannot recover
+page 10's diagram labels or page 14's visual hierarchy edges.
 
 ## Capstone Development Phase R5 - Task And Study-Plan Foundation
 
@@ -186,11 +201,12 @@ Major deliverables:
 Exit criteria:
 
 - Engine build passes.
-- Aggregate deterministic evals pass with 292 cases.
+- Aggregate deterministic evals pass with 303 cases.
 - Default visible reviewer output is source-faithful.
 - Unsupported enrichment is excluded from default assembly.
 
-Real-course quality note: the 2026-08-30 CIT6 audit repaired natural course-PDF
+Real-course quality note: the 2026-08-30 CIT6 audit and Intro to IT Security B2
+repaired natural course-PDF
 outline detection and retained complete, grounded coverage, but scored 3.75/5
 because flattened tables/process flows and repeated slide banners still produce
 dense extractive key points with little explanation. The next Reviewer quality

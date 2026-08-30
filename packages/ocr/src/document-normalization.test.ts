@@ -24,6 +24,13 @@ describe("normalizeDocumentTextWithEvidence", () => {
     expect(result.text).not.toContain("BIOLOGY 101 — COURSE HANDOUT");
     expect(result.text).not.toContain("Department learning materials");
     expect(result.text.match(/legitimate body content/g)).toHaveLength(5);
+    expect(result.pages).toHaveLength(5);
+    expect(result.pages[0]).toMatchObject({
+      pageNumber: 1,
+      text: expect.stringContaining("Section 1"),
+    });
+    expect(result.pages[0]?.text).not.toContain("COURSE HANDOUT");
+    expect(result.pages[0]?.text).not.toContain("Department learning materials");
     expect(result.diagnostics.removedLineCount).toBe(10);
     expect(result.diagnostics.removedCandidates).toHaveLength(2);
   });
@@ -45,6 +52,7 @@ describe("normalizeDocumentTextWithEvidence", () => {
     const result = normalizeDocumentTextWithEvidence(pages);
 
     expect(result.text.match(/Shared definition/g)).toHaveLength(3);
+    expect(result.pages.map((page) => page.pageNumber)).toEqual([1, 2, 3]);
     expect(result.diagnostics.removedLineCount).toBe(0);
   });
 });

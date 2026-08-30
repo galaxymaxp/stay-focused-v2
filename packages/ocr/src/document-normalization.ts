@@ -18,7 +18,13 @@ export interface DocumentTextNormalizationDiagnostics {
 
 export interface NormalizedDocumentText {
   readonly text: string;
+  readonly pages: readonly NormalizedDocumentPageText[];
   readonly diagnostics: DocumentTextNormalizationDiagnostics;
+}
+
+export interface NormalizedDocumentPageText {
+  readonly pageNumber: number;
+  readonly text: string;
 }
 
 const MIN_PAGE_LINES_FOR_BOILERPLATE = 5;
@@ -45,26 +51,34 @@ export function normalizeDocumentTextWithEvidence(
     candidates.map((candidate) => `${candidate.position}:${candidate.exactText}`),
   );
   let removedLineCount = 0;
-  const normalizedPages = pageLines.map(({ lines }) => {
+  const normalizedPages = pageLines.map(({ pageNumber, lines }) => {
     if (lines.filter((line) => line.trim()).length < MIN_PAGE_LINES_FOR_BOILERPLATE) {
-      return lines;
+      return { pageNumber, lines };
     }
 
     const first = firstNonBlankIndex(lines);
     const last = lastNonBlankIndex(lines);
-    return lines.filter((line, index) => {
-      const position = index === first ? "top" : index === last ? "bottom" : null;
-      if (!position || !candidateKeys.has(`${position}:${line.trim()}`)) {
-        return true;
-      }
-      removedLineCount += 1;
-      return false;
-    });
+    return {
+      pageNumber,
+      lines: lines.filter((line, index) => {
+        const position = index === first ? "top" : index === last ? "bottom" : null;
+        if (!position || !candidateKeys.has(`${position}:${line.trim()}`)) {
+          return true;
+        }
+        removedLineCount += 1;
+        return false;
+      }),
+    };
   });
-  const text = joinPages(normalizedPages);
+  const normalizedPageText = normalizedPages.map(({ pageNumber, lines }) => ({
+    pageNumber,
+    text: lines.join("\n").trim(),
+  }));
+  const text = joinPages(normalizedPages.map((page) => page.lines));
 
   return {
     text,
+    pages: normalizedPageText,
     diagnostics: {
       version: "document-text-normalization-v1",
       rawCharacterCount: rawText.length,

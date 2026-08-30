@@ -1,3 +1,4 @@
+import type { SourceNormalizationBlockInput } from "@stay-focused/engine";
 import type { OcrClientError } from "../../services/ocrApi";
 import type {
   GallerySelectionError,
@@ -15,6 +16,7 @@ export interface ReviewerSourceState {
   readonly mode: ReviewerSourceMode;
   readonly manualText: string;
   readonly ocrText: string;
+  readonly sourceBlocks: readonly SourceNormalizationBlockInput[];
   readonly selectedImage: SelectedGalleryImage | null;
   readonly selectedPdf: SelectedPdfDocument | null;
   readonly pdfPageCount: number | null;
@@ -71,12 +73,14 @@ export type ReviewerSourceAction =
       readonly type: "ocr_succeeded";
       readonly text: string;
       readonly pageCount?: number;
+      readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
     }
   | {
       readonly type: "restore_ocr_result";
       readonly mode: "image" | "pdf";
       readonly text: string;
       readonly pageCount?: number;
+      readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
     }
   | {
       readonly type: "ocr_failed";
@@ -96,6 +100,7 @@ export const initialReviewerSourceState: ReviewerSourceState = {
   mode: "paste",
   manualText: "",
   ocrText: "",
+  sourceBlocks: [],
   selectedImage: null,
   selectedPdf: null,
   pdfPageCount: null,
@@ -109,10 +114,18 @@ export function reviewerSourceReducer(
 ): ReviewerSourceState {
   switch (action.type) {
     case "switch_mode":
-      if (action.mode === state.mode || action.mode === "paste") {
+      if (action.mode === state.mode) {
         return {
           ...state,
           mode: action.mode,
+          ocrError: null,
+        };
+      }
+      if (action.mode === "paste") {
+        return {
+          ...state,
+          mode: action.mode,
+          sourceBlocks: [],
           ocrError: null,
         };
       }
@@ -120,6 +133,7 @@ export function reviewerSourceReducer(
         ...state,
         mode: action.mode,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: null,
         ocrStatus:
           action.mode === "image"
@@ -134,7 +148,7 @@ export function reviewerSourceReducer(
     case "edit_source_text":
       return state.mode === "paste"
         ? { ...state, manualText: action.value, ocrError: null }
-        : { ...state, ocrText: action.value, ocrError: null };
+        : { ...state, ocrText: action.value, sourceBlocks: [], ocrError: null };
 
     case "image_selection_cancelled":
       return {
@@ -158,6 +172,7 @@ export function reviewerSourceReducer(
         selectedPdf: null,
         pdfPageCount: null,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: null,
         ocrStatus: "selected",
       };
@@ -184,6 +199,7 @@ export function reviewerSourceReducer(
         selectedPdf: action.pdf,
         pdfPageCount: null,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: null,
         ocrStatus: "selected",
       };
@@ -192,6 +208,7 @@ export function reviewerSourceReducer(
       return {
         ...state,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: null,
         pdfPageCount: state.mode === "pdf" ? null : state.pdfPageCount,
         ocrStatus: "uploading",
@@ -202,6 +219,7 @@ export function reviewerSourceReducer(
       return {
         ...state,
         ocrText: text,
+        sourceBlocks: action.sourceBlocks ?? [],
         ocrError:
           text.trim().length === 0
             ? {
@@ -227,6 +245,7 @@ export function reviewerSourceReducer(
         ...state,
         mode: action.mode,
         ocrText: text,
+        sourceBlocks: action.sourceBlocks ?? [],
         ocrError: null,
         pdfPageCount:
           action.mode === "pdf" ? action.pageCount ?? null : null,
@@ -238,6 +257,7 @@ export function reviewerSourceReducer(
       return {
         ...state,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: formatOcrClientError(action.error),
         pdfPageCount: state.mode === "pdf" ? null : state.pdfPageCount,
         ocrStatus: "failed",
@@ -248,6 +268,7 @@ export function reviewerSourceReducer(
         ...state,
         selectedImage: null,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: null,
         ocrStatus: "idle",
       };
@@ -258,6 +279,7 @@ export function reviewerSourceReducer(
         selectedPdf: null,
         pdfPageCount: null,
         ocrText: "",
+        sourceBlocks: [],
         ocrError: null,
         ocrStatus: "idle",
       };

@@ -4,6 +4,12 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Completed objective
 
+Reviewer Benchmark B2 is complete: production PDF page identity now reaches
+generic Stage 0/1 source blocks, eleven regression cases protect page-aware
+outline behavior, and the real Intro to IT Security deck produces the approved
+17-concept outline without decorative or reference/OCR noise. Stage 3 remains
+unchanged; semantic relationships and explanations are the next Reviewer task.
+
 Physically accept the consolidated Android Reviewer Maker -> Processing ->
 Reader -> Save -> Study Library -> Reopen workflow and repair only defects
 demonstrated by that run.

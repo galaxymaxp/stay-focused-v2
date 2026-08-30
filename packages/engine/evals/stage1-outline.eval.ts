@@ -5,6 +5,9 @@ import basicFixtures from "./fixtures/stage1-basic.json" with { type: "json" };
 import structureFixtures from "./fixtures/stage1-structure.json" with {
   type: "json",
 };
+import pageAwareFixtures from "./fixtures/stage1-page-aware.json" with {
+  type: "json",
+};
 import tagFixtures from "./fixtures/stage1-tags.json" with { type: "json" };
 
 import { normalizeSource } from "../src/stage0-normalize.js";
@@ -53,6 +56,7 @@ interface Stage1FixtureFile {
 const fixtures = [
   ...(basicFixtures as Stage1FixtureFile).cases,
   ...(structureFixtures as Stage1FixtureFile).cases,
+  ...(pageAwareFixtures as Stage1FixtureFile).cases,
   ...(tagFixtures as Stage1FixtureFile).cases,
 ];
 

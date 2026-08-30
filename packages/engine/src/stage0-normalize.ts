@@ -84,8 +84,17 @@ export async function normalizeSource(
     );
   }
 
+  const kind = isSourceKind(input.kind)
+    ? input.kind
+    : normalizedText
+      ? "plain-text"
+      : "unknown";
+  const inputTitle = readSafeString(input.title);
   const textBlocks = normalizedText ? detectTextBlocks(normalizedText) : [];
-  const suppliedBlocks = normalizeSuppliedBlocks(inputBlocks);
+  const normalizedSuppliedBlocks = normalizeSuppliedBlocks(inputBlocks);
+  const suppliedBlocks = kind === "presentation"
+    ? expandPresentationPageBlocks(normalizedSuppliedBlocks, inputTitle)
+    : normalizedSuppliedBlocks;
   const draftBlocks = [...textBlocks, ...suppliedBlocks];
 
   if (draftBlocks.length === 0) {
@@ -94,13 +103,8 @@ export async function normalizeSource(
     );
   }
 
-  const title = readSafeString(input.title) ?? inferTitle(draftBlocks);
+  const title = inputTitle ?? inferTitle(draftBlocks);
   const language = readSafeString(input.language) ?? "und";
-  const kind = isSourceKind(input.kind)
-    ? input.kind
-    : normalizedText
-      ? "plain-text"
-      : "unknown";
   const metadata = sanitizeMetadata(input.metadata);
   const createdAt =
     readSafeString(input.createdAt) ??
@@ -1026,6 +1030,179 @@ function isPlainTextOcrHeadingLine(line: string): boolean {
       (headingWords.length + connectorWords.length === words.length &&
         headingWords.length >= 2))
   );
+}
+
+type PresentationPageRole =
+  | "academic"
+  | "presentation-title"
+  | "presentation-divider"
+  | "references"
+  | "branding-noise";
+
+function expandPresentationPageBlocks(
+  blocks: readonly DraftBlock[],
+  sourceTitle: string | undefined,
+): DraftBlock[] {
+  return blocks.flatMap((block) => {
+    if (block.pageNumber === undefined) {
+      return [block];
+    }
+
+    const lines = block.text
+      .split("\n")
+      .map((line) => normalizeInlineWhitespace(line))
+      .filter((line) => line.length > 0 && !isIsolatedPresentationGlyph(line));
+    const headingIndex = lines.findIndex(isPresentationHeadingCandidate);
+    if (headingIndex < 0) {
+      return [{
+        ...block,
+        metadata: withPresentationRole(block.metadata, "branding-noise"),
+      }];
+    }
+
+    const heading = lines[headingIndex] ?? "";
+    const bodyLines = lines.filter((_, index) => index !== headingIndex);
+    const role = classifyPresentationPage({
+      bodyLines,
+      heading,
+      lines,
+      pageNumber: block.pageNumber,
+      sourceTitle,
+    });
+    const headingText = role === "presentation-divider"
+      ? lines.join(" ")
+      : heading;
+    const metadata = withPresentationRole(block.metadata, role);
+    const headingBlock: DraftBlock = {
+      ...(block.id ? { id: `${block.id}-heading` } : {}),
+      kind: "heading",
+      text: headingText,
+      pageNumber: block.pageNumber,
+      ...(block.sectionHint ? { sectionHint: block.sectionHint } : {}),
+      metadata,
+    };
+    const remainingBody = role === "presentation-divider" ? [] : bodyLines;
+
+    if (remainingBody.length === 0) {
+      return [headingBlock];
+    }
+
+    return [
+      headingBlock,
+      {
+        ...(block.id ? { id: `${block.id}-body` } : {}),
+        kind: remainingBody.every(isListLine) ? "list" : "paragraph",
+        text: remainingBody.join("\n"),
+        pageNumber: block.pageNumber,
+        ...(block.sectionHint ? { sectionHint: block.sectionHint } : {}),
+        metadata,
+      },
+    ];
+  });
+}
+
+function classifyPresentationPage(args: {
+  readonly bodyLines: readonly string[];
+  readonly heading: string;
+  readonly lines: readonly string[];
+  readonly pageNumber: number;
+  readonly sourceTitle: string | undefined;
+}): PresentationPageRole {
+  const referenceSignals = args.bodyLines.filter(
+    (line) => isUrlLike(line) || /^\s*\[\d{1,3}\]\s+/.test(line),
+  ).length;
+  if (
+    /^(?:references|bibliography|works cited|sources)(?:\s|$)/i.test(args.heading) ||
+    (referenceSignals >= 2 && referenceSignals >= args.bodyLines.length / 2)
+  ) {
+    return "references";
+  }
+
+  if (
+    args.pageNumber <= 1 &&
+    args.lines.length <= 4 &&
+    (hasStrongTitleOverlap(args.lines.join(" "), args.sourceTitle) ||
+      args.lines.some((line) => /^(?:module|lesson|lecture|chapter)\b/i.test(line)))
+  ) {
+    return "presentation-title";
+  }
+
+  if (
+    args.lines.length <= 2 &&
+    args.lines.every(isPresentationHeadingFragment)
+  ) {
+    return "presentation-divider";
+  }
+
+  return "academic";
+}
+
+function isPresentationHeadingCandidate(line: string): boolean {
+  return (
+    /[A-Za-z]/.test(line) &&
+    !isListLine(line) &&
+    !isUrlLike(line) &&
+    !/^[A-Z]{1,4}$/.test(line) &&
+    line.length <= 140
+  );
+}
+
+function isPresentationHeadingFragment(line: string): boolean {
+  const words = line.split(/\s+/).filter(Boolean);
+  const lexicalWords = words.filter((word) => /[A-Za-z]/.test(word));
+  const isHeadingShaped = lexicalWords.length > 0 && lexicalWords.every(
+    (word) => /^[A-Z][A-Za-z0-9'-]*$/.test(word) || isHeadingConnector(word),
+  );
+  return (
+    words.length > 0 &&
+    words.length <= 10 &&
+    line.length <= 90 &&
+    isHeadingShaped &&
+    !/[.!?;:]$/.test(line) &&
+    !isListLine(line) &&
+    !isUrlLike(line)
+  );
+}
+
+function isIsolatedPresentationGlyph(line: string): boolean {
+  return !/[A-Za-z0-9]/.test(line);
+}
+
+function isUrlLike(line: string): boolean {
+  return /(?:https?:\/\/|www\.|\bdoi\b|\S+@\S+\.\S+)/i.test(line);
+}
+
+function hasStrongTitleOverlap(
+  pageText: string,
+  sourceTitle: string | undefined,
+): boolean {
+  if (!sourceTitle) {
+    return false;
+  }
+  const titleWords = significantTitleWords(sourceTitle);
+  const pageWords = new Set(significantTitleWords(pageText));
+  if (titleWords.length === 0) {
+    return false;
+  }
+  return titleWords.filter((word) => pageWords.has(word)).length / titleWords.length >= 0.6;
+}
+
+function significantTitleWords(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !/^(?:the|and|for|with)$/.test(word));
+}
+
+function withPresentationRole(
+  metadata: Readonly<Record<string, MetadataValue>> | undefined,
+  role: PresentationPageRole,
+): Readonly<Record<string, MetadataValue>> {
+  return {
+    ...(metadata ?? {}),
+    presentationRole: role,
+  };
 }
 
 function allowsShortBodyAfterHeading(line: string): boolean {

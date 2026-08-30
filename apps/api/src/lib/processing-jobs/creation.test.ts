@@ -129,6 +129,36 @@ describe("durable processing job creation", () => {
     expect(repositoryMocks.create).toHaveBeenCalledTimes(2);
   });
 
+  it("stores generic reviewer page blocks in private job metadata", async () => {
+    repositoryMocks.find.mockResolvedValue(null);
+    repositoryMocks.create.mockResolvedValue(makeJob());
+
+    await createReviewerProcessingJob({
+      client: {} as never,
+      idempotencyKey: "reviewer:page-aware:1",
+      source: {
+        sourceText: "Topic\nBody",
+        sourceKind: "presentation",
+        sourceBlocks: [
+          { id: "page-1", kind: "unknown", order: 0, pageNumber: 1, text: "Topic\nBody" },
+        ],
+      },
+      userId: "user-a",
+    });
+
+    expect(repositoryMocks.create).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sourcePrivateMetadata: expect.objectContaining({
+          reviewerSourceKind: "presentation",
+          reviewerSourceBlocks: [
+            expect.objectContaining({ pageNumber: 1, text: "Topic\nBody" }),
+          ],
+        }),
+      }),
+    );
+  });
+
   it("removes an unreferenced staged object after a different-payload race", async () => {
     const remove = vi.fn(async () => ({ data: [], error: null }));
     const upload = vi.fn(async () => ({ data: { path: "staged" }, error: null }));

@@ -1,4 +1,8 @@
-import type { ReviewerOutput } from "@stay-focused/engine";
+import type {
+  NormalizedSourceKind,
+  ReviewerOutput,
+  SourceNormalizationBlockInput,
+} from "@stay-focused/engine";
 import type {
   ProcessingJobListPage,
   ProcessingJobProvenance,
@@ -52,6 +56,8 @@ export interface CreateReviewerJobInput extends ProcessingJobApiInput {
   readonly idempotencyKey: string;
   readonly sourceText: string;
   readonly sourceTitle?: string;
+  readonly sourceKind?: NormalizedSourceKind;
+  readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
   readonly canvasPreviewSessionId?: string;
   readonly canvasCourseId?: string;
   readonly canvasItemIds?: readonly string[];
@@ -64,6 +70,7 @@ export interface CreateReviewerJobInput extends ProcessingJobApiInput {
 
 export interface ExtractionJobResult {
   readonly text: string;
+  readonly sourceBlocks: readonly SourceNormalizationBlockInput[];
   readonly pageCount: number;
   readonly processedPageCount: number;
   readonly extraction?: unknown;
@@ -184,6 +191,10 @@ export async function createReviewerJob(
       jobType: "reviewer_generation",
       sourceText,
       ...(input.sourceTitle?.trim() ? { sourceTitle: input.sourceTitle.trim() } : {}),
+      ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
+      ...(input.sourceBlocks && input.sourceBlocks.length > 0
+        ? { sourceBlocks: input.sourceBlocks }
+        : {}),
       ...(input.sourceVersionId ? { sourceVersionId: input.sourceVersionId } : {}),
       language: input.language ?? "auto",
       outputMode: input.outputMode ?? "standard",
@@ -534,6 +545,7 @@ function parseExtractionResult(
   if (!isRecord(value) || typeof value.text !== "string") return null;
   return {
     text: value.text,
+    sourceBlocks: parseSourceBlocks(value.sourceBlocks),
     pageCount: typeof value.pageCount === "number" ? value.pageCount : 1,
     processedPageCount:
       typeof value.processedPageCount === "number" ? value.processedPageCount : 1,
@@ -549,6 +561,30 @@ function parseExtractionResult(
       ? { extractionResultId: envelope.extractionResultId }
       : {}),
   };
+}
+
+function parseSourceBlocks(value: unknown): readonly SourceNormalizationBlockInput[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry, inputIndex) => {
+    if (!isRecord(entry) || typeof entry.text !== "string" || !entry.text.trim()) {
+      return [];
+    }
+    const pageNumber = typeof entry.pageNumber === "number" &&
+        Number.isInteger(entry.pageNumber) && entry.pageNumber > 0
+      ? entry.pageNumber
+      : undefined;
+    return [{
+      ...(typeof entry.id === "string" && entry.id.trim()
+        ? { id: entry.id.trim() }
+        : {}),
+      kind: "unknown" as const,
+      order: typeof entry.order === "number" && Number.isFinite(entry.order)
+        ? entry.order
+        : inputIndex,
+      ...(pageNumber !== undefined ? { pageNumber } : {}),
+      text: entry.text,
+    }];
+  });
 }
 
 function parseReviewerResult(

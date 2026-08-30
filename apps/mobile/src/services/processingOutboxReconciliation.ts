@@ -65,6 +65,10 @@ async function submitReviewerIntent(
     idempotencyKey: intent.idempotencyKey,
     sourceText: draft.sourceText,
     ...(draft.sourceTitle ? { sourceTitle: draft.sourceTitle } : {}),
+    ...(draft.sourceKind ? { sourceKind: draft.sourceKind } : {}),
+    ...(draft.sourceBlocks && draft.sourceBlocks.length > 0
+      ? { sourceBlocks: draft.sourceBlocks }
+      : {}),
     language:
       typeof intent.settings.language === "string"
         ? intent.settings.language

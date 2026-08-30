@@ -1,5 +1,9 @@
 import type { Json, ProcessingJobDatabaseRow, SourceVersionRow } from "@stay-focused/db";
 import type {
+  NormalizedSourceKind,
+  SourceNormalizationBlockInput,
+} from "@stay-focused/engine";
+import type {
   ProcessingJobSourceMetadata,
   ProcessingJobType,
 } from "@stay-focused/shared";
@@ -43,6 +47,8 @@ export interface ExtractionJobSourceInput {
 export interface ReviewerJobSourceInput {
   readonly sourceText: string;
   readonly sourceTitle?: string;
+  readonly sourceKind?: NormalizedSourceKind;
+  readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
   readonly sourcePrivateMetadata?: Json;
   readonly sourceVersionId?: string;
   readonly language?: string;
@@ -222,6 +228,14 @@ export async function createReviewerProcessingJob({
   });
   const requestFingerprint = createGenerationRequestFingerprint({
     sourceContentSha256: resolvedSource.contentSha256,
+    ...(source.sourceBlocks && source.sourceBlocks.length > 0
+      ? {
+          sourceStructureSha256: sha256Text(JSON.stringify({
+            kind: source.sourceKind ?? "unknown",
+            blocks: source.sourceBlocks,
+          })),
+        }
+      : {}),
     ...(normalizedTitle ? { sourceTitle: normalizedTitle } : {}),
     settingsFingerprint,
     reuseMode,
@@ -259,6 +273,20 @@ export async function createReviewerProcessingJob({
           ? source.sourcePrivateMetadata
           : {}),
         ...(normalizedTitle ? { sourceTitle: normalizedTitle } : {}),
+        ...(source.sourceKind ? { reviewerSourceKind: source.sourceKind } : {}),
+        ...(source.sourceBlocks && source.sourceBlocks.length > 0
+          ? {
+              reviewerSourceBlocks: source.sourceBlocks.map((block) => ({
+                ...(block.id ? { id: block.id } : {}),
+                kind: block.kind ?? "unknown",
+                order: block.order ?? 0,
+                ...(block.pageNumber !== undefined
+                  ? { pageNumber: block.pageNumber }
+                  : {}),
+                text: block.text,
+              })),
+            }
+          : {}),
       },
       contract: {
         artifactType: "reviewer",

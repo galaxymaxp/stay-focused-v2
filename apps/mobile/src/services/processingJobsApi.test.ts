@@ -18,6 +18,7 @@ import {
   cancelProcessingJob,
   createExtractionJob,
   createReviewerJob,
+  getExtractionJobResult,
   getProcessingJobStatus,
   listProcessingJobsPage,
 } from "./processingJobsApi";
@@ -78,6 +79,36 @@ describe("processing jobs mobile API", () => {
       }),
     ).resolves.toMatchObject({ ok: true });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves page-aware extraction blocks for reviewer submission", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      jsonResponse({
+        ok: true,
+        data: {
+          jobType: "document_extraction",
+          result: {
+            text: "Topic\nBody",
+            pageCount: 1,
+            processedPageCount: 1,
+            sourceBlocks: [
+              { id: "page-1", kind: "unknown", order: 0, pageNumber: 1, text: "Topic\nBody" },
+            ],
+          },
+        },
+      }),
+    );
+
+    await expect(getExtractionJobResult({
+      ...BASE_INPUT,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      jobId: "extraction-job-1",
+    })).resolves.toMatchObject({
+      ok: true,
+      data: {
+        sourceBlocks: [{ id: "page-1", order: 0, pageNumber: 1, text: "Topic\nBody" }],
+      },
+    });
   });
 
   it("stages bytes directly before accepting a durable extraction job", async () => {

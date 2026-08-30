@@ -68,7 +68,8 @@ export async function detectOutline(
         left.block.order - right.block.order ||
         left.inputIndex - right.inputIndex,
     )
-    .map(({ block }) => block);
+    .map(({ block }) => block)
+    .filter(isStudyContentBlock);
   const flattenedBlocks = flattenBlocks(
     removeConsecutiveDuplicateBlocks(orderedBlocks),
   );
@@ -181,7 +182,7 @@ function detectBlockBoundary(
 function detectLineBoundaries(
   entry: FlattenedBlock,
 ): readonly BoundaryCandidate[] {
-  if (entry.block.kind === "heading") {
+  if (entry.block.kind === "heading" || isPageAwarePresentationBody(entry.block)) {
     return [];
   }
 
@@ -264,7 +265,7 @@ function findPlainTextOcrBoundaryLineIndexes(
 function detectInlineBoundaries(
   entry: FlattenedBlock,
 ): readonly BoundaryCandidate[] {
-  if (entry.block.kind === "heading") {
+  if (entry.block.kind === "heading" || isPageAwarePresentationBody(entry.block)) {
     return [];
   }
 
@@ -606,6 +607,24 @@ function mergeRepeatedDrafts(
   );
 }
 
+function isPageAwarePresentationBody(block: NormalizedSourceBlock): boolean {
+  return (
+    block.pageNumber !== undefined &&
+    block.metadata?.presentationRole === "academic" &&
+    block.kind !== "heading"
+  );
+}
+
+function isStudyContentBlock(block: NormalizedSourceBlock): boolean {
+  const role = block.metadata?.presentationRole;
+  return (
+    role !== "presentation-title" &&
+    role !== "presentation-divider" &&
+    role !== "references" &&
+    role !== "branding-noise"
+  );
+}
+
 function mergeAdjacentRepeatedDrafts(
   drafts: readonly SectionDraft[],
 ): readonly SectionDraft[] {
@@ -617,9 +636,14 @@ function mergeAdjacentRepeatedDrafts(
     const previous = merged.at(-1);
 
     if (previous && key && key === previousKey) {
+      const continuationFragments = draft.fragments.filter(
+        (fragment) =>
+          fragment.kind !== "heading" ||
+          normalizeTitleKey(fragment.text) !== key,
+      );
       merged[merged.length - 1] = {
         ...previous,
-        fragments: [...previous.fragments, ...draft.fragments],
+        fragments: [...previous.fragments, ...continuationFragments],
         endOffset: draft.endOffset,
         inferred: previous.inferred && draft.inferred,
       };

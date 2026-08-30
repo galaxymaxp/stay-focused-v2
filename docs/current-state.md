@@ -32,6 +32,15 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer Benchmark B2 is complete locally. Production PDF extraction now
+  preserves normalized page blocks through mobile job submission and durable
+  worker storage into generic engine source blocks. Page-aware Stage 0/1
+  classifies title/divider/reference noise, recognizes page-leading academic
+  headings, merges repeated continuation slides, and keeps distinct concepts
+  separate without changing Stage 3. The real 32-page Intro to IT Security run
+  now produces the approved 17-concept outline instead of the B1 giant Domains
+  span and noise sections; see
+  `docs/ai/benchmarks/intro-it-security/benchmark-b2.md`.
 - The R6 reviewer-core capstone audit is accepted. The complete supported path
   is source intake or synchronized Canvas selection, editable preparation,
   grounded Stage 0-6 generation, durable progress, reviewer reading, save, and
@@ -100,7 +109,8 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
   targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
-  reviewer engine: 292/292 deterministic evaluations. These suites were rerun
+  reviewer engine: 303/303 deterministic evaluations after the eleven B2
+  page-aware regressions. These suites were rerun
   after hosted acceptance.
 - Forced root typecheck and lint pass fresh for 7/7 packages with zero cached
   tasks; lint retains only the four known mobile import-order warnings. DB and

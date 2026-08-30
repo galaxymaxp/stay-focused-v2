@@ -213,6 +213,7 @@ export function ReviewerGenerateScreen({
           mode: job.source.sourceKind === "pdf" ? "pdf" : "image",
           text: result.data.text,
           pageCount: result.data.pageCount,
+          sourceBlocks: result.data.sourceBlocks,
         });
         setActiveExtractionJob(null);
       } else {
@@ -396,6 +397,12 @@ export function ReviewerGenerateScreen({
         idempotencyKey,
         sourceText: trimmedSourceText,
         ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
+        ...(sourceState.sourceBlocks.length > 0
+          ? {
+              sourceBlocks: sourceState.sourceBlocks,
+              sourceKind: sourceState.mode === "pdf" ? "presentation" as const : "document" as const,
+            }
+          : {}),
       });
 
       if (result.ok) {
@@ -413,6 +420,12 @@ export function ReviewerGenerateScreen({
             ownerUserId,
             sourceText: trimmedSourceText,
             ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
+            ...(sourceState.sourceBlocks.length > 0
+              ? {
+                  sourceBlocks: sourceState.sourceBlocks,
+                  sourceKind: sourceState.mode === "pdf" ? "presentation" as const : "document" as const,
+                }
+              : {}),
           });
           if (saved) {
             await enqueueOfflineProcessingIntent({

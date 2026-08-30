@@ -32,6 +32,7 @@ export function createGenerationSettingsFingerprint(
 
 export function createGenerationRequestFingerprint(input: {
   readonly sourceContentSha256: string;
+  readonly sourceStructureSha256?: string;
   readonly sourceTitle?: string;
   readonly settingsFingerprint: string;
   readonly reuseMode?: GenerationReuseMode;
@@ -46,6 +47,7 @@ export function createGenerationRequestFingerprint(input: {
       schemaVersion: REVIEWER_SCHEMA_VERSION,
       settingsFingerprint: input.settingsFingerprint,
       sourceContentSha256: input.sourceContentSha256,
+      sourceStructureSha256: input.sourceStructureSha256 ?? "",
       sourceTitle: input.sourceTitle?.trim() ?? "",
     }),
   );

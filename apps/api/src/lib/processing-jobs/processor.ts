@@ -8,6 +8,8 @@ import {
   PipelineCancellationError,
   runPipeline,
   type GenerationProvider,
+  type NormalizedSourceKind,
+  type SourceNormalizationBlockInput,
 } from "@stay-focused/engine";
 import {
   normalizeDocumentTextWithEvidence,
@@ -278,6 +280,15 @@ async function processExtractionJob({
   return {
     payload: {
       text: normalized.text,
+      sourceBlocks: normalized.pages
+        .filter((page) => page.text.length > 0)
+        .map((page, order) => ({
+          id: `page-${page.pageNumber}`,
+          kind: "unknown" as const,
+          order,
+          pageNumber: page.pageNumber,
+          text: page.text,
+        })),
       rawText: extraction.result.pages
         .map((page) => page.text)
         .join("\n\n"),
@@ -317,6 +328,10 @@ async function processReviewerJob({
     typeof privateMetadata.reviewerSourceSnapshotId === "string"
       ? privateMetadata.reviewerSourceSnapshotId
       : undefined;
+  const sourceBlocks = readReviewerSourceBlocks(
+    privateMetadata.reviewerSourceBlocks,
+  );
+  const sourceKind = readReviewerSourceKind(privateMetadata.reviewerSourceKind);
   const generationStartedAt = Date.now();
   const pipelineMetrics: {
     normalizedCharacterCount: number | null;
@@ -335,7 +350,9 @@ async function processReviewerJob({
 
   const reviewer = await runPipeline({
     input: {
-      text: source.source_text,
+      ...(sourceBlocks.length > 0
+        ? { blocks: sourceBlocks, kind: sourceKind ?? "unknown" }
+        : { text: source.source_text }),
       ...(sourceTitle ? { title: sourceTitle } : {}),
     },
     provider,
@@ -406,6 +423,44 @@ async function processReviewerJob({
     },
     metrics,
   };
+}
+
+function readReviewerSourceKind(value: unknown): NormalizedSourceKind | undefined {
+  return value === "document" ||
+    value === "presentation" ||
+    value === "webpage" ||
+    value === "plain-text" ||
+    value === "unknown"
+    ? value
+    : undefined;
+}
+
+function readReviewerSourceBlocks(
+  value: unknown,
+): readonly SourceNormalizationBlockInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((entry, inputIndex) => {
+    if (!isRecord(entry) || typeof entry.text !== "string" || !entry.text.trim()) {
+      return [];
+    }
+    const pageNumber = typeof entry.pageNumber === "number" &&
+        Number.isInteger(entry.pageNumber) && entry.pageNumber > 0
+      ? entry.pageNumber
+      : undefined;
+    return [{
+      text: entry.text,
+      order: typeof entry.order === "number" && Number.isFinite(entry.order)
+        ? entry.order
+        : inputIndex,
+      ...(pageNumber !== undefined ? { pageNumber } : {}),
+      ...(typeof entry.id === "string" && entry.id.trim()
+        ? { id: entry.id.trim() }
+        : {}),
+      kind: "unknown" as const,
+    }];
+  });
 }
 
 interface ProcessorContext {

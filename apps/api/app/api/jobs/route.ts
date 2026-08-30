@@ -365,6 +365,29 @@ async function createReviewerJob(
       request,
     );
   }
+  const sourceKind = readReviewerSourceKind(body.sourceKind);
+  if (body.sourceKind !== undefined && !sourceKind) {
+    return errorResponse(400, "invalid_source_kind", "sourceKind is invalid.", false, request);
+  }
+  const sourceBlocks = readReviewerSourceBlocks(body.sourceBlocks);
+  if (body.sourceBlocks !== undefined && !sourceBlocks) {
+    return errorResponse(400, "invalid_source_blocks", "sourceBlocks are invalid.", false, request);
+  }
+  if (
+    sourceBlocks &&
+    sourceBlocks.length > 0 &&
+    normalizeReviewerSourceText(
+      sourceBlocks.map((block) => block.text).join("\n\n"),
+    ) !== normalizeReviewerSourceText(sourceText)
+  ) {
+    return errorResponse(
+      400,
+      "source_blocks_mismatch",
+      "sourceBlocks must represent the submitted sourceText.",
+      false,
+      request,
+    );
+  }
   const reuseMode = body.reuseMode ?? "fresh";
   if (reuseMode !== "fresh" && reuseMode !== "reuse_existing") {
     return errorResponse(
@@ -402,6 +425,8 @@ async function createReviewerJob(
     source: {
       sourceText,
       ...(sourceTitle ? { sourceTitle } : {}),
+      ...(sourceKind ? { sourceKind } : {}),
+      ...(sourceBlocks && sourceBlocks.length > 0 ? { sourceBlocks } : {}),
       ...(sourceVersionId ? { sourceVersionId } : {}),
       language: readOptionalString(body.language) ?? "auto",
       outputMode: readOptionalString(body.outputMode) ?? "standard",
@@ -416,6 +441,64 @@ async function createReviewerJob(
     await dispatchAcceptedProcessingJob(job),
     request,
   );
+}
+
+function normalizeReviewerSourceText(value: string): string {
+  return value.replace(/\r\n?/g, "\n").trim();
+}
+
+function readReviewerSourceKind(
+  value: unknown,
+): "document" | "presentation" | "webpage" | "plain-text" | "unknown" | undefined {
+  return value === "document" ||
+    value === "presentation" ||
+    value === "webpage" ||
+    value === "plain-text" ||
+    value === "unknown"
+    ? value
+    : undefined;
+}
+
+function readReviewerSourceBlocks(value: unknown): readonly {
+  readonly id?: string;
+  readonly kind: "unknown";
+  readonly order: number;
+  readonly pageNumber?: number;
+  readonly text: string;
+}[] | undefined {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value) || value.length > 500) {
+    return undefined;
+  }
+  const blocks = value.flatMap((entry, inputIndex) => {
+    if (!isRecord(entry) || typeof entry.text !== "string") {
+      return [];
+    }
+    const text = entry.text.trim();
+    const pageNumber = entry.pageNumber;
+    if (
+      !text ||
+      text.length > REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS ||
+      (pageNumber !== undefined &&
+        (typeof pageNumber !== "number" || !Number.isInteger(pageNumber) || pageNumber < 1))
+    ) {
+      return [];
+    }
+    return [{
+      ...(typeof entry.id === "string" && entry.id.trim()
+        ? { id: entry.id.trim().slice(0, 180) }
+        : {}),
+      kind: "unknown" as const,
+      order: typeof entry.order === "number" && Number.isFinite(entry.order)
+        ? entry.order
+        : inputIndex,
+      ...(typeof pageNumber === "number" ? { pageNumber } : {}),
+      text,
+    }];
+  });
+  return blocks.length === value.length ? blocks : undefined;
 }
 
 async function validateAndSnapshotCanvasContext({

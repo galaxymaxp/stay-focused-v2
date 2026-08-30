@@ -1,0 +1,133 @@
+{
+  "cases": [
+    {
+      "name": "presentation title page is not a study section",
+      "input": {
+        "title": "Distributed Systems",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Distributed Systems\nModule 1" },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "Consensus\nNodes agree on one committed value." }
+        ]
+      },
+      "expect": { "sectionTitles": ["Consensus"] }
+    },
+    {
+      "name": "decorative transition divider is not a study section",
+      "input": {
+        "title": "Research Methods",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Sampling Methods\nProbability Sampling" },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "Simple Random Sampling\nEvery member has an equal selection chance." }
+        ]
+      },
+      "expect": { "sectionTitles": ["Simple Random Sampling"] }
+    },
+    {
+      "name": "reference-only page is not a study section",
+      "input": {
+        "title": "Cell Biology",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Cell Membrane\nThe membrane regulates movement into and out of a cell." },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "References\nhttps://example.edu/cells\nhttps://example.org/membranes" }
+        ]
+      },
+      "expect": { "sectionTitles": ["Cell Membrane"] }
+    },
+    {
+      "name": "isolated branding noise is not a study section",
+      "input": {
+        "title": "Data Ethics",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Informed Consent\nParticipants receive enough information to decide voluntarily." },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "SF\n1946\n•" }
+        ]
+      },
+      "expect": { "sectionTitles": ["Informed Consent"] }
+    },
+    {
+      "name": "short academic slide remains a study section",
+      "input": {
+        "title": "Operating Systems",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Deadlock\nProcesses wait indefinitely for held resources" }
+        ]
+      },
+      "expect": { "sectionTitles": ["Deadlock"] }
+    },
+    {
+      "name": "adjacent repeated slide headings merge into one concept",
+      "input": {
+        "title": "Networks",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Routing Protocols\nDistance-vector routing exchanges path costs." },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "Routing Protocols\nLink-state routing distributes topology information." }
+        ]
+      },
+      "expect": { "sectionTitles": ["Routing Protocols"], "sectionBlockCounts": [3] }
+    },
+    {
+      "name": "continuation slides with a repeated heading keep all page bodies",
+      "input": {
+        "title": "Database Design",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Normalization\nFirst normal form removes repeating groups." },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "Normalization\nSecond normal form removes partial dependencies." },
+          { "id": "page-3", "kind": "unknown", "pageNumber": 3, "order": 2, "text": "Normalization\nThird normal form removes transitive dependencies." }
+        ]
+      },
+      "expect": { "sectionTitles": ["Normalization"], "sectionBlockCounts": [4] }
+    },
+    {
+      "name": "visual hierarchy labels remain grouped under the page heading",
+      "input": {
+        "title": "Animal Classification",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Vertebrates\nMammals\nBirds\nReptiles\nFish" }
+        ]
+      },
+      "expect": { "sectionTitles": ["Vertebrates"], "sectionBlockCounts": [2] }
+    },
+    {
+      "name": "related but distinct page headings stay separate",
+      "input": {
+        "title": "Software Testing",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Unit Testing\nA unit test checks one small component." },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "Integration Testing\nAn integration test checks component interactions." }
+        ]
+      },
+      "expect": { "sectionTitles": ["Unit Testing", "Integration Testing"] }
+    },
+    {
+      "name": "distinct headings after a long page list do not fuse",
+      "input": {
+        "title": "Ecology",
+        "kind": "presentation",
+        "blocks": [
+          { "id": "page-1", "kind": "unknown", "pageNumber": 1, "order": 0, "text": "Biomes\n1. Tundra\n2. Taiga\n3. Grassland\n4. Desert\n5. Rainforest\n6. Chaparral" },
+          { "id": "page-2", "kind": "unknown", "pageNumber": 2, "order": 1, "text": "Food Webs\nA food web connects multiple feeding relationships." },
+          { "id": "page-3", "kind": "unknown", "pageNumber": 3, "order": 2, "text": "Energy Pyramids\nEnergy decreases at higher trophic levels." }
+        ]
+      },
+      "expect": { "sectionTitles": ["Biomes", "Food Webs", "Energy Pyramids"] }
+    },
+    {
+      "name": "plain text source remains independent of page metadata",
+      "input": {
+        "title": "Civic Notes",
+        "kind": "plain-text",
+        "text": "# Public Goods\n\nPublic goods are non-rival and non-excludable.\n\n# Collective Action\n\nCollective action coordinates people toward a shared outcome."
+      },
+      "expect": { "sectionTitles": ["Public Goods", "Collective Action"] }
+    }
+  ]
+}
