@@ -80,6 +80,7 @@ export const stage1OutlineSuite: EvalSuite = {
   cases: [
     ...fixtures.map(createFixtureCase),
     createItSecurityOutlineCase(),
+    createCoursePdfOutlineCase(),
     createEmptySourceCase(),
   ],
 };
@@ -89,6 +90,80 @@ export async function runStage1OutlineEvals(): Promise<boolean> {
   printEvalSuiteResult(result);
   setFailureExitCode([result]);
   return result.status === "passed";
+}
+
+function createCoursePdfOutlineCase(): EvalCase {
+  return {
+    name: "course PDF outline keeps natural units, formulas, and readmission flow",
+    run: async () => {
+      const source = await normalizeSource({
+        title: "Course orientation",
+        kind: "plain-text",
+        language: "en",
+        text: [
+          "Course Content - Midterm",
+          "August 27, 2026 to October 17, 2026",
+          "Course Content - Midterm",
+          "Unit 1: Research Alignment",
+          "• Identify a problem aligned with a sustainable development goal.",
+          "Course Content - Midterm",
+          "Unit 2: Project Conceptualization",
+          "• Apply design thinking and build a prototype.",
+          "Grading System",
+          "midtermGrade + tentativeFinalGrade / 2 = finalGrade",
+          "Attendance",
+          "Students who exceed the absence limit are UNOFFICIALLY",
+          "DROPPED (UD)",
+          "• Readmission requires approval.",
+          "Process for Unofficially Dropped Students",
+          "Faculty",
+          "to report the",
+          "student name to",
+          "OSAS (S217)",
+          "to explain each absence",
+        ].join("\n"),
+      });
+      const outline = await detectOutline(source);
+      const titles = outline.sections.map((section) => section.title);
+      const issues: EvalIssue[] = [];
+
+      for (const expectedTitle of [
+        "Course Content - Midterm",
+        "Unit 1: Research Alignment",
+        "Unit 2: Project Conceptualization",
+        "Grading System",
+        "Process for Unofficially Dropped Students",
+      ]) {
+        issues.push(
+          ...assertEqual(
+            titles.includes(expectedTitle),
+            true,
+            `Course outline did not include natural section "${expectedTitle}".`,
+          ),
+        );
+      }
+
+      for (const rejectedTitle of ["DROPPED (UD)", "OSAS (S217)"]) {
+        issues.push(
+          ...assertEqual(
+            titles.includes(rejectedTitle),
+            false,
+            `Wrapped flow text became an outline section: "${rejectedTitle}".`,
+          ),
+        );
+      }
+
+      issues.push(
+        ...assertEqual(
+          countTitle(outline.sections, "Course Content - Midterm"),
+          1,
+          "Repeated slide banners should collapse into one useful section.",
+        ),
+      );
+
+      return issues;
+    },
+  };
 }
 
 if (isDirectExecution(import.meta.url)) {

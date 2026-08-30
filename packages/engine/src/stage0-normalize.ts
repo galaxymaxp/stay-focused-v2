@@ -298,7 +298,10 @@ function detectTextBlocks(text: string): DraftBlock[] {
       continue;
     }
 
-    if (isReasonableAllCapsHeading(trimmedLine)) {
+    if (
+      isReasonableAllCapsHeading(trimmedLine) &&
+      !isWrappedAllCapsContinuation(sourceLines, lineIndex)
+    ) {
       flushActiveBlock();
       blocks.push({ kind: "heading", text: trimmedLine });
       continue;
@@ -343,7 +346,8 @@ function findPlainTextOcrHeadingLineIndexes(
     if (
       nextLine &&
       isPlainTextOcrHeadingLine(trimmedLine) &&
-      startsPlainTextOcrBodyLine(nextLine)
+      (startsPlainTextOcrBodyLine(nextLine) ||
+        allowsShortBodyAfterHeading(trimmedLine))
     ) {
       candidates.add(index);
     }
@@ -995,7 +999,9 @@ function isPlainTextOcrHeadingLine(line: string): boolean {
     return false;
   }
 
-  const words = line.split(/\s+/).filter((word) => word.length > 0);
+  const words = line
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !/^(?:-|\u2013|\u2014)$/.test(word));
   const letters = line.match(/[A-Za-z]/g) ?? [];
   const headingWords = words.filter((word) =>
     /^(?:[A-Z][A-Za-z0-9()'.?&-]*|IT|IoT|BYOD|SEO|DDoS)$/.test(word),
@@ -1004,16 +1010,26 @@ function isPlainTextOcrHeadingLine(line: string): boolean {
     /^(?:a|an|and|for|in|is|of|or|the|to|vs\.?|with)$/i.test(word),
   );
 
+  const structuredHeading =
+    /^(?:unit|module|chapter|part|lesson|topic|week|section)\s+\d+\s*(?::|[-\u2013\u2014])?\s*\S/i.test(
+      line,
+    ) || /^(?:process|procedure|steps?)\s+(?:for|to)\s+\S/i.test(line);
+
   return (
     line.length >= 3 &&
     line.length <= 80 &&
     words.length >= 2 &&
     words.length <= 8 &&
     letters.length >= 2 &&
-    !/[.!?:;]$/.test(line) &&
-    headingWords.length + connectorWords.length === words.length &&
-    headingWords.length >= 2
+    !/[.!?;]$/.test(line) &&
+    (structuredHeading ||
+      (headingWords.length + connectorWords.length === words.length &&
+        headingWords.length >= 2))
   );
+}
+
+function allowsShortBodyAfterHeading(line: string): boolean {
+  return /^(?:process|procedure|steps?)\s+(?:for|to)\s+\S/i.test(line);
 }
 
 function startsPlainTextOcrBodyLine(line: string): boolean {
@@ -1036,11 +1052,44 @@ function startsPlainTextOcrBodyLine(line: string): boolean {
 
   const words =
     trimmedLine.match(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g) ?? [];
-  return /[.!?:;]/.test(trimmedLine) || words.length >= 4;
+  return /[.!?:;+%=]/.test(trimmedLine) || words.length >= 4;
 }
 
 function isListLine(line: string): boolean {
-  return /^(?:[-*+]\s+|\d+[.)]\s+)\S/.test(line);
+  return /^(?:[-*+]\s+|\d+[.)]\s+|(?:\u2022|â€¢|Ã¢â‚¬Â¢)\s*)\S/.test(line);
+}
+
+function isWrappedAllCapsContinuation(
+  lines: readonly string[],
+  index: number,
+): boolean {
+  const previousLine = findPreviousNonBlankLine(lines, index - 1);
+  const nextLine = findNextNonBlankLine(lines, index + 1);
+  if (!previousLine) {
+    return false;
+  }
+
+  const previousEndsWithAllCapsWord = /\b[A-Z]{2,}\s*$/.test(previousLine);
+  const previousIsShortContinuation =
+    previousLine.split(/\s+/).length <= 4 &&
+    !/[.!?:;]$/.test(previousLine) &&
+    Boolean(nextLine && /^[a-z]/.test(nextLine));
+
+  return previousEndsWithAllCapsWord || previousIsShortContinuation;
+}
+
+function findPreviousNonBlankLine(
+  lines: readonly string[],
+  startIndex: number,
+): string | undefined {
+  for (let index = startIndex; index >= 0; index -= 1) {
+    const trimmedLine = lines[index]?.trim() ?? "";
+    if (trimmedLine) {
+      return trimmedLine;
+    }
+  }
+
+  return undefined;
 }
 
 function isQuoteLine(line: string): boolean {

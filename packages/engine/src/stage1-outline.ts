@@ -251,7 +251,8 @@ function findPlainTextOcrBoundaryLineIndexes(
       trimmed &&
       nextLine &&
       isPlainTextOcrHeadingLine(trimmed) &&
-      startsPlainTextOcrBodyLine(nextLine.text.trim())
+      (startsPlainTextOcrBodyLine(nextLine.text.trim()) ||
+        allowsShortBodyAfterHeading(trimmed))
     ) {
       candidates.add(index);
     }
@@ -595,6 +596,19 @@ function extractFragments(
 function mergeRepeatedDrafts(
   drafts: readonly SectionDraft[],
 ): readonly SectionDraft[] {
+  const initiallyMerged = mergeAdjacentRepeatedDrafts(drafts);
+  const withoutRepeatedHeaderOnlyDrafts = removeRepeatedHeaderOnlyDrafts(
+    initiallyMerged,
+  );
+
+  return disambiguateNonContiguousRepeats(
+    mergeAdjacentRepeatedDrafts(withoutRepeatedHeaderOnlyDrafts),
+  );
+}
+
+function mergeAdjacentRepeatedDrafts(
+  drafts: readonly SectionDraft[],
+): readonly SectionDraft[] {
   const merged: SectionDraft[] = [];
   let previousKey = "";
 
@@ -616,7 +630,34 @@ function mergeRepeatedDrafts(
     previousKey = key;
   }
 
-  return disambiguateNonContiguousRepeats(merged);
+  return merged;
+}
+
+function removeRepeatedHeaderOnlyDrafts(
+  drafts: readonly SectionDraft[],
+): readonly SectionDraft[] {
+  const meaningfulCounts = new Map<string, number>();
+
+  for (const draft of drafts) {
+    if (!isHeaderOnlyDraft(draft)) {
+      const key = normalizeTitleKey(draft.title);
+      meaningfulCounts.set(key, (meaningfulCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  return drafts.filter((draft) => {
+    const key = normalizeTitleKey(draft.title);
+    return !isHeaderOnlyDraft(draft) || (meaningfulCounts.get(key) ?? 0) === 0;
+  });
+}
+
+function isHeaderOnlyDraft(draft: SectionDraft): boolean {
+  const titleKey = normalizeTitleKey(draft.title);
+  const contentKeys = draft.fragments
+    .map((fragment) => normalizeTitleKey(fragment.text))
+    .filter((key) => key.length > 0);
+
+  return contentKeys.length > 0 && contentKeys.every((key) => key === titleKey);
 }
 
 function disambiguateNonContiguousRepeats(
@@ -766,7 +807,13 @@ function startsExplicitBodyAfterHeading(line: string): boolean {
 }
 
 function isShortHeadingLine(line: string): boolean {
-  const words = line.split(/\s+/).filter((word) => word.length > 0);
+  if (startsExplicitBodyAfterHeading(line)) {
+    return false;
+  }
+
+  const words = line
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !/^(?:-|\u2013|\u2014)$/.test(word));
   const letters = line.match(/[A-Za-z]/g) ?? [];
   const capitalizedWords = words.filter((word) =>
     /^(?:[A-Z][A-Za-z0-9()'.?&-]*|IT|IoT|BYOD|SEO|DDoS)$/.test(word),
@@ -795,7 +842,9 @@ function isPlainTextOcrHeadingLine(line: string): boolean {
     return false;
   }
 
-  const words = line.split(/\s+/).filter((word) => word.length > 0);
+  const words = line
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !/^(?:-|\u2013|\u2014)$/.test(word));
   const letters = line.match(/[A-Za-z]/g) ?? [];
   const headingWords = words.filter((word) =>
     /^(?:[A-Z][A-Za-z0-9()'.?&-]*|IT|IoT|BYOD|SEO|DDoS)$/.test(word),
@@ -804,15 +853,21 @@ function isPlainTextOcrHeadingLine(line: string): boolean {
     /^(?:a|an|and|for|in|is|of|or|the|to|vs\.?|with)$/i.test(word),
   );
 
+  const structuredHeading =
+    /^(?:unit|module|chapter|part|lesson|topic|week|section)\s+\d+\s*(?::|[-\u2013\u2014])?\s*\S/i.test(
+      line,
+    ) || /^(?:process|procedure|steps?)\s+(?:for|to)\s+\S/i.test(line);
+
   return (
     line.length >= 3 &&
     line.length <= 80 &&
     words.length >= 2 &&
     words.length <= 8 &&
     letters.length >= 2 &&
-    !/[.!?:;]$/.test(line) &&
-    headingWords.length + connectorWords.length === words.length &&
-    headingWords.length >= 2
+    !/[.!?;]$/.test(line) &&
+    (structuredHeading ||
+      (headingWords.length + connectorWords.length === words.length &&
+        headingWords.length >= 2))
   );
 }
 
@@ -834,7 +889,11 @@ function startsPlainTextOcrBodyLine(line: string): boolean {
 
   const words =
     trimmedLine.match(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g) ?? [];
-  return /[.!?:;]/.test(trimmedLine) || words.length >= 4;
+  return /[.!?:;+%=]/.test(trimmedLine) || words.length >= 4;
+}
+
+function allowsShortBodyAfterHeading(line: string): boolean {
+  return /^(?:process|procedure|steps?)\s+(?:for|to)\s+\S/i.test(line);
 }
 
 function isMarkdownHeading(line: string): boolean {

@@ -92,6 +92,7 @@ export const stage0NormalizationSuite: EvalSuite = {
   cases: [
     ...successFixtures.map(createSuccessCase),
     createDigitalComponentsCollapsedCase(),
+    createCoursePdfStructureCase(),
     ...expectedErrorFixtures.map(createErrorCase),
   ],
 };
@@ -101,6 +102,48 @@ export async function runStage0NormalizationEvals(): Promise<boolean> {
   printEvalSuiteResult(result);
   setFailureExitCode([result]);
   return result.status === "passed";
+}
+
+function createCoursePdfStructureCase(): EvalCase {
+  return {
+    name: "course PDF text preserves Unicode bullets and wrapped policy text",
+    run: async () => {
+      const output = await normalizeSource({
+        title: "Course orientation",
+        kind: "plain-text",
+        language: "en",
+        text: [
+          "Course Requirements",
+          "• Submit a written manuscript.",
+          "• Present the prototype.",
+          "Attendance",
+          "Students who exceed the absence limit are UNOFFICIALLY",
+          "DROPPED (UD)",
+          "• Readmission requires approval.",
+        ].join("\n"),
+      });
+      const issues: EvalIssue[] = [];
+
+      issues.push(
+        ...assertEqual(
+          output.blocks.some(
+            (block) => block.kind === "list" && block.text.includes("• Submit"),
+          ),
+          true,
+          "Unicode bullet lines should normalize as list content.",
+        ),
+        ...assertEqual(
+          output.blocks.some(
+            (block) => block.kind === "heading" && block.text === "DROPPED (UD)",
+          ),
+          false,
+          "A wrapped all-caps policy phrase should not become a heading.",
+        ),
+      );
+
+      return issues;
+    },
+  };
 }
 
 if (isDirectExecution(import.meta.url)) {

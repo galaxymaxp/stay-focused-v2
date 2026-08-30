@@ -186,9 +186,15 @@ Major deliverables:
 Exit criteria:
 
 - Engine build passes.
-- Aggregate deterministic evals pass with 266 cases.
+- Aggregate deterministic evals pass with 292 cases.
 - Default visible reviewer output is source-faithful.
 - Unsupported enrichment is excluded from default assembly.
+
+Real-course quality note: the 2026-08-30 CIT6 audit repaired natural course-PDF
+outline detection and retained complete, grounded coverage, but scored 3.75/5
+because flattened tables/process flows and repeated slide banners still produce
+dense extractive key points with little explanation. The next Reviewer quality
+task is Stage 3 study transformation, not UI redesign.
 
 Immediate dependency: None.
 

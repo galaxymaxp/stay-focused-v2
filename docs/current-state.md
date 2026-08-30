@@ -100,7 +100,7 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
   targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
-  reviewer engine: 290/290 deterministic evaluations. These suites were rerun
+  reviewer engine: 292/292 deterministic evaluations. These suites were rerun
   after hosted acceptance.
 - Forced root typecheck and lint pass fresh for 7/7 packages with zero cached
   tasks; lint retains only the four known mobile import-order warnings. DB and
@@ -159,8 +159,11 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: run the consolidated Reviewer acceptance on a physical
-  iPhone, including Dynamic Type and VoiceOver.
+- Recommended next task: improve Stage 3 study transformation for flattened
+  tables/processes and repeated slide banners while preserving the corrected
+  outline and strict grounding. The 2026-08-30 CIT6 real-course audit reached
+  3.75/5 after outline repair, below the 4.0 capstone-ready threshold; see
+  `docs/ai/cit6-reviewer-quality-output.md`.
 - Reviewer-core limitations are documented in
   `docs/ai/reviewer-core-capstone-acceptance-20260828.md`; notably, fresh camera
   and long-document device acceptance was not repeated, and a cold-start
