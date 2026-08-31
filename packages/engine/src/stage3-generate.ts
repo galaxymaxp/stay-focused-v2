@@ -511,6 +511,9 @@ function semanticPlanPromptLines(section: PlannedSection): readonly string[] {
   return [
     "SEMANTIC PLAN:",
     `- Section meaning: ${semanticPlan.kind}`,
+    ...(semanticPlan.taxonomyContext
+      ? [`- Source taxonomy context: ${semanticPlan.taxonomyContext}`]
+      : []),
     `- Useful explanation: ${semanticPlan.explanationUseful ? "yes" : "no"}`,
     ...semanticPlan.units.map(
       (unit, index) =>

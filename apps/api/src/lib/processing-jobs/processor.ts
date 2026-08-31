@@ -277,6 +277,9 @@ async function processExtractionJob({
     removedBoilerplateLines: normalized.diagnostics.removedLineCount,
     extractionDurationMs: Date.now() - extractionStartedAt,
   };
+  const pageEvidenceByNumber = new Map(
+    extraction.result.pages.map((page) => [page.pageNumber, page] as const),
+  );
   return {
     payload: {
       text: normalized.text,
@@ -288,6 +291,12 @@ async function processExtractionJob({
           order,
           pageNumber: page.pageNumber,
           text: page.text,
+          metadata: {
+            extractionMethod:
+              pageEvidenceByNumber.get(page.pageNumber)?.method ?? "native_text",
+            layoutStatus:
+              pageEvidenceByNumber.get(page.pageNumber)?.layoutStatus ?? "native_complete",
+          },
         })),
       rawText: extraction.result.pages
         .map((page) => page.text)

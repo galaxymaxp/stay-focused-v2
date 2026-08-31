@@ -175,6 +175,26 @@ describe("extractPdfDocument", () => {
     expect(result.result.text).toContain("Introduction\n\nCore concept\n\nComparison");
   });
 
+  it("supplements sparse native text with OCR and reports the reason", async () => {
+    const bytes = await sparseVisualPdf("Relationship Map");
+    const provider = localPageProvider(["Parent node Child one Child two"]);
+
+    const result = await runExtraction(bytes, provider);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.extraction).toMatchObject({
+      extractionMode: "ocr",
+      nativeTextPageCount: 0,
+      ocrPageCount: 1,
+    });
+    expect(result.result.text).toContain("Relationship Map");
+    expect(result.result.text).toContain("Parent node Child one Child two");
+    expect(result.result.warnings).toContainEqual(
+      expect.objectContaining({ code: "native_text_layout_incomplete", pageNumber: 1 }),
+    );
+  });
+
   it("marks every original page in a failed OCR chunk and rejects partial text", async () => {
     const provider = sequentialProvider({ rejectCall: 2 });
     const result = await runExtraction(await scannedPdf(12), provider);
@@ -442,3 +462,16 @@ async function mixedPdf({
   }
   return await document.save({ useObjectStreams: false });
 }
+
+async function sparseVisualPdf(title: string): Promise<Uint8Array> {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const image = await document.embedPng(Buffer.from(ONE_PIXEL_PNG, "base64"));
+  const page = document.addPage();
+  page.drawText(title, { x: 40, y: 700, font, size: 14 });
+  page.drawImage(image, { x: 40, y: 500, width: 80, height: 80 });
+  page.drawImage(image, { x: 160, y: 500, width: 80, height: 80 });
+  return await document.save({ useObjectStreams: false });
+}
+
+const ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";

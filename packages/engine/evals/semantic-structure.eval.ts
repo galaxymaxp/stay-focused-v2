@@ -23,6 +23,7 @@ interface SemanticFixture {
   readonly title: string;
   readonly sourceText: string;
   readonly tags?: readonly SectionContentTag[];
+  readonly metadata?: NormalizedSourceBlock["metadata"];
   readonly verify: (plan: PlannedSectionSemanticPlan) => ReturnType<EvalCase["run"]>;
 }
 
@@ -55,9 +56,9 @@ const fixtures: readonly SemanticFixture[] = [
     verify: async (plan) => [
       ...assertEqual(plan.kind, "procedure", "Explicit procedure was flattened."),
       ...assertIncludes(
-        serializeSemanticUnits(plan.units)[0] ?? "",
-        "1. Collect the sample. 2. Record the sample code. 3. Place the sample in the tray.",
-        "Procedure order was not retained inside one semantic unit.",
+        serializeSemanticUnits(plan.units).join(" | "),
+        "1. Collect the sample. | 2. Record the sample code.",
+        "Procedure order was not retained across distinct visible rows.",
       ),
     ],
   },
@@ -135,10 +136,10 @@ const fixtures: readonly SemanticFixture[] = [
         "Explicit examples were flattened.",
       ),
       ...assertDeepEqual(
-        plan.units[1],
+        plan.units[0],
         {
           kind: "examples",
-          label: "Examples:",
+          label: "Repeating bands",
           items: ["Ripple marks", "Alternating stripes"],
         },
         "Examples were not attached to their source concept.",
@@ -242,6 +243,122 @@ const fixtures: readonly SemanticFixture[] = [
       ),
     ],
   },
+  {
+    name: "U - components cue preserves ownership in separate rows",
+    title: "Parts of a Habitat",
+    sourceText: "Made up of two parts:\n- Living zone\n- Nonliving zone",
+    verify: async (plan) => [
+      ...assertEqual(plan.kind, "category-hierarchy", "Components cue was flattened."),
+      ...assertDeepEqual(
+        serializeSemanticUnits(plan.units),
+        ["Parts of a Habitat: Living zone", "Parts of a Habitat: Nonliving zone"],
+        "Component children were fused or lost ownership.",
+      ),
+    ],
+  },
+  {
+    name: "V - advantages and disadvantages remain separate groups",
+    title: "Material Choice",
+    sourceText: "Advantages:\n- Low mass\n- Easy shaping\nDisadvantages:\n- Low heat tolerance\n- Surface wear",
+    verify: async (plan) => [
+      ...assertDeepEqual(
+        plan.units.map((unit) => [unit.label, ...unit.items]),
+        [
+          ["Advantages", "Low mass", "Easy shaping"],
+          ["Disadvantages", "Low heat tolerance", "Surface wear"],
+        ],
+        "Contrast group ownership changed.",
+      ),
+    ],
+  },
+  {
+    name: "W - implementation cue preserves children",
+    title: "Common Implementations",
+    sourceText: "Common Implementations:\n- Embedded module\n- Hosted service\n- Desktop utility",
+    verify: async (plan) => [
+      ...assertDeepEqual(
+        plan.units[0],
+        { kind: "group", label: "Common Implementations", items: ["Embedded module", "Hosted service", "Desktop utility"] },
+        "Implementation cue was not normalized.",
+      ),
+    ],
+  },
+  {
+    name: "X - inline abbreviated example stays attached",
+    title: "Transfer Methods",
+    sourceText: "- Network transfer\n- Ex. RiverLink protocol",
+    tags: ["example"],
+    verify: async (plan) => [
+      ...assertDeepEqual(
+        plan.units[0],
+        { kind: "examples", label: "Network transfer", items: ["RiverLink protocol"] },
+        "Inline example lost its concept association.",
+      ),
+    ],
+  },
+  {
+    name: "Y - checklist numbering does not imply a procedure",
+    title: "Best Practices",
+    sourceText: "1. Review labels regularly.\n2. Use clear names.\n3. Automate the process when appropriate.",
+    tags: ["process"],
+    verify: async (plan) => [
+      ...assertEqual(plan.kind, "checklist", "Checklist was mislabeled as a procedure."),
+      ...assertEqual(plan.units.every((unit) => unit.kind === "point"), true, "Checklist invented step dependencies."),
+    ],
+  },
+  {
+    name: "Z - ambiguous short labels stay flat",
+    title: "Archive Notes",
+    sourceText: "- North\n- Birch\n- Quiet\n- Amber",
+    verify: async (plan) => [
+      ...assertEqual(plan.kind, "list", "Ambiguous labels invented a relationship."),
+      ...assertEqual(plan.units.every((unit) => unit.kind === "point"), true, "Ambiguous labels were grouped."),
+    ],
+  },
+  {
+    name: "AA - imperative checklist remains unordered",
+    title: "Field Guidelines",
+    sourceText: "- Record each observation.\n- Review labels regularly.\n- Use consistent units.",
+    tags: ["process"],
+    verify: async (plan) => [
+      ...assertEqual(plan.kind, "checklist", "Imperative guidelines became a procedure."),
+      ...assertEqual(plan.units.every((unit) => unit.kind === "point"), true, "Imperative checklist invented order."),
+    ],
+  },
+  {
+    name: "AB - explicit sequence without Step wording remains ordered",
+    title: "Sample Transfer",
+    sourceText: "Complete in this sequence:\n1. Collect the sample.\n2. Record the code.\n3. Place it in storage.",
+    tags: ["process"],
+    verify: async (plan) => [
+      ...assertEqual(plan.kind, "procedure", "Explicit sequence was flattened without a Step label."),
+      ...assertEqual(plan.units[0]?.kind, "steps", "Explicit sequence lost ordered semantics."),
+    ],
+  },
+  {
+    name: "AC - OCR labels do not invent visual relationships",
+    title: "Assembly Diagram",
+    sourceText: "Components:\nRotor\nHousing",
+    metadata: { layoutStatus: "ocr_supplemented" },
+    verify: async (plan) => [
+      ...assertEqual(plan.kind, "concept", "OCR-only labels invented a relationship."),
+      ...assertEqual(plan.units.length, 0, "OCR-only layout evidence created semantic targets."),
+    ],
+  },
+  {
+    name: "AD - lettered dependency reference preserves a true sequence",
+    title: "Material Inspection",
+    sourceText: "1. Surface Analysis\na) Record the baseline.\nb) Determine the comparison from (a).\nc) Place the result in storage.\n2. Storage Notes\n- Shelf label\n- Archive code",
+    tags: ["process"],
+    verify: async (plan) => [
+      ...assertEqual(plan.units[0]?.kind, "steps", "Explicit child dependency was flattened."),
+      ...assertDeepEqual(
+        plan.units[0]?.items,
+        ["Record the baseline.", "Determine the comparison from (a).", "Place the result in storage."],
+        "Dependency sequence lost its source order.",
+      ),
+    ],
+  },
 ];
 
 export const semanticStructureSuite: EvalSuite = {
@@ -268,17 +385,21 @@ function createCase(fixture: SemanticFixture): EvalCase {
         analyzeSectionSemanticStructure({
           title: fixture.title,
           tags: fixture.tags ?? [],
-          sourceBlocks: [sourceBlock(fixture.sourceText)],
+          sourceBlocks: [sourceBlock(fixture.sourceText, fixture.metadata)],
         }),
       ),
   };
 }
 
-function sourceBlock(text: string): NormalizedSourceBlock {
+function sourceBlock(
+  text: string,
+  metadata?: NormalizedSourceBlock["metadata"],
+): NormalizedSourceBlock {
   return {
     id: "semantic-fixture-block",
     kind: "list",
     text,
     order: 0,
+    ...(metadata ? { metadata } : {}),
   };
 }

@@ -20,7 +20,7 @@ const fallbackFixtures: readonly { readonly name: string; readonly text: string;
   { name: "mixed headings and paragraphs fallback", text: "# Cloud Gardens\nCloud gardens collect mist for fictional hill farms.\n## Mesh trays\nMesh trays hold seed beds above stone channels.", expected: "Cloud" },
   { name: "exact technical-term preservation", text: "Zero-Trust Fabric\nThe Zero-Trust Fabric uses MT-47 gates at 12.5% capacity.", expected: "MT-47" },
   { name: "comparison table converted to text", text: "Material comparison\nAster glass: flexible.\nBeryl glass: rigid.", expected: "Aster glass" },
-  { name: "numbered procedure fallback", text: "Signal setup\n1. Raise the violet marker.\n2. Record the beacon code.\n3. Close the copper latch.", expected: "violet marker" },
+  { name: "numbered action-list fallback", text: "Signal setup\n1. Raise the violet marker.\n2. Record the beacon code.\n3. Close the copper latch.", expected: "violet marker" },
   { name: "OCR-like line breaks fallback", text: "Fictional Civic Notes\nA council records\npublic comments before\nissuing a local notice.", expected: "council" },
   { name: "Canvas-like page fallback", text: "Week 4: Orchard Maps\nOrchard maps label rows by tree age.\nKey terms\n- row marker\n- harvest zone", expected: "row marker" },
   { name: "too-few-block fallback", text: "Basalt Compass\nA basalt compass points toward the fictional north arch.", expected: "basalt compass" },

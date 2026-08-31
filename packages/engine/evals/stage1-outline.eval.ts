@@ -85,9 +85,62 @@ export const stage1OutlineSuite: EvalSuite = {
     ...fixtures.map(createFixtureCase),
     createItSecurityOutlineCase(),
     createCoursePdfOutlineCase(),
+    createTaxonomyContextOutlineCase(),
+    createDiagramContinuationOutlineCase(),
     createEmptySourceCase(),
   ],
 };
+
+function createDiagramContinuationOutlineCase(): EvalCase {
+  return {
+    name: "repeated diagram continuation remains in its academic section",
+    run: async () => {
+      const source = await normalizeSource({
+        title: "Neutral Lecture",
+        kind: "presentation",
+        blocks: [
+          { pageNumber: 2, text: "Transfer Model\nThe model connects two measured states." },
+          {
+            pageNumber: 3,
+            text: "Transfer Model\nState Alpha\nState Beta",
+            metadata: { layoutStatus: "ocr_supplemented" },
+          },
+          { pageNumber: 4, text: "Next Topic\nA separate academic statement." },
+        ],
+      });
+      const outline = await detectOutline(source);
+      return [
+        ...assertDeepEqual(outline.sections.map((section) => section.title), ["Transfer Model", "Next Topic"], "Repeated visual continuation was discarded or split."),
+        ...assertEqual(outline.sections[0]?.sourceBlockIds.some((id) => id.includes("page-3") || source.blocks.find((block) => block.id === id)?.pageNumber === 3), true, "Diagram continuation evidence was not retained."),
+      ];
+    },
+  };
+}
+
+function createTaxonomyContextOutlineCase(): EvalCase {
+  return {
+    name: "taxonomy divider is not a reviewer section but its context survives",
+    run: async () => {
+      const source = await normalizeSource({
+        title: "Neutral Lecture",
+        kind: "presentation",
+        blocks: [
+          { pageNumber: 2, text: "Classified by\nObserved Form" },
+          { pageNumber: 3, text: "Type Alpha\nRetains one measured property." },
+          { pageNumber: 4, text: "Type Beta\nRetains a different measured property." },
+        ],
+      });
+      const outline = await detectOutline(source);
+      const academicBlocks = source.blocks.filter(
+        (block) => block.metadata?.presentationRole === "academic",
+      );
+      return [
+        ...assertDeepEqual(outline.sections.map((section) => section.title), ["Type Alpha", "Type Beta"], "Divider leaked into the outline."),
+        ...assertEqual(academicBlocks.every((block) => block.metadata?.presentationTaxonomyContext === "Classified by Observed Form"), true, "Taxonomy context was not retained on academic content."),
+      ];
+    },
+  };
+}
 
 export async function runStage1OutlineEvals(): Promise<boolean> {
   const result = await runEvalSuite(stage1OutlineSuite);

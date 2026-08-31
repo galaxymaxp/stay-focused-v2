@@ -697,7 +697,7 @@ function previousNonWhitespaceCharacter(
 }
 
 function isHeadingConnector(token: string): boolean {
-  return /^(?:a|an|and|for|in|of|or|the|to|vs\.?|with)$/i.test(token);
+  return /^(?:a|an|and|by|for|in|of|or|the|to|vs\.?|with)$/i.test(token);
 }
 
 function detectFunctionLabelMarkers(
@@ -1043,9 +1043,13 @@ function expandPresentationPageBlocks(
   blocks: readonly DraftBlock[],
   sourceTitle: string | undefined,
 ): DraftBlock[] {
-  return blocks.flatMap((block) => {
+  const expanded: DraftBlock[] = [];
+  let taxonomyContext: string | undefined;
+
+  for (const block of blocks) {
     if (block.pageNumber === undefined) {
-      return [block];
+      expanded.push(block);
+      continue;
     }
 
     const lines = block.text
@@ -1054,10 +1058,11 @@ function expandPresentationPageBlocks(
       .filter((line) => line.length > 0 && !isIsolatedPresentationGlyph(line));
     const headingIndex = lines.findIndex(isPresentationHeadingCandidate);
     if (headingIndex < 0) {
-      return [{
+      expanded.push({
         ...block,
         metadata: withPresentationRole(block.metadata, "branding-noise"),
-      }];
+      });
+      continue;
     }
 
     const heading = lines[headingIndex] ?? "";
@@ -1072,7 +1077,16 @@ function expandPresentationPageBlocks(
     const headingText = role === "presentation-divider"
       ? lines.join(" ")
       : heading;
-    const metadata = withPresentationRole(block.metadata, role);
+    if (role === "presentation-divider") {
+      taxonomyContext = isTaxonomyDivider(headingText)
+        ? headingText
+        : undefined;
+    }
+    const metadata = withPresentationRole(
+      block.metadata,
+      role,
+      role === "academic" ? taxonomyContext : undefined,
+    );
     const headingBlock: DraftBlock = {
       ...(block.id ? { id: `${block.id}-heading` } : {}),
       kind: "heading",
@@ -1084,10 +1098,11 @@ function expandPresentationPageBlocks(
     const remainingBody = role === "presentation-divider" ? [] : bodyLines;
 
     if (remainingBody.length === 0) {
-      return [headingBlock];
+      expanded.push(headingBlock);
+      continue;
     }
 
-    return [
+    expanded.push(
       headingBlock,
       {
         ...(block.id ? { id: `${block.id}-body` } : {}),
@@ -1097,8 +1112,16 @@ function expandPresentationPageBlocks(
         ...(block.sectionHint ? { sectionHint: block.sectionHint } : {}),
         metadata,
       },
-    ];
-  });
+    );
+  }
+
+  return expanded;
+}
+
+function isTaxonomyDivider(value: string): boolean {
+  return /\b(?:categor(?:y|ies|ized|ised)|classif(?:y|ied|ication)|grouped|organized|organised|divided|arranged)\s+by\b/i.test(
+    value,
+  );
 }
 
 function classifyPresentationPage(args: {
@@ -1198,10 +1221,12 @@ function significantTitleWords(value: string): string[] {
 function withPresentationRole(
   metadata: Readonly<Record<string, MetadataValue>> | undefined,
   role: PresentationPageRole,
+  taxonomyContext?: string,
 ): Readonly<Record<string, MetadataValue>> {
   return {
     ...(metadata ?? {}),
     presentationRole: role,
+    ...(taxonomyContext ? { presentationTaxonomyContext: taxonomyContext } : {}),
   };
 }
 

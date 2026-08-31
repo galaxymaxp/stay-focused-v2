@@ -1,6 +1,7 @@
 import { COVERAGE_THRESHOLD } from "@stay-focused/shared";
 
 import { verifySemanticCoverage } from "./semantic-verification.js";
+import { verifyPlanIntegrity } from "./plan-integrity.js";
 
 import type {
   CoverageIssue,
@@ -9,6 +10,7 @@ import type {
   CoverageStatus,
   GenerationPlan,
   NormalizedSource,
+  PlanIntegrityIssue,
   PlannedSection,
   SectionCoverageResult,
   SectionOutput,
@@ -54,6 +56,7 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
   const { plan, outputs, source, outline } = args;
   const sourceBlockIds = new Set(source.blocks.map((block) => block.id));
   validatePlanReferences(plan, sourceBlockIds);
+  const planIntegrity = verifyPlanIntegrity(plan, source);
 
   const plannedSectionIds = new Set(plan.sections.map((section) => section.id));
   const outputsBySectionId = groupOutputsByPlannedSection(outputs);
@@ -62,6 +65,7 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
       section,
       outputsBySectionId.get(section.id) ?? [],
       sourceBlockIds,
+      planIntegrity.issuesBySectionId.get(section.id) ?? [],
     ),
   );
   const unplannedResults = outputs
@@ -109,11 +113,14 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     duplicateGroups,
     unplannedResults,
     sourceSectionsTotal,
+    planIntegrityIssues: planIntegrity.issues,
   });
+  const overallScore = roundScore(Math.min(coverageScore, planIntegrity.score));
   const status = reportStatus({
     coverageScore,
     sectionResults,
     unplannedResults,
+    planIntegrityStatus: planIntegrity.status,
   });
 
   emitCoverageLog({
@@ -135,7 +142,7 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
         plan.id,
         source.id,
         outline.id,
-        coverageScore,
+        overallScore,
         status,
         ...sourceSections.map(
           (section) =>
@@ -150,7 +157,7 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     planId: plan.id,
     sourceId: source.id,
     status,
-    score: coverageScore,
+    score: overallScore,
     coverageScore,
     coverageBasis: "source-outline",
     sourceSectionsTotal,
@@ -161,6 +168,9 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     semanticTargetCount,
     coveredSemanticTargetCount,
     semanticCoverageScore,
+    planIntegrityStatus: planIntegrity.status,
+    planIntegrityScore: planIntegrity.score,
+    planIntegrityIssues: planIntegrity.issues,
   };
 }
 
@@ -242,6 +252,7 @@ function verifyPlannedSection(
   section: PlannedSection,
   outputs: readonly SectionOutput[],
   sourceBlockIds: ReadonlySet<string>,
+  planIntegrityIssues: readonly PlanIntegrityIssue[],
 ): SectionCoverageResult {
   const output = outputs[0];
   if (!output) {
@@ -258,6 +269,8 @@ function verifyPlannedSection(
       semanticTargetCount,
       coveredSemanticTargetCount: 0,
       semanticCoverageScore: 0,
+      planIntegrityStatus: planIntegrityIssues.length === 0 ? "passed" : "failed",
+      planIntegrityIssues,
     };
   }
 
@@ -321,18 +334,25 @@ function verifyPlannedSection(
 
   const semanticIncomplete =
     hasSemanticPlan && coveredSemanticTargetCount < semanticTargetCount;
+  const planIsInvalid = planIntegrityIssues.length > 0;
+  if (planIsInvalid) {
+    score = Math.min(score, REQUIRED_FIELD_FAILURE_CAP);
+    issues.push(...planIntegrityIssues.map((issue) => issue.message));
+  }
   return {
     plannedSectionId: section.id,
     status:
-      semanticIncomplete && score >= WEAK_THRESHOLD
+      !planIsInvalid && semanticIncomplete && score >= WEAK_THRESHOLD
         ? "weak"
         : statusForScore(score),
     score,
     issues,
-    retryable: semanticIncomplete || score < PASSED_THRESHOLD,
+    retryable: !planIsInvalid && (semanticIncomplete || score < PASSED_THRESHOLD),
     semanticTargetCount,
     coveredSemanticTargetCount,
     semanticCoverageScore,
+    planIntegrityStatus: planIsInvalid ? "failed" : "passed",
+    planIntegrityIssues,
   };
 }
 
@@ -473,6 +493,7 @@ function createCoverageIssues(args: {
   readonly duplicateGroups: readonly DuplicateSectionGroup[];
   readonly unplannedResults: readonly SectionCoverageResult[];
   readonly sourceSectionsTotal: number;
+  readonly planIntegrityIssues: readonly PlanIntegrityIssue[];
 }): readonly CoverageIssue[] {
   const issues: CoverageIssue[] = [];
 
@@ -518,6 +539,15 @@ function createCoverageIssues(args: {
       severity: "error",
       plannedSectionId: result.plannedSectionId,
       message: `Output references unplanned section "${result.plannedSectionId}".`,
+    });
+  }
+
+  for (const issue of args.planIntegrityIssues) {
+    issues.push({
+      type: "plan-integrity",
+      severity: "error",
+      plannedSectionId: issue.plannedSectionId,
+      message: issue.message,
     });
   }
 
@@ -599,12 +629,15 @@ function reportStatus(args: {
   readonly coverageScore: number;
   readonly sectionResults: readonly SectionCoverageResult[];
   readonly unplannedResults: readonly SectionCoverageResult[];
+  readonly planIntegrityStatus: CoverageReportStatus;
 }): CoverageReportStatus {
   const hasFailedGeneratedSection =
     args.sectionResults.some((section) => section.status === "failed") ||
     args.unplannedResults.length > 0;
 
-  return args.coverageScore >= COVERAGE_THRESHOLD && !hasFailedGeneratedSection
+  return args.coverageScore >= COVERAGE_THRESHOLD &&
+    args.planIntegrityStatus === "passed" &&
+    !hasFailedGeneratedSection
     ? "passed"
     : "failed";
 }

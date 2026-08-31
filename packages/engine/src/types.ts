@@ -119,6 +119,7 @@ export interface PlannedSectionTarget {
 export type SectionSemanticKind =
   | "concept"
   | "list"
+  | "checklist"
   | "definition-set"
   | "category-hierarchy"
   | "procedure"
@@ -141,6 +142,7 @@ export interface PlannedSectionSemanticPlan {
   readonly kind: SectionSemanticKind;
   readonly units: readonly PlannedSemanticUnit[];
   readonly explanationUseful: boolean;
+  readonly taxonomyContext?: string;
 }
 
 export interface PlannedSection {
@@ -224,7 +226,21 @@ export type CoverageIssueType =
   | "duplicate-section"
   | "unplanned-output"
   | "section-quality"
-  | "empty-source";
+  | "empty-source"
+  | "plan-integrity";
+
+export type PlanIntegrityIssueType =
+  | "presentation-only-target"
+  | "unsupported-procedure"
+  | "missing-explicit-relationship"
+  | "empty-academic-target";
+
+export interface PlanIntegrityIssue {
+  readonly type: PlanIntegrityIssueType;
+  readonly message: string;
+  readonly plannedSectionId: string;
+  readonly sourceBlockIds: readonly string[];
+}
 
 export interface CoverageIssue {
   readonly type: CoverageIssueType;
@@ -245,6 +261,8 @@ export interface SectionCoverageResult {
   readonly semanticTargetCount?: number;
   readonly coveredSemanticTargetCount?: number;
   readonly semanticCoverageScore?: number;
+  readonly planIntegrityStatus?: CoverageReportStatus;
+  readonly planIntegrityIssues?: readonly PlanIntegrityIssue[];
 }
 
 export interface SourceSectionCoverage {
@@ -270,6 +288,9 @@ export interface CoverageReport {
   readonly semanticTargetCount?: number;
   readonly coveredSemanticTargetCount?: number;
   readonly semanticCoverageScore?: number;
+  readonly planIntegrityStatus?: CoverageReportStatus;
+  readonly planIntegrityScore?: number;
+  readonly planIntegrityIssues?: readonly PlanIntegrityIssue[];
 }
 
 export type GroundingReportStatus = "passed" | "failed";

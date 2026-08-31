@@ -93,9 +93,48 @@ export const stage0NormalizationSuite: EvalSuite = {
     ...successFixtures.map(createSuccessCase),
     createDigitalComponentsCollapsedCase(),
     createCoursePdfStructureCase(),
+    createWrappedTaxonomyDividerCase(),
+    createOrdinaryWrappedHeadingCase(),
     ...expectedErrorFixtures.map(createErrorCase),
   ],
 };
+
+function createWrappedTaxonomyDividerCase(): EvalCase {
+  return {
+    name: "wrapped taxonomy divider becomes hidden context for following pages",
+    run: async () => {
+      const output = await normalizeSource({
+        title: "Neutral Lecture",
+        kind: "presentation",
+        blocks: [
+          { pageNumber: 2, text: "Categorized by\nObserved Form" },
+          { pageNumber: 3, text: "Type Alpha\nRetains one measured property." },
+        ],
+      });
+      return [
+        ...assertEqual(output.blocks[0]?.metadata?.presentationRole, "presentation-divider", "Wrapped taxonomy divider was not recognized."),
+        ...assertEqual(output.blocks[1]?.metadata?.presentationTaxonomyContext, "Categorized by Observed Form", "Taxonomy context did not propagate."),
+      ];
+    },
+  };
+}
+
+function createOrdinaryWrappedHeadingCase(): EvalCase {
+  return {
+    name: "ordinary wrapped academic page is not treated as taxonomy context",
+    run: async () => {
+      const output = await normalizeSource({
+        title: "Neutral Lecture",
+        kind: "presentation",
+        blocks: [{ pageNumber: 4, text: "Observed Patterns\nAcross Regions\nMeasurements differ by season." }],
+      });
+      return [
+        ...assertEqual(output.blocks[0]?.metadata?.presentationRole, "academic", "Ordinary academic page became a divider."),
+        ...assertEqual(output.blocks[0]?.metadata?.presentationTaxonomyContext, undefined, "Ordinary heading invented taxonomy context."),
+      ];
+    },
+  };
+}
 
 export async function runStage0NormalizationEvals(): Promise<boolean> {
   const result = await runEvalSuite(stage0NormalizationSuite);

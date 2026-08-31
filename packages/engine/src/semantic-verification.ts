@@ -32,12 +32,6 @@ interface VisibleRow {
   readonly fieldPath: string;
 }
 
-interface MatchCandidate {
-  readonly unitIndex: number;
-  readonly rowIndex: number;
-  readonly score: number;
-}
-
 const CONTENT_STOPWORDS = new Set([
   "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
   "in", "is", "it", "of", "on", "or", "the", "this", "to", "was",
@@ -55,25 +49,10 @@ export function verifySemanticCoverage(
   }
 
   const rows = visibleRows(output);
-  const candidates: MatchCandidate[] = [];
-  for (const [unitIndex, unit] of units.entries()) {
-    for (const [rowIndex, row] of rows.entries()) {
-      const score = semanticUnitMatchScore(unit, row.text);
-      if (score >= IDEA_MATCH_THRESHOLD && relationshipShapeIsValid(unit, row.text)) {
-        candidates.push({ unitIndex, rowIndex, score });
-      }
-    }
-  }
-
   const assignedUnits = new Set<number>();
-  const assignedRows = new Set<number>();
-  for (const candidate of candidates.sort((left, right) => right.score - left.score)) {
-    if (assignedUnits.has(candidate.unitIndex) || assignedRows.has(candidate.rowIndex)) {
-      continue;
-    }
-    assignedUnits.add(candidate.unitIndex);
-    assignedRows.add(candidate.rowIndex);
-  }
+  units.forEach((unit, unitIndex) => {
+    if (semanticUnitIsCovered(unit, rows)) assignedUnits.add(unitIndex);
+  });
 
   const missingUnits = units.filter((_unit, index) => !assignedUnits.has(index));
   return {
@@ -85,6 +64,38 @@ export function verifySemanticCoverage(
         `Missing semantic target: ${describeUnit(unit)}. Preserve its source-supported content and relationship.`,
     ),
   };
+}
+
+function semanticUnitIsCovered(
+  unit: PlannedSemanticUnit,
+  rows: readonly VisibleRow[],
+): boolean {
+  if (unit.kind === "point") {
+    return rows.some((row) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD);
+  }
+  if (unit.kind === "steps") {
+    const itemRows = unit.items.map((item) =>
+      rows.find((row) => ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD),
+    );
+    if (itemRows.some((row) => row === undefined)) return false;
+    return stepOrderIsValid(unit, rows, itemRows as readonly VisibleRow[]);
+  }
+  const labelRows = rows.filter(
+    (row) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD,
+  );
+  const relatedRows = labelRows.length > 0 ? labelRows : rows.filter(
+    (row) =>
+      unit.items.some((item) => ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD),
+  );
+  if (relatedRows.length === 0) return false;
+  const combined = relatedRows.map((row) => row.text).join(" \n ");
+  return relationshipShapeIsValid(unit, combined) && unit.items.every((item) =>
+    relatedRows.some(
+      (row) =>
+        ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD &&
+        ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD,
+    ),
+  );
 }
 
 export function verifySemanticRelationships(args: {
@@ -111,9 +122,39 @@ function detectRelationshipShapeIssues(
   for (const [unitIndex, unit] of units.entries()) {
     if (unit.kind === "point") continue;
 
+    if (unit.kind === "steps") {
+      const itemRows = unit.items.map((item) =>
+        rows.find((row) => ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD),
+      );
+      if (itemRows.every((row) => row !== undefined)) {
+        const ordered = stepOrderIsValid(
+          unit,
+          rows,
+          itemRows as readonly VisibleRow[],
+        );
+        if (!ordered) {
+          const firstRow = itemRows[0] as VisibleRow;
+          issues.push(relationshipIssue(
+            "grounding-wrong-step-order",
+            firstRow,
+            `Procedure "${unit.label}" does not preserve the source step order.`,
+          ));
+        }
+        continue;
+      }
+    }
+
     const matchingRows = rows.filter(
       (row) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD,
     );
+    const combined = matchingRows.map((row) => row.text).join(" \n ");
+    const distributedShapeIsValid =
+      matchingRows.length > 0 &&
+      relationshipShapeIsValid(unit, combined) &&
+      unit.items.every((item) => matchingRows.some((row) =>
+        ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD,
+      ));
+    if (distributedShapeIsValid) continue;
     for (const row of matchingRows) {
       const hasEveryChild = unit.items.every(
         (item) => ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD,
@@ -174,6 +215,26 @@ function detectRelationshipShapeIssues(
     }
   }
   return issues;
+}
+
+function stepOrderIsValid(
+  unit: PlannedSemanticUnit,
+  allRows: readonly VisibleRow[],
+  itemRows: readonly VisibleRow[],
+): boolean {
+  const distinctRows = new Set(itemRows);
+  if (distinctRows.size === 1) {
+    const text = itemRows[0]?.text ?? "";
+    const positions = unit.items.map((item) => semanticPosition(text, item));
+    return positions.every(
+      (position, index) =>
+        position >= 0 && (index === 0 || position > (positions[index - 1] ?? -1)),
+    );
+  }
+  const rowIndexes = itemRows.map((row) => allRows.indexOf(row));
+  return rowIndexes.every(
+    (rowIndex, index) => index === 0 || rowIndex > (rowIndexes[index - 1] ?? -1),
+  );
 }
 
 function detectSiblingFusion(

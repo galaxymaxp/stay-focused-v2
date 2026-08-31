@@ -93,13 +93,15 @@ export interface OcrPage {
   readonly width?: number;
   readonly height?: number;
   readonly confidence?: number;
+  readonly layoutStatus?: "native_complete" | "ocr_supplemented" | "layout_incomplete";
 }
 
 export type OcrWarningCode =
   | "empty_text"
   | "missing_layout"
   | "partial_layout"
-  | "native_text_unavailable";
+  | "native_text_unavailable"
+  | "native_text_layout_incomplete";
 
 export interface OcrWarning {
   readonly code: OcrWarningCode;

@@ -372,6 +372,20 @@ async function extractPdfDocumentWithinDeadline({
   });
 
   const pages: OcrPage[] = [...createInspectedPdfPages(inspections)];
+  const incompleteNativeTextByPage = new Map(
+    inspections.flatMap((page) =>
+      page.kind === "ocr" && page.reason === "layout_incomplete" && page.nativeText
+        ? [[page.pageNumber, page.nativeText] as const]
+        : [],
+    ),
+  );
+  for (const [pageNumber] of incompleteNativeTextByPage) {
+    warnings.push({
+      code: "native_text_layout_incomplete",
+      pageNumber,
+      message: "Sparse embedded text did not account for the page's visual content; OCR supplemented the page.",
+    });
+  }
   const ocrPageNumbers = inspections
     .filter((page) => page.kind === "ocr")
     .map((page) => page.pageNumber);
@@ -468,7 +482,9 @@ async function extractPdfDocumentWithinDeadline({
       },
     );
     for (const chunkResult of chunkResults) {
-      pages.push(...chunkResult.pages);
+      pages.push(...chunkResult.pages.map((page) =>
+        supplementOcrPage(page, incompleteNativeTextByPage.get(page.pageNumber)),
+      ));
       warnings.push(...chunkResult.warnings);
     }
   }
@@ -532,6 +548,38 @@ async function extractPdfDocumentWithinDeadline({
       warnings,
     },
     extraction: diagnostics,
+  };
+}
+
+function supplementOcrPage(page: OcrPage, nativeText: string | undefined): OcrPage {
+  if (!nativeText) return page;
+  if (page.status !== "text_extracted") {
+    return { ...page, layoutStatus: "layout_incomplete" };
+  }
+  const normalizedNative = nativeText.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  const normalizedOcr = page.text.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  if (normalizedOcr.includes(normalizedNative)) {
+    return { ...page, layoutStatus: "ocr_supplemented" };
+  }
+  const text = `${nativeText}\n${page.text}`.trim();
+  return {
+    ...page,
+    layoutStatus: "ocr_supplemented",
+    text,
+    blocks: [
+      {
+        id: `page-${page.pageNumber}-native-supplement`,
+        order: -1,
+        kind: "block",
+        text: nativeText,
+        lines: nativeText.split("\n").map((line, order) => ({
+          id: `page-${page.pageNumber}-native-supplement-line-${order + 1}`,
+          order,
+          text: line,
+        })),
+      },
+      ...page.blocks,
+    ],
   };
 }
 
@@ -617,6 +665,7 @@ function createNativeTextPage(pageNumber: number, text: string): OcrPage {
     pageNumber,
     status: "text_extracted",
     method: "native_text",
+    layoutStatus: "native_complete",
     text,
     blocks: [
       {

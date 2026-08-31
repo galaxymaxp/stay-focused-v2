@@ -104,9 +104,142 @@ export const stage4VerifySuite: EvalSuite = {
     ...basicCases.map(createBasicCase),
     ...statusCases.map(createStatusCase),
     createItSecurityFalsePositiveRegressionCase(),
+    createPresentationOnlyPlanIntegrityCase(),
+    createUnsupportedProcedurePlanIntegrityCase(),
+    createMissingRelationshipPlanIntegrityCase(),
+    createValidChecklistPlanIntegrityCase(),
+    createAmbiguousFlatPlanIntegrityCase(),
     ...validationCases.map(createValidationCase),
   ],
 };
+
+function createPresentationOnlyPlanIntegrityCase(): EvalCase {
+  return {
+    name: "plan integrity rejects presentation-only targets",
+    run: async () => {
+      const context = createContext(["concept-card"]);
+      const source = {
+        ...context.source,
+        blocks: context.source.blocks.map((block) => ({
+          ...block,
+          metadata: { presentationRole: "presentation-divider" },
+        })),
+      };
+      const report = verifyCoverage({
+        plan: context.plan,
+        outputs: [createValidOutput("concept-card", context.sections[0])],
+        source,
+        outline: context.outline,
+      });
+      return [
+        ...assertEqual(report.planIntegrityStatus, "failed", "Presentation furniture certified itself."),
+        ...assertIncludes(report.planIntegrityIssues?.[0]?.type ?? "", "presentation-only-target", "Expected integrity issue was absent."),
+      ];
+    },
+  };
+}
+
+function createUnsupportedProcedurePlanIntegrityCase(): EvalCase {
+  return createSemanticPlanIntegrityCase({
+    name: "plan integrity rejects false procedures",
+    title: "Best Practices",
+    sourceTexts: ["1. Review labels regularly.", "2. Automate the process when appropriate."],
+    semanticPlan: {
+      kind: "procedure",
+      units: [{ kind: "steps", label: "Best Practices", items: ["Review labels regularly.", "Automate the process when appropriate."] }],
+      explanationUseful: true,
+    },
+    expectedStatus: "failed",
+    expectedIssue: "unsupported-procedure",
+  });
+}
+
+function createMissingRelationshipPlanIntegrityCase(): EvalCase {
+  return createSemanticPlanIntegrityCase({
+    name: "plan integrity rejects omitted explicit relationships",
+    title: "Assembly",
+    sourceTexts: ["Components:", "Rotor\nHousing"],
+    semanticPlan: {
+      kind: "list",
+      units: [{ kind: "point", label: "Rotor", items: [] }, { kind: "point", label: "Housing", items: [] }],
+      explanationUseful: true,
+    },
+    expectedStatus: "failed",
+    expectedIssue: "missing-explicit-relationship",
+  });
+}
+
+function createValidChecklistPlanIntegrityCase(): EvalCase {
+  return createSemanticPlanIntegrityCase({
+    name: "plan integrity accepts a supported checklist",
+    title: "Field Checklist",
+    sourceTexts: ["1. Review the label.", "2. Record the location."],
+    semanticPlan: {
+      kind: "checklist",
+      units: [{ kind: "point", label: "Review the label.", items: [] }, { kind: "point", label: "Record the location.", items: [] }],
+      explanationUseful: true,
+    },
+    expectedStatus: "passed",
+  });
+}
+
+function createAmbiguousFlatPlanIntegrityCase(): EvalCase {
+  return createSemanticPlanIntegrityCase({
+    name: "plan integrity accepts ambiguous flat labels",
+    title: "Neutral Labels",
+    sourceTexts: ["Amber", "Birch"],
+    semanticPlan: {
+      kind: "list",
+      units: [{ kind: "point", label: "Amber", items: [] }, { kind: "point", label: "Birch", items: [] }],
+      explanationUseful: true,
+    },
+    expectedStatus: "passed",
+  });
+}
+
+function createSemanticPlanIntegrityCase(args: {
+  readonly name: string;
+  readonly title: string;
+  readonly sourceTexts: readonly [string, string];
+  readonly semanticPlan: NonNullable<PlannedSection["semanticPlan"]>;
+  readonly expectedStatus: "passed" | "failed";
+  readonly expectedIssue?: string;
+}): EvalCase {
+  return {
+    name: args.name,
+    run: async () => {
+      const context = createContext(["concept-card"]);
+      const original = requireSection(context.sections[0]);
+      const section: PlannedSection = {
+        ...original,
+        title: args.title,
+        semanticPlan: args.semanticPlan,
+      };
+      const plan = { ...context.plan, sections: [section] };
+      const source = {
+        ...context.source,
+        blocks: context.source.blocks.map((block, index) => ({
+          ...block,
+          text: args.sourceTexts[index] ?? block.text,
+        })),
+      };
+      const output: SectionOutput = {
+        ...createValidOutput("concept-card", section),
+        sourceCore: {
+          explanation: args.sourceTexts.join(" "),
+          keyPoints: args.semanticPlan.units.flatMap((unit) => [unit.label, ...unit.items]),
+        },
+      };
+      const report = verifyCoverage({ plan, outputs: [output], source, outline: context.outline });
+      return [
+        ...assertEqual(report.planIntegrityStatus, args.expectedStatus, "Plan-integrity status did not match."),
+        ...(args.expectedIssue
+          ? assertIncludes(report.planIntegrityIssues?.[0]?.type ?? "", args.expectedIssue, "Expected plan-integrity issue was absent.")
+          : assertEqual(report.planIntegrityIssues?.length ?? 0, 0, "Valid plan produced an integrity issue.")),
+      ];
+    },
+  };
+}
 
 export async function runStage4VerifyEvals(): Promise<boolean> {
   const result = await runEvalSuite(stage4VerifySuite);

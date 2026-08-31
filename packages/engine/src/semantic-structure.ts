@@ -8,8 +8,9 @@ import type {
 
 const TERM_PATTERN = /[\p{L}\p{N}]+(?:[-/&][\p{L}\p{N}]+)*/gu;
 const PROCEDURE_FRAME_PATTERN =
-  /\b(?:procedure|process|steps?|sequence|instructions?|how\s+to)\b/i;
-const EXAMPLE_LABEL_PATTERN = /^(?:common\s+)?examples?\s*:?[\s-]*$/i;
+  /\b(?:procedure|process(?:ing)?|steps?|sequence|instructions?|how\s+to)\b/i;
+const CHECKLIST_FRAME_PATTERN =
+  /\b(?:practices?|checklist|guidelines?|recommendations?|rules?|considerations?)\b/i;
 const ORDERED_MARKER_PATTERN =
   /(?:^|\n)[ \t]*(?:\d{1,3}|[a-z])[.)][ \t]+(?=\S)/gi;
 const ACTION_START_PATTERN =
@@ -20,10 +21,16 @@ export function analyzeSectionSemanticStructure(args: {
   readonly tags: readonly SectionContentTag[];
   readonly sourceBlocks: readonly NormalizedSourceBlock[];
 }): PlannedSectionSemanticPlan {
-  const sourceText = args.sourceBlocks.map((block) => block.text).join("\n");
+  const semanticSourceText = args.sourceBlocks
+    .filter((block) => block.metadata?.layoutStatus !== "ocr_supplemented")
+    .map((block) => block.text)
+    .join("\n");
+  const taxonomyContext = args.sourceBlocks
+    .map((block) => block.metadata?.presentationTaxonomyContext)
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0);
   const items = dedupe(
     extractCleanSourceItems({
-      sourceSpanText: sourceText,
+      sourceSpanText: semanticSourceText,
       sectionTitle: args.title,
     }).map((item) => item.text),
   );
@@ -31,9 +38,9 @@ export function analyzeSectionSemanticStructure(args: {
     args.sourceBlocks,
     args.title,
   );
-  const indentedUnits = extractIndentedGroups(sourceText, args.title);
-  const orderedRun = findOrderedRun(sourceText, args.title, items);
-  const exampleUnits = extractExampleUnits(items);
+  const indentedUnits = extractIndentedGroups(semanticSourceText, args.title);
+  const orderedRun = findOrderedRun(semanticSourceText, args.title, items);
+  const cueUnits = extractCueRelationshipUnits(semanticSourceText, args.title, items);
   const pairedUnits = extractLabelRelationshipUnits(items, args.title, args.tags);
 
   let units: readonly PlannedSemanticUnit[];
@@ -45,18 +52,20 @@ export function analyzeSectionSemanticStructure(args: {
   } else if (indentedUnits.length > 0) {
     units = indentedUnits;
     kind = "category-hierarchy";
-  } else if (exampleUnits.length > 0) {
-    units = exampleUnits;
-    kind = "example-group";
+  } else if (cueUnits.length > 0) {
+    units = cueUnits;
+    kind = cueUnits.some((unit) => unit.kind === "examples")
+      ? "example-group"
+      : "category-hierarchy";
   } else if (pairedUnits.length > 0) {
     units = pairedUnits;
     kind = relationshipKind(args.title, args.tags);
-  } else if (orderedRun.length >= 2 && isExplicitProcedure(sourceText, args.title)) {
+  } else if (orderedRun.length >= 2 && hasSupportedProcedureSequence(args.title, semanticSourceText)) {
     units = [{ kind: "steps", label: args.title, items: orderedRun }];
     kind = "procedure";
   } else if (items.length >= 2) {
     units = items.map((text) => ({ kind: "point", label: text, items: [] }));
-    kind = "list";
+    kind = CHECKLIST_FRAME_PATTERN.test(args.title) ? "checklist" : "list";
   } else {
     units = [];
     kind = "concept";
@@ -67,11 +76,8 @@ export function analyzeSectionSemanticStructure(args: {
       unit.kind === "steps" &&
       normalizeKey(unit.items.join(" ")) === normalizeKey(orderedRun.join(" ")),
   );
-  if (
-    orderedRun.length >= 2 &&
-    kind !== "procedure" &&
-    !orderedRunAlreadyGrouped
-  ) {
+  if (orderedRun.length >= 2 && kind !== "procedure" && !orderedRunAlreadyGrouped &&
+      hasSupportedProcedureSequence(args.title, semanticSourceText)) {
     const stepKeys = new Set(orderedRun.map(normalizeKey));
     const firstStepIndex = items.findIndex(
       (item) => normalizeKey(item) === normalizeKey(orderedRun[0] ?? ""),
@@ -94,7 +100,8 @@ export function analyzeSectionSemanticStructure(args: {
   return {
     kind,
     units,
-    explanationUseful: explanationAddsStudyValue(sourceText, items, units),
+    explanationUseful: explanationAddsStudyValue(semanticSourceText, items, units),
+    ...(taxonomyContext ? { taxonomyContext } : {}),
   };
 }
 
@@ -116,7 +123,9 @@ function extractNumberedParentGroups(
       const orderedChildren = childMarkers.every((marker) => /^[a-z][.)]$/i.test(marker));
       units.push({
         kind:
-          orderedChildren && children.every((child) => ACTION_START_PATTERN.test(child))
+          orderedChildren &&
+            hasSupportedChildSequence(parent, children) &&
+            children.every((child) => ACTION_START_PATTERN.test(child))
             ? "steps"
             : "group",
         label: parent,
@@ -157,6 +166,18 @@ function extractNumberedParentGroups(
     : [];
 }
 
+function hasSupportedChildSequence(
+  parent: string,
+  children: readonly string[],
+): boolean {
+  if (PROCEDURE_FRAME_PATTERN.test(parent)) return true;
+  return children.some((child) =>
+    /\b(?:after|before|then|next|finally|following|previous)\b|\(\s*[a-z]\s*\)|\b(?:step|stage|phase)\s+\d+\b/i.test(
+      child,
+    ),
+  );
+}
+
 export function serializeSemanticUnits(
   units: readonly PlannedSemanticUnit[],
 ): readonly string[] {
@@ -168,15 +189,13 @@ export function serializeSemanticUnits(
         case "definition":
           return [`${unit.label} - ${unit.items.join(" ")}`];
         case "group":
-          return [`${unit.label}: ${unit.items.join("; ")}`];
+          return unit.items.map((item) => `${unit.label}: ${item}`);
         case "steps":
-          return [
-            `${unit.label}: ${unit.items
-              .map((item, index) => `${index + 1}. ${item}`)
-              .join(" ")}`,
-          ];
+          return unit.items.map(
+            (item, index) => `${index + 1}. ${item}`,
+          );
         case "examples":
-          return [`${unit.label} - Examples: ${unit.items.join("; ")}`];
+          return unit.items.map((item) => `${unit.label}: ${item}`);
       }
     }),
   );
@@ -220,19 +239,165 @@ function extractLabelRelationshipUnits(
   return representedCount === items.length ? units : [];
 }
 
-function extractExampleUnits(
+type RelationshipCueKind = "examples" | "group";
+
+interface RelationshipCue {
+  readonly kind: RelationshipCueKind;
+  readonly label: string;
+  readonly inlineItem?: string;
+  readonly usePrecedingLabel?: boolean;
+  readonly form: "example" | "label" | "sentence";
+  readonly childCount?: number;
+}
+
+function extractCueRelationshipUnits(
+  sourceText: string,
+  sectionTitle: string,
   items: readonly string[],
 ): readonly PlannedSemanticUnit[] {
-  const markerIndex = items.findIndex((item) => EXAMPLE_LABEL_PATTERN.test(item));
-  if (markerIndex <= 0 || markerIndex >= items.length - 1) return [];
-  const label = items[markerIndex];
-  if (!label) return [];
+  const itemSentenceCueIndex = items.findIndex((item) =>
+    parseRelationshipCue(item)?.form === "sentence",
+  );
+  if (itemSentenceCueIndex >= 0) {
+    const cue = parseRelationshipCue(items[itemSentenceCueIndex] ?? "");
+    if (cue) {
+      const availableChildren = items.slice(itemSentenceCueIndex + 1);
+      const childCount = Math.min(
+        cue.childCount ?? availableChildren.length,
+        availableChildren.length,
+      );
+      const children = availableChildren.slice(0, childCount);
+      if (children.length > 0) {
+        return [
+          { kind: cue.kind, label: cue.label || sectionTitle, items: children },
+          ...availableChildren.slice(childCount).map((label) => ({
+            kind: "point" as const,
+            label,
+            items: [],
+          })),
+        ];
+      }
+    }
+  }
+  const itemCueIndexes = items.flatMap((item, index) => {
+    const cue = parseRelationshipCue(item);
+    return cue ? [{ index, cue }] : [];
+  });
+  if (itemCueIndexes.length > 0) {
+    const relatedUnits: PlannedSemanticUnit[] = [];
+    const consumedIndexes = new Set<number>();
+    for (const [position, entry] of itemCueIndexes.entries()) {
+      const end = itemCueIndexes[position + 1]?.index ?? items.length;
+      const children = [
+        ...(entry.cue.inlineItem ? [entry.cue.inlineItem] : []),
+        ...items.slice(entry.index + 1, end),
+      ];
+      if (children.length === 0) continue;
+      const precedingIndex = entry.index - 1;
+      const label = entry.cue.usePrecedingLabel
+        ? items[precedingIndex] || sectionTitle
+        : entry.cue.label || sectionTitle;
+      relatedUnits.push({ kind: entry.cue.kind, label, items: dedupe(children) });
+      consumedIndexes.add(entry.index);
+      for (let index = entry.index + 1; index < end; index += 1) consumedIndexes.add(index);
+      if (entry.cue.usePrecedingLabel && precedingIndex >= 0) consumedIndexes.add(precedingIndex);
+    }
+    if (relatedUnits.length > 0) {
+      return [
+        ...items.flatMap((label, index) =>
+          consumedIndexes.has(index)
+            ? []
+            : [{ kind: "point" as const, label, items: [] }],
+        ),
+        ...relatedUnits,
+      ];
+    }
+  }
+  const lines = sourceText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^[^\p{L}\p{N}]+/u, "").replace(/^(?:\d{1,3}|[a-z])[.)]\s*/i, "").trim());
+  const cueIndexes = lines.flatMap((item, index) => {
+    const cue = parseRelationshipCue(item);
+    return cue ? [{ index, cue }] : [];
+  });
+  if (cueIndexes.length === 0) return [];
 
-  const units: PlannedSemanticUnit[] = items
-    .slice(0, markerIndex)
-    .map((text) => ({ kind: "point", label: text, items: [] }));
-  units.push({ kind: "examples", label, items: items.slice(markerIndex + 1) });
-  return units;
+  const units: PlannedSemanticUnit[] = [];
+  for (const [position, entry] of cueIndexes.entries()) {
+    const end = cueIndexes[position + 1]?.index ?? lines.length;
+    const children = [
+      ...(entry.cue.inlineItem ? [entry.cue.inlineItem] : []),
+      ...lines.slice(entry.index + 1, end),
+    ].filter((item) => !parseRelationshipCue(item));
+    if (children.length === 0) continue;
+    const preceding = lines[entry.index - 1];
+    const label = entry.cue.usePrecedingLabel
+      ? preceding || sectionTitle
+      : entry.cue.label || sectionTitle;
+    units.push({
+      kind: entry.cue.kind,
+      label,
+      items: dedupe(children),
+    });
+  }
+  const represented = new Set(
+    units.flatMap((unit) => [unit.label, ...unit.items]).map(normalizeKey),
+  );
+  const remainingPoints = items
+    .filter((item) => !represented.has(normalizeKey(item)))
+    .filter((item) => !parseRelationshipCue(item))
+    .filter((item) => ![...represented].some((value) => value && normalizeKey(item).includes(value)));
+  return [
+    ...remainingPoints.map((label) => ({ kind: "point" as const, label, items: [] })),
+    ...units,
+  ];
+}
+
+function parseRelationshipCue(value: string): RelationshipCue | undefined {
+  const normalized = value.trim();
+  const inlineExample = /^(?:examples?\s*[:.-]|ex\.\s*|e\.g\.\s*|for\s+example\s*[:,.-]?)\s*(.+)$/i.exec(normalized);
+  if (inlineExample?.[1]) {
+    return {
+      kind: "examples",
+      label: "Examples",
+      inlineItem: inlineExample[1].trim(),
+      usePrecedingLabel: true,
+      form: "example",
+    };
+  }
+  if (/^(?:common\s+)?(?:examples?|ex\.?|for\s+example)\s*:?[\s-]*$/i.test(normalized)) {
+    return { kind: "examples", label: "Examples", usePrecedingLabel: true, form: "example" };
+  }
+
+  const labelCue = /^(?:(common)\s+)?(components?|parts?|advantages?|benefits?|disadvantages?|limitations?|drawbacks?|implementations?|types?|categories?|classes?|forms?|characteristics?|features?|properties?|requirements?)\s*:?[\s-]*$/i.exec(normalized);
+  if (labelCue) return { kind: "group", label: normalized.replace(/\s*:\s*$/, ""), form: "label" };
+
+  const sentenceCue = /^(.*?)(?:is|are)?\s*(?:made\s+up\s+of|composed\s+of|consists?\s+of|comprises?|contains?)\s+(?:the\s+following\s+)?(?:(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+)?(?:components?|parts?|types?|categories?|elements?)\s*:?$/i.exec(normalized);
+  if (sentenceCue) {
+    return {
+      kind: "group",
+      label: conciseRelationshipLabel(sentenceCue[1]?.trim() ?? ""),
+      form: "sentence",
+      ...(sentenceCue[2] ? { childCount: parseCount(sentenceCue[2]) } : {}),
+    };
+  }
+  return undefined;
+}
+
+function conciseRelationshipLabel(value: string): string {
+  return value.split(/\s+/).filter(Boolean).length > 5 ? "" : value;
+}
+
+function parseCount(value: string): number {
+  const numeric = Number.parseInt(value, 10);
+  if (Number.isFinite(numeric)) return numeric;
+  return ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"].indexOf(value.toLocaleLowerCase());
+}
+
+export function hasExplicitRelationshipCue(sourceText: string): boolean {
+  return sourceText.split(/\r?\n/).some((line) => parseRelationshipCue(line.replace(/^\s*(?:[-*+]|\d+[.)])\s*/, "")) !== undefined);
 }
 
 function extractIndentedGroups(
@@ -275,7 +440,7 @@ function findOrderedRun(
 ): readonly string[] {
   const orderedMarkerCount = [...sourceText.matchAll(ORDERED_MARKER_PATTERN)].length;
   if (orderedMarkerCount < 2) return [];
-  if (isExplicitProcedure(sourceText, title) && items.length >= 2) return items;
+  if (hasSupportedProcedureSequence(title, sourceText) && items.length >= 2) return items;
   let best: string[] = [];
   let current: string[] = [];
   for (const item of items) {
@@ -289,8 +454,17 @@ function findOrderedRun(
   return best.length >= 2 ? best : [];
 }
 
-function isExplicitProcedure(sourceText: string, title: string): boolean {
-  return PROCEDURE_FRAME_PATTERN.test(`${title}\n${sourceText}`);
+export function hasSupportedProcedureSequence(title: string, sourceText: string): boolean {
+  const orderedMarkerCount = [...sourceText.matchAll(ORDERED_MARKER_PATTERN)].length;
+  if (orderedMarkerCount < 2) return false;
+  if (PROCEDURE_FRAME_PATTERN.test(title)) return true;
+  const lines = sourceText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lead = lines.find((line) => normalizeKey(line) !== normalizeKey(title) && !/^(?:\d{1,3}|[a-z])[.)]\s+/i.test(line));
+  return Boolean(
+    lead &&
+    PROCEDURE_FRAME_PATTERN.test(lead) &&
+    /[:：]\s*$/.test(lead),
+  );
 }
 
 function isRelationshipLabel(value: string): boolean {

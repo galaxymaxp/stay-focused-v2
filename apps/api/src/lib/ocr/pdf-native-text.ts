@@ -16,7 +16,14 @@ export type PdfPageInspection =
       readonly pageNumber: number;
       readonly kind: "blank" | "ocr";
       readonly text: "";
+      readonly nativeText?: string;
+      readonly reason?: "missing_text" | "layout_incomplete";
     };
+
+export interface PdfPageVisualEvidence {
+  readonly imagePaintCount: number;
+  readonly pathConstructionCount: number;
+}
 
 export async function inspectPdfTextPages(
   bytes: Uint8Array,
@@ -62,6 +69,22 @@ export async function inspectPdfTextPages(
         });
         const text = assembleNativePageText(textContent);
         if (isUsableEmbeddedText(text)) {
+          if (!isSparseNativeText(text)) {
+            pages.push({ pageNumber, kind: "native_text", text });
+            continue;
+          }
+          const operatorList = await page.getOperatorList();
+          const evidence = collectVisualEvidence(operatorList.fnArray, OPS);
+          if (isLikelyLayoutIncompletePage(text, evidence)) {
+            pages.push({
+              pageNumber,
+              kind: "ocr",
+              text: "",
+              nativeText: text,
+              reason: "layout_incomplete",
+            });
+            continue;
+          }
           pages.push({ pageNumber, kind: "native_text", text });
           continue;
         }
@@ -74,6 +97,7 @@ export async function inspectPdfTextPages(
           pageNumber,
           kind: hasVisibleContent ? "ocr" : "blank",
           text: "",
+          ...(hasVisibleContent ? { reason: "missing_text" as const } : {}),
         });
       } finally {
         page.cleanup();
@@ -84,6 +108,42 @@ export async function inspectPdfTextPages(
   } finally {
     await loadingTask.destroy();
   }
+}
+
+export function isLikelyLayoutIncompletePage(
+  text: string,
+  evidence: PdfPageVisualEvidence,
+): boolean {
+  if (!isSparseNativeText(text)) return false;
+  return evidence.imagePaintCount >= 2 || evidence.pathConstructionCount >= 12;
+}
+
+function isSparseNativeText(text: string): boolean {
+  const normalized = normalizeOcrText(text);
+  const words = normalized.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
+  const meaningfulCharacters = normalized.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  return words <= 8 && meaningfulCharacters <= 64;
+}
+
+function collectVisualEvidence(
+  operatorIds: readonly number[],
+  ops: typeof pdfJsRuntime.OPS,
+): PdfPageVisualEvidence {
+  const imageOperatorIds = new Set<number>([
+    ops.paintXObject,
+    ops.paintImageMaskXObject,
+    ops.paintImageMaskXObjectGroup,
+    ops.paintImageXObject,
+    ops.paintInlineImageXObject,
+    ops.paintInlineImageXObjectGroup,
+    ops.paintImageXObjectRepeat,
+    ops.paintImageMaskXObjectRepeat,
+    ops.paintSolidColorImageMask,
+  ]);
+  return {
+    imagePaintCount: operatorIds.filter((id) => imageOperatorIds.has(id)).length,
+    pathConstructionCount: operatorIds.filter((id) => id === ops.constructPath).length,
+  };
 }
 
 export function assembleNativePageText(textContent: TextContent): string {
