@@ -34,10 +34,11 @@ interface GoogleCredentialsJson
 
 type GoogleVisionSdkClientOptionValue = string | number | object | undefined;
 
-interface GoogleVisionSdkClientOptions
+export interface GoogleVisionSdkClientOptions
   extends Readonly<Record<string, GoogleVisionSdkClientOptionValue>> {
   readonly projectId?: string;
   readonly credentials?: GoogleCredentialsJson;
+  readonly keyFilename?: string;
 }
 
 export function createServerOcrProvider(
@@ -47,7 +48,14 @@ export function createServerOcrProvider(
   const clientOptions = createGoogleVisionClientOptions(environment);
   const clientFactory = options.clientFactory ?? createGoogleVisionSdkClient;
 
-  return new GoogleCloudVisionOcrProvider(clientFactory(clientOptions));
+  try {
+    return new GoogleCloudVisionOcrProvider(clientFactory(clientOptions));
+  } catch {
+    throw new OcrProviderError({
+      code: "ocr_not_configured",
+      message: "Google Cloud Vision OCR client initialization failed.",
+    });
+  }
 }
 
 function createGoogleVisionClientOptions(
@@ -63,6 +71,10 @@ function createGoogleVisionClientOptions(
     environment.GOOGLE_APPLICATION_CREDENTIALS,
   );
 
+  if (credentialsPath) {
+    assertCredentialPath(credentialsPath);
+  }
+
   if (!credentialsJson && !credentialsPath && !projectId) {
     throw new OcrProviderError({
       code: "ocr_not_configured",
@@ -74,7 +86,31 @@ function createGoogleVisionClientOptions(
   return {
     ...(projectId ? { projectId } : {}),
     ...(credentialsJson ? { credentials: parseCredentials(credentialsJson) } : {}),
+    ...(!credentialsJson && credentialsPath
+      ? { keyFilename: credentialsPath }
+      : {}),
   };
+}
+
+function assertCredentialPath(credentialsPath: string): void {
+  if (!looksLikeCredentialPayload(credentialsPath)) {
+    return;
+  }
+
+  throw new OcrProviderError({
+    code: "ocr_not_configured",
+    message:
+      "Google OCR credential configuration is invalid: GOOGLE_APPLICATION_CREDENTIALS must contain a file path, not raw JSON.",
+  });
+}
+
+function looksLikeCredentialPayload(value: string): boolean {
+  const normalized = value.trim();
+  if (/^[{[]/.test(normalized)) {
+    return true;
+  }
+
+  return /^[A-Z][A-Z0-9_]*\s*=\s*[{[]/i.test(normalized);
 }
 
 function parseCredentials(credentialsJson: string): GoogleCredentialsJson {

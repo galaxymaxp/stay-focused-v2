@@ -24,6 +24,7 @@ import {
   extractPdfDocument,
   validatePdfOcrBytes,
 } from "../src/lib/ocr/extraction-service";
+import { safeErrorMessage } from "../src/lib/ocr/credential-error-redaction";
 import {
   getConfiguredDurableDocumentMaxOcrPages,
   getConfiguredDurableDocumentMaxPdfPages,
@@ -390,6 +391,6 @@ function parseArguments(values: readonly string[]): BenchmarkArguments {
 }
 
 void main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Benchmark failed.");
+  console.error(safeErrorMessage(error, "Benchmark failed safely."));
   process.exitCode = 1;
 });

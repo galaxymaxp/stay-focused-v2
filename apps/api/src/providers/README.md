@@ -34,9 +34,13 @@ and `npm run provider:contract -w apps/api` never invoke it. The OpenAI key,
 Supabase service-role key, and Google credentials must never be exposed to
 browser or mobile environments.
 
-OCR configuration is server-only. Use `GOOGLE_CLOUD_PROJECT_ID` plus
-`GOOGLE_CLOUD_CREDENTIALS_JSON`, or Application Default Credentials through
-`GOOGLE_APPLICATION_CREDENTIALS` or `GOOGLE_CLOUD_PROJECT`. Do not put these in
+OCR configuration is server-only. `GOOGLE_CLOUD_CREDENTIALS_JSON` contains raw
+credential JSON and takes precedence when both supported credential mechanisms
+are configured. `GOOGLE_APPLICATION_CREDENTIALS` contains only a credential
+file path; raw JSON in that variable is rejected before the Google SDK is
+constructed. Application Default Credentials remain supported through a valid
+`GOOGLE_APPLICATION_CREDENTIALS` path or project-scoped runtime identity via
+`GOOGLE_CLOUD_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`. Do not put these values in
 Expo public env files.
 
 V1 env files may supply local V2 values only through approved variable-name
