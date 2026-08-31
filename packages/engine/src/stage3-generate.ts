@@ -12,6 +12,7 @@ import {
 } from "./source-items.js";
 import { toDefaultStudentVisibleSectionOutput } from "./student-visible-text.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
+import { serializeRecoveryEvidence } from "./recovery-evidence.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -140,7 +141,7 @@ export function buildSectionPrompt(
   const passage = sourceBlocks
     .map(
       (block) =>
-        `[Passage block ${block.id} | ${block.kind}]\n${block.text}`,
+        `[Passage block ${block.id} | ${block.kind}${block.pageNumber !== undefined ? ` | page ${block.pageNumber}` : ""}]\n${block.text}`,
     )
     .join("\n\n");
 
@@ -158,6 +159,7 @@ export function buildSectionPrompt(
     ...semanticPlanPromptLines(section),
     "PASSAGE:",
     passage,
+    ...structuredEvidencePromptLines(section, sourceBlocks),
     ...detectedItemsPromptLines(detectedItems),
     "Requirements:",
     "- Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
@@ -296,6 +298,23 @@ function applySparseSourceCoreGuard(
     },
     enrichment: null,
   } as SectionOutput;
+}
+
+function structuredEvidencePromptLines(
+  section: PlannedSection,
+  sourceBlocks: readonly NormalizedSourceBlock[],
+): readonly string[] {
+  const serialized = serializeRecoveryEvidence({
+    sourceText: sourceBlocksToLineText(sourceBlocks),
+    sectionTitle: section.title,
+  });
+  return serialized.length > 0
+    ? [
+        "STRUCTURED SOURCE EVIDENCE:",
+        "The markers below serialize only row/order cues explicitly present in the passage.",
+        ...serialized,
+      ]
+    : [];
 }
 
 function applySemanticCoreGuard(

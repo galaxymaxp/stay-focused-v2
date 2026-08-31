@@ -37,6 +37,7 @@ export interface ValidateGroundingArgs {
 interface SourceSpan {
   readonly sourceSection: SourceOutlineSection;
   readonly text: string;
+  readonly sourceItems: readonly SourceItem[];
 }
 
 interface TermOccurrence {
@@ -104,6 +105,7 @@ const STOPWORDS = new Set([
 ]);
 
 const LIST_COVERAGE_THRESHOLD = 0.8; // mirrors GROUNDING_THRESHOLD convention
+const MAX_COHERENT_SOURCE_ITEM_WORDS = 40;
 const TOKEN_PATTERN = /[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+)*/g;
 
 export function validateGrounding(
@@ -129,6 +131,7 @@ export function validateGrounding(
       sourceSpan: {
         sourceSection,
         text: extractGroundingSourceSectionText(args.source, sourceSection),
+        sourceItems: extractGroundingSourceSectionItems(args.source, sourceSection),
       },
     });
   });
@@ -213,10 +216,9 @@ function validateSectionGrounding(args: {
     ...extractTermSet(args.sourceSpan.sourceSection.title),
     ...extractTermSet(args.section.title),
   ]);
-  const sourceItems = extractCleanSourceItems({
-    sourceSpanText: args.sourceSpan.text,
-    sectionTitle: args.sourceSpan.sourceSection.title,
-  });
+  const sourceItems = args.sourceSpan.sourceItems.filter(
+    (item) => countSourceItemWords(item.text) <= MAX_COHERENT_SOURCE_ITEM_WORDS,
+  );
   const fabricationCheck = checkFabrication({
     section: args.section,
     sourceText: args.sourceSpan.text,
@@ -241,6 +243,7 @@ function validateSectionGrounding(args: {
     section: args.section,
     output,
     allSections: args.allSections,
+    currentSourceText: args.sourceSpan.text,
   }).map(
     (issue): GroundingIssue => ({
       type: issue.type,
@@ -299,6 +302,10 @@ function validateSectionGrounding(args: {
     phase1FabricationFailures: fabricationCheck.failures,
     semanticRelationshipIssueCount: relationshipIssues.length,
   };
+}
+
+function countSourceItemWords(value: string): number {
+  return value.match(/[\p{L}\p{N}]+(?:[-/&][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 }
 
 function checkFabrication(args: {
@@ -500,6 +507,39 @@ export function extractGroundingSourceSectionText(
   source: NormalizedSource,
   sourceSection: SourceOutlineSection,
 ): string {
+  return extractGroundingSourceSectionFragments(source, sourceSection)
+    .join("\n")
+    .trim();
+}
+
+function extractGroundingSourceSectionItems(
+  source: NormalizedSource,
+  sourceSection: SourceOutlineSection,
+): readonly SourceItem[] {
+  const nativeSource: NormalizedSource = {
+    ...source,
+    blocks: source.blocks.filter(
+      (block) => block.metadata?.layoutStatus !== "ocr_supplemented",
+    ),
+  };
+  const nativeFragments = extractGroundingSourceSectionFragments(
+    nativeSource,
+    sourceSection,
+  );
+  const sourceSpanText = (nativeFragments.length > 0
+    ? nativeFragments
+    : extractGroundingSourceSectionFragments(source, sourceSection))
+    .join("\n\f\n");
+  return extractCleanSourceItems({
+    sourceSpanText,
+    sectionTitle: sourceSection.title,
+  });
+}
+
+function extractGroundingSourceSectionFragments(
+  source: NormalizedSource,
+  sourceSection: SourceOutlineSection,
+): readonly string[] {
   const sourceBlockIds = new Set([
     ...sourceSection.sourceBlockIds,
     ...sourceSection.blockIds,
@@ -527,7 +567,7 @@ export function extractGroundingSourceSectionText(
     )
     .filter((text): text is string => text !== undefined && text.length > 0);
 
-  return fragments.join("\n").trim();
+  return fragments;
 }
 
 function sliceBlockForSourceSection(args: {

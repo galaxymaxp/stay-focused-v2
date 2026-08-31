@@ -33,6 +33,7 @@ const TABLE_HEADER_LABELS = new Set([
   "item",
   "label",
   "meaning",
+  "property",
   "status",
   "term",
   "value",
@@ -278,6 +279,11 @@ function extractTableRowItems(
   )
     ? rows.slice(1)
     : rows;
+  const hasHeader = dataRows.length < rows.length;
+  const columnCounts = new Set(dataRows.map((row) => row.cells.length));
+  if (!hasHeader && columnCounts.size > 1) {
+    return [];
+  }
   if (
     dataRows.some((row) => row.separator === "spacing") &&
     dataRows.length === rows.length
@@ -297,7 +303,7 @@ function parseTableRow(line: string): ParsedTableRow | undefined {
 
 function parsePipeTableRow(line: string): ParsedTableRow | undefined {
   const trimmed = line.trim();
-  if ((trimmed.match(/\|/g)?.length ?? 0) < 2) {
+  if ((trimmed.match(/\|/g)?.length ?? 0) < 1) {
     return undefined;
   }
 
@@ -524,7 +530,7 @@ function shouldJoinHyphenContinuation(
 }
 
 function cleanSourceItemText(value: string): string {
-  return value
+  return (value.split("\f")[0] ?? "")
     .split(/\r?\n/)
     .filter((line) => !isOcrNoiseLine(line))
     .join("\n")
@@ -547,7 +553,10 @@ function finalizeSourceItems(
   const normalizedTitleKey = normalizeCoverageTitleKey(sectionTitle);
   const cleanedItems = itemTexts
     .map((itemText) =>
-      stripTrailingRepeatedSectionTitle(itemText, sectionTitle),
+      stripAfterRepeatedSectionTitle(
+        stripTrailingRepeatedSectionTitle(itemText, sectionTitle),
+        sectionTitle,
+      ),
     )
     .flatMap((itemText) =>
       splitFlattenedBoundaryItems(itemText, sectionTitle, {
@@ -569,6 +578,26 @@ function finalizeSourceItems(
       : dedupedItems;
 
   return filteredItems.map((text) => ({ text }));
+}
+
+function stripAfterRepeatedSectionTitle(
+  itemText: string,
+  sectionTitle: string,
+): string {
+  const titleKey = normalizeCoverageTitleKey(sectionTitle);
+  if (!itemText || !titleKey) return itemText;
+  const lowerItem = itemText.toLocaleLowerCase();
+  const lowerTitle = sectionTitle.toLocaleLowerCase();
+  let start = lowerItem.indexOf(lowerTitle);
+  while (start >= 0) {
+    const prefix = itemText.slice(0, start).trim();
+    const suffix = itemText.slice(start + sectionTitle.length).trim();
+    if (countTerms(prefix) >= 3 && countTerms(suffix) >= 1) {
+      return prefix;
+    }
+    start = lowerItem.indexOf(lowerTitle, start + lowerTitle.length);
+  }
+  return itemText;
 }
 
 function suppressBareDuplicateBoundaryLabels(

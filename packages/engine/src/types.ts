@@ -119,6 +119,7 @@ export interface PlannedSectionTarget {
 export type SectionSemanticKind =
   | "concept"
   | "list"
+  | "mapping"
   | "checklist"
   | "definition-set"
   | "category-hierarchy"
@@ -127,15 +128,18 @@ export type SectionSemanticKind =
 
 export type PlannedSemanticUnitKind =
   | "point"
+  | "mapping"
   | "definition"
   | "group"
   | "steps"
+  | "sequence"
   | "examples";
 
 export interface PlannedSemanticUnit {
   readonly kind: PlannedSemanticUnitKind;
   readonly label: string;
   readonly items: readonly string[];
+  readonly sourceLayout?: "pipe-row" | "vertical-table";
 }
 
 export interface PlannedSectionSemanticPlan {

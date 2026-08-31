@@ -1,4 +1,5 @@
 import { extractCleanSourceItems } from "./source-items.js";
+import { extractExplicitSequence } from "./recovery-evidence.js";
 import type {
   NormalizedSourceBlock,
   PlannedSectionSemanticPlan,
@@ -40,13 +41,25 @@ export function analyzeSectionSemanticStructure(args: {
   );
   const indentedUnits = extractIndentedGroups(semanticSourceText, args.title);
   const orderedRun = findOrderedRun(semanticSourceText, args.title, items);
+  const explicitSequence = extractExplicitSequence(semanticSourceText, args.title);
+  const mappingUnits = extractMappingUnits(items);
+  const paragraphTableUnits = extractParagraphTableUnits(semanticSourceText, args.title);
   const cueUnits = extractCueRelationshipUnits(semanticSourceText, args.title, items);
   const pairedUnits = extractLabelRelationshipUnits(items, args.title, args.tags);
 
   let units: readonly PlannedSemanticUnit[];
   let kind: PlannedSectionSemanticPlan["kind"];
 
-  if (blockScopedUnits.length > 0) {
+  if (paragraphTableUnits.length > 0) {
+    units = paragraphTableUnits;
+    kind = "mapping";
+  } else if (mappingUnits.length > 0) {
+    units = mappingUnits;
+    kind = "mapping";
+  } else if (explicitSequence.length >= 2) {
+    units = [{ kind: "sequence", label: args.title, items: explicitSequence }];
+    kind = "procedure";
+  } else if (blockScopedUnits.length > 0) {
     units = blockScopedUnits;
     kind = "category-hierarchy";
   } else if (indentedUnits.length > 0) {
@@ -186,6 +199,10 @@ export function serializeSemanticUnits(
       switch (unit.kind) {
         case "point":
           return [unit.label];
+        case "mapping":
+          return unit.sourceLayout === "pipe-row"
+            ? [`${unit.label} | ${unit.items.join(" | ")}`]
+            : [`${unit.label}: ${unit.items.join(" ")}`];
         case "definition":
           return [`${unit.label} - ${unit.items.join(" ")}`];
         case "group":
@@ -194,11 +211,104 @@ export function serializeSemanticUnits(
           return unit.items.map(
             (item, index) => `${index + 1}. ${item}`,
           );
+        case "sequence":
+          return [unit.items.join(" \u2192 ")];
         case "examples":
           return unit.items.map((item) => `${unit.label}: ${item}`);
       }
     }),
   );
+}
+
+function extractMappingUnits(items: readonly string[]): readonly PlannedSemanticUnit[] {
+  if (items.length < 2 || !items.every((item) => item.includes("|"))) return [];
+  const units = items.map((item) => {
+    const cells = item.split("|").map((cell) => cell.trim()).filter(Boolean);
+    return {
+      kind: "mapping" as const,
+      label: cells[0] ?? "",
+      items: cells.slice(1),
+      sourceLayout: "pipe-row" as const,
+    };
+  });
+  return units.every((unit) => unit.label.length > 0 && unit.items.length > 0) ? units : [];
+}
+
+const TABLE_HEADER_ANCHORS = new Set([
+  "category", "class", "description", "formula", "goal", "item", "label",
+  "meaning", "objective", "property", "status", "term", "type", "value",
+]);
+
+function extractParagraphTableUnits(
+  sourceText: string,
+  title: string,
+): readonly PlannedSemanticUnit[] {
+  const paragraphs = sourceText
+    .split(/\r?\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter((paragraph) => normalizeKey(paragraph) !== normalizeKey(title));
+  const headerIndex = paragraphs.findIndex(
+    (paragraph) => parseTableHeaderLabels(paragraph).length === 3,
+  );
+  if (headerIndex < 0) return [];
+  const headers = parseTableHeaderLabels(paragraphs[headerIndex] ?? "");
+  const data = paragraphs.slice(headerIndex + 1);
+  const units: PlannedSemanticUnit[] = [];
+  let index = 0;
+  while (index < data.length) {
+    const label = data[index]?.trim() ?? "";
+    if (!isCompactRowLabel(label)) return [];
+    index += 1;
+
+    const descriptionParts: string[] = [];
+    while (index < data.length) {
+      const part = data[index]?.trim() ?? "";
+      if (!part) break;
+      descriptionParts.push(part);
+      index += 1;
+      if (/[.!?]$/.test(part)) break;
+    }
+    const formulaParts: string[] = [];
+    while (index < data.length && isFormulaLike(data[index] ?? "")) {
+      formulaParts.push(data[index] ?? "");
+      index += 1;
+    }
+    if (descriptionParts.length === 0 || formulaParts.length === 0) return [];
+    units.push({
+      kind: "mapping",
+      label,
+      sourceLayout: "vertical-table",
+      items: [
+        `${headers[1]}: ${descriptionParts.join(" ")}`,
+        `${headers[2]}: ${formulaParts.join(" ")}`,
+      ],
+    });
+  }
+  return units.length >= 2 ? units : [];
+}
+
+function parseTableHeaderLabels(value: string): readonly string[] {
+  const tokens = value.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const anchors = tokens.flatMap((token, index) =>
+    TABLE_HEADER_ANCHORS.has(token.toLocaleLowerCase()) ? [index] : [],
+  );
+  if (anchors.length !== 3 || anchors[2] !== tokens.length - 1) return [];
+  return anchors.map((anchor, index) =>
+    tokens.slice((anchors[index - 1] ?? -1) + 1, anchor + 1).join(" "),
+  );
+}
+
+function isCompactRowLabel(value: string): boolean {
+  return countSemanticWords(value) >= 1 && countSemanticWords(value) <= 5 && !/[.!?]$/.test(value) && !isFormulaLike(value);
+}
+
+function isFormulaLike(value: string): boolean {
+  return /[+=>]|[()[\]{}]|\d/.test(value);
+}
+
+function countSemanticWords(value: string): number {
+  return value.match(TERM_PATTERN)?.length ?? 0;
 }
 
 function extractLabelRelationshipUnits(

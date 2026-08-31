@@ -17,6 +17,7 @@ import { sourceTokenFidelitySuite } from "./source-token-fidelity.eval.js";
 import { reviewerRecoverySuite } from "./reviewer-recovery.eval.js";
 import { semanticStructureSuite } from "./semantic-structure.eval.js";
 import { semanticVerificationSuite } from "./semantic-verification.eval.js";
+import { structuredEvidenceRecoverySuite } from "./structured-evidence-recovery.eval.js";
 
 const suites = [
   stage0NormalizationSuite,
@@ -25,6 +26,7 @@ const suites = [
   stage3GenerateSuite,
   semanticStructureSuite,
   semanticVerificationSuite,
+  structuredEvidenceRecoverySuite,
   stage4VerifySuite,
   stage5aGroundingSuite,
   stage5RetrySuite,

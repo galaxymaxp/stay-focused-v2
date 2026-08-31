@@ -73,7 +73,7 @@ function semanticUnitIsCovered(
   if (unit.kind === "point") {
     return rows.some((row) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD);
   }
-  if (unit.kind === "steps") {
+  if (unit.kind === "steps" || unit.kind === "sequence") {
     const itemRows = unit.items.map((item) =>
       rows.find((row) => ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD),
     );
@@ -102,16 +102,41 @@ export function verifySemanticRelationships(args: {
   readonly section: PlannedSection;
   readonly output: SectionOutput;
   readonly allSections: readonly PlannedSection[];
+  readonly currentSourceText?: string;
 }): readonly SemanticRelationshipIssue[] {
   const units = args.section.semanticPlan?.units ?? [];
-  if (units.length === 0) return [];
-
   const rows = visibleRows(args.output);
   return dedupeIssues([
+    ...detectUnsupportedExplicitRelations(units, rows),
     ...detectRelationshipShapeIssues(units, rows),
     ...detectSiblingFusion(units, rows),
-    ...detectCrossConceptFusion(args.section, args.allSections, rows),
+    ...detectCrossConceptFusion(
+      args.section,
+      args.allSections,
+      rows,
+      args.currentSourceText,
+    ),
   ]);
+}
+
+function detectUnsupportedExplicitRelations(
+  units: readonly PlannedSemanticUnit[],
+  rows: readonly VisibleRow[],
+): readonly SemanticRelationshipIssue[] {
+  if (units.some((unit) => unit.kind !== "point")) return [];
+  return rows.flatMap((row) => {
+    if (!/(?:[-=]+>|[\u2190-\u21ff\u27f0-\u27ff])/u.test(row.text)) return [];
+    const representedPoints = units.filter(
+      (unit) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD,
+    );
+    return units.length < 2 || representedPoints.length >= 2
+      ? [relationshipIssue(
+          "grounding-unsupported-relationship",
+          row,
+          "Visible content adds an explicit relationship that is not supported by the source semantic structure.",
+        )]
+      : [];
+  });
 }
 
 function detectRelationshipShapeIssues(
@@ -122,7 +147,7 @@ function detectRelationshipShapeIssues(
   for (const [unitIndex, unit] of units.entries()) {
     if (unit.kind === "point") continue;
 
-    if (unit.kind === "steps") {
+    if (unit.kind === "steps" || unit.kind === "sequence") {
       const itemRows = unit.items.map((item) =>
         rows.find((row) => ideaMatchScore(row.text, item) >= IDEA_MATCH_THRESHOLD),
       );
@@ -185,11 +210,11 @@ function detectRelationshipShapeIssues(
 
       if (hasEveryChild) {
         const type =
-          unit.kind === "steps"
+          unit.kind === "steps" || unit.kind === "sequence"
             ? "grounding-wrong-step-order"
             : associationIssueType(unit);
         const message =
-          unit.kind === "steps"
+          unit.kind === "steps" || unit.kind === "sequence"
             ? `Procedure "${unit.label}" does not preserve the source step order.`
             : `${unitKindName(unit)} "${unit.label}" does not preserve its source-supported parent-child direction.`;
         issues.push(relationshipIssue(type, row, message));
@@ -270,11 +295,14 @@ function detectCrossConceptFusion(
   section: PlannedSection,
   allSections: readonly PlannedSection[],
   rows: readonly VisibleRow[],
+  currentSourceText?: string,
 ): readonly SemanticRelationshipIssue[] {
   const ownEvidence = normalizeWords(
-    (section.semanticPlan?.units ?? [])
-      .flatMap((unit) => [unit.label, ...unit.items])
-      .join(" "),
+    [
+      ...(section.semanticPlan?.units ?? [])
+        .flatMap((unit) => [unit.label, ...unit.items]),
+      currentSourceText ?? "",
+    ].join(" "),
   );
   const foreignTitles = allSections.filter((candidate) => candidate.id !== section.id);
 
@@ -327,7 +355,7 @@ function relationshipShapeIsValid(unit: PlannedSemanticUnit, text: string): bool
   ) {
     return false;
   }
-  if (unit.kind === "steps") {
+  if (unit.kind === "steps" || unit.kind === "sequence") {
     return childPositions.every(
       (position, index) => index === 0 || position > (childPositions[index - 1] ?? -1),
     );
@@ -384,8 +412,10 @@ function visibleRows(output: SectionOutput): readonly VisibleRow[] {
 function associationIssueType(unit: PlannedSemanticUnit): SemanticRelationshipIssueType {
   switch (unit.kind) {
     case "definition": return "grounding-wrong-definition-association";
+    case "mapping": return "grounding-unsupported-relationship";
     case "group": return "grounding-wrong-parent-child";
     case "steps": return "grounding-wrong-step-order";
+    case "sequence": return "grounding-wrong-step-order";
     case "examples": return "grounding-wrong-example-association";
     case "point": return "grounding-unsupported-relationship";
   }
@@ -394,8 +424,10 @@ function associationIssueType(unit: PlannedSemanticUnit): SemanticRelationshipIs
 function unitKindName(unit: PlannedSemanticUnit): string {
   switch (unit.kind) {
     case "definition": return "Definition";
+    case "mapping": return "Mapping";
     case "group": return "Parent";
     case "steps": return "Procedure";
+    case "sequence": return "Sequence";
     case "examples": return "Example group";
     case "point": return "Point";
   }

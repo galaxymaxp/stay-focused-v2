@@ -14,6 +14,10 @@ import {
 import { extractCleanSourceItems } from "./source-items.js";
 import { extractProtectedSourceTokens } from "./source-token-fidelity.js";
 import { serializeSemanticUnits } from "./semantic-structure.js";
+import {
+  analyzeRecoveryEvidence,
+  selectRecoveryExplanation,
+} from "./recovery-evidence.js";
 import type {
   CoverageReport,
   CoverageStatus,
@@ -189,6 +193,7 @@ export async function retryFailedSections(
       section,
       source,
       sourceTextOverride,
+      otherSectionTitles: plan.sections.filter((candidate) => candidate.id !== section.id).map((candidate) => candidate.title),
     });
     if (!fallbackOutput) {
       currentOutputs.delete(section.id);
@@ -215,6 +220,7 @@ export async function retryFailedSections(
         section,
         source,
         sourceTextOverride,
+        otherSectionTitles: plan.sections.filter((candidate) => candidate.id !== section.id).map((candidate) => candidate.title),
         mode: "blocks",
       });
       if (blockFallback) {
@@ -240,6 +246,7 @@ export async function retryFailedSections(
         section,
         source,
         sourceTextOverride,
+        otherSectionTitles: plan.sections.filter((candidate) => candidate.id !== section.id).map((candidate) => candidate.title),
         mode: "lines",
       });
       if (lineFallback) {
@@ -265,6 +272,7 @@ export async function retryFailedSections(
         section,
         source,
         sourceTextOverride,
+        otherSectionTitles: plan.sections.filter((candidate) => candidate.id !== section.id).map((candidate) => candidate.title),
         mode: "span",
       });
       if (spanFallback) {
@@ -352,6 +360,7 @@ export function createExtractiveSectionFallback(args: {
   readonly section: PlannedSection;
   readonly source: NormalizedSource;
   readonly sourceTextOverride?: string;
+  readonly otherSectionTitles?: readonly string[];
   readonly mode?: "items" | "blocks" | "lines" | "span";
 }): SectionOutput | undefined {
   const sourceBlocks = collectSectionSourceBlocks(args.section, args.source);
@@ -359,6 +368,9 @@ export function createExtractiveSectionFallback(args: {
     args.sourceTextOverride?.trim() ||
     sourceBlocks.map((block) => block.text).join("\n").trim();
   if (sourceText.length === 0) {
+    return undefined;
+  }
+  if (isCrossSectionNavigation(args.section, sourceText, args.otherSectionTitles ?? [])) {
     return undefined;
   }
 
@@ -382,19 +394,63 @@ export function createExtractiveSectionFallback(args: {
       );
     },
   );
+  const usableExtractiveItems = extractiveItems.filter(
+    (item) => countWords(item) <= 40,
+  );
   const semanticItems = args.section.semanticPlan?.units.length
     ? serializeSemanticUnits(args.section.semanticPlan.units)
     : [];
-  const allBlocks = sourceLines.length > 0 ? sourceLines : [normalizeBlockText(sourceText)];
-  const contentBlocks = allBlocks.filter(
-    (text) => normalizeBlockText(text).toLocaleLowerCase() !== normalizeBlockText(args.section.title).toLocaleLowerCase(),
+  const hasStructuredEvidence = evidenceHasStructuredSemanticUnits(args.section);
+  const evidence = analyzeRecoveryEvidence({
+    sourceText,
+    sectionTitle: args.section.title,
+    documentText: args.source.blocks.map((block) => block.text).join("\n"),
+  });
+  const explanation = hasStructuredEvidence || evidence.mappings.length > 0 || evidence.sequence.length > 0
+    ? ""
+    : selectRecoveryExplanation(evidence);
+  const usefulCandidates = evidence.candidates
+    .filter(
+      (candidate) =>
+        candidate.score > 0 &&
+        candidate.kind !== "noise" &&
+        candidate.wordCount <= 40,
+    )
+    .sort((left, right) => left.position - right.position)
+    .filter((candidate, index, candidates) =>
+      !candidates.some(
+        (other, otherIndex) =>
+          otherIndex !== index &&
+          other.text.length > candidate.text.length &&
+          normalizeCoverageTitleKey(other.text).includes(
+            normalizeCoverageTitleKey(candidate.text),
+          ),
+      ),
+    )
+    .map((candidate) => candidate.text);
+  const usefulSourceLines = sourceLines.filter((line) =>
+    evidence.candidates.some(
+      (candidate) =>
+        candidate.score > 0 &&
+        candidate.kind !== "noise" &&
+        normalizeCoverageTitleKey(candidate.text) === normalizeCoverageTitleKey(line),
+    ),
   );
-  const proseBlocks = contentBlocks.filter((text) => /[.!?]$/.test(text));
-  const explanation =
-    proseBlocks.at(-1) ?? contentBlocks.at(-1) ?? detectedItems[0] ?? allBlocks[0];
-  if (!explanation) {
-    return undefined;
-  }
+  const sourceParagraphs = sourceText
+    .split(/(?:\r?\n){2,}/)
+    .map((paragraph) => normalizeBlockText(paragraph))
+    .filter((paragraph) => paragraph.length > 0 && countWords(paragraph) <= 40);
+  const usefulParagraphs = sourceParagraphs.filter((paragraph) =>
+    evidence.candidates.some(
+      (candidate) =>
+        candidate.score > 0 &&
+        candidate.kind !== "noise" &&
+        normalizeCoverageTitleKey(candidate.text) === normalizeCoverageTitleKey(paragraph),
+    ),
+  );
+  const preferRankedEvidence = sourceBlocks.some(
+    (block) => block.metadata?.layoutStatus === "ocr_supplemented",
+  );
 
   const keyPoints = uniqueExtracts(
     semanticItems.length > 0
@@ -410,15 +466,23 @@ export function createExtractiveSectionFallback(args: {
           ),
         ]
       : args.mode === "lines"
-      ? sourceLines
-      : args.mode !== "blocks" && extractiveItems.length > 0
-      ? extractiveItems
-      : proseBlocks.length > 1
-        ? proseBlocks.slice(0, -1)
-        : contentBlocks.length > 0
-          ? contentBlocks
-          : allBlocks,
+      ? preferRankedEvidence && usefulCandidates.length > 0
+        ? usefulCandidates.slice(0, 8)
+        : usefulSourceLines
+      : preferRankedEvidence && usefulCandidates.length > 0
+      ? usefulCandidates.slice(0, 8)
+      : args.mode !== "blocks" && usableExtractiveItems.length > 0
+      ? usableExtractiveItems
+      : usefulParagraphs.length > 0
+        ? usefulParagraphs.slice(0, 8)
+        : usefulCandidates.length > 0
+          ? usefulCandidates.slice(0, 8)
+          : usefulSourceLines.slice(0, 8),
   );
+  const visibleKeyPoints = keyPoints.filter(
+    (point) => normalizeCoverageTitleKey(point) !== normalizeCoverageTitleKey(explanation),
+  );
+  if (!explanation && visibleKeyPoints.length === 0) return undefined;
   return {
     id: stableId("extractive", `${args.source.id}\u001f${args.section.id}`),
     kind: args.section.schemaKind,
@@ -427,7 +491,7 @@ export function createExtractiveSectionFallback(args: {
     sourceBlockIds: [...args.section.sourceBlockIds],
     sourceCore: {
       explanation,
-      keyPoints: keyPoints.length > 0 ? keyPoints : [explanation],
+      keyPoints: visibleKeyPoints.length > 0 ? visibleKeyPoints : [explanation],
     },
     enrichment: null,
   } as SectionOutput;
@@ -435,6 +499,16 @@ export function createExtractiveSectionFallback(args: {
 
 function normalizeBlockText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function evidenceHasStructuredSemanticUnits(section: PlannedSection): boolean {
+  return section.semanticPlan?.units.some(
+    (unit) => unit.kind === "mapping" || unit.kind === "sequence",
+  ) ?? false;
+}
+
+function countWords(value: string): number {
+  return value.match(/[\p{L}\p{N}]+(?:[-/&][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 }
 
 function uniqueExtracts(values: readonly string[]): readonly string[] {
@@ -728,6 +802,23 @@ function formatGroundingIssueGuidance(
   return relationshipIssue
     ? `Semantic relationship issue (${issue.type}): ${details.join(" | ")}`
     : `Grounding issue: ${details.join(" | ")}`;
+}
+
+function isCrossSectionNavigation(
+  section: PlannedSection,
+  sourceText: string,
+  otherSectionTitles: readonly string[],
+): boolean {
+  if ((section.semanticPlan?.units.length ?? 0) > 0) return false;
+  const pipeRows = sourceText.split(/\r?\n/).filter(
+    (line) => (line.match(/\|/g)?.length ?? 0) >= 1,
+  );
+  if (pipeRows.length < 2) return false;
+  const sourceKey = normalizeCoverageTitleKey(pipeRows.join(" "));
+  return otherSectionTitles.some((title) => {
+    const titleKey = normalizeCoverageTitleKey(title);
+    return titleKey.length >= 4 && sourceKey.includes(titleKey);
+  });
 }
 
 function formatLeakageIssueGuidance(
