@@ -7,6 +7,7 @@ import {
   getConfiguredDocumentMaxPdfPages,
   getConfiguredDurableDocumentMaxOcrPages,
   getConfiguredDurableDocumentMaxPdfPages,
+  selectPdfDocumentProcessingPath,
 } from "./upload-policy";
 
 describe("PDF upload policy", () => {
@@ -43,5 +44,25 @@ describe("PDF upload policy", () => {
         DURABLE_DOCUMENT_MAX_OCR_PAGES: "80",
       }),
     ).toBe(40);
+  });
+
+  it("routes supported PDFs without weakening either page limit", () => {
+    expect(selectPdfDocumentProcessingPath(1, {})).toBe("synchronous");
+    expect(selectPdfDocumentProcessingPath(40, {})).toBe("synchronous");
+    expect(selectPdfDocumentProcessingPath(41, {})).toBe("durable");
+    expect(selectPdfDocumentProcessingPath(100, {})).toBe("durable");
+    expect(selectPdfDocumentProcessingPath(101, {})).toBe("unsupported");
+  });
+
+  it("honors lower deployment limits when selecting the durable path", () => {
+    const environment = {
+      DOCUMENT_MAX_PDF_PAGES: "20",
+      DURABLE_DOCUMENT_MAX_PDF_PAGES: "75",
+    };
+
+    expect(selectPdfDocumentProcessingPath(20, environment)).toBe("synchronous");
+    expect(selectPdfDocumentProcessingPath(21, environment)).toBe("durable");
+    expect(selectPdfDocumentProcessingPath(75, environment)).toBe("durable");
+    expect(selectPdfDocumentProcessingPath(76, environment)).toBe("unsupported");
   });
 });

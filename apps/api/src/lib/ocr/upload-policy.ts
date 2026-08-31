@@ -18,6 +18,11 @@ export const OCR_PDF_CHUNK_CONCURRENCY = 2;
 export const OCR_PROVIDER_REQUEST_TIMEOUT_MS = 12_000;
 export const DOCUMENT_EXTRACTION_TIMEOUT_MS = 50_000;
 
+export type PdfDocumentProcessingPath =
+  | "synchronous"
+  | "durable"
+  | "unsupported";
+
 export function getConfiguredDocumentMaxPdfPages(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): number {
@@ -46,4 +51,19 @@ export function getConfiguredDurableDocumentMaxOcrPages(
     return DURABLE_DOCUMENT_MAX_OCR_PAGES;
   }
   return Math.min(configured, DURABLE_DOCUMENT_MAX_OCR_PAGES);
+}
+
+export function selectPdfDocumentProcessingPath(
+  pageCount: number,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): PdfDocumentProcessingPath {
+  if (!Number.isInteger(pageCount) || pageCount < 1) {
+    return "unsupported";
+  }
+  if (pageCount <= getConfiguredDocumentMaxPdfPages(environment)) {
+    return "synchronous";
+  }
+  return pageCount <= getConfiguredDurableDocumentMaxPdfPages(environment)
+    ? "durable"
+    : "unsupported";
 }

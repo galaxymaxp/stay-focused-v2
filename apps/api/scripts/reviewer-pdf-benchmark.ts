@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import { loadEnvConfig } from "@next/env";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@stay-focused/engine";
 import {
   normalizeDocumentTextWithEvidence,
+  verifyDocumentExtraction,
   type DocumentExtractionDiagnostics,
   type OcrPage,
   type OcrWarning,
@@ -22,9 +24,19 @@ import {
   extractPdfDocument,
   validatePdfOcrBytes,
 } from "../src/lib/ocr/extraction-service";
+import {
+  getConfiguredDurableDocumentMaxOcrPages,
+  getConfiguredDurableDocumentMaxPdfPages,
+  selectPdfDocumentProcessingPath,
+  type PdfDocumentProcessingPath,
+} from "../src/lib/ocr/upload-policy";
+import {
+  EXTRACTION_JOB_DEADLINE_MS,
+  OCR_PROVIDER_CALL_TIMEOUT_MS,
+} from "../src/lib/processing-jobs/constants";
 import { createOpenAIGenerationProvider } from "../../../packages/engine/src/providers/openai-provider";
 
-loadEnvConfig(process.cwd());
+loadEnvConfig(resolve(__dirname, "../../.."));
 
 interface BenchmarkArguments {
   readonly pdfPath: string;
@@ -39,19 +51,30 @@ interface BenchmarkArguments {
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
   const bytes = new Uint8Array(await readFile(args.pdfPath));
-  const validation = await validatePdfOcrBytes({
+  const fileName = args.pdfPath.split(/[\\/]/).at(-1);
+  const { processingPath, validation } = await validateBenchmarkPdf({
     bytes,
-    fileName: args.pdfPath.split(/[\\/]/).at(-1),
-    mimeType: "application/pdf",
+    fileName,
   });
-  if (!validation.ok) throw new Error(`PDF validation failed: ${validation.code}`);
 
   const evidence = args.reuseSummaryPath
     ? await readCachedExtractionEvidence(args.reuseSummaryPath, validation.pageCount)
-    : await extractFreshEvidence(validation.input, validation.pageCount);
-  const normalized = normalizeDocumentTextWithEvidence(evidence.pages);
+    : await extractFreshEvidence(
+        validation.input,
+        validation.pageCount,
+        processingPath,
+      );
+  const integrity = verifyDocumentExtraction({
+    expectedPageCount: validation.pageCount,
+    pages: evidence.pages,
+  });
+  if (!integrity.sourceEligible) {
+    throw new Error("PDF extraction evidence failed whole-document integrity verification.");
+  }
+  const verifiedPages = integrity.pages;
+  const normalized = normalizeDocumentTextWithEvidence(verifiedPages);
   const pageEvidenceByNumber = new Map(
-    evidence.pages.map((page) => [page.pageNumber, page] as const),
+    verifiedPages.map((page) => [page.pageNumber, page] as const),
   );
   const input = {
     id: args.sourceId,
@@ -74,7 +97,7 @@ async function main(): Promise<void> {
         },
       })),
     metadata: {
-      sourceName: args.pdfPath.split(/[\\/]/).at(-1),
+      sourceName: fileName,
       mimeType: "application/pdf",
       pageCount: validation.pageCount,
     },
@@ -82,17 +105,20 @@ async function main(): Promise<void> {
   const callMetadata: Array<Readonly<Record<string, unknown>> | undefined> = [];
   const provider = recordingProvider(createOpenAIGenerationProvider(), callMetadata);
   const generationStartedAt = Date.now();
+  let reviewerPipelineInvocationCount = 0;
   let reviewer: ReviewerOutput;
   try {
+    reviewerPipelineInvocationCount += 1;
     reviewer = await runPipeline({ input, provider });
   } catch (error) {
     if (error instanceof PipelineAssemblyError) {
       await writeFile(args.summaryPath, `${JSON.stringify({
         pdfPath: args.pdfPath,
+        processingPath,
         extractionDurationMs: evidence.durationMs,
         extraction: evidence.diagnostics,
         extractionWarnings: evidence.warnings,
-        pageEvidence: evidence.pages.map((page) => ({
+        pageEvidence: verifiedPages.map((page) => ({
           pageNumber: page.pageNumber,
           status: page.status,
           method: page.method,
@@ -108,6 +134,7 @@ async function main(): Promise<void> {
           leakage: error.state.leakage,
           validationFailures: error.state.sectionValidationFailures,
         },
+        reviewerPipelineInvocationCount,
       }, null, 2)}\n`, "utf8");
     }
     throw error;
@@ -119,12 +146,13 @@ async function main(): Promise<void> {
   const plan = buildGenerationPlan(outline, source);
   const summary = {
     pdfPath: args.pdfPath,
+    processingPath,
     extractionDurationMs: evidence.durationMs,
     generationDurationMs,
     extraction: evidence.diagnostics,
     extractionProvider: evidence.provider,
     extractionWarnings: evidence.warnings,
-    pageEvidence: evidence.pages.map((page) => ({
+    pageEvidence: verifiedPages.map((page) => ({
       pageNumber: page.pageNumber,
       status: page.status,
       method: page.method,
@@ -132,6 +160,22 @@ async function main(): Promise<void> {
       text: page.text,
     })),
     normalization: normalized.diagnostics,
+    sourceIntegrity: {
+      expectedPageCount: integrity.diagnostics.expectedPageCount,
+      processedPageCount: integrity.diagnostics.processedPageCount,
+      missingPageNumbers: integrity.diagnostics.missingPageNumbers,
+      duplicatePageNumbers: integrity.diagnostics.duplicatePageNumbers,
+      outOfRangePageNumbers: integrity.diagnostics.outOfRangePageNumbers,
+      invalidPageNumbers: integrity.diagnostics.invalidPageNumbers,
+      firstPageNumber: verifiedPages.at(0)?.pageNumber ?? null,
+      lastPageNumber: verifiedPages.at(-1)?.pageNumber ?? null,
+      orderedPageNumbers: verifiedPages.map((page) => page.pageNumber),
+    },
+    internalProcessing: {
+      nativeInspectionPasses: 1,
+      ocrChunkCount: evidence.diagnostics.ocrChunkCount ?? 0,
+      ocrChunks: evidence.diagnostics.ocrChunks ?? [],
+    },
     sourceBlockCount: source.blocks.length,
     outlineSections: outline.sections.map((section) => ({
       title: section.title,
@@ -144,6 +188,7 @@ async function main(): Promise<void> {
     })),
     generationCallCount: callMetadata.length,
     retryCallCount: callMetadata.filter((metadata) => metadata?.retryAttempt !== undefined).length,
+    reviewerPipelineInvocationCount,
     reviewerMetadata: reviewer.metadata,
   };
 
@@ -152,6 +197,7 @@ async function main(): Promise<void> {
   await writeFile(args.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
   console.log(JSON.stringify({
     title: args.title,
+    processingPath,
     extractionDurationMs: evidence.durationMs,
     generationDurationMs,
     pageCount: validation.pageCount,
@@ -163,12 +209,61 @@ async function main(): Promise<void> {
     planIntegrityScore: reviewer.metadata.coverage.planIntegrityScore,
     groundingScore: reviewer.metadata.groundingScore,
     generationCallCount: callMetadata.length,
+    reviewerPipelineInvocationCount,
   }, null, 2));
+}
+
+type SuccessfulPdfValidation = Extract<
+  Awaited<ReturnType<typeof validatePdfOcrBytes>>,
+  { readonly ok: true }
+>;
+
+type SupportedPdfDocumentProcessingPath = Exclude<
+  PdfDocumentProcessingPath,
+  "unsupported"
+>;
+
+async function validateBenchmarkPdf({
+  bytes,
+  fileName,
+}: {
+  readonly bytes: Uint8Array;
+  readonly fileName?: string;
+}): Promise<{
+  readonly processingPath: SupportedPdfDocumentProcessingPath;
+  readonly validation: SuccessfulPdfValidation;
+}> {
+  const synchronous = await validatePdfOcrBytes({
+    bytes,
+    fileName,
+    mimeType: "application/pdf",
+  });
+  if (synchronous.ok) {
+    return { processingPath: "synchronous", validation: synchronous };
+  }
+  if (synchronous.code !== "pdf_page_limit_exceeded") {
+    throw new Error(`PDF validation failed: ${synchronous.code}`);
+  }
+
+  const durable = await validatePdfOcrBytes({
+    bytes,
+    documentMaxPages: getConfiguredDurableDocumentMaxPdfPages(),
+    fileName,
+    mimeType: "application/pdf",
+  });
+  if (!durable.ok) {
+    throw new Error(`PDF validation failed: ${durable.code}`);
+  }
+  if (selectPdfDocumentProcessingPath(durable.pageCount) !== "durable") {
+    throw new Error("PDF processing path selection did not match durable validation.");
+  }
+  return { processingPath: "durable", validation: durable };
 }
 
 async function extractFreshEvidence(
   input: Parameters<typeof extractPdfDocument>[0]["input"],
   pageCount: number,
+  processingPath: SupportedPdfDocumentProcessingPath,
 ): Promise<BenchmarkExtractionEvidence> {
   const { createServerOcrProvider } = await import(
     "../src/lib/ocr/create-server-ocr-provider"
@@ -178,6 +273,15 @@ async function extractFreshEvidence(
     getProvider: createServerOcrProvider,
     input,
     pageCount,
+    ...(processingPath === "durable"
+      ? {
+          options: {
+            documentTimeoutMs: EXTRACTION_JOB_DEADLINE_MS - 60_000,
+            maxOcrPages: getConfiguredDurableDocumentMaxOcrPages(),
+            providerRequestTimeoutMs: OCR_PROVIDER_CALL_TIMEOUT_MS,
+          },
+        }
+      : {}),
   });
   const durationMs = Date.now() - startedAt;
   if (!extraction.ok) throw new Error(`PDF extraction failed: ${extraction.failure.code}`);
