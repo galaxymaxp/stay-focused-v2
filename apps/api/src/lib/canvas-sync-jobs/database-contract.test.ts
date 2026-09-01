@@ -3,27 +3,15 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(
-  resolve(
-    process.cwd(),
-    "../../packages/db/migrations/20260728094421_add_durable_canvas_sync_jobs.sql",
-  ),
-  "utf8",
-).toLowerCase();
-const retryMigration = readFileSync(
-  resolve(
-    process.cwd(),
-    "../../packages/db/migrations/20260728104000_canvas_sync_retry_idempotency.sql",
-  ),
-  "utf8",
-).toLowerCase();
-const incrementalMigration = readFileSync(
-  resolve(
-    process.cwd(),
-    "../../packages/db/migrations/20260728201000_canvas_incremental_resumable_sync.sql",
-  ),
-  "utf8",
-).toLowerCase();
+const migration = readMigration(
+  "20260728094421_add_durable_canvas_sync_jobs.sql",
+);
+const retryMigration = readMigration(
+  "20260728104000_canvas_sync_retry_idempotency.sql",
+);
+const incrementalMigration = readMigration(
+  "20260728201000_canvas_incremental_resumable_sync.sql",
+);
 
 describe("durable Canvas sync database contract", () => {
   it("persists strict job state with owner-only reads", () => {
@@ -194,4 +182,14 @@ function sliceIncrementalFunction(name: string): string {
   const start = incrementalMigration.indexOf(`function public.${name}`);
   const end = incrementalMigration.indexOf("\n$$;", start);
   return incrementalMigration.slice(start, end);
+}
+
+function readMigration(fileName: string): string {
+  // Keep exact SQL assertions independent of the checkout's line-ending style.
+  return readFileSync(
+    resolve(process.cwd(), "../../packages/db/migrations", fileName),
+    "utf8",
+  )
+    .replace(/\r\n?/g, "\n")
+    .toLowerCase();
 }
