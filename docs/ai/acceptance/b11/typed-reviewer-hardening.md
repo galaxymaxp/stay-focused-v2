@@ -8,6 +8,14 @@ Starting HEAD: `13e0b4157aab012c188eb69e3befd02a36936415`
 
 Verdict: `PASS`
 
+Continuation audit note: the repository was later reopened at local B11 commit
+`56b2519c397854c081500d9f8f48245bccdeaa1e` (three ahead, zero behind) with
+only the known B8 directory untracked. The audit added a source-absent
+relationship regression and found that typed group co-membership was too broad
+an exemption for explicit arrows, sibling fusion, and algebraic transforms.
+Those exemptions now require an exact source/parser representation; group
+membership alone never proves a relationship.
+
 ## Starting state
 
 The working tree contained only the known untracked B8 acceptance directory,
@@ -36,6 +44,16 @@ Stage 6 validated IDs and upstream reports but had no objective gate for
 student-visible furniture, code/body-fragment titles, duplicates, empty
 sections, repeated structural noise, or a section hiding multiple unrelated
 heading transitions.
+
+Representative B10 failures were classified before matching behavior changed:
+
+| Example | Category | Trace result |
+| --- | --- | --- |
+| Mean formula | D | Stage 0 retained raw/LaTeX structure, but the B10 Stage 3 request exposed only the flattened representation. |
+| Median formula/table | G | Formula, table, and result evidence survived but noisy headings separated or attached them to the wrong concept boundary. |
+| Cumulative frequency | E | Exact cells existed, while validation searched flattened prose/semantic points and could report sibling fusion. |
+| Mode result | D | The result paragraph existed after typed evidence, but no plan-level association reached Stage 3. |
+| Ordinary numeric cell | E | Cell text/provenance existed, but Stage 5 had no cell-level evidence matcher. |
 
 ## Heading roles and consolidation
 
@@ -78,8 +96,10 @@ standalone `67` is not accepted merely because the range cell exists.
 Formula raw text remains grounding evidence when parser LaTeX is also present;
 both are serialized separately. An algebraically transformed expression is
 rejected unless that exact representation exists in source evidence. A visible
-relationship may use multiple members of one typed group, but membership alone
-does not prove a calculation.
+relationship may use multiple members of one typed group only when the
+relationship itself has an exact source/parser representation. Membership
+alone does not prove an arrow, sibling fusion, calculation, or algebraic
+transformation.
 
 ## Student-visible structure gate
 
@@ -98,8 +118,8 @@ evidence). A regression protects a legitimate dense 12-point source section.
 | Parser/run | Planned/final | Coverage | Grounding | Issues | Retries/calls | Assembly | Student-visible result |
 | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
 | B10 Docling | 20/20 | 1.00 | 1.00 | 0 | 6/26 | Passed | Partial: furniture, fragments, and duplicate suffixes remained. |
-| B11 legacy control | 16/0 | 1.00 | 1.00 | 0 | 6/22 | Withheld | The new gate catches the legacy code-like `characters:` title. |
-| B11 Docling | 13/13 | 1.00 | 1.00 | 0 | 6/19 | Passed | Clean conceptual hierarchy and usable source-core structure. |
+| B11 legacy control | 16/0 | 1.00 | 1.00 | 0 | 12/28 | Withheld | The new gate catches the legacy code-like `characters:` title. |
+| B11 Docling | 13/13 | 1.00 | 1.00 | 0 | 10/23 | Passed | Clean conceptual hierarchy and usable source-core structure. |
 
 B11 Docling exact titles:
 
@@ -127,9 +147,9 @@ under supported concepts.
 | Parser/run | Planned/final | Coverage | Grounding | Issues | Fabrication failures | Assembly |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | B10 Docling | 17/0 | 0.87 | 0.78 | 41 | Not separately summarized | Withheld |
-| B11 Docling | 11/0 | 0.89 | 0.81 | 4 omissions | 0 | Withheld |
+| B11 Docling | 11/0 | 0.89 | 0.81 | 4 omissions | 0 | Withheld (21 retries / 32 calls) |
 | B10 MinerU | 12/0 | 0.95 | 0.71 | 40 | Not separately summarized | Withheld |
-| B11 MinerU | 10/0 | 0.89 | 0.78 | 2 omissions | 0 | Withheld |
+| B11 MinerU | 10/0 | 0.89 | 0.78 | 2 omissions | 0 | Withheld (12 retries / 22 calls) |
 
 Docling retains 16 formula blocks and 11 tables; MinerU retains its typed
 formula/table source and the planned Mean, Median, and Mode hierarchy. Evidence
@@ -167,9 +187,10 @@ provenance and keeps OCR origin. Known parser omissions remain unsynthesized.
 
 ## Verification
 
-- Focused B11 families: 8/8.
+- Focused B11 families: 9/9, including explicit source-present versus
+  source-absent relationship classification.
 - Engine typecheck and build: passed.
-- Engine evaluations: 404/404; all original 396 remain passing.
+- Engine evaluations: 405/405; all original 396 remain passing.
 - API: 607/607 tests across 69 files.
 - Full repository typecheck and build: passed.
 - Lint: passed with only the four accepted mobile import-order warnings.

@@ -36,6 +36,7 @@ export const typedReviewerHardeningSuite: EvalSuite = {
     relationshipGroupingCase(),
     missingEvidenceRefusalCase(),
     studentVisibleStructureGateCase(),
+    typedEvidenceGroundingClassificationCase(),
   ],
 };
 
@@ -267,6 +268,54 @@ function relationshipGroupingCase(): EvalCase {
         source: context.source,
         outline: context.outline,
       });
+      const unsupportedRelationshipSection: PlannedSection = {
+        ...context.section,
+        semanticPlan: {
+          kind: "list",
+          units: [
+            { kind: "point", label: "12", items: [] },
+            { kind: "point", label: "3", items: [] },
+          ],
+          explanationUseful: true,
+        },
+      };
+      const unsupportedRelationshipPlan = {
+        ...context.plan,
+        sections: [unsupportedRelationshipSection],
+      };
+      const unsupportedRelationshipOutput = outputFor(unsupportedRelationshipSection, {
+        explanation: "The source records 12 and 3.",
+        keyPoints: ["12 → 3"],
+      });
+      const unsupportedRelationshipGrounding = validateGrounding({
+        plan: unsupportedRelationshipPlan,
+        outputs: [unsupportedRelationshipOutput],
+        source: context.source,
+        outline: context.outline,
+      });
+      const explicitRelationshipContext = await createTypedEvidenceContext({
+        tableRows: [
+          ["Origin", "Destination"],
+          ["12", "3"],
+        ],
+        resultText: "12 → 3",
+      });
+      const explicitRelationshipSection: PlannedSection = {
+        ...explicitRelationshipContext.section,
+        semanticPlan: unsupportedRelationshipSection.semanticPlan,
+      };
+      const explicitRelationshipGrounding = validateGrounding({
+        plan: {
+          ...explicitRelationshipContext.plan,
+          sections: [explicitRelationshipSection],
+        },
+        outputs: [outputFor(explicitRelationshipSection, {
+          explanation: "12 → 3",
+          keyPoints: ["12 → 3"],
+        })],
+        source: explicitRelationshipContext.source,
+        outline: explicitRelationshipContext.outline,
+      });
       const conceptFamilies = await createConceptFamilyFixture();
       return [
         ...assertEqual(evidenceGroups.length > 0, true, "No typed evidence group reached the generation plan."),
@@ -277,6 +326,20 @@ function relationshipGroupingCase(): EvalCase {
           grounding.issues.some((issue) => issue.type === "grounding-fabrication"),
           false,
           "A deterministic source-supported group plus exact table row was rejected as fabricated.",
+        ),
+        ...assertEqual(
+          unsupportedRelationshipGrounding.issues.some((issue) =>
+            issue.type === "grounding-unsupported-relationship"
+          ),
+          true,
+          "Typed values in one evidence group authorized a relationship that the source never stated.",
+        ),
+        ...assertEqual(
+          explicitRelationshipGrounding.issues.some((issue) =>
+            issue.type === "grounding-unsupported-relationship"
+          ),
+          false,
+          "An exact source-stated typed relationship was rejected.",
         ),
         ...assertDeepEqual(
           conceptFamilies.plan.sections.map((section) => section.title),
@@ -462,6 +525,69 @@ function studentVisibleStructureGateCase(): EvalCase {
         ...assertEqual(diagnostics.noise.includes("STRUCTURAL_NOISE"), true, "Assembly accepted repeated structural noise."),
         ...assertEqual(duplicateDiagnostic.includes("DUPLICATE_SECTION"), true, "Assembly accepted duplicate conceptual sections."),
         ...assertEqual(oversizedDiagnostic.includes("OVERSIZED_SECTION"), true, "Assembly accepted a section containing multiple hidden concept transitions."),
+      ];
+    },
+  };
+}
+
+function typedEvidenceGroundingClassificationCase(): EvalCase {
+  return {
+    name: "I. typed-evidence grounding classification",
+    run: async () => {
+      const context = await createTypedEvidenceContext({
+        formulaRawText: "ratio = left / right",
+        formulaLatex: "ratio=\\frac{left}{right}",
+        tableRows: [
+          ["Interval", "Frequency"],
+          ["67–69", "4"],
+        ],
+        resultText: "The recorded result is 4.",
+      });
+      const supported = validateGrounding({
+        plan: context.plan,
+        outputs: [outputFor(context.section, {
+          explanation: "ratio = left / right",
+          keyPoints: ["67–69", "The recorded result is 4."],
+        })],
+        source: context.source,
+        outline: context.outline,
+      });
+      const unsupportedTransformation = validateGrounding({
+        plan: context.plan,
+        outputs: [outputFor(context.section, {
+          explanation: "left = ratio * right",
+          keyPoints: ["left = ratio * right"],
+        })],
+        source: context.source,
+        outline: context.outline,
+      });
+      const absentValue = validateGrounding({
+        plan: context.plan,
+        outputs: [outputFor(context.section, {
+          explanation: "The missing frequency is 5.",
+          keyPoints: ["Frequency 5"],
+        })],
+        source: context.source,
+        outline: context.outline,
+      });
+      return [
+        ...assertEqual(
+          supported.issues.some((issue) => issue.type === "grounding-fabrication"),
+          false,
+          "Correct typed formula, cell, and result evidence was classified as absent.",
+        ),
+        ...assertEqual(
+          unsupportedTransformation.issues.some((issue) =>
+            issue.type === "grounding-unsupported-relationship"
+          ),
+          true,
+          "An unsupported model transformation was not classified as such.",
+        ),
+        ...assertEqual(
+          absentValue.issues.some((issue) => issue.type === "grounding-fabrication"),
+          true,
+          "A source-absent numeric value was not classified as fabrication.",
+        ),
       ];
     },
   };

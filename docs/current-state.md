@@ -156,7 +156,7 @@ Last refreshed: 2026-09-02, Asia/Manila.
 
 ## Deterministic test baseline
 
-- B11 verification passes 404/404 engine evaluations (all prior 396 remain)
+- B11 verification passes 405/405 engine evaluations (all prior 396 remain)
   and 607/607 API tests. Engine and full repository typechecks pass; builds
   pass; lint retains only the four accepted mobile import-order warnings. B10's
   unchanged adjacent baselines remain 1/1 durable workflow and 10/10 focused

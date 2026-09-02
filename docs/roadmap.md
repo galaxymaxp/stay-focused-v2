@@ -13,7 +13,7 @@ generation and relationship grounding. Objective Stage 6 diagnostics withhold
 malformed student-visible structure without imposing a blind point cap.
 
 The eight B11 regression families pass, and the complete engine suite is
-404/404 with all prior 396 cases retained. API remains 607/607. Live Python
+405/405 with all prior 396 cases retained. API remains 607/607. Live Python
 Docling now assembles 13 clean concepts at 1.00 coverage/grounding. Statistics
 Docling grounding issues fall from 41 to 4 and MinerU from 40 to 2, with zero
 fabrication failures; both remain safely withheld for omissions or missing

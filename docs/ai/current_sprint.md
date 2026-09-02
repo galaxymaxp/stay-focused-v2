@@ -36,8 +36,9 @@ provenance remain intact.
 
 ## Verification
 
-- Focused B11 regressions: 8/8.
-- Engine evaluations: 404/404, including all prior 396 cases.
+- Focused B11 regressions: 9/9, including source-present/source-absent typed
+  relationship classification.
+- Engine evaluations: 405/405, including all prior 396 cases.
 - API tests: 607/607.
 - Durable workflow: 1/1; focused mobile parser handoff: 10/10.
 - Full typecheck and builds pass. Lint retains only the four accepted mobile

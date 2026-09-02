@@ -109,9 +109,9 @@ export function verifySemanticRelationships(args: {
   const units = args.section.semanticPlan?.units ?? [];
   const rows = visibleRows(args.output);
   return dedupeIssues([
-    ...detectUnsupportedExplicitRelations(units, rows, args.currentEvidenceGroups),
+    ...detectUnsupportedExplicitRelations(units, rows, args.currentSourceText),
     ...detectRelationshipShapeIssues(units, rows),
-    ...detectSiblingFusion(units, rows, args.currentEvidenceGroups),
+    ...detectSiblingFusion(units, rows, args.currentSourceText),
     ...detectUnsupportedTypedTransformations(
       rows,
       args.currentEvidenceGroups,
@@ -129,12 +129,12 @@ export function verifySemanticRelationships(args: {
 function detectUnsupportedExplicitRelations(
   units: readonly PlannedSemanticUnit[],
   rows: readonly VisibleRow[],
-  evidenceGroups: readonly TypedEvidenceGroup[] | undefined,
+  currentSourceText: string | undefined,
 ): readonly SemanticRelationshipIssue[] {
   if (units.some((unit) => unit.kind !== "point")) return [];
   return rows.flatMap((row) => {
     if (!/(?:[-=]+>|[\u2190-\u21ff\u27f0-\u27ff])/u.test(row.text)) return [];
-    if (rowSupportedByTypedGroup(row.text, evidenceGroups)) return [];
+    if (sourceContainsExactRepresentation(currentSourceText, row.text)) return [];
     const representedPoints = units.filter(
       (unit) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD,
     );
@@ -274,13 +274,13 @@ function stepOrderIsValid(
 function detectSiblingFusion(
   units: readonly PlannedSemanticUnit[],
   rows: readonly VisibleRow[],
-  evidenceGroups: readonly TypedEvidenceGroup[] | undefined,
+  currentSourceText: string | undefined,
 ): readonly SemanticRelationshipIssue[] {
   const points = units.filter((unit) => unit.kind === "point");
   if (points.length < 2) return [];
 
   return rows.flatMap((row) => {
-    if (rowSupportedByTypedGroup(row.text, evidenceGroups)) return [];
+    if (sourceContainsExactRepresentation(currentSourceText, row.text)) return [];
     const matched = points.filter(
       (point) => ideaMatchScore(row.text, point.label) >= 0.8,
     );
@@ -316,10 +316,7 @@ function detectUnsupportedTypedTransformations(
   if (formulaTexts.length === 0) return [];
   return rows.flatMap((row) => {
     if (!/[=+*/^]|(?:^|\s)-(?:\s|\d)/u.test(row.text)) return [];
-    if (
-      rowSupportedByTypedGroup(row.text, groups) ||
-      sourceContainsExactRepresentation(currentSourceText, row.text)
-    ) return [];
+    if (sourceContainsExactRepresentation(currentSourceText, row.text)) return [];
     const resemblesFormula = formulaTexts.some(
       (formula) => ideaMatchScore(row.text, formula) >= IDEA_MATCH_THRESHOLD,
     );
@@ -346,25 +343,6 @@ function sourceContainsExactRepresentation(
   return visible.length > 0 && sourceText
     .split(/\r?\n/)
     .some((line) => normalizeFormula(line) === visible);
-}
-
-function rowSupportedByTypedGroup(
-  text: string,
-  groups: readonly TypedEvidenceGroup[] | undefined,
-): boolean {
-  if (!groups) return false;
-  return groups.some((group) => {
-    const matchedMembers = group.members.filter((member) => {
-      const evidencePieces = [
-        ...member.evidenceTexts,
-        ...(member.tableCells?.map((cell) => cell.text) ?? []),
-      ].filter((piece) => canonicalTerms(piece).length > 0);
-      return evidencePieces.some(
-        (piece) => ideaMatchScore(text, piece) >= IDEA_MATCH_THRESHOLD,
-      );
-    });
-    return matchedMembers.length >= 2;
-  });
 }
 
 function normalizeFormula(value: string): string {
