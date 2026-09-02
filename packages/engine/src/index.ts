@@ -17,3 +17,7 @@ export * from "./stage5a-grounding";
 export * from "./stage5-retry";
 export * from "./stage6-assemble";
 export * from "./types";
+export * from "./structured-document";
+export * from "./structured-document-normalize";
+export * from "./structured-parser-adapters";
+export * from "./document-parser";

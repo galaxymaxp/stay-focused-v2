@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./structured-document": "./src/structured-document.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.evals.json",
@@ -23,6 +24,7 @@
     "live-run": "tsc -p tsconfig.live-run.json && node dist-live/scripts/live-run.js",
     "diagnose:stage012": "tsc -p tsconfig.live-run.json && node dist-live/scripts/diagnose-stage012.js",
     "validate:api-reviewer": "tsx scripts/api-reviewer-functional-test.ts",
+    "acceptance:b10": "tsx scripts/b10-structured-parser-ab.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.evals.json && tsc --noEmit -p tsconfig.live-run.json",
     "clean": "rimraf dist dist-live"

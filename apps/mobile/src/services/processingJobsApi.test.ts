@@ -111,6 +111,56 @@ describe("processing jobs mobile API", () => {
     });
   });
 
+  it("preserves typed structured blocks from extraction to reviewer submission", async () => {
+    const structuredBlock = {
+      id: "code-1",
+      type: "code",
+      pageNumber: 2,
+      order: 0,
+      text: "yield value",
+      provenance: {
+        sourceId: "source-1",
+        pageNumber: 2,
+        blockId: "code-1",
+        parser: "docling",
+      },
+    };
+    const fetchImpl = vi.fn<typeof fetch>(async () => jsonResponse({
+      ok: true,
+      data: {
+        jobType: "document_extraction",
+        result: {
+          text: "yield value",
+          pageCount: 2,
+          processedPageCount: 2,
+          sourceBlocks: [{
+            id: "code-1",
+            kind: "code",
+            order: 0,
+            pageNumber: 2,
+            text: "yield value",
+            structuredBlock,
+          }],
+        },
+      },
+    }));
+
+    await expect(getExtractionJobResult({
+      ...BASE_INPUT,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      jobId: "structured-extraction-job",
+    })).resolves.toMatchObject({
+      ok: true,
+      data: {
+        sourceBlocks: [{
+          kind: "code",
+          metadata: { typedStructure: true, structuredRole: "content" },
+          structuredBlock,
+        }],
+      },
+    });
+  });
+
   it("stages bytes directly before accepting a durable extraction job", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (url, init) => {
       const path = String(url);

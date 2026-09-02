@@ -1,6 +1,30 @@
 # Roadmap
 
-Last refreshed: 2026-08-30, Asia/Manila.
+Last refreshed: 2026-09-02, Asia/Manila.
+
+## Reviewer Benchmark B10 - Complete
+
+A feature-flagged structured parser architecture now preserves typed document
+structure and provenance across the API, durable processing, engine Stage 0,
+and mobile result boundary. Legacy, Docling, and MinerU outputs map into one
+provider-independent contract; generic observable-signal routing and quality
+gates select or reject external parses, and every external failure falls back
+to the unchanged current extraction/Google OCR path. `legacy` remains the
+production default.
+
+Sanitized code-heavy, formula/table-heavy, and scanned-accounting fixtures
+protect typed code, formulas, tables, OCR origin, hierarchy, source order, and
+numeric cell provenance. The deterministic engine suite is 396/396 and the API
+suite is 607/607. Live generation evidence is partial: Docling improves the
+code-heavy reviewer before additional heading heuristics, but MinerU is
+withheld; all central-tendency arms are withheld even though Docling/MinerU
+retain formulas and tables. Scanned accounting reaches MinerU and the shared
+contract without Google credentials, while known parser omissions remain
+visible rather than being invented.
+
+Next Reviewer benchmark: B11 - harden reviewer hierarchy and student-visible
+validation using the typed parser structure. External parser promotion remains
+deferred until that layer is accepted.
 
 ## Reviewer Benchmark B4 - Complete
 

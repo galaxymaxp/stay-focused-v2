@@ -1,3 +1,5 @@
+import type { StructuredBlock, StructuredDocument } from "./structured-document.js";
+
 export type NormalizedSourceKind =
   | "document"
   | "presentation"
@@ -11,6 +13,8 @@ export type SourceBlockKind =
   | "list"
   | "table"
   | "code"
+  | "formula"
+  | "image"
   | "quote"
   | "unknown";
 
@@ -34,6 +38,7 @@ export interface NormalizedSourceBlock {
   readonly pageNumber?: number;
   readonly sectionHint?: string;
   readonly metadata?: Readonly<Record<string, MetadataValue>>;
+  readonly structuredBlock?: StructuredBlock;
 }
 
 export interface NormalizedSource {
@@ -54,6 +59,7 @@ export interface SourceNormalizationBlockInput {
   readonly pageNumber?: number;
   readonly sectionHint?: string;
   readonly metadata?: unknown;
+  readonly structuredBlock?: StructuredBlock;
 }
 
 export interface SourceNormalizationInput {
@@ -65,6 +71,7 @@ export interface SourceNormalizationInput {
   readonly blocks?: readonly SourceNormalizationBlockInput[];
   readonly metadata?: unknown;
   readonly createdAt?: string;
+  readonly structuredDocument?: StructuredDocument;
 }
 
 export type SectionContentTag =

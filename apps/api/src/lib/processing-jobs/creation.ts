@@ -158,9 +158,9 @@ export async function createExtractionProcessingJob({
       byteSize: source.bytes.byteLength,
       ...(source.pageCount !== undefined ? { pageCount: source.pageCount } : {}),
       sourceMetadata,
-      sourcePrivateMetadata: {
+      sourcePrivateMetadata: toJson({
         stagedObjectVersion: "processing-job-source-v1",
-      },
+      }),
       contract: {
         contentSha256,
         normalizationVersion: DOCUMENT_NORMALIZATION_VERSION,
@@ -268,7 +268,7 @@ export async function createReviewerProcessingJob({
       sourceText: resolvedSource.sourceText,
       sourceCharacterCount: resolvedSource.sourceText.length,
       sourceMetadata,
-      sourcePrivateMetadata: {
+      sourcePrivateMetadata: toJson({
         ...(isRecord(source.sourcePrivateMetadata)
           ? source.sourcePrivateMetadata
           : {}),
@@ -284,10 +284,13 @@ export async function createReviewerProcessingJob({
                   ? { pageNumber: block.pageNumber }
                   : {}),
                 text: block.text,
+                ...(block.structuredBlock
+                  ? { structuredBlock: block.structuredBlock }
+                  : {}),
               })),
             }
           : {}),
-      },
+      }),
       contract: {
         artifactType: "reviewer",
         contentSha256: resolvedSource.contentSha256,
@@ -531,6 +534,10 @@ async function findOwnedDocumentAssetByContent(
 
 function isRecord(value: unknown): value is Record<string, Json | undefined> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toJson(value: unknown): Json {
+  return JSON.parse(JSON.stringify(value)) as Json;
 }
 
 export class ProcessingJobCreationError extends Error {

@@ -9,6 +9,7 @@
   "files": [
     "scripts/live-run.ts",
     "scripts/diagnose-stage012.ts",
-    "scripts/api-reviewer-functional-test.ts"
+    "scripts/api-reviewer-functional-test.ts",
+    "scripts/b10-structured-parser-ab.ts"
   ]
 }

@@ -3,6 +3,7 @@ import type {
   ReviewerOutput,
   SourceNormalizationBlockInput,
 } from "@stay-focused/engine";
+import { sanitizeStructuredBlock } from "@stay-focused/engine/structured-document";
 import type {
   ProcessingJobListPage,
   ProcessingJobProvenance,
@@ -573,18 +574,36 @@ function parseSourceBlocks(value: unknown): readonly SourceNormalizationBlockInp
         Number.isInteger(entry.pageNumber) && entry.pageNumber > 0
       ? entry.pageNumber
       : undefined;
+    const structuredBlock = sanitizeStructuredBlock(entry.structuredBlock);
+    const kind = structuredBlock && isSourceBlockKind(entry.kind) ? entry.kind : "unknown";
     return [{
       ...(typeof entry.id === "string" && entry.id.trim()
         ? { id: entry.id.trim() }
         : {}),
-      kind: "unknown" as const,
+      kind,
       order: typeof entry.order === "number" && Number.isFinite(entry.order)
         ? entry.order
         : inputIndex,
       ...(pageNumber !== undefined ? { pageNumber } : {}),
       text: entry.text,
+      ...(structuredBlock
+        ? {
+            structuredBlock,
+            metadata: {
+              typedStructure: true,
+              structuredRole: structuredBlock.role ?? "content",
+              textOrigin: structuredBlock.textOrigin ?? "parser",
+            },
+          }
+        : {}),
     }];
   });
+}
+
+function isSourceBlockKind(value: unknown): value is NonNullable<SourceNormalizationBlockInput["kind"]> {
+  return value === "heading" || value === "paragraph" || value === "list" ||
+    value === "table" || value === "code" || value === "formula" ||
+    value === "image" || value === "quote" || value === "unknown";
 }
 
 function parseReviewerResult(

@@ -9,13 +9,18 @@ import {
   runPipeline,
   type GenerationProvider,
   type NormalizedSourceKind,
-  type SourceNormalizationBlockInput,
 } from "@stay-focused/engine";
 import {
   normalizeDocumentTextWithEvidence,
   OCR_PDF_MIME_TYPE,
 } from "@stay-focused/ocr";
 
+import { readDocumentParserConfig } from "@/lib/document-parsers/config";
+import {
+  createDocumentSignalsFromInspections,
+  createStructuredExtractionPayload,
+  tryParseStructuredPdf,
+} from "@/lib/document-parsers/structured-parser-service";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import {
   DocumentExtractionCancellationError,
@@ -23,6 +28,7 @@ import {
   extractWithOcrProvider,
   type OcrExtractionResult,
 } from "@/lib/ocr/extraction-service";
+import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
 import { getConfiguredDurableDocumentMaxOcrPages } from "@/lib/ocr/upload-policy";
 import { createServerOpenAIProvider } from "@/providers";
 
@@ -35,6 +41,7 @@ import {
   findProcessingJobSource,
   type ProcessingJobServiceClient,
 } from "./repository";
+import { readStructuredSourceBlocks } from "./structured-source-blocks";
 import {
   completeProcessingJob,
   failProcessingJob,
@@ -166,6 +173,64 @@ async function processExtractionJob({
     const pageCount = source.page_count ?? 0;
     if (pageCount < 1) {
       throw new WorkerJobError("invalid_pdf", "The staged PDF is invalid.", false);
+    }
+    const parserConfig = readDocumentParserConfig();
+    if (parserConfig.mode !== "legacy") {
+      await updateProcessingJobProgress(client, {
+        jobId: job.id,
+        workerId,
+        stage: "inspecting_document",
+        statusMessage: "Inspecting document",
+        completedUnits: 0,
+        totalUnits: pageCount,
+        unitLabel: "pages",
+      });
+      let inspections;
+      try {
+        inspections = await inspectPdfTextPages(bytes, pageCount);
+      } catch {
+        inspections = Array.from({ length: pageCount }, (_, index) => ({
+          pageNumber: index + 1,
+          kind: "ocr" as const,
+          text: "" as const,
+        }));
+      }
+      const structured = await tryParseStructuredPdf({
+        bytes,
+        mimeType: OCR_PDF_MIME_TYPE,
+        pageCount,
+        fileName: source.display_name,
+        sourceId: job.id,
+        title: source.display_name,
+        signals: createDocumentSignalsFromInspections(inspections),
+      }, parserConfig);
+      if (structured.document) {
+        const payload = createStructuredExtractionPayload(structured.document, source.mime_type);
+        return {
+          payload,
+          metrics: {
+            pageCount,
+            processedPageCount: structured.document.pages.length,
+            blankPageCount: structured.document.pages.filter((page) => page.blocks.length === 0).length,
+            failedPageCount: 0,
+            ocrChunkCount: 0,
+            rawSourceCharacters: String(payload.rawText ?? "").length,
+            normalizedSourceCharacters: String(payload.text ?? "").length,
+            removedBoilerplateLines: 0,
+            parser: structured.selectedParser,
+            parserDurationMs: structured.durationMs,
+            extractionDurationMs: Date.now() - extractionStartedAt,
+          },
+        };
+      }
+      safeWorkerLog("processing_job.structured_parser_fallback", {
+        jobId: job.id,
+        parserMode: parserConfig.mode,
+        attempts: structured.attempts
+          .map((attempt) => `${attempt.parser}:${attempt.outcome}`)
+          .join(","),
+        durationMs: structured.durationMs,
+      });
     }
     extraction = await extractPdfDocument({
       getProvider: createServerOcrProvider,
@@ -337,9 +402,9 @@ async function processReviewerJob({
     typeof privateMetadata.reviewerSourceSnapshotId === "string"
       ? privateMetadata.reviewerSourceSnapshotId
       : undefined;
-  const sourceBlocks = readReviewerSourceBlocks(
+  const sourceBlocks = readStructuredSourceBlocks(
     privateMetadata.reviewerSourceBlocks,
-  );
+  ) ?? [];
   const sourceKind = readReviewerSourceKind(privateMetadata.reviewerSourceKind);
   const generationStartedAt = Date.now();
   const pipelineMetrics: {
@@ -442,34 +507,6 @@ function readReviewerSourceKind(value: unknown): NormalizedSourceKind | undefine
     value === "unknown"
     ? value
     : undefined;
-}
-
-function readReviewerSourceBlocks(
-  value: unknown,
-): readonly SourceNormalizationBlockInput[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.flatMap((entry, inputIndex) => {
-    if (!isRecord(entry) || typeof entry.text !== "string" || !entry.text.trim()) {
-      return [];
-    }
-    const pageNumber = typeof entry.pageNumber === "number" &&
-        Number.isInteger(entry.pageNumber) && entry.pageNumber > 0
-      ? entry.pageNumber
-      : undefined;
-    return [{
-      text: entry.text,
-      order: typeof entry.order === "number" && Number.isFinite(entry.order)
-        ? entry.order
-        : inputIndex,
-      ...(pageNumber !== undefined ? { pageNumber } : {}),
-      ...(typeof entry.id === "string" && entry.id.trim()
-        ? { id: entry.id.trim() }
-        : {}),
-      kind: "unknown" as const,
-    }];
-  });
 }
 
 interface ProcessorContext {

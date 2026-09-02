@@ -1,0 +1,69 @@
+{
+  "codeHeavy": {
+    "schemaVersion": "structured-document-v1",
+    "sourceId": "fixture-code",
+    "title": "Generators in Python",
+    "pageCount": 2,
+    "parser": { "name": "docling", "version": "fixture", "ocrUsed": false },
+    "diagnostics": [],
+    "pages": [
+      {
+        "pageNumber": 1,
+        "blocks": [
+          { "id": "c-h1", "type": "heading", "pageNumber": 1, "order": 0, "text": "Generator Expressions", "level": 1, "provenance": { "sourceId": "fixture-code", "pageNumber": 1, "blockId": "c-h1", "parser": "docling" } },
+          { "id": "c-p1", "type": "paragraph", "pageNumber": 1, "order": 1, "text": "A generator produces values lazily.", "provenance": { "sourceId": "fixture-code", "pageNumber": 1, "blockId": "c-p1", "parser": "docling" } },
+          { "id": "c-code", "type": "code", "pageNumber": 1, "order": 2, "text": "items = [\"REVIEW\", \"ACTIVITY\"]\nresult = (item for item in items)", "languageHint": "python", "provenance": { "sourceId": "fixture-code", "pageNumber": 1, "blockId": "c-code", "parser": "docling" } },
+          { "id": "c-list", "type": "list", "pageNumber": 1, "order": 3, "items": [{ "id": "c-li1", "order": 0, "text": "REVIEW", "provenance": { "sourceId": "fixture-code", "pageNumber": 1, "blockId": "c-li1", "parser": "docling" } }, { "id": "c-li2", "order": 1, "text": "ACTIVITY", "provenance": { "sourceId": "fixture-code", "pageNumber": 1, "blockId": "c-li2", "parser": "docling" } }], "provenance": { "sourceId": "fixture-code", "pageNumber": 1, "blockId": "c-list", "parser": "docling" } }
+        ]
+      },
+      {
+        "pageNumber": 2,
+        "blocks": [
+          { "id": "c-h2", "type": "heading", "pageNumber": 2, "order": 0, "text": "Generator Expressions", "level": 1, "provenance": { "sourceId": "fixture-code", "pageNumber": 2, "blockId": "c-h2", "parser": "docling" } },
+          { "id": "c-p2", "type": "paragraph", "pageNumber": 2, "order": 1, "text": "Parentheses create a generator expression.", "provenance": { "sourceId": "fixture-code", "pageNumber": 2, "blockId": "c-p2", "parser": "docling" } }
+        ]
+      }
+    ]
+  },
+  "centralTendency": {
+    "schemaVersion": "structured-document-v1",
+    "sourceId": "fixture-stats",
+    "title": "Measures of Central Tendency",
+    "pageCount": 3,
+    "parser": { "name": "mineru", "version": "fixture", "ocrUsed": false },
+    "diagnostics": [],
+    "pages": [
+      { "pageNumber": 1, "blocks": [
+        { "id": "s-h-mean", "type": "heading", "pageNumber": 1, "order": 0, "text": "Mean", "provenance": { "sourceId": "fixture-stats", "pageNumber": 1, "blockId": "s-h-mean", "parser": "mineru" } },
+        { "id": "s-f-mean", "type": "formula", "pageNumber": 1, "order": 1, "rawText": "x̄ = Σx / n", "latex": "\\bar{x}=\\frac{\\sum x}{n}", "provenance": { "sourceId": "fixture-stats", "pageNumber": 1, "blockId": "s-f-mean", "parser": "mineru" } },
+        { "id": "s-t-mean", "type": "table", "pageNumber": 1, "order": 2, "rows": [{ "index": 0, "cells": [{ "id": "s-m00", "rowIndex": 0, "columnIndex": 0, "rowSpan": 1, "columnSpan": 1, "text": "x", "isHeader": true, "provenance": { "sourceId": "fixture-stats", "pageNumber": 1, "blockId": "s-m00", "parser": "mineru", "tableCell": { "tableBlockId": "s-t-mean", "rowIndex": 0, "columnIndex": 0 } } }, { "id": "s-m01", "rowIndex": 0, "columnIndex": 1, "rowSpan": 1, "columnSpan": 1, "text": "67", "provenance": { "sourceId": "fixture-stats", "pageNumber": 1, "blockId": "s-m01", "parser": "mineru", "tableCell": { "tableBlockId": "s-t-mean", "rowIndex": 0, "columnIndex": 1 } } }] }], "provenance": { "sourceId": "fixture-stats", "pageNumber": 1, "blockId": "s-t-mean", "parser": "mineru" } }
+      ] },
+      { "pageNumber": 2, "blocks": [
+        { "id": "s-meta", "type": "paragraph", "pageNumber": 2, "order": 0, "text": "Course handout footer", "role": "metadata", "provenance": { "sourceId": "fixture-stats", "pageNumber": 2, "blockId": "s-meta", "parser": "mineru" } },
+        { "id": "s-h-median", "type": "heading", "pageNumber": 2, "order": 1, "text": "Median", "provenance": { "sourceId": "fixture-stats", "pageNumber": 2, "blockId": "s-h-median", "parser": "mineru" } },
+        { "id": "s-f-median", "type": "formula", "pageNumber": 2, "order": 2, "rawText": "Md = L + ((N/2-cf)/f)i", "provenance": { "sourceId": "fixture-stats", "pageNumber": 2, "blockId": "s-f-median", "parser": "mineru" } },
+        { "id": "s-t-median", "type": "table", "pageNumber": 2, "order": 3, "rows": [{ "index": 0, "cells": [{ "id": "s-d00", "rowIndex": 0, "columnIndex": 0, "rowSpan": 1, "columnSpan": 1, "text": "Cumulative frequency", "isHeader": true, "provenance": { "sourceId": "fixture-stats", "pageNumber": 2, "blockId": "s-d00", "parser": "mineru", "tableCell": { "tableBlockId": "s-t-median", "rowIndex": 0, "columnIndex": 0 } } }, { "id": "s-d01", "rowIndex": 0, "columnIndex": 1, "rowSpan": 1, "columnSpan": 1, "text": "24", "provenance": { "sourceId": "fixture-stats", "pageNumber": 2, "blockId": "s-d01", "parser": "mineru", "tableCell": { "tableBlockId": "s-t-median", "rowIndex": 0, "columnIndex": 1 } } }] }], "provenance": { "sourceId": "fixture-stats", "pageNumber": 2, "blockId": "s-t-median", "parser": "mineru" } }
+      ] },
+      { "pageNumber": 3, "blocks": [
+        { "id": "s-h-mode", "type": "heading", "pageNumber": 3, "order": 0, "text": "Mode", "provenance": { "sourceId": "fixture-stats", "pageNumber": 3, "blockId": "s-h-mode", "parser": "mineru" } },
+        { "id": "s-t-mode", "type": "table", "pageNumber": 3, "order": 1, "rows": [{ "index": 0, "cells": [{ "id": "s-o00", "rowIndex": 0, "columnIndex": 0, "rowSpan": 1, "columnSpan": 1, "text": "Modal class", "isHeader": true, "provenance": { "sourceId": "fixture-stats", "pageNumber": 3, "blockId": "s-o00", "parser": "mineru", "tableCell": { "tableBlockId": "s-t-mode", "rowIndex": 0, "columnIndex": 0 } } }, { "id": "s-o01", "rowIndex": 0, "columnIndex": 1, "rowSpan": 1, "columnSpan": 1, "text": "20–29", "provenance": { "sourceId": "fixture-stats", "pageNumber": 3, "blockId": "s-o01", "parser": "mineru", "tableCell": { "tableBlockId": "s-t-mode", "rowIndex": 0, "columnIndex": 1 } } }] }], "provenance": { "sourceId": "fixture-stats", "pageNumber": 3, "blockId": "s-t-mode", "parser": "mineru" } }
+      ] }
+    ]
+  },
+  "accounting": {
+    "schemaVersion": "structured-document-v1",
+    "sourceId": "fixture-accounting",
+    "title": "Recording Methods and Ledgering",
+    "pageCount": 1,
+    "parser": { "name": "mineru", "version": "fixture", "ocrUsed": true },
+    "diagnostics": [],
+    "pages": [{ "pageNumber": 1, "blocks": [
+      { "id": "a-h", "type": "heading", "pageNumber": 1, "order": 0, "text": "Trial Balance", "textOrigin": "ocr", "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a-h", "parser": "mineru" } },
+      { "id": "a-p", "type": "paragraph", "pageNumber": 1, "order": 1, "text": "Prepare the ledger before balancing.", "textOrigin": "ocr", "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a-p", "parser": "mineru" } },
+      { "id": "a-table", "type": "table", "pageNumber": 1, "order": 2, "rows": [
+        { "index": 0, "cells": [{ "id": "a00", "rowIndex": 0, "columnIndex": 0, "rowSpan": 1, "columnSpan": 1, "text": "Account", "isHeader": true, "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a00", "parser": "mineru", "tableCell": { "tableBlockId": "a-table", "rowIndex": 0, "columnIndex": 0 } } }, { "id": "a01", "rowIndex": 0, "columnIndex": 1, "rowSpan": 1, "columnSpan": 1, "text": "Debit", "isHeader": true, "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a01", "parser": "mineru", "tableCell": { "tableBlockId": "a-table", "rowIndex": 0, "columnIndex": 1 } } }] },
+        { "index": 1, "cells": [{ "id": "a10", "rowIndex": 1, "columnIndex": 0, "rowSpan": 1, "columnSpan": 1, "text": "Cash", "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a10", "parser": "mineru", "tableCell": { "tableBlockId": "a-table", "rowIndex": 1, "columnIndex": 0 } } }, { "id": "a11", "rowIndex": 1, "columnIndex": 1, "rowSpan": 1, "columnSpan": 1, "text": "12,500", "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a11", "parser": "mineru", "tableCell": { "tableBlockId": "a-table", "rowIndex": 1, "columnIndex": 1 } } }] }
+      ], "provenance": { "sourceId": "fixture-accounting", "pageNumber": 1, "blockId": "a-table", "parser": "mineru" } }
+    ] }]
+  }
+}

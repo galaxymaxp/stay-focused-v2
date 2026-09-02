@@ -20,9 +20,11 @@ import {
   type GroundingReport,
   type LeakageReport,
   type NormalizedSource,
+  type NormalizedSourceKind,
   type ReviewerSectionQualityStatus,
   type SectionOutput,
   type SourceOutline,
+  type StructuredDocument,
 } from "@stay-focused/engine";
 import {
   normalizeDocumentTextWithEvidence,
@@ -33,15 +35,21 @@ import {
 } from "@stay-focused/ocr";
 import { FatalError, getWorkflowMetadata } from "workflow";
 
+import { readDocumentParserConfig } from "@/lib/document-parsers/config";
+import {
+  createDocumentSignalsFromInspections,
+  createStructuredExtractionPayload,
+  tryParseStructuredPdf,
+} from "@/lib/document-parsers/structured-parser-service";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import {
   createInspectedPdfPages,
   extractPreparedPdfOcrChunk,
   extractWithOcrProvider,
 } from "@/lib/ocr/extraction-service";
-import { getConfiguredDurableDocumentMaxOcrPages } from "@/lib/ocr/upload-policy";
 import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
 import {
+  getConfiguredDurableDocumentMaxOcrPages,
   OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
 } from "@/lib/ocr/upload-policy";
 import {
@@ -52,6 +60,7 @@ import {
   findProcessingJobSource,
   type ProcessingJobServiceClient,
 } from "@/lib/processing-jobs/repository";
+import { readStructuredSourceBlocks } from "@/lib/processing-jobs/structured-source-blocks";
 import {
   claimProcessingJobForWorkflow,
   attachProcessingJobWorkflow,
@@ -70,6 +79,7 @@ import {
 import { createServerOpenAIProvider } from "@/providers";
 
 const EXTRACTION_PLAN_CHECKPOINT = "extraction.plan";
+const EXTRACTION_STRUCTURED_CHECKPOINT = "extraction.structured";
 const EXTRACTION_IMAGE_CHECKPOINT = "extraction.image";
 const EXTRACTION_CHUNK_PREFIX = "extraction.chunk.";
 const REVIEWER_PREPARED_CHECKPOINT = "reviewer.prepared";
@@ -91,7 +101,7 @@ interface ClaimedWorkflowJob {
 }
 
 interface ExtractionWorkflowPlan {
-  readonly kind: "image" | "pdf";
+  readonly kind: "image" | "pdf" | "structured";
   readonly chunks: readonly {
     readonly index: number;
     readonly pageNumbers: readonly number[];
@@ -124,6 +134,11 @@ interface StoredInitialSection {
   readonly output: SectionOutput | null;
   readonly validationFailure: boolean;
   readonly providerFailure: boolean;
+}
+
+function readReviewerSourceKind(value: unknown): NormalizedSourceKind | undefined {
+  return value === "document" || value === "presentation" || value === "webpage" ||
+    value === "plain-text" || value === "unknown" ? value : undefined;
 }
 
 interface StoredReviewerVerification {
@@ -161,7 +176,7 @@ export async function processingJobWorkflow(
       const plan = await prepareExtractionStep(jobId, workerId);
       if (plan.kind === "image") {
         await extractImageStep(jobId, workerId);
-      } else {
+      } else if (plan.kind === "pdf") {
         for (
           let offset = 0;
           offset < plan.chunks.length;
@@ -251,6 +266,10 @@ async function prepareExtractionStep(
       safeStepLog("prepare_extraction", "checkpoint", jobId);
       return { kind: "pdf", chunks: stored.chunks };
     }
+    if (await readProcessingJobCheckpoint(client, jobId, EXTRACTION_STRUCTURED_CHECKPOINT)) {
+      safeStepLog("prepare_extraction", "checkpoint", jobId);
+      return { kind: "structured", chunks: [] };
+    }
 
     const job = await readProcessingJobState(client, jobId);
     const source = await findProcessingJobSource(client, job);
@@ -305,6 +324,43 @@ async function prepareExtractionStep(
     const ocrPageNumbers = inspections
       .filter((page) => page.kind === "ocr")
       .map((page) => page.pageNumber);
+    const parserConfig = readDocumentParserConfig();
+    if (parserConfig.mode !== "legacy") {
+      const structured = await tryParseStructuredPdf({
+        bytes,
+        mimeType: source.mime_type,
+        pageCount: source.page_count,
+        fileName: source.display_name,
+        sourceId: jobId,
+        title: source.display_name,
+        signals: createDocumentSignalsFromInspections(inspections),
+      }, parserConfig);
+      if (structured.document) {
+        await writeProcessingJobCheckpoint(client, {
+          jobId,
+          checkpointKey: EXTRACTION_STRUCTURED_CHECKPOINT,
+          payload: toJson({
+            document: structured.document,
+            selectedParser: structured.selectedParser,
+            attempts: structured.attempts,
+            durationMs: structured.durationMs,
+            completedAt: new Date().toISOString(),
+          }),
+        });
+        safeStepLog("prepare_extraction", "done", jobId);
+        return { kind: "structured", chunks: [] };
+      }
+      console.info("processing_workflow.structured_parser_fallback", {
+        jobId,
+        parserMode: parserConfig.mode,
+        attempts: structured.attempts.map((attempt) => ({
+          parser: attempt.parser,
+          outcome: attempt.outcome,
+          diagnosticCodes: attempt.diagnostics.map((diagnostic) => diagnostic.code),
+        })),
+        durationMs: structured.durationMs,
+      });
+    }
     const maxOcrPages = getConfiguredDurableDocumentMaxOcrPages();
     if (ocrPageNumbers.length > maxOcrPages) {
       await failKnownWorkflowJob(client, jobId, workerId, {
@@ -494,6 +550,39 @@ async function finalizeExtractionStep(
     let provider: string;
     let diagnostics: DocumentExtractionDiagnostics;
 
+    const structuredCheckpoint = source.source_kind === "pdf"
+      ? await readProcessingJobCheckpoint(client, jobId, EXTRACTION_STRUCTURED_CHECKPOINT)
+      : null;
+    if (structuredCheckpoint) {
+      const stored = requireRecord(structuredCheckpoint.payload, "structured extraction checkpoint");
+      const document = requireRecord(stored.document, "structured document") as unknown as StructuredDocument;
+      const payload = createStructuredExtractionPayload(document, source.mime_type);
+      const durationMs = typeof stored.durationMs === "number" ? stored.durationMs : 0;
+      const metrics = {
+        pageCount: document.pageCount,
+        processedPageCount: document.pages.length,
+        blankPageCount: document.pages.filter((page) => page.blocks.length === 0).length,
+        failedPageCount: 0,
+        ocrChunkCount: 0,
+        rawSourceCharacters: String(payload.rawText ?? "").length,
+        normalizedSourceCharacters: String(payload.text ?? "").length,
+        removedBoilerplateLines: 0,
+        parser: document.parser.name,
+        parserDurationMs: durationMs,
+        extractionDurationMs: Math.max(0, Date.now() - startedAt),
+        queueWaitMs: queueWaitMs(job),
+        workerExecutionMs: Math.max(0, Date.now() - startedAt),
+      };
+      await completeProcessingJob(client, {
+        jobId,
+        workerId,
+        resultType: "document_extraction",
+        payload: toJson(payload),
+        metrics: toJson(metrics),
+      });
+      return;
+    }
+
     if (source.source_kind === "image") {
       const checkpoint = await readProcessingJobCheckpoint(
         client,
@@ -654,6 +743,10 @@ async function prepareReviewerStep(
       typeof privateMetadata.reviewerSourceSnapshotId === "string"
         ? privateMetadata.reviewerSourceSnapshotId
         : undefined;
+    const sourceBlocks = readStructuredSourceBlocks(
+      privateMetadata.reviewerSourceBlocks,
+    ) ?? [];
+    const sourceKind = readReviewerSourceKind(privateMetadata.reviewerSourceKind);
 
     await updateProcessingJobProgress(client, {
       jobId,
@@ -662,7 +755,9 @@ async function prepareReviewerStep(
       statusMessage: "Preparing source",
     });
     const source = await normalizeSource({
-      text: sourceRow.source_text,
+      ...(sourceBlocks.length > 0
+        ? { blocks: sourceBlocks, kind: sourceKind ?? "unknown" }
+        : { text: sourceRow.source_text }),
       ...(sourceTitle ? { title: sourceTitle } : {}),
     });
     await updateProcessingJobProgress(client, {

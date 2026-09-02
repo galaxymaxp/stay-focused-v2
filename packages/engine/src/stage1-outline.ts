@@ -610,7 +610,8 @@ function mergeRepeatedDrafts(
 function isPageAwarePresentationBody(block: NormalizedSourceBlock): boolean {
   return (
     block.pageNumber !== undefined &&
-    block.metadata?.presentationRole === "academic" &&
+    (block.metadata?.presentationRole === "academic" ||
+      block.metadata?.typedStructure === true) &&
     block.kind !== "heading"
   );
 }
@@ -618,6 +619,8 @@ function isPageAwarePresentationBody(block: NormalizedSourceBlock): boolean {
 function isStudyContentBlock(block: NormalizedSourceBlock): boolean {
   const role = block.metadata?.presentationRole;
   return (
+    block.structuredBlock?.role !== "furniture" &&
+    block.structuredBlock?.role !== "metadata" &&
     role !== "presentation-title" &&
     role !== "presentation-divider" &&
     role !== "references" &&

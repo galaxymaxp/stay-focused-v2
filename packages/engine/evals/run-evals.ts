@@ -18,6 +18,7 @@ import { reviewerRecoverySuite } from "./reviewer-recovery.eval.js";
 import { semanticStructureSuite } from "./semantic-structure.eval.js";
 import { semanticVerificationSuite } from "./semantic-verification.eval.js";
 import { structuredEvidenceRecoverySuite } from "./structured-evidence-recovery.eval.js";
+import { structuredDocumentSuite } from "./structured-document.eval.js";
 
 const suites = [
   stage0NormalizationSuite,
@@ -27,6 +28,7 @@ const suites = [
   semanticStructureSuite,
   semanticVerificationSuite,
   structuredEvidenceRecoverySuite,
+  structuredDocumentSuite,
   stage4VerifySuite,
   stage5aGroundingSuite,
   stage5RetrySuite,

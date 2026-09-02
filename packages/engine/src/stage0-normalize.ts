@@ -8,6 +8,8 @@ import type {
   SourceNormalizationBlockInput,
   SourceNormalizationInput,
 } from "./types";
+import { structuredDocumentToNormalizationInput } from "./structured-document-normalize.js";
+import type { StructuredBlock } from "./structured-document.js";
 
 interface DraftBlock {
   readonly id?: string;
@@ -16,6 +18,7 @@ interface DraftBlock {
   readonly pageNumber?: number;
   readonly sectionHint?: string;
   readonly metadata?: Readonly<Record<string, MetadataValue>>;
+  readonly structuredBlock?: StructuredBlock;
 }
 
 interface TableOfContentsSignal {
@@ -49,6 +52,8 @@ const BLOCK_KINDS: readonly SourceBlockKind[] = [
   "list",
   "table",
   "code",
+  "formula",
+  "image",
   "quote",
   "unknown",
 ];
@@ -63,20 +68,35 @@ export async function normalizeSource(
     throw new Error("Source normalization input is required.");
   }
 
-  if (input.text === undefined && input.blocks === undefined) {
+  if (
+    input.text === undefined &&
+    input.blocks === undefined &&
+    input.structuredDocument === undefined
+  ) {
     throw new Error("Source normalization input must include text or blocks.");
   }
 
-  if (input.text !== undefined && typeof input.text !== "string") {
+  const resolvedInput = input.structuredDocument
+    ? structuredDocumentToNormalizationInput(input.structuredDocument, {
+        ...(input.id ? { id: input.id } : {}),
+        ...(input.title ? { title: input.title } : {}),
+        ...(input.kind ? { kind: input.kind } : {}),
+        ...(input.language ? { language: input.language } : {}),
+        ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+        ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+      })
+    : input;
+
+  if (resolvedInput.text !== undefined && typeof resolvedInput.text !== "string") {
     throw new Error("Source normalization text must be a string.");
   }
 
-  if (input.blocks !== undefined && !Array.isArray(input.blocks)) {
+  if (resolvedInput.blocks !== undefined && !Array.isArray(resolvedInput.blocks)) {
     throw new Error("Source normalization blocks must be an array.");
   }
 
-  const normalizedText = normalizeExtractedText(input.text ?? "");
-  const inputBlocks = input.blocks ?? [];
+  const normalizedText = normalizeExtractedText(resolvedInput.text ?? "");
+  const inputBlocks = resolvedInput.blocks ?? [];
 
   if (normalizedText.length === 0 && inputBlocks.length === 0) {
     throw new Error(
@@ -84,15 +104,16 @@ export async function normalizeSource(
     );
   }
 
-  const kind = isSourceKind(input.kind)
-    ? input.kind
+  const kind = isSourceKind(resolvedInput.kind)
+    ? resolvedInput.kind
     : normalizedText
       ? "plain-text"
       : "unknown";
-  const inputTitle = readSafeString(input.title);
+  const inputTitle = readSafeString(resolvedInput.title);
   const textBlocks = normalizedText ? detectTextBlocks(normalizedText) : [];
   const normalizedSuppliedBlocks = normalizeSuppliedBlocks(inputBlocks);
-  const suppliedBlocks = kind === "presentation"
+  const suppliedBlocks = kind === "presentation" &&
+      (!input.structuredDocument || input.structuredDocument.parser.name === "legacy")
     ? expandPresentationPageBlocks(normalizedSuppliedBlocks, inputTitle)
     : normalizedSuppliedBlocks;
   const draftBlocks = [...textBlocks, ...suppliedBlocks];
@@ -104,15 +125,15 @@ export async function normalizeSource(
   }
 
   const title = inputTitle ?? inferTitle(draftBlocks);
-  const language = readSafeString(input.language) ?? "und";
-  const metadata = sanitizeMetadata(input.metadata);
+  const language = readSafeString(resolvedInput.language) ?? "und";
+  const metadata = sanitizeMetadata(resolvedInput.metadata);
   const createdAt =
-    readSafeString(input.createdAt) ??
+    readSafeString(resolvedInput.createdAt) ??
     metadata.originalCreatedAt ??
     readMetadataAttributeString(metadata, "createdAt") ??
     new Date().toISOString();
   const sourceId =
-    readSafeString(input.id) ??
+    readSafeString(resolvedInput.id) ??
     stableId(
       "source",
       [
@@ -900,6 +921,7 @@ function normalizeSuppliedBlock(
   }
 
   const metadata = sanitizeScalarRecord(block.metadata);
+  const structuredBlock = block.structuredBlock;
   const pageNumber = readNonNegativeNumber(block.pageNumber);
   const sectionHint = readSafeString(block.sectionHint);
   const id = readSafeString(block.id);
@@ -914,6 +936,7 @@ function normalizeSuppliedBlock(
     ...(pageNumber !== undefined ? { pageNumber } : {}),
     ...(sectionHint ? { sectionHint } : {}),
     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+    ...(structuredBlock ? { structuredBlock } : {}),
   };
 }
 
@@ -943,6 +966,7 @@ function finalizeBlock(
       : {}),
     ...(block.sectionHint ? { sectionHint: block.sectionHint } : {}),
     ...(block.metadata ? { metadata: block.metadata } : {}),
+    ...(block.structuredBlock ? { structuredBlock: block.structuredBlock } : {}),
   };
 }
 

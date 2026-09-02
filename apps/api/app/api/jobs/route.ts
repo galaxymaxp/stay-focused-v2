@@ -16,6 +16,7 @@ import {
   listOwnedProcessingJobs,
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
+import { readStructuredSourceBlocks } from "@/lib/processing-jobs/structured-source-blocks";
 import {
   dispatchAcceptedProcessingJob,
   ProcessingWorkflowDispatchError,
@@ -369,7 +370,10 @@ async function createReviewerJob(
   if (body.sourceKind !== undefined && !sourceKind) {
     return errorResponse(400, "invalid_source_kind", "sourceKind is invalid.", false, request);
   }
-  const sourceBlocks = readReviewerSourceBlocks(body.sourceBlocks);
+  const sourceBlocks = readStructuredSourceBlocks(body.sourceBlocks, {
+    strict: true,
+    maxTextLength: REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS,
+  });
   if (body.sourceBlocks !== undefined && !sourceBlocks) {
     return errorResponse(400, "invalid_source_blocks", "sourceBlocks are invalid.", false, request);
   }
@@ -457,48 +461,6 @@ function readReviewerSourceKind(
     value === "unknown"
     ? value
     : undefined;
-}
-
-function readReviewerSourceBlocks(value: unknown): readonly {
-  readonly id?: string;
-  readonly kind: "unknown";
-  readonly order: number;
-  readonly pageNumber?: number;
-  readonly text: string;
-}[] | undefined {
-  if (value === undefined) {
-    return [];
-  }
-  if (!Array.isArray(value) || value.length > 500) {
-    return undefined;
-  }
-  const blocks = value.flatMap((entry, inputIndex) => {
-    if (!isRecord(entry) || typeof entry.text !== "string") {
-      return [];
-    }
-    const text = entry.text.trim();
-    const pageNumber = entry.pageNumber;
-    if (
-      !text ||
-      text.length > REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS ||
-      (pageNumber !== undefined &&
-        (typeof pageNumber !== "number" || !Number.isInteger(pageNumber) || pageNumber < 1))
-    ) {
-      return [];
-    }
-    return [{
-      ...(typeof entry.id === "string" && entry.id.trim()
-        ? { id: entry.id.trim().slice(0, 180) }
-        : {}),
-      kind: "unknown" as const,
-      order: typeof entry.order === "number" && Number.isFinite(entry.order)
-        ? entry.order
-        : inputIndex,
-      ...(typeof pageNumber === "number" ? { pageNumber } : {}),
-      text,
-    }];
-  });
-  return blocks.length === value.length ? blocks : undefined;
 }
 
 async function validateAndSnapshotCanvasContext({

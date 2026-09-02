@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-08-30, Asia/Manila.
+Last refreshed: 2026-09-02, Asia/Manila.
 
 ## Repository
 
@@ -32,6 +32,23 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer Benchmark B10 is complete locally. The API can now route PDF bytes
+  through a feature-flagged, provider-independent `StructuredDocument`
+  boundary with legacy, Docling, and MinerU adapters. Typed headings,
+  paragraphs, lists, code, formulas, tables, images, reading order, hierarchy,
+  parser diagnostics, and block/cell provenance reach Stage 0 without first
+  being collapsed into Markdown. The production default remains the existing
+  extraction/Google OCR path; external parser failures and quality failures
+  fall back deterministically and expose only safe diagnostics.
+- B10's sanitized three-class fixtures and router regressions pass without
+  downloading parser models. Live A/B evidence is mixed: Docling materially
+  improves code-heavy source structure and title quality, while MinerU's
+  Python reviewer is withheld by grounding; all three central-tendency
+  reviewers are withheld despite substantially better typed formula/table
+  evidence. The scanned accounting source routes through MinerU into the
+  shared contract without Google credentials, but known missing/misread cells
+  remain unsynthesized. The next work belongs in reviewer hierarchy and
+  student-visible validation, not another parser-specific mapping.
 - Reviewer Benchmark B4 is complete locally. Stage 4 now scores unique
   source-derived semantic targets, while Stage 5a independently rejects wrong
   definition, parent-child, step-order, example, cross-concept, and sibling
@@ -126,6 +143,10 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Deterministic test baseline
 
+- B10 verification passes 396/396 engine evaluations (the prior 383 remain),
+  607/607 API tests, 1/1 durable-workflow test, and 10/10 focused mobile parser
+  handoff tests. Engine/API/mobile and full repository typechecks pass; builds
+  pass; lint retains only the four accepted mobile import-order warnings.
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
   targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
   reviewer engine: 343/343 deterministic evaluations after B4 semantic
@@ -188,6 +209,9 @@ Last refreshed: 2026-08-30, Asia/Manila.
 
 ## Known risks and immediate task
 
+- Recommended next task: B11 - harden reviewer hierarchy and student-visible
+  validation using typed parser structure before promoting an external parser
+  mode beyond its feature-flagged, legacy-default integration.
 - Recommended next task: run the same reviewer benchmark on the Firewalls PDF
   to test whether the B3 generation structure and B4 semantic verifier
   generalize beyond Intro to IT Security.
