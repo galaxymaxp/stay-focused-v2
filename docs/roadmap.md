@@ -2,6 +2,27 @@
 
 Last refreshed: 2026-09-02, Asia/Manila.
 
+## Reviewer Benchmark B11 - Complete
+
+Stages 1-6 now exploit the typed structure established in B10. Generic
+multi-signal heading roles suppress furniture and instructional fragments while
+retaining their child evidence; equivalent same-parent headings consolidate
+without numeric suffixes. Planned typed evidence groups preserve formula raw
+text/parser LaTeX, tables, exact cells, code, results, and provenance through
+generation and relationship grounding. Objective Stage 6 diagnostics withhold
+malformed student-visible structure without imposing a blind point cap.
+
+The eight B11 regression families pass, and the complete engine suite is
+404/404 with all prior 396 cases retained. API remains 607/607. Live Python
+Docling now assembles 13 clean concepts at 1.00 coverage/grounding. Statistics
+Docling grounding issues fall from 41 to 4 and MinerU from 40 to 2, with zero
+fabrication failures; both remain safely withheld for omissions or missing
+output. Accounting cell and numeric/OCR provenance is unchanged. The parser
+production default remains `legacy`.
+
+Next Reviewer benchmark: B12 - rerun full B8 end-to-end acceptance using hybrid
+structured parsing. Unconditional parser promotion remains deferred.
+
 ## Reviewer Benchmark B10 - Complete
 
 A feature-flagged structured parser architecture now preserves typed document
@@ -22,9 +43,8 @@ retain formulas and tables. Scanned accounting reaches MinerU and the shared
 contract without Google credentials, while known parser omissions remain
 visible rather than being invented.
 
-Next Reviewer benchmark: B11 - harden reviewer hierarchy and student-visible
-validation using the typed parser structure. External parser promotion remains
-deferred until that layer is accepted.
+Next Reviewer benchmark: B12 - rerun full B8 end-to-end acceptance using the
+accepted typed hierarchy/grounding layer and hybrid structured parser.
 
 ## Reviewer Benchmark B4 - Complete
 

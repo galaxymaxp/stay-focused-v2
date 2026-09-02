@@ -9,6 +9,7 @@ import type {
   SourceOutlineSection,
 } from "./types";
 import { analyzeSectionSemanticStructure } from "./semantic-structure.js";
+import { buildTypedEvidenceGroups } from "./typed-evidence.js";
 
 const COVERAGE_RULES: Readonly<
   Record<SectionSchemaKind, readonly string[]>
@@ -124,6 +125,10 @@ function createPlannedSection(
     tags: section.tags,
     sourceBlocks,
   });
+  const evidenceGroups = buildTypedEvidenceGroups({
+    sectionTitle: section.title,
+    sourceBlocks,
+  });
   const schemaKind = selectSchemaKind(section, semanticPlan.kind);
   const tokenWeight = tokenWeightForSection(section, sourceBlockIds, sourceBlockById);
   const targetItemCount = targetItemCountFor(tokenWeight);
@@ -143,7 +148,11 @@ function createPlannedSection(
     targetItemCount,
     sourceStartOffset: finiteNumberOr(section.startOffset, 0),
     sourceEndOffset: finiteNumberOr(section.endOffset, 0),
+    ...(section.conceptualParentKey
+      ? { conceptualParentKey: section.conceptualParentKey }
+      : {}),
     semanticPlan,
+    ...(evidenceGroups.length > 0 ? { evidenceGroups } : {}),
   };
 }
 

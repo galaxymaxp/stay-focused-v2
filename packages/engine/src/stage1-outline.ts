@@ -28,6 +28,8 @@ interface SectionDraft {
   readonly inferred: boolean;
   readonly startOffset: number;
   readonly endOffset: number;
+  readonly typedHeading?: boolean;
+  readonly conceptualParentKey?: string;
 }
 
 interface BoundaryCandidate {
@@ -79,11 +81,11 @@ export async function detectOutline(
   }
 
   const drafts = mergeRepeatedDrafts(
-    createDraftsFromBoundaries({
+    refineTypedHeadingDrafts(createDraftsFromBoundaries({
       source,
       flattenedBlocks,
       boundaries: detectBoundaries(flattenedBlocks),
-    }),
+    })),
   );
   const sections = drafts.map((draft, order) =>
     createOutlineSection(source.id, draft, order),
@@ -603,8 +605,203 @@ function mergeRepeatedDrafts(
   );
 
   return disambiguateNonContiguousRepeats(
-    mergeAdjacentRepeatedDrafts(withoutRepeatedHeaderOnlyDrafts),
+    mergeCompatibleTypedRepeats(
+      mergeAdjacentRepeatedDrafts(withoutRepeatedHeaderOnlyDrafts),
+    ),
   );
+}
+
+function refineTypedHeadingDrafts(
+  drafts: readonly SectionDraft[],
+): readonly SectionDraft[] {
+  const repeatedTitleCounts = new Map<string, number>();
+  for (const draft of drafts) {
+    if (typedHeadingFor(draft)) {
+      const key = normalizeTitleKey(draft.title);
+      repeatedTitleCounts.set(key, (repeatedTitleCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const refined: SectionDraft[] = [];
+  const headingStack: { readonly level: number; readonly key: string }[] = [];
+  for (const draft of drafts) {
+    const heading = typedHeadingFor(draft);
+    if (!heading) {
+      refined.push(draft);
+      continue;
+    }
+
+    const body = draft.fragments.filter(
+      (fragment) => fragment.block.id !== heading.id,
+    );
+    const level = heading.level ?? 1;
+    const parent = [...headingStack].reverse().find((entry) => entry.level < level);
+    const titleKey = normalizeTitleKey(draft.title);
+    if (headingIsMetadataFrontMatter(draft, body)) {
+      continue;
+    }
+    const subordinate = headingIsSubordinate({
+      draft,
+      heading,
+      body,
+      repeated: (repeatedTitleCounts.get(titleKey) ?? 0) > 1,
+    });
+
+    if (subordinate && refined.length > 0) {
+      const previous = refined.at(-1);
+      if (previous) {
+        refined[refined.length - 1] = {
+          ...previous,
+          fragments: [...previous.fragments, ...draft.fragments],
+          endOffset: draft.endOffset,
+        };
+      }
+      continue;
+    }
+
+    while ((headingStack.at(-1)?.level ?? 0) >= level) headingStack.pop();
+    const conceptualDraft: SectionDraft = {
+      ...draft,
+      typedHeading: true,
+      ...(parent ? { conceptualParentKey: parent.key } : {}),
+    };
+    refined.push(conceptualDraft);
+    headingStack.push({ level, key: titleKey });
+  }
+  return refined;
+}
+
+function headingIsMetadataFrontMatter(
+  draft: SectionDraft,
+  body: readonly SectionFragment[],
+): boolean {
+  const paragraphs = body.filter((fragment) => fragment.kind === "paragraph");
+  const labelCount = paragraphs.filter((fragment) => /:\s*$/.test(fragment.text)).length;
+  const compactParagraphCount = paragraphs.filter(
+    (fragment) => (fragment.text.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) <= 8,
+  ).length;
+  const substantiveTypedEvidence = body.some((fragment) =>
+    fragment.kind === "code" ||
+    fragment.kind === "formula" ||
+    fragment.kind === "table"
+  );
+  return (
+    !substantiveTypedEvidence &&
+    paragraphs.length >= 5 &&
+    labelCount >= 2 &&
+    compactParagraphCount / paragraphs.length >= 0.75 &&
+    draft.title === draft.title.toLocaleUpperCase()
+  );
+}
+
+function typedHeadingFor(
+  draft: SectionDraft,
+): Extract<NonNullable<NormalizedSourceBlock["structuredBlock"]>, { type: "heading" }> | undefined {
+  const structured = draft.fragments.find(
+    (fragment) =>
+      fragment.kind === "heading" &&
+      normalizeTitleKey(fragment.text) === normalizeTitleKey(draft.title),
+  )?.block.structuredBlock;
+  return structured?.type === "heading" ? structured : undefined;
+}
+
+function headingIsSubordinate(args: {
+  readonly draft: SectionDraft;
+  readonly heading: Extract<NonNullable<NormalizedSourceBlock["structuredBlock"]>, { type: "heading" }>;
+  readonly body: readonly SectionFragment[];
+  readonly repeated: boolean;
+}): boolean {
+  const title = args.draft.title.trim();
+  const titleWords = title.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const bodyText = fragmentText(args.body).trim();
+  const bodyWords = bodyText.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const compactFurnitureVocabulary = /^(?:activity|answer|answers|example|examples|exercise|exercises|practice|question|questions|recap|review|solution|solutions)$/i;
+  const instructionalBody = /\b(?:answer|complete|discuss|identify|perform|practice|review|solve|try|write)\b/i.test(bodyText);
+  const instructionalTitle = /^(?:(?:\d{1,3}|[a-z])[.)]\s*)?(?:apply|calculate|complete|compute|determine|discuss|identify|perform|practice|review|solve|substitute|try|write)\b/i.test(title);
+  const malformedTitle =
+    /^(?:[-*+\u00b7\u2022]|\u00c2\u00b7)/u.test(title) ||
+    /(?:^|\s)(?:return|yield|print|def|class|const|let|var)\b.*[();={}\[\]]/i.test(title) ||
+    /^[\[{(].*[\]})]$/.test(title) ||
+    (/=/.test(title) && titleWords.length <= 8);
+  const labelLikeTitle = /[:;]$/.test(title) || /^(?:when|where|why|how)\b.*[:?]$/i.test(title);
+  const allCapsLabel =
+    titleWords.length <= 3 &&
+    /\p{L}/u.test(title) &&
+    title === title.toLocaleUpperCase();
+  const furnitureTerm = compactFurnitureVocabulary.test(
+    title.replace(/[:;]+$/, "").trim(),
+  );
+  const typedEvidenceChildren = args.body.filter((fragment) =>
+    fragment.kind === "code" ||
+    fragment.kind === "formula" ||
+    fragment.kind === "table" ||
+    fragment.kind === "image"
+  ).length;
+  const explanatoryBody =
+    bodyWords.length >= 8 ||
+    args.body.some((fragment) =>
+      fragment.kind === "paragraph" &&
+      /[.!?]$/.test(fragment.text.trim()) &&
+      (fragment.text.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) >= 6
+    );
+
+  let conceptScore = 0;
+  let subordinateScore = 0;
+  if ((args.heading.level ?? 1) === 1) conceptScore += 2;
+  if (titleWords.length >= 2 && !labelLikeTitle) conceptScore += 1;
+  if (explanatoryBody) conceptScore += 3;
+  if (args.repeated && !furnitureTerm && !labelLikeTitle) conceptScore += 2;
+  if (args.heading.hierarchyConfidence !== undefined && args.heading.hierarchyConfidence >= 0.8) conceptScore += 1;
+
+  if (malformedTitle) subordinateScore += 8;
+  if (labelLikeTitle) subordinateScore += 7;
+  if (furnitureTerm) subordinateScore += 6;
+  if (allCapsLabel) subordinateScore += 1;
+  if (instructionalBody) subordinateScore += 3;
+  if (instructionalTitle) subordinateScore += 8;
+  if (bodyWords.length < 6) subordinateScore += 1;
+  if (typedEvidenceChildren > 0 && (labelLikeTitle || furnitureTerm)) subordinateScore += 2;
+
+  return subordinateScore >= conceptScore + 2;
+}
+
+function mergeCompatibleTypedRepeats(
+  drafts: readonly SectionDraft[],
+): readonly SectionDraft[] {
+  const merged: SectionDraft[] = [];
+  const targetIndexByRegion = new Map<string, number>();
+
+  for (const draft of drafts) {
+    if (!draft.typedHeading) {
+      merged.push(draft);
+      continue;
+    }
+    const titleKey = normalizeTitleKey(draft.title);
+    const regionKey = `${draft.conceptualParentKey ?? "<root>"}\u001f${titleKey}`;
+    const existingIndex = targetIndexByRegion.get(regionKey);
+    if (existingIndex === undefined) {
+      targetIndexByRegion.set(regionKey, merged.length);
+      merged.push(draft);
+      continue;
+    }
+    const existing = merged[existingIndex];
+    if (!existing) {
+      merged.push(draft);
+      continue;
+    }
+    const continuationFragments = draft.fragments.filter(
+      (fragment) =>
+        fragment.kind !== "heading" ||
+        normalizeTitleKey(fragment.text) !== titleKey,
+    );
+    merged[existingIndex] = {
+      ...existing,
+      fragments: [...existing.fragments, ...continuationFragments],
+      endOffset: Math.max(existing.endOffset, draft.endOffset),
+      inferred: existing.inferred && draft.inferred,
+    };
+  }
+  return merged;
 }
 
 function isPageAwarePresentationBody(block: NormalizedSourceBlock): boolean {
@@ -701,7 +898,7 @@ function disambiguateNonContiguousRepeats(
   return drafts.map((draft) => {
     const key = normalizeTitleKey(draft.title);
     const total = totals.get(key) ?? 0;
-    if (total <= 1) {
+    if (total <= 1 || draft.typedHeading) {
       return draft;
     }
 
@@ -754,6 +951,9 @@ function createOutlineSection(
     tags: detectContentTags(draft.fragments),
     confidence: calculateConfidence(draft),
     ...(draft.inferred ? { inferred: true } : {}),
+    ...(draft.conceptualParentKey
+      ? { conceptualParentKey: draft.conceptualParentKey }
+      : {}),
   };
 }
 

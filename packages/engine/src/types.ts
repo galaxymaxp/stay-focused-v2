@@ -97,6 +97,7 @@ export interface SourceOutlineSection {
   readonly tags: readonly SectionContentTag[];
   readonly confidence: number;
   readonly inferred?: boolean;
+  readonly conceptualParentKey?: string;
 }
 
 export type OutlineSection = SourceOutlineSection;
@@ -156,6 +157,37 @@ export interface PlannedSectionSemanticPlan {
   readonly taxonomyContext?: string;
 }
 
+export interface TypedTableCellEvidence {
+  readonly tableBlockId: string;
+  readonly cellId: string;
+  readonly rowIndex: number;
+  readonly columnIndex: number;
+  readonly rowSpan: number;
+  readonly columnSpan: number;
+  readonly text: string;
+  readonly pageNumber: number;
+}
+
+export interface TypedEvidenceMember {
+  readonly blockId: string;
+  readonly kind: SourceBlockKind;
+  readonly pageNumber?: number;
+  readonly parentId?: string;
+  readonly evidenceTexts: readonly string[];
+  readonly tableCells?: readonly TypedTableCellEvidence[];
+}
+
+export interface TypedEvidenceGroup {
+  readonly id: string;
+  readonly label: string;
+  readonly sourceBlockIds: readonly string[];
+  readonly formulaBlockIds: readonly string[];
+  readonly tableBlockIds: readonly string[];
+  readonly codeBlockIds: readonly string[];
+  readonly resultBlockIds: readonly string[];
+  readonly members: readonly TypedEvidenceMember[];
+}
+
 export interface PlannedSection {
   readonly id: string;
   readonly sourceSectionId: string;
@@ -168,7 +200,9 @@ export interface PlannedSection {
   readonly targetItemCount: number;
   readonly sourceStartOffset: number;
   readonly sourceEndOffset: number;
+  readonly conceptualParentKey?: string;
   readonly semanticPlan?: PlannedSectionSemanticPlan;
+  readonly evidenceGroups?: readonly TypedEvidenceGroup[];
 }
 
 export interface GenerationPlan {

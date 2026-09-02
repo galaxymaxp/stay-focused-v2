@@ -6,6 +6,7 @@ import {
 } from "./source-items.js";
 import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
 import { verifySemanticRelationships } from "./semantic-verification.js";
+import { serializeSemanticUnits } from "./semantic-structure.js";
 import {
   extractStudentVisibleText,
   type StudentVisibleTextEntry,
@@ -13,6 +14,7 @@ import {
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import { normalizeCoverageTitleKey } from "./stage4-verify.js";
 import { findSourceTokenFidelityViolations } from "./source-token-fidelity.js";
+import { typedEvidenceTexts } from "./typed-evidence.js";
 import type {
   GenerationPlan,
   GroundingIssue,
@@ -130,7 +132,11 @@ export function validateGrounding(
       outputs: outputsBySectionId.get(section.id) ?? [],
       sourceSpan: {
         sourceSection,
-        text: extractGroundingSourceSectionText(args.source, sourceSection),
+        text: [
+          extractGroundingSourceSectionText(args.source, sourceSection),
+          ...typedEvidenceTexts(section.evidenceGroups),
+          ...serializeSemanticUnits(section.semanticPlan?.units ?? []),
+        ].filter(Boolean).join("\n"),
         sourceItems: extractGroundingSourceSectionItems(args.source, sourceSection),
       },
     });
@@ -244,6 +250,7 @@ function validateSectionGrounding(args: {
     output,
     allSections: args.allSections,
     currentSourceText: args.sourceSpan.text,
+    currentEvidenceGroups: args.section.evidenceGroups,
   }).map(
     (issue): GroundingIssue => ({
       type: issue.type,
@@ -324,10 +331,15 @@ function checkFabrication(args: {
       entry.text,
       entry.field === "title" ? args.titleTerms : args.sourceTerms,
     );
-    const fidelityOccurrences = findSourceTokenFidelityViolations(
-      entry.field === "title" ? args.titleSourceText : args.sourceText,
+    const fidelitySourceText = entry.field === "title"
+      ? args.titleSourceText
+      : args.sourceText;
+    const fidelityOccurrences = (isExactSourceEvidenceLine(
+      fidelitySourceText,
       entry.text,
-    ).map(
+    )
+      ? []
+      : findSourceTokenFidelityViolations(fidelitySourceText, entry.text)).map(
       (violation): TermOccurrence => ({
         text: violation.text,
         canonical: `source-token:${violation.text}`,
@@ -454,6 +466,14 @@ function checkOmissions(args: {
       },
     ],
   };
+}
+
+function isExactSourceEvidenceLine(sourceText: string, visibleText: string): boolean {
+  const visible = visibleText.replace(/\s+/g, " ").trim();
+  if (!visible) return false;
+  return sourceText.split(/\r?\n/).some(
+    (line) => line.replace(/\s+/g, " ").trim() === visible,
+  );
 }
 
 function sourceItemTokenRecall(sourceItem: string, visibleText: string): number {

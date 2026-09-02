@@ -166,6 +166,12 @@ async function runComparison({
       groundingStatus: reviewer.metadata.groundingStatus,
       groundingIssues: reviewer.metadata.grounding.issues.length,
       groundingIssueTypes: countValues(reviewer.metadata.grounding.issues.map((issue) => issue.type)),
+      groundingIssueDiagnostics: reviewer.metadata.grounding.issues.map(compactGroundingIssue),
+      relationshipDiagnostics: countValues(
+        reviewer.metadata.grounding.issues
+          .filter((issue) => issue.type !== "grounding-fabrication" && issue.type !== "grounding-omission")
+          .map((issue) => issue.type),
+      ),
       phase1FabricationFails: reviewer.metadata.grounding.phase1FabricationFails,
       leakageStatus: reviewer.metadata.leakageStatus,
       leakageIssues: reviewer.metadata.leakage.issues.length,
@@ -174,6 +180,7 @@ async function runComparison({
       assembly: "passed",
       studentVisibleResult: "assembled",
       finalTitles: reviewer.sections.map((section) => section.title),
+      structureDiagnostics: [],
       unsupported67: /\b67\b/u.test(serialized) && !/\b67\b/u.test(sourceText),
       durationMs: Date.now() - startedAt,
     };
@@ -194,6 +201,12 @@ async function runComparison({
       groundingStatus: state.grounding.status,
       groundingIssues: state.grounding.issues.length,
       groundingIssueTypes: countValues(state.grounding.issues.map((issue) => issue.type)),
+      groundingIssueDiagnostics: state.grounding.issues.map(compactGroundingIssue),
+      relationshipDiagnostics: countValues(
+        state.grounding.issues
+          .filter((issue) => issue.type !== "grounding-fabrication" && issue.type !== "grounding-omission")
+          .map((issue) => issue.type),
+      ),
       phase1FabricationFails: state.grounding.phase1FabricationFails,
       leakageStatus: state.leakage.status,
       leakageIssues: state.leakage.issues.length,
@@ -203,11 +216,39 @@ async function runComparison({
       studentVisibleResult: "withheld",
       finalTitles: [],
       rejectedCandidateTitles: state.outputs.map((output) => output.title),
+      plannedTitles: state.plan.sections.map((section) => section.title),
+      evidenceGroups: state.plan.sections.map((section) => ({
+        title: section.title,
+        groups: (section.evidenceGroups ?? []).map((group) => ({
+          formulaBlocks: group.formulaBlockIds.length,
+          tableBlocks: group.tableBlockIds.length,
+          resultBlocks: group.resultBlockIds.length,
+          tableCells: group.members.reduce(
+            (count, member) => count + (member.tableCells?.length ?? 0),
+            0,
+          ),
+        })),
+      })),
       assemblyError: error.message,
+      structureDiagnostics: [...error.message.matchAll(/\[([A-Z_]+)\]/gu)].map((match) => match[1]),
       unsupported67: /\b67\b/u.test(serialized) && !/\b67\b/u.test(sourceText),
       durationMs: Date.now() - startedAt,
     };
   }
+}
+
+function compactGroundingIssue(issue: {
+  readonly type: string;
+  readonly fieldPath?: string;
+  readonly offendingText?: readonly string[];
+  readonly message: string;
+}): Record<string, unknown> {
+  return {
+    type: issue.type,
+    fieldPath: issue.fieldPath ?? null,
+    offendingText: issue.offendingText ?? [],
+    message: issue.message,
+  };
 }
 
 async function inspectAccounting(workspace: string): Promise<Record<string, unknown>> {

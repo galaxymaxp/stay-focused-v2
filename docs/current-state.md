@@ -32,6 +32,19 @@ Last refreshed: 2026-09-02, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer Benchmark B11 is complete locally. Typed heading roles now use
+  hierarchy, repetition, lexical/body, neighbor, and subordinate-evidence
+  signals; furniture and instruction labels fold into their supported parent
+  without losing source blocks. Same-parent repeats consolidate without numeric
+  suffixes. Plan-level typed evidence groups carry formulas, tables, exact
+  cells, code, and result statements through generation and grounding. Stage 6
+  now rejects objective malformed student-visible structure.
+- Live Python Docling assembles 13/13 clean concepts with 1.00 coverage and
+  grounding and none of B10's furniture, malformed fragments, or repeated
+  suffixes. Central-tendency Docling issues fall from 41 to 4 and MinerU from
+  40 to 2, all omissions with zero fabrication failures; both remain safely
+  withheld. Accounting numeric provenance remains Docling 41/41 and MinerU
+  32/32. The production parser default remains `legacy`.
 - Reviewer Benchmark B10 is complete locally. The API can now route PDF bytes
   through a feature-flagged, provider-independent `StructuredDocument`
   boundary with legacy, Docling, and MinerU adapters. Typed headings,
@@ -47,8 +60,8 @@ Last refreshed: 2026-09-02, Asia/Manila.
   reviewers are withheld despite substantially better typed formula/table
   evidence. The scanned accounting source routes through MinerU into the
   shared contract without Google credentials, but known missing/misread cells
-  remain unsynthesized. The next work belongs in reviewer hierarchy and
-  student-visible validation, not another parser-specific mapping.
+  remain unsynthesized. B11 now addresses the downstream hierarchy and
+  grounding layer without another parser-specific mapping.
 - Reviewer Benchmark B4 is complete locally. Stage 4 now scores unique
   source-derived semantic targets, while Stage 5a independently rejects wrong
   definition, parent-child, step-order, example, cross-concept, and sibling
@@ -143,10 +156,11 @@ Last refreshed: 2026-09-02, Asia/Manila.
 
 ## Deterministic test baseline
 
-- B10 verification passes 396/396 engine evaluations (the prior 383 remain),
-  607/607 API tests, 1/1 durable-workflow test, and 10/10 focused mobile parser
-  handoff tests. Engine/API/mobile and full repository typechecks pass; builds
-  pass; lint retains only the four accepted mobile import-order warnings.
+- B11 verification passes 404/404 engine evaluations (all prior 396 remain)
+  and 607/607 API tests. Engine and full repository typechecks pass; builds
+  pass; lint retains only the four accepted mobile import-order warnings. B10's
+  unchanged adjacent baselines remain 1/1 durable workflow and 10/10 focused
+  mobile parser handoff tests.
 - Shared: 32/32, including the PostgreSQL microsecond timestamp regression;
   targeted Gap A/Gap B API/database/session coverage: 27/27; mobile: 216/216;
   reviewer engine: 343/343 deterministic evaluations after B4 semantic
@@ -209,9 +223,9 @@ Last refreshed: 2026-09-02, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: B11 - harden reviewer hierarchy and student-visible
-  validation using typed parser structure before promoting an external parser
-  mode beyond its feature-flagged, legacy-default integration.
+- Recommended next task: B12 - rerun full B8 end-to-end acceptance using the
+  feature-flagged hybrid structured parser. Parser-default promotion remains
+  deferred until that acceptance evidence is reviewed.
 - Recommended next task: run the same reviewer benchmark on the Firewalls PDF
   to test whether the B3 generation structure and B4 semantic verifier
   generalize beyond Intro to IT Security.

@@ -2,6 +2,7 @@ import type {
   PlannedSection,
   PlannedSemanticUnit,
   SectionOutput,
+  TypedEvidenceGroup,
 } from "./types.js";
 
 export interface SemanticCoverageCheck {
@@ -103,13 +104,19 @@ export function verifySemanticRelationships(args: {
   readonly output: SectionOutput;
   readonly allSections: readonly PlannedSection[];
   readonly currentSourceText?: string;
+  readonly currentEvidenceGroups?: readonly TypedEvidenceGroup[];
 }): readonly SemanticRelationshipIssue[] {
   const units = args.section.semanticPlan?.units ?? [];
   const rows = visibleRows(args.output);
   return dedupeIssues([
-    ...detectUnsupportedExplicitRelations(units, rows),
+    ...detectUnsupportedExplicitRelations(units, rows, args.currentEvidenceGroups),
     ...detectRelationshipShapeIssues(units, rows),
-    ...detectSiblingFusion(units, rows),
+    ...detectSiblingFusion(units, rows, args.currentEvidenceGroups),
+    ...detectUnsupportedTypedTransformations(
+      rows,
+      args.currentEvidenceGroups,
+      args.currentSourceText,
+    ),
     ...detectCrossConceptFusion(
       args.section,
       args.allSections,
@@ -122,10 +129,12 @@ export function verifySemanticRelationships(args: {
 function detectUnsupportedExplicitRelations(
   units: readonly PlannedSemanticUnit[],
   rows: readonly VisibleRow[],
+  evidenceGroups: readonly TypedEvidenceGroup[] | undefined,
 ): readonly SemanticRelationshipIssue[] {
   if (units.some((unit) => unit.kind !== "point")) return [];
   return rows.flatMap((row) => {
     if (!/(?:[-=]+>|[\u2190-\u21ff\u27f0-\u27ff])/u.test(row.text)) return [];
+    if (rowSupportedByTypedGroup(row.text, evidenceGroups)) return [];
     const representedPoints = units.filter(
       (unit) => ideaMatchScore(row.text, unit.label) >= IDEA_MATCH_THRESHOLD,
     );
@@ -265,11 +274,13 @@ function stepOrderIsValid(
 function detectSiblingFusion(
   units: readonly PlannedSemanticUnit[],
   rows: readonly VisibleRow[],
+  evidenceGroups: readonly TypedEvidenceGroup[] | undefined,
 ): readonly SemanticRelationshipIssue[] {
   const points = units.filter((unit) => unit.kind === "point");
   if (points.length < 2) return [];
 
   return rows.flatMap((row) => {
+    if (rowSupportedByTypedGroup(row.text, evidenceGroups)) return [];
     const matched = points.filter(
       (point) => ideaMatchScore(row.text, point.label) >= 0.8,
     );
@@ -289,6 +300,75 @@ function detectSiblingFusion(
       ),
     ];
   });
+}
+
+function detectUnsupportedTypedTransformations(
+  rows: readonly VisibleRow[],
+  groups: readonly TypedEvidenceGroup[] | undefined,
+  currentSourceText: string | undefined,
+): readonly SemanticRelationshipIssue[] {
+  if (!groups || groups.length === 0) return [];
+  const formulaTexts = groups.flatMap((group) =>
+    group.members
+      .filter((member) => member.kind === "formula")
+      .flatMap((member) => member.evidenceTexts),
+  );
+  if (formulaTexts.length === 0) return [];
+  return rows.flatMap((row) => {
+    if (!/[=+*/^]|(?:^|\s)-(?:\s|\d)/u.test(row.text)) return [];
+    if (
+      rowSupportedByTypedGroup(row.text, groups) ||
+      sourceContainsExactRepresentation(currentSourceText, row.text)
+    ) return [];
+    const resemblesFormula = formulaTexts.some(
+      (formula) => ideaMatchScore(row.text, formula) >= IDEA_MATCH_THRESHOLD,
+    );
+    if (!resemblesFormula) return [];
+    const exactSourceRepresentation = formulaTexts.some(
+      (formula) => normalizeFormula(row.text).includes(normalizeFormula(formula)),
+    );
+    return exactSourceRepresentation
+      ? []
+      : [relationshipIssue(
+          "grounding-unsupported-relationship",
+          row,
+          "Visible formula content transforms a source/parser formula representation without explicit source evidence.",
+        )];
+  });
+}
+
+function sourceContainsExactRepresentation(
+  sourceText: string | undefined,
+  visibleText: string,
+): boolean {
+  if (!sourceText) return false;
+  const visible = normalizeFormula(visibleText);
+  return visible.length > 0 && sourceText
+    .split(/\r?\n/)
+    .some((line) => normalizeFormula(line) === visible);
+}
+
+function rowSupportedByTypedGroup(
+  text: string,
+  groups: readonly TypedEvidenceGroup[] | undefined,
+): boolean {
+  if (!groups) return false;
+  return groups.some((group) => {
+    const matchedMembers = group.members.filter((member) => {
+      const evidencePieces = [
+        ...member.evidenceTexts,
+        ...(member.tableCells?.map((cell) => cell.text) ?? []),
+      ].filter((piece) => canonicalTerms(piece).length > 0);
+      return evidencePieces.some(
+        (piece) => ideaMatchScore(text, piece) >= IDEA_MATCH_THRESHOLD,
+      );
+    });
+    return matchedMembers.length >= 2;
+  });
+}
+
+function normalizeFormula(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/g, "").trim();
 }
 
 function detectCrossConceptFusion(

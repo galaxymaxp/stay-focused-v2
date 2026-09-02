@@ -304,14 +304,35 @@ function structuredEvidencePromptLines(
   section: PlannedSection,
   sourceBlocks: readonly NormalizedSourceBlock[],
 ): readonly string[] {
+  const typedGroups = section.evidenceGroups ?? [];
+  const typedLines = typedGroups.flatMap((group) => [
+    `[evidence-group ${group.id} | concept ${group.label}]`,
+    ...group.members.flatMap((member) => {
+      if (member.kind === "formula") {
+        return member.evidenceTexts.map((text, index) =>
+          `[formula ${member.blockId} | ${index === 0 ? "source" : "parser-representation"}] ${text}`
+        );
+      }
+      if (member.kind === "table") {
+        return member.tableCells?.map((cell) =>
+          `[table-cell ${cell.tableBlockId} | row ${cell.rowIndex} | column ${cell.columnIndex}] ${cell.text}`
+        ) ?? [];
+      }
+      return member.evidenceTexts.map((text) =>
+        `[related-${member.kind} ${member.blockId}] ${text}`
+      );
+    }),
+  ]);
   const serialized = serializeRecoveryEvidence({
     sourceText: sourceBlocksToLineText(sourceBlocks),
     sectionTitle: section.title,
   });
-  return serialized.length > 0
+  return serialized.length > 0 || typedLines.length > 0
     ? [
         "STRUCTURED SOURCE EVIDENCE:",
-        "The markers below serialize only row/order cues explicitly present in the passage.",
+        "The markers below serialize only typed/provenance and row/order cues explicitly present in the passage.",
+        "Evidence inside one group is structurally associated, but no unstated calculation or algebraic transformation is authorized.",
+        ...typedLines,
         ...serialized,
       ]
     : [];

@@ -39,6 +39,7 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
   const coverageBySectionId = indexCoverage(coverage, plannedSectionIds);
   const groundingBySectionId = indexGrounding(grounding, plannedSectionIds);
   const leakageBySectionId = indexLeakage(leakage, plannedSectionIds);
+  validateStudentVisibleStructure({ plan, source, outputsBySectionId });
 
   const sections = plan.sections.map((plannedSection) => {
     validatePlannedSourceReferences(plannedSection, sourceBlockIds);
@@ -152,6 +153,145 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       leakage,
     },
   };
+}
+
+export type StudentVisibleStructureDiagnostic =
+  | "NON_CONCEPT_HEADING"
+  | "PRESENTATION_FURNITURE_HEADING"
+  | "DUPLICATE_SECTION"
+  | "TITLE_BODY_FRAGMENT"
+  | "CODE_TITLE"
+  | "OVERSIZED_SECTION"
+  | "EMPTY_EXPLANATION"
+  | "STRUCTURAL_NOISE";
+
+function validateStudentVisibleStructure(args: {
+  readonly plan: GenerationPlan;
+  readonly source: NormalizedSource;
+  readonly outputsBySectionId: ReadonlyMap<string, SectionOutput>;
+}): void {
+  const seenTitles = new Map<string, string>();
+  const sourceBlockById = new Map(
+    args.source.blocks.map((block) => [block.id, block] as const),
+  );
+  for (const section of args.plan.sections) {
+    const output = args.outputsBySectionId.get(section.id);
+    if (!output) continue;
+    const title = output.title.trim() || section.title.trim();
+    const titleKey = structuralKey(title);
+    if ((title.match(/[\p{L}\p{N}]/gu)?.length ?? 0) < 2) {
+      throwStructureError("NON_CONCEPT_HEADING", section.id, title);
+    }
+    if (looksLikeCodeTitle(title)) {
+      throwStructureError("CODE_TITLE", section.id, title);
+    }
+    if (looksLikeBodyFragmentTitle(title)) {
+      throwStructureError("TITLE_BODY_FRAGMENT", section.id, title);
+    }
+    const sourceBlocks = section.sourceBlockIds.flatMap((id) => {
+      const block = sourceBlockById.get(id);
+      return block ? [block] : [];
+    });
+    if (looksLikePresentationFurniture(title, sourceBlocks)) {
+      throwStructureError("PRESENTATION_FURNITURE_HEADING", section.id, title);
+    }
+    const duplicateScopeKey = `${section.conceptualParentKey ?? "<root>"}\u001f${titleKey}`;
+    const previousSectionId = seenTitles.get(duplicateScopeKey);
+    if (previousSectionId) {
+      throw new Error(
+        `Stage 6 student-visible structure [DUPLICATE_SECTION] repeats conceptual title "${title}" in planned sections "${previousSectionId}" and "${section.id}".`,
+      );
+    }
+    seenTitles.set(duplicateScopeKey, section.id);
+
+    const explanation = output.sourceCore.explanation.trim();
+    const points = output.sourceCore.keyPoints.map((point) => point.trim()).filter(Boolean);
+    if (!explanation && points.length === 0) {
+      throwStructureError("EMPTY_EXPLANATION", section.id, title);
+    }
+    const pointKeys = points.map(structuralKey).filter(Boolean);
+    const duplicatePointCount = pointKeys.length - new Set(pointKeys).size;
+    if (duplicatePointCount >= 2) {
+      throwStructureError("STRUCTURAL_NOISE", section.id, title);
+    }
+    const hiddenHeadingCount = points.filter((point) =>
+      point.length <= 90 &&
+      (/:$/.test(point) ||
+        (/^[\p{Lu}\p{N}][\p{L}\p{N} &'()/-]+$/u.test(point) &&
+          (point.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) <= 7))
+    ).length;
+    const sourceHeadingTransitions = sourceBlocks.filter((block) =>
+      block.kind === "heading" &&
+      structuralKey(block.text) !== titleKey &&
+      !/^(?:activity|answer|answers|example|examples|exercise|exercises|practice|question|questions|recap|review|solution|solutions)[:;]?$/i.test(block.text.trim())
+    ).length;
+    const visibleLength = explanation.length + points.reduce(
+      (total, point) => total + point.length,
+      0,
+    );
+    if (
+      (points.length >= 12 && hiddenHeadingCount >= 3 && sourceHeadingTransitions >= 3) ||
+      (visibleLength > 12_000 && hiddenHeadingCount >= 2 && sourceHeadingTransitions >= 2)
+    ) {
+      throwStructureError("OVERSIZED_SECTION", section.id, title);
+    }
+  }
+}
+
+function looksLikePresentationFurniture(
+  title: string,
+  sourceBlocks: readonly NormalizedSource["blocks"][number][],
+): boolean {
+  const compactVocabulary = /^(?:activity|answer|answers|example|examples|exercise|exercises|practice|question|questions|recap|review|solution|solutions)$/i;
+  const normalizedTitle = title.replace(/[:;]+$/, "").trim();
+  if (!compactVocabulary.test(normalizedTitle)) return false;
+  const body = sourceBlocks
+    .filter((block) => block.kind !== "heading")
+    .map((block) => block.text)
+    .join(" ")
+    .trim();
+  const wordCount = body.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
+  const instructional = /\b(?:answer|complete|discuss|identify|perform|practice|review|solve|try|write)\b/i.test(body);
+  const typedSubordinateEvidence = sourceBlocks.some((block) =>
+    block.structuredBlock !== undefined &&
+    (block.kind === "code" || block.kind === "formula" || block.kind === "table")
+  );
+  return instructional || wordCount < 8 || typedSubordinateEvidence;
+}
+
+function looksLikeCodeTitle(title: string): boolean {
+  return (
+    /^```/u.test(title) ||
+    /(?:^|\s)(?:def|class|return|yield|print|const|let|var)\b.*[();={}:]/i.test(title) ||
+    /^[\[{(].*[\]})]$/u.test(title)
+  );
+}
+
+function looksLikeBodyFragmentTitle(title: string): boolean {
+  const words = title.match(/[\p{L}\p{N}]+/gu) ?? [];
+  return (
+    /^(?:[-*+\u00b7\u2022]|\u00c2\u00b7)/u.test(title) ||
+    /[:;]$/.test(title) ||
+    (words.length >= 12 && /[.!?]$/.test(title))
+  );
+}
+
+function throwStructureError(
+  diagnostic: StudentVisibleStructureDiagnostic,
+  sectionId: string,
+  title: string,
+): never {
+  throw new Error(
+    `Stage 6 student-visible structure [${diagnostic}] rejected planned section "${sectionId}" with title "${title}".`,
+  );
+}
+
+function structuralKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .trim();
 }
 
 function validateArgs(args: AssembleReviewerArgs): void {
