@@ -190,7 +190,8 @@ export async function retryFailedSections(
         throw error;
       }
 
-      generated = section.requiredEvidence !== undefined && missingRequiredEvidence.length > 0
+      generated = section.requiredEvidence !== undefined && previousCandidate !== undefined &&
+          (missingRequiredEvidence.length > 0 || sectionUsefulness.length > 0)
         ? mergeSectionRepair({
             previous: previousCandidate,
             generated,

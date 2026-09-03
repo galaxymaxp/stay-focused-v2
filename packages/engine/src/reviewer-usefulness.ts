@@ -13,6 +13,8 @@ import type {
 export type StudentVisibleUsefulnessDiagnostic =
   | "NON_EXPLANATORY_SECTION"
   | "INSTRUCTIONAL_NOISE"
+  | "CODE_AS_EXPLANATION"
+  | "FRAGMENTARY_EXPLANATION"
   | "SOURCE_DUMP"
   | "LOW_INFORMATION_SECTION";
 
@@ -51,12 +53,36 @@ export function diagnoseStudentVisibleUsefulness(args: {
     ));
   }
 
-  if (explanation && isInstructionalNoiseText(explanation)) {
+  if (explanation && isInstructionalNoiseText(explanation, { explanationField: true })) {
     issues.push(issue(
       "INSTRUCTIONAL_NOISE",
       args.section.id,
       "sourceCore.explanation",
       "Explanation contains learner-directed activity or presentation instructions.",
+      explanation,
+    ));
+  } else if (explanation && explanationIsCodeDominant(explanation)) {
+    issues.push(issue(
+      "CODE_AS_EXPLANATION",
+      args.section.id,
+      "sourceCore.explanation",
+      "Typed code is evidence, but cannot substitute for explanatory prose.",
+      explanation,
+    ));
+  } else if (explanation && explanationIsFragmentary(explanation)) {
+    issues.push(issue(
+      "FRAGMENTARY_EXPLANATION",
+      args.section.id,
+      "sourceCore.explanation",
+      "Explanation is a phrase or presentation fragment rather than a complete concept statement.",
+      explanation,
+    ));
+  } else if (explanation && proseIsOversized(explanation)) {
+    issues.push(issue(
+      "SOURCE_DUMP",
+      args.section.id,
+      "sourceCore.explanation",
+      "Explanation is an oversized source passage rather than concise explanatory prose.",
       explanation,
     ));
   }
@@ -102,6 +128,16 @@ export function diagnoseStudentVisibleUsefulness(args: {
   return dedupeIssues(issues);
 }
 
+export function explanationHasUsefulForm(title: string, explanation: string): boolean {
+  const text = explanation.trim();
+  return text.length > 0 &&
+    !explanationAddsNoInformation(title, text) &&
+    !isInstructionalNoiseText(text, { explanationField: true }) &&
+    !explanationIsCodeDominant(text) &&
+    !explanationIsFragmentary(text) &&
+    !proseIsOversized(text);
+}
+
 function explanationAddsNoInformation(title: string, explanation: string): boolean {
   const titleTerms = new Set(informationTerms(title));
   const explanationTerms = informationTerms(explanation);
@@ -121,6 +157,50 @@ function pointIsSourceDump(
   const paragraphCount = point.split(/(?:\r?\n){2,}/u).filter(Boolean).length;
   const sentenceCount = point.split(/(?<=[.!?])\s+/u).filter(Boolean).length;
   return wordCount > 70 || paragraphCount >= 2 || (wordCount > 48 && sentenceCount >= 4);
+}
+
+function explanationIsCodeDominant(value: string): boolean {
+  const text = value.trim();
+  const startsAsCode = /^\s*(?:async\s+)?(?:def|class|function|import|from|const|let|var)\b/im.test(text);
+  const hasCodeLayout = /\n\s{2,}\S/u.test(text) || /[{}();=]/u.test(text);
+  if (startsAsCode && hasCodeLayout) return true;
+  const assignmentCount = text.match(/\b[A-Za-z_]\w*\s*=(?!=)/gu)?.length ?? 0;
+  const codeKeywordCount = text.match(/\b(?:def|else|for|if|print|range|return|while|yield)\b/giu)?.length ?? 0;
+  if (assignmentCount >= 1 && codeKeywordCount >= 2) return true;
+  const codeSignals = [
+    /^\s*(?:async\s+)?(?:def|class|function|import|from|const|let|var)\b/im,
+    /\b(?:yield|return)\b[^.!?]*(?:\n|;|\})/i,
+    /(?:^|\n)\s{2,}\S/u,
+    /(?:=>|:=|==|!=|\+\+|--|\{[^}]*\}|\[[^\]]*\]\s*=)/u,
+    /\b\w+\s*\([^)]*\)\s*[:{]/u,
+  ].filter((pattern) => pattern.test(text)).length;
+  const proseSentences = text.split(/(?<=[.!?])\s+/u).filter((sentence) =>
+    countWords(sentence) >= 5 && !/[{}[\];=]/u.test(sentence)
+  ).length;
+  return proseSentences === 0 && codeSignals >= 2;
+}
+
+function explanationIsFragmentary(value: string): boolean {
+  const text = value.replace(/^\s*[-*+\u2022]\s*/u, "").trim();
+  const words = text.match(/[\p{L}\p{N}]+(?:[-/&][\p{L}\p{N}]+)*/gu) ?? [];
+  if (words.length < 2) return true;
+  if (/^(?:shown|displayed|provided|listed)(?:\s+(?:here|above|below))?[.!?]?$/iu.test(text)) return true;
+  if (words.length <= 5 && !text.includes(",") && /^(?:for\s+\p{L}+ing|to\s+\p{L}+)/iu.test(text)) {
+    return true;
+  }
+  if (words.length <= 5 && !text.includes(",") && /^using\s+/iu.test(text)) {
+    const remainder = words.slice(1).join(" ");
+    const finitePredicate = /\b(?:is|are|was|were|has|have|does|can|may|must|will|should|\p{L}{4,}(?:ed|es))\b/iu.test(remainder);
+    if (!finitePredicate) return true;
+  }
+  return false;
+}
+
+function proseIsOversized(value: string): boolean {
+  const wordCount = countWords(value);
+  const paragraphCount = value.split(/(?:\r?\n){2,}/u).filter(Boolean).length;
+  const sentenceCount = value.split(/(?<=[.!?])\s+/u).filter(Boolean).length;
+  return wordCount > 55 || paragraphCount >= 2 || (wordCount > 42 && sentenceCount >= 4);
 }
 
 function keyPointSetIsSourceDump(

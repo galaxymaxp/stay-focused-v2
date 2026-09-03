@@ -21,6 +21,7 @@ import {
   filterReviewableText,
   isInstructionalNoiseText,
 } from "./review-content.js";
+import { explanationHasUsefulForm } from "./reviewer-usefulness.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -195,10 +196,27 @@ export function buildSectionPrompt(
   repairContext?: SectionRepairContext,
 ): string {
   const sourceText = sourceBlocksToText(sourceBlocks);
+  const targetedEvidenceRepair = (repairContext?.missingRequiredEvidence.length ?? 0) > 0;
+  const activeRequiredEvidence = targetedEvidenceRepair
+    ? repairContext?.missingRequiredEvidence ?? []
+    : section.requiredEvidence;
+  const repairEvidenceByBlockId = new Map<string, string[]>();
+  for (const target of activeRequiredEvidence ?? []) {
+    for (const blockId of target.sourceBlockIds) {
+      repairEvidenceByBlockId.set(blockId, [
+        ...(repairEvidenceByBlockId.get(blockId) ?? []),
+        ...target.evidenceTexts,
+      ]);
+    }
+  }
   const passage = sourceBlocks
     .map(
-      (block) =>
-        `[Passage block ${block.id} | ${block.kind}${block.pageNumber !== undefined ? ` | page ${block.pageNumber}` : ""}]\n${block.text}`,
+      (block) => {
+        const text = targetedEvidenceRepair
+          ? [...new Set(repairEvidenceByBlockId.get(block.id) ?? [])].join("\n")
+          : block.text;
+        return `[Passage block ${block.id} | ${block.kind}${block.pageNumber !== undefined ? ` | page ${block.pageNumber}` : ""}]\n${text}`;
+      },
     )
     .join("\n\n");
 
@@ -211,22 +229,26 @@ export function buildSectionPrompt(
     `- Focus — ${section.target.focus}`,
     `- Expected tags — ${section.target.expectedTags.join(", ")}`,
     ...(section.requiredEvidence !== undefined
-      ? [`- Required evidence targets — ${section.requiredEvidence.length}; every target is mandatory, with no smaller point-count quota.`]
+      ? [targetedEvidenceRepair
+          ? `- Missing required evidence targets in this bounded repair — ${activeRequiredEvidence?.length ?? 0}.`
+          : `- Required evidence targets — ${section.requiredEvidence.length}; every target is mandatory, with no smaller point-count quota.`]
       : [`- Desired point total — ${section.target.itemCount}`]),
     "- Content checks:",
     ...section.target.coverageRules.map((rule) => `  - ${rule}`),
-    ...semanticPlanPromptLines(section),
-    ...requiredEvidencePromptLines(section),
-    ...structuredEvidencePromptLines(section, sourceBlocks),
+    ...(targetedEvidenceRepair ? [] : semanticPlanPromptLines(section)),
+    ...requiredEvidencePromptLines(section, activeRequiredEvidence),
+    ...structuredEvidencePromptLines(section, targetedEvidenceRepair ? [] : sourceBlocks),
     "PASSAGE:",
     passage,
-    ...detectedItemsPromptLines(detectedItems),
+    ...(targetedEvidenceRepair ? [] : detectedItemsPromptLines(detectedItems)),
     "Requirements:",
     `- Copy the complete section identity, not only cited/required evidence IDs: ${JSON.stringify({ plannedSectionId: section.id, sourceBlockIds: section.sourceBlockIds })}.`,
     "- Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
     ...(section.requiredEvidence !== undefined
       ? [
-          "- Represent every REQUIRED EVIDENCE target. Required targets may be concise, but they must not be silently dropped.",
+          targetedEvidenceRepair
+            ? "- Represent every REQUIRED EVIDENCE target in this repair slice. Already accepted targets are preserved by deterministic merge."
+            : "- Represent every REQUIRED EVIDENCE target. Required targets may be concise, but they must not be silently dropped.",
           "- Supporting evidence is optional. Do not copy it merely to fill key points.",
           "- Preserve supported relationships instead of flattening related items into peers.",
         ]
@@ -235,7 +257,8 @@ export function buildSectionPrompt(
         ]),
     "- Keep one coherent source idea per key point. Never fuse adjacent siblings or a heading with the next item.",
     "- For definitions, categories, examples, and procedures, keep related content attached using the supplied semantic plan.",
-    "- sourceCore.explanation must add source-supported meaning beyond the title when the passage supports an explanation; otherwise it may be empty.",
+    "- sourceCore.explanation must be concise, complete prose that adds source-supported meaning beyond the title.",
+    "- Code, a formula, a table row, a heading fragment, or a learner command cannot substitute for the explanation. Keep required typed evidence in keyPoints.",
     "- sourceCore.explanation MUST NEVER describe the card itself, describe its purpose, or restate the task.",
     "- Forbidden meta-commentary includes: \"This section lists...\", \"The following are...\", \"These are the steps to...\", \"This section explains...\", and similar framing. Such text is not study content and can trigger instruction-leakage rejection.",
     "- List-heavy content may still have a useful explanation. Do not suppress it merely because key points are present.",
@@ -426,8 +449,9 @@ function structuredEvidencePromptLines(
 
 function requiredEvidencePromptLines(
   section: PlannedSection,
+  activeTargets: readonly RequiredEvidenceTarget[] | undefined = section.requiredEvidence,
 ): readonly string[] {
-  const targets = section.requiredEvidence ?? [];
+  const targets = activeTargets ?? [];
   return [
     "REQUIRED EVIDENCE MANIFEST:",
     ...(targets.length > 0
@@ -575,7 +599,8 @@ function selectGroundedExplanation(
   if (
     explanation &&
     isFullySourceGrounded(explanation, sourceText) &&
-    isUsefulDirectSourceExplanation(explanation, section.title)
+    isUsefulDirectSourceExplanation(explanation, section.title) &&
+    explanationHasUsefulForm(section.title, explanation)
   ) {
     return explanation;
   }
@@ -591,7 +616,8 @@ function selectGroundedExplanation(
       const titleRelated = pointTerms.some((term) => titleTerms.has(term));
       return (
         pointTerms.length >= 7 &&
-        (semanticPlan.kind === "example-group" || titleRelated)
+        (semanticPlan.kind === "example-group" || titleRelated) &&
+        explanationHasUsefulForm(section.title, point)
       );
     });
   if (!candidate) return "";

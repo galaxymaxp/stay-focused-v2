@@ -184,6 +184,19 @@ function validateStudentVisibleStructure(args: {
     const output = args.outputsBySectionId.get(section.id);
     if (!output) continue;
     const title = output.title.trim() || section.title.trim();
+    const duplicateScopeKey = `${section.conceptualParentKey ?? "<root>"}\u001f${structuralKey(title)}`;
+    const previousSectionId = seenTitles.get(duplicateScopeKey);
+    if (previousSectionId) {
+      throw new Error(
+        `Stage 6 student-visible structure [DUPLICATE_SECTION] repeats conceptual title "${title}" in planned sections "${previousSectionId}" and "${section.id}".`,
+      );
+    }
+    seenTitles.set(duplicateScopeKey, section.id);
+  }
+  for (const section of args.plan.sections) {
+    const output = args.outputsBySectionId.get(section.id);
+    if (!output) continue;
+    const title = output.title.trim() || section.title.trim();
     const titleKey = structuralKey(title);
     if ((title.match(/[\p{L}\p{N}]/gu)?.length ?? 0) < 2) {
       throwStructureError("NON_CONCEPT_HEADING", section.id, title);
@@ -201,15 +214,6 @@ function validateStudentVisibleStructure(args: {
     if (looksLikePresentationFurniture(title, sourceBlocks)) {
       throwStructureError("PRESENTATION_FURNITURE_HEADING", section.id, title);
     }
-    const duplicateScopeKey = `${section.conceptualParentKey ?? "<root>"}\u001f${titleKey}`;
-    const previousSectionId = seenTitles.get(duplicateScopeKey);
-    if (previousSectionId) {
-      throw new Error(
-        `Stage 6 student-visible structure [DUPLICATE_SECTION] repeats conceptual title "${title}" in planned sections "${previousSectionId}" and "${section.id}".`,
-      );
-    }
-    seenTitles.set(duplicateScopeKey, section.id);
-
     const explanation = output.sourceCore.explanation.trim();
     if (!requiredEvidenceSourceIsAvailable({
       section,

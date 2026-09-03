@@ -83,7 +83,10 @@ export function isInstructionalHeadingText(value: string): boolean {
 
 export function isInstructionalNoiseText(
   value: string,
-  context: { readonly instructionalRegion?: boolean } = {},
+  context: {
+    readonly instructionalRegion?: boolean;
+    readonly explanationField?: boolean;
+  } = {},
 ): boolean {
   const text = value
     .replace(/^\s*(?:[-*+\u2022]|\d{1,3}[.)])\s*/u, "")
@@ -99,11 +102,15 @@ export function isInstructionalNoiseText(
   const questionPrompt = /\?\s*$/u.test(text) && countWords(text) >= 4;
   const navigation = PRESENTATION_NAVIGATION_PATTERN.test(text);
 
-  if (context.instructionalRegion && (imperative || learnerDirected || questionPrompt)) {
+  if (context.explanationField && imperative) {
+    return true;
+  }
+  if (context.instructionalRegion && (learnerDirected || questionPrompt)) {
     return true;
   }
   return (
-    (imperative && (learnerDirected || directiveFraming || learnerTaskObject || questionPrompt)) ||
+    (imperative && (learnerDirected || directiveFraming || learnerTaskObject || questionPrompt ||
+      /\b(?:how|using\s+(?:this|these|those)|each\s+(?:value|entry|step))\b/i.test(text))) ||
     questionPrompt ||
     navigation
   );

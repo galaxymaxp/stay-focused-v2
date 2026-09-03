@@ -16,6 +16,7 @@ import { pipelineSuite } from "./pipeline.eval.js";
 import { sourceTokenFidelitySuite } from "./source-token-fidelity.eval.js";
 import { reviewerRecoverySuite } from "./reviewer-recovery.eval.js";
 import { reviewerCompletionUsefulnessSuite } from "./reviewer-completion-usefulness.eval.js";
+import { reviewerExplanatoryRepairSuite } from "./reviewer-explanatory-repair.eval.js";
 import { semanticStructureSuite } from "./semantic-structure.eval.js";
 import { semanticVerificationSuite } from "./semantic-verification.eval.js";
 import { structuredEvidenceRecoverySuite } from "./structured-evidence-recovery.eval.js";
@@ -41,6 +42,7 @@ const suites = [
   pipelineSuite,
   reviewerRecoverySuite,
   reviewerCompletionUsefulnessSuite,
+  reviewerExplanatoryRepairSuite,
 ];
 const results = [];
 
