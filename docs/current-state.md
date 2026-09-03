@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-09-03, Asia/Manila.
+Last refreshed: 2026-09-04, Asia/Manila.
 
 ## Repository
 
@@ -32,6 +32,12 @@ Last refreshed: 2026-09-03, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer B14 hardens explanation form and targeted repair while retaining all
+  B13 safety gates. The new 12/12 suite and full 437/437 engine evaluations pass.
+  Acceptance remains failed: exact B13 candidates are still withheld, and
+  source audit proves two planned Python sections are heading-only while two
+  additional sections are code-only. B14 made no fresh provider calls and did
+  not fabricate prose. See `docs/ai/acceptance/b14/reviewer-explanatory-repair.md`.
 - Reviewer B13 adds stable required-evidence manifests, structured row/cell
   provenance, source-absent preflight refusal, exact-target bounded repairs and
   final deterministic usefulness gates. Empty-child semantic group labels no
@@ -243,11 +249,10 @@ Last refreshed: 2026-09-03, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: recover evidence-bound provider completion and
-  explanatory study content from the exact B13 failed candidates, including
-  remaining instructional/code-as-explanation false negatives. Keep all gates
-  strict; targeted cases must pass before the unchanged full B12 rerun.
-  Parser-default promotion remains deferred.
+- Recommended next task: reconcile heading-only planned sections with the
+  source-faithful explanatory contract. Do not borrow child content, fabricate,
+  weaken usefulness, or change the parser default. Targeted acceptance must pass
+  before the unchanged full B12 rerun.
 - Recommended next task: run the same reviewer benchmark on the Firewalls PDF
   to test whether the B3 generation structure and B4 semantic verifier
   generalize beyond Intro to IT Security.

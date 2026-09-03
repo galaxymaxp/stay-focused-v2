@@ -2213,3 +2213,17 @@ Current route status:
   for the known Windows CRLF Canvas assertion. No protected subsystem changed.
 - R5.1 verdict: PASS. Next recommended task: R6 — mobile Tasks and Study
   Schedule integration.
+
+## 2026-09-04 — Reviewer B14 explanatory repair
+
+- Starting HEAD `f61e0dc`; only historical untracked B8 evidence was present.
+- Added bounded missing-target prompts, usefulness-aware merge and deterministic
+  imperative/code/fragment/explanation-dump checks. B14 12/12 and engine 437/437
+  pass; API baseline remains 607/607 across 69 files.
+- Exact B13 candidate replay remains withheld. Plan audit proves the frozen
+  Python hierarchy has two heading-only and two code-only sections without
+  source explanatory prose. No B14 provider or full B12 rerun was made after
+  that stop condition; no evidence was invented and parser default is `legacy`.
+- B14 verdict: FAIL. Next task is to reconcile heading-only planned sections
+  with the source-faithful explanatory contract without borrowing or weakening
+  gates. See `docs/ai/acceptance/b14/reviewer-explanatory-repair.md`.

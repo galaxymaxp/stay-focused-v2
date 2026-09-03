@@ -1,6 +1,24 @@
 # Roadmap
 
-Last refreshed: 2026-09-03, Asia/Manila.
+Last refreshed: 2026-09-04, Asia/Manila.
+
+## Reviewer B14 - Explanation hardening, acceptance blocked by source boundary
+
+Field-aware imperative, code-as-explanation, fragment and explanation-dump
+checks now protect Stage 6. Missing-target repair prompts carry only exact
+target evidence while retaining all source identities, and usefulness repairs
+merge with accepted content. B14 adds 12/12 regressions; engine total is
+437/437 with all 425 prior cases retained.
+
+The milestone still fails. Exact candidate replay remains withheld, and source
+audit proves the frozen 13-title Python plan contains two heading-only sections
+and two code-only sections without explanatory prose. No B14 live or full B12
+rerun was attempted after that deterministic stop condition. Production remains
+`legacy`; historical acceptance evidence is unchanged.
+
+Next task: reconcile heading-only planned sections with the source-faithful
+Reviewer contract without cross-section borrowing, fabrication, default-parser
+promotion, or weaker usefulness gates.
 
 ## Reviewer B13 - Implemented hardening, failed acceptance
 

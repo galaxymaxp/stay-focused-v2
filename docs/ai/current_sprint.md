@@ -1,18 +1,24 @@
 # Current Sprint
 
-Last refreshed: 2026-09-03, Asia/Manila.
+Last refreshed: 2026-09-04, Asia/Manila.
 
 ## Current objective result
 
-Reviewer B13 has implemented required-evidence manifests, exact-target bounded
-repairs, source-availability refusal and deterministic student-usefulness gates.
-Its **425/425 engine evaluations** pass, but the acceptance objective remains
-failed: safe withholding and completed technical checks are not a usable
-reviewer. Required provider evidence consumption and source-sparse explanations
-still need recovery. Production remains `legacy`; parser/UI/mobile/auth/
-scheduling behavior was not changed. See
-`docs/ai/acceptance/b13/reviewer-usefulness-and-completion.md` for the separate
-live measurements and final-code candidate replay.
+Reviewer B14 added field-aware imperative, code-dominant, fragmentary and
+explanation-dump diagnostics; missing-target prompts now expose a bounded exact
+slice, and usefulness repair preserves accepted content. Its new suite is 12/12
+and the engine is **437/437**. Acceptance remains failed without new live calls:
+the exact B13 replay is still withheld, and plan audit proves heading-only and
+code-only Python sections lack source prose for the required explanations.
+Production remains `legacy`. See
+`docs/ai/acceptance/b14/reviewer-explanatory-repair.md`.
+
+## B13 predecessor result
+
+Reviewer B13 introduced stable required-evidence manifests, exact-target repair,
+source-absent refusal and initial deterministic usefulness gates. Its 19/19
+regressions remain frozen and green. B13 acceptance failed because provider
+omissions, activity/source dumps and source-sparse explanations remained.
 
 ## B12 predecessor result
 
@@ -63,21 +69,20 @@ Both statistics arms remain correctly withheld for omissions or missing output
 rather than inventing relationships. Typed accounting cells and numeric/OCR
 provenance remain intact.
 
-## B13 verification
+## B14 verification
 
-- FRESH B13 regressions: 19/19; engine evaluations: 425/425, retaining all 406
-  prior cases, including B11 structure and B12 durable typed-block regressions.
+- FRESH B14 regressions: 12/12; engine evaluations: 437/437, retaining all 425
+  prior cases, including all 19 B13 regressions.
 - FRESH API tests: 607/607 across 69 files.
 - Full typecheck, lint and builds pass; the acceptance report records fresh
   versus cached tasks. Lint retains only the four accepted mobile warnings.
-- Four targeted live cases remain withheld. Full unchanged B12/durable rerun:
-  NOT RUN because targeted acceptance prerequisites failed.
+- Exact B13 candidate replay remains withheld. B14 targeted live and full
+  unchanged B12 reruns: NOT RUN because evidence-bound prerequisites failed.
 - Repository diff and object-integrity checks pass; only the two known
   dangling blobs remain.
 
 ## Next action
 
-Resolve the remaining evidence-bound provider completion and source-sparse
-explanation failures using the B13 candidates. Keep required evidence and all
-grounding/usefulness gates strict, then rerun targeted acceptance before the
-unchanged full B12 corpus. Do not promote the parser default or mark B13 passed.
+Reconcile heading-only planned sections with the source-faithful explanatory
+contract without borrowing, fabrication, parser-default changes, or weaker
+usefulness gates. Do not spend further live calls until that boundary is solved.
