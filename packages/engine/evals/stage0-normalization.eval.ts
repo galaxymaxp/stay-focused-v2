@@ -11,6 +11,7 @@ import structureFixtures from "./fixtures/stage0-structure.json" with {
 };
 
 import { normalizeSource } from "../src/stage0-normalize.js";
+import type { StructuredBlock } from "../src/structured-document.js";
 import type {
   MetadataValue,
   NormalizedSourceKind,
@@ -95,9 +96,77 @@ export const stage0NormalizationSuite: EvalSuite = {
     createCoursePdfStructureCase(),
     createWrappedTaxonomyDividerCase(),
     createOrdinaryWrappedHeadingCase(),
+    createPersistedTypedPresentationBlocksCase(),
     ...expectedErrorFixtures.map(createErrorCase),
   ],
 };
+
+function createPersistedTypedPresentationBlocksCase(): EvalCase {
+  return {
+    name: "persisted typed presentation blocks bypass legacy page expansion",
+    run: async () => {
+      const structuredBlocks: readonly StructuredBlock[] = [
+        {
+          id: "typed-heading",
+          type: "heading",
+          text: "Generator Expressions",
+          level: 2,
+          pageNumber: 1,
+          order: 0,
+          provenance: {
+            pageNumber: 1,
+            blockId: "typed-heading",
+            parser: "docling",
+          },
+        },
+        {
+          id: "typed-code",
+          type: "code",
+          text: "result = (item for item in items)",
+          pageNumber: 1,
+          order: 1,
+          parentId: "typed-heading",
+          provenance: {
+            pageNumber: 1,
+            blockId: "typed-code",
+            parser: "docling",
+          },
+        },
+      ];
+      const output = await normalizeSource({
+        title: "Generators",
+        kind: "presentation",
+        blocks: structuredBlocks.map((structuredBlock) => ({
+          id: structuredBlock.id,
+          kind: structuredBlock.type,
+          order: structuredBlock.order,
+          pageNumber: structuredBlock.pageNumber,
+          text: structuredBlock.type === "heading" || structuredBlock.type === "code"
+            ? structuredBlock.text
+            : "",
+          structuredBlock,
+        })),
+      });
+      return [
+        ...assertDeepEqual(
+          output.blocks.map((block) => block.kind),
+          ["heading", "code"],
+          "Persisted typed blocks were re-expanded as legacy presentation pages.",
+        ),
+        ...assertEqual(
+          output.blocks[1]?.structuredBlock?.type,
+          "code",
+          "Persisted parser-native code typing was lost.",
+        ),
+        ...assertEqual(
+          output.blocks[1]?.structuredBlock?.parentId,
+          "typed-heading",
+          "Persisted parser-native parentage was lost.",
+        ),
+      ];
+    },
+  };
+}
 
 function createWrappedTaxonomyDividerCase(): EvalCase {
   return {

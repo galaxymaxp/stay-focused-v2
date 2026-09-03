@@ -112,7 +112,13 @@ export async function normalizeSource(
   const inputTitle = readSafeString(resolvedInput.title);
   const textBlocks = normalizedText ? detectTextBlocks(normalizedText) : [];
   const normalizedSuppliedBlocks = normalizeSuppliedBlocks(inputBlocks);
+  const hasNonLegacyTypedBlocks = normalizedSuppliedBlocks.some(
+    (block) =>
+      block.structuredBlock !== undefined &&
+      block.structuredBlock.provenance.parser !== "legacy",
+  );
   const suppliedBlocks = kind === "presentation" &&
+      !hasNonLegacyTypedBlocks &&
       (!input.structuredDocument || input.structuredDocument.parser.name === "legacy")
     ? expandPresentationPageBlocks(normalizedSuppliedBlocks, inputTitle)
     : normalizedSuppliedBlocks;
