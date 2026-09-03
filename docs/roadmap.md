@@ -1,6 +1,27 @@
 # Roadmap
 
-Last refreshed: 2026-09-02, Asia/Manila.
+Last refreshed: 2026-09-03, Asia/Manila.
+
+## Reviewer Benchmark B12 - Failed acceptance
+
+The frozen B8 Python, Statistics, and scanned Accounting sources were rerun
+through hybrid extraction, production pipeline components, and the real durable
+job APIs. Parser readiness passed for every source with no fallback or parser
+loss. One generic durable-boundary defect was fixed: persisted Docling/MinerU
+typed blocks now bypass legacy presentation-page expansion. The focused Stage 0
+regression passes and the complete engine suite is 406/406.
+
+The acceptance milestone is not complete. Python restores the exact 13 B11
+titles and passes coverage/grounding at 1.00, but manual inspection still finds
+non-explanatory sections, activity leakage, and overlong source-like points.
+Statistics remains withheld for omissions with both MinerU and Docling.
+Accounting remains withheld when generated Ledger content omits an exact table
+row. Zero fabrication and zero unsupported relationships were accepted; the
+production parser default remains `legacy`.
+
+Next Reviewer task: generically strengthen student-visible usefulness and
+required-evidence completion without weakening current gates, then rerun the
+unchanged B12 workload.
 
 ## Reviewer Benchmark B11 - Complete
 

@@ -1,8 +1,25 @@
 # Current Sprint
 
-Last refreshed: 2026-09-02, Asia/Manila.
+Last refreshed: 2026-09-03, Asia/Manila.
 
-## Completed objective
+## Current objective result
+
+Reviewer Benchmark B12 completed the frozen three-source B8 workload through
+hybrid parsing and the real durable job path. Verdict:
+`FAIL — B12 exposed unresolved Reviewer acceptance defects`.
+
+The run found and fixed one generic Stage 0 defect: non-legacy typed blocks
+rehydrated from durable metadata were incorrectly expanded as legacy
+presentation pages. The post-fix durable rerun restored Python's 13-section
+typed plan. Python technically passes at 1.00 coverage/grounding, but manual
+inspection still finds title-only explanations, activity leakage, and overly
+source-like key-point lists. Statistics remains safely withheld for provider
+omissions with both MinerU and Docling; Accounting remains safely withheld
+because generated Ledger content omits a required exact source row. No visible
+fabrication or unsupported relationship was accepted. Production remains
+`legacy` by default.
+
+## Completed predecessor
 
 Reviewer Benchmark B11 is complete. Stages 1-6 now use B10's typed document
 structure for concept hierarchy, evidence grouping, relationship grounding,
@@ -46,4 +63,5 @@ provenance remain intact.
 
 ## Next action
 
-B12 - Rerun full B8 end-to-end acceptance using hybrid structured parsing.
+Run a focused generic Reviewer usefulness and required-evidence completion task,
+then rerun the unchanged B12 corpus and gates.

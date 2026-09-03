@@ -1,0 +1,126 @@
+Unit 5: Generators in Python
+Before discussing generators, it's important to understand the following concepts:.
+- 1.Iterables: An iterable is any object that can be looped over using a for loop or other iterator. E.g. lists, tuples, strings, and dictionaries.
+- 2.Iterators: An iterator is an object that generates the next value in a sequence when called. Iterators are objects that can be iterated over like in a loop one element at a time.
+
+ITERATORS
+The iterator can be seen as a pointer that allows us to iterate over all the contents of a container.
+- They work based on a principle called lazy evaluation.
+- Lazy evaluation is an evaluation strategy which delays the evaluation of an expression until the value is needed.
+- Due to how they work, they can help us manage 'infinite' values.
+- Iterators are a fundamental concept in Python.
+- Some examples of objects in python which can be iterated are lists and tuples.
+- This then allows us to access all elements of an iterable object such as list, tuple, dictionary or string.
+- We can iterate though a list with a 'for' loop: Cities = ["Manila", "Baguio", "Davao","Cebu", "Taguig", "Pasig","Bacolod", "Parañaque"] for x in cities: print("City: " + x) # Prints each city one by one
+- The code in the previous slide is one way we can iterate through a city.
+- The output of the code will be each of the cities displayed in a new line:
+- City: Manila
+- City: Baguio
+- City: Davao
+- City: Cebu
+- City: Taguig
+- City: Pasig
+- City: Bacolod
+- City: Parañaque
+- String are also iterable objects, containing a sequence of characters: mystr ="banana" myit =iter(mystr) print(next(myit)) print(next(myit)) print(next(myit)) print(next(myit)) print(next(myit)) print(next(myit))
+- Tuples are also iterable objects, containing a sequence of characters: mytuple = ("apple", "banana", "cherry") myit = iter(mytuple) print(next(myit)) print(next(myit)) print(next(myit)) print(next(myit, "End"))
+
+GENERATORS
+
+- Now let us see what: Generators are lazy iterators that allows us to declare a function that behaves like an iterator.
+- The key to using: Generators in Python are a type of iterable that can be used to generate a sequence of values on-the-fly without creating a list or other data structure. This makes
+- The key to using: 1.When you need to access the entire sequence of values at once.
+- The key to using: 2.When you need to modify the sequence of values.
+- The key to using: 3.When you need random access to values. When to use:
+- The key to using: 1.When you need to iterate over a large sequence of data.
+- The key to using: 2.When you want to process data lazily.
+- The key to using: 3.When you want to generate an infinite sequence of data.
+- The key to using: 4.When you want to generate data on-the-fly. ACTIVITY
+- The key to using: Create a program that asks the user for an integral answer
+- The key to using: Use a function generator that yields asterisks based on that integer. Using the range function, the first element must starts at 1 and the final element must be a value of n+1 which is based on the integral answer of the user. Use for loop to print asterisks where each asterisk sequence has a length equal to its position in the sequence (e.g. the first asterisk sequence has length 1, the second has length 2, and so on).
+
+Yield Command
+- This is used inside a function to produce a value that can be iterated over. When a function with a yield statement is called, it returns a generator object, which can be used to iterate over the values produced by the yield statement.
+- - This is used inside a function to produce a value that can be iterated over.
+- def my_generator(): yield 1 yield 2 yield 3
+
+GENERATOR FUNCTION vs GENERATOR EXPRESSION
+GENERATOR FUNCTION vs GENERATOR EXPRESSION
+- GENERATOR FUNCTION vs GENERATOR EXPRESSION
+
+Generator Expressions
+Generator expressions are like lists, dictionaries, and set comprehensions but is enclosed with parenthesis.
+- This allows to create a one-line declaration that we can check each individual value for.
+- This is the general syntax:
+- expression_name = ( expression for item in iterable if condition == True )
+- expression_name - This is the name of the generator expression.
+- expression - This is the code which will process the index.
+- item - This is the 'index' that points to a specific value in the iterable.
+- iterable - This is the list or tuple that is being iterated.
+- condition - This is an optional condition that defines some limitation to the iteration.: Sample 1 gen = (x**2 for x in range(10)) for x in gen: print(x) #Prints 0 1 4 9 16 25 36 49 64 81 Sample 2 my_list = [1, 2, 3, 4, 5] my_generator = (x for x in my_list) for i in my_generator: print(i) #Prints 1 2 3 4 5
+- Sample 1 gen = (x**2 for x in range(10)) for x in gen: print(x) #Prints 0 1 4 9 16 25 36 49 64 81 Sample 2 my_list = [1, 2, 3, 4, 5] my_generator = (x for x in my_list) for i in my_generator: print(i) #Prints 1 2 3 4 5: Sample 3 words=['apple','banana','cherry','date'] filtered_words=[x for x in words if x.startswith('b')] print(filtered_words) # Output:['banana'] Sample 4 list1 = [1, 2, 3] list2 = ['a', 'b', 'c'] combinations = ((x, y) for x in list1 for y in list2) print(list(combinations))# Output: [(1, 'a'), (1, 'b'), (1, 'c'), (2, 'a'), (2, 'b'), (2, 'c'), (3, 'a'), (3, 'b'), (3, 'c')]
+
+The next() function
+Once we have defined our generator expression, we make use of the 'next()' function to receive a new value from our generator.
+- The syntax for this is as follows:
+- next(iterator,[default])
+- If the iterator ends and a default value was passed, it is returned.
+- If no default was defined, the error ' StopIteration ' is raised. · An example of how it is used can be seen here: · expression = (x*2 for x in range(5)) · print(next(expression, "No more data")) # Prints 0 · print(next(expression, "No more data")) # Prints 2 · print(next(expression, "No more data")) # Prints 4 · print(next(expression, "No more data")) # Prints 6 · print(next(expression, "No more data")) # Prints 8 · print(next(expression, "No more data")) # Prints "No more data"
+- As seen in the previous slide, we were able to create a generator and call each value one by one using next().
+- Since we set a default value "No more data', this will be printed if we run out of values from the generator.
+- If there is no set default value, then we will encounter an error called ' StopIteration ' instead.
+
+Generator Functions
+Generator functions are like regular functions, but they have 'yield' statements in place of 'return' statements.
+- A generator function can contain one or more yield statement.
+- The difference between the two is that a return statement terminates a function.
+- The yield statement pauses the function saving all its states and later continues from there on the next calls.
+- Syntax: def my_generator_function(): # Code to generate values yield value
+- Let us mimic the example of the generator expression from earlier, but turn it into a generator function: · def function(): · for x in range(5): · yield x*2 · a = function() · print(next(a, "No more data")) # Prints 0 · print(next(a, "No more data")) # Prints 2 · print(next(a, "No more data")) # Prints 4 · print(next(a, "No more data")) # Prints 6 · print(next(a, "No more data")) # Prints 8 · print(next(a, "No more data")) # Prints "No more data"
+- As seen in the previous slide, we can make use of the generator function to achieve the same output as the generator expression.
+- We simply need to assign our function to an object so that we can 'initialize' the generator.
+- This essentially resets the generator when the object is called.
+- This is done because when the generator is completely iterated upon, we can no longer restart the iteration for that object.
+- We can also iterate through the generator function using a for loop as well. def function(): for x in range(0, 5): yield x*2 a = function() for x in a: print(x) # Prints 0 2 4 6 8
+- This allows us to have shorter code for printing out the content of the generator.
+- This also automatically stops once the generator is empty.
+- The disadvantage here is the we cannot pause halfway through the loop as easily compared to using 'next()'.
+
+Using a Regular List
+Using a Regular List
+- Using a Regular List
+
+Using Generators
+numbers=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] even_squares = [] for num in numbers: if num % 2 == 0: even_squares.append(num**2) sum_of_squares = sum(even_squares) print(sum_of_squares) # Output: 220 def even_squares(numbers): for num in numbers: if num % 2 == 0: yield num**2 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] even_squares_generator = even_squares(numbers) sum_of_squares = sum(even_squares_generator) print(sum_of_squares) # Output: 220
+- numbers=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] even_squares = [] for num in numbers: if num % 2 == 0: even_squares.append(num**2) sum_of_squares = sum(even_squares) print(sum_of_squares) # Output: 220 def even_squares(numbers): for num in numbers: if num % 2 == 0: yield num**2 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] even_squares_generator = even_squares(numbers) sum_of_squares = sum(even_squares_generator) print(sum_of_squares) # Output: 220
+
+Using a Generator Expression
+Using a Generator Expression numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] even_squares = (num**2 for num in numbers if num % sum_of_squares = sum(even_squares) print(sum_of_squares) # Output: 220 2 == 0)
+- Using a Generator Expression numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] even_squares = (num**2 for num in numbers if num % sum_of_squares = sum(even_squares) print(sum_of_squares) # Output: 220 2 == 0)
+
+Infinite Sequences
+The advantage of this is you do not necessarily get stuck in an infinite loop.
+- Generators can be used to represent
+- An example of this is shown here: · def integers_starting_from(n): · while True: · yield n · n += 1 · natural_numbers = integers_starting_from(3) · print(next(natural_numbers))
+- You can also pass the data from one generator to another generator.
+- This allows you to use generator expressions to produce new generators.
+- An example of this is shown below:
+- multiples_of_two = (x for x in natural_numbers if x % 2 == 0)
+- print(next(multiples_of_two)) # Prints 4
+- multiples_of_three = (x for x in natural_numbers if x % 3 == 0)
+- print(next(multiples_of_three)) # Prints 6
+- This allows us to create various generators with virtual infinite data.
+- Keep in mind that as the name suggests, an infinite generator has a virtually infinite pool of data.
+- This means that if we pass this to a for loop, it might try to iterate through the entire list, crashing your IDE or your system.
+
+Sending objects to a Generator
+We can send objects to a generator using the 'send()' command.
+- This will allow us to send variables to our generator and have the generator process the value.
+- The generator will only process the value when it is called via next() or send().
+- An example is shown in the next slide.
+- We create a generator which will allow us to stack numbers which are sent to it: · def accumulator(): · total = 0 · value = None · while True: · value = yield total · if value is None: break · total += value · generator = accumulator()
+- We create a generator which will allow us to stack numbers which are sent to it: · print(next(generator)) # Prints 0 · print(generator.send(1)) # Prints 1 · print(generator.send(10)) # Prints 11 · print(generator.send(100)) # Prints 111 · print(next(generator)) # Gives an error
+- In the example shown, we first call 'next(generator)' to advance to the first yield, where the value we yield is 0.
+- We can then send new values to the generator using the 'send()' function.
+- Take note that the generator does not keep these values in memory, the 'default' state of the 'value' variable is None, if we use next.
+- This is why when we call the generator again using next, it sticks with the default data and ends up stopping the program.

@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-09-02, Asia/Manila.
+Last refreshed: 2026-09-03, Asia/Manila.
 
 ## Repository
 
@@ -32,6 +32,16 @@ Last refreshed: 2026-09-02, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer Benchmark B12 completed the full frozen B8 corpus in hybrid mode and
+  failed acceptance. A minimal Stage 0 fix now preserves non-legacy typed blocks
+  after durable metadata rehydration; its regression raises engine evaluations
+  to 406/406. The post-fix durable run produces Python's expected 13-section
+  plan, while Statistics and Accounting remain safely withheld for missing
+  generated source evidence. Manual Python inspection also finds title-only
+  explanations, activity leakage into key points, and excessive source-like
+  lists despite 1.00 coverage/grounding. No fabrication was allowed, and the
+  production parser default remains `legacy`. See
+  `docs/ai/acceptance/b12/full-b8-hybrid-acceptance.md`.
 - Reviewer Benchmark B11 is complete locally. Typed heading roles now use
   hierarchy, repetition, lexical/body, neighbor, and subordinate-evidence
   signals; furniture and instruction labels fold into their supported parent
