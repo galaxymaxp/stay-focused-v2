@@ -13,6 +13,11 @@ import type {
   SectionOutput,
 } from "./types";
 import { toDefaultStudentVisibleSectionOutput } from "./student-visible-text.js";
+import { requiredEvidenceSourceIsAvailable } from "./required-evidence.js";
+import {
+  diagnoseStudentVisibleUsefulness,
+  type StudentVisibleUsefulnessDiagnostic,
+} from "./reviewer-usefulness.js";
 
 export interface AssembleReviewerArgs {
   readonly source: NormalizedSource;
@@ -163,7 +168,8 @@ export type StudentVisibleStructureDiagnostic =
   | "CODE_TITLE"
   | "OVERSIZED_SECTION"
   | "EMPTY_EXPLANATION"
-  | "STRUCTURAL_NOISE";
+  | "STRUCTURAL_NOISE"
+  | StudentVisibleUsefulnessDiagnostic;
 
 function validateStudentVisibleStructure(args: {
   readonly plan: GenerationPlan;
@@ -205,6 +211,12 @@ function validateStudentVisibleStructure(args: {
     seenTitles.set(duplicateScopeKey, section.id);
 
     const explanation = output.sourceCore.explanation.trim();
+    if (!requiredEvidenceSourceIsAvailable({
+      section,
+      sourceBlocks: args.source.blocks.filter((block) => section.sourceBlockIds.includes(block.id)),
+    })) {
+      throw new Error(`Stage 6 cannot assemble planned section "${section.id}" because required evidence is absent from its source.`);
+    }
     const points = output.sourceCore.keyPoints.map((point) => point.trim()).filter(Boolean);
     if (!explanation && points.length === 0) {
       throwStructureError("EMPTY_EXPLANATION", section.id, title);
@@ -234,6 +246,19 @@ function validateStudentVisibleStructure(args: {
       (visibleLength > 12_000 && hiddenHeadingCount >= 2 && sourceHeadingTransitions >= 2)
     ) {
       throwStructureError("OVERSIZED_SECTION", section.id, title);
+    }
+    const usefulnessIssues = section.requiredEvidence !== undefined
+      ? diagnoseStudentVisibleUsefulness({
+          section,
+          source: args.source,
+          output,
+        })
+      : [];
+    const firstUsefulnessIssue = usefulnessIssues[0];
+    if (firstUsefulnessIssue) {
+      throw new Error(
+        `Stage 6 student-visible usefulness [${firstUsefulnessIssue.type}] rejected planned section "${section.id}" with title "${title}": ${firstUsefulnessIssue.message}`,
+      );
     }
   }
 }

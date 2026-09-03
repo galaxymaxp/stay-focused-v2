@@ -1,5 +1,6 @@
 import { extractCleanSourceItems } from "./source-items.js";
 import { extractExplicitSequence } from "./recovery-evidence.js";
+import { reviewableSourceBlocks } from "./review-content.js";
 import type {
   NormalizedSourceBlock,
   PlannedSectionSemanticPlan,
@@ -22,7 +23,8 @@ export function analyzeSectionSemanticStructure(args: {
   readonly tags: readonly SectionContentTag[];
   readonly sourceBlocks: readonly NormalizedSourceBlock[];
 }): PlannedSectionSemanticPlan {
-  const semanticSourceText = args.sourceBlocks
+  const semanticBlocks = reviewableSourceBlocks(args.sourceBlocks);
+  const semanticSourceText = semanticBlocks
     .filter((block) => block.metadata?.layoutStatus !== "ocr_supplemented")
     .map((block) => block.text)
     .join("\n");
@@ -36,7 +38,7 @@ export function analyzeSectionSemanticStructure(args: {
     }).map((item) => item.text),
   );
   const blockScopedUnits = extractNumberedParentGroups(
-    args.sourceBlocks,
+    semanticBlocks,
     args.title,
   );
   const indentedUnits = extractIndentedGroups(semanticSourceText, args.title);
@@ -206,7 +208,9 @@ export function serializeSemanticUnits(
         case "definition":
           return [`${unit.label} - ${unit.items.join(" ")}`];
         case "group":
-          return unit.items.map((item) => `${unit.label}: ${item}`);
+          return unit.items.length > 0
+            ? unit.items.map((item) => `${unit.label}: ${item}`)
+            : [unit.label];
         case "steps":
           return unit.items.map(
             (item, index) => `${index + 1}. ${item}`,
@@ -214,7 +218,9 @@ export function serializeSemanticUnits(
         case "sequence":
           return [unit.items.join(" \u2192 ")];
         case "examples":
-          return unit.items.map((item) => `${unit.label}: ${item}`);
+          return unit.items.length > 0
+            ? unit.items.map((item) => `${unit.label}: ${item}`)
+            : [unit.label];
       }
     }),
   );

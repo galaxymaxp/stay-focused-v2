@@ -18,6 +18,15 @@ import {
   analyzeRecoveryEvidence,
   selectRecoveryExplanation,
 } from "./recovery-evidence.js";
+import {
+  findMissingRequiredEvidenceTargets,
+  requiredEvidenceTargetIsRepresented,
+  requiredEvidenceSourceIsAvailable,
+} from "./required-evidence.js";
+import {
+  diagnoseStudentVisibleUsefulness,
+  type StudentVisibleUsefulnessIssue,
+} from "./reviewer-usefulness.js";
 import type {
   CoverageReport,
   CoverageStatus,
@@ -32,6 +41,7 @@ import type {
   SectionLeakageResult,
   SectionOutput,
   ReviewerSectionQualityStatus,
+  RequiredEvidenceTarget,
   SourceOutline,
 } from "./types";
 
@@ -108,11 +118,17 @@ export async function retryFailedSections(
     let sectionCoverage = requireCoverageResult(section, coverageBySectionId);
     let sectionGrounding = groundingBySectionId.get(section.id);
     let sectionLeakage = leakageBySectionId.get(section.id);
+    let sectionUsefulness = diagnoseUsefulness(
+      section,
+      source,
+      currentOutputs.get(section.id),
+    );
     if (
       !shouldRetry(
         sectionCoverage,
         sectionGrounding,
         sectionLeakage,
+        sectionUsefulness,
         retryPolicy,
       )
     ) {
@@ -122,6 +138,17 @@ export async function retryFailedSections(
     for (let attempt = 1; attempt <= retryPolicy.maxRetries; attempt += 1) {
       args.onRetryAttempt?.(section, attempt);
       let generated: SectionOutput;
+      const previousCandidate = currentOutputs.get(section.id);
+      const missingRequiredEvidence = findMissingRequiredEvidenceTargets(
+        section,
+        previousCandidate,
+      );
+      const acceptedContent = collectAcceptedContent({
+        output: previousCandidate,
+        grounding: sectionGrounding,
+        leakage: sectionLeakage,
+        usefulness: sectionUsefulness,
+      });
       try {
         generated = await generateSection({
           section,
@@ -136,7 +163,16 @@ export async function retryFailedSections(
             sectionCoverage,
             sectionGrounding,
             sectionLeakage,
+            sectionUsefulness,
           ),
+          repairContext: {
+            previousCandidate,
+            missingRequiredEvidence,
+            acceptedContent,
+            usefulnessDiagnostics: sectionUsefulness.map(
+              (issue) => `${issue.type} in ${issue.fieldPath}: ${issue.message}`,
+            ),
+          },
           metadata: {
             ...args.metadata,
             retryAttempt: attempt,
@@ -154,6 +190,15 @@ export async function retryFailedSections(
         throw error;
       }
 
+      generated = section.requiredEvidence !== undefined && missingRequiredEvidence.length > 0
+        ? mergeSectionRepair({
+            previous: previousCandidate,
+            generated,
+            missingRequiredEvidence,
+            usefulness: sectionUsefulness,
+            acceptedContent,
+          })
+        : generated;
       currentOutputs.set(section.id, generated);
       const refreshed = refreshSectionReports({
         section,
@@ -167,19 +212,23 @@ export async function retryFailedSections(
       sectionCoverage = refreshed.coverage;
       sectionGrounding = refreshed.grounding;
       sectionLeakage = refreshed.leakage;
+      sectionUsefulness = diagnoseUsefulness(section, source, generated);
       if (
         isSectionAccepted(
           sectionCoverage,
           sectionGrounding,
           sectionLeakage,
-        )
+        ) && sectionUsefulness.length === 0
       ) {
         args.onSectionRecovered?.(section, "repaired");
         break;
       }
     }
 
-    if (isSectionAccepted(sectionCoverage, sectionGrounding, sectionLeakage)) {
+    if (
+      isSectionAccepted(sectionCoverage, sectionGrounding, sectionLeakage) &&
+      sectionUsefulness.length === 0
+    ) {
       continue;
     }
 
@@ -189,6 +238,13 @@ export async function retryFailedSections(
     const sourceTextOverride = sourceOutlineSection
       ? extractGroundingSourceSectionText(source, sourceOutlineSection)
       : undefined;
+    if (!requiredEvidenceSourceIsAvailable({
+      section,
+      sourceBlocks: source.blocks.filter((block) => section.sourceBlockIds.includes(block.id)),
+    })) {
+      // A fallback must not turn a source-absent plan label into evidence.
+      continue;
+    }
     const fallbackOutput = createExtractiveSectionFallback({
       section,
       source,
@@ -214,7 +270,7 @@ export async function retryFailedSections(
       fallbackReports.coverage,
       fallbackReports.grounding,
       fallbackReports.leakage,
-    );
+    ) && isOutputUseful(section, source, fallbackOutput);
     if (!accepted) {
       const blockFallback = createExtractiveSectionFallback({
         section,
@@ -238,7 +294,7 @@ export async function retryFailedSections(
           fallbackReports.coverage,
           fallbackReports.grounding,
           fallbackReports.leakage,
-        );
+        ) && isOutputUseful(section, source, blockFallback);
       }
     }
     if (!accepted) {
@@ -264,7 +320,7 @@ export async function retryFailedSections(
           fallbackReports.coverage,
           fallbackReports.grounding,
           fallbackReports.leakage,
-        );
+        ) && isOutputUseful(section, source, lineFallback);
       }
     }
     if (!accepted) {
@@ -290,7 +346,7 @@ export async function retryFailedSections(
           fallbackReports.coverage,
           fallbackReports.grounding,
           fallbackReports.leakage,
-        );
+        ) && isOutputUseful(section, source, spanFallback);
       }
     }
     if (accepted) {
@@ -696,6 +752,7 @@ function shouldRetry(
   result: SectionCoverageResult,
   groundingResult: SectionGroundingResult | undefined,
   leakageResult: SectionLeakageResult | undefined,
+  usefulnessIssues: readonly StudentVisibleUsefulnessIssue[],
   policy: RetryPolicy,
 ): boolean {
   const shouldRetryCoverage =
@@ -710,7 +767,7 @@ function shouldRetry(
   if (shouldRetryCoverage) {
     return true;
   }
-  return shouldRetryGrounding || shouldRetryLeakage;
+  return shouldRetryGrounding || shouldRetryLeakage || usefulnessIssues.length > 0;
 }
 
 function buildRetryGuidance(
@@ -719,6 +776,7 @@ function buildRetryGuidance(
   coverageResult: SectionCoverageResult,
   groundingResult: SectionGroundingResult | undefined,
   leakageResult: SectionLeakageResult | undefined,
+  usefulnessIssues: readonly StudentVisibleUsefulnessIssue[],
 ): readonly string[] {
   const guidance: string[] = [];
   const failedFields = new Set<string>();
@@ -726,6 +784,9 @@ function buildRetryGuidance(
     if (issue.fieldPath) failedFields.add(issue.fieldPath);
   }
   for (const issue of leakageResult?.issues ?? []) {
+    failedFields.add(issue.fieldPath);
+  }
+  for (const issue of usefulnessIssues) {
     failedFields.add(issue.fieldPath);
   }
   if (coverageResult.status !== "passed") {
@@ -752,6 +813,13 @@ function buildRetryGuidance(
     );
   }
 
+  const missingTargetIds = coverageResult.missingRequiredEvidenceTargetIds ?? [];
+  if (missingTargetIds.length > 0) {
+    guidance.push(
+      `Repair the exact missing required evidence target IDs: ${missingTargetIds.join(", ")}. The repair task includes their source evidence and provenance.`,
+    );
+  }
+
   if (groundingResult?.status === "failed") {
     guidance.push(
       "Previous default student-visible content failed grounding. Use the exact topic heading as title, rewrite sourceCore using only facts and terms present in the section passage, and set enrichment to null. If the passage is only a heading or very short phrase, use a minimal restatement of that exact text.",
@@ -767,6 +835,15 @@ function buildRetryGuidance(
     );
     guidance.push(
       ...leakageResult.issues.slice(0, 5).map(formatLeakageIssueGuidance),
+    );
+  }
+
+  if (usefulnessIssues.length > 0) {
+    guidance.push(
+      ...usefulnessIssues.map(
+        (issue) =>
+          `Usefulness issue (${issue.type}) in ${issue.fieldPath}: ${issue.message}`,
+      ),
     );
   }
 
@@ -845,6 +922,106 @@ function orderedOutputs(
     const output = outputsBySectionId.get(section.id);
     return output ? [output] : [];
   });
+}
+
+function diagnoseUsefulness(
+  section: PlannedSection,
+  source: NormalizedSource,
+  output: SectionOutput | undefined,
+): readonly StudentVisibleUsefulnessIssue[] {
+  return output && section.requiredEvidence !== undefined
+    ? diagnoseStudentVisibleUsefulness({ section, source, output })
+    : [];
+}
+
+function isOutputUseful(
+  section: PlannedSection,
+  source: NormalizedSource,
+  output: SectionOutput,
+): boolean {
+  return section.requiredEvidence === undefined ||
+    diagnoseStudentVisibleUsefulness({ section, source, output }).length === 0;
+}
+
+function collectAcceptedContent(args: {
+  readonly output: SectionOutput | undefined;
+  readonly grounding: SectionGroundingResult | undefined;
+  readonly leakage: SectionLeakageResult | undefined;
+  readonly usefulness: readonly StudentVisibleUsefulnessIssue[];
+}): readonly string[] {
+  if (!args.output) return [];
+  const failedPaths = new Set([
+    ...(args.grounding?.issues.flatMap((issue) => issue.fieldPath ? [issue.fieldPath] : []) ?? []),
+    ...(args.leakage?.issues.map((issue) => issue.fieldPath) ?? []),
+    ...args.usefulness.map((issue) => issue.fieldPath),
+  ]);
+  const accepted: string[] = [];
+  if (
+    args.output.sourceCore.explanation.trim() &&
+    !failedPaths.has("sourceCore") &&
+    !failedPaths.has("sourceCore.explanation")
+  ) {
+    accepted.push(args.output.sourceCore.explanation.trim());
+  }
+  args.output.sourceCore.keyPoints.forEach((point, index) => {
+    if (
+      !failedPaths.has("sourceCore") &&
+      !failedPaths.has("sourceCore.keyPoints") &&
+      !failedPaths.has(`sourceCore.keyPoints[${index}]`)
+    ) {
+      accepted.push(point.trim());
+    }
+  });
+  return accepted.filter(Boolean);
+}
+
+function mergeSectionRepair(args: {
+  readonly previous: SectionOutput | undefined;
+  readonly generated: SectionOutput;
+  readonly missingRequiredEvidence: readonly RequiredEvidenceTarget[];
+  readonly usefulness: readonly StudentVisibleUsefulnessIssue[];
+  readonly acceptedContent: readonly string[];
+}): SectionOutput {
+  if (!args.previous) return args.generated;
+  const explanationInvalid = !args.acceptedContent.includes(args.previous.sourceCore.explanation.trim()) || args.usefulness.some(
+    (issue) => issue.fieldPath === "sourceCore" || issue.fieldPath === "sourceCore.explanation",
+  );
+  const explanation = explanationInvalid || !args.previous.sourceCore.explanation.trim()
+    ? args.generated.sourceCore.explanation
+    : args.previous.sourceCore.explanation;
+  const priorPoints = args.previous.sourceCore.keyPoints.filter((point, index) =>
+    args.acceptedContent.includes(point.trim()) &&
+    !args.usefulness.some((issue) =>
+      issue.fieldPath === "sourceCore" ||
+      issue.fieldPath === "sourceCore.keyPoints" ||
+      issue.fieldPath === `sourceCore.keyPoints[${index}]`
+    )
+  );
+  const generatedRows = [
+    args.generated.sourceCore.explanation,
+    ...args.generated.sourceCore.keyPoints,
+  ].filter(Boolean);
+  const repairPoints = args.missingRequiredEvidence.length > 0
+    ? generatedRows.filter((row) =>
+        args.missingRequiredEvidence.some((target) =>
+          requiredEvidenceTargetIsRepresented(target, [row])
+        )
+      )
+    : args.generated.sourceCore.keyPoints;
+  const keyPoints = uniqueExtracts([
+    ...priorPoints,
+    ...repairPoints,
+    ...(repairPoints.length === 0 ? args.generated.sourceCore.keyPoints : []),
+  ]).filter((point) => point.trim() && point.trim() !== explanation.trim());
+
+  return {
+    ...args.generated,
+    sourceCore: {
+      explanation,
+      keyPoints,
+    },
+    enrichment: null,
+  } as SectionOutput;
 }
 
 function validateGroundingReport(

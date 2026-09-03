@@ -188,6 +188,41 @@ export interface TypedEvidenceGroup {
   readonly members: readonly TypedEvidenceMember[];
 }
 
+export type RequiredEvidenceTargetKind =
+  | "concept"
+  | "list-item"
+  | "mapping"
+  | "relationship"
+  | "procedure-step"
+  | "example"
+  | "formula"
+  | "table-row"
+  | "table-cell"
+  | "code"
+  | "result-value";
+
+export interface RequiredEvidenceProvenance {
+  readonly sourceBlockId: string;
+  readonly sourceOrder: number;
+  readonly pageNumber?: number;
+  readonly sourceItemId?: string;
+  readonly evidenceGroupId?: string;
+  readonly tableBlockId?: string;
+  readonly tableRowIndex?: number;
+  readonly tableCellIds?: readonly string[];
+}
+
+export interface RequiredEvidenceTarget {
+  readonly id: string;
+  readonly kind: RequiredEvidenceTargetKind;
+  readonly label: string;
+  readonly evidenceTexts: readonly string[];
+  readonly relationshipLabel?: string;
+  readonly sourceBlockIds: readonly string[];
+  readonly provenance: readonly RequiredEvidenceProvenance[];
+  readonly tableCells?: readonly TypedTableCellEvidence[];
+}
+
 export interface PlannedSection {
   readonly id: string;
   readonly sourceSectionId: string;
@@ -203,6 +238,8 @@ export interface PlannedSection {
   readonly conceptualParentKey?: string;
   readonly semanticPlan?: PlannedSectionSemanticPlan;
   readonly evidenceGroups?: readonly TypedEvidenceGroup[];
+  readonly requiredEvidence?: readonly RequiredEvidenceTarget[];
+  readonly supportingSourceBlockIds?: readonly string[];
 }
 
 export interface GenerationPlan {
@@ -308,6 +345,9 @@ export interface SectionCoverageResult {
   readonly semanticCoverageScore?: number;
   readonly planIntegrityStatus?: CoverageReportStatus;
   readonly planIntegrityIssues?: readonly PlanIntegrityIssue[];
+  readonly requiredEvidenceTargetCount?: number;
+  readonly representedRequiredEvidenceTargetCount?: number;
+  readonly missingRequiredEvidenceTargetIds?: readonly string[];
 }
 
 export interface SourceSectionCoverage {

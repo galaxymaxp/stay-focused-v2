@@ -2,6 +2,7 @@ import { COVERAGE_THRESHOLD } from "@stay-focused/shared";
 
 import { verifySemanticCoverage } from "./semantic-verification.js";
 import { verifyPlanIntegrity } from "./plan-integrity.js";
+import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
 
 import type {
   CoverageIssue,
@@ -284,7 +285,7 @@ function verifyPlannedSection(
     issues.push("Output kind does not match planned schema kind.");
   }
 
-  const fieldCheck = checkRequiredFields(output, section.schemaKind);
+  const fieldCheck = checkRequiredFields(output, section);
   score += fieldCheck.score * 0.35;
   issues.push(...fieldCheck.issues);
 
@@ -298,11 +299,26 @@ function verifyPlannedSection(
   }
 
   const semanticCheck = verifySemanticCoverage(section, output);
+  const missingRequiredEvidence = findMissingRequiredEvidenceTargets(section, output);
+  const requiredEvidenceTargetCount = section.requiredEvidence?.length ?? 0;
+  const representedRequiredEvidenceTargetCount = Math.max(
+    0,
+    requiredEvidenceTargetCount - missingRequiredEvidence.length,
+  );
+  const hasRequiredManifest = section.requiredEvidence !== undefined;
   const hasSemanticPlan = section.semanticPlan !== undefined;
-  const semanticTargetCount = hasSemanticPlan
+  const semanticTargetCount = hasRequiredManifest
+    ? Math.max(1, requiredEvidenceTargetCount)
+    : hasSemanticPlan
     ? Math.max(1, semanticCheck.targetCount)
     : 0;
-  const coveredSemanticTargetCount = hasSemanticPlan
+  const coveredSemanticTargetCount = hasRequiredManifest
+    ? requiredEvidenceTargetCount === 0
+      ? hasWrongKind || fieldCheck.hasMissingRequiredField || sourceCheck.hasUnknownReference
+        ? 0
+        : 1
+      : representedRequiredEvidenceTargetCount
+    : hasSemanticPlan
     ? semanticCheck.targetCount === 0
       ? hasWrongKind ||
         fieldCheck.hasMissingRequiredField ||
@@ -315,9 +331,17 @@ function verifyPlannedSection(
   const semanticCoverageScore = hasSemanticPlan
     ? roundScore(coveredSemanticTargetCount / semanticTargetCount)
     : 1;
-  if (hasSemanticPlan) {
-    score = Math.min(score, semanticCoverageScore);
-    issues.push(...semanticCheck.issues);
+  if (hasRequiredManifest || hasSemanticPlan) {
+    score = Math.min(score, semanticCoverageScore, semanticCheck.score);
+    issues.push(
+      ...semanticCheck.issues,
+      ...(hasRequiredManifest
+        ? missingRequiredEvidence.map(
+            (target) =>
+              `Missing required evidence target "${target.id}" (${target.kind}): ${target.label}`,
+          )
+        : []),
+    );
   }
 
   score = Math.max(0, score);
@@ -333,7 +357,8 @@ function verifyPlannedSection(
   score = roundScore(score);
 
   const semanticIncomplete =
-    hasSemanticPlan && coveredSemanticTargetCount < semanticTargetCount;
+    (hasRequiredManifest || hasSemanticPlan) &&
+    (coveredSemanticTargetCount < semanticTargetCount || semanticCheck.coveredTargetCount < semanticCheck.targetCount);
   const planIsInvalid = planIntegrityIssues.length > 0;
   if (planIsInvalid) {
     score = Math.min(score, REQUIRED_FIELD_FAILURE_CAP);
@@ -353,15 +378,18 @@ function verifyPlannedSection(
     semanticCoverageScore,
     planIntegrityStatus: planIsInvalid ? "failed" : "passed",
     planIntegrityIssues,
+    requiredEvidenceTargetCount,
+    representedRequiredEvidenceTargetCount,
+    missingRequiredEvidenceTargetIds: missingRequiredEvidence.map((target) => target.id),
   };
 }
 
 function checkRequiredFields(
   output: SectionOutput,
-  expectedKind: SectionSchemaKind,
+  section: PlannedSection,
 ): FieldCheckResult {
   const value = output as unknown as Readonly<Record<string, unknown>>;
-  const fields = requiredFieldsFor(expectedKind);
+  const fields = requiredFieldsFor(section.schemaKind);
   const issues: string[] = [];
   let validFields = 0;
   let weakFields = 0;
@@ -371,13 +399,23 @@ function checkRequiredFields(
     const fieldValue = readNestedField(value, field);
     const permitsEmptyString =
       field === "sourceCore.explanation" && fieldValue === "";
-    if (!permitsEmptyString && !hasRequiredContent(fieldValue)) {
+    const permitsEmptyKeyPoints =
+      field === "sourceCore.keyPoints" &&
+      Array.isArray(fieldValue) &&
+      fieldValue.length === 0 &&
+      section.requiredEvidence !== undefined &&
+      (
+        typeof output.sourceCore?.explanation === "string" &&
+        output.sourceCore.explanation.trim().length > 0 &&
+        findMissingRequiredEvidenceTargets(section, output).length === 0
+      );
+    if (!permitsEmptyString && !permitsEmptyKeyPoints && !hasRequiredContent(fieldValue)) {
       issues.push(`Missing required field: ${field}.`);
       hasMissingRequiredField = true;
       continue;
     }
     validFields += 1;
-    if (!permitsEmptyString && isWeakContent(fieldValue)) {
+    if (!permitsEmptyString && !permitsEmptyKeyPoints && isWeakContent(fieldValue)) {
       issues.push(`Weak content field: ${field}.`);
       weakFields += 1;
     }

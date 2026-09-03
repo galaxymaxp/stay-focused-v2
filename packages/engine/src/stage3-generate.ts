@@ -13,13 +13,29 @@ import {
 import { toDefaultStudentVisibleSectionOutput } from "./student-visible-text.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
 import { serializeRecoveryEvidence } from "./recovery-evidence.js";
+import {
+  requiredEvidenceSourceIsAvailable,
+  serializeRequiredEvidenceTarget,
+} from "./required-evidence.js";
+import {
+  filterReviewableText,
+  isInstructionalNoiseText,
+} from "./review-content.js";
 import type {
   GenerationPlan,
   NormalizedSource,
   NormalizedSourceBlock,
   PlannedSection,
   SectionOutput,
+  RequiredEvidenceTarget,
 } from "./types";
+
+export interface SectionRepairContext {
+  readonly previousCandidate?: SectionOutput;
+  readonly missingRequiredEvidence: readonly RequiredEvidenceTarget[];
+  readonly acceptedContent: readonly string[];
+  readonly usefulnessDiagnostics?: readonly string[];
+}
 
 export interface GenerateSectionArgs {
   readonly section: PlannedSection;
@@ -30,11 +46,13 @@ export interface GenerateSectionArgs {
   readonly temperature?: number;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly retryGuidance?: readonly string[];
+  readonly repairContext?: SectionRepairContext;
 }
 
 export type SectionValidationFailureReason =
   | "output-validation"
-  | "instruction-leakage";
+  | "instruction-leakage"
+  | "required-evidence-unavailable";
 
 export class SectionValidationError extends Error {
   public readonly sectionId: string;
@@ -82,17 +100,41 @@ export async function generateSection(
 
   const { section, plan, source, provider } = args;
   const sourceBlocks = collectSectionSourceBlocks(section, source);
+  if (!requiredEvidenceSourceIsAvailable({ section, sourceBlocks })) {
+    throw new SectionValidationError({
+      sectionId: section.id,
+      reason: "required-evidence-unavailable",
+      detail: "required evidence manifest references evidence absent from the supplied source blocks",
+    });
+  }
   const detectedItems = extractCleanSourceItems({
     sourceSpanText: sourceBlocksToLineText(sourceBlocks),
     sectionTitle: section.title,
   });
-  const schema = getSchemaForSectionKind(section.schemaKind);
+  const baseSchema = getSchemaForSectionKind(section.schemaKind);
+  const schema = section.requiredEvidence === undefined ? baseSchema : {
+    ...baseSchema,
+    schema: {
+      ...baseSchema.schema,
+      properties: {
+        ...baseSchema.schema.properties,
+        plannedSectionId: { type: "string", const: section.id },
+        sourceBlockIds: {
+          type: "array",
+          minItems: section.sourceBlockIds.length,
+          maxItems: section.sourceBlockIds.length,
+          items: { type: "string", enum: section.sourceBlockIds },
+        },
+      },
+    },
+  };
   const request = {
     prompt: buildSectionPrompt(
       section,
       sourceBlocks,
       detectedItems,
       args.retryGuidance,
+      args.repairContext,
     ),
     schema,
     model: args.model ?? "gpt-4o",
@@ -103,6 +145,20 @@ export async function generateSection(
       planId: plan.id,
       schemaKind: section.schemaKind,
       sourceId: source.id,
+      ...(section.requiredEvidence !== undefined
+        ? {
+            requiredEvidenceTargetIds: section.requiredEvidence.map(
+              (target) => target.id,
+            ),
+          }
+        : {}),
+      ...(args.repairContext
+        ? {
+            missingRequiredEvidenceTargetIds: args.repairContext.missingRequiredEvidence.map(
+              (target) => target.id,
+            ),
+          }
+        : {}),
     },
   };
 
@@ -136,6 +192,7 @@ export function buildSectionPrompt(
   sourceBlocks: readonly NormalizedSourceBlock[],
   detectedItems: readonly SourceItem[] = [],
   retryGuidance: readonly string[] = [],
+  repairContext?: SectionRepairContext,
 ): string {
   const sourceText = sourceBlocksToText(sourceBlocks);
   const passage = sourceBlocks
@@ -153,23 +210,38 @@ export function buildSectionPrompt(
     `- Objective — ${section.target.objective}`,
     `- Focus — ${section.target.focus}`,
     `- Expected tags — ${section.target.expectedTags.join(", ")}`,
-    `- Desired point total — ${section.target.itemCount}`,
+    ...(section.requiredEvidence !== undefined
+      ? [`- Required evidence targets — ${section.requiredEvidence.length}; every target is mandatory, with no smaller point-count quota.`]
+      : [`- Desired point total — ${section.target.itemCount}`]),
     "- Content checks:",
     ...section.target.coverageRules.map((rule) => `  - ${rule}`),
     ...semanticPlanPromptLines(section),
+    ...requiredEvidencePromptLines(section),
+    ...structuredEvidencePromptLines(section, sourceBlocks),
     "PASSAGE:",
     passage,
-    ...structuredEvidencePromptLines(section, sourceBlocks),
     ...detectedItemsPromptLines(detectedItems),
     "Requirements:",
+    `- Copy the complete section identity, not only cited/required evidence IDs: ${JSON.stringify({ plannedSectionId: section.id, sourceBlockIds: section.sourceBlockIds })}.`,
     "- Populate sourceCore.explanation and sourceCore.keyPoints from this card's passage alone.",
-    "- Preserve every detected passage item, but preserve supported relationships instead of flattening related items into peers.",
+    ...(section.requiredEvidence !== undefined
+      ? [
+          "- Represent every REQUIRED EVIDENCE target. Required targets may be concise, but they must not be silently dropped.",
+          "- Supporting evidence is optional. Do not copy it merely to fill key points.",
+          "- Preserve supported relationships instead of flattening related items into peers.",
+        ]
+      : [
+          "- Preserve every detected passage item, but preserve supported relationships instead of flattening related items into peers.",
+        ]),
     "- Keep one coherent source idea per key point. Never fuse adjacent siblings or a heading with the next item.",
     "- For definitions, categories, examples, and procedures, keep related content attached using the supplied semantic plan.",
-    "- ANTI-META EXPLANATION RULE: sourceCore.explanation must be one concise passage-derived synthesis sentence when the semantic plan says an explanation is useful; otherwise it may be empty.",
+    "- sourceCore.explanation must add source-supported meaning beyond the title when the passage supports an explanation; otherwise it may be empty.",
     "- sourceCore.explanation MUST NEVER describe the card itself, describe its purpose, or restate the task.",
     "- Forbidden meta-commentary includes: \"This section lists...\", \"The following are...\", \"These are the steps to...\", \"This section explains...\", and similar framing. Such text is not study content and can trigger instruction-leakage rejection.",
     "- List-heavy content may still have a useful explanation. Do not suppress it merely because key points are present.",
+    "- Keep key points concise and atomic. Summarize repeated prose; do not paste whole paragraphs, slide transcripts, classroom commands, or every optional example.",
+    "- Omit directions addressed to the learner, activity prompts, presentation navigation, and classroom instructions. Preserve any separate declarative concept evidence from those blocks.",
+    "- Formula, code, and compact table evidence may be longer than prose when it is a REQUIRED EVIDENCE target.",
     "- For a heading-only or very short passage, keep sourceCore minimal and use the wording as-is with no filler.",
     "- FAKE FORMAT EXAMPLE: \"Fruit List • Apple • Banana • Cherry\" maps to explanation \"\" and keyPoints [\"Apple\",\"Banana\",\"Cherry\"].",
     "- FAKE FORMAT EXAMPLE: \"Desk Supplies • Pen • Notebook\" maps to explanation \"\" and keyPoints [\"Pen\",\"Notebook\"].",
@@ -187,6 +259,7 @@ export function buildSectionPrompt(
     `- plannedSectionId value — "${section.id}".`,
     `- sourceBlockIds value — ${section.sourceBlockIds.join(", ")}.`,
     ...sparseSourcePromptLines(sourceText),
+    ...repairContextPromptLines(repairContext),
     ...retryGuidancePromptLines(retryGuidance),
   ].join("\n");
 }
@@ -284,17 +357,27 @@ function sliceBlockForSection(
 function applySparseSourceCoreGuard(
   output: SectionOutput,
   sourceBlocks: readonly NormalizedSourceBlock[],
+  section: PlannedSection,
 ): SectionOutput {
   const sourceText = sourceBlocksToText(sourceBlocks);
   if (!isSparseSourceText(sourceText)) {
     return output;
   }
 
+  if (section.requiredEvidence === undefined) {
+    return {
+      ...output,
+      sourceCore: { explanation: sourceText, keyPoints: [sourceText] },
+      enrichment: null,
+    } as SectionOutput;
+  }
+  const headingOnly = sourceBlocks.every((block) => block.kind === "heading");
+
   return {
     ...output,
     sourceCore: {
-      explanation: sourceText,
-      keyPoints: [sourceText],
+      explanation: "",
+      keyPoints: headingOnly ? [] : [sourceText],
     },
     enrichment: null,
   } as SectionOutput;
@@ -305,21 +388,24 @@ function structuredEvidencePromptLines(
   sourceBlocks: readonly NormalizedSourceBlock[],
 ): readonly string[] {
   const typedGroups = section.evidenceGroups ?? [];
+  const requiredBlockIds = new Set(
+    (section.requiredEvidence ?? []).flatMap((target) => target.sourceBlockIds),
+  );
   const typedLines = typedGroups.flatMap((group) => [
     `[evidence-group ${group.id} | concept ${group.label}]`,
     ...group.members.flatMap((member) => {
       if (member.kind === "formula") {
         return member.evidenceTexts.map((text, index) =>
-          `[formula ${member.blockId} | ${index === 0 ? "source" : "parser-representation"}] ${text}`
+          `[${requiredBlockIds.has(member.blockId) ? "required" : "supporting"} formula ${member.blockId} | ${index === 0 ? "source" : "parser-representation"}] ${text}`
         );
       }
       if (member.kind === "table") {
         return member.tableCells?.map((cell) =>
-          `[table-cell ${cell.tableBlockId} | row ${cell.rowIndex} | column ${cell.columnIndex}] ${cell.text}`
+          `[${requiredBlockIds.has(member.blockId) ? "required" : "supporting"} table-cell ${cell.tableBlockId} | row ${cell.rowIndex} | column ${cell.columnIndex} | cell ${cell.cellId}] ${cell.text}`
         ) ?? [];
       }
       return member.evidenceTexts.map((text) =>
-        `[related-${member.kind} ${member.blockId}] ${text}`
+        `[${requiredBlockIds.has(member.blockId) ? "required" : "supporting"} related-${member.kind} ${member.blockId}] ${text}`
       );
     }),
   ]);
@@ -338,6 +424,71 @@ function structuredEvidencePromptLines(
     : [];
 }
 
+function requiredEvidencePromptLines(
+  section: PlannedSection,
+): readonly string[] {
+  const targets = section.requiredEvidence ?? [];
+  return [
+    "REQUIRED EVIDENCE MANIFEST:",
+    ...(targets.length > 0
+      ? targets.map(serializeRequiredEvidenceTarget)
+      : ["[none] The source span contains no evidence beyond its heading; do not invent an explanation."]),
+    "SUPPORTING / OPTIONAL SOURCE BLOCKS:",
+    (section.supportingSourceBlockIds ?? []).length > 0
+      ? (section.supportingSourceBlockIds ?? []).join(", ")
+      : "[none]",
+  ];
+}
+
+function repairContextPromptLines(
+  context: SectionRepairContext | undefined,
+): readonly string[] {
+  if (!context) return [];
+  const previous = context.previousCandidate
+    ? JSON.stringify({
+        explanation: context.previousCandidate.sourceCore.explanation,
+        keyPoints: context.previousCandidate.sourceCore.keyPoints,
+      }).slice(0, 8_000)
+    : "[no previous candidate]";
+  return [
+    "REPAIR TASK:",
+    `- Previous candidate: ${previous}`,
+    `- Accepted grounded content to preserve: ${context.acceptedContent.length > 0 ? context.acceptedContent.join(" | ").slice(0, 6_000) : "[none]"}`,
+    "- Missing required targets (use only the exact source evidence shown):",
+    ...(context.missingRequiredEvidence.length > 0
+      ? context.missingRequiredEvidence.map((target) => `  ${serializeRequiredEvidenceTarget(target)}`)
+      : ["  [none] Repair only the listed usefulness defect."]),
+    ...(context.usefulnessDiagnostics?.map((diagnostic) =>
+      `- Usefulness defect: ${diagnostic}`
+    ) ?? []),
+    "- Return a complete schema-valid section. Preserve accepted grounded content, add or rewrite only what is necessary, and do not introduce unsupported relationships.",
+  ];
+}
+
+function applyReviewContentGuard(output: SectionOutput): SectionOutput {
+  const explanation = filterReviewableText(output.sourceCore.explanation);
+  const keyPoints = uniqueSemanticText(
+    output.sourceCore.keyPoints
+      .map((point) => filterReviewableText(point))
+      .filter((point) => point.length > 0 && !isInstructionalNoiseText(point)),
+  );
+  return {
+    ...output,
+    sourceCore: { explanation, keyPoints },
+    enrichment: null,
+  } as SectionOutput;
+}
+
+function uniqueSemanticText(values: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = normalizeSemanticText(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function applySemanticCoreGuard(
   output: SectionOutput,
   section: PlannedSection,
@@ -346,17 +497,52 @@ function applySemanticCoreGuard(
 ): SectionOutput {
   const semanticPlan = section.semanticPlan;
   if (!semanticPlan) {
-    return detectedItems.length >= 2
-      ? applyDetectedListCoreGuard(output, detectedItems)
-      : applySparseSourceCoreGuard(output, sourceBlocks);
+    if (section.requiredEvidence === undefined) {
+      return detectedItems.length >= 2
+        ? applyDetectedListCoreGuard(output, detectedItems)
+        : applySparseSourceCoreGuard(output, sourceBlocks, section);
+    }
+    return applyReviewContentGuard(
+      detectedItems.length >= 2 ? output : applySparseSourceCoreGuard(output, sourceBlocks, section),
+    );
   }
 
   const sourceText = sourceBlocksToText(sourceBlocks);
   if (isSparseSourceText(sourceText)) {
-    return applySparseSourceCoreGuard(output, sourceBlocks);
+    return applySparseSourceCoreGuard(output, sourceBlocks, section);
   }
 
-  const plannedKeyPoints = serializeSemanticUnits(semanticPlan.units);
+  // A literal short source list already is atomic review material. Preserve
+  // exact tokens (measurements, commands, symbols) without expanding prose.
+  const atomicList = (semanticPlan.kind === "list" || semanticPlan.kind === "mapping") &&
+    semanticPlan.units.length >= 2 &&
+    semanticPlan.units.every((unit) =>
+      (unit.kind === "point" || (unit.kind === "mapping" && unit.sourceLayout === "pipe-row")) &&
+      ([unit.label, ...unit.items].join(" ").match(/\S+/g)?.length ?? 0) <= 48 &&
+      !isInstructionalNoiseText(unit.label)
+    );
+
+  if (section.requiredEvidence === undefined || atomicList) {
+    const plannedKeyPoints = serializeSemanticUnits(semanticPlan.units);
+    const generatedExplanation = output.sourceCore.explanation.trim();
+    const explanation = semanticPlan.explanationUseful
+      ? semanticPlan.units.length > 0
+        ? selectGroundedExplanation(generatedExplanation, sourceText, section)
+        : generatedExplanation
+      : "";
+    const visibleKeyPoints = plannedKeyPoints.filter(
+      (point) => normalizeSemanticText(point) !== normalizeSemanticText(explanation),
+    );
+    return {
+      ...output,
+      sourceCore: {
+        explanation,
+        keyPoints: visibleKeyPoints.length > 0 ? visibleKeyPoints : output.sourceCore.keyPoints,
+      },
+      enrichment: null,
+    } as SectionOutput;
+  }
+
   const generatedExplanation = output.sourceCore.explanation.trim();
   const explanation = semanticPlan.explanationUseful
     ? semanticPlan.units.length > 0
@@ -367,17 +553,15 @@ function applySemanticCoreGuard(
         )
       : generatedExplanation
     : "";
-  const visibleKeyPoints = plannedKeyPoints.filter(
-    (point) => normalizeSemanticText(point) !== normalizeSemanticText(explanation),
-  );
+  const visibleKeyPoints = output.sourceCore.keyPoints
+    .map((point) => filterReviewableText(point))
+    .filter((point) => point.length > 0 && !isInstructionalNoiseText(point))
+    .filter((point) => normalizeSemanticText(point) !== normalizeSemanticText(explanation));
   return {
     ...output,
     sourceCore: {
       explanation,
-      keyPoints:
-        visibleKeyPoints.length > 0
-          ? visibleKeyPoints
-          : output.sourceCore.keyPoints,
+      keyPoints: uniqueSemanticText(visibleKeyPoints),
     },
     enrichment: null,
   } as SectionOutput;
@@ -391,7 +575,7 @@ function selectGroundedExplanation(
   if (
     explanation &&
     isFullySourceGrounded(explanation, sourceText) &&
-    isUsefulDirectSourceExplanation(explanation, sourceText)
+    isUsefulDirectSourceExplanation(explanation, section.title)
   ) {
     return explanation;
   }
@@ -461,16 +645,15 @@ function isFullySourceGrounded(explanation: string, sourceText: string): boolean
 
 function isUsefulDirectSourceExplanation(
   explanation: string,
-  sourceText: string,
+  title: string,
 ): boolean {
   const explanationWords = explanation.match(/[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)*/g) ?? [];
   if (explanationWords.length < 5) return false;
 
-  const normalizedExplanation = normalizeSemanticText(explanation);
-  return (
-    normalizedExplanation.length > 0 &&
-    normalizeSemanticText(sourceText).includes(normalizedExplanation)
-  );
+  const explanationTerms = new Set(extractCanonicalContentTerms(explanation));
+  const titleTerms = new Set(extractCanonicalContentTerms(title));
+  const informationGain = [...explanationTerms].filter((term) => !titleTerms.has(term)).length;
+  return informationGain >= 2;
 }
 
 function extractCanonicalContentTerms(value: string): readonly string[] {
@@ -513,23 +696,6 @@ function normalizeSemanticText(value: string): string {
     .trim();
 }
 
-function applyDetectedListCoreGuard(
-  output: SectionOutput,
-  detectedItems: readonly SourceItem[],
-): SectionOutput {
-  if (detectedItems.length < 2) {
-    return output;
-  }
-
-  return {
-    ...output,
-    sourceCore: {
-      explanation: "",
-      keyPoints: detectedItems.map((item) => item.text),
-    },
-  } as SectionOutput;
-}
-
 function detectedItemsPromptLines(
   detectedItems: readonly SourceItem[],
 ): readonly string[] {
@@ -539,9 +705,22 @@ function detectedItemsPromptLines(
 
   return [
     "DETECTED PASSAGE ITEMS:",
-    "These entries were mechanically extracted from this card's passage. Preserve their content and order; combine entries only when the semantic plan explicitly relates them.",
+    "These entries were mechanically extracted as optional supporting cues. Use only those needed after satisfying REQUIRED EVIDENCE; combine entries only when the semantic plan explicitly relates them.",
     ...detectedItems.map((item, index) => `${index + 1}. ${item.text}`),
   ];
+}
+
+function applyDetectedListCoreGuard(
+  output: SectionOutput,
+  detectedItems: readonly SourceItem[],
+): SectionOutput {
+  return {
+    ...output,
+    sourceCore: {
+      explanation: "",
+      keyPoints: detectedItems.map((item) => item.text),
+    },
+  } as SectionOutput;
 }
 
 function semanticPlanPromptLines(section: PlannedSection): readonly string[] {

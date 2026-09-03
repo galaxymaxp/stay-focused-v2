@@ -15,6 +15,8 @@ import { flattenSourceBlocks } from "./stage1-outline.js";
 import { normalizeCoverageTitleKey } from "./stage4-verify.js";
 import { findSourceTokenFidelityViolations } from "./source-token-fidelity.js";
 import { typedEvidenceTexts } from "./typed-evidence.js";
+import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
+import { reviewableSourceBlocks } from "./review-content.js";
 import type {
   GenerationPlan,
   GroundingIssue,
@@ -237,7 +239,7 @@ function validateSectionGrounding(args: {
     titleTerms,
     visibleEntries,
   });
-  const omissionCheck = checkOmissions({
+  const sourceOmissions = checkOmissions({
     section: args.section,
     sourceItems,
     visibleCoreTexts: [
@@ -245,6 +247,12 @@ function validateSectionGrounding(args: {
       ...output.sourceCore.keyPoints,
     ],
   });
+  const manifestOmissions = checkRequiredEvidenceOmissions(args.section, output);
+  const omissionCheck = args.section.requiredEvidence !== undefined ? {
+    ...manifestOmissions,
+    score: Math.min(sourceOmissions.score, manifestOmissions.score),
+    issues: [...sourceOmissions.issues, ...manifestOmissions.issues],
+  } : sourceOmissions;
   const relationshipIssues = verifySemanticRelationships({
     section: args.section,
     output,
@@ -308,6 +316,29 @@ function validateSectionGrounding(args: {
     retryable: issues.length > 0,
     phase1FabricationFailures: fabricationCheck.failures,
     semanticRelationshipIssueCount: relationshipIssues.length,
+  };
+}
+
+function checkRequiredEvidenceOmissions(
+  section: PlannedSection,
+  output: SectionOutput,
+): OmissionCheck {
+  const targets = section.requiredEvidence ?? [];
+  const missing = findMissingRequiredEvidenceTargets(section, output);
+  const represented = targets.length - missing.length;
+  const score = targets.length === 0 ? 1 : roundScore(represented / targets.length);
+  return {
+    score,
+    sourceItemCount: targets.length,
+    representedSourceItemCount: represented,
+    issues: missing.map((target) => ({
+      type: "grounding-omission" as const,
+      severity: "error" as const,
+      plannedSectionId: section.id,
+      sourceSectionId: section.sourceSectionId,
+      sourceItem: target.label,
+      message: `Required evidence target "${target.id}" (${target.kind}) is absent from SourceCore.`,
+    })),
   };
 }
 
@@ -545,10 +576,11 @@ function extractGroundingSourceSectionItems(
   const nativeFragments = extractGroundingSourceSectionFragments(
     nativeSource,
     sourceSection,
+    true,
   );
   const sourceSpanText = (nativeFragments.length > 0
     ? nativeFragments
-    : extractGroundingSourceSectionFragments(source, sourceSection))
+    : extractGroundingSourceSectionFragments(source, sourceSection, true))
     .join("\n\f\n");
   return extractCleanSourceItems({
     sourceSpanText,
@@ -559,6 +591,7 @@ function extractGroundingSourceSectionItems(
 function extractGroundingSourceSectionFragments(
   source: NormalizedSource,
   sourceSection: SourceOutlineSection,
+  reviewable = false,
 ): readonly string[] {
   const sourceBlockIds = new Set([
     ...sourceSection.sourceBlockIds,
@@ -577,17 +610,19 @@ function extractGroundingSourceSectionFragments(
   );
   const fragments = flattened
     .filter(({ block }) => sourceBlockIds.has(block.id))
-    .map(({ block, startOffset, endOffset }) =>
-      sliceBlockForSourceSection({
+    .flatMap(({ block, startOffset, endOffset }) => {
+      const text = sliceBlockForSourceSection({
         block,
         blockStartOffset: startOffset,
         blockEndOffset: endOffset,
         sourceSection,
-      }),
-    )
-    .filter((text): text is string => text !== undefined && text.length > 0);
+      });
+      return text ? [{ ...block, text }] : [];
+    });
 
-  return fragments;
+  // Filter after slicing: removing activity text must not shift offsets of
+  // later source sections, especially in the legacy production path.
+  return (reviewable ? reviewableSourceBlocks(fragments) : fragments).map((block) => block.text);
 }
 
 function sliceBlockForSourceSection(args: {

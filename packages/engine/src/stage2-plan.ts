@@ -10,6 +10,7 @@ import type {
 } from "./types";
 import { analyzeSectionSemanticStructure } from "./semantic-structure.js";
 import { buildTypedEvidenceGroups } from "./typed-evidence.js";
+import { buildRequiredEvidenceManifest } from "./required-evidence.js";
 
 const COVERAGE_RULES: Readonly<
   Record<SectionSchemaKind, readonly string[]>
@@ -132,12 +133,23 @@ function createPlannedSection(
   const schemaKind = selectSchemaKind(section, semanticPlan.kind);
   const tokenWeight = tokenWeightForSection(section, sourceBlockIds, sourceBlockById);
   const targetItemCount = targetItemCountFor(tokenWeight);
+  const plannedSectionId = stableId(
+    `${section.id}-planned`,
+    [section.order, schemaKind, ...sourceBlockIds].join("\u001f"),
+  );
+  const requiredEvidence = buildRequiredEvidenceManifest({
+    sectionId: plannedSectionId,
+    sectionTitle: section.title,
+    semanticPlan,
+    sourceBlocks,
+    evidenceGroups,
+  });
+  const requiredBlockIds = new Set(
+    requiredEvidence.flatMap((target) => target.sourceBlockIds),
+  );
 
   return {
-    id: stableId(
-      `${section.id}-planned`,
-      [section.order, schemaKind, ...sourceBlockIds].join("\u001f"),
-    ),
+    id: plannedSectionId,
     sourceSectionId: section.id,
     title: section.title,
     order: section.order,
@@ -153,6 +165,10 @@ function createPlannedSection(
       : {}),
     semanticPlan,
     ...(evidenceGroups.length > 0 ? { evidenceGroups } : {}),
+    requiredEvidence,
+    supportingSourceBlockIds: sourceBlockIds.filter(
+      (blockId) => !requiredBlockIds.has(blockId),
+    ),
   };
 }
 
