@@ -2,6 +2,25 @@
 
 Last refreshed: 2026-09-03, Asia/Manila.
 
+## Reviewer B13 - Implemented hardening, failed acceptance
+
+Required evidence now has stable IDs and typed provenance, source availability
+is checked before generation/fallback/assembly, and retries receive exact
+missing targets with prior accepted content. Stage 6 rejects non-explanatory,
+instructional-noise, source-dump and low-information content without deleting
+required sections. Formula/code/table allowances remain block-aware. The engine
+suite is **425/425**, including all 406 previous cases.
+
+This does not complete the acceptance milestone. The frozen targeted workload
+still produces withheld reviewers. The report distinguishes captured live
+metrics from replay after final required-technical-evidence tightening; no full
+B12 or durable acceptance rerun is claimed. Production remains `legacy` and
+all original safety/structure gates are retained.
+
+Next task: evidence-bound provider completion and source-sparse explanation
+recovery, then targeted acceptance and only afterward the unchanged full B12
+corpus. See `docs/ai/acceptance/b13/reviewer-usefulness-and-completion.md`.
+
 ## Reviewer Benchmark B12 - Failed acceptance
 
 The frozen B8 Python, Statistics, and scanned Accounting sources were rerun

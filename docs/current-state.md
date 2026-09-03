@@ -32,6 +32,16 @@ Last refreshed: 2026-09-03, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer B13 adds stable required-evidence manifests, structured row/cell
+  provenance, source-absent preflight refusal, exact-target bounded repairs and
+  final deterministic usefulness gates. Empty-child semantic group labels no
+  longer disappear from extractive fallback. All **425/425 engine evaluations**
+  pass, but the Reviewer acceptance milestone remains **failed**: provider
+  omissions and non-explanatory/source-dump candidates are still withheld.
+  Earlier live metrics and final-code candidate replay are distinguished in
+  `docs/ai/acceptance/b13/reviewer-usefulness-and-completion.md`. No full B12
+  rerun is claimed after failed targeted prerequisites. Parser default remains
+  `legacy`; B11 gates and B12 durable typed-block preservation remain intact.
 - Reviewer Benchmark B12 completed the full frozen B8 corpus in hybrid mode and
   failed acceptance. A minimal Stage 0 fix now preserves non-legacy typed blocks
   after durable metadata rehydration; its regression raises engine evaluations
@@ -233,9 +243,11 @@ Last refreshed: 2026-09-03, Asia/Manila.
 
 ## Known risks and immediate task
 
-- Recommended next task: B12 - rerun full B8 end-to-end acceptance using the
-  feature-flagged hybrid structured parser. Parser-default promotion remains
-  deferred until that acceptance evidence is reviewed.
+- Recommended next task: recover evidence-bound provider completion and
+  explanatory study content from the exact B13 failed candidates, including
+  remaining instructional/code-as-explanation false negatives. Keep all gates
+  strict; targeted cases must pass before the unchanged full B12 rerun.
+  Parser-default promotion remains deferred.
 - Recommended next task: run the same reviewer benchmark on the Firewalls PDF
   to test whether the B3 generation structure and B4 semantic verifier
   generalize beyond Intro to IT Security.
