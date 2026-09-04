@@ -11,6 +11,10 @@ import type {
 import { analyzeSectionSemanticStructure } from "./semantic-structure.js";
 import { buildTypedEvidenceGroups } from "./typed-evidence.js";
 import { buildRequiredEvidenceManifest } from "./required-evidence.js";
+import {
+  classifyReviewerSectionSupport,
+  type ReviewerSectionSupport,
+} from "./reviewer-section-support.js";
 
 const COVERAGE_RULES: Readonly<
   Record<SectionSchemaKind, readonly string[]>
@@ -43,15 +47,59 @@ export function buildGenerationPlan(
   const sourceBlockById = new Map(
     source.blocks.map((block) => [block.id, block] as const),
   );
-  const sections = outline.sections.map((section) => {
+  const initialSections = outline.sections.map((section) => {
     validateSectionBlockIds(section, sourceBlockIds);
     return createPlannedSection(section, sourceBlockById);
+  });
+  const plannedSectionByTitleKey = new Map(
+    initialSections.map((section) => [sectionTitleKey(section.title), section] as const),
+  );
+  const childCountByParentKey = new Map<string, number>();
+  for (const section of initialSections) {
+    if (!section.conceptualParentKey) continue;
+    childCountByParentKey.set(
+      section.conceptualParentKey,
+      (childCountByParentKey.get(section.conceptualParentKey) ?? 0) + 1,
+    );
+  }
+  const sections = initialSections.map((section): PlannedSection => {
+    const localSourceBlocks = section.sourceBlockIds.flatMap((blockId) => {
+        const block = sourceBlockById.get(blockId);
+        return block ? [block] : [];
+      });
+    const meaningfulHeadingCount = localSourceBlocks.filter(
+      (block) => block.kind === "heading" && !isAuxiliarySourceHeading(block.text),
+    ).length;
+    const support: ReviewerSectionSupport =
+      localSourceBlocks.some((block) => block.kind === "heading") &&
+      !requiresStandaloneSafetyValidation(section.title) &&
+      meaningfulHeadingCount <= 1
+        ? classifyReviewerSectionSupport({
+            sourceBlocks: localSourceBlocks,
+            childSectionCount: childCountByParentKey.get(sectionTitleKey(section.title)) ?? 0,
+          })
+        : {
+            disposition: "standalone",
+            reason: "non-heading-or-safety-gated-source-section",
+            hasLocalExplanatoryEvidence: true,
+            localSemanticTextCount: localSourceBlocks.filter((block) => block.kind !== "heading").length,
+            localTypedEvidenceCount: 0,
+          };
+    const parent = section.conceptualParentKey
+      ? plannedSectionByTitleKey.get(section.conceptualParentKey)
+      : undefined;
+    return {
+      ...section,
+      reviewerDisposition: support.disposition,
+      dispositionReason: support.reason,
+      ...(parent ? { parentPlannedSectionId: parent.id } : {}),
+    };
   });
 
   return {
     id: stableId(
       "plan",
-      [outline.id, source.id, ...sections.map((section) => section.id)].join(
+      [outline.id, source.id, ...sections.map((section) => `${section.id}:${section.reviewerDisposition}`)].join(
         "\u001f",
       ),
     ),
@@ -62,6 +110,14 @@ export function buildGenerationPlan(
     metadata: {
       sectionCount: sections.length,
       sourceBlockCount: source.blocks.length,
+      ...(sections.some((section) => section.reviewerDisposition !== "standalone")
+        ? {
+            standaloneSectionCount: sections.filter((section) => section.reviewerDisposition === "standalone").length,
+            structuralNodeCount: sections.filter((section) => section.reviewerDisposition === "structural").length,
+            typedEvidenceNodeCount: sections.filter((section) => section.reviewerDisposition === "typed-evidence").length,
+            unsupportedNodeCount: sections.filter((section) => section.reviewerDisposition === "unsupported").length,
+          }
+        : {}),
     },
     sourceOutline: outline,
   };
@@ -274,4 +330,16 @@ function stableId(prefix: string, value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return `${prefix}-${(hash >>> 0).toString(36)}`;
+}
+
+function sectionTitleKey(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+}
+
+function requiresStandaloneSafetyValidation(title: string): boolean {
+  return /^(?:activity|answer|answers|example|examples|exercise|exercises|practice|question|questions|recap|review|solution|solutions)[:;]?$/i.test(title.trim());
+}
+
+function isAuxiliarySourceHeading(title: string): boolean {
+  return /^(?:activity|answer|answers|example|examples|exercise|exercises|objectives?|practice|question|questions|recap|review|solution|solutions)[:;]?$/i.test(title.trim());
 }

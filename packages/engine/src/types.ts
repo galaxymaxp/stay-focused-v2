@@ -223,6 +223,12 @@ export interface RequiredEvidenceTarget {
   readonly tableCells?: readonly TypedTableCellEvidence[];
 }
 
+export type ReviewerSectionDisposition =
+  | "standalone"
+  | "structural"
+  | "typed-evidence"
+  | "unsupported";
+
 export interface PlannedSection {
   readonly id: string;
   readonly sourceSectionId: string;
@@ -240,6 +246,9 @@ export interface PlannedSection {
   readonly evidenceGroups?: readonly TypedEvidenceGroup[];
   readonly requiredEvidence?: readonly RequiredEvidenceTarget[];
   readonly supportingSourceBlockIds?: readonly string[];
+  readonly reviewerDisposition?: ReviewerSectionDisposition;
+  readonly dispositionReason?: string;
+  readonly parentPlannedSectionId?: string;
 }
 
 export interface GenerationPlan {
@@ -255,6 +264,10 @@ export interface GenerationPlan {
 export interface GenerationPlanMetadata {
   readonly sectionCount: number;
   readonly sourceBlockCount: number;
+  readonly standaloneSectionCount?: number;
+  readonly structuralNodeCount?: number;
+  readonly typedEvidenceNodeCount?: number;
+  readonly unsupportedNodeCount?: number;
 }
 
 interface BaseSectionOutput {
@@ -497,6 +510,9 @@ export interface ReviewerSection {
   readonly leakageIssues: readonly LeakageIssue[];
   readonly qualityStatus: ReviewerSectionQualityStatus;
   readonly items: readonly SectionOutput[];
+  readonly representation?: ReviewerSectionDisposition;
+  readonly dispositionReason?: string;
+  readonly parentPlannedSectionId?: string;
 }
 
 export interface ReviewerMetadata {
@@ -523,6 +539,11 @@ export interface ReviewerMetadata {
   readonly grounding: GroundingReport;
   readonly leakageStatus: "passed" | "failed";
   readonly leakage: LeakageReport;
+  readonly sourceHierarchyNodeCount?: number;
+  readonly standaloneSectionCount?: number;
+  readonly structuralNodeCount?: number;
+  readonly typedEvidenceNodeCount?: number;
+  readonly unsupportedNodeCount?: number;
 }
 
 export interface ReviewerOutput {

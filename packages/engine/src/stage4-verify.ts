@@ -3,6 +3,7 @@ import { COVERAGE_THRESHOLD } from "@stay-focused/shared";
 import { verifySemanticCoverage } from "./semantic-verification.js";
 import { verifyPlanIntegrity } from "./plan-integrity.js";
 import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
+import { reviewerDispositionFor } from "./reviewer-section-support.js";
 
 import type {
   CoverageIssue,
@@ -94,7 +95,9 @@ export function verifyCoverage(args: VerifyCoverageArgs): CoverageReport {
     0,
   );
   const usesSemanticCoverage = plan.sections.some(
-    (section) => section.semanticPlan !== undefined,
+    (section) =>
+      reviewerDispositionFor(section) === "standalone" &&
+      section.semanticPlan !== undefined,
   );
   const semanticCoverageScore = roundScore(
     semanticTargetCount === 0
@@ -255,6 +258,9 @@ function verifyPlannedSection(
   sourceBlockIds: ReadonlySet<string>,
   planIntegrityIssues: readonly PlanIntegrityIssue[],
 ): SectionCoverageResult {
+  if (reviewerDispositionFor(section) !== "standalone") {
+    return verifySourceRepresentation(section, outputs, sourceBlockIds, planIntegrityIssues);
+  }
   const output = outputs[0];
   if (!output) {
     const semanticTargetCount = Math.max(
@@ -381,6 +387,69 @@ function verifyPlannedSection(
     requiredEvidenceTargetCount,
     representedRequiredEvidenceTargetCount,
     missingRequiredEvidenceTargetIds: missingRequiredEvidence.map((target) => target.id),
+  };
+}
+
+function verifySourceRepresentation(
+  section: PlannedSection,
+  outputs: readonly SectionOutput[],
+  sourceBlockIds: ReadonlySet<string>,
+  planIntegrityIssues: readonly PlanIntegrityIssue[],
+): SectionCoverageResult {
+  const output = outputs[0];
+  const targets = section.requiredEvidence ?? [];
+  if (!output) {
+    return {
+      plannedSectionId: section.id,
+      status: "failed",
+      score: 0,
+      issues: [`Missing deterministic source representation for planned node "${section.id}".`],
+      retryable: false,
+      semanticTargetCount: targets.length,
+      coveredSemanticTargetCount: 0,
+      semanticCoverageScore: targets.length === 0 ? 1 : 0,
+      planIntegrityStatus: planIntegrityIssues.length === 0 ? "passed" : "failed",
+      planIntegrityIssues,
+      requiredEvidenceTargetCount: targets.length,
+      representedRequiredEvidenceTargetCount: 0,
+      missingRequiredEvidenceTargetIds: targets.map((target) => target.id),
+    };
+  }
+
+  const issues: string[] = [];
+  if (output.kind !== section.schemaKind) issues.push("Output kind does not match planned schema kind.");
+  if (outputs.length > 1) issues.push(`Multiple outputs found for planned section "${section.id}".`);
+  if (
+    output.sourceBlockIds.length !== section.sourceBlockIds.length ||
+    output.sourceBlockIds.some((id, index) => id !== section.sourceBlockIds[index])
+  ) {
+    issues.push("Deterministic source representation changed source block ownership.");
+  }
+  if (output.sourceBlockIds.some((id) => !sourceBlockIds.has(id))) {
+    issues.push("Deterministic source representation references an unknown source block.");
+  }
+  const missing = findMissingRequiredEvidenceTargets(section, output);
+  issues.push(...missing.map((target) =>
+    `Missing required evidence target "${target.id}" (${target.kind}): ${target.label}`,
+  ));
+  issues.push(...planIntegrityIssues.map((issue) => issue.message));
+  const represented = targets.length - missing.length;
+  const semanticCoverageScore = targets.length === 0 ? 1 : roundScore(represented / targets.length);
+  const passed = issues.length === 0;
+  return {
+    plannedSectionId: section.id,
+    status: passed ? "passed" : "failed",
+    score: passed ? 1 : Math.min(REQUIRED_FIELD_FAILURE_CAP, semanticCoverageScore),
+    issues,
+    retryable: false,
+    semanticTargetCount: targets.length,
+    coveredSemanticTargetCount: represented,
+    semanticCoverageScore,
+    planIntegrityStatus: planIntegrityIssues.length === 0 ? "passed" : "failed",
+    planIntegrityIssues,
+    requiredEvidenceTargetCount: targets.length,
+    representedRequiredEvidenceTargetCount: represented,
+    missingRequiredEvidenceTargetIds: missing.map((target) => target.id),
   };
 }
 

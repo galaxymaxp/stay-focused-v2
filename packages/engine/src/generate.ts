@@ -14,6 +14,7 @@ import { retryFailedSections } from "./stage5-retry.js";
 import { validateGrounding } from "./stage5a-grounding.js";
 import { validateLeakage } from "./leakage-guard.js";
 import { assembleReviewer } from "./stage6-assemble.js";
+import { requiresProviderGeneration } from "./reviewer-section-support.js";
 import type {
   CoverageReport,
   GenerationPlan,
@@ -188,11 +189,11 @@ export async function runPipeline(
       sourceCharacterCount: sourceInputCharacterCount(args.input),
       normalizedCharacterCount: normalizedSourceCharacterCount(source),
       outlineItemCount: outline.sections.length,
-      plannedSectionCount: plan.sections.length,
+      plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
       providerCallCount,
       retryCount,
     });
-    providerCallCount += 1;
+    if (requiresProviderGeneration(section)) providerCallCount += 1;
     try {
       const output = await generateSection({
           section,
@@ -224,7 +225,7 @@ export async function runPipeline(
       sourceCharacterCount: sourceInputCharacterCount(args.input),
       normalizedCharacterCount: normalizedSourceCharacterCount(source),
       outlineItemCount: outline.sections.length,
-      plannedSectionCount: plan.sections.length,
+      plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
       providerCallCount,
       retryCount,
     });
@@ -238,7 +239,7 @@ export async function runPipeline(
     sourceCharacterCount: sourceInputCharacterCount(args.input),
     normalizedCharacterCount: normalizedSourceCharacterCount(source),
     outlineItemCount: outline.sections.length,
-    plannedSectionCount: plan.sections.length,
+    plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
     providerCallCount,
     retryCount,
   });
@@ -267,7 +268,7 @@ export async function runPipeline(
     sourceCharacterCount: sourceInputCharacterCount(args.input),
     normalizedCharacterCount: normalizedSourceCharacterCount(source),
     outlineItemCount: outline.sections.length,
-    plannedSectionCount: plan.sections.length,
+    plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
     providerCallCount,
     retryCount,
   });
@@ -327,7 +328,7 @@ export async function runPipeline(
     sourceCharacterCount: sourceInputCharacterCount(args.input),
     normalizedCharacterCount: normalizedSourceCharacterCount(source),
     outlineItemCount: outline.sections.length,
-    plannedSectionCount: plan.sections.length,
+    plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
     providerCallCount,
     retryCount,
   });

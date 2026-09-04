@@ -27,6 +27,7 @@ import {
   diagnoseStudentVisibleUsefulness,
   type StudentVisibleUsefulnessIssue,
 } from "./reviewer-usefulness.js";
+import { reviewerDispositionFor } from "./reviewer-section-support.js";
 import type {
   CoverageReport,
   CoverageStatus,
@@ -115,6 +116,7 @@ export async function retryFailedSections(
   );
 
   for (const section of plan.sections) {
+    if (reviewerDispositionFor(section) !== "standalone") continue;
     let sectionCoverage = requireCoverageResult(section, coverageBySectionId);
     let sectionGrounding = groundingBySectionId.get(section.id);
     let sectionLeakage = leakageBySectionId.get(section.id);
@@ -930,7 +932,7 @@ function diagnoseUsefulness(
   source: NormalizedSource,
   output: SectionOutput | undefined,
 ): readonly StudentVisibleUsefulnessIssue[] {
-  return output && section.requiredEvidence !== undefined
+  return reviewerDispositionFor(section) === "standalone" && output && section.requiredEvidence !== undefined
     ? diagnoseStudentVisibleUsefulness({ section, source, output })
     : [];
 }
@@ -940,7 +942,7 @@ function isOutputUseful(
   source: NormalizedSource,
   output: SectionOutput,
 ): boolean {
-  return section.requiredEvidence === undefined ||
+  return reviewerDispositionFor(section) !== "standalone" || section.requiredEvidence === undefined ||
     diagnoseStudentVisibleUsefulness({ section, source, output }).length === 0;
 }
 

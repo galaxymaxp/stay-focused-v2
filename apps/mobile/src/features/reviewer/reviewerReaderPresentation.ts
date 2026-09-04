@@ -75,6 +75,8 @@ export interface ReviewerReaderSection {
 const UNTITLED_REVIEWER = "Untitled reviewer";
 const UNTITLED_SECTION = "Untitled section";
 const EMPTY_SECTION_MESSAGE = "This section returned no study content.";
+const UNSUPPORTED_SOURCE_HEADING_MESSAGE =
+  "This source heading did not contain enough local evidence for a review explanation.";
 const EMPTY_BLOCK_MESSAGE = "No study content was returned here.";
 const EMPTY_REVIEWER_MESSAGE =
   "This reviewer returned no sections, so there is nothing to study yet.";
@@ -190,6 +192,7 @@ export function presentReviewerSection(
   sectionNumber: number,
 ): ReviewerReaderSection {
   const title = withFallback(section.title, UNTITLED_SECTION);
+  const representation = section.representation ?? "standalone";
   const singleItem = section.items.length === 1;
 
   const blocks = section.items.map((item, index): ReviewerReaderBlock => {
@@ -225,7 +228,13 @@ export function presentReviewerSection(
     title,
     blocks,
     notice: describeSectionNotice(section),
-    emptyMessage: blocks.length === 0 ? EMPTY_SECTION_MESSAGE : null,
+    emptyMessage: blocks.length === 0
+      ? representation === "structural"
+        ? null
+        : representation === "unsupported"
+        ? UNSUPPORTED_SOURCE_HEADING_MESSAGE
+        : EMPTY_SECTION_MESSAGE
+      : null,
   };
 }
 
@@ -235,6 +244,10 @@ export function presentReviewerSection(
  * enough to mean something.
  */
 export function describeSectionNotice(section: ReviewerSection): string | null {
+  if (section.representation === "typed-evidence") {
+    return "Evidence shown directly from your source material.";
+  }
+
   if (section.groundingStatus === "failed") {
     return "Parts of this section could not be matched back to your source.";
   }

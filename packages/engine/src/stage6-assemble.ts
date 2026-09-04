@@ -18,6 +18,7 @@ import {
   diagnoseStudentVisibleUsefulness,
   type StudentVisibleUsefulnessDiagnostic,
 } from "./reviewer-usefulness.js";
+import { reviewerDispositionFor } from "./reviewer-section-support.js";
 
 export interface AssembleReviewerArgs {
   readonly source: NormalizedSource;
@@ -106,7 +107,7 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
   validateLeakageReportAcceptance(leakage);
 
   const originalGeneratedSectionCount = sections.filter(
-    (section) => section.qualityStatus === "generated",
+    (section) => section.representation === "standalone" && section.qualityStatus === "generated",
   ).length;
   const repairedSectionCount = sections.filter(
     (section) => section.qualityStatus === "repaired",
@@ -138,7 +139,7 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       sourceKind: source.kind,
       language: source.language,
       sectionCount: plan.sections.length,
-      generatedSectionCount: sections.length,
+      generatedSectionCount: sections.filter((section) => section.representation === "standalone").length,
       originalGeneratedSectionCount,
       repairedSectionCount,
       fallbackSectionCount,
@@ -156,6 +157,11 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       grounding,
       leakageStatus: leakage.status,
       leakage,
+      sourceHierarchyNodeCount: plan.sections.length,
+      standaloneSectionCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "standalone").length,
+      structuralNodeCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "structural").length,
+      typedEvidenceNodeCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "typed-evidence").length,
+      unsupportedNodeCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "unsupported").length,
     },
   };
 }
@@ -221,6 +227,8 @@ function validateStudentVisibleStructure(args: {
     })) {
       throw new Error(`Stage 6 cannot assemble planned section "${section.id}" because required evidence is absent from its source.`);
     }
+    const disposition = reviewerDispositionFor(section);
+    if (disposition !== "standalone") continue;
     const points = output.sourceCore.keyPoints.map((point) => point.trim()).filter(Boolean);
     if (!explanation && points.length === 0) {
       throwStructureError("EMPTY_EXPLANATION", section.id, title);
@@ -251,7 +259,7 @@ function validateStudentVisibleStructure(args: {
     ) {
       throwStructureError("OVERSIZED_SECTION", section.id, title);
     }
-    const usefulnessIssues = section.requiredEvidence !== undefined
+    const usefulnessIssues = disposition === "standalone" && section.requiredEvidence !== undefined
       ? diagnoseStudentVisibleUsefulness({
           section,
           source: args.source,
@@ -602,6 +610,12 @@ function createReviewerSection(
   qualityStatus: ReviewerSectionQualityStatus,
 ): ReviewerSection {
   const visibleOutput = toDefaultStudentVisibleSectionOutput(output);
+  const representation = reviewerDispositionFor(plannedSection);
+  const hasVisibleItem =
+    representation === "standalone" ||
+    representation === "typed-evidence" ||
+    visibleOutput.sourceCore.explanation.trim().length > 0 ||
+    visibleOutput.sourceCore.keyPoints.some((point) => point.trim().length > 0);
 
   return {
     id: stableId(
@@ -622,7 +636,14 @@ function createReviewerSection(
     leakageStatus: leakage.status,
     leakageIssues: [...leakage.issues],
     qualityStatus,
-    items: [visibleOutput],
+    items: hasVisibleItem ? [visibleOutput] : [],
+    representation,
+    ...(plannedSection.dispositionReason
+      ? { dispositionReason: plannedSection.dispositionReason }
+      : {}),
+    ...(plannedSection.parentPlannedSectionId
+      ? { parentPlannedSectionId: plannedSection.parentPlannedSectionId }
+      : {}),
   };
 }
 

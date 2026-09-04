@@ -22,6 +22,7 @@ import {
   isInstructionalNoiseText,
 } from "./review-content.js";
 import { explanationHasUsefulForm } from "./reviewer-usefulness.js";
+import { reviewerDispositionFor } from "./reviewer-section-support.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -108,6 +109,11 @@ export async function generateSection(
       detail: "required evidence manifest references evidence absent from the supplied source blocks",
     });
   }
+  const sourceRepresentation = createSourceRepresentedSectionOutput({
+    section,
+    sourceBlocks,
+  });
+  if (sourceRepresentation) return sourceRepresentation;
   const detectedItems = extractCleanSourceItems({
     sourceSpanText: sourceBlocksToLineText(sourceBlocks),
     sectionTitle: section.title,
@@ -186,6 +192,89 @@ export async function generateSection(
   } as SectionOutput);
   validateSectionInstructionLeakage(normalizedOutput, section);
   return normalizedOutput;
+}
+
+export function createSourceRepresentedSectionOutput(args: {
+  readonly section: PlannedSection;
+  readonly sourceBlocks: readonly NormalizedSourceBlock[];
+}): SectionOutput | undefined {
+  const disposition = reviewerDispositionFor(args.section);
+  if (disposition === "standalone") return undefined;
+
+  const keyPoints = disposition === "typed-evidence"
+    ? typedSourceRepresentationTexts(args.sourceBlocks)
+    : disposition === "structural"
+    ? semanticSourceRepresentationTexts(args.section)
+    : [];
+
+  return {
+    id: stableSectionRepresentationId(args.section.id, disposition, keyPoints),
+    kind: args.section.schemaKind,
+    plannedSectionId: args.section.id,
+    title: args.section.title,
+    sourceBlockIds: [...args.section.sourceBlockIds],
+    sourceCore: { explanation: "", keyPoints },
+    enrichment: null,
+  } as SectionOutput;
+}
+
+function semanticSourceRepresentationTexts(section: PlannedSection): readonly string[] {
+  const semanticRows = (section.semanticPlan?.units ?? []).map((unit) => {
+    if (unit.items.length === 0) return unit.label;
+    return unit.kind === "mapping"
+      ? [unit.label, ...unit.items].join(" | ")
+      : `${unit.label}: ${unit.items.join("; ")}`;
+  });
+  return uniqueExactText(
+    semanticRows.length > 0
+      ? semanticRows
+      : (section.requiredEvidence ?? []).flatMap((target) => target.evidenceTexts),
+  );
+}
+
+function typedSourceRepresentationTexts(
+  sourceBlocks: readonly NormalizedSourceBlock[],
+): readonly string[] {
+  return uniqueExactText(sourceBlocks.flatMap((block) => {
+    const structured = block.structuredBlock;
+    if (structured?.type === "table") {
+      return [
+        block.text,
+        ...structured.rows.map((row) => row.cells.map((cell) => cell.text).join(" | ")),
+      ];
+    }
+    if (structured?.type === "formula") return [block.text, structured.rawText];
+    if (structured?.type === "code") return [block.text, structured.text];
+    return block.kind === "code" || block.kind === "formula" || block.kind === "table"
+      ? [block.text]
+      : [];
+  }));
+}
+
+function uniqueExactText(values: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+}
+
+function stableSectionRepresentationId(
+  sectionId: string,
+  disposition: string,
+  keyPoints: readonly string[],
+): string {
+  const value = [sectionId, disposition, ...keyPoints].join("\u001f");
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `source-representation-${(hash >>> 0).toString(36)}`;
 }
 
 export function buildSectionPrompt(

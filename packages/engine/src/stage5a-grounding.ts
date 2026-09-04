@@ -17,6 +17,7 @@ import { findSourceTokenFidelityViolations } from "./source-token-fidelity.js";
 import { typedEvidenceTexts } from "./typed-evidence.js";
 import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
 import { reviewableSourceBlocks } from "./review-content.js";
+import { reviewerDispositionFor } from "./reviewer-section-support.js";
 import type {
   GenerationPlan,
   GroundingIssue,
@@ -128,6 +129,12 @@ export function validateGrounding(
         `Grounding validation could not find source section "${section.sourceSectionId}".`,
       );
     }
+    if (reviewerDispositionFor(section) !== "standalone") {
+      return validateSourceRepresentationGrounding(
+        section,
+        outputsBySectionId.get(section.id) ?? [],
+      );
+    }
     return validateSectionGrounding({
       section,
       allSections: args.plan.sections,
@@ -152,11 +159,17 @@ export function validateGrounding(
       total + (section.semanticRelationshipIssueCount ?? 0),
     0,
   );
+  const scoredSectionIds = new Set(
+    args.plan.sections
+      .filter((section) => reviewerDispositionFor(section) === "standalone")
+      .map((section) => section.id),
+  );
+  const scoredSections = sections.filter((section) => scoredSectionIds.has(section.plannedSectionId));
   const score = roundScore(
-    sections.length === 0
-      ? 0
-      : sections.reduce((total, section) => total + section.score, 0) /
-          sections.length,
+    scoredSections.length === 0
+      ? sections.every((section) => section.status === "passed") ? 1 : 0
+      : scoredSections.reduce((total, section) => total + section.score, 0) /
+          scoredSections.length,
   );
   const status =
     score >= GROUNDING_THRESHOLD &&
@@ -190,6 +203,48 @@ export function validateGrounding(
     phase1FabricationFails: phase1FabricationFailures.length,
     phase1FabricationFailures,
     semanticRelationshipIssueCount,
+  };
+}
+
+function validateSourceRepresentationGrounding(
+  section: PlannedSection,
+  outputs: readonly SectionOutput[],
+): InstrumentedSectionGroundingResult {
+  const output = outputs[0];
+  const targets = section.requiredEvidence ?? [];
+  const missing = output ? findMissingRequiredEvidenceTargets(section, output) : targets;
+  const represented = targets.length - missing.length;
+  const issues: GroundingIssue[] = missing.map((target) => ({
+    type: "grounding-omission",
+    severity: "error",
+    plannedSectionId: section.id,
+    sourceSectionId: section.sourceSectionId,
+    sourceItem: target.label,
+    message: `Required evidence target "${target.id}" (${target.kind}) is absent from the source representation.`,
+  }));
+  if (!output && targets.length === 0) {
+    issues.push({
+      type: "grounding-omission",
+      severity: "error",
+      plannedSectionId: section.id,
+      sourceSectionId: section.sourceSectionId,
+      message: "Deterministic source representation is absent.",
+    });
+  }
+  const score = targets.length === 0
+    ? output ? 1 : 0
+    : roundScore(represented / targets.length);
+  return {
+    plannedSectionId: section.id,
+    sourceSectionId: section.sourceSectionId,
+    status: issues.length === 0 ? "passed" : "failed",
+    score,
+    sourceItemCount: targets.length,
+    representedSourceItemCount: represented,
+    issues,
+    retryable: false,
+    phase1FabricationFailures: [],
+    semanticRelationshipIssueCount: 0,
   };
 }
 
