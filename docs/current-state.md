@@ -32,6 +32,16 @@ Last refreshed: 2026-09-04, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer B15 makes source sufficiency a Stage 2 planning concern. Explicit
+  source nodes are deterministically classified as standalone, structural,
+  typed evidence or unsupported; non-standalone nodes retain hierarchy and
+  exact evidence ownership without provider calls or fabricated explanations.
+  B15 passes 12/12 focused regressions and the full 449/449 engine suite. Fresh
+  targeted acceptance remains failed: Python preserves 99/99 targets but is
+  withheld for instructional noise; Statistics/MinerU preserves 211/232,
+  Statistics/Docling 152/156 and Accounting 35/46, all with zero fabrication
+  failures. The full B12 rerun was not eligible. Production remains `legacy`.
+  See `docs/ai/acceptance/b15/reviewer-section-planning.md`.
 - Reviewer B14 hardens explanation form and targeted repair while retaining all
   B13 safety gates. The new 12/12 suite and full 437/437 engine evaluations pass.
   Acceptance remains failed: exact B13 candidates are still withheld, and
@@ -182,6 +192,11 @@ Last refreshed: 2026-09-04, Asia/Manila.
 
 ## Deterministic test baseline
 
+- B15 verification passes 449/449 engine evaluations (B15 12/12, B14 12/12,
+  B13 19/19) and 607/607 API tests across 69 files. Root typecheck, lint and
+  build pass for 7/7 workspaces; four established mobile import-order warnings
+  remain. Fresh targeted provider runs completed but all four Reviewers were
+  safely withheld, so the full B12 rerun was not run.
 - B11 verification passes 405/405 engine evaluations (all prior 396 remain)
   and 607/607 API tests. Engine and full repository typechecks pass; builds
   pass; lint retains only the four accepted mobile import-order warnings. B10's

@@ -2227,3 +2227,29 @@ Current route status:
 - B14 verdict: FAIL. Next task is to reconcile heading-only planned sections
   with the source-faithful explanatory contract without borrowing or weakening
   gates. See `docs/ai/acceptance/b14/reviewer-explanatory-repair.md`.
+
+## 2026-09-04 — Reviewer B15 evidence-supported section planning
+
+- Started at `55547b2` on `main`, 10 ahead / 0 behind, with only the historical
+  untracked B8 evidence present and the same two known dangling blobs.
+- Stage 2 now classifies explicit source nodes as standalone, structural,
+  typed-evidence or unsupported from local normalized/semantic evidence.
+  Non-standalone nodes retain titles, reasons, manifests and exact evidence but
+  make no provider/retry calls and do not require invented explanations.
+- The source audit retains all 13 Python headings as 9 standalone, 2 typed and
+  2 unsupported nodes; Statistics/MinerU is 9 standalone plus 1 unsupported;
+  Statistics/Docling remains 11 standalone; Accounting is 5 standalone plus 1
+  structural introduction. Manifest totals and owners remain 99, 232, 156 and
+  46 respectively, with zero planning-time loss or reassignment.
+- B15 12/12 and engine 449/449 pass; API remains 607/607. Root typecheck, lint
+  and build pass, with only four established mobile import-order warnings.
+- Fresh targeted provider validation still fails acceptance. Python reaches
+  1.00 coverage/grounding and 99/99 targets but is withheld for instructional
+  noise. Statistics/MinerU reaches 0.91/0.80 and 211/232,
+  Statistics/Docling 0.97/0.81 and 152/156, and Accounting 0.76/0.88 and 35/46.
+  All four are withheld with zero fabrication failures, so the full unchanged
+  B12 rerun was not eligible.
+- B15 verdict: FAIL. Next task is source-supported evidence completion and
+  usefulness repair without changing B15 dispositions, evidence ownership,
+  parser defaults or frozen B13/B14 gates. See
+  `docs/ai/acceptance/b15/reviewer-section-planning.md`.

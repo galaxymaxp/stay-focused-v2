@@ -2,6 +2,27 @@
 
 Last refreshed: 2026-09-04, Asia/Manila.
 
+## Reviewer B15 - Planning boundary repaired, acceptance still failed
+
+Stage 2 now distinguishes standalone, structural, typed-evidence and
+unsupported source nodes using only local normalized/semantic evidence.
+Non-standalone nodes retain explicit hierarchy, disposition reasons, exact
+typed/semantic representations and unchanged manifest owners while consuming
+no provider or retry calls. Twelve focused regressions pass and the complete
+engine suite is 449/449 with all B13/B14 gates retained.
+
+Fresh targeted acceptance did not clear the full-corpus prerequisite. Python
+preserved 99/99 targets at 1.00 coverage/grounding but was withheld for
+instructional noise. Statistics/MinerU preserved 211/232, Statistics/Docling
+152/156 and Accounting 35/46; provider omissions and Statistics usefulness
+failures were rejected with zero fabrication failures. The full unchanged B12
+rerun was therefore not run. Production remains `legacy` and historical
+acceptance evidence is unchanged.
+
+Next task: repair source-supported evidence completion and usefulness without
+changing B15 classifications, ownership, frozen thresholds or parser defaults,
+then rerun the four targeted cases before full B12.
+
 ## Reviewer B14 - Explanation hardening, acceptance blocked by source boundary
 
 Field-aware imperative, code-as-explanation, fragment and explanation-dump

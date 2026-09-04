@@ -4,14 +4,15 @@ Last refreshed: 2026-09-04, Asia/Manila.
 
 ## Current objective result
 
-Reviewer B14 added field-aware imperative, code-dominant, fragmentary and
-explanation-dump diagnostics; missing-target prompts now expose a bounded exact
-slice, and usefulness repair preserves accepted content. Its new suite is 12/12
-and the engine is **437/437**. Acceptance remains failed without new live calls:
-the exact B13 replay is still withheld, and plan audit proves heading-only and
-code-only Python sections lack source prose for the required explanations.
-Production remains `legacy`. See
-`docs/ai/acceptance/b14/reviewer-explanatory-repair.md`.
+Reviewer B15 now distinguishes source-supported standalone sections from
+structural, typed-evidence and unsupported nodes before generation. Exact
+non-standalone representations retain titles, manifests and ownership while
+making no provider or retry calls. Its new suite is 12/12 and the engine is
+**449/449**, retaining B13 and B14. Fresh targeted acceptance still fails:
+Python is withheld for instructional noise despite 99/99 target representation;
+Statistics and Accounting remain withheld for provider omissions, with
+Statistics also failing usefulness. Production remains `legacy`. See
+`docs/ai/acceptance/b15/reviewer-section-planning.md`.
 
 ## B13 predecessor result
 
@@ -69,20 +70,24 @@ Both statistics arms remain correctly withheld for omissions or missing output
 rather than inventing relationships. Typed accounting cells and numeric/OCR
 provenance remain intact.
 
-## B14 verification
+## B15 verification
 
-- FRESH B14 regressions: 12/12; engine evaluations: 437/437, retaining all 425
-  prior cases, including all 19 B13 regressions.
+- FRESH B15 regressions: 12/12; engine evaluations: 449/449, retaining all 437
+  prior cases, including all B13 and B14 regressions.
 - FRESH API tests: 607/607 across 69 files.
 - Full typecheck, lint and builds pass; the acceptance report records fresh
   versus cached tasks. Lint retains only the four accepted mobile warnings.
-- Exact B13 candidate replay remains withheld. B14 targeted live and full
-  unchanged B12 reruns: NOT RUN because evidence-bound prerequisites failed.
+- Fresh provider-backed targeted results: Python 1.00/1.00 with 99/99 required
+  targets but usefulness failure; Statistics/MinerU 0.91/0.80 with 211/232;
+  Statistics/Docling 0.97/0.81 with 152/156; Accounting 0.76/0.88 with 35/46.
+  All four were safely withheld with zero fabrication failures.
+- Full unchanged B12 rerun: NOT RUN because targeted prerequisites failed.
 - Repository diff and object-integrity checks pass; only the two known
   dangling blobs remain.
 
 ## Next action
 
-Reconcile heading-only planned sections with the source-faithful explanatory
-contract without borrowing, fabrication, parser-default changes, or weaker
-usefulness gates. Do not spend further live calls until that boundary is solved.
+Repair source-supported required-evidence completion and student-visible
+usefulness for the four targeted cases without changing B15 dispositions,
+evidence ownership, parser defaults, grounding thresholds or frozen B13/B14
+gates. Rerun targeted acceptance before the full unchanged B12 contract.
