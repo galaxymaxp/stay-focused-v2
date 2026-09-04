@@ -1,8 +1,20 @@
 # Current Sprint
 
-Last refreshed: 2026-09-04, Asia/Manila.
+Last refreshed: 2026-09-05, Asia/Manila.
 
 ## Current objective result
+
+Reviewer B16 now assembles every required manifest target deterministically
+before provider work and restricts batched provider output to explanations.
+The focused suite passes 26/26, the engine 475/475, and API 607/607. Provider-
+owned required targets and factual retries are zero; non-standalone nodes use
+zero calls. Live quality acceptance is unresolved because Python calls returned
+OpenAI 429 `no credits remaining`. Its safe fallback preserved 99/99 targets
+with zero loss/fabrication in 5.432 s and two initial batches, but Statistics,
+Accounting, and full B12 were not run. Production remains `legacy`. See
+`docs/ai/acceptance/b16/reviewer-deterministic-evidence-runtime.md`.
+
+## B15 predecessor result
 
 Reviewer B15 now distinguishes source-supported standalone sections from
 structural, typed-evidence and unsupported nodes before generation. Exact
@@ -87,7 +99,6 @@ provenance remain intact.
 
 ## Next action
 
-Repair source-supported required-evidence completion and student-visible
-usefulness for the four targeted cases without changing B15 dispositions,
-evidence ownership, parser defaults, grounding thresholds or frozen B13/B14
-gates. Rerun targeted acceptance before the full unchanged B12 contract.
+Restore provider capacity and rerun the B16 targeted order. Accept only after
+successful explanations pass grounding, usefulness, manual quality, and
+runtime, then run unchanged B12. Do not start a B17 benchmark patch.

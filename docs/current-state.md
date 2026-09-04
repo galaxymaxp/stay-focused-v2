@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-09-04, Asia/Manila.
+Last refreshed: 2026-09-05, Asia/Manila.
 
 ## Repository
 
@@ -32,6 +32,15 @@ Last refreshed: 2026-09-04, Asia/Manila.
 
 ## Recovery and active implementation
 
+- Reviewer B16 deterministically assembles required facts, list items,
+  formulas/results, tables/rows, code, relationships, titles, and provenance.
+  OpenAI owns only bounded batched explanations; ownership and prose validation
+  are separate and runtime/request metrics are explicit. Focused 26/26, engine
+  475/475, API 607/607, and all root gates pass. Live acceptance is unresolved:
+  Python returned permanent no-credit 429s. Its two-call, zero-retry fallback
+  preserved 99/99 targets in 5.432 s, but Statistics, Accounting, and full B12
+  were not run. Production remains `legacy`. See
+  `docs/ai/acceptance/b16/reviewer-deterministic-evidence-runtime.md`.
 - Reviewer B15 makes source sufficiency a Stage 2 planning concern. Explicit
   source nodes are deterministically classified as standalone, structural,
   typed evidence or unsupported; non-standalone nodes retain hierarchy and

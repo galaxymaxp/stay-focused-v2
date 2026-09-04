@@ -1,6 +1,20 @@
 # Roadmap
 
-Last refreshed: 2026-09-04, Asia/Manila.
+Last refreshed: 2026-09-05, Asia/Manila.
+
+## Reviewer B16 - Deterministic architecture implemented, live gate blocked
+
+Required evidence is now assembled and identity-checked from the Stage 2
+manifest before any provider call. OpenAI owns only bounded batched
+explanations; factual retries are zero, stable IDs isolate batch failures, and
+non-standalone dispositions consume zero calls. Focused 26/26, full engine
+475/475, API 607/607, and all root gates pass.
+
+The live decision gate remains unresolved. Python's two batches returned
+OpenAI 429 `no credits remaining`; safe fallback preserved 99/99 targets in
+5.432 s with no loss/fabrication, but this does not establish provider quality.
+Statistics, Accounting, and full B12 were not run. Restore provider capacity
+and rerun B16 before B17. Production remains `legacy`.
 
 ## Reviewer B15 - Planning boundary repaired, acceptance still failed
 

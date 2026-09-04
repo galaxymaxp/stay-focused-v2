@@ -2253,3 +2253,27 @@ Current route status:
   usefulness repair without changing B15 dispositions, evidence ownership,
   parser defaults or frozen B13/B14 gates. See
   `docs/ai/acceptance/b15/reviewer-section-planning.md`.
+
+## 2026-09-05 — Reviewer B16 deterministic evidence architecture
+
+- Started at `95fc5ac` on `main`, 12 ahead / 0 behind, with only historical B8
+  untracked and the same two known dangling blobs.
+- Required targets are assembled and identity-hashed before provider work. The
+  provider schema contains only stable IDs and concise explanations; required
+  key points are source-owned. Batches are capped at six sections / 36,000
+  support characters with stable-ID isolation and source-order assembly.
+- Stage 4 checks deterministic representation; Stage 5 performs explanation-
+  only repair for manifest plans; Stage 5a validates source-owned evidence and
+  model prose separately. Permanent quota failures do not retry.
+- Runtime metrics cover total/planning/deterministic/provider/validation/
+  assembly time, batch sizes, requests, and both retry classes. The durable
+  workflow shares this batching boundary and keeps per-section checkpoints.
+- Focused 26/26, engine 475/475, API 607/607, root typecheck/lint/build pass.
+- Live acceptance stopped at Python because OpenAI returned 429 `no credits
+  remaining`. Two initial batches, zero retries, and 5.432 s total preserved
+  99/99 targets with zero issues, omissions, fabrications, or provider losses.
+  This fallback is not provider-quality acceptance; remaining targets and full
+  B12 were not run.
+- Verdict: FAIL because frozen live acceptance is unresolved. Restore provider
+  capacity and rerun the required B16 order before any B17 work. See
+  `docs/ai/acceptance/b16/reviewer-deterministic-evidence-runtime.md`.
