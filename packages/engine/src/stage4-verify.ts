@@ -4,6 +4,7 @@ import { verifySemanticCoverage } from "./semantic-verification.js";
 import { verifyPlanIntegrity } from "./plan-integrity.js";
 import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
 import { reviewerDispositionFor } from "./reviewer-section-support.js";
+import { validateDeterministicSectionEvidence } from "./reviewer-evidence-assembly.js";
 
 import type {
   CoverageIssue,
@@ -305,6 +306,12 @@ function verifyPlannedSection(
   }
 
   const semanticCheck = verifySemanticCoverage(section, output);
+  const deterministicCheck = output.deterministicEvidence
+    ? validateDeterministicSectionEvidence(section, output)
+    : undefined;
+  if (deterministicCheck && !deterministicCheck.valid) {
+    issues.push(...deterministicCheck.issues);
+  }
   const missingRequiredEvidence = findMissingRequiredEvidenceTargets(section, output);
   const requiredEvidenceTargetCount = section.requiredEvidence?.length ?? 0;
   const representedRequiredEvidenceTargetCount = Math.max(
@@ -334,13 +341,20 @@ function verifyPlannedSection(
         : 1
       : semanticCheck.coveredTargetCount
     : 0;
-  const semanticCoverageScore = hasSemanticPlan
+  const semanticCoverageScore = hasRequiredManifest || hasSemanticPlan
     ? roundScore(coveredSemanticTargetCount / semanticTargetCount)
     : 1;
   if (hasRequiredManifest || hasSemanticPlan) {
-    score = Math.min(score, semanticCoverageScore, semanticCheck.score);
+    // A required-evidence manifest supersedes the older fuzzy semantic text
+    // match. Once exact manifest identities are assembled and validated, a
+    // paraphrased explanation cannot lower factual coverage.
+    score = Math.min(
+      score,
+      semanticCoverageScore,
+      ...(hasRequiredManifest ? [] : [semanticCheck.score]),
+    );
     issues.push(
-      ...semanticCheck.issues,
+      ...(hasRequiredManifest ? [] : semanticCheck.issues),
       ...(hasRequiredManifest
         ? missingRequiredEvidence.map(
             (target) =>
@@ -357,15 +371,22 @@ function verifyPlannedSection(
     sourceCheck.hasUnknownReference
   ) {
     score = Math.min(score, REQUIRED_FIELD_FAILURE_CAP);
-  } else if (fieldCheck.hasWeakContent) {
+  } else if (fieldCheck.hasWeakContent && !output.deterministicEvidence) {
+    // In the deterministic architecture, factual coverage and explanation
+    // usefulness are separate gates. Weak prose is handled by the usefulness
+    // validator/retry path and cannot downgrade exact evidence coverage.
     score = Math.min(score, 0.84);
   }
   score = roundScore(score);
 
-  const semanticIncomplete =
-    (hasRequiredManifest || hasSemanticPlan) &&
-    (coveredSemanticTargetCount < semanticTargetCount || semanticCheck.coveredTargetCount < semanticCheck.targetCount);
+  const semanticIncomplete = hasRequiredManifest
+    ? coveredSemanticTargetCount < semanticTargetCount
+    : hasSemanticPlan && semanticCheck.coveredTargetCount < semanticCheck.targetCount;
   const planIsInvalid = planIntegrityIssues.length > 0;
+  const deterministicAssemblyInvalid = deterministicCheck?.valid === false;
+  if (deterministicAssemblyInvalid) {
+    score = Math.min(score, REQUIRED_FIELD_FAILURE_CAP);
+  }
   if (planIsInvalid) {
     score = Math.min(score, REQUIRED_FIELD_FAILURE_CAP);
     issues.push(...planIntegrityIssues.map((issue) => issue.message));
@@ -378,7 +399,8 @@ function verifyPlannedSection(
         : statusForScore(score),
     score,
     issues,
-    retryable: !planIsInvalid && (semanticIncomplete || score < PASSED_THRESHOLD),
+    retryable: !planIsInvalid && !deterministicAssemblyInvalid &&
+      (semanticIncomplete || score < PASSED_THRESHOLD),
     semanticTargetCount,
     coveredSemanticTargetCount,
     semanticCoverageScore,

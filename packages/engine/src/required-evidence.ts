@@ -128,7 +128,7 @@ export function findMissingRequiredEvidenceTargets(
   const targets = section.requiredEvidence ?? [];
   if (!output) return targets;
   const visibleRows = [
-    output.sourceCore?.explanation,
+    ...(output.deterministicEvidence ? [] : [output.sourceCore?.explanation]),
     ...(output.sourceCore?.keyPoints ?? []),
   ].filter((value): value is string => typeof value === "string")
     .map((value) => value.trim()).filter(Boolean);

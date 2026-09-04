@@ -36,8 +36,9 @@ export function extractStudentVisibleText(
 export function toDefaultStudentVisibleSectionOutput(
   output: SectionOutput,
 ): SectionOutput {
+  const { deterministicEvidence: _internalEvidence, ...studentVisible } = output;
   return {
-    ...output,
+    ...studentVisible,
     sourceBlockIds: [...output.sourceBlockIds],
     sourceCore: {
       explanation: output.sourceCore.explanation,

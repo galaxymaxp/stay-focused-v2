@@ -238,10 +238,15 @@ async function runComparison(
       groundingIssueDiagnostics: reviewer.metadata.grounding.issues.map(compactGroundingIssue),
       fabricationCount: reviewer.metadata.grounding.phase1FabricationFails,
       omissionCount: reviewer.metadata.grounding.issues.filter((issue) => issue.type === "grounding-omission").length,
+      manifestTotal: reviewer.metadata.coverage.sections.reduce((total, section) => total + (section.requiredEvidenceTargetCount ?? 0), 0),
+      representedDeterministicTargets: reviewer.metadata.coverage.sections.reduce((total, section) => total + (section.representedRequiredEvidenceTargetCount ?? 0), 0),
+      providerOwnedRequiredTargets: 0,
+      providerCausedTargetLosses: 0,
       relationshipFailures: reviewer.metadata.grounding.issues.filter((issue) => !["grounding-fabrication", "grounding-omission"].includes(issue.type)).length,
       leakageStatus: reviewer.metadata.leakageStatus,
       retries: progress?.retryCount ?? 0,
       providerCalls: progress?.providerCallCount ?? 0,
+      generationMetrics: reviewer.metadata.generationMetrics ?? null,
       assembly: "passed",
       structureDiagnostics: [],
       finalTitles: reviewer.sections.map((section) => section.title),
@@ -268,10 +273,15 @@ async function runComparison(
       groundingIssueDiagnostics: state.grounding.issues.map(compactGroundingIssue),
       fabricationCount: state.grounding.phase1FabricationFails,
       omissionCount: state.grounding.issues.filter((issue) => issue.type === "grounding-omission").length,
+      manifestTotal: state.plan.sections.reduce((total, section) => total + (section.requiredEvidence?.length ?? 0), 0),
+      representedDeterministicTargets: state.coverage.sections.reduce((total, section) => total + (section.representedRequiredEvidenceTargetCount ?? 0), 0),
+      providerOwnedRequiredTargets: 0,
+      providerCausedTargetLosses: state.coverage.sections.reduce((total, section) => total + (section.missingRequiredEvidenceTargetIds?.length ?? 0), 0),
       relationshipFailures: state.grounding.issues.filter((issue) => !["grounding-fabrication", "grounding-omission"].includes(issue.type)).length,
       leakageStatus: state.leakage.status,
       retries: Object.values(state.retryAttemptsBySectionId).reduce((total, value) => total + value, 0),
       providerCalls: progress?.providerCallCount ?? 0,
+      generationMetrics: state.generationMetrics ?? null,
       assembly: "failed",
       assemblyError: error.message,
       assemblyDiagnostics: error.diagnostics,
@@ -337,12 +347,12 @@ function countValues(values: readonly string[]): Record<string, number> {
   return counts;
 }
 
-function renderReviewer(reviewer: { readonly sections: readonly { readonly title: string; readonly explanation?: string; readonly keyPoints?: readonly string[] }[] }): string {
-  return `${reviewer.sections.map((section) => [
+function renderReviewer(reviewer: { readonly sections: readonly { readonly title: string; readonly items: readonly { readonly title: string; readonly sourceCore: { readonly explanation: string; readonly keyPoints: readonly string[] } }[] }[] }): string {
+  return `${reviewer.sections.flatMap((group) => group.items.map((section) => [
     section.title,
-    section.explanation ?? "",
-    ...(section.keyPoints ?? []).map((point) => `- ${point}`),
-  ].filter(Boolean).join("\n")).join("\n\n")}\n`;
+    section.sourceCore.explanation,
+    ...section.sourceCore.keyPoints.map((point) => `- ${point}`),
+  ].filter(Boolean).join("\n"))).join("\n\n")}\n`;
 }
 
 function renderWithheld(run: Record<string, unknown>): string {

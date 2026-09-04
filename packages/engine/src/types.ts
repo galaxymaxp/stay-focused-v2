@@ -277,6 +277,13 @@ interface BaseSectionOutput {
   readonly sourceBlockIds: readonly string[];
   readonly sourceCore: SourceGroundedCore;
   readonly enrichment: EnrichmentLayer | null;
+  /** Internal ownership proof. Removed before student-visible serialization. */
+  readonly deterministicEvidence?: DeterministicEvidenceAssembly;
+}
+
+export interface DeterministicEvidenceAssembly {
+  readonly targetIds: readonly string[];
+  readonly evidenceHash: string;
 }
 
 export interface SourceGroundedCore {
@@ -544,6 +551,21 @@ export interface ReviewerMetadata {
   readonly structuralNodeCount?: number;
   readonly typedEvidenceNodeCount?: number;
   readonly unsupportedNodeCount?: number;
+  readonly generationMetrics?: ReviewerGenerationMetrics;
+}
+
+export interface ReviewerGenerationMetrics {
+  readonly totalDurationMs: number;
+  readonly planningDurationMs: number;
+  readonly deterministicEvidenceDurationMs: number;
+  readonly providerWaitDurationMs: number;
+  readonly validationDurationMs: number;
+  readonly assemblyDurationMs: number;
+  readonly providerRequestCount: number;
+  readonly sectionsPerProviderRequest: readonly number[];
+  readonly providerRetryCount: number;
+  readonly factualCompletionRetryCount: 0;
+  readonly explanationRetryCount: number;
 }
 
 export interface ReviewerOutput {

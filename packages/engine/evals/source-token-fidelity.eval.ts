@@ -6,6 +6,7 @@ import type {
   GenerationRequest,
 } from "../src/provider.js";
 import { assembleReviewer } from "../src/stage6-assemble.js";
+import { renderRequiredEvidenceTarget } from "../src/reviewer-evidence-assembly.js";
 import { extractCleanSourceItems } from "../src/source-items.js";
 import { normalizeSource } from "../src/stage0-normalize.js";
 import { detectOutline } from "../src/stage1-outline.js";
@@ -416,6 +417,9 @@ function createPreservationCase(fixture: FidelityFixture): EvalCase {
       });
       const visibleKeyPoints =
         reviewer.sections[0]?.items[0]?.sourceCore.keyPoints ?? [];
+      const deterministicKeyPoints = [...new Set(
+        (section.requiredEvidence ?? []).map(renderRequiredEvidenceTarget),
+      )];
       const issues: EvalIssue[] = [
         ...assertDeepEqual(
           plannedItems,
@@ -424,8 +428,8 @@ function createPreservationCase(fixture: FidelityFixture): EvalCase {
         ),
         ...assertDeepEqual(
           output.sourceCore.keyPoints,
-          fixture.items,
-          `${fixture.name} source items changed during Stage 3 overwrite.`,
+          deterministicKeyPoints,
+          `${fixture.name} deterministic manifest evidence changed during Stage 3.`,
         ),
         ...assertEqual(
           grounding.status,
@@ -434,8 +438,8 @@ function createPreservationCase(fixture: FidelityFixture): EvalCase {
         ),
         ...assertDeepEqual(
           visibleKeyPoints,
-          fixture.items,
-          `${fixture.name} source items changed during Stage 6 assembly.`,
+          deterministicKeyPoints,
+          `${fixture.name} deterministic manifest evidence changed during Stage 6 assembly.`,
         ),
       ];
 

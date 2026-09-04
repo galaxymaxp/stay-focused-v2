@@ -95,7 +95,7 @@
       }
     },
     {
-      "name": "provider receives one initial request per planned section",
+      "name": "provider receives one batched initial explanation request",
       "scenario": "initial-request-count",
       "input": {
         "id": "pipeline-request-count-source",

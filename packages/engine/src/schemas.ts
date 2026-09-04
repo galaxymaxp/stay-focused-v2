@@ -11,6 +11,39 @@ export interface StructuredOutputSchema {
   };
 }
 
+export function createExplanationBatchSchema(
+  sectionIds: readonly string[],
+): StructuredOutputSchema {
+  if (sectionIds.length === 0) {
+    throw new Error("Explanation batch schema requires at least one section ID.");
+  }
+  return {
+    name: "ReviewerExplanationBatch",
+    description: "Concise source-grounded explanations keyed by planned section ID.",
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["explanations"],
+      properties: {
+        explanations: {
+          type: "array",
+          minItems: sectionIds.length,
+          maxItems: sectionIds.length,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["sectionId", "explanation"],
+            properties: {
+              sectionId: { type: "string", enum: sectionIds },
+              explanation: { type: "string", minLength: 1 },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 const baseRequired = [
   "id",
   "plannedSectionId",

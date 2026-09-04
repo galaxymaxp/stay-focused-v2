@@ -18,6 +18,7 @@ import { typedEvidenceTexts } from "./typed-evidence.js";
 import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
 import { reviewableSourceBlocks } from "./review-content.js";
 import { reviewerDispositionFor } from "./reviewer-section-support.js";
+import { validateDeterministicSectionEvidence } from "./reviewer-evidence-assembly.js";
 import type {
   GenerationPlan,
   GroundingIssue,
@@ -270,7 +271,9 @@ function validateSectionGrounding(args: {
     };
   }
 
-  const visibleEntries = extractStudentVisibleText(output);
+  const visibleEntries = extractStudentVisibleText(output).filter((entry) =>
+    output.deterministicEvidence === undefined || entry.field !== "sourceCore.keyPoints",
+  );
   const sourceTerms = extractTermSet(
     [args.sourceSpan.text, args.section.title].join("\n"),
   );
@@ -303,10 +306,22 @@ function validateSectionGrounding(args: {
     ],
   });
   const manifestOmissions = checkRequiredEvidenceOmissions(args.section, output);
+  const deterministicValidation = output.deterministicEvidence
+    ? validateDeterministicSectionEvidence(args.section, output)
+    : undefined;
+  const deterministicIssues: GroundingIssue[] = deterministicValidation?.issues.map((message) => ({
+    type: "grounding-omission",
+    severity: "error",
+    plannedSectionId: args.section.id,
+    sourceSectionId: args.section.sourceSectionId,
+    field: "sourceCore.keyPoints",
+    fieldPath: "sourceCore.keyPoints",
+    message,
+  })) ?? [];
   const omissionCheck = args.section.requiredEvidence !== undefined ? {
     ...manifestOmissions,
     score: Math.min(sourceOmissions.score, manifestOmissions.score),
-    issues: [...sourceOmissions.issues, ...manifestOmissions.issues],
+    issues: [...sourceOmissions.issues, ...manifestOmissions.issues, ...deterministicIssues],
   } : sourceOmissions;
   const relationshipIssues = verifySemanticRelationships({
     section: args.section,

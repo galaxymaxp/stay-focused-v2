@@ -2,6 +2,7 @@ import type { GenerationProvider } from "./provider";
 import { validateLeakage } from "./leakage-guard.js";
 import {
   collectSectionSourceBlocks,
+  generateSections,
   generateSection,
   SectionProviderError,
   SectionValidationError,
@@ -25,9 +26,15 @@ import {
 } from "./required-evidence.js";
 import {
   diagnoseStudentVisibleUsefulness,
+  explanationHasUsefulForm,
   type StudentVisibleUsefulnessIssue,
 } from "./reviewer-usefulness.js";
 import { reviewerDispositionFor } from "./reviewer-section-support.js";
+import { validateDeterministicSectionEvidence } from "./reviewer-evidence-assembly.js";
+import {
+  assembleDeterministicSectionEvidence,
+  attachGeneratedExplanation,
+} from "./reviewer-evidence-assembly.js";
 import type {
   CoverageReport,
   CoverageStatus,
@@ -59,6 +66,7 @@ export interface RetryFailedSectionsArgs {
   readonly model?: string;
   readonly temperature?: number;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly skipProviderRetries?: boolean;
   readonly onValidationFailure?: (
     section: PlannedSection,
     error: SectionValidationError,
@@ -90,6 +98,33 @@ export async function retryFailedSections(
   validateRetryPolicy(retryPolicy);
   validatePlanAndReports({ plan, source, outline, coverage, grounding, leakage });
 
+  if (plan.sections.every((section) => section.requiredEvidence !== undefined)) {
+    const priorBySectionId = new Map(
+      args.outputs.map((output) => [output.plannedSectionId, output] as const),
+    );
+    const deterministicOutputs = plan.sections.flatMap((section) => {
+      const existing = priorBySectionId.get(section.id);
+      if (existing?.deterministicEvidence) return [existing];
+      try {
+        const base = assembleDeterministicSectionEvidence({
+          section,
+          sourceBlocks: source.blocks.filter((block) => section.sourceBlockIds.includes(block.id)),
+        });
+        return [existing?.sourceCore.explanation
+          ? attachGeneratedExplanation(base, existing.sourceCore.explanation)
+          : base];
+      } catch {
+        // Source-absent evidence remains an engine/planning failure and is not
+        // handed to the provider for reconstruction.
+        return existing ? [existing] : [];
+      }
+    });
+    return retryDeterministicExplanations(
+      { ...args, outputs: deterministicOutputs },
+      retryPolicy,
+    );
+  }
+
   const plannedSectionIds = new Set(plan.sections.map((section) => section.id));
   const currentOutputs = new Map<string, SectionOutput>();
   for (const output of args.outputs) {
@@ -117,6 +152,14 @@ export async function retryFailedSections(
 
   for (const section of plan.sections) {
     if (reviewerDispositionFor(section) !== "standalone") continue;
+    if (!requiredEvidenceSourceIsAvailable({
+      section,
+      sourceBlocks: source.blocks.filter((block) => section.sourceBlockIds.includes(block.id)),
+    })) {
+      // Source-absent evidence is an engine/planning failure. Even the legacy
+      // compatibility path must never ask a provider to synthesize it.
+      continue;
+    }
     let sectionCoverage = requireCoverageResult(section, coverageBySectionId);
     let sectionGrounding = groundingBySectionId.get(section.id);
     let sectionLeakage = leakageBySectionId.get(section.id);
@@ -175,6 +218,7 @@ export async function retryFailedSections(
               (issue) => `${issue.type} in ${issue.fieldPath}: ${issue.message}`,
             ),
           },
+          legacyFullSectionGeneration: true,
           metadata: {
             ...args.metadata,
             retryAttempt: attempt,
@@ -358,6 +402,168 @@ export async function retryFailedSections(
   }
 
   return orderedOutputs(plan, currentOutputs);
+}
+
+async function retryDeterministicExplanations(
+  args: RetryFailedSectionsArgs,
+  retryPolicy: RetryPolicy,
+): Promise<readonly SectionOutput[]> {
+  const currentOutputs = new Map(
+    args.outputs.map((output) => [output.plannedSectionId, output] as const),
+  );
+
+  const maxExplanationRetries = args.skipProviderRetries
+    ? 0
+    : retryPolicy.maxRetries;
+  for (let attempt = 1; attempt <= maxExplanationRetries; attempt += 1) {
+    const reports = refreshAllReports(args, currentOutputs);
+    const candidates = args.plan.sections.filter((section) => {
+      if (reviewerDispositionFor(section) !== "standalone") return false;
+      const output = currentOutputs.get(section.id);
+      if (!output?.deterministicEvidence) return false;
+      if (!validateDeterministicSectionEvidence(section, output).valid) {
+        // Missing or changed deterministic evidence is an engine/ownership
+        // failure. A provider must never reconstruct it.
+        return false;
+      }
+      const grounding = reports.grounding?.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      const leakage = reports.leakage?.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      const usefulness = diagnoseUsefulness(section, args.source, output);
+      const explanationGroundingFailure = grounding?.issues.some((issue) =>
+        issue.fieldPath === "sourceCore.explanation",
+      ) ?? false;
+      const explanationLeakageFailure = leakage?.issues.some((issue) =>
+        issue.fieldPath === "sourceCore.explanation",
+      ) ?? false;
+      return !output.sourceCore.explanation.trim() || explanationGroundingFailure ||
+        explanationLeakageFailure || usefulness.length > 0;
+    });
+    if (candidates.length === 0) break;
+
+    candidates.forEach((section) => args.onRetryAttempt?.(section, attempt));
+    const generated = await generateSections({
+      sections: candidates,
+      plan: args.plan,
+      source: args.source,
+      provider: args.provider,
+      model: args.model,
+      temperature: args.temperature,
+      metadata: { ...args.metadata, retryAttempt: attempt },
+    });
+    for (const failure of generated.validationFailures) {
+      const section = candidates.find((candidate) => candidate.id === failure.sectionId);
+      if (section) args.onValidationFailure?.(section, failure);
+    }
+    for (const providerError of generated.providerErrors) {
+      for (const sectionId of generated.failedSectionIds) {
+        const section = candidates.find((candidate) => candidate.id === sectionId);
+        if (section) args.onProviderFailure?.(section, providerError);
+      }
+    }
+    for (const output of generated.outputs) {
+      if (generated.failedSectionIds.includes(output.plannedSectionId)) continue;
+      currentOutputs.set(output.plannedSectionId, output);
+    }
+
+    const refreshed = refreshAllReports(args, currentOutputs);
+    for (const section of candidates) {
+      const output = currentOutputs.get(section.id);
+      const sectionCoverage = refreshed.coverage.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      const sectionGrounding = refreshed.grounding?.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      const sectionLeakage = refreshed.leakage?.sections.find(
+        (candidate) => candidate.plannedSectionId === section.id,
+      );
+      if (
+        output && isSectionAccepted(sectionCoverage, sectionGrounding, sectionLeakage) &&
+        diagnoseUsefulness(section, args.source, output).length === 0
+      ) {
+        args.onSectionRecovered?.(section, "repaired");
+      }
+    }
+  }
+
+  const finalReports = refreshAllReports(args, currentOutputs);
+  for (const section of args.plan.sections) {
+    if (reviewerDispositionFor(section) !== "standalone") continue;
+    const output = currentOutputs.get(section.id);
+    if (!output?.deterministicEvidence) continue;
+    const coverage = finalReports.coverage.sections.find(
+      (candidate) => candidate.plannedSectionId === section.id,
+    );
+    if (!validateDeterministicSectionEvidence(section, output).valid) continue;
+    const grounding = finalReports.grounding?.sections.find(
+      (candidate) => candidate.plannedSectionId === section.id,
+    );
+    const leakage = finalReports.leakage?.sections.find(
+      (candidate) => candidate.plannedSectionId === section.id,
+    );
+    const accepted = isSectionAccepted(coverage, grounding, leakage) &&
+      diagnoseUsefulness(section, args.source, output).length === 0;
+    if (accepted) continue;
+    const explanation = extractiveExplanationFor(section, args.source);
+    if (!explanation) continue;
+    currentOutputs.set(section.id, {
+      ...output,
+      sourceCore: { explanation, keyPoints: [...output.sourceCore.keyPoints] },
+    } as SectionOutput);
+    args.onSectionRecovered?.(section, "extractive_fallback");
+  }
+
+  return orderedOutputs(args.plan, currentOutputs);
+}
+
+function extractiveExplanationFor(
+  section: PlannedSection,
+  source: NormalizedSource,
+): string | undefined {
+  const candidates = collectSectionSourceBlocks(section, source)
+    .filter((block) =>
+      block.kind !== "heading" && block.kind !== "code" &&
+      block.kind !== "formula" && block.kind !== "table" && block.kind !== "image",
+    )
+    .flatMap((block) => block.text.split(/(?<=[.!?])\s+|\r?\n/u))
+    .map((value) => value.trim())
+    .filter((value) => countWords(value) <= 55)
+    .find((value) => explanationHasUsefulForm(section.title, value));
+  return candidates;
+}
+
+function refreshAllReports(
+  args: RetryFailedSectionsArgs,
+  currentOutputs: ReadonlyMap<string, SectionOutput>,
+): {
+  readonly coverage: CoverageReport;
+  readonly grounding: GroundingReport | undefined;
+  readonly leakage: LeakageReport | undefined;
+} {
+  const outputs = orderedOutputs(args.plan, currentOutputs);
+  return {
+    coverage: verifyCoverage({
+      outputs,
+      plan: args.plan,
+      source: args.source,
+      outline: args.outline,
+    }),
+    grounding: args.grounding === undefined ? undefined : validateGrounding({
+      outputs,
+      plan: args.plan,
+      source: args.source,
+      outline: args.outline,
+    }),
+    leakage: args.leakage === undefined ? undefined : validateLeakage({
+      outputs,
+      plan: args.plan,
+      source: args.source,
+    }),
+  };
 }
 
 function refreshSectionReports(args: {

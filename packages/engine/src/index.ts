@@ -5,6 +5,7 @@ export * from "./required-evidence";
 export * from "./review-content";
 export * from "./reviewer-usefulness";
 export * from "./reviewer-section-support";
+export * from "./reviewer-evidence-assembly";
 export * from "./schemas";
 export * from "./semantic-structure";
 export * from "./semantic-verification";

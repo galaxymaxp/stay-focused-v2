@@ -297,19 +297,15 @@ function createCollectAndContinueCase(): EvalCase {
         provider,
         retryPolicy: noRetriesPolicy(),
       });
-        const firstSectionId = readMetadataString(
-          provider.requests[0]?.metadata,
-          "plannedSectionId",
-        );
-        const secondSectionId = readMetadataString(
-          provider.requests[1]?.metadata,
-          "plannedSectionId",
-        );
+        const batchIds = provider.requests[0]?.metadata?.explanationBatchSectionIds;
+        const secondSectionId = Array.isArray(batchIds) && typeof batchIds[1] === "string"
+          ? batchIds[1]
+          : "";
         return [
           ...assertEqual(
             provider.requests.length,
-            2,
-            "Pipeline did not attempt the section after a validation failure.",
+            1,
+            "Pipeline did not batch independent section explanations.",
           ),
           ...assertEqual(
             reviewer.sections.some((section) => section.plannedSectionId === secondSectionId),
@@ -335,11 +331,11 @@ function createInfraErrorBoundaryCase(): EvalCase {
         return [
           ...assertEqual(
             provider.requests.length,
-            2,
-            "Infrastructure boundary fixture did not reach the second section.",
+            1,
+            "Infrastructure boundary fixture did not use one bounded batch.",
           ),
           ...assertEqual(reviewer.sections.length, 2, "Provider-wide failure did not return a useful reviewer."),
-          ...assertEqual(reviewer.metadata.fallbackPlanUsed, true, "Provider-wide failure did not record the emergency fallback plan."),
+          ...assertEqual(reviewer.metadata.fallbackSectionCount, 2, "Provider-wide failure did not isolate both explanation fallbacks."),
         ];
     },
   };
@@ -519,13 +515,18 @@ async function runBasicScenario(
       return [
         ...assertEqual(
           initialRequests.length,
-          reviewer.sections.length,
-          "Provider did not receive one initial request per planned section.",
+          1,
+          "Provider did not receive one batched initial explanation request.",
         ),
         ...assertEqual(
           provider.requests.length,
-          reviewer.sections.length,
+          1,
           "Passing sections unexpectedly triggered retry requests.",
+        ),
+        ...assertDeepEqual(
+          provider.requests[0]?.metadata?.explanationBatchSectionIds,
+          reviewer.sections.flatMap((group) => group.items.map((item) => item.plannedSectionId)),
+          "Batched request did not retain stable planned-section identities.",
         ),
       ];
     }
@@ -719,6 +720,12 @@ class FakeProvider implements GenerationProvider {
       throw new Error("initial provider failure");
     }
     if (
+      request.schema.name === "ReviewerExplanationBatch" &&
+      this.behavior === "validation-then-infra-error" && retryAttempt === undefined
+    ) {
+      throw new Error("batched provider infrastructure failure");
+    }
+    if (
       this.behavior === "validation-then-infra-error" &&
       retryAttempt === undefined &&
       initialRequestCount === 2
@@ -734,6 +741,16 @@ class FakeProvider implements GenerationProvider {
       ((this.behavior === "weak-then-pass" ||
         this.behavior === "weak-then-error") &&
         retryAttempt === undefined);
+    if (request.schema.name === "ReviewerExplanationBatch") {
+      const output = createExplanationBatchOutput(request, weak);
+      if (
+        this.behavior === "first-validation-error" && retryAttempt === undefined &&
+        Array.isArray(output.explanations)
+      ) {
+        return { explanations: output.explanations.slice(1) } as TOutput;
+      }
+      return output as TOutput;
+    }
     const output = createProviderOutput(request, weak);
     if (
       (this.behavior === "first-validation-error" ||
@@ -748,6 +765,37 @@ class FakeProvider implements GenerationProvider {
     }
     return output as unknown as TOutput;
   }
+}
+
+function createExplanationBatchOutput(
+  request: GenerationRequest<unknown>,
+  weak: boolean,
+): { readonly explanations: readonly { readonly sectionId: string; readonly explanation: string }[] } {
+  const ids = request.metadata?.explanationBatchSectionIds;
+  if (!Array.isArray(ids) || !ids.every((value) => typeof value === "string")) {
+    throw new Error("Fake explanation provider is missing batch section IDs.");
+  }
+  return {
+    explanations: ids.map((sectionId) => ({
+      sectionId,
+      explanation: weak ? "The." : explanationSupportFromBatchPrompt(request.prompt, sectionId),
+    })),
+  };
+}
+
+function explanationSupportFromBatchPrompt(prompt: string, sectionId: string): string {
+  const escaped = sectionId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(
+    `BEGIN SECTION "${escaped}"[\\s\\S]*?APPROVED LOCAL EXPLANATION EVIDENCE:\\n([\\s\\S]*?)\\nEND SECTION "${escaped}"`,
+  ).exec(prompt);
+  const evidence = (match?.[1] ?? "")
+    .split(/\r?\n/u)
+    .map((line) => line.replace(/^\[source [^\]]+\]\s*/u, "").trim())
+    .filter(Boolean);
+  const sentence = evidence.flatMap((line) => line.split(/(?<=[.!?])\s+/u))
+    .find((line) => line.trim().split(/\s+/u).length >= 4);
+  if (!sentence) throw new Error(`Fake explanation provider has no support for ${sectionId}.`);
+  return sentence.trim();
 }
 
 function multiSectionValidationInput(): SourceNormalizationInput {

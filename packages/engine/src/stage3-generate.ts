@@ -3,7 +3,7 @@ import {
   DEFAULT_FORBIDDEN_INSTRUCTION_PATTERNS,
   detectInstructionLeakage,
 } from "./leakage-guard.js";
-import { getSchemaForSectionKind } from "./schemas.js";
+import { createExplanationBatchSchema, getSchemaForSectionKind } from "./schemas.js";
 import { serializeSemanticUnits } from "./semantic-structure.js";
 import { removeConsecutiveDuplicateSourceBlocks } from "./source-blocks.js";
 import {
@@ -20,9 +20,17 @@ import {
 import {
   filterReviewableText,
   isInstructionalNoiseText,
+  reviewableSourceBlocks,
 } from "./review-content.js";
 import { explanationHasUsefulForm } from "./reviewer-usefulness.js";
-import { reviewerDispositionFor } from "./reviewer-section-support.js";
+import {
+  isLocallyExplanatoryText,
+  reviewerDispositionFor,
+} from "./reviewer-section-support.js";
+import {
+  assembleDeterministicSectionEvidence,
+  attachGeneratedExplanation,
+} from "./reviewer-evidence-assembly.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -49,11 +57,14 @@ export interface GenerateSectionArgs {
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly retryGuidance?: readonly string[];
   readonly repairContext?: SectionRepairContext;
+  /** Compatibility path for pre-deterministic evaluation fixtures only. */
+  readonly legacyFullSectionGeneration?: boolean;
 }
 
 export type SectionValidationFailureReason =
   | "output-validation"
   | "instruction-leakage"
+  | "explanation-validation"
   | "required-evidence-unavailable";
 
 export class SectionValidationError extends Error {
@@ -79,6 +90,9 @@ export class SectionValidationError extends Error {
 }
 
 const SPARSE_SOURCE_WORD_LIMIT = 8;
+const MAX_EXPLANATION_BATCH_SECTIONS = 6;
+const MAX_EXPLANATION_BATCH_CHARACTERS = 36_000;
+const MAX_SECTION_EXPLANATION_SUPPORT_CHARACTERS = 10_000;
 
 export class SectionProviderError extends Error {
   public readonly sectionId: string;
@@ -99,42 +113,34 @@ export async function generateSection(
   args: GenerateSectionArgs,
 ): Promise<SectionOutput> {
   validateArgs(args);
+  if (args.section.requiredEvidence === undefined || args.legacyFullSectionGeneration) {
+    return generateLegacySection(args);
+  }
+  const result = await generateSections({
+    sections: [args.section],
+    plan: args.plan,
+    source: args.source,
+    provider: args.provider,
+    model: args.model,
+    temperature: args.temperature,
+    metadata: args.metadata,
+  });
+  const output = result.outputs[0];
+  if (output && !result.failedSectionIds.includes(args.section.id)) return output;
+  const failure = result.validationFailures.find(
+    (candidate) => candidate.sectionId === args.section.id,
+  );
+  if (failure) throw failure;
+  throw new SectionProviderError(args.section.id, result.providerErrors[0]);
+}
 
+async function generateLegacySection(args: GenerateSectionArgs): Promise<SectionOutput> {
   const { section, plan, source, provider } = args;
   const sourceBlocks = collectSectionSourceBlocks(section, source);
-  if (!requiredEvidenceSourceIsAvailable({ section, sourceBlocks })) {
-    throw new SectionValidationError({
-      sectionId: section.id,
-      reason: "required-evidence-unavailable",
-      detail: "required evidence manifest references evidence absent from the supplied source blocks",
-    });
-  }
-  const sourceRepresentation = createSourceRepresentedSectionOutput({
-    section,
-    sourceBlocks,
-  });
-  if (sourceRepresentation) return sourceRepresentation;
   const detectedItems = extractCleanSourceItems({
     sourceSpanText: sourceBlocksToLineText(sourceBlocks),
     sectionTitle: section.title,
   });
-  const baseSchema = getSchemaForSectionKind(section.schemaKind);
-  const schema = section.requiredEvidence === undefined ? baseSchema : {
-    ...baseSchema,
-    schema: {
-      ...baseSchema.schema,
-      properties: {
-        ...baseSchema.schema.properties,
-        plannedSectionId: { type: "string", const: section.id },
-        sourceBlockIds: {
-          type: "array",
-          minItems: section.sourceBlockIds.length,
-          maxItems: section.sourceBlockIds.length,
-          items: { type: "string", enum: section.sourceBlockIds },
-        },
-      },
-    },
-  };
   const request = {
     prompt: buildSectionPrompt(
       section,
@@ -143,7 +149,7 @@ export async function generateSection(
       args.retryGuidance,
       args.repairContext,
     ),
-    schema,
+    schema: getSchemaForSectionKind(section.schemaKind),
     model: args.model ?? "gpt-4o",
     temperature: args.temperature,
     metadata: {
@@ -152,34 +158,15 @@ export async function generateSection(
       planId: plan.id,
       schemaKind: section.schemaKind,
       sourceId: source.id,
-      ...(section.requiredEvidence !== undefined
-        ? {
-            requiredEvidenceTargetIds: section.requiredEvidence.map(
-              (target) => target.id,
-            ),
-          }
-        : {}),
-      ...(args.repairContext
-        ? {
-            missingRequiredEvidenceTargetIds: args.repairContext.missingRequiredEvidence.map(
-              (target) => target.id,
-            ),
-          }
-        : {}),
     },
   };
-
   let providerOutput: unknown;
   try {
     providerOutput = await provider.generate<unknown>(request);
   } catch (error) {
     throw new SectionProviderError(section.id, error);
   }
-
-  const structurallyValidOutput = validateSectionOutputShape(
-    providerOutput,
-    section,
-  );
+  const structurallyValidOutput = validateSectionOutputShape(providerOutput, section);
   const guardedOutput = applySemanticCoreGuard(
     structurallyValidOutput,
     section,
@@ -194,28 +181,270 @@ export async function generateSection(
   return normalizedOutput;
 }
 
+export interface GenerateSectionsArgs {
+  readonly sections: readonly PlannedSection[];
+  readonly plan: GenerationPlan;
+  readonly source: NormalizedSource;
+  readonly provider: GenerationProvider;
+  readonly model?: string;
+  readonly temperature?: number;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface GenerateSectionsResult {
+  readonly outputs: readonly SectionOutput[];
+  readonly failedSectionIds: readonly string[];
+  readonly validationFailures: readonly SectionValidationError[];
+  readonly providerErrors: readonly unknown[];
+  readonly batchSectionIds: readonly (readonly string[])[];
+  readonly deterministicAssemblyDurationMs: number;
+}
+
+export async function generateSections(
+  args: GenerateSectionsArgs,
+): Promise<GenerateSectionsResult> {
+  if (!Array.isArray(args.sections) || args.sections.length === 0) {
+    return {
+      outputs: [],
+      failedSectionIds: [],
+      validationFailures: [],
+      providerErrors: [],
+      batchSectionIds: [],
+      deterministicAssemblyDurationMs: 0,
+    };
+  }
+
+  const deterministicStartedAt = Date.now();
+  const deterministic = new Map<string, SectionOutput>();
+  const validationFailures: SectionValidationError[] = [];
+  for (const section of args.sections) {
+    const sourceBlocks = collectSectionSourceBlocks(section, args.source);
+    try {
+      deterministic.set(
+        section.id,
+        assembleDeterministicSectionEvidence({ section, sourceBlocks }),
+      );
+    } catch (error) {
+      validationFailures.push(new SectionValidationError({
+        sectionId: section.id,
+        reason: "required-evidence-unavailable",
+        detail: error instanceof Error ? error.message : "required evidence is unavailable",
+      }));
+    }
+  }
+  const deterministicAssemblyDurationMs = Date.now() - deterministicStartedAt;
+
+  const standalone = args.sections.filter(
+    (section) => reviewerDispositionFor(section) === "standalone" && deterministic.has(section.id),
+  );
+  const supportBySectionId = new Map(
+    standalone.map((section) => [
+      section.id,
+      explanationSupportFor(section, collectSectionSourceBlocks(section, args.source)),
+    ] as const),
+  );
+  const batches = createExplanationBatches(standalone, supportBySectionId);
+  const explanations = new Map<string, string>();
+  const failedSectionIds = new Set(validationFailures.map((failure) => failure.sectionId));
+  const providerErrors: unknown[] = [];
+
+  for (const batch of batches) {
+    const sectionIds = batch.map((section) => section.id);
+    let providerOutput: unknown;
+    try {
+      providerOutput = await args.provider.generate<unknown>({
+        prompt: buildExplanationBatchPrompt(batch, supportBySectionId, args.metadata?.retryAttempt),
+        schema: createExplanationBatchSchema(sectionIds),
+        model: args.model ?? "gpt-4o",
+        temperature: args.temperature,
+        metadata: {
+          ...args.metadata,
+          planId: args.plan.id,
+          sourceId: args.source.id,
+          explanationBatchSectionIds: sectionIds,
+          sectionCount: sectionIds.length,
+          providerResponsibility: "explanation-only",
+          ...(sectionIds.length === 1
+            ? {
+                plannedSectionId: sectionIds[0],
+                schemaKind: batch[0]?.schemaKind,
+              }
+            : {}),
+        },
+      });
+    } catch (error) {
+      providerErrors.push(error);
+      sectionIds.forEach((sectionId) => failedSectionIds.add(sectionId));
+      continue;
+    }
+
+    const parsed = parseExplanationBatch(providerOutput, batch);
+    for (const section of batch) {
+      const explanation = parsed.get(section.id);
+      if (explanation === undefined) {
+        failedSectionIds.add(section.id);
+        validationFailures.push(new SectionValidationError({
+          sectionId: section.id,
+          reason: "explanation-validation",
+          detail: "provider response omitted the required explanation entry",
+        }));
+        continue;
+      }
+      explanations.set(section.id, explanation);
+    }
+  }
+
+  const outputs = args.sections.flatMap((section) => {
+    const base = deterministic.get(section.id);
+    if (!base) return [];
+    const explanation = explanations.get(section.id);
+    return [explanation === undefined ? base : attachGeneratedExplanation(base, explanation)];
+  });
+
+  return {
+    outputs,
+    failedSectionIds: [...failedSectionIds],
+    validationFailures,
+    providerErrors,
+    batchSectionIds: batches.map((batch) => batch.map((section) => section.id)),
+    deterministicAssemblyDurationMs,
+  };
+}
+
+function createExplanationBatches(
+  sections: readonly PlannedSection[],
+  supportBySectionId: ReadonlyMap<string, string>,
+): readonly (readonly PlannedSection[])[] {
+  const batches: PlannedSection[][] = [];
+  let current: PlannedSection[] = [];
+  let currentCharacters = 0;
+  for (const section of sections) {
+    const sectionCharacters = (supportBySectionId.get(section.id)?.length ?? 0) +
+      section.title.length + 200;
+    if (
+      current.length > 0 &&
+      (current.length >= MAX_EXPLANATION_BATCH_SECTIONS ||
+        currentCharacters + sectionCharacters > MAX_EXPLANATION_BATCH_CHARACTERS)
+    ) {
+      batches.push(current);
+      current = [];
+      currentCharacters = 0;
+    }
+    current.push(section);
+    currentCharacters += sectionCharacters;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+function explanationSupportFor(
+  section: PlannedSection,
+  sourceBlocks: readonly NormalizedSourceBlock[],
+): string {
+  const reviewable = reviewableSourceBlocks(sourceBlocks)
+    .filter((block) => block.kind !== "heading" && block.kind !== "image")
+    .filter((block) => block.structuredBlock?.role !== "furniture");
+  const prose = reviewable.filter(
+    (block) =>
+      block.kind !== "code" && block.kind !== "table" &&
+      block.text.split(/\r?\n/u).some(isLocallyExplanatoryText),
+  );
+  const selected = (prose.length > 0 ? prose : reviewable.filter(
+    (block) => block.kind !== "code" && block.kind !== "table",
+  ));
+  const rows: string[] = [];
+  let characterCount = 0;
+  for (const block of selected) {
+    const text = filterReviewableText(block.text, { block });
+    if (!text) continue;
+    if (rows.length > 0 && characterCount + text.length > MAX_SECTION_EXPLANATION_SUPPORT_CHARACTERS) {
+      break;
+    }
+    rows.push(`[source ${block.id}] ${text}`);
+    characterCount += text.length;
+  }
+  if (rows.length === 0) {
+    throw new SectionValidationError({
+      sectionId: section.id,
+      reason: "required-evidence-unavailable",
+      detail: "standalone section has no approved local explanation support",
+    });
+  }
+  return rows.join("\n");
+}
+
+function buildExplanationBatchPrompt(
+  sections: readonly PlannedSection[],
+  supportBySectionId: ReadonlyMap<string, string>,
+  retryAttempt: unknown,
+): string {
+  return [
+    "Write one concise study explanation for each isolated section below.",
+    "Return only the requested section IDs and explanation strings.",
+    "The engine has already assembled every required fact and typed item deterministically.",
+    "Do not choose, restate, summarize away, add, remove, or rewrite required evidence.",
+    "Use only the approved local evidence inside that section's boundary.",
+    "Do not borrow evidence between sections or add outside knowledge.",
+    "Do not invent examples, issue learner instructions, reproduce large passages, use code as the explanation, or merely repeat the title.",
+    "Each explanation must be one or two short, complete, source-grounded sentences.",
+    ...(typeof retryAttempt === "number"
+      ? ["This is a bounded explanation-only repair. Correct only the explanation quality or grounding defect."]
+      : []),
+    "SECTIONS:",
+    ...sections.flatMap((section) => [
+      `BEGIN SECTION ${JSON.stringify(section.id)}`,
+      `TITLE: ${section.title}`,
+      "APPROVED LOCAL EXPLANATION EVIDENCE:",
+      supportBySectionId.get(section.id) ?? "",
+      `END SECTION ${JSON.stringify(section.id)}`,
+    ]),
+  ].join("\n");
+}
+
+function parseExplanationBatch(
+  value: unknown,
+  sections: readonly PlannedSection[],
+): ReadonlyMap<string, string> {
+  const expected = new Set(sections.map((section) => section.id));
+  const parsed = new Map<string, string>();
+  if (isRecord(value) && Array.isArray(value["explanations"])) {
+    for (const entry of value["explanations"]) {
+      if (!isRecord(entry)) continue;
+      const sectionId = entry["sectionId"];
+      const explanation = entry["explanation"];
+      if (
+        typeof sectionId !== "string" || !expected.has(sectionId) ||
+        typeof explanation !== "string" || !explanation.trim() ||
+        parsed.has(sectionId)
+      ) continue;
+      parsed.set(sectionId, explanation.trim());
+    }
+    return parsed;
+  }
+
+  // Compatibility for single-section provider doubles. Production OpenAI
+  // receives the minimal ExplanationBatch schema above; factual fields from a
+  // legacy-shaped double are ignored even when present.
+  const only = sections[0];
+  if (sections.length === 1 && only && isRecord(value)) {
+    const direct = value["explanation"];
+    const core = isRecord(value["sourceCore"]) ? value["sourceCore"] : undefined;
+    const legacy = core?.["explanation"];
+    const explanation = typeof direct === "string" ? direct : legacy;
+    if (typeof explanation === "string" && explanation.trim()) {
+      parsed.set(only.id, explanation.trim());
+    }
+  }
+  return parsed;
+}
+
 export function createSourceRepresentedSectionOutput(args: {
   readonly section: PlannedSection;
   readonly sourceBlocks: readonly NormalizedSourceBlock[];
 }): SectionOutput | undefined {
   const disposition = reviewerDispositionFor(args.section);
   if (disposition === "standalone") return undefined;
-
-  const keyPoints = disposition === "typed-evidence"
-    ? typedSourceRepresentationTexts(args.sourceBlocks)
-    : disposition === "structural"
-    ? semanticSourceRepresentationTexts(args.section)
-    : [];
-
-  return {
-    id: stableSectionRepresentationId(args.section.id, disposition, keyPoints),
-    kind: args.section.schemaKind,
-    plannedSectionId: args.section.id,
-    title: args.section.title,
-    sourceBlockIds: [...args.section.sourceBlockIds],
-    sourceCore: { explanation: "", keyPoints },
-    enrichment: null,
-  } as SectionOutput;
+  return assembleDeterministicSectionEvidence(args);
 }
 
 function semanticSourceRepresentationTexts(section: PlannedSection): readonly string[] {

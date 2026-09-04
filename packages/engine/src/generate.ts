@@ -1,11 +1,10 @@
-import type { GenerationProvider } from "./provider";
+import type { GenerationProvider, GenerationRequest } from "./provider";
 import { normalizeSource } from "./stage0-normalize.js";
 import { detectOutline } from "./stage1-outline.js";
 import { buildGenerationPlan } from "./stage2-plan.js";
 import {
   collectSectionSourceBlocks,
-  generateSection,
-  SectionProviderError,
+  generateSections,
   SectionValidationError,
   type SectionValidationFailureReason,
 } from "./stage3-generate.js";
@@ -14,7 +13,6 @@ import { retryFailedSections } from "./stage5-retry.js";
 import { validateGrounding } from "./stage5a-grounding.js";
 import { validateLeakage } from "./leakage-guard.js";
 import { assembleReviewer } from "./stage6-assemble.js";
-import { requiresProviderGeneration } from "./reviewer-section-support.js";
 import type {
   CoverageReport,
   GenerationPlan,
@@ -24,6 +22,7 @@ import type {
   PipelineOptions,
   PlannedSection,
   ReviewerOutput,
+  ReviewerGenerationMetrics,
   ReviewerSectionQualityStatus,
   SectionOutput,
   SourceOutline,
@@ -83,6 +82,7 @@ export interface PipelineAssemblyErrorState {
   readonly leakage: LeakageReport;
   readonly sectionValidationFailures: readonly SectionValidationFailure[];
   readonly retryAttemptsBySectionId: Readonly<Record<string, number>>;
+  readonly generationMetrics?: ReviewerGenerationMetrics;
 }
 
 export interface PipelineAssemblyOutputDiagnostic {
@@ -143,6 +143,8 @@ export async function runPipeline(
 ): Promise<ReviewerOutput> {
   validateArgs(args);
 
+  const pipelineStartedAt = Date.now();
+  const providerObservation = observeProvider(args.provider);
   let providerCallCount = 0;
   let retryCount = 0;
   await assertNotCancelled(args);
@@ -172,6 +174,7 @@ export async function runPipeline(
     retryCount,
   });
   const plan = buildGenerationPlan(outline, source);
+  const planningCompletedAt = Date.now();
   const initialOutputs: SectionOutput[] = [];
   const sectionValidationFailures = new Map<
     string,
@@ -180,56 +183,52 @@ export async function runPipeline(
   const retryAttemptsBySectionId = new Map<string, number>();
   const sectionQualityById = new Map<string, ReviewerSectionQualityStatus>();
 
-  for (const [sectionIndex, section] of plan.sections.entries()) {
-    await assertNotCancelled(args);
-    await emitProgress(args, {
-      stage: "generating_sections",
-      completedUnits: sectionIndex,
-      totalUnits: plan.sections.length,
-      sourceCharacterCount: sourceInputCharacterCount(args.input),
-      normalizedCharacterCount: normalizedSourceCharacterCount(source),
-      outlineItemCount: outline.sections.length,
-      plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
-      providerCallCount,
-      retryCount,
-    });
-    if (requiresProviderGeneration(section)) providerCallCount += 1;
-    try {
-      const output = await generateSection({
-          section,
-          plan,
-          source,
-          provider: args.provider,
-          model: args.model,
-          temperature: args.temperature,
-          metadata: args.metadata,
-        });
-      initialOutputs.push(output);
-      sectionQualityById.set(section.id, "generated");
-    } catch (error) {
-      if (error instanceof SectionProviderError) {
-        continue;
-      }
-      if (!(error instanceof SectionValidationError)) {
-        throw error;
-      }
+  await assertNotCancelled(args);
+  await emitProgress(args, {
+    stage: "generating_sections",
+    completedUnits: 0,
+    totalUnits: plan.sections.length,
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    outlineItemCount: outline.sections.length,
+    plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
+    providerCallCount,
+    retryCount,
+  });
+  const initialGeneration = await generateSections({
+    sections: plan.sections,
+    plan,
+    source,
+    provider: providerObservation.provider,
+    model: args.model,
+    temperature: args.temperature,
+    metadata: args.metadata,
+  });
+  initialOutputs.push(...initialGeneration.outputs);
+  for (const failure of initialGeneration.validationFailures) {
+    const section = plan.sections.find((candidate) => candidate.id === failure.sectionId);
+    if (section) {
       sectionValidationFailures.set(
         section.id,
-        createSectionValidationFailure(section.title, error),
+        createSectionValidationFailure(section.title, failure),
       );
     }
-    await emitProgress(args, {
-      stage: "generating_sections",
-      completedUnits: sectionIndex + 1,
-      totalUnits: plan.sections.length,
-      sourceCharacterCount: sourceInputCharacterCount(args.input),
-      normalizedCharacterCount: normalizedSourceCharacterCount(source),
-      outlineItemCount: outline.sections.length,
-      plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
-      providerCallCount,
-      retryCount,
-    });
   }
+  for (const output of initialOutputs) {
+    sectionQualityById.set(output.plannedSectionId, "generated");
+  }
+  providerCallCount = providerObservation.requestCount;
+  await emitProgress(args, {
+    stage: "generating_sections",
+    completedUnits: initialOutputs.length,
+    totalUnits: plan.sections.length,
+    sourceCharacterCount: sourceInputCharacterCount(args.input),
+    normalizedCharacterCount: normalizedSourceCharacterCount(source),
+    outlineItemCount: outline.sections.length,
+    plannedSectionCount: plan.metadata.standaloneSectionCount ?? plan.sections.length,
+    providerCallCount,
+    retryCount,
+  });
 
   await assertNotCancelled(args);
   await emitProgress(args, {
@@ -243,6 +242,7 @@ export async function runPipeline(
     providerCallCount,
     retryCount,
   });
+  const initialValidationStartedAt = Date.now();
   const initialCoverage = verifyCoverage({
     outputs: initialOutputs,
     plan,
@@ -260,6 +260,7 @@ export async function runPipeline(
     plan,
     source,
   });
+  const initialValidationCompletedAt = Date.now();
   await assertNotCancelled(args);
   await emitProgress(args, {
     stage: "retrying_sections",
@@ -280,11 +281,14 @@ export async function runPipeline(
     plan,
     source,
     outline,
-    provider: args.provider,
+    provider: providerObservation.provider,
     retryPolicy: args.retryPolicy,
     model: args.model,
     temperature: args.temperature,
     metadata: args.metadata,
+    skipProviderRetries:
+      initialGeneration.providerErrors.length > 0 &&
+      initialGeneration.providerErrors.every(isPermanentProviderFailure),
     onValidationFailure: (section, error) => {
       sectionValidationFailures.set(
         section.id,
@@ -292,8 +296,6 @@ export async function runPipeline(
       );
     },
     onRetryAttempt: (section, attempt) => {
-      providerCallCount += 1;
-      retryCount += 1;
       retryAttemptsBySectionId.set(
         section.id,
         Math.max(retryAttemptsBySectionId.get(section.id) ?? 0, attempt),
@@ -303,6 +305,9 @@ export async function runPipeline(
       sectionQualityById.set(section.id, status);
     },
   });
+  providerCallCount = providerObservation.requestCount;
+  retryCount = providerObservation.retryRequestCount;
+  const finalValidationStartedAt = Date.now();
   const finalCoverage = verifyCoverage({
     outputs: finalOutputs,
     plan,
@@ -320,6 +325,7 @@ export async function runPipeline(
     plan,
     source,
   });
+  const finalValidationCompletedAt = Date.now();
   await assertNotCancelled(args);
   await emitProgress(args, {
     stage: "assembling_reviewer",
@@ -332,6 +338,21 @@ export async function runPipeline(
     providerCallCount,
     retryCount,
   });
+  const metricsBeforeAssembly: ReviewerGenerationMetrics = {
+    totalDurationMs: finalValidationCompletedAt - pipelineStartedAt,
+    planningDurationMs: planningCompletedAt - pipelineStartedAt,
+    deterministicEvidenceDurationMs: initialGeneration.deterministicAssemblyDurationMs,
+    providerWaitDurationMs: providerObservation.waitDurationMs,
+    validationDurationMs:
+      (initialValidationCompletedAt - initialValidationStartedAt) +
+      (finalValidationCompletedAt - finalValidationStartedAt),
+    assemblyDurationMs: 0,
+    providerRequestCount: providerObservation.requestCount,
+    sectionsPerProviderRequest: providerObservation.sectionsPerRequest,
+    providerRetryCount: providerObservation.retryRequestCount,
+    factualCompletionRetryCount: 0,
+    explanationRetryCount: providerObservation.retryRequestCount,
+  };
   const state: PipelineAssemblyErrorState = {
     source,
     outline,
@@ -344,15 +365,17 @@ export async function runPipeline(
       sectionValidationFailures.values(),
     ),
     retryAttemptsBySectionId: Object.fromEntries(retryAttemptsBySectionId),
+    generationMetrics: metricsBeforeAssembly,
   };
 
   let reviewer: ReviewerOutput;
   try {
     const fallbackPlanUsed =
-      initialOutputs.length === 0 &&
       plan.sections.every(
         (section) => sectionQualityById.get(section.id) === "extractive_fallback",
       );
+    const assemblyStartedAt = Date.now();
+    const preliminaryMetrics = metricsBeforeAssembly;
     reviewer = assembleReviewer({
       outputs: finalOutputs,
       coverage: finalCoverage,
@@ -363,7 +386,18 @@ export async function runPipeline(
       allowWeakSections: args.allowWeakSections,
       sectionQualityById: Object.fromEntries(sectionQualityById),
       fallbackPlanUsed,
+      generationMetrics: preliminaryMetrics,
     });
+    const completedAt = Date.now();
+    const metrics: ReviewerGenerationMetrics = {
+      ...preliminaryMetrics,
+      totalDurationMs: completedAt - pipelineStartedAt,
+      assemblyDurationMs: completedAt - assemblyStartedAt,
+    };
+    reviewer = {
+      ...reviewer,
+      metadata: { ...reviewer.metadata, generationMetrics: metrics },
+    };
   } catch (error) {
     throw new PipelineAssemblyError(
       errorMessage(error),
@@ -399,6 +433,40 @@ function normalizedSourceCharacterCount(source: NormalizedSource): number {
   return source.blocks.reduce((total, block) => total + block.text.length, 0);
 }
 
+function observeProvider(provider: GenerationProvider): {
+  readonly provider: GenerationProvider;
+  readonly requestCount: number;
+  readonly retryRequestCount: number;
+  readonly waitDurationMs: number;
+  readonly sectionsPerRequest: readonly number[];
+} {
+  let requestCount = 0;
+  let retryRequestCount = 0;
+  let waitDurationMs = 0;
+  const sectionsPerRequest: number[] = [];
+  const observed: GenerationProvider = {
+    async generate<TOutput>(request: GenerationRequest<TOutput>): Promise<TOutput> {
+      requestCount += 1;
+      if (typeof request.metadata?.retryAttempt === "number") retryRequestCount += 1;
+      const sectionIds = request.metadata?.explanationBatchSectionIds;
+      sectionsPerRequest.push(Array.isArray(sectionIds) ? sectionIds.length : 1);
+      const startedAt = Date.now();
+      try {
+        return await provider.generate<TOutput>(request);
+      } finally {
+        waitDurationMs += Date.now() - startedAt;
+      }
+    },
+  };
+  return {
+    provider: observed,
+    get requestCount() { return requestCount; },
+    get retryRequestCount() { return retryRequestCount; },
+    get waitDurationMs() { return waitDurationMs; },
+    get sectionsPerRequest() { return [...sectionsPerRequest]; },
+  };
+}
+
 function createSectionValidationFailure(
   sectionTitle: string,
   error: SectionValidationError,
@@ -423,6 +491,13 @@ function validateArgs(args: RunPipelineArgs): void {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isPermanentProviderFailure(error: unknown): boolean {
+  const message = errorMessage(error).toLocaleLowerCase();
+  return message.includes("no credits remaining") ||
+    message.includes("insufficient_quota") ||
+    /\b(?:400|401|403|404|422)\b/u.test(message);
 }
 
 function createPipelineAssemblyDiagnostics(

@@ -7,11 +7,10 @@ import {
   assembleReviewer,
   buildGenerationPlan,
   detectOutline,
-  generateSection,
+  diagnoseStudentVisibleUsefulness,
+  generateSections,
   normalizeSource,
   retryFailedSections,
-  SectionProviderError,
-  SectionValidationError,
   validateGrounding,
   validateLeakage,
   verifyCoverage,
@@ -22,6 +21,7 @@ import {
   type NormalizedSource,
   type NormalizedSourceKind,
   type ReviewerSectionQualityStatus,
+  type ReviewerGenerationMetrics,
   type SectionOutput,
   type SourceOutline,
   type StructuredDocument,
@@ -88,7 +88,6 @@ const REVIEWER_VERIFICATION_CHECKPOINT = "reviewer.verification.initial";
 const REVIEWER_RETRY_PREFIX = "reviewer.retry.";
 const WORKFLOW_STEP_HEARTBEAT_INTERVAL_MS = 60_000;
 const WORKFLOW_OCR_CHUNK_CONCURRENCY = 2;
-const WORKFLOW_REVIEWER_SECTION_CONCURRENCY = 2;
 
 type WorkflowOutcome =
   | { readonly status: "succeeded"; readonly jobId: string }
@@ -134,6 +133,10 @@ interface StoredInitialSection {
   readonly output: SectionOutput | null;
   readonly validationFailure: boolean;
   readonly providerFailure: boolean;
+  readonly providerRequestCount?: number;
+  readonly sectionsPerProviderRequest?: readonly number[];
+  readonly providerWaitDurationMs?: number;
+  readonly deterministicEvidenceDurationMs?: number;
 }
 
 function readReviewerSourceKind(value: unknown): NormalizedSourceKind | undefined {
@@ -145,6 +148,7 @@ interface StoredReviewerVerification {
   readonly coverage: CoverageReport;
   readonly grounding: GroundingReport;
   readonly leakage: LeakageReport;
+  readonly usefulnessFailedSectionIds?: readonly string[];
 }
 
 interface StoredRetriedSection {
@@ -152,6 +156,9 @@ interface StoredRetriedSection {
   readonly output: SectionOutput | null;
   readonly qualityStatus: ReviewerSectionQualityStatus | null;
   readonly retryCount: number;
+  readonly providerRequestCount?: number;
+  readonly sectionsPerProviderRequest?: readonly number[];
+  readonly providerWaitDurationMs?: number;
 }
 
 export async function processingJobWorkflow(
@@ -194,33 +201,9 @@ export async function processingJobWorkflow(
       await finalizeExtractionStep(jobId, workerId);
     } else {
       const sectionIds = await prepareReviewerStep(jobId, workerId);
-      for (
-        let offset = 0;
-        offset < sectionIds.length;
-        offset += WORKFLOW_REVIEWER_SECTION_CONCURRENCY
-      ) {
-        await Promise.all(
-          sectionIds
-            .slice(offset, offset + WORKFLOW_REVIEWER_SECTION_CONCURRENCY)
-            .map((sectionId) =>
-              generateReviewerSectionStep(jobId, workerId, sectionId)
-            ),
-        );
-      }
+      await generateReviewerSectionsStep(jobId, workerId, sectionIds);
       const retrySectionIds = await verifyReviewerStep(jobId, workerId);
-      for (
-        let offset = 0;
-        offset < retrySectionIds.length;
-        offset += WORKFLOW_REVIEWER_SECTION_CONCURRENCY
-      ) {
-        await Promise.all(
-          retrySectionIds
-            .slice(offset, offset + WORKFLOW_REVIEWER_SECTION_CONCURRENCY)
-            .map((sectionId) =>
-              retryReviewerSectionStep(jobId, workerId, sectionId)
-            ),
-        );
-      }
+      await retryReviewerSectionsStep(jobId, workerId, retrySectionIds);
       await finalizeReviewerStep(jobId, workerId);
     }
 
@@ -812,76 +795,92 @@ async function prepareReviewerStep(
   });
 }
 
-async function generateReviewerSectionStep(
+async function generateReviewerSectionsStep(
   jobId: string,
   workerId: string,
-  sectionId: string,
+  sectionIds: readonly string[],
 ): Promise<void> {
   "use step";
-  const checkpointKey = `${REVIEWER_INITIAL_PREFIX}${sectionId}`;
-  safeStepLog("generate_section", "start", jobId, sectionId);
+  safeStepLog("generate_sections", "start", jobId);
   const client = createProcessingJobServiceClient();
   await withWorkflowLease(client, jobId, workerId, async () => {
-    if (await readProcessingJobCheckpoint(client, jobId, checkpointKey)) {
-      safeStepLog("generate_section", "checkpoint", jobId, sectionId);
+    const existing = await readInitialReviewerSections(client, jobId);
+    const existingIds = new Set(existing.map((section) => section.sectionId));
+    const missingIds = sectionIds.filter((sectionId) => !existingIds.has(sectionId));
+    if (missingIds.length === 0) {
+      safeStepLog("generate_sections", "checkpoint", jobId);
       return;
     }
     await assertWorkflowJobMayContinue(client, jobId, workerId);
     const prepared = await requireReviewerPreparation(client, jobId);
-    const section = prepared.plan.sections.find(
-      (candidate) => candidate.id === sectionId,
+    const sections = prepared.plan.sections.filter(
+      (candidate) => missingIds.includes(candidate.id),
     );
-    if (!section) throw new FatalError("reviewer_section_missing");
-
-    let stored: StoredInitialSection;
-    try {
-      const output = await generateSection({
-        section,
-        plan: prepared.plan,
-        source: prepared.source,
-        provider: createServerOpenAIProvider(),
-      });
-      stored = {
-        sectionId,
-        output,
-        validationFailure: false,
-        providerFailure: false,
-      };
-    } catch (error) {
-      if (
-        !(error instanceof SectionProviderError) &&
-        !(error instanceof SectionValidationError)
-      ) {
-        throw error;
-      }
-      stored = {
-        sectionId,
-        output: null,
-        validationFailure: error instanceof SectionValidationError,
-        providerFailure: error instanceof SectionProviderError,
-      };
+    if (sections.length !== missingIds.length) {
+      throw new FatalError("reviewer_section_missing");
     }
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    await writeProcessingJobCheckpoint(client, {
-      jobId,
-      checkpointKey,
-      payload: toJson(stored),
+    const upstream = createServerOpenAIProvider();
+    let providerRequestCount = 0;
+    let providerWaitDurationMs = 0;
+    const sectionsPerProviderRequest: number[] = [];
+    const result = await generateSections({
+      sections,
+      plan: prepared.plan,
+      source: prepared.source,
+      provider: {
+        generate: async (request) => {
+          providerRequestCount += 1;
+          sectionsPerProviderRequest.push(
+            Array.isArray(request.metadata?.explanationBatchSectionIds)
+              ? request.metadata.explanationBatchSectionIds.length
+              : 1,
+          );
+          const startedAt = Date.now();
+          try {
+            return await upstream.generate(request);
+          } finally {
+            providerWaitDurationMs += Date.now() - startedAt;
+          }
+        },
+      },
     });
+    const outputs = new Map(result.outputs.map((output) => [output.plannedSectionId, output] as const));
+    const validationFailures = new Set(result.validationFailures.map((failure) => failure.sectionId));
+    const failed = new Set(result.failedSectionIds);
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    for (const [index, sectionId] of missingIds.entries()) {
+      const stored: StoredInitialSection = {
+        sectionId,
+        output: outputs.get(sectionId) ?? null,
+        validationFailure: validationFailures.has(sectionId),
+        providerFailure: failed.has(sectionId) && result.providerErrors.length > 0,
+        providerRequestCount: index === 0 ? providerRequestCount : 0,
+        sectionsPerProviderRequest: index === 0 ? sectionsPerProviderRequest : [],
+        providerWaitDurationMs: index === 0 ? providerWaitDurationMs : 0,
+        deterministicEvidenceDurationMs:
+          index === 0 ? result.deterministicAssemblyDurationMs : 0,
+      };
+      await writeProcessingJobCheckpoint(client, {
+        jobId,
+        checkpointKey: `${REVIEWER_INITIAL_PREFIX}${sectionId}`,
+        payload: toJson(stored),
+      });
+    }
     const completed = (
       await listProcessingJobCheckpoints(client, jobId, REVIEWER_INITIAL_PREFIX)
-    ).length;
+    ).map((row) => readStoredInitialSection(row.payload));
     await updateProcessingJobProgress(client, {
       jobId,
       workerId,
       stage: "generating_sections",
       statusMessage: "Creating reviewer sections",
-      completedUnits: Math.min(completed, prepared.plan.sections.length),
+      completedUnits: Math.min(completed.length, prepared.plan.sections.length),
       totalUnits: prepared.plan.sections.length,
       unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, completed, 0),
+      metrics: reviewerMetrics(prepared, sumInitialProviderRequests(completed), 0),
     });
   });
-  safeStepLog("generate_section", "done", jobId, sectionId);
+  safeStepLog("generate_sections", "done", jobId);
 }
 
 async function verifyReviewerStep(
@@ -915,7 +914,7 @@ async function verifyReviewerStep(
       completedUnits: outputs.length,
       totalUnits: prepared.plan.sections.length,
       unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, initial.length, 0),
+      metrics: reviewerMetrics(prepared, sumInitialProviderRequests(initial), 0),
     });
     const verification: StoredReviewerVerification = {
       coverage: verifyCoverage({
@@ -935,6 +934,14 @@ async function verifyReviewerStep(
         plan: prepared.plan,
         source: prepared.source,
       }),
+      usefulnessFailedSectionIds: prepared.plan.sections.flatMap((section) => {
+        const output = outputs.find((candidate) => candidate.plannedSectionId === section.id);
+        return output && diagnoseStudentVisibleUsefulness({
+          section,
+          source: prepared.source,
+          output,
+        }).length > 0 ? [section.id] : [];
+      }),
     };
     await writeProcessingJobCheckpoint(client, {
       jobId,
@@ -952,25 +959,33 @@ async function verifyReviewerStep(
       completedUnits: outputs.length,
       totalUnits: prepared.plan.sections.length,
       unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, initial.length, 0),
+      metrics: reviewerMetrics(prepared, sumInitialProviderRequests(initial), 0),
     });
     safeStepLog("verify_reviewer", "done", jobId);
     return retryIds;
   });
 }
 
-async function retryReviewerSectionStep(
+async function retryReviewerSectionsStep(
   jobId: string,
   workerId: string,
-  sectionId: string,
+  sectionIds: readonly string[],
 ): Promise<void> {
   "use step";
-  const checkpointKey = `${REVIEWER_RETRY_PREFIX}${sectionId}`;
-  safeStepLog("retry_section", "start", jobId, sectionId);
+  if (sectionIds.length === 0) return;
+  safeStepLog("retry_sections", "start", jobId);
   const client = createProcessingJobServiceClient();
   await withWorkflowLease(client, jobId, workerId, async () => {
-    if (await readProcessingJobCheckpoint(client, jobId, checkpointKey)) {
-      safeStepLog("retry_section", "checkpoint", jobId, sectionId);
+    const existingRows = await listProcessingJobCheckpoints(
+      client,
+      jobId,
+      REVIEWER_RETRY_PREFIX,
+    );
+    const existing = existingRows.map((row) => readStoredRetriedSection(row.payload));
+    const existingIds = new Set(existing.map((section) => section.sectionId));
+    const missingIds = sectionIds.filter((sectionId) => !existingIds.has(sectionId));
+    if (missingIds.length === 0) {
+      safeStepLog("retry_sections", "checkpoint", jobId);
       return;
     }
     await assertWorkflowJobMayContinue(client, jobId, workerId);
@@ -982,47 +997,73 @@ async function retryReviewerSectionStep(
     );
     const verification = readStoredReviewerVerification(verificationRow?.payload);
     const initial = await readInitialReviewerSections(client, jobId);
-    const outputs = initial.flatMap((section) =>
-      section.output ? [section.output] : []
-    );
-    let qualityStatus: ReviewerSectionQualityStatus | null = null;
-    let retryCount = 0;
+    const retriedById = new Map(existing.map((section) => [section.sectionId, section] as const));
+    const outputs = initial.flatMap((section) => {
+      const retried = retriedById.get(section.sectionId)?.output;
+      return retried ? [retried] : section.output ? [section.output] : [];
+    });
+    const qualityById = new Map<string, ReviewerSectionQualityStatus>();
+    const retryCountById = new Map<string, number>();
+    const upstream = createServerOpenAIProvider();
+    let providerRequestCount = 0;
+    let providerWaitDurationMs = 0;
+    const sectionsPerProviderRequest: number[] = [];
     const finalOutputs = await retryFailedSections({
       outputs,
-      coverage: maskCoverageForSection(verification.coverage, sectionId),
-      grounding: maskGroundingForSection(verification.grounding, sectionId),
-      leakage: maskLeakageForSection(verification.leakage, sectionId),
+      coverage: verification.coverage,
+      grounding: verification.grounding,
+      leakage: verification.leakage,
       plan: prepared.plan,
       source: prepared.source,
       outline: prepared.outline,
-      provider: createServerOpenAIProvider(),
+      provider: {
+        generate: async (request) => {
+          providerRequestCount += 1;
+          sectionsPerProviderRequest.push(
+            Array.isArray(request.metadata?.explanationBatchSectionIds)
+              ? request.metadata.explanationBatchSectionIds.length
+              : 1,
+          );
+          const startedAt = Date.now();
+          try {
+            return await upstream.generate(request);
+          } finally {
+            providerWaitDurationMs += Date.now() - startedAt;
+          }
+        },
+      },
       retryPolicy: {
         maxRetries: 2,
         retryWeakSections: true,
         retryFailedSections: true,
       },
       onRetryAttempt: (section, attempt) => {
-        if (section.id === sectionId) retryCount = Math.max(retryCount, attempt);
+        retryCountById.set(
+          section.id,
+          Math.max(retryCountById.get(section.id) ?? 0, attempt),
+        );
       },
       onSectionRecovered: (section, status) => {
-        if (section.id === sectionId) qualityStatus = status;
+        qualityById.set(section.id, status);
       },
     });
-    const output =
-      finalOutputs.find((candidate) => candidate.plannedSectionId === sectionId) ??
-      null;
-    const stored: StoredRetriedSection = {
-      sectionId,
-      output,
-      qualityStatus,
-      retryCount,
-    };
     await assertWorkflowJobMayContinue(client, jobId, workerId);
-    await writeProcessingJobCheckpoint(client, {
-      jobId,
-      checkpointKey,
-      payload: toJson(stored),
-    });
+    for (const [index, sectionId] of missingIds.entries()) {
+      const stored: StoredRetriedSection = {
+        sectionId,
+        output: finalOutputs.find((candidate) => candidate.plannedSectionId === sectionId) ?? null,
+        qualityStatus: qualityById.get(sectionId) ?? null,
+        retryCount: retryCountById.get(sectionId) ?? 0,
+        providerRequestCount: index === 0 ? providerRequestCount : 0,
+        sectionsPerProviderRequest: index === 0 ? sectionsPerProviderRequest : [],
+        providerWaitDurationMs: index === 0 ? providerWaitDurationMs : 0,
+      };
+      await writeProcessingJobCheckpoint(client, {
+        jobId,
+        checkpointKey: `${REVIEWER_RETRY_PREFIX}${sectionId}`,
+        payload: toJson(stored),
+      });
+    }
     const retryRows = await listProcessingJobCheckpoints(
       client,
       jobId,
@@ -1045,12 +1086,12 @@ async function retryReviewerSectionStep(
       unitLabel: "sections",
       metrics: reviewerMetrics(
         prepared,
-        initial.length + totalRetryCount,
+        sumInitialProviderRequests(initial) + sumRetryProviderRequests(retryRows),
         totalRetryCount,
       ),
     });
   });
-  safeStepLog("retry_section", "done", jobId, sectionId);
+  safeStepLog("retry_sections", "done", jobId);
 }
 
 async function finalizeReviewerStep(
@@ -1103,6 +1144,19 @@ async function finalizeReviewerStep(
       plan: prepared.plan,
       source: prepared.source,
     });
+    const providerRequestCount = sumInitialProviderRequests(initial) +
+      retried.reduce((total, section) => total + (section.providerRequestCount ?? 0), 0);
+    const providerWaitDurationMs = initial.reduce(
+      (total, section) => total + (section.providerWaitDurationMs ?? 0),
+      0,
+    ) + retried.reduce(
+      (total, section) => total + (section.providerWaitDurationMs ?? 0),
+      0,
+    );
+    const deterministicEvidenceDurationMs = initial.reduce(
+      (total, section) => total + (section.deterministicEvidenceDurationMs ?? 0),
+      0,
+    );
     await updateProcessingJobProgress(client, {
       jobId,
       workerId,
@@ -1113,17 +1167,39 @@ async function finalizeReviewerStep(
       unitLabel: "sections",
       metrics: reviewerMetrics(
         prepared,
-        initial.length + retryCount,
+        providerRequestCount,
         retryCount,
       ),
     });
-    const fallbackPlanUsed =
-      initial.every((section) => section.output === null) &&
-      prepared.plan.sections.every(
+    const fallbackPlanUsed = prepared.plan.sections.every(
         (section) =>
           sectionQualityById[section.id] === "extractive_fallback",
       );
-    const reviewer = assembleReviewer({
+    const startedAt = Date.parse(job.started_at ?? job.updated_at);
+    const assemblyStartedAt = Date.now();
+    const generationMetrics: ReviewerGenerationMetrics = {
+      totalDurationMs: Math.max(0, assemblyStartedAt - startedAt),
+      planningDurationMs: Math.max(0, Date.parse(prepared.preparedAt) - startedAt),
+      deterministicEvidenceDurationMs,
+      providerWaitDurationMs,
+      validationDurationMs: 0,
+      assemblyDurationMs: 0,
+      providerRequestCount,
+      sectionsPerProviderRequest: [
+        ...initial.flatMap((section) => section.sectionsPerProviderRequest ?? []),
+        ...retried.flatMap((section) => section.sectionsPerProviderRequest ?? []),
+      ],
+      providerRetryCount: retried.reduce(
+        (total, section) => total + (section.providerRequestCount ?? 0),
+        0,
+      ),
+      factualCompletionRetryCount: 0,
+      explanationRetryCount: retried.reduce(
+        (total, section) => total + (section.providerRequestCount ?? 0),
+        0,
+      ),
+    };
+    const assembledReviewer = assembleReviewer({
       outputs,
       coverage,
       grounding,
@@ -1132,7 +1208,19 @@ async function finalizeReviewerStep(
       source: prepared.source,
       sectionQualityById,
       fallbackPlanUsed,
+      generationMetrics,
     });
+    const reviewer = {
+      ...assembledReviewer,
+      metadata: {
+        ...assembledReviewer.metadata,
+        generationMetrics: {
+          ...generationMetrics,
+          totalDurationMs: Math.max(0, Date.now() - startedAt),
+          assemblyDurationMs: Math.max(0, Date.now() - assemblyStartedAt),
+        },
+      },
+    };
     await updateProcessingJobProgress(client, {
       jobId,
       workerId,
@@ -1142,13 +1230,15 @@ async function finalizeReviewerStep(
       totalUnits: reviewer.sections.length,
       unitLabel: "sections",
     });
-    const startedAt = Date.parse(job.started_at ?? job.updated_at);
     const metrics = {
       sourceCharacterCount: prepared.sourceCharacterCount,
       normalizedCharacterCount: normalizedSourceCharacterCount(prepared.source),
       outlineItemCount: prepared.outline.sections.length,
       plannedSectionCount: prepared.plan.sections.length,
-      providerCallCount: initial.length + retryCount,
+      providerCallCount: providerRequestCount,
+      providerWaitDurationMs,
+      deterministicEvidenceDurationMs,
+      factualCompletionRetryCount: 0,
       retryCount,
       finalReviewerSectionCount: reviewer.sections.length,
       coverageStatus: reviewer.metadata.coverageStatus,
@@ -1352,66 +1442,28 @@ function retryableSectionIds(
       ids.add(section.plannedSectionId);
     }
   }
+  for (const sectionId of verification.usefulnessFailedSectionIds ?? []) {
+    ids.add(sectionId);
+  }
   return [...ids];
 }
 
-function maskCoverageForSection(
-  report: CoverageReport,
-  sectionId: string,
-): CoverageReport {
-  return {
-    ...report,
-    sections: report.sections.map((section) =>
-      section.plannedSectionId === sectionId
-        ? section
-        : {
-            ...section,
-            status: "passed" as const,
-            score: 1,
-            issues: [],
-            retryable: false,
-          }
-    ),
-  };
+function sumInitialProviderRequests(
+  sections: readonly StoredInitialSection[],
+): number {
+  return sections.reduce(
+    (total, section) => total + (section.providerRequestCount ?? 1),
+    0,
+  );
 }
 
-function maskGroundingForSection(
-  report: GroundingReport,
-  sectionId: string,
-): GroundingReport {
-  return {
-    ...report,
-    sections: report.sections.map((section) =>
-      section.plannedSectionId === sectionId
-        ? section
-        : {
-            ...section,
-            status: "passed" as const,
-            score: 1,
-            issues: [],
-            retryable: false,
-          }
-    ),
-  };
-}
-
-function maskLeakageForSection(
-  report: LeakageReport,
-  sectionId: string,
-): LeakageReport {
-  return {
-    ...report,
-    sections: report.sections.map((section) =>
-      section.plannedSectionId === sectionId
-        ? section
-        : {
-            ...section,
-            status: "passed" as const,
-            issues: [],
-            retryable: false,
-          }
-    ),
-  };
+function sumRetryProviderRequests(
+  rows: readonly { readonly payload: Json }[],
+): number {
+  return rows.reduce(
+    (total, row) => total + (readOptionalNumber(row.payload, "providerRequestCount") ?? 1),
+    0,
+  );
 }
 
 function reviewerMetrics(
@@ -1597,6 +1649,12 @@ function readNumber(record: Json, key: string): number {
   return isRecord(record) && typeof record[key] === "number"
     ? record[key]
     : 0;
+}
+
+function readOptionalNumber(record: Json, key: string): number | undefined {
+  return isRecord(record) && typeof record[key] === "number"
+    ? record[key]
+    : undefined;
 }
 
 function readString(record: Readonly<Record<string, unknown>>, key: string): string {

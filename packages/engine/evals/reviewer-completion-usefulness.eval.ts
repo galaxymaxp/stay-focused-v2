@@ -2,7 +2,8 @@ import { validateLeakage } from "../src/leakage-guard.js";
 import type { GenerationProvider, GenerationRequest } from "../src/provider.js";
 import { buildRequiredEvidenceManifest, findMissingRequiredEvidenceTargets } from "../src/required-evidence.js";
 import { diagnoseStudentVisibleUsefulness } from "../src/reviewer-usefulness.js";
-import { generateSection, SectionValidationError } from "../src/stage3-generate.js";
+import { generateSection, generateSections, SectionValidationError } from "../src/stage3-generate.js";
+import { assembleDeterministicSectionEvidence } from "../src/reviewer-evidence-assembly.js";
 import { verifyCoverage } from "../src/stage4-verify.js";
 import { retryFailedSections } from "../src/stage5-retry.js";
 import { validateGrounding } from "../src/stage5a-grounding.js";
@@ -41,8 +42,8 @@ class FakeProvider implements GenerationProvider {
 export const reviewerCompletionUsefulnessSuite: EvalSuite = {
   name: "Reviewer completion and usefulness hardening",
   cases: [
-    retryCompletionCase("required list completion repairs the exact missing item", "list"),
-    retryCompletionCase("required table-row completion preserves the actual source row", "table"),
+    retryCompletionCase("required list item is assembled before explanation retry", "list"),
+    retryCompletionCase("required table row is assembled before explanation retry", "table"),
     formulaCompletionCase(),
     usefulnessFailureCase(
       "title repetition is non-explanatory",
@@ -101,9 +102,9 @@ function retryCompletionCase(name: string, kind: "list" | "table"): EvalCase {
           [`${kind}-target-3`],
           "Preflight did not isolate the exact missing target.",
         ),
-        ...assertIncludes(prompt, `${kind}-target-3`, "Retry prompt omitted the missing target ID."),
+        ...assertEqual(prompt.includes(`${kind}-target-3`), false, "Explanation retry retained factual-repair instructions."),
         ...assertIncludes(prompt, labels[2] ?? "", "Retry prompt omitted the missing target source evidence."),
-        ...assertEqual(finalMissing.length, 0, "Repaired output did not complete required evidence."),
+        ...assertEqual(finalMissing.length, 0, "Deterministic pre-provider assembly did not complete required evidence."),
       ];
     },
   };
@@ -120,17 +121,23 @@ function formulaCompletionCase(): EvalCase {
         targets: [target("formula-target", "formula", formula, "source-block", 0)],
       });
       const unsupported = outputFor(context.section, ["m = total + count"], "unsupported");
-      const valid = outputFor(context.section, [formula], "valid");
-      const grounding = validateGrounding({ ...context, outputs: [unsupported] });
-      const provider = new FakeProvider([valid]);
-      const repaired = await retryFailedSections({
-        ...context,
-        outputs: [unsupported],
-        coverage: verifyCoverage({ ...context, outputs: [unsupported] }),
-        grounding,
-        provider,
-        retryPolicy: { maxRetries: 1, retryWeakSections: true, retryFailedSections: true },
+      const deterministic = assembleDeterministicSectionEvidence({
+        section: context.section,
+        sourceBlocks: context.source.blocks,
       });
+      const grounding = validateGrounding({ ...context, outputs: [unsupported] });
+      const provider = new FakeProvider([outputFor(
+        context.section,
+        ["m = total + count"],
+        "malicious-provider-shape",
+      )]);
+      const generated = await generateSections({
+        sections: [context.section],
+        plan: context.plan,
+        source: context.source,
+        provider,
+      });
+      const final = generated.outputs[0];
       return [
         ...assertDeepEqual(
           findMissingRequiredEvidenceTargets(context.section, unsupported).map((entry) => entry.id),
@@ -138,9 +145,10 @@ function formulaCompletionCase(): EvalCase {
           "Unsupported replacement formula satisfied the required formula target.",
         ),
         ...assertEqual(grounding.status, "failed", "Unsupported replacement formula passed grounding."),
-        ...assertEqual(findMissingRequiredEvidenceTargets(context.section, valid).length, 0, "Exact typed formula did not satisfy its target."),
-        ...assertIncludes(provider.requests[0]?.prompt ?? "", formula, "Formula retry lost exact source evidence."),
-        ...assertEqual(findMissingRequiredEvidenceTargets(context.section, repaired[0]).length, 0, "Formula repair remained incomplete."),
+        ...assertEqual(findMissingRequiredEvidenceTargets(context.section, deterministic).length, 0, "Deterministic formula assembly was incomplete."),
+        ...assertEqual(provider.requests[0]?.schema.name, "ReviewerExplanationBatch", "Provider retained ownership of the full factual section schema."),
+        ...assertDeepEqual(final?.sourceCore.keyPoints, [formula], "Provider rewrote the authoritative formula value."),
+        ...assertEqual(findMissingRequiredEvidenceTargets(context.section, final).length, 0, "Provider response removed the exact deterministic formula."),
       ];
     },
   };

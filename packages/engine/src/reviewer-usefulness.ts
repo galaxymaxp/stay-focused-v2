@@ -43,6 +43,15 @@ export function diagnoseStudentVisibleUsefulness(args: {
   const points = args.output.sourceCore.keyPoints.map((point) => point.trim()).filter(Boolean);
   const targets = args.section.requiredEvidence ?? [];
 
+  if (!explanation) {
+    issues.push(issue(
+      "NON_EXPLANATORY_SECTION",
+      args.section.id,
+      "sourceCore.explanation",
+      "Source-supported standalone section is missing its concise explanation.",
+    ));
+  }
+
   if (explanation && explanationAddsNoInformation(args.section.title, explanation)) {
     issues.push(issue(
       "NON_EXPLANATORY_SECTION",
@@ -86,7 +95,7 @@ export function diagnoseStudentVisibleUsefulness(args: {
       explanation,
     ));
   }
-  points.forEach((point, index) => {
+  if (!args.output.deterministicEvidence) points.forEach((point, index) => {
     if (isInstructionalNoiseText(point)) {
       issues.push(issue(
         "INSTRUCTIONAL_NOISE",
@@ -107,7 +116,7 @@ export function diagnoseStudentVisibleUsefulness(args: {
     }
   });
 
-  if (keyPointSetIsSourceDump(points, targets, args.source, args.section)) {
+  if (!args.output.deterministicEvidence && keyPointSetIsSourceDump(points, targets, args.source, args.section)) {
     issues.push(issue(
       "SOURCE_DUMP",
       args.section.id,

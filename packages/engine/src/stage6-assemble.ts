@@ -5,6 +5,7 @@ import type {
   LeakageReport,
   NormalizedSource,
   ReviewerOutput,
+  ReviewerGenerationMetrics,
   ReviewerSectionQualityStatus,
   ReviewerSection,
   SectionCoverageResult,
@@ -30,6 +31,7 @@ export interface AssembleReviewerArgs {
   readonly allowWeakSections?: boolean;
   readonly sectionQualityById?: Readonly<Record<string, ReviewerSectionQualityStatus>>;
   readonly fallbackPlanUsed?: boolean;
+  readonly generationMetrics?: ReviewerGenerationMetrics;
 }
 
 export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
@@ -162,6 +164,7 @@ export function assembleReviewer(args: AssembleReviewerArgs): ReviewerOutput {
       structuralNodeCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "structural").length,
       typedEvidenceNodeCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "typed-evidence").length,
       unsupportedNodeCount: plan.sections.filter((section) => reviewerDispositionFor(section) === "unsupported").length,
+      ...(args.generationMetrics ? { generationMetrics: args.generationMetrics } : {}),
     },
   };
 }

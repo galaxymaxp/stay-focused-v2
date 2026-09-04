@@ -181,14 +181,46 @@ class RecoveryProvider implements GenerationProvider {
     this.requests.push(request);
     const requestNumber = this.requests.length;
     if (this.behavior === "outage") throw new Error("fictional provider outage");
-    if (this.behavior === "malformed" || (this.behavior === "first-malformed" && requestNumber === 1) || (this.behavior === "second-malformed" && requestNumber === 2)) {
+    if (this.behavior === "malformed") {
       return { malformed: true } as TOutput;
+    }
+    if (request.schema.name === "ReviewerExplanationBatch") {
+      const ids = request.metadata?.explanationBatchSectionIds;
+      if (!Array.isArray(ids) || !ids.every((value) => typeof value === "string")) {
+        throw new Error("Recovery provider is missing explanation batch IDs.");
+      }
+      const drift = this.behavior === "always-drift" ||
+        (this.behavior === "drift-then-valid" && requestNumber === 1);
+      let explanations = ids.map((sectionId) => ({
+          sectionId,
+          explanation: drift
+            ? "Invented astronomy recommendations are essential."
+            : explanationFromBatch(request.prompt, sectionId),
+        }));
+      if (this.behavior === "first-malformed" && requestNumber === 1) {
+        explanations = explanations.slice(1);
+      } else if (this.behavior === "second-malformed" && requestNumber === 1) {
+        explanations = explanations.slice(0, -1);
+      }
+      return { explanations } as TOutput;
     }
     if (this.behavior === "always-drift" || (this.behavior === "drift-then-valid" && requestNumber === 1)) {
       return createOutput(request, ["Invented astronomy recommendations are essential."], "Invented astronomy recommendations are essential.") as TOutput;
     }
     return createOutput(request) as TOutput;
   }
+}
+
+function explanationFromBatch(prompt: string, sectionId: string): string {
+  const begin = `BEGIN SECTION "${sectionId}"`;
+  const end = `END SECTION "${sectionId}"`;
+  const sectionText = prompt.split(begin)[1]?.split(end)[0] ?? "";
+  const support = sectionText.split("APPROVED LOCAL EXPLANATION EVIDENCE:\n")[1] ?? "";
+  const values = support.split(/\r?\n/u)
+    .map((line) => line.replace(/^\[source [^\]]+\]\s*/u, "").trim())
+    .filter(Boolean);
+  return values.flatMap((value) => value.split(/(?<=[.!?])\s+/u))
+    .find((value) => value.split(/\s+/u).length >= 4) ?? values[0] ?? "";
 }
 
 function createOutput(
