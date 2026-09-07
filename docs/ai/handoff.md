@@ -2299,3 +2299,34 @@ Current route status:
   with existing validation rules using captured failures. No B17, default parser
   promotion, frozen-gate weakening, evidence-ownership change or push.
 - Evidence: `docs/ai/acceptance/b16/live-provider-runtime-validation.md`.
+
+## 2026-09-07 — B17 explanation and evidence presentation (local)
+
+- Continued from `4cc7233c2102a3251945a1825e2f591bd158b166` on `main` in
+  `C:/Projects/stay-focused-v2`. Implementation/tests committed locally as
+  `39fb81211b0f8e48a24d6f29c41f4b9accdfbbb5`; accompanying documentation is in
+  the subsequent `docs(ai): record B17 Reviewer presentation validation` commit.
+- Added conservative source-owned typed evidence presentation, local prose
+  selection, heading-only subject completion, exact duplication removal and
+  reader/API support. Manifest identity and all frozen factual rules remain.
+- Fresh engine 494/494, architecture 45/45, API 607/607 and reader 32/32 PASS.
+  Root typecheck, lint and build each ran seven fresh tasks with zero cached;
+  all PASS, with four unchanged lint warnings. Diff check/full fsck PASS;
+  the two pre-existing dangling blobs remain.
+- Final live Python/MinerU/Docling/Accounting preserve 99/232/156/46 targets
+  with zero provider target losses or factual retries. Calls are 2/2/2/2;
+  explanation retries 0/0/0/1; observed replacements 0/0/3/0. Accounting's
+  extra retry is explicitly reported. All generation requests used gpt-4o.
+- Verdict: FAIL — generic Reviewer quality defect remains. Every case fails
+  manual usefulness; Statistics remains withheld for two/four independent
+  source-item omissions. Required composite labels still repeat source
+  passages and damaged cached code/table layout remains. Full frozen B12:
+  NOT RUN — targeted prerequisites failed. Native screenshot acceptance was
+  not run; complete projected text/payloads were reviewed.
+- Next task: repair generic composite source-span/relationship presentation
+  and its alignment with source-item evidence, then repeat the frozen four
+  gates. Do not weaken factual checks or change model/parser defaults.
+- Historical reports preserved; B16 receives an additive continuation link.
+  Private source/provider captures and logs remain ignored in `.local/b17/`;
+  pre-existing untracked B8 is untouched. No secrets staged and no push.
+- Evidence: `docs/ai/acceptance/b17/reviewer-explanation-evidence-presentation.md`.

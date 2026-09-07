@@ -1,5 +1,22 @@
 # Current State
 
+## B17 local repair — current result (2026-09-07)
+
+**FAIL — generic Reviewer quality defect remains.** All frozen targets remain
+99/99, 232/232, 156/156 and 46/46; model gpt-4o and parser default legacy
+are unchanged. Deterministic display now separates typed evidence, protects
+row identity/order and exact overlap, and preserves every target at serialization.
+Local sentence context and heading-subject completion improve explanations.
+Fresh engine 494/494, architecture 45/45 and reader 32/32 pass.
+Final calls 2/2/2/2, explanation retries 0/0/0/1, factual retries all zero.
+Python has zero fallback, but source code/layout and repetitive labels remain.
+Statistics remains withheld (two/four omissions); Accounting improves but
+still fails manual usefulness. All four manual gates FAIL; full B12 NOT RUN.
+Next: repair composite source-span/relationship presentation and align its
+source-item evidence, preserving the frozen gates. No push or parser promotion.
+See [B17 acceptance](ai/acceptance/b17/reviewer-explanation-evidence-presentation.md).
+
+
 Last refreshed: 2026-09-07, Asia/Manila.
 
 ## Repository

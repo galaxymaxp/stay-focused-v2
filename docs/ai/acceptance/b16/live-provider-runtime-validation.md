@@ -530,3 +530,11 @@ Single next task: reconcile the generic explanation/evidence presentation
 contract with the existing validation rules using these captured failures,
 while preserving deterministic ownership and frozen gates. The evidence does
 not justify a benchmark-specific B17 or a claim that Reviewer acceptance is done.
+
+
+## B17 continuation — 2026-09-07
+
+B16.1 remains historically FAIL. The local generic presentation repair and fresh
+validation are recorded in [B17](../b17/reviewer-explanation-evidence-presentation.md).
+B17 also fails manual acceptance; all frozen target counts and the production
+model remain unchanged. No historical result above has been rewritten.
