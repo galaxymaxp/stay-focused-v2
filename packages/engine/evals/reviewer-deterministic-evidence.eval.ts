@@ -57,6 +57,7 @@ export const reviewerDeterministicEvidenceSuite: EvalSuite = {
   cases: [
     ...omissionCases.map(([name, targetId]) => omissionCase(name, targetId)),
     excellentExplanationCase(),
+    lexicalExplanationContractCase(),
     unsupportedExplanationCase(),
     usefulnessFailureCase("instructional explanation", "Try calculating every record now.", "INSTRUCTIONAL_NOISE"),
     usefulnessFailureCase("code-only explanation", "const total = values.length;\nreturn total;", "CODE_AS_EXPLANATION"),
@@ -115,6 +116,30 @@ function excellentExplanationCase(): EvalCase {
       ...assertEqual(output.sourceCore.explanation.includes("r = total / count"), false, "Explanation was forced to reproduce a formula."),
       ...assertEqual(validateGrounding({ ...context, outputs: [output] }).status, "passed", "Concise explanation failed grounding."),
       ...assertEqual(findMissingRequiredEvidenceTargets(context.sections[0]!, output).length, 0, "Concise explanation caused factual loss."),
+    ];
+  } };
+}
+
+function lexicalExplanationContractCase(): EvalCase {
+  return { name: "explanation prompt matches frozen lexical grounding without transferring factual ownership", run: async () => {
+    const context = createContext();
+    const paraphrase = await generateSections({
+      ...context,
+      provider: new ScriptedProvider((request) => explanationsFor(request,
+        "The archive safeguards authentic source records.")),
+    });
+    const provider = new ScriptedProvider((request) => explanationsFor(request,
+      "The archive preserves exact source records."));
+    const generated = await generateSections({ ...context, provider });
+    const prompt = provider.requests[0]!.prompt;
+    return [
+      ...assertEqual(validateGrounding({ ...context, outputs: paraphrase.outputs }).status, "failed", "Frozen lexical grounding must still reject unsupported vocabulary."),
+      ...assertIncludes(prompt, "source vocabulary", "Explanation contract does not disclose the frozen lexical grounding constraint."),
+      ...assertIncludes(prompt, "Reuse", "Explanation contract must permit concise local source clauses."),
+      ...assertEqual(prompt.includes("Do not choose, restate"), false, "Prompt contradicts source-grounded explanatory clause reuse."),
+      ...assertEqual(validateGrounding({ ...context, outputs: generated.outputs }).status, "passed", "Concise local source explanation should pass the unchanged grounding gate."),
+      ...assertEqual(diagnoseStudentVisibleUsefulness({ section: context.sections[0]!, source: context.source, output: generated.outputs[0]! }).length, 0, "Source vocabulary must still produce a useful explanation."),
+      ...assertDeepEqual(generated.outputs[0]!.sourceCore.keyPoints, paraphrase.outputs[0]!.sourceCore.keyPoints, "Explanation wording altered deterministic evidence."),
     ];
   } };
 }
