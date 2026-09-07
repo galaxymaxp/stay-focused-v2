@@ -453,6 +453,10 @@ function isSectionOutput(value: unknown): value is SectionOutput {
     typeof value.sourceCore.explanation === "string" &&
     Array.isArray(value.sourceCore.keyPoints) &&
     value.sourceCore.keyPoints.every(isString) &&
+    (value.sourceCore.evidence === undefined ||
+      (Array.isArray(value.sourceCore.evidence) && value.sourceCore.evidence.every(block =>
+        isRecord(block) && typeof block.text === "string" &&
+        ["code", "formula", "table", "result", "example", "source"].includes(String(block.kind))))) &&
     ("enrichment" in value)
   );
 }

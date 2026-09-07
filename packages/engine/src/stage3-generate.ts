@@ -31,6 +31,7 @@ import {
   assembleDeterministicSectionEvidence,
   attachGeneratedExplanation,
 } from "./reviewer-evidence-assembly.js";
+import { explanationEvidenceFor } from "./reviewer-explanation-evidence.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -341,26 +342,20 @@ function explanationSupportFor(
   section: PlannedSection,
   sourceBlocks: readonly NormalizedSourceBlock[],
 ): string {
-  const reviewable = reviewableSourceBlocks(sourceBlocks)
-    .filter((block) => block.kind !== "heading" && block.kind !== "image")
-    .filter((block) => block.structuredBlock?.role !== "furniture");
-  const prose = reviewable.filter(
-    (block) =>
-      block.kind !== "code" && block.kind !== "table" &&
-      block.text.split(/\r?\n/u).some(isLocallyExplanatoryText),
-  );
-  const selected = (prose.length > 0 ? prose : reviewable.filter(
-    (block) => block.kind !== "code" && block.kind !== "table",
-  ));
+  const shaped = sourceBlocks.some(block => block.structuredBlock)
+    ? explanationEvidenceFor(section, sourceBlocks) : [];
+  const selected = shaped.length > 0 ? shaped : reviewableSourceBlocks(sourceBlocks)
+    .filter(block => !["heading", "image", "code", "table", "formula"].includes(block.kind))
+    .map(block => ({blockId: block.id, text: filterReviewableText(block.text, {block})}));
   const rows: string[] = [];
   let characterCount = 0;
   for (const block of selected) {
-    const text = filterReviewableText(block.text, { block });
+    const text = block.text;
     if (!text) continue;
     if (rows.length > 0 && characterCount + text.length > MAX_SECTION_EXPLANATION_SUPPORT_CHARACTERS) {
       break;
     }
-    rows.push(`[source ${block.id}] ${text}`);
+    rows.push(`[source ${block.blockId}] ${text}`);
     characterCount += text.length;
   }
   if (rows.length === 0) {
@@ -385,11 +380,13 @@ function buildExplanationBatchPrompt(
     "Return explanatory prose only; the engine retains the complete required evidence separately.",
     "Use only the approved local evidence inside that section's boundary.",
     "Grounding requires local source vocabulary: do not introduce synonyms, new terminology, or unstated relationships even when they seem equivalent.",
-    "Reuse one or two short, complete explanatory sentences verbatim from that section's evidence. Only remove source markers and list prefixes; do not paraphrase, combine clauses, substitute words, or add transitions.",
+    "Reuse ONE short explanatory sentence from that section's evidence. Preserve source wording, including source errors; do not paraphrase, combine separate source points, substitute words, or add transitions.",
+    "If the source is a predicate fragment (is..., may..., reports...), use the local section title as its subject. This is the only permitted subject completion; do not add a new claim or correct the source.",
+    "If the source sentence already has a subject, do not prepend the title. Do not repeat a subject or add a second title inside the sentence.",
     "Choose sentences that explain the concept, not presentation instructions, metadata, code, or a list of examples. Do not copy the full evidence passage.",
     "Do not borrow evidence between sections or add outside knowledge.",
     "Do not invent examples, issue learner instructions, reproduce large passages, use code as the explanation, or merely repeat the title.",
-    "Each explanation must be one or two short, complete, source-grounded sentences.",
+    "Each explanation must be one short, complete, source-grounded sentence. Do not use remember that, take note, students should, or you should. Required code, formulas, results and tables are displayed separately; do not recite them in prose.",
     ...(typeof retryAttempt === "number"
       ? ["This is a bounded explanation-only repair. Correct only the explanation quality or grounding defect."]
       : []),

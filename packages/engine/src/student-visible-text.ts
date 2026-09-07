@@ -2,6 +2,7 @@ import type {
   SectionOutput,
   StudentFacingSectionField,
 } from "./types.js";
+import { sameVisibleText } from "./reviewer-evidence-presentation.js";
 
 export interface StudentVisibleTextEntry {
   readonly field: StudentFacingSectionField;
@@ -30,6 +31,11 @@ export function extractStudentVisibleText(
         text,
       }),
     ),
+    ...(output.sourceCore.evidence ?? []).map((block, index): StudentVisibleTextEntry => ({
+      field: "sourceCore.keyPoints",
+      fieldPath: `sourceCore.evidence[${index}]`,
+      text: block.text,
+    })),
   ];
 }
 
@@ -37,12 +43,18 @@ export function toDefaultStudentVisibleSectionOutput(
   output: SectionOutput,
 ): SectionOutput {
   const { deterministicEvidence: _internalEvidence, ...studentVisible } = output;
+  const presentation = output.deterministicEvidence?.presentation ?? output.sourceCore;
+  const explanation = output.sourceCore.explanation;
   return {
     ...studentVisible,
     sourceBlockIds: [...output.sourceBlockIds],
     sourceCore: {
-      explanation: output.sourceCore.explanation,
-      keyPoints: [...output.sourceCore.keyPoints],
+      explanation,
+      keyPoints: output.deterministicEvidence?.presentation
+        ? presentation.keyPoints.filter(point => !sameVisibleText(point, explanation) &&
+          !sameVisibleText(`${output.title} ${point.replace(/^\s*[-*•]\s*/u, "")}`, explanation))
+        : [...presentation.keyPoints],
+      ...(presentation.evidence ? { evidence: presentation.evidence.map(block => ({...block})) } : {}),
     },
     enrichment: null,
   } as SectionOutput;

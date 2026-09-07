@@ -419,3 +419,17 @@ describe("presentReviewerSections", () => {
     expect(presented[0]?.blocks[0]?.keyPoints).toHaveLength(3);
   });
 });
+
+describe('typed Reviewer evidence', () => {
+  it('keeps table cells, code whitespace and formulas available to the reader', () => {
+    const evidence = [
+      {kind: 'table' as const, text: 'Record | Count\nNorth | 42\nNorth | 42'},
+      {kind: 'code' as const, text: 'function values() {\n  return 42;\n}'},
+      {kind: 'formula' as const, text: 'r = 84 / 2'},
+    ];
+    const presented = presentReviewerSection(section({items:[item({sourceCore:{explanation:'',keyPoints:[],evidence}})]}),1);
+    expect(presented.blocks[0]?.evidence).toEqual(evidence);
+    expect(presented.blocks[0]?.emptyMessage).toBeNull();
+    expect(presented.blocks[0]?.keyPoints).toEqual([]);
+  });
+});

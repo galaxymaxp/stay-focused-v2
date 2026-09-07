@@ -284,11 +284,18 @@ interface BaseSectionOutput {
 export interface DeterministicEvidenceAssembly {
   readonly targetIds: readonly string[];
   readonly evidenceHash: string;
+  readonly presentation?: SourceGroundedCore;
+}
+
+export interface ReviewerEvidenceBlock {
+  readonly kind: "code" | "formula" | "table" | "result" | "example" | "source";
+  readonly text: string;
 }
 
 export interface SourceGroundedCore {
   readonly explanation: string;
   readonly keyPoints: readonly string[];
+  readonly evidence?: readonly ReviewerEvidenceBlock[];
 }
 
 export interface EnrichmentLayer {

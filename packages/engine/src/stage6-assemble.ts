@@ -14,12 +14,13 @@ import type {
   SectionOutput,
 } from "./types";
 import { toDefaultStudentVisibleSectionOutput } from "./student-visible-text.js";
-import { requiredEvidenceSourceIsAvailable } from "./required-evidence.js";
+import { findMissingRequiredEvidenceTargets, requiredEvidenceSourceIsAvailable } from "./required-evidence.js";
 import {
   diagnoseStudentVisibleUsefulness,
   type StudentVisibleUsefulnessDiagnostic,
 } from "./reviewer-usefulness.js";
 import { reviewerDispositionFor } from "./reviewer-section-support.js";
+import { renderRequiredEvidenceTarget } from "./reviewer-evidence-assembly.js";
 
 export interface AssembleReviewerArgs {
   readonly source: NormalizedSource;
@@ -232,7 +233,10 @@ function validateStudentVisibleStructure(args: {
     }
     const disposition = reviewerDispositionFor(section);
     if (disposition !== "standalone") continue;
-    const points = output.sourceCore.keyPoints.map((point) => point.trim()).filter(Boolean);
+    const visibleOutput = output.deterministicEvidence &&
+      output.sourceCore.keyPoints.join("\n") === (section.requiredEvidence ?? []).map(renderRequiredEvidenceTarget).filter((value, index, all) => all.indexOf(value) === index).join("\n")
+      ? toDefaultStudentVisibleSectionOutput(output) : output;
+    const points = visibleOutput.sourceCore.keyPoints.map((point) => point.trim()).filter(Boolean);
     if (!explanation && points.length === 0) {
       throwStructureError("EMPTY_EXPLANATION", section.id, title);
     }
@@ -613,12 +617,16 @@ function createReviewerSection(
   qualityStatus: ReviewerSectionQualityStatus,
 ): ReviewerSection {
   const visibleOutput = toDefaultStudentVisibleSectionOutput(output);
+  if (output.deterministicEvidence && findMissingRequiredEvidenceTargets(plannedSection, visibleOutput).length > 0) {
+    throw new Error(`Stage 6 presentation lost required source evidence for planned section "${plannedSection.id}".`);
+  }
   const representation = reviewerDispositionFor(plannedSection);
   const hasVisibleItem =
     representation === "standalone" ||
     representation === "typed-evidence" ||
     visibleOutput.sourceCore.explanation.trim().length > 0 ||
-    visibleOutput.sourceCore.keyPoints.some((point) => point.trim().length > 0);
+    visibleOutput.sourceCore.keyPoints.some((point) => point.trim().length > 0) ||
+    (visibleOutput.sourceCore.evidence?.some(block => block.text.trim().length > 0) ?? false);
 
   return {
     id: stableId(

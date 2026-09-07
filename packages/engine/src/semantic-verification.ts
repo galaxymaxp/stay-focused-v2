@@ -464,6 +464,9 @@ function visibleRows(output: SectionOutput): readonly VisibleRow[] {
   output.sourceCore.keyPoints.forEach((text, index) => {
     if (text.trim()) rows.push({ text, fieldPath: `sourceCore.keyPoints[${index}]` });
   });
+  (output.sourceCore.evidence ?? []).forEach((block, index) => {
+    if (block.text.trim()) rows.push({text: block.text, fieldPath: `sourceCore.evidence[${index}]`});
+  });
   return rows;
 }
 

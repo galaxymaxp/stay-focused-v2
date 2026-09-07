@@ -12,6 +12,10 @@ import { retryFailedSections } from "../src/stage5-retry.js";
 import { validateGrounding } from "../src/stage5a-grounding.js";
 import { validateLeakage } from "../src/leakage-guard.js";
 import { runPipeline } from "../src/generate.js";
+import { completeSourcePredicate, presentDeterministicEvidence } from "../src/reviewer-evidence-presentation.js";
+import { explanationEvidenceFor } from "../src/reviewer-explanation-evidence.js";
+import { toDefaultStudentVisibleSectionOutput } from "../src/student-visible-text.js";
+import { verifySemanticRelationships } from "../src/semantic-verification.js";
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -76,6 +80,7 @@ export const reviewerDeterministicEvidenceSuite: EvalSuite = {
     batchOrderingCase(),
     retryBoundCase(),
     permanentProviderFailureCase(),
+    ...presentationRegressionCases(),
   ],
 };
 
@@ -620,4 +625,112 @@ export async function runReviewerDeterministicEvidenceEvals(): Promise<boolean> 
 
 if (isDirectExecution(import.meta.url)) {
   await runReviewerDeterministicEvidenceEvals();
+}
+
+function presentationRegressionCases(): readonly EvalCase[] {
+  const row = (id: string, label: string, index: number): RequiredEvidenceTarget => ({
+    ...target(id, 'table-row', label, 'table-a', 1),
+    provenance: [{sourceBlockId: 'table-a', sourceOrder: 1, tableBlockId: 'table-a', tableRowIndex: index}],
+  });
+  const rows = [row('header', 'Region | Count', 0), row('north', 'North | 42', 1), row('south', 'South | 17', 2)];
+  const project = () => presentDeterministicEvidence(rows);
+  const cases: EvalCase[] = [
+    {name: 'B17 serialized typed evidence still satisfies the information-value gate', run: async () => {
+      const context = createContext(); const section = context.sections[0]!;
+      const base = assembleDeterministicSectionEvidence({section,sourceBlocks:context.source.blocks});
+      const core = presentDeterministicEvidence(section.requiredEvidence!);
+      const output: SectionOutput = {...base,deterministicEvidence:undefined,sourceCore:{explanation:'The archive preserves exact source records.',keyPoints:[],evidence:[...(core.evidence??[]),...core.keyPoints.map(text=>({kind:'source' as const,text}))]}};
+      return [...assertEqual(diagnoseStudentVisibleUsefulness({section,source:context.source,output}).some(issue=>issue.type==='LOW_INFORMATION_SECTION'),false,'Information in typed blocks was ignored.')];
+    }},
+    {name: 'B17 source predicate gains only its local heading subject', run: async () => [
+      ...assertEqual(completeSourcePredicate('Register','Is a record of regional counts.'),'Register is a record of regional counts.','Source predicate subject was not restored.'),
+      ...assertEqual(completeSourcePredicate('Register','The register contains regional counts.'),'The register contains regional counts.','An existing subject was duplicated.'),
+      ...assertEqual(completeSourcePredicate('Register','Reports regional counts.'),'Register reports regional counts.','Predicate wording was rewritten.'),
+    ]},
+    {name: 'B17 title-completed source predicate is not repeated as a bullet', run: async () => {
+      const context = createContext();
+      const base = assembleDeterministicSectionEvidence({section:context.sections[0]!,sourceBlocks:context.source.blocks});
+      const output: SectionOutput = {...base, title:'Archive', sourceCore:{explanation:'Archive is a record of regional counts.',keyPoints:[]}, deterministicEvidence:{...base.deterministicEvidence!,presentation:{explanation:'',keyPoints:['• is a record of regional counts','A separate source fact.']}}};
+      return [...assertDeepEqual(toDefaultStudentVisibleSectionOutput(output).sourceCore.keyPoints,['A separate source fact.'],'Local subject completion left a duplicate predicate.')];
+    }},
+    {name: 'B17 table rows follow source row order rather than semantic discovery order', run: async () => {
+      return [...assertEqual(presentDeterministicEvidence([rows[2]!, rows[0]!, rows[1]!]).evidence?.[0]?.text, 'Region | Count\nNorth | 42\nSouth | 17', 'Table header or rows were reordered by semantic discovery.')];
+    }},
+    {name: 'B17 table rows are retained separately from explanatory points', run: async () => [
+      ...assertEqual(project().keyPoints.length, 0, 'Raw table leaked into key points.'),
+      ...assertEqual(project().evidence?.[0]?.kind, 'table', 'Table type was lost.'),
+      ...assertIncludes(project().evidence?.[0]?.text ?? '', 'South | 17', 'Table row lost.'),
+    ]},
+    {name: 'B17 exact table passage is not duplicated in concept display', run: async () => {
+      const tableText = rows.map(t => t.label).join('\n');
+      const passage = target('passage', 'concept', `The record contains regional counts. ${tableText}`, 'table-a', 1);
+      const core = presentDeterministicEvidence([passage,...rows]);
+      return [
+        ...assertEqual(core.keyPoints.some(point => point.includes('North | 42')), false, 'Whole table remains in prose.'),
+        ...assertEqual(rows.every(t => core.evidence?.some(b => b.text.includes(t.label))), true, 'Rows were summarized away.'),
+      ];
+    }},
+    {name: 'B17 code whitespace remains verbatim in a typed code block', run: async () => {
+      const code = 'function values() {\n  return 42;\n}';
+      const core = presentDeterministicEvidence([target('code','code',code,'code-a',0)]);
+      return [...assertEqual(core.evidence?.[0]?.kind,'code','Code flattened into prose.'), ...assertEqual(core.evidence?.[0]?.text,code,'Code whitespace rewritten.')];
+    }},
+    {name: 'B17 extractive fallback is displayed once', run: async () => {
+      const context = createContext();
+      const base = assembleDeterministicSectionEvidence({section:context.sections[0]!,sourceBlocks:context.source.blocks});
+      const explanation = base.sourceCore.keyPoints[0]!;
+      const output: SectionOutput = {...base,sourceCore:{...base.sourceCore,explanation},deterministicEvidence:{...base.deterministicEvidence!,presentation:presentDeterministicEvidence(context.sections[0]!.requiredEvidence!)}};
+      const visible = toDefaultStudentVisibleSectionOutput(output);
+      return [...assertEqual(visible.sourceCore.explanation,explanation,'Fallback removed.'),...assertEqual(visible.sourceCore.keyPoints.includes(explanation),false,'Fallback repeated as key point.')];
+    }},
+    {name: 'B17 duplicate explanation bullet normalization preserves distinct facts', run: async () => {
+      const context = createContext();const base = assembleDeterministicSectionEvidence({section:context.sections[0]!,sourceBlocks:context.source.blocks});
+      const explanation='The archive preserves exact source records.';
+      const output: SectionOutput={...base,sourceCore:{...base.sourceCore,explanation},deterministicEvidence:{...base.deterministicEvidence!,presentation:{explanation:'',keyPoints:['• '+explanation,'The archive preserves other source records.']}}};
+      const visible=toDefaultStudentVisibleSectionOutput(output);
+      return [...assertDeepEqual(visible.sourceCore.keyPoints,['The archive preserves other source records.'],'Exact duplicate filtering removed a distinct idea.')];
+    }},
+    {name: 'B17 presentation commands stay out of explanation evidence',run: async () =>{
+      const context=createContext();const section=context.sections[0]!;
+      const blocks=[{id:section.sourceBlockIds[0]!,order:0,kind:'paragraph' as const,text:'Remember that the archive is important.\nThe archive preserves exact source records.\nCalculate the following values.'}];
+      return [...assertDeepEqual(explanationEvidenceFor(section,blocks).map(b=>b.text),['The archive preserves exact source records.'],'Presentation-only commands entered explanatory context.')];
+    }},
+    {name: 'B17 every mixed required target survives the presentation projection',run: async () =>{
+      const context=createContext(); const section=context.sections[0]!;
+      const base=assembleDeterministicSectionEvidence({section,sourceBlocks:context.source.blocks});
+      const visible={...base,deterministicEvidence:undefined,sourceCore:presentDeterministicEvidence(section.requiredEvidence!)};
+      return [...assertEqual(findMissingRequiredEvidenceTargets(section,visible).length,0,'Projection lost required evidence.')];
+    }},
+    {name: 'B17 identical values in distinct table rows survive deduplication',run: async () =>{
+      const core=presentDeterministicEvidence([row('one','North | 42',1),row('two','North | 42',2)]);
+      return [...assertEqual(core.evidence?.[0]?.text.split('\n').length,2,'Distinct repeated source rows collapsed.')];
+    }},
+    {name: 'B17 identical table row identity is emitted once',run: async () =>{
+      const core=presentDeterministicEvidence([rows[1]!,{...rows[1]!,id:'duplicate-semantic-row'}]);
+      return [...assertEqual(core.evidence?.[0]?.text,'North | 42','Same row duplicated by semantic and typed paths.')];
+    }},
+    {name: 'B17 formula and result pair both remain exact',run: async () =>{
+      const core=presentDeterministicEvidence([target('formula','formula','r = 84 / 2','calc',0),target('result','result-value','r = 42','calc',0)]);
+      return [...assertDeepEqual(core.evidence,[{kind:'formula',text:'r = 84 / 2'},{kind:'result',text:'r = 42'}],'Formula/result relationship lost.')];
+    }},
+    {name: 'B17 explanation shaping cannot borrow adjacent source blocks',run: async () =>{
+      const context=createTwoSectionContext();
+      const evidence=explanationEvidenceFor(context.sections[0]!,context.source.blocks);
+      return [...assertEqual(evidence.length,1,'Adjacent section entered local context.'),...assertEqual(evidence[0]?.blockId,'block-a','Context borrowed sibling evidence.')];
+    }},
+    {name: 'B17 presentation mutation cannot gain factual ownership',run: async () =>{
+      const context=createContext();const section=context.sections[0]!;
+      const base=assembleDeterministicSectionEvidence({section,sourceBlocks:context.source.blocks});
+      const malicious={...base,deterministicEvidence:{...base.deterministicEvidence!,presentation:{explanation:'',keyPoints:['Invented evidence.']}}};
+      return [...assertEqual(validateDeterministicSectionEvidence(section,malicious).valid,false,'Changed display evidence was accepted.')];
+    }},
+  ];
+  for (const exact of [true,false]) cases.push({name:exact?'B17 source-authorized same-concept combination remains accepted':'B17 unsupported sibling combination remains rejected',run: async () =>{
+    const context=createContext();const section={...context.sections[0]!,semanticPlan:{kind:'concept' as const,explanationUseful:true,units:[{kind:'point' as const,label:'The amber archive stores northern records.',items:[]},{kind:'point' as const,label:'The cobalt archive stores southern records.',items:[]}]}};
+    const text='The amber archive stores northern records and the cobalt archive stores southern records.';
+    const output={...assembleDeterministicSectionEvidence({section,sourceBlocks:context.source.blocks}),sourceCore:{explanation:text,keyPoints:[]}};
+    const issues=verifySemanticRelationships({section,output,allSections:[section],currentSourceText:exact?text:section.semanticPlan.units.map(u=>u.label).join('\n')});
+    return [...assertEqual(issues.some(i=>i.type==='grounding-sibling-fusion'),!exact,'Source-authorized fusion boundary changed.')];
+  }});
+  return cases;
 }

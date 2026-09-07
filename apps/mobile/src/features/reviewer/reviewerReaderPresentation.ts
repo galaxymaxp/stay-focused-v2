@@ -2,6 +2,7 @@ import type {
   ReviewerMetadata,
   ReviewerOutput,
   ReviewerSection,
+  ReviewerEvidenceBlock,
 } from "@stay-focused/engine";
 
 import type { SavedReviewerSourceMode } from "../../services/reviewerLibraryApi";
@@ -53,6 +54,7 @@ export interface ReviewerReaderBlock {
   readonly heading: string | null;
   readonly explanation: string | null;
   readonly keyPoints: readonly string[];
+  readonly evidence?: readonly ReviewerEvidenceBlock[];
   /**
    * The `Key points` label only earns its place when there is prose beside the
    * list to tell it apart from. A section whose whole body is its key points
@@ -209,13 +211,15 @@ export function presentReviewerSection(
       singleItem && (itemTitle.length === 0 || sameText(itemTitle, title))
         ? null
         : itemTitle || `Part ${index + 1}`;
-    const hasContent = explanation !== null || keyPoints.length > 0;
+    const evidence = item.sourceCore.evidence ?? [];
+    const hasContent = explanation !== null || keyPoints.length > 0 || evidence.length > 0;
 
     return {
       id: item.id,
       heading,
       explanation,
       keyPoints,
+      ...(evidence.length ? {evidence} : {}),
       showKeyPointsLabel:
         keyPoints.length > 0 && (explanation !== null || heading !== null),
       emptyMessage: hasContent ? null : EMPTY_BLOCK_MESSAGE,

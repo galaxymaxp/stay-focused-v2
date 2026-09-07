@@ -303,6 +303,7 @@ function validateSectionGrounding(args: {
     visibleCoreTexts: [
       output.sourceCore.explanation,
       ...output.sourceCore.keyPoints,
+      ...(output.sourceCore.evidence ?? []).map(block => block.text),
     ],
   });
   const manifestOmissions = checkRequiredEvidenceOmissions(args.section, output);

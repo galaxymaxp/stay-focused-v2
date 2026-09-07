@@ -15,6 +15,8 @@ import {
 import { extractCleanSourceItems } from "./source-items.js";
 import { extractProtectedSourceTokens } from "./source-token-fidelity.js";
 import { serializeSemanticUnits } from "./semantic-structure.js";
+import { explanationEvidenceFor } from "./reviewer-explanation-evidence.js";
+import { completeSourcePredicate } from "./reviewer-evidence-presentation.js";
 import {
   analyzeRecoveryEvidence,
   selectRecoveryExplanation,
@@ -520,17 +522,17 @@ async function retryDeterministicExplanations(
   return orderedOutputs(args.plan, currentOutputs);
 }
 
-function extractiveExplanationFor(
+export function extractiveExplanationFor(
   section: PlannedSection,
   source: NormalizedSource,
 ): string | undefined {
-  const candidates = collectSectionSourceBlocks(section, source)
-    .filter((block) =>
-      block.kind !== "heading" && block.kind !== "code" &&
-      block.kind !== "formula" && block.kind !== "table" && block.kind !== "image",
-    )
-    .flatMap((block) => block.text.split(/(?<=[.!?])\s+|\r?\n/u))
-    .map((value) => value.trim())
+  const blocks = collectSectionSourceBlocks(section, source);
+  const shaped = explanationEvidenceFor(section, blocks).map(value => value.text);
+  const candidates = (shaped.length ? shaped : blocks
+    .filter(block => !["heading", "code", "formula", "table", "image"].includes(block.kind))
+    .flatMap(block => block.text.split(/(?<=[.!?])\s+|\r?\n/u))
+    .map(value => value.trim()))
+    .map(value => completeSourcePredicate(section.title, value))
     .filter((value) => countWords(value) <= 55)
     .find((value) => explanationHasUsefulForm(section.title, value));
   return candidates;

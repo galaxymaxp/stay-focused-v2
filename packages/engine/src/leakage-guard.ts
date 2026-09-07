@@ -278,6 +278,9 @@ function collectStudentFacingText(
         text,
       }),
     ),
+    ...(output.sourceCore.evidence ?? []).map((block, index): StudentFacingTextEntry => ({
+      field: "sourceCore.keyPoints", fieldPath: `sourceCore.evidence[${index}]`, text: block.text,
+    })),
   ];
 
   if (output.enrichment?.note !== undefined) {

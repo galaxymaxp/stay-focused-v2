@@ -2,6 +2,7 @@ import {
   requiredEvidenceSourceIsAvailable,
   requiredEvidenceTargetIsRepresented,
 } from "./required-evidence.js";
+import { completeSourcePredicate, presentDeterministicEvidence } from "./reviewer-evidence-presentation.js";
 import type {
   NormalizedSourceBlock,
   PlannedSection,
@@ -53,6 +54,9 @@ export function assembleDeterministicSectionEvidence(args: {
     deterministicEvidence: {
       targetIds,
       evidenceHash: stableId("evidence", keyPoints.join("\u001f")),
+      ...(args.sourceBlocks.some(block => block.structuredBlock) ? {
+        presentation: presentDeterministicEvidence(targets),
+      } : {}),
     },
   } satisfies SectionOutput;
 
@@ -72,7 +76,7 @@ export function attachGeneratedExplanation(
   return {
     ...output,
     sourceCore: {
-      explanation: explanation.trim(),
+      explanation: completeSourcePredicate(output.title, explanation),
       keyPoints: [...output.sourceCore.keyPoints],
     },
     enrichment: null,
@@ -101,6 +105,10 @@ export function validateDeterministicSectionEvidence(
   }
   if (!arraysEqual(output.sourceCore.keyPoints, expectedPoints)) {
     issues.push("Student-visible deterministic evidence differs from the planned source evidence.");
+  }
+  if (marker?.presentation && JSON.stringify(marker.presentation) !==
+      JSON.stringify(presentDeterministicEvidence(targets))) {
+    issues.push("Deterministic evidence presentation differs from the planned source evidence.");
   }
 
   const missing = targets.filter((target) =>

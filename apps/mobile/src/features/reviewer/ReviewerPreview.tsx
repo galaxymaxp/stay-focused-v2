@@ -1,6 +1,6 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
 import { AlertCircle, Check } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "../../design/tokens";
 import {
@@ -194,6 +194,31 @@ function ReaderBlock({ block }: { readonly block: ReviewerReaderBlock }) {
         </View>
       ) : null}
 
+      {(block.evidence ?? []).map((evidence, index) => (
+        <View key={`${block.id}-evidence-${index}`} style={styles.keyPoints}>
+          <Text accessibilityRole="header" style={styles.keyPointsLabel}>
+            {evidence.kind === "source" ? "Source material" : evidence.kind.charAt(0).toUpperCase() + evidence.kind.slice(1)}
+          </Text>
+          {evidence.kind === "table" ? (
+            <ScrollView horizontal accessibilityLabel="Source table">
+              <View>
+                {evidence.text.split("\n").map((row, rowIndex) => (
+                  <View key={rowIndex} style={styles.evidenceRow}>
+                    {row.split("|").map((cell, cellIndex) => (
+                      <Text selectable key={cellIndex} style={[styles.bodyText, styles.evidenceCell]}>{cell.trim()}</Text>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          ) : evidence.kind === "code" || evidence.kind === "formula" ? (
+            <ScrollView horizontal accessibilityLabel={`Source ${evidence.kind}`}>
+              <Text selectable style={[styles.bodyText, styles.technicalText]}>{evidence.text}</Text>
+            </ScrollView>
+          ) : <Text selectable style={styles.bodyText}>{evidence.text}</Text>}
+        </View>
+      ))}
+
       {block.emptyMessage ? (
         <Text style={styles.mutedText}>{block.emptyMessage}</Text>
       ) : null}
@@ -202,6 +227,9 @@ function ReaderBlock({ block }: { readonly block: ReviewerReaderBlock }) {
 }
 
 const styles = StyleSheet.create({
+  evidenceRow: { flexDirection: "row" },
+  evidenceCell: { width: 180, padding: spacing[2], borderBottomWidth: StyleSheet.hairlineWidth },
+  technicalText: { fontFamily: "monospace" },
   document: {
     alignSelf: "stretch",
     gap: spacing[4],

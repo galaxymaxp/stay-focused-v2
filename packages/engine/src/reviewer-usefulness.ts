@@ -125,7 +125,9 @@ export function diagnoseStudentVisibleUsefulness(args: {
     ));
   }
 
-  if (hasLowInformationValue(args.section, explanation, points)) {
+  if (hasLowInformationValue(args.section, explanation, [
+    ...points, ...(args.output.sourceCore.evidence ?? []).map(block => block.text),
+  ])) {
     issues.push(issue(
       "LOW_INFORMATION_SECTION",
       args.section.id,
