@@ -1,10 +1,25 @@
 # Current Sprint
 
-Last refreshed: 2026-09-05, Asia/Manila.
+Last refreshed: 2026-09-07, Asia/Manila.
 
 ## Current objective result
 
-Reviewer B16 now assembles every required manifest target deterministically
+B16.1 attempt 3 (2026-09-07) is FAIL with provider capacity AVAILABLE.
+All four targeted cases ran through real `gpt-4o`; deterministic retention is
+99/99, 232/232, 156/156 and 46/46 with zero factual retries or provider losses.
+A captured generic prompt-contract regression now passes: concise source wording
+is explicitly permitted under the unchanged lexical grounding rule. Python
+improves to four calls, 10.383 s and two fallback explanations, but still fails
+provider acceptance. Statistics MinerU/Docling remain withheld (two/four
+grounding omissions; MinerU also structural noise). Accounting has one call,
+5.824 s and automated PASS, but fragmentary prose/raw tables fail manual quality.
+Full B12 is NOT RUN: targeted prerequisites failed. Fresh engine 476/476,
+architecture 27/27 and API 607/607 pass. Next: reconcile the generic
+explanation/evidence presentation contract with the existing validation rules
+using captured failures. No B17, ownership/default/threshold change or push.
+See `docs/ai/acceptance/b16/live-provider-runtime-validation.md`.
+
+Historical B16 architecture baseline: the engine assembles every required manifest target deterministically
 before provider work and restricts batched provider output to explanations.
 The focused suite passes 26/26, the engine 475/475, and API 607/607. Provider-
 owned required targets and factual retries are zero; non-standalone nodes use

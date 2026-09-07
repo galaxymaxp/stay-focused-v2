@@ -2277,3 +2277,25 @@ Current route status:
 - Verdict: FAIL because frozen live acceptance is unresolved. Restore provider
   capacity and rerun the required B16 order before any B17 work. See
   `docs/ai/acceptance/b16/reviewer-deterministic-evidence-runtime.md`.
+
+## B16.1 attempt 3 — working-provider validation, 2026-09-07
+
+- One minimal `gpt-4o` readiness request succeeded; provider capacity AVAILABLE.
+  The two earlier no-credit attempts remain in the continued validation report.
+- Fresh original-prompt Python exposed a generic source-wording prompt contract
+  mismatch. A synthetic regression was captured failing before the small prompt
+  correction; grounding/usefulness rules, thresholds, ownership and retries did
+  not change. Final Python uses four calls, 10.383 s, and two fallback explanations.
+- All four target sets remain intact before/after provider work: 99/99, 232/232,
+  156/156 and 46/46. Provider-owned targets, provider losses and factual retries
+  are zero. Final case call counts are 4/2/3/1.
+- Verdict FAIL: Statistics MinerU/Docling are withheld with two/four unresolved
+  grounding omissions; MinerU also has structural noise. Python still falls back;
+  Accounting has automated PASS but fragmentary prose/raw table dumps. Manual
+  quality is not accepted, so the full frozen B12 rerun was NOT RUN.
+- Fresh engine 476/476, architecture 27/27, API 607/607; root typecheck/lint/build
+  PASS with three fresh/four cached tasks each and four existing lint warnings.
+- Next task: reconcile the generic explanation/evidence presentation contract
+  with existing validation rules using captured failures. No B17, default parser
+  promotion, frozen-gate weakening, evidence-ownership change or push.
+- Evidence: `docs/ai/acceptance/b16/live-provider-runtime-validation.md`.

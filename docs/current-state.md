@@ -1,6 +1,6 @@
 # Current State
 
-Last refreshed: 2026-09-05, Asia/Manila.
+Last refreshed: 2026-09-07, Asia/Manila.
 
 ## Repository
 
@@ -32,6 +32,19 @@ Last refreshed: 2026-09-05, Asia/Manila.
 
 ## Recovery and active implementation
 
+- B16.1 attempt 3 on 2026-09-07 has working OpenAI capacity but FAILS live
+  acceptance. All four targeted cases retained every deterministic target
+  (99/99, 232/232, 156/156, 46/46), with zero provider losses or factual retries.
+  A regression-backed generic prompt correction reduced Python from six calls
+  and eight fallback explanations to four calls and two fallbacks (10.383 s).
+  Statistics remains withheld for grounding omissions/structural noise;
+  Accounting assembles in 5.824 s but has fragmentary prose and raw table dumps.
+  Manual quality fails, so full frozen B12 was not eligible. Fresh engine
+  476/476 (architecture 27/27) and API 607/607 pass. Preserve the frozen gates;
+  next: reconcile the generic explanation/evidence presentation contract with
+  the existing validation rules, using these captured failures. No B17, parser
+  promotion, evidence-ownership change, or push. See
+  `docs/ai/acceptance/b16/live-provider-runtime-validation.md`.
 - Reviewer B16 deterministically assembles required facts, list items,
   formulas/results, tables/rows, code, relationships, titles, and provenance.
   OpenAI owns only bounded batched explanations; ownership and prose validation

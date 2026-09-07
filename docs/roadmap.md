@@ -1,8 +1,21 @@
 # Roadmap
 
-Last refreshed: 2026-09-05, Asia/Manila.
+Last refreshed: 2026-09-07, Asia/Manila.
 
-## Reviewer B16 - Deterministic architecture implemented, live gate blocked
+## Reviewer B16 - Deterministic retention verified, live quality gate failed
+
+B16.1 attempt 3 (2026-09-07): capacity AVAILABLE; all four live cases ran.
+Required targets are retained at 99/99, 232/232, 156/156 and 46/46, with no
+provider-owned targets, provider losses or factual retries. Final calls are
+4/2/3/1 and durations 10.383/26.266/16.945/5.824 s. A generic, regression-backed
+prompt correction aligns explanation wording with the frozen lexical gate;
+Python still uses two fallbacks. Statistics fails assembly and Accounting fails
+manual quality despite automated PASS. Full B12 is NOT RUN because targeted
+acceptance failed. Fresh engine 476/476, architecture 27/27 and API 607/607 pass.
+Next: reconcile the generic explanation/evidence presentation contract with
+existing validation rules using captured failures; do not weaken gates or start
+a benchmark-specific B17. The earlier no-credit attempts remain historical.
+See `docs/ai/acceptance/b16/live-provider-runtime-validation.md`.
 
 Required evidence is now assembled and identity-checked from the Stage 2
 manifest before any provider call. OpenAI owns only bounded batched
@@ -10,11 +23,11 @@ explanations; factual retries are zero, stable IDs isolate batch failures, and
 non-standalone dispositions consume zero calls. Focused 26/26, full engine
 475/475, API 607/607, and all root gates pass.
 
-The live decision gate remains unresolved. Python's two batches returned
+Historical B16 result before restored capacity: Python's two batches returned
 OpenAI 429 `no credits remaining`; safe fallback preserved 99/99 targets in
 5.432 s with no loss/fabrication, but this does not establish provider quality.
-Statistics, Accounting, and full B12 were not run. Restore provider capacity
-and rerun B16 before B17. Production remains `legacy`.
+Statistics, Accounting, and full B12 were not run in that historical attempt.
+The attempt 3 result above supersedes its provider blocker. Production remains `legacy`.
 
 ## Reviewer B15 - Planning boundary repaired, acceptance still failed
 
