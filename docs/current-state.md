@@ -1,6 +1,10 @@
 # Current State
 
-## B18 local repair — current result (2026-09-08)
+## B19 local repair — current result (2026-09-08)
+
+**FAIL — Reviewer source completeness/presentation defect remains.** Source-owned residual evidence restores both real Docling definitions without changing the 533 frozen targets, hashes, ownership, parser default legacy, or gpt-4o. All four cases now have zero omissions and pass assembly; all Statistics SOURCE_DUMP findings are resolved. Calls are 2/2/2/1, with zero factual/explanation retries or replacements. Python/MinerU/Docling still fail serialized automatic usefulness; all four fail manual quality for residual fragments/repetition/grammar. Full unchanged B12: NOT RUN — targeted prerequisites failed. FRESH engine 547/547, architecture 98/98, reader 32/32, API 607/607, and forced root typecheck/lint/build PASS. No push. See [B19 acceptance](ai/acceptance/b19/source-span-ancestry-completeness.md).
+
+## B18 local repair — historical result (2026-09-08)
 
 **FAIL — Reviewer representation defect remains.** All frozen targets remain
 99/99, 232/232, 156/156 and 46/46, with unchanged hashes, source ownership,
