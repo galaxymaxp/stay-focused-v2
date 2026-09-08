@@ -1,9 +1,10 @@
-import { buildSourceRepresentationMap, containsSourceSpan } from './reviewer-source-representation.js';
+import { buildSourceRepresentationMap, containsSourceSpan, sourceBoundaryPresentation } from './reviewer-source-representation.js';
 import type { RequiredEvidenceTarget, ResidualSourceEvidence, ReviewerEvidenceBlock, SourceGroundedCore } from './types.js';
 import { visibleResidualSourceEvidence } from './reviewer-source-ancestry.js';
+import { displayProseKey, standaloneSourceClause, withoutRepeatedSourceHeading } from './reviewer-presentation-prose.js';
 
 /** Projects immutable factual identities into source-owned visible spans. */
-export function presentDeterministicEvidence(targets: readonly RequiredEvidenceTarget[], residuals: readonly ResidualSourceEvidence[] = []): SourceGroundedCore {
+export function presentDeterministicEvidence(targets: readonly RequiredEvidenceTarget[], residuals: readonly ResidualSourceEvidence[] = [], title?: string): SourceGroundedCore {
   const keyPoints: string[] = [];
   const evidence: ReviewerEvidenceBlock[] = [];
   const map = buildSourceRepresentationMap(targets);
@@ -28,19 +29,25 @@ export function presentDeterministicEvidence(targets: readonly RequiredEvidenceT
     const kind = entry.prose ? undefined : target.kind === 'code' ? 'code' : target.kind === 'formula' ? 'formula'
       : target.kind === 'result-value' ? 'result' : target.kind === 'example' ? 'example' : undefined;
     if (kind) evidence.push({kind, text: entry.text});
-    else keyPoints.push(entry.text);
+    else keyPoints.push(standaloneSourceClause(sourceBoundaryPresentation(entry, residuals).text));
   }
-  keyPoints.push(...visibleResidualSourceEvidence(residuals).map(span => span.text));
+  keyPoints.push(...visibleResidualSourceEvidence(residuals).map(span => standaloneSourceClause(span.displayText ?? span.text)));
+  if (title) keyPoints.splice(0, keyPoints.length, ...keyPoints.map(point => {
+    const remainder = withoutRepeatedSourceHeading(point, title);
+    // An existing grammatical subject must not be stripped (Archive is...).
+    const completed = completeSourcePredicate(title, remainder);
+    return remainder !== point && completed !== remainder ? point : completed;
+  }));
   return {explanation: '', keyPoints, evidence};
 }
 export function sameVisibleText(a: string, b: string): boolean {
-  const normalize = (text: string) => text.normalize('NFKC')
-    .replace(/^\s*[-*•]\s*/u, '').replace(/[.!?]+$/u, '').replace(/\s+/gu, ' ').trim().toLowerCase();
-  return normalize(a) === normalize(b);
+  return displayProseKey(a) === displayProseKey(b);
 }
 /** Restore only the subject supplied by the source heading. */
-export function completeSourcePredicate(title: string, explanation: string): string {
+export function completeSourcePredicate(title: string, explanation: string, sourceHeading = title): string {
   const text = explanation.trim().replace(/^\s*[-*•]\s*/u, '');
-  return /^(?:is|are|was|were|may|reports?|has|have)\b/iu.test(text)
+  if (!title.trim() || displayProseKey(title) !== displayProseKey(sourceHeading)) return text;
+  if (/^prepared (?:before|after|by|for)\s+\S/iu.test(text)) return `${title.trim()} is ${text}`;
+  return /^(?:is|are|was|were|can|could|may|must|will|should|reports?|has|have)\b/iu.test(text)
     ? `${title.trim()} ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text;
 }

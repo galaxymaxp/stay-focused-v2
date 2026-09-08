@@ -289,6 +289,8 @@ export interface DeterministicEvidenceAssembly {
 }
 
 export interface ResidualSourceEvidence {
+  /** Deterministic removal of navigation only; original source text remains intact. */
+  readonly displayText?: string;
   readonly id: string;
   readonly sourceBlockId: string;
   readonly sourceItemId: string;

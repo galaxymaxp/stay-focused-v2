@@ -3,6 +3,8 @@ import {
   isInstructionalNoiseText,
 } from "./review-content.js";
 import { requiredEvidenceTargetIsRepresented } from "./required-evidence.js";
+import { displayProseKey, displayProseSentences } from './reviewer-presentation-prose.js';
+import { buildSourceRepresentationMap } from './reviewer-source-representation.js';
 import type {
   NormalizedSource,
   PlannedSection,
@@ -15,6 +17,8 @@ export type StudentVisibleUsefulnessDiagnostic =
   | "INSTRUCTIONAL_NOISE"
   | "CODE_AS_EXPLANATION"
   | "FRAGMENTARY_EXPLANATION"
+  | "FRAGMENTARY_KEY_POINT"
+  | "REPETITION"
   | "SOURCE_DUMP"
   | "LOW_INFORMATION_SECTION";
 
@@ -96,6 +100,18 @@ export function diagnoseStudentVisibleUsefulness(args: {
     ));
   }
   if (!args.output.deterministicEvidence) points.forEach((point, index) => {
+    if (!pointRepresentsTypedTarget(point, targets) && hasIncompleteProseBoundary(point)) {
+      issues.push(issue('FRAGMENTARY_KEY_POINT', args.section.id, `sourceCore.keyPoints[${index}]`,
+        'Key point contains an incomplete prose clause.', point));
+    }
+    const duplicateExplanation = displayProseSentences(explanation).some(sentence =>
+      displayProseKey(sentence) === displayProseKey(point));
+    const duplicateNeighbor = index > 0 && displayProseKey(points[index - 1]!) === displayProseKey(point) &&
+      !targets.some(a => targets.some(b => a !== b &&
+        displayProseKey(a.label) === displayProseKey(point) && displayProseKey(b.label) === displayProseKey(point) &&
+        !a.sourceBlockIds.some(id => b.sourceBlockIds.includes(id))));
+    if (args.output.sourceCore.evidence && (duplicateExplanation || duplicateNeighbor)) issues.push(issue('REPETITION', args.section.id,
+      `sourceCore.keyPoints[${index}]`, 'An exact prose span is repeated immediately nearby.', point));
     if (isInstructionalNoiseText(point)) {
       issues.push(issue(
         "INSTRUCTIONAL_NOISE",
@@ -195,6 +211,7 @@ function explanationIsFragmentary(value: string): boolean {
   const text = value.replace(/^\s*[-*+\u2022]\s*/u, "").trim();
   const words = text.match(/[\p{L}\p{N}]+(?:[-/&][\p{L}\p{N}]+)*/gu) ?? [];
   if (words.length < 2) return true;
+  if (hasIncompleteProseBoundary(text)) return true;
   if (/^(?:shown|displayed|provided|listed)(?:\s+(?:here|above|below))?[.!?]?$/iu.test(text)) return true;
   if (words.length <= 5 && !text.includes(",") && /^(?:for\s+\p{L}+ing|to\s+\p{L}+)/iu.test(text)) {
     return true;
@@ -205,6 +222,11 @@ function explanationIsFragmentary(value: string): boolean {
     if (!finitePredicate) return true;
   }
   return false;
+}
+
+function hasIncompleteProseBoundary(text: string): boolean {
+  return /\b(?:the|a|an|and|or|because|although)\s*$/iu.test(text) ||
+    /^(?:since|because|although)\b[^.!?]*,\s*$/iu.test(text);
 }
 
 function proseIsOversized(value: string): boolean {
@@ -220,7 +242,12 @@ function keyPointSetIsSourceDump(
   source: NormalizedSource,
   section: PlannedSection,
 ): boolean {
-  const nonTyped = points.filter((point) => !pointRepresentsTypedTarget(point, targets));
+  const requiredResidual = (point: string) => section.residualSourceEvidence?.some(span =>
+    (span.classification === 'UNIQUE_REQUIRED' || span.classification === 'UNRESOLVED') &&
+    displayProseKey(span.displayText ?? span.text) === displayProseKey(point));
+  const ownedSpans = new Set(buildSourceRepresentationMap(targets).entries.map(entry => displayProseKey(entry.text)));
+  const nonTyped = points.filter((point) => !pointRepresentsTypedTarget(point, targets) &&
+    !requiredResidual(point) && !ownedSpans.has(displayProseKey(point)));
   const totalWords = nonTyped.reduce((total, point) => total + countWords(point), 0);
   const requiredWords = Math.max(
     1,

@@ -38,6 +38,7 @@ import {
   setFailureExitCode,
 } from "./assert.js";
 import type { EvalCase, EvalIssue, EvalSuite } from "./types.js";
+import { finalPresentationRegressionCases } from './reviewer-final-presentation.eval.js';
 
 const mixedTargets = [
   ["fact", "concept", "The archive preserves exact source records."],
@@ -86,6 +87,7 @@ export const reviewerDeterministicEvidenceSuite: EvalSuite = {
     ...presentationRegressionCases(),
     ...sourceRepresentationRegressionCases(),
     ...sourceAncestryRegressionCases(),
+    ...finalPresentationRegressionCases(),
   ],
 };
 

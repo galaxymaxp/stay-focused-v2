@@ -61,7 +61,7 @@ export function assembleDeterministicSectionEvidence(args: {
       targetIds,
       evidenceHash: stableId("evidence", keyPoints.join("\u001f")),
       ...(args.sourceBlocks.some(block => block.structuredBlock) ? {
-        presentation: presentDeterministicEvidence(targets, args.section.residualSourceEvidence),
+        presentation: presentDeterministicEvidence(targets, args.section.residualSourceEvidence, args.section.title),
       } : {}),
     },
   } satisfies SectionOutput;
@@ -116,7 +116,7 @@ export function validateDeterministicSectionEvidence(
     issues.push("Student-visible deterministic evidence differs from the planned source evidence.");
   }
   if (marker?.presentation && JSON.stringify(marker.presentation) !==
-      JSON.stringify(presentDeterministicEvidence(targets, section.residualSourceEvidence))) {
+      JSON.stringify(presentDeterministicEvidence(targets, section.residualSourceEvidence, section.title))) {
     issues.push("Deterministic evidence presentation differs from the planned source evidence.");
   }
 

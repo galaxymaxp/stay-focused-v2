@@ -1,4 +1,5 @@
-import type { RequiredEvidenceTarget, SourceGroundedCore } from './types.js';
+import type { RequiredEvidenceTarget, ResidualSourceEvidence, SourceGroundedCore } from './types.js';
+import { standaloneSourceClause, withoutRepeatedSourceHeading } from './reviewer-presentation-prose.js';
 
 export interface SourceRepresentation {
   readonly id: string;
@@ -180,22 +181,69 @@ export function buildSourceRepresentationMap(targets: readonly RequiredEvidenceT
   // provenance can assign several items to a parent and must not reorder them.
   // Table rows have their own explicit row-index ordering in the projection.
   entries.sort((a, b) => targets.indexOf(a.target) - targets.indexOf(b.target));
-  return {entries, owners};
+  const aliases = new Map<string, readonly string[]>();
+  const tableIds = new Set(targets.flatMap(t => t.kind === 'table-row'
+    ? t.provenance.flatMap(p => p.tableBlockId ? [p.tableBlockId] : []) : []));
+  for (const tableId of tableIds) {
+    const rows = entries.filter(e => e.target.kind === 'table-row' &&
+      e.target.provenance.some(p => p.tableBlockId === tableId))
+      .sort((a, b) => (a.target.provenance.find(p => p.tableBlockId === tableId)?.tableRowIndex ?? 0) -
+        (b.target.provenance.find(p => p.tableBlockId === tableId)?.tableRowIndex ?? 0));
+    // Flatten only known cell/row separators. Cross-row mapping fragments can
+    // be owned by the complete ordered table, never by scattered matching cells.
+    const tableText = sourceSpanKey(rows.map(r => r.text.replace(/\|/gu, ' ')).join(' '));
+    for (const entry of entries) {
+      if (entry.target.kind !== 'mapping' || !sourceSpanKey(entry.text).includes(' ') ||
+          !rows.some(row => sameSource(entry.target, row.target))) continue;
+      if (containsSourceSpan(tableText, entry.text)) aliases.set(entry.id, rows.map(row => row.id));
+    }
+  }
+  // Exact spans in the same source context share one display owner. Independent
+  // rows (including equal-valued rows) and different source contexts remain.
+  for (const [index, entry] of entries.entries()) {
+    if (aliases.has(entry.id) || !entry.prose && ['table-row', 'table-cell', 'code', 'formula'].includes(entry.target.kind)) continue;
+    const owner = entries.slice(0, index).find(other => !aliases.has(other.id) &&
+      sameSource(entry.target, other.target) && sourceSpanKey(other.text) === sourceSpanKey(entry.text));
+    if (owner) aliases.set(entry.id, [owner.id]);
+  }
+  for (const [targetId, ids] of owners) owners.set(targetId,
+    [...new Set(ids.flatMap(id => aliases.get(id) ?? [id]))]);
+  return {entries: entries.filter(entry => !aliases.has(entry.id)), owners};
 }
 /** Only displayed text discharges an owner. Internal target IDs never suffice. */
-export function representedSourceOwners(map: SourceRepresentationMap, core: SourceGroundedCore): ReadonlySet<string> {
+export function representedSourceOwners(map: SourceRepresentationMap, core: SourceGroundedCore, title?: string, residuals: readonly ResidualSourceEvidence[] = []): ReadonlySet<string> {
   const texts = [core.explanation, ...core.keyPoints, ...(core.evidence ?? []).map(block => block.text)];
   const represented = new Set<string>();
   const used = new Map<string, number>();
   for (const entry of map.entries) {
-    const key = sourceSpanKey(['code', 'formula', 'table-row', 'table-cell'].includes(entry.target.kind)
-      ? entry.text : entry.text.replace(/^\s*[-*•]\s*/u, ''));
+    const technical = !entry.prose && ['code', 'formula', 'table-row', 'table-cell'].includes(entry.target.kind);
+    const boundary = sourceBoundaryPresentation(entry, residuals);
+    const sourceProse = boundary.text.replace(/^\s*[-*•]\s*/u, '');
+    const prose = ['example','result-value'].includes(entry.target.kind) ? sourceProse : standaloneSourceClause(sourceProse);
+    const key = sourceSpanKey(technical ? entry.text : title ? withoutRepeatedSourceHeading(prose, title) : prose);
     const count = texts.reduce((total, text) => total + sourceSpanKey(text).split(key).length - 1, 0);
     const ordinal = used.get(key) ?? 0;
-    if (key && count > ordinal && texts.some(text => containsSourceSpan(text, key))) represented.add(entry.id);
+    if (key && count > ordinal && texts.some(text => containsSourceSpan(text, key)) &&
+        (!boundary.continuation || texts.some(text => containsSourceSpan(text, boundary.continuation!)))) represented.add(entry.id);
     used.set(key, ordinal + 1);
   }
   return represented;
+}
+
+/** A clipped determiner belongs to the next complete source unit. The unit
+ * boundary and the entire visible continuation are both required as proof. */
+export function sourceBoundaryPresentation(entry: SourceRepresentation, residuals: readonly ResidualSourceEvidence[]): {text: string; continuation?: string} {
+  if (['code', 'formula', 'table-row', 'table-cell'].includes(entry.target.kind)) return {text:entry.text};
+  const ordered = [...residuals].sort((a,b)=>a.sourceOrder-b.sourceOrder);
+  const index = ordered.findIndex(span => span.classification === 'CHILD_OWNED' &&
+    span.ownerIds.includes(entry.id) && entry.target.sourceBlockIds.includes(span.sourceBlockId) &&
+    sourceSpanKey(entry.text).startsWith(`${sourceSpanKey(span.text)} `));
+  const span = ordered[index];
+  const next = ordered[index+1];
+  if (!span || !next || !['UNIQUE_REQUIRED','UNRESOLVED','CHILD_OWNED'].includes(next.classification)) return {text:entry.text};
+  const suffix = sourceSpanKey(entry.text).slice(sourceSpanKey(span.text).length).trim();
+  if (!/^(?:The|A|An)$/u.test(suffix) || !next.text.startsWith(`${suffix} `)) return {text:entry.text};
+  return {text:span.text,continuation:next.displayText ?? next.text};
 }
 
 /** A collective source-item proof is scoped by source identity and requires all
@@ -204,10 +252,12 @@ export function sourceItemHasVisibleOwnedEvidence(
   item: {readonly text: string; readonly sourceBlockIds?: readonly string[]},
   targets: readonly RequiredEvidenceTarget[],
   core: SourceGroundedCore,
+  title?: string,
+  residuals: readonly ResidualSourceEvidence[] = [],
 ): boolean {
   if (!item.sourceBlockIds?.length) return false;
   const map = buildSourceRepresentationMap(targets);
-  const represented = representedSourceOwners(map, core);
+  const represented = representedSourceOwners(map, core, title, residuals);
   const owned = map.entries.filter(entry => represented.has(entry.id) &&
     entry.target.sourceBlockIds.some(id => item.sourceBlockIds!.includes(id)));
   let remaining = sourceSpanKey(item.text);

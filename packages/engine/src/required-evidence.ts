@@ -132,7 +132,8 @@ export function findMissingRequiredEvidenceTargets(
   if (presentation || output.sourceCore.evidence) {
     const map = buildSourceRepresentationMap(targets);
     const represented = representedSourceOwners(map, presentation
-      ? {...presentation, explanation: output.sourceCore.explanation} : output.sourceCore);
+      ? {...presentation, explanation: output.sourceCore.explanation} : output.sourceCore,
+      output.title === section.title ? section.title : undefined, section.residualSourceEvidence);
     return targets.filter(target => !(map.owners.get(target.id) ?? []).every(id => represented.has(id)));
   }
   const visibleRows = [

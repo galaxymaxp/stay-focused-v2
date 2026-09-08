@@ -1,6 +1,7 @@
 import { buildSourceRepresentationMap, containsSourceSpan, sourceSpanKey, sourceProseSpans, sourceFormulaSpan } from './reviewer-source-representation.js';
 import type { NormalizedSourceBlock, RequiredEvidenceTarget, ResidualSourceEvidence, SourceGroundedCore } from './types.js';
 import { isInstructionalHeadingText, isInstructionalNoiseText } from './review-content.js';
+import { presentSourceNavigation, standaloneSourceClause } from './reviewer-presentation-prose.js';
 
 /** The manifest is a selection, not a proof that the source span is exhausted.
  * Keep a second, source-owned contract without changing any target identity. */
@@ -10,6 +11,8 @@ export function buildResidualSourceEvidence(args: {
   readonly targets: readonly RequiredEvidenceTarget[];
 }): readonly ResidualSourceEvidence[] {
   const map = buildSourceRepresentationMap(args.targets);
+  const hasTypedReferent = args.targets.some(t => ['code', 'example'].includes(t.kind) &&
+    t.sourceBlockIds.some(id => args.sourceBlocks.some(b => b.id === id)));
   let instructionalRegion = false;
   return [...args.sourceBlocks].sort((a, b) => a.order - b.order).flatMap(block => {
     const structured = block.structuredBlock;
@@ -64,11 +67,21 @@ export function buildResidualSourceEvidence(args: {
           return [span.slice(0, offset), span.slice(offset + part.length)].map(s => s.trim()).filter(Boolean);
         });
       }
-      return [...covered, ...remaining.flatMap(sourceProseSpans).map((span, index) => ({...base,
-        id: `${unit.id}:residual:${index}`, text: span,
-        classification: structured.role === 'content' || structured.type === 'list'
-          ? 'UNIQUE_REQUIRED' as const : 'UNRESOLVED' as const, ownerIds: [],
-      }))];
+      return [...covered, ...remaining.flatMap(sourceProseSpans).map((span, index) => {
+        // Never suppress a target-backed command. Only unowned navigation can
+        // be removed, and mixed source units retain their factual sentences.
+        const objective = /^Find (?:the )?([\p{L}]+(?: [\p{L}]+){0,3}) of the following values[.:]?$/iu.exec(span)?.[1];
+        const headingNamesObjective = objective && new RegExp(`\\b${objective}\\b`, 'iu').test(args.title);
+        const workedExampleFollows = args.targets.some(t => ['example', 'formula', 'result-value'].includes(t.kind) &&
+          /\d/u.test(t.label) && t.provenance.some(p => p.sourceOrder > block.order));
+        const displayText = headingNamesObjective && workedExampleFollows ? '' : presentSourceNavigation(span, hasTypedReferent);
+        return {...base, id: `${unit.id}:residual:${index}`, text: span,
+          ...(displayText !== span ? {displayText} : {}),
+          classification: !displayText ? 'PRESENTATION_ONLY' as const :
+            structured.role === 'content' || structured.type === 'list'
+              ? 'UNIQUE_REQUIRED' as const : 'UNRESOLVED' as const, ownerIds: [],
+        };
+      })];
     });
   });
 }
@@ -82,7 +95,7 @@ export function visibleResidualSourceEvidence(spans: readonly ResidualSourceEvid
 export function missingVisibleResidualSourceEvidence(spans: readonly ResidualSourceEvidence[], core: SourceGroundedCore): readonly ResidualSourceEvidence[] {
   const texts = [core.explanation, ...core.keyPoints, ...(core.evidence ?? []).map(b => b.text)];
   return visibleResidualSourceEvidence(spans).filter(span => !texts.some(text =>
-    containsSourceSpan(text, span.text) ||
+    containsSourceSpan(text, standaloneSourceClause(span.displayText ?? span.text)) ||
     sourceSpanKey(text.replace(/^\s*[-*•]\s*/u, '').replace(/[.!?]+$/u, '')).toLowerCase() ===
-      sourceSpanKey(span.text.replace(/[.!?]+$/u, '')).toLowerCase()));
+      sourceSpanKey((span.displayText ?? span.text).replace(/[.!?]+$/u, '')).toLowerCase()));
 }

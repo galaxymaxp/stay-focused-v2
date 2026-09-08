@@ -553,8 +553,16 @@ function checkOmissions(args: {
     const headingKey = (text: string) => normalizeListItemCoverageKey(text.replace(/^\s*[a-z][.)]\s+/iu, ''));
     const titleRepresentsHeading = headingKey(args.visibleTitle) === itemKey &&
       headingKey(args.section.title) === itemKey;
-    const represented = titleRepresentsHeading ||
-      sourceItemHasVisibleOwnedEvidence(item, args.section.requiredEvidence ?? [], args.visibleCore) ||
+    // A source-owned navigation edit retains the original span in the plan.
+    // Count that exact source item only when its remaining factual clause is
+    // visible; presentation-only spans have no factual clause to discharge.
+    const residualPresentation = args.section.residualSourceEvidence?.some(span =>
+      span.displayText !== undefined && item.sourceBlockIds?.includes(span.sourceBlockId) &&
+      normalizeListItemCoverageKey(span.text) === itemKey &&
+      (span.classification === 'PRESENTATION_ONLY' && span.displayText === '' ||
+        span.displayText.length > 0 && args.visibleCoreTexts.some(text => containsSourceSpan(text, span.displayText!))));
+    const represented = titleRepresentsHeading || residualPresentation ||
+      sourceItemHasVisibleOwnedEvidence(item, args.section.requiredEvidence ?? [], args.visibleCore, args.visibleTitle, args.section.residualSourceEvidence) ||
       representedItemKeys.has(itemKey) ||
       (itemKey.length >= 3 && [...representedItemKeys].some((key) => key.includes(itemKey))) ||
       args.visibleCoreTexts.some((text) => sourceItemTokenRecall(item.text, text) >= 0.8);
