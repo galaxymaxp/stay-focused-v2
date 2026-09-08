@@ -9,6 +9,7 @@ import { verifySemanticRelationships } from "./semantic-verification.js";
 import { serializeSemanticUnits } from "./semantic-structure.js";
 import {
   extractStudentVisibleText,
+  toDefaultStudentVisibleSectionOutput,
   type StudentVisibleTextEntry,
 } from "./student-visible-text.js";
 import { flattenSourceBlocks } from "./stage1-outline.js";
@@ -19,6 +20,7 @@ import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
 import { reviewableSourceBlocks } from "./review-content.js";
 import { reviewerDispositionFor } from "./reviewer-section-support.js";
 import { validateDeterministicSectionEvidence } from "./reviewer-evidence-assembly.js";
+import { containsSourceSpan, sourceItemHasVisibleOwnedEvidence } from './reviewer-source-representation.js';
 import type {
   GenerationPlan,
   GroundingIssue,
@@ -297,14 +299,17 @@ function validateSectionGrounding(args: {
     titleTerms,
     visibleEntries,
   });
+  const studentVisible = toDefaultStudentVisibleSectionOutput(output);
   const sourceOmissions = checkOmissions({
     section: args.section,
     sourceItems,
     visibleCoreTexts: [
-      output.sourceCore.explanation,
-      ...output.sourceCore.keyPoints,
-      ...(output.sourceCore.evidence ?? []).map(block => block.text),
+      studentVisible.sourceCore.explanation,
+      ...studentVisible.sourceCore.keyPoints,
+      ...(studentVisible.sourceCore.evidence ?? []).map(block => block.text),
     ],
+    visibleTitle: studentVisible.title,
+    visibleCore: studentVisible.sourceCore,
   });
   const manifestOmissions = checkRequiredEvidenceOmissions(args.section, output);
   const deterministicValidation = output.deterministicEvidence
@@ -511,6 +516,8 @@ function checkOmissions(args: {
   readonly section: PlannedSection;
   readonly sourceItems: readonly SourceItem[];
   readonly visibleCoreTexts: readonly string[];
+  readonly visibleTitle: string;
+  readonly visibleCore: SectionOutput['sourceCore'];
 }): OmissionCheck {
   if (args.sourceItems.length < 2) {
     return {
@@ -530,7 +537,14 @@ function checkOmissions(args: {
 
   for (const item of args.sourceItems) {
     const itemKey = normalizeListItemCoverageKey(item.text);
-    const represented = representedItemKeys.has(itemKey) ||
+    // A source heading is legitimately displayed as the section title. Do not
+    // grant other source facts coverage merely for occurring in a nearby title.
+    const headingKey = (text: string) => normalizeListItemCoverageKey(text.replace(/^\s*[a-z][.)]\s+/iu, ''));
+    const titleRepresentsHeading = headingKey(args.visibleTitle) === itemKey &&
+      headingKey(args.section.title) === itemKey;
+    const represented = titleRepresentsHeading ||
+      sourceItemHasVisibleOwnedEvidence(item, args.section.requiredEvidence ?? [], args.visibleCore) ||
+      representedItemKeys.has(itemKey) ||
       (itemKey.length >= 3 && [...representedItemKeys].some((key) => key.includes(itemKey))) ||
       args.visibleCoreTexts.some((text) => sourceItemTokenRecall(item.text, text) >= 0.8);
     if (!represented) {
@@ -653,10 +667,14 @@ function extractGroundingSourceSectionItems(
     ? nativeFragments
     : extractGroundingSourceSectionFragments(source, sourceSection, true))
     .join("\n\f\n");
-  return extractCleanSourceItems({
+  const items = extractCleanSourceItems({
     sourceSpanText,
     sectionTitle: sourceSection.title,
   });
+  const blockIds = new Set([...sourceSection.sourceBlockIds, ...sourceSection.blockIds]);
+  return items.map(item => ({...item, sourceBlockIds: nativeSource.blocks
+    .filter(block => blockIds.has(block.id) && containsSourceSpan(block.text, item.text))
+    .map(block => block.id)}));
 }
 
 function extractGroundingSourceSectionFragments(

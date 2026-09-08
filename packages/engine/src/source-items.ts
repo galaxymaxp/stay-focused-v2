@@ -2,6 +2,8 @@ import { normalizeCoverageTitleKey } from "./stage4-verify.js";
 
 export interface SourceItem {
   readonly text: string;
+  /** Exact source-span ownership, when supplied by the grounding extraction. */
+  readonly sourceBlockIds?: readonly string[];
 }
 
 export interface ExtractCleanSourceItemsArgs {

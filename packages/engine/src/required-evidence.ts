@@ -1,4 +1,5 @@
 import { countWords, isInstructionalNoiseText } from "./review-content.js";
+import { buildSourceRepresentationMap, representedSourceOwners } from './reviewer-source-representation.js';
 import type {
   NormalizedSourceBlock,
   PlannedSection,
@@ -127,10 +128,16 @@ export function findMissingRequiredEvidenceTargets(
 ): readonly RequiredEvidenceTarget[] {
   const targets = section.requiredEvidence ?? [];
   if (!output) return targets;
+  const presentation = output.deterministicEvidence?.presentation;
+  if (presentation || output.sourceCore.evidence) {
+    const map = buildSourceRepresentationMap(targets);
+    const represented = representedSourceOwners(map, presentation
+      ? {...presentation, explanation: output.sourceCore.explanation} : output.sourceCore);
+    return targets.filter(target => !(map.owners.get(target.id) ?? []).every(id => represented.has(id)));
+  }
   const visibleRows = [
     ...(output.deterministicEvidence ? [] : [output.sourceCore?.explanation]),
     ...(output.sourceCore?.keyPoints ?? []),
-    ...(output.sourceCore?.evidence ?? []).map(block => block.text),
   ].filter((value): value is string => typeof value === "string")
     .map((value) => value.trim()).filter(Boolean);
   const visibleText = visibleRows.join("\n");

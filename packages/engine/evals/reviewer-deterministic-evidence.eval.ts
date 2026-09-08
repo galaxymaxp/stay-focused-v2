@@ -16,6 +16,7 @@ import { completeSourcePredicate, presentDeterministicEvidence } from "../src/re
 import { explanationEvidenceFor } from "../src/reviewer-explanation-evidence.js";
 import { toDefaultStudentVisibleSectionOutput } from "../src/student-visible-text.js";
 import { verifySemanticRelationships } from "../src/semantic-verification.js";
+import { buildSourceRepresentationMap, sourceItemHasVisibleOwnedEvidence } from '../src/reviewer-source-representation.js';
 import type {
   GenerationPlan,
   NormalizedSource,
@@ -81,6 +82,7 @@ export const reviewerDeterministicEvidenceSuite: EvalSuite = {
     retryBoundCase(),
     permanentProviderFailureCase(),
     ...presentationRegressionCases(),
+    ...sourceRepresentationRegressionCases(),
   ],
 };
 
@@ -733,4 +735,112 @@ function presentationRegressionCases(): readonly EvalCase[] {
     return [...assertEqual(issues.some(i=>i.type==='grounding-sibling-fusion'),!exact,'Source-authorized fusion boundary changed.')];
   }});
   return cases;
+}
+
+function sourceRepresentationRegressionCases(): readonly EvalCase[] {
+  const formula = target('calc-formula', 'formula', 'r = 84 / 2', 'calculation', 0);
+  const result = target('calc-result', 'result-value', 'r = 42', 'calculation', 0);
+  const parent = target('calc-parent', 'concept', 'Register values: r = 84 / 2 r = 42', 'calculation', 0);
+  const children = [formula, result].map(t => ({...t, relationshipLabel: parent.label}));
+  const targets = [parent, ...children];
+  const visibleText = (core: ReturnType<typeof presentDeterministicEvidence>) =>
+    [...core.keyPoints, ...(core.evidence ?? []).map(b => b.text)].join('\n');
+  const item = {text: 'r = 84 / 2 r = 42', sourceBlockIds: ['calculation']};
+  const typed = {explanation: '', keyPoints: [], evidence: [{kind: 'formula' as const, text: formula.label}, {kind: 'result' as const, text: result.label}]};
+  const missing = (ts: readonly RequiredEvidenceTarget[], core: typeof typed | ReturnType<typeof presentDeterministicEvidence>) => {
+    const section = createSection('projection', 'Register', ['calculation'], ts);
+    return findMissingRequiredEvidenceTargets(section, {id: 'output', kind: 'concept-card', plannedSectionId: section.id,
+      title: section.title, sourceBlockIds: section.sourceBlockIds, sourceCore: core, enrichment: null});
+  };
+  const row = (id: string, text: string, index: number, block = 'table') => ({
+    ...target(id, 'table-row', text, block, 1),
+    provenance: [{sourceBlockId: block, sourceOrder: 1, tableBlockId: block, tableRowIndex: index}],
+  });
+  const rows = [row('h', 'Region | Count', 0), row('a', 'Amber | 42', 1), row('b', 'Cobalt | 17', 2)];
+  const check = (name: string, run: () => readonly EvalIssue[]): EvalCase => ({name: `B18 ${name}`, run: async () => run()});
+  return [
+    check('composite parent is conserved without raw duplicate display', () => [
+      ...assertEqual(missing(targets, presentDeterministicEvidence(targets)).length, 0, 'Parent lost.'),
+      ...assertEqual(visibleText(presentDeterministicEvidence(targets)).split(formula.label).length - 1, 1, 'Formula duplicated.'),
+    ]),
+    check('unique composite content stays visible', () => assertIncludes(visibleText(presentDeterministicEvidence(targets)), 'Register values:', 'Unique content lost.')),
+    check('owned formula and result collectively satisfy their source item', () => assertEqual(sourceItemHasVisibleOwnedEvidence(item, [formula, result], typed), true, 'Owned child coverage ignored.')),
+    check('unrelated identical child evidence cannot satisfy source identity', () => assertEqual(sourceItemHasVisibleOwnedEvidence({...item, sourceBlockIds: ['unrelated']}, [formula, result], typed), false, 'Unrelated source accepted.')),
+    check('source-item validation counts a legitimate typed formula', () => assertEqual(sourceItemHasVisibleOwnedEvidence({...item, text: formula.label}, [formula], typed), true, 'Typed formula ignored.')),
+    check('hidden targets do not satisfy visible source-item coverage', () => assertEqual(sourceItemHasVisibleOwnedEvidence(item, [formula, result], {explanation: '', keyPoints: []}), false, 'Hidden facts accepted.')),
+    check('explicit parent label is emitted once for adjacent children', () => assertEqual(visibleText(presentDeterministicEvidence(targets)).split('Register values:').length - 1, 1, 'Parent label repeated.')),
+    check('same label remains in distinct source contexts', () => {
+      const first = target('p1', 'concept', 'Recorded values', 'north', 0);
+      const second = target('p2', 'concept', 'Recorded values', 'south', 3);
+      const ts = [first, {...target('c1', 'result-value', 'North = 42', 'north', 1), relationshipLabel: first.label}, second,
+        {...target('c2', 'result-value', 'South = 17', 'south', 4), relationshipLabel: second.label}];
+      return assertEqual(visibleText(presentDeterministicEvidence(ts)).split(first.label).length - 1, 2, 'Distant parent context erased.');
+    }),
+    check('identical valued distinct rows remain distinct', () => assertEqual(presentDeterministicEvidence([rows[1]!, row('distinct', rows[1]!.label, 2)]).evidence?.[0]?.text.split('\n').length, 2, 'Distinct row collapsed.')),
+    check('same row identity is emitted once', () => assertEqual(presentDeterministicEvidence([rows[1]!, {...rows[1]!, id: 'alias'}]).evidence?.[0]?.text, rows[1]!.label, 'Same row duplicated.')),
+    check('formula and result ownership is preserved', () => {
+      const map = buildSourceRepresentationMap(targets);
+      return assertEqual(map.entries.filter(e => e.target.kind === 'formula' || e.target.kind === 'result-value').every(e => e.target.sourceBlockIds[0] === 'calculation'), true, 'Source ownership changed.');
+    }),
+    check('complete table children satisfy their composite parent', () => {
+      const p = target('table-parent', 'concept', rows.map(r => r.label).join('\n'), 'table', 1);
+      const ts = [p, ...rows]; const core = presentDeterministicEvidence(ts);
+      return [...assertEqual(core.keyPoints.length, 0, 'Raw table repeated.'), ...assertEqual(missing(ts, core).length, 0, 'Table parent not covered.')];
+    }),
+    check('partial child set cannot falsely satisfy the composite parent', () => {
+      const core = presentDeterministicEvidence(targets);
+      return assertEqual(missing(targets, {...core, evidence: core.evidence?.filter(b => b.kind !== 'result')}).some(t => t.id === parent.id), true, 'Missing result silently accepted.');
+    }),
+    check('missing unique parent word cannot pass on token recall', () => {
+      const p = target('partial', 'concept', 'Amber bronze cobalt denim emerald fuchsia gold hazel indigo jade unique', 'calculation', 0);
+      return assertEqual(missing([p], {explanation: '', keyPoints: [], evidence: [{kind: 'source', text: p.label.replace(' unique', '')}]}).length, 1, 'Incomplete text accepted.');
+    }),
+    check('malformed cached code stays exact', () => {
+      const text = 'def values(): yield 1 yield 2';
+      return assertEqual(presentDeterministicEvidence([target('flat', 'code', text, 'cache', 0)]).evidence?.[0]?.text, text, 'Indentation inferred.');
+    }),
+    check('relationship metadata is not repeated as study prose', () => assertEqual(presentDeterministicEvidence(targets).evidence?.some(b => b.text.includes(parent.label)), false, 'Full relationship passage repeated.')),
+    check('target identities and factual content are unchanged by projection', () => {
+      const before = JSON.stringify(targets); presentDeterministicEvidence(targets);
+      return assertEqual(JSON.stringify(targets), before, 'Projection mutated manifest.');
+    }),
+    check('additional evidence spans remain required independently of labels', () => {
+      const t = {...formula, evidenceTexts: [formula.label, 'r = 42']};
+      return [...assertIncludes(visibleText(presentDeterministicEvidence([t])), 'r = 42', 'Additional factual span hidden.'),
+        ...assertEqual(missing([t], {...typed, evidence: typed.evidence.slice(0, 1)}).length, 1, 'Label alone satisfied a multi-span contract.')];
+    }),
+    check('provider cannot alter source representation ownership', () => {
+      const section = createSection('protected', 'Register', ['calculation'], targets);
+      const output = assembleDeterministicSectionEvidence({section, sourceBlocks: [{id: 'calculation', order: 0, kind: 'paragraph', text: parent.label}]});
+      const changed = {...output, deterministicEvidence: {...output.deterministicEvidence!, presentation: {...typed, evidence: typed.evidence.slice(0, 1)}}};
+      return assertEqual(validateDeterministicSectionEvidence(section, changed).valid, false, 'Provider-owned projection accepted.');
+    }),
+    check('source row order is deterministic', () => assertEqual(presentDeterministicEvidence([rows[2]!, rows[0]!, rows[1]!]).evidence?.[0]?.text, rows.map(r => r.label).join('\n'), 'Source row order lost.')),
+    check('coarse provenance cannot reorder the frozen semantic list', () => {
+      const ts = [target('first', 'list-item', '1. First action.', 'a', 10),
+        target('second', 'list-item', '2. Second action.', 'b', 20),
+        target('third', 'list-item', '3. Third action.', 'parent', 0)];
+      return assertDeepEqual(presentDeterministicEvidence(ts).keyPoints, ts.map(t => t.label), 'Block provenance reordered a semantic list.');
+    }),
+    check('short scalar children cannot shred source prose', () => {
+      const p = target('prose', 'concept', 'Locate the class where n/2 is found.', 'calculation', 0);
+      const scalar = {...target('scalar', 'result-value', '2', 'calculation', 0), relationshipLabel: p.label};
+      return assertIncludes(visibleText(presentDeterministicEvidence([p, scalar])), p.label, 'Scalar was subtracted from prose.');
+    }),
+    check('exact prose prefix can yield ownership to cached code', () => {
+      const code = target('code-child', 'code', 'const total = values.length;', 'code', 0);
+      const p = target('code-parent', 'code', `Recorded code: ${code.label}`, 'code', 0);
+      const core = presentDeterministicEvidence([p, code]);
+      return [...assertEqual(core.evidence?.[0]?.text, code.label, 'Typed code changed.'), ...assertEqual(visibleText(core).split(code.label).length - 1, 1, 'Code duplicated.')];
+    }),
+    check('formula runs are not split by scalar children', () => {
+      const p = target('math', 'formula', 'r = 84 / 2', 'calculation', 0);
+      return assertEqual(presentDeterministicEvidence([p, target('denominator', 'result-value', '2', 'calculation', 0)]).evidence?.[0]?.text, p.label, 'Formula run split.');
+    }),
+    check('partial table row collection preserves unique source rows', () => {
+      const p = target('table-parent', 'concept', rows.map(r => r.label).join('\n'), 'table', 1);
+      const core = presentDeterministicEvidence([p, rows[0]!, rows[1]!]);
+      return assertIncludes(visibleText(core), rows[2]!.label, 'Unique source row lost.');
+    }),
+  ];
 }

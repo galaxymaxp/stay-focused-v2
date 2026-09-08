@@ -1,0 +1,207 @@
+import type { RequiredEvidenceTarget, SourceGroundedCore } from './types.js';
+
+export interface SourceRepresentation {
+  readonly id: string;
+  readonly text: string;
+  readonly target: RequiredEvidenceTarget;
+  readonly prose?: boolean;
+}
+export interface SourceRepresentationMap {
+  readonly entries: readonly SourceRepresentation[];
+  readonly owners: ReadonlyMap<string, readonly string[]>;
+}
+/** Whitespace equivalence only; never infer numbers, operators or words. */
+export function sourceSpanKey(text: string): string {
+  return text.replace(/\s+/gu, ' ').trim();
+}
+export function containsSourceSpan(container: string, span: string): boolean {
+  const text = sourceSpanKey(container);
+  const part = sourceSpanKey(span);
+  let index = text.indexOf(part);
+  while (part && index >= 0) {
+    const before = text[index - 1] ?? '';
+    const after = text[index + part.length] ?? '';
+    if (!(/[\p{L}\p{N}]/u.test(before) && /^[\p{L}\p{N}]/u.test(part)) &&
+        !(/[\p{L}\p{N}]/u.test(after) && /[\p{L}\p{N}]$/u.test(part))) return true;
+    index = text.indexOf(part, index + 1);
+  }
+  return false;
+}
+function sameSource(left: RequiredEvidenceTarget, right: RequiredEvidenceTarget): boolean {
+  return left.sourceBlockIds.some(id => right.sourceBlockIds.includes(id));
+}
+function sameRow(left: RequiredEvidenceTarget, right: RequiredEvidenceTarget): boolean {
+  return left.provenance.some(a => a.tableBlockId !== undefined && a.tableRowIndex !== undefined &&
+    right.provenance.some(b => a.tableBlockId === b.tableBlockId && a.tableRowIndex === b.tableRowIndex));
+}
+/** Every character is retained as a residual span or owned exact child span.
+ * The graph is derived from immutable targets, never from provider output. */
+export function buildSourceRepresentationMap(targets: readonly RequiredEvidenceTarget[]): SourceRepresentationMap {
+  const entries: SourceRepresentation[] = [];
+  const owners = new Map<string, readonly string[]>();
+  const building = new Set<string>();
+  const build = (target: RequiredEvidenceTarget): readonly string[] => {
+    const existing = owners.get(target.id);
+    if (existing) return existing;
+    building.add(target.id);
+    const index = targets.indexOf(target);
+    const alias = targets.find((other, otherIndex) => otherIndex < index && sameSource(target, other) &&
+      sourceSpanKey(other.label) === sourceSpanKey(target.label) &&
+      (!target.provenance.some(p => p.tableBlockId) || sameRow(target, other)) && !building.has(other.id));
+    if (alias) {
+      const result = build(alias);
+      owners.set(target.id, result);
+      building.delete(target.id);
+      return result;
+    }
+    const rowOwner = target.kind === 'table-cell' || target.kind === 'table-row'
+      ? targets.find(other => other !== target && other.kind === 'table-row' && sameRow(target, other) &&
+        other.label.length > target.label.length && containsSourceSpan(other.label, target.label) && !building.has(other.id))
+      : undefined;
+    if (rowOwner) {
+      const result = build(rowOwner);
+      owners.set(target.id, result);
+      building.delete(target.id);
+      return result;
+    }
+    const compositeParent = target.relationshipLabel &&
+      !['code', 'formula', 'result-value', 'table-row'].includes(target.kind)
+      ? targets.slice(0, index).reverse().find(other => other.label === target.relationshipLabel &&
+        containsSourceSpan(other.label, target.label) && !building.has(other.id)) : undefined;
+    if (compositeParent) {
+      const result = build(compositeParent);
+      owners.set(target.id, result);
+      building.delete(target.id);
+      return result;
+    }
+    let residuals = [target.label.trim()];
+    const references: string[] = [];
+    let prose = false;
+    const subtract = (text: string, ids: readonly string[]) => {
+      if (!residuals.some(part => containsSourceSpan(part, text))) return;
+      const pattern = sourceSpanKey(text).split(' ')
+        .map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+      residuals = residuals.flatMap(part => containsSourceSpan(part, text)
+        ? part.split(new RegExp(pattern, 'u')).map(span => span.trim()).filter(Boolean) : [part]);
+      references.push(...ids);
+    };
+    // A source prose prefix followed by an exact cached code suffix may be
+    // separated, but indentation or code syntax is never reconstructed.
+    if (target.kind === 'code') {
+      const code = targets.filter(other => other !== target && other.kind === 'code' && sameSource(target, other) &&
+        target.label.endsWith(other.label) && other.label.length < target.label.length &&
+        /[:.]\s*$/u.test(target.label.slice(0, -other.label.length)) && !building.has(other.id))
+        .sort((a, b) => b.label.length - a.label.length)[0];
+      if (code) {
+        prose = true;
+        subtract(code.label, build(code));
+      }
+    }
+    // A table is subtracted as a complete ordered row set, never as scattered
+    // cells/numbers inside prose. Partial matches must leave the passage intact.
+    if (!['code', 'formula', 'result-value', 'table-row', 'table-cell'].includes(target.kind)) {
+      const tableIds = new Set(targets.flatMap(other => other.kind === 'table-row'
+        ? other.provenance.flatMap(p => p.tableBlockId ? [p.tableBlockId] : []) : []));
+      for (const tableId of tableIds) {
+        const rows = targets.filter(other => other.kind === 'table-row' && other !== target &&
+          other.provenance.some(p => p.tableBlockId === tableId) && !building.has(other.id));
+        if (!rows.length || !rows.every(row => sameSource(target, row) || row.relationshipLabel === target.label)) continue;
+        const uniqueRows = rows.filter((row, i) => rows.findIndex(other => sameRow(row, other) && other.label === row.label) === i)
+          .sort((a, b) => (a.provenance.find(p => p.tableBlockId)?.tableRowIndex ?? 0) -
+            (b.provenance.find(p => p.tableBlockId)?.tableRowIndex ?? 0));
+        const text = uniqueRows.map(row => row.label).join('\n');
+        if (residuals.some(part => containsSourceSpan(part, text))) subtract(text, uniqueRows.flatMap(build));
+      }
+    }
+    const children = targets.filter(other => other !== target && !building.has(other.id) &&
+      // Scalars and partial mathematical/code runs are not independent spans.
+      !['code', 'formula', 'result-value', 'table-row', 'table-cell'].includes(target.kind) &&
+      ['code', 'formula', 'result-value'].includes(other.kind) &&
+      sourceSpanKey(other.label).includes(' ') &&
+      other.label.trim().length < target.label.trim().length &&
+      (sourceSpanKey(other.relationshipLabel ?? '') === sourceSpanKey(target.label) ||
+       (sameSource(target, other) && ['code', 'formula', 'result-value'].includes(other.kind) &&
+        target.kind !== 'table-row' && target.kind !== 'table-cell')))
+      .sort((a, b) => b.label.length - a.label.length);
+    for (const child of children) {
+      if (!residuals.some(text => containsSourceSpan(text, child.label))) continue;
+      subtract(child.label, build(child));
+    }
+    const ownIds = residuals.map((text, part) => {
+      const id = `${target.id}:${part}`;
+      entries.push({id, text, target, ...(prose ? {prose: true} : {})});
+      return id;
+    });
+    const result = [...ownIds, ...references];
+    owners.set(target.id, result);
+    building.delete(target.id);
+    return result;
+  };
+  for (const target of targets) build(target);
+  // Labels usually equal evidenceTexts, but the factual contract may carry
+  // additional spans. Display ownership must cover those too.
+  for (const target of targets) {
+    target.evidenceTexts.forEach((text, index) => {
+      if (containsSourceSpan(target.label, text)) return;
+      const id = `${target.id}:evidence:${index}`;
+      entries.push({id, text, target});
+      owners.set(target.id, [...(owners.get(target.id) ?? []), id]);
+    });
+  }
+  // Explicit relationship parents own their label once. Unknown relations stay
+  // local; equal text in separate source contexts is never globally deduped.
+  const labelOwners = new Map(owners);
+  for (const target of targets) {
+    const relation = target.relationshipLabel?.trim();
+    if (!relation || sourceSpanKey(relation) === sourceSpanKey(target.label)) continue;
+    const index = targets.indexOf(target);
+    const parent = targets.slice(0, index).reverse().find(other => sourceSpanKey(other.label) === sourceSpanKey(relation));
+    if (parent) owners.set(target.id, [...new Set([...(owners.get(target.id) ?? []), ...(labelOwners.get(parent.id) ?? [])])]);
+    else {
+      const id = `${target.id}:relation`;
+      entries.push({id, text: relation, target});
+      owners.set(target.id, [...(owners.get(target.id) ?? []), id]);
+    }
+  }
+  // Semantic list order is already frozen in the manifest. Coarse block
+  // provenance can assign several items to a parent and must not reorder them.
+  // Table rows have their own explicit row-index ordering in the projection.
+  entries.sort((a, b) => targets.indexOf(a.target) - targets.indexOf(b.target));
+  return {entries, owners};
+}
+/** Only displayed text discharges an owner. Internal target IDs never suffice. */
+export function representedSourceOwners(map: SourceRepresentationMap, core: SourceGroundedCore): ReadonlySet<string> {
+  const texts = [core.explanation, ...core.keyPoints, ...(core.evidence ?? []).map(block => block.text)];
+  const represented = new Set<string>();
+  const used = new Map<string, number>();
+  for (const entry of map.entries) {
+    const key = sourceSpanKey(['code', 'formula', 'table-row', 'table-cell'].includes(entry.target.kind)
+      ? entry.text : entry.text.replace(/^\s*[-*•]\s*/u, ''));
+    const count = texts.reduce((total, text) => total + sourceSpanKey(text).split(key).length - 1, 0);
+    const ordinal = used.get(key) ?? 0;
+    if (key && count > ordinal && texts.some(text => containsSourceSpan(text, key))) represented.add(entry.id);
+    used.set(key, ordinal + 1);
+  }
+  return represented;
+}
+
+/** A collective source-item proof is scoped by source identity and requires all
+ * source characters. It does not use the legacy prose token-recall allowance. */
+export function sourceItemHasVisibleOwnedEvidence(
+  item: {readonly text: string; readonly sourceBlockIds?: readonly string[]},
+  targets: readonly RequiredEvidenceTarget[],
+  core: SourceGroundedCore,
+): boolean {
+  if (!item.sourceBlockIds?.length) return false;
+  const map = buildSourceRepresentationMap(targets);
+  const represented = representedSourceOwners(map, core);
+  const owned = map.entries.filter(entry => represented.has(entry.id) &&
+    entry.target.sourceBlockIds.some(id => item.sourceBlockIds!.includes(id)));
+  let remaining = sourceSpanKey(item.text);
+  for (const entry of [...owned].sort((a, b) => b.text.length - a.text.length)) {
+    if (containsSourceSpan(entry.text, item.text)) return true;
+    const text = sourceSpanKey(entry.text);
+    if (containsSourceSpan(remaining, text)) remaining = remaining.replace(text, ' ').trim();
+  }
+  return remaining.length === 0;
+}
