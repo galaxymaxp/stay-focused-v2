@@ -20,6 +20,7 @@ import { findMissingRequiredEvidenceTargets } from "./required-evidence.js";
 import { reviewableSourceBlocks } from "./review-content.js";
 import { reviewerDispositionFor } from "./reviewer-section-support.js";
 import { validateDeterministicSectionEvidence } from "./reviewer-evidence-assembly.js";
+import { missingVisibleResidualSourceEvidence } from './reviewer-source-ancestry.js';
 import { containsSourceSpan, sourceItemHasVisibleOwnedEvidence } from './reviewer-source-representation.js';
 import type {
   GenerationPlan,
@@ -225,6 +226,11 @@ function validateSourceRepresentationGrounding(
     sourceItem: target.label,
     message: `Required evidence target "${target.id}" (${target.kind}) is absent from the source representation.`,
   }));
+  const residuals = missingVisibleResidualSourceEvidence(section.residualSourceEvidence ?? [],
+    output ? toDefaultStudentVisibleSectionOutput(output).sourceCore : {explanation: '', keyPoints: []});
+  issues.push(...residuals.map((span): GroundingIssue => ({type: 'grounding-omission', severity: 'error',
+    plannedSectionId: section.id, sourceSectionId: section.sourceSectionId, sourceItem: span.text,
+    message: `Source residual "${span.id}" has no visible source-backed representation.`})));
   if (!output && targets.length === 0) {
     issues.push({
       type: "grounding-omission",
@@ -312,6 +318,11 @@ function validateSectionGrounding(args: {
     visibleCore: studentVisible.sourceCore,
   });
   const manifestOmissions = checkRequiredEvidenceOmissions(args.section, output);
+  const residualIssues: GroundingIssue[] = missingVisibleResidualSourceEvidence(
+    args.section.residualSourceEvidence ?? [], studentVisible.sourceCore,
+  ).map(span => ({type: 'grounding-omission', severity: 'error', plannedSectionId: args.section.id,
+    sourceSectionId: args.section.sourceSectionId, sourceItem: span.text,
+    message: `Source residual "${span.id}" has no visible source-backed representation.`}));
   const deterministicValidation = output.deterministicEvidence
     ? validateDeterministicSectionEvidence(args.section, output)
     : undefined;
@@ -327,7 +338,7 @@ function validateSectionGrounding(args: {
   const omissionCheck = args.section.requiredEvidence !== undefined ? {
     ...manifestOmissions,
     score: Math.min(sourceOmissions.score, manifestOmissions.score),
-    issues: [...sourceOmissions.issues, ...manifestOmissions.issues, ...deterministicIssues],
+    issues: [...sourceOmissions.issues, ...manifestOmissions.issues, ...deterministicIssues, ...residualIssues],
   } : sourceOmissions;
   const relationshipIssues = verifySemanticRelationships({
     section: args.section,

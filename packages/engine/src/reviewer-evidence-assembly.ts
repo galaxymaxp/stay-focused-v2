@@ -3,6 +3,7 @@ import {
   requiredEvidenceTargetIsRepresented,
 } from "./required-evidence.js";
 import { completeSourcePredicate, presentDeterministicEvidence } from "./reviewer-evidence-presentation.js";
+import { buildResidualSourceEvidence } from './reviewer-source-ancestry.js';
 import type {
   NormalizedSourceBlock,
   PlannedSection,
@@ -34,6 +35,11 @@ export function assembleDeterministicSectionEvidence(args: {
   }
 
   const targets = orderedTargets(args.section.requiredEvidence ?? []);
+  if (args.section.residualSourceEvidence && JSON.stringify(args.section.residualSourceEvidence) !==
+      JSON.stringify(buildResidualSourceEvidence({title: args.section.title, targets,
+        sourceBlocks: args.sourceBlocks.filter(block => args.section.sourceBlockIds.includes(block.id))}))) {
+    throw new Error(`Residual source ancestry differs from the accepted source for section "${args.section.id}".`);
+  }
   const keyPoints = uniqueExact(targets.map(renderRequiredEvidenceTarget));
   const targetIds = targets.map((target) => target.id);
 
@@ -55,7 +61,7 @@ export function assembleDeterministicSectionEvidence(args: {
       targetIds,
       evidenceHash: stableId("evidence", keyPoints.join("\u001f")),
       ...(args.sourceBlocks.some(block => block.structuredBlock) ? {
-        presentation: presentDeterministicEvidence(targets),
+        presentation: presentDeterministicEvidence(targets, args.section.residualSourceEvidence),
       } : {}),
     },
   } satisfies SectionOutput;
@@ -92,6 +98,9 @@ export function validateDeterministicSectionEvidence(
   const expectedPoints = uniqueExact(targets.map(renderRequiredEvidenceTarget));
   const marker = output.deterministicEvidence;
   const issues: string[] = [];
+  if (section.residualSourceEvidence && !marker?.presentation) {
+    issues.push('Residual source presentation is missing.');
+  }
 
   if (!marker) {
     issues.push("Deterministic evidence ownership marker is missing.");
@@ -107,7 +116,7 @@ export function validateDeterministicSectionEvidence(
     issues.push("Student-visible deterministic evidence differs from the planned source evidence.");
   }
   if (marker?.presentation && JSON.stringify(marker.presentation) !==
-      JSON.stringify(presentDeterministicEvidence(targets))) {
+      JSON.stringify(presentDeterministicEvidence(targets, section.residualSourceEvidence))) {
     issues.push("Deterministic evidence presentation differs from the planned source evidence.");
   }
 

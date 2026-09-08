@@ -14,6 +14,15 @@ export interface SourceRepresentationMap {
 export function sourceSpanKey(text: string): string {
   return text.replace(/\s+/gu, ' ').trim();
 }
+/** Paired Markdown display-math delimiters are presentation, not formula facts. */
+export function sourceFormulaSpan(text: string): string {
+  return /^\s*\$\$([\s\S]*?)\$\$\s*$/u.exec(text)?.[1]?.trim() ?? text;
+}
+/** Split only explicit prose boundaries; never infer mathematical/code layout. */
+export function sourceProseSpans(text: string): readonly string[] {
+  if (/[=\\{}|]/u.test(text) || /^\s*(?:\d+|[a-z])[.)]\s/u.test(text)) return [text];
+  return text.split(/\r?\n|(?<=[^\d.!?][.!?])\s+(?=[\p{Lu}])/u).map(s => s.trim()).filter(Boolean);
+}
 export function containsSourceSpan(container: string, span: string): boolean {
   const text = sourceSpanKey(container);
   const part = sourceSpanKey(span);
@@ -124,8 +133,12 @@ export function buildSourceRepresentationMap(targets: readonly RequiredEvidenceT
         target.kind !== 'table-row' && target.kind !== 'table-cell')))
       .sort((a, b) => b.label.length - a.label.length);
     for (const child of children) {
-      if (!residuals.some(text => containsSourceSpan(text, child.label))) continue;
-      subtract(child.label, build(child));
+      const span = child.kind === 'formula' ? sourceFormulaSpan(child.label) : child.label;
+      if (!residuals.some(text => containsSourceSpan(text, span))) continue;
+      subtract(span, build(child));
+    }
+    if (prose || !['code', 'formula', 'result-value', 'table-row', 'table-cell'].includes(target.kind)) {
+      residuals = residuals.flatMap(sourceProseSpans);
     }
     const ownIds = residuals.map((text, part) => {
       const id = `${target.id}:${part}`;

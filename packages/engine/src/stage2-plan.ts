@@ -11,6 +11,7 @@ import type {
 import { analyzeSectionSemanticStructure } from "./semantic-structure.js";
 import { buildTypedEvidenceGroups } from "./typed-evidence.js";
 import { buildRequiredEvidenceManifest } from "./required-evidence.js";
+import { buildResidualSourceEvidence } from './reviewer-source-ancestry.js';
 import {
   classifyReviewerSectionSupport,
   type ReviewerSectionSupport,
@@ -222,6 +223,9 @@ function createPlannedSection(
     semanticPlan,
     ...(evidenceGroups.length > 0 ? { evidenceGroups } : {}),
     requiredEvidence,
+    ...(sourceBlocks.some(block => block.structuredBlock) ? {
+      residualSourceEvidence: buildResidualSourceEvidence({title: section.title, sourceBlocks, targets: requiredEvidence}),
+    } : {}),
     supportingSourceBlockIds: sourceBlockIds.filter(
       (blockId) => !requiredBlockIds.has(blockId),
     ),

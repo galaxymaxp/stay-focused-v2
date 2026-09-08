@@ -1,14 +1,19 @@
-import { buildSourceRepresentationMap } from './reviewer-source-representation.js';
-import type { RequiredEvidenceTarget, ReviewerEvidenceBlock, SourceGroundedCore } from './types.js';
+import { buildSourceRepresentationMap, containsSourceSpan } from './reviewer-source-representation.js';
+import type { RequiredEvidenceTarget, ResidualSourceEvidence, ReviewerEvidenceBlock, SourceGroundedCore } from './types.js';
+import { visibleResidualSourceEvidence } from './reviewer-source-ancestry.js';
 
 /** Projects immutable factual identities into source-owned visible spans. */
-export function presentDeterministicEvidence(targets: readonly RequiredEvidenceTarget[]): SourceGroundedCore {
+export function presentDeterministicEvidence(targets: readonly RequiredEvidenceTarget[], residuals: readonly ResidualSourceEvidence[] = []): SourceGroundedCore {
   const keyPoints: string[] = [];
   const evidence: ReviewerEvidenceBlock[] = [];
   const map = buildSourceRepresentationMap(targets);
   const tables = new Set<string>();
   for (const entry of map.entries) {
     const target = entry.target;
+    // A complete source item can visibly own a truncated manifest phrase.
+    if (!['code', 'formula', 'result-value', 'table-row', 'table-cell'].includes(target.kind) &&
+        visibleResidualSourceEvidence(residuals).some(span => target.sourceBlockIds.includes(span.sourceBlockId) &&
+          containsSourceSpan(span.text, entry.text))) continue;
     const tableId = target.kind === 'table-row' ? target.provenance.find(p => p.tableBlockId)?.tableBlockId : undefined;
     if (tableId) {
       if (tables.has(tableId)) continue;
@@ -25,6 +30,7 @@ export function presentDeterministicEvidence(targets: readonly RequiredEvidenceT
     if (kind) evidence.push({kind, text: entry.text});
     else keyPoints.push(entry.text);
   }
+  keyPoints.push(...visibleResidualSourceEvidence(residuals).map(span => span.text));
   return {explanation: '', keyPoints, evidence};
 }
 export function sameVisibleText(a: string, b: string): boolean {

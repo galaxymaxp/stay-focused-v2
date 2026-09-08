@@ -245,6 +245,7 @@ export interface PlannedSection {
   readonly semanticPlan?: PlannedSectionSemanticPlan;
   readonly evidenceGroups?: readonly TypedEvidenceGroup[];
   readonly requiredEvidence?: readonly RequiredEvidenceTarget[];
+  readonly residualSourceEvidence?: readonly ResidualSourceEvidence[];
   readonly supportingSourceBlockIds?: readonly string[];
   readonly reviewerDisposition?: ReviewerSectionDisposition;
   readonly dispositionReason?: string;
@@ -285,6 +286,17 @@ export interface DeterministicEvidenceAssembly {
   readonly targetIds: readonly string[];
   readonly evidenceHash: string;
   readonly presentation?: SourceGroundedCore;
+}
+
+export interface ResidualSourceEvidence {
+  readonly id: string;
+  readonly sourceBlockId: string;
+  readonly sourceItemId: string;
+  readonly sourceOrder: number;
+  readonly parentId?: string;
+  readonly text: string;
+  readonly classification: 'CHILD_OWNED' | 'UNIQUE_REQUIRED' | 'PRESENTATION_ONLY' | 'UNRESOLVED';
+  readonly ownerIds: readonly string[];
 }
 
 export interface ReviewerEvidenceBlock {

@@ -17,8 +17,10 @@ import { explanationEvidenceFor } from "../src/reviewer-explanation-evidence.js"
 import { toDefaultStudentVisibleSectionOutput } from "../src/student-visible-text.js";
 import { verifySemanticRelationships } from "../src/semantic-verification.js";
 import { buildSourceRepresentationMap, sourceItemHasVisibleOwnedEvidence } from '../src/reviewer-source-representation.js';
+import { buildResidualSourceEvidence, visibleResidualSourceEvidence, missingVisibleResidualSourceEvidence } from '../src/reviewer-source-ancestry.js';
 import type {
   GenerationPlan,
+  NormalizedSourceBlock,
   NormalizedSource,
   PlannedSection,
   RequiredEvidenceTarget,
@@ -83,8 +85,140 @@ export const reviewerDeterministicEvidenceSuite: EvalSuite = {
     permanentProviderFailureCase(),
     ...presentationRegressionCases(),
     ...sourceRepresentationRegressionCases(),
+    ...sourceAncestryRegressionCases(),
   ],
 };
+
+function sourceAncestryRegressionCases(): readonly EvalCase[] {
+  const definition = 'The interval records the difference between neighboring counts.';
+  const formula = target('formula-child', 'formula', 'q = total / count', 'span', 0);
+  const result = target('result-child', 'result-value', 'q = 42', 'span', 0);
+  const parent = target('parent', 'concept', `${definition} ${formula.label} ${result.label}`, 'span', 0);
+  const block = (text: string, id = 'span', order = 0, role?: 'content' | 'metadata' | 'furniture'): NormalizedSourceBlock => ({
+    id, order, kind: 'paragraph', text,
+    structuredBlock: {id, order, pageNumber: 1, type: 'paragraph', text, parentId: 'source-group', ...(role ? {role} : {}),
+      provenance: {blockId: id, pageNumber: 1, parser: 'legacy'}},
+  });
+  const build = (blocks = [block(parent.label, 'span', 0, 'content')], targets: readonly RequiredEvidenceTarget[] = [formula, result], title = 'Register') => {
+    const residualSourceEvidence = buildResidualSourceEvidence({title, sourceBlocks: blocks, targets});
+    const section = {...createSection('residual-section', title, blocks.map(b => b.id), targets), residualSourceEvidence};
+    const output = assembleDeterministicSectionEvidence({section, sourceBlocks: blocks});
+    const visible = toDefaultStudentVisibleSectionOutput(output);
+    return {section, output, visible, residual: visibleResidualSourceEvidence(residualSourceEvidence),
+      text: [...visible.sourceCore.keyPoints, ...(visible.sourceCore.evidence ?? []).map(b => b.text)].join('\n')};
+  };
+  const check = (name: string, run: () => readonly EvalIssue[]): EvalCase => ({name: `B19 ${name}`, run: async () => run()});
+  return [
+    check('parent definition survives formula and result children', () => {
+      const text = build().text;
+      return [...assertIncludes(text, definition, 'Definition disappeared.'), ...assertEqual(text.split(formula.label).length - 1, 1, 'Child formula duplicated.'), ...assertEqual(text.split(result.label).length - 1, 1, 'Child result duplicated.')];
+    }),
+    check('fully covered parent suppresses duplicate raw display', () => {
+      const b = build([block(formula.label)], [formula]);
+      return [...assertEqual(b.residual.length, 0, 'Fully owned span retained raw.'), ...assertEqual(b.text.split(formula.label).length - 1, 1, 'Formula repeated.')];
+    }),
+    check('partially covered parent retains unique residual', () => assertEqual(build().residual.some(r => r.text.includes(definition)), true, 'Partial coverage erased parent.')),
+    check('residual preserves source and parent identity', () => assertEqual(build().residual.every(r => r.sourceBlockId === 'span' && r.parentId === 'source-group'), true, 'Ancestry lost.')),
+    check('structural metadata residual is suppressed', () => assertEqual(build([block('Slide navigation', 'meta', 0, 'metadata')], []).residual.length, 0, 'Metadata emitted.')),
+    check('ambiguous residual is retained', () => {
+      const b = build([block('Check this relationship.')], []);
+      return [...assertEqual(b.residual[0]?.classification, 'UNRESOLVED', 'Ambiguity guessed.'), ...assertIncludes(b.text, 'Check this relationship.', 'Ambiguity discarded.')];
+    }),
+    check('exact heading ownership avoids raw duplication', () => {
+      const b = block('Register');
+      const heading: NormalizedSourceBlock = {...b, kind: 'heading', structuredBlock: {...b.structuredBlock!, type: 'heading', text: 'Register'}};
+      return assertEqual(build([heading], []).text, '', 'Visible title duplicated.');
+    }),
+    check('row child cannot absorb unrelated prose', () => assertEqual(visibleResidualSourceEvidence(buildResidualSourceEvidence({title: 'Register', sourceBlocks: [block(definition)], targets: [target('row', 'table-row', 'North | 42', 'span', 0)]}))[0]?.text, definition, 'Row absorbed prose.')),
+    check('table children cover only table portion', () => {
+      const rows = ['Region | Count', 'North | 42'].map((label, index) => ({...target(`row-${index}`, 'table-row', label, 'span', 0), provenance: [{sourceBlockId: 'span', sourceOrder: 0, tableBlockId: 'table', tableRowIndex: index}]}));
+      const p = target('table-parent', 'concept', `${definition}\n${rows.map(r => r.label).join('\n')}`, 'span', 0);
+      const core = presentDeterministicEvidence([p, ...rows]);
+      return [...assertIncludes(core.keyPoints.join(' '), definition, 'Neighbor definition lost.'), ...assertEqual(core.evidence?.[0]?.text, rows.map(r => r.label).join('\n'), 'Table changed.')];
+    }),
+    check('formula cannot satisfy a definition', () => assertEqual(visibleResidualSourceEvidence(buildResidualSourceEvidence({title: 'Register', sourceBlocks: [block(definition)], targets: [formula]}))[0]?.text, definition, 'Formula satisfied definition.')),
+    check('result cannot satisfy a definition', () => assertEqual(visibleResidualSourceEvidence(buildResidualSourceEvidence({title: 'Register', sourceBlocks: [block(definition)], targets: [result]}))[0]?.text, definition, 'Result satisfied definition.')),
+    check('provider response order cannot alter residual ancestry', () => {
+      const a = build();
+      const generated = {...a.output, sourceCore: {...a.output.sourceCore, explanation: 'Recorded counts are retained.'}};
+      return assertEqual(validateDeterministicSectionEvidence(a.section, generated).valid, true, 'Explanation changed factual ownership.');
+    }),
+    check('provider cannot replace residual factual ownership', () => {
+      const b = build();
+      return assertEqual(validateDeterministicSectionEvidence(b.section, {...b.output, deterministicEvidence: {...b.output.deterministicEvidence!, presentation: {explanation: '', keyPoints: [], evidence: []}}}).valid, false, 'Provider replacement accepted.');
+    }),
+    check('source-item validator recognizes visible residual', () => {
+      const b = build([block(definition)], []);
+      const context = createContext();
+      const source = {...context.source, blocks: [block(`- ${definition}`)]};
+      const section = {...b.section, sourceSectionId: context.outline.sections[0]!.id};
+      const g = validateGrounding({source, outline: context.outline, plan: {...context.plan, sections: [section]}, outputs: [{...b.visible, sourceCore: {...b.visible.sourceCore, explanation: definition}}]});
+      return assertEqual(g.issues.some(i => i.type === 'grounding-omission'), false, 'Visible source item rejected.');
+    }),
+    check('hidden residual does not satisfy visibility', () => {
+      const b = build();
+      return assertEqual(validateDeterministicSectionEvidence(b.section, {...b.output, deterministicEvidence: {targetIds: b.output.deterministicEvidence!.targetIds, evidenceHash: b.output.deterministicEvidence!.evidenceHash}}).valid, false, 'Hidden residual accepted.');
+    }),
+    check('residual items retain source order', () => assertEqual(build([block('Second unique fact.', 'second', 2), block('First unique fact.', 'first', 1)], []).residual.map(r => r.sourceBlockId).join(','), 'first,second', 'Source order lost.')),
+    check('multiple unique parent items all survive', () => assertEqual(build([block('First unique fact. Second unique fact.')], []).residual.length, 2, 'Unique item dropped.')),
+    check('metadata role cannot delete required row headers', () => {
+      const t = target('header', 'table-row', 'Region | Count', 'span', 0);
+      return assertIncludes(build([block(t.label, 'span', 0, 'metadata')], [t]).text, t.label, 'Required header removed.');
+    }),
+    check('source dump projection preserves each sentence exactly', () => {
+      const text = 'The first record describes the archive. The second record describes its source. The third record preserves its identity.';
+      return assertEqual(presentDeterministicEvidence([target('prose', 'concept', text, 'span', 0)]).keyPoints.join(' '), text, 'Prose facts changed.');
+    }),
+    check('target conservation and hashes remain exact', () => {
+      const ts = [parent, formula, result]; const before = JSON.stringify(ts); const b = build(undefined, ts);
+      return [...assertEqual(JSON.stringify(ts), before, 'Targets mutated.'), ...assertEqual(findMissingRequiredEvidenceTargets(b.section, b.visible).length, 0, 'Target disappeared.')];
+    }),
+    check('incomplete phrase receives a whole source item owner', () => {
+      const b = build([block('The key records the interval.')], [target('phrase', 'concept', 'The key', 'span', 0)]);
+      return [...assertEqual(b.visible.sourceCore.keyPoints.length, 1, 'Truncated phrase duplicated.'), ...assertEqual(b.text, 'The key records the interval.', 'Source item fragmented.')];
+    }),
+    check('source ancestry tampering is rejected before provider work', () => {
+      const b = build(); let rejected = false;
+      try { assembleDeterministicSectionEvidence({section: b.section, sourceBlocks: [block('Altered source')]}); } catch { rejected = true; }
+      return assertEqual(rejected, true, 'Altered source contract accepted.');
+    }),
+    check('serialized visible residual discharges the completeness contract', () => {
+      const b = build();
+      return assertEqual(missingVisibleResidualSourceEvidence(b.section.residualSourceEvidence, b.visible.sourceCore).length, 0, 'Visible residual rejected.');
+    }),
+    check('serialized hidden residual fails despite complete child targets', () => {
+      const b = build();
+      return assertEqual(missingVisibleResidualSourceEvidence(b.section.residualSourceEvidence, {explanation: '', keyPoints: [], evidence: b.visible.sourceCore.evidence}).length > 0, true, 'Child-only output accepted.');
+    }),
+    check('activity ancestry suppresses task commands but retains definitions', () => {
+      const h = block('Activity', 'heading');
+      const heading: NormalizedSourceBlock = {...h, kind: 'heading', structuredBlock: {...h.structuredBlock!, type: 'heading', text: 'Activity'}};
+      const b = build([heading, block('Create a program for your answer.', 'command', 1), block(definition, 'definition', 2)], []);
+      return [...assertIncludes(b.text, definition, 'Activity heading erased a fact.'), ...assertEqual(b.text.includes('Create a program'), false, 'Structural activity command emitted.')];
+    }),
+    check('non-standalone sections cannot hide unique residuals', () => {
+      const b = build(); const context = createContext();
+      const section = {...b.section, sourceSectionId: context.outline.sections[0]!.id, reviewerDisposition: 'typed-evidence' as const};
+      const output = {...b.visible, sourceCore: {explanation: '', keyPoints: [], evidence: b.visible.sourceCore.evidence}};
+      const g = validateGrounding({...context, plan: {...context.plan, sections: [section]}, outputs: [output]});
+      return assertEqual(g.issues.some(i => i.type === 'grounding-omission' && i.message.includes('residual')), true, 'Non-standalone residual hidden.');
+    }),
+    check('explicit composite span bridges an exact typed child without duplication', () => {
+      const child = target('output', 'code', 'Recorded: Amber', 'code-block', 0);
+      const parent = {...target('composite', 'concept', 'Recorded outputs:', 'code-block', 0), sourceBlockIds: ['code-block', 'output-block']};
+      const blocks = [block('Recorded outputs: Recorded: Amber', 'code-block'), block('Recorded: Amber', 'output-block', 1)];
+      const b = build(blocks, [parent, child]);
+      return [...assertEqual(b.residual.some(s => s.sourceBlockId === 'output-block'), false, 'Exact typed output repeated.'),
+        ...assertEqual(buildResidualSourceEvidence({title: 'Register', sourceBlocks: [block('Recorded: Amber', 'unrelated')], targets: [child]}).some(s => s.classification === 'CHILD_OWNED'), false, 'Unrelated identity accepted.')];
+    }),
+    check('display math delimiters do not duplicate a source formula in its parent', () => {
+      const child = {...formula, label: `$$\n${formula.label}\n$$`, evidenceTexts: [formula.label]};
+      const p = {...parent, label: `${definition} ${formula.label}`, evidenceTexts: [`${definition} ${formula.label}`]};
+      const core = presentDeterministicEvidence([p, child]);
+      return [...assertEqual(core.keyPoints.join(' '), definition, 'Formula wrapper blocked child ownership.'), ...assertEqual(core.evidence?.[0]?.text, child.label, 'Typed formula identity changed.')];
+    }),
+  ];
+}
 
 function omissionCase(name: string, targetId: string): EvalCase {
   return { name, run: async () => {
