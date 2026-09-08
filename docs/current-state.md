@@ -1,6 +1,25 @@
 # Current State
 
-## B17 local repair — current result (2026-09-07)
+## B18 local repair — current result (2026-09-08)
+
+**FAIL — Reviewer representation defect remains.** All frozen targets remain
+99/99, 232/232, 156/156 and 46/46, with unchanged hashes, source ownership,
+production gpt-4o, parser default legacy and initial prompts. Deterministic
+representation ownership reduces composite/relationship copies and validates
+visible spans. All Statistics mapping mismatches are resolved; Docling remains
+withheld for one finding containing two real missing definitions. MinerU now
+assembles with zero omissions. Python fallback remains zero. Final calls are
+2/3/3/1, explanation retries 0/1/1/0, factual retries all zero. All four manual
+gates still FAIL; serialized usefulness also fails Python/MinerU/Docling.
+Full unchanged B12: NOT RUN — targeted prerequisites failed.
+Fresh engine 519/519, architecture 70/70, reader 32/32, API 607/607, root
+typecheck/lint/build all PASS. No push. B16/B17 historical FAIL reports unchanged.
+Next: repair remaining source-span ancestry and source-item completeness from
+B18 captures, preserving frozen targets and gates.
+See [B18 acceptance](ai/acceptance/b18/composite-source-presentation-source-item-alignment.md).
+
+
+## B17 local repair — historical result (2026-09-07)
 
 **FAIL — generic Reviewer quality defect remains.** All frozen targets remain
 99/99, 232/232, 156/156 and 46/46; model gpt-4o and parser default legacy
@@ -17,7 +36,7 @@ source-item evidence, preserving the frozen gates. No push or parser promotion.
 See [B17 acceptance](ai/acceptance/b17/reviewer-explanation-evidence-presentation.md).
 
 
-Last refreshed: 2026-09-07, Asia/Manila.
+Last refreshed: 2026-09-08, Asia/Manila.
 
 ## Repository
 
