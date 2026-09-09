@@ -1,4 +1,4 @@
-import type { RequiredEvidenceTarget, ResidualSourceEvidence, SourceGroundedCore } from './types.js';
+import type { RequiredEvidenceTarget, ResidualSourceEvidence, SourceGroundedCore, TypedEvidenceGroup, ReviewerEvidenceBlock } from './types.js';
 import { standaloneSourceClause, withoutRepeatedSourceHeading } from './reviewer-presentation-prose.js';
 
 export interface SourceRepresentation {
@@ -6,6 +6,9 @@ export interface SourceRepresentation {
   readonly text: string;
   readonly target: RequiredEvidenceTarget;
   readonly prose?: boolean;
+  readonly displayKind?: ReviewerEvidenceBlock["kind"];
+  readonly displayOrder?: number;
+  readonly sourceHeading?: string;
 }
 export interface SourceRepresentationMap {
   readonly entries: readonly SourceRepresentation[];
@@ -210,12 +213,121 @@ export function buildSourceRepresentationMap(targets: readonly RequiredEvidenceT
     [...new Set(ids.flatMap(id => aliases.get(id) ?? [id]))]);
   return {entries: entries.filter(entry => !aliases.has(entry.id)), owners};
 }
+
+/** A second, display-only graph. The factual/ancestry graph above stays frozen.
+ * Split composites only at accepted member boundaries; no word-based fact repair.
+ * Every original owner resolves to all its pieces or to a complete typed owner. */
+export function buildSourceRoleRepresentationMap(
+  targets: readonly RequiredEvidenceTarget[],
+  groups: readonly TypedEvidenceGroup[] = [],
+): SourceRepresentationMap {
+  const map = buildSourceRepresentationMap(targets);
+  const active = groups.filter(group => map.entries.some(entry =>
+    !['code', 'formula', 'result-value', 'table-row', 'table-cell'].includes(entry.target.kind) &&
+    group.members.filter(member => member.kind === 'paragraph' &&
+      entry.target.sourceBlockIds.includes(member.blockId) && member.evidenceTexts.some(text =>
+        containsSourceSpan(entry.text, text))).length >= 2));
+  if (!active.length) return map;
+  const members = active.flatMap(group => group.members);
+  const orderOf = (blockId: string) => targets.flatMap(t => t.provenance)
+    .find(p => p.sourceBlockId === blockId)?.sourceOrder ?? Number.MAX_SAFE_INTEGER;
+  const sameContext = (entry: SourceRepresentation, blockId: string) =>
+    entry.target.sourceBlockIds.includes(blockId) || active.some(group =>
+      group.sourceBlockIds.includes(blockId) && entry.target.provenance.some(p => p.evidenceGroupId === group.id));
+  const candidates = members.flatMap(member => {
+    if (member.kind === 'paragraph' || member.kind === 'heading') return member.evidenceTexts.flatMap(text => {
+      const suffix=text.replace(/^\s*(?:\d+|[a-z])[.)]\s+/iu,'');
+      return [{text,member},...(suffix!==text?[{text:suffix,member}]:[])];
+    });
+    if (member.kind !== 'table' || !member.tableCells?.length) return [];
+    // A typed table's leading text before its first row is a caption. It remains
+    // visible beside the table, even when the frozen caption is incomplete.
+    const firstRow = Math.min(...member.tableCells.map(c => c.rowIndex));
+    const header = member.tableCells.filter(c => c.rowIndex === firstRow)
+      .sort((a,b) => a.columnIndex-b.columnIndex).map(c => c.text).join(' | ');
+    return member.evidenceTexts.flatMap(text => {
+      const firstCell = member.tableCells?.find(c => c.rowIndex === firstRow && c.columnIndex === 0)?.text;
+      const rowLine = text.split('\n').find(line => line.includes('|') && firstCell && containsSourceSpan(line,firstCell));
+      const offset = text.indexOf(rowLine ?? header);
+      return offset > 0 ? [{text:text.slice(0,offset).trim(),member}] : [];
+    });
+  }).filter(c => sourceSpanKey(c.text).includes(' ') || /^[\p{L}]+:$/u.test(c.text.trim())).sort((a,b) => b.text.length-a.text.length);
+  const entries: SourceRepresentation[] = [];
+  const replacements = new Map<string, readonly string[]>();
+  for (const entry of map.entries) {
+    if (!members.some(m => sameContext(entry,m.blockId)) ||
+        ['code','formula','table-row','table-cell','result-value'].includes(entry.target.kind)) {
+      const member = members.find(m => entry.target.sourceBlockIds.length === 1 && m.blockId === entry.target.sourceBlockIds[0]);
+      entries.push({...entry,...(member ? {displayOrder:orderOf(member.blockId)} : {})});
+      continue;
+    }
+    type Piece = {text:string; member?: (typeof members)[number]};
+    let pieces: Piece[] = [{text:sourceSpanKey(entry.text)}];
+    for (const candidate of candidates) {
+      if (!sameContext(entry,candidate.member.blockId)) continue;
+      const span = sourceSpanKey(candidate.text);
+      pieces = pieces.flatMap(piece => {
+        if (piece.member || !containsSourceSpan(piece.text,span)) return [piece];
+        const offset=piece.text.indexOf(span);
+        return [{text:piece.text.slice(0,offset).trim()}, {text:span,member:candidate.member},
+          {text:piece.text.slice(offset+span.length).trim()}].filter(p=>p.text);
+      });
+    }
+    const ids: string[]=[];
+    for (const [index,piece] of pieces.entries()) {
+      // A table fragment must match one contiguous sequence in its canonical
+      // ordered cells, and all rows must have visible owners. Never collect
+      // scattered matching numbers or accept an incomplete row set.
+      const table = !piece.member && members.find(m => {
+        if (m.kind !== 'table' || !m.tableCells?.length || !sameContext(entry,m.blockId)) return false;
+        const cells=[...m.tableCells].sort((a,b)=>a.rowIndex-b.rowIndex||a.columnIndex-b.columnIndex);
+        const rowIndices=[...new Set(cells.map(c=>c.rowIndex))];
+        const rows=map.entries.filter(e=>e.target.kind==='table-row' && e.target.provenance.some(p=>p.tableBlockId===m.blockId));
+        return rowIndices.every(i=>rows.some(r=>r.target.provenance.some(p=>p.tableRowIndex===i) &&
+          containsSourceSpan(r.text,cells.filter(c=>c.rowIndex===i).map(c=>c.text).join(' | ')))) &&
+          containsSourceSpan(cells.map(c=>c.text).join(' '),piece.text);
+      });
+      if (table) {
+        ids.push(...map.entries.filter(e=>e.target.kind==='table-row'&&e.target.provenance.some(p=>p.tableBlockId===table.blockId)).map(e=>e.id));
+        continue;
+      }
+      const existing = map.entries.find(other => other.id !== entry.id &&
+        ['example','result-value'].includes(other.target.kind) && sameSource(entry.target,other.target) &&
+        containsSourceSpan(other.text,piece.text));
+      if (existing) {ids.push(existing.id); continue;}
+      const heading = piece.member ? undefined : members.find(m => m.kind === 'heading' && m.evidenceTexts.some(text =>
+        sourceSpanKey(text.replace(/^\s*(?:\d+|[a-z])[.)]\s+/iu,'')) === sourceSpanKey(piece.text)));
+      const member=piece.member ?? heading;
+      const group=member && active.find(g=>g.sourceBlockIds.includes(member.blockId));
+      const order=member ? orderOf(member.blockId) : undefined;
+      const afterFormula=group && order !== undefined && group.formulaBlockIds.some(id=>orderOf(id)<order);
+      const objective=member && /^(?:Example\b|Find\b|Compute\b|Calculate\b)/iu.test(piece.text) &&
+        group?.members.some(m=>orderOf(m.blockId)>order! && ['table','formula'].includes(m.kind));
+      const displayKind = objective ? 'example' as const : member && (member.kind==='table' || afterFormula) ? 'source' as const : undefined;
+      const id=pieces.length===1?entry.id:`${entry.id}:role:${index}`;
+      entries.push({...entry,id,text:piece.text,...(displayKind?{displayKind}:{}),...(member?.kind==='heading'?{sourceHeading:member.evidenceTexts[0]}:{}),...(order!==undefined?{displayOrder:order}:{}),
+        ...(member?{target:{...entry.target,sourceBlockIds:[member.blockId]}}:{})});
+      ids.push(id);
+    }
+    replacements.set(entry.id,ids);
+  }
+  const resolve=(id:string,seen=new Set<string>()):readonly string[]=>{
+    if(seen.has(id)) return [id];
+    const next=replacements.get(id);
+    return next ? next.flatMap(child=>child===id?[id]:resolve(child,new Set([...seen,id]))) : [id];
+  };
+  return {entries:entries.sort((a,b)=>(a.displayOrder??Math.min(...a.target.provenance.map(p=>p.sourceOrder)))-
+      (b.displayOrder??Math.min(...b.target.provenance.map(p=>p.sourceOrder)))),
+    owners:new Map([...map.owners].map(([id,owned])=>[id,[...new Set(owned.flatMap(o=>resolve(o)))]]))};
+}
+
 /** Only displayed text discharges an owner. Internal target IDs never suffice. */
 export function representedSourceOwners(map: SourceRepresentationMap, core: SourceGroundedCore, title?: string, residuals: readonly ResidualSourceEvidence[] = []): ReadonlySet<string> {
   const texts = [core.explanation, ...core.keyPoints, ...(core.evidence ?? []).map(block => block.text)];
   const represented = new Set<string>();
   const used = new Map<string, number>();
   for (const entry of map.entries) {
+    if (title && entry.sourceHeading === title) {represented.add(entry.id); continue;}
     const technical = !entry.prose && ['code', 'formula', 'table-row', 'table-cell'].includes(entry.target.kind);
     const boundary = sourceBoundaryPresentation(entry, residuals);
     const sourceProse = boundary.text.replace(/^\s*[-*•]\s*/u, '');
@@ -254,9 +366,10 @@ export function sourceItemHasVisibleOwnedEvidence(
   core: SourceGroundedCore,
   title?: string,
   residuals: readonly ResidualSourceEvidence[] = [],
+  groups: readonly TypedEvidenceGroup[] = [],
 ): boolean {
   if (!item.sourceBlockIds?.length) return false;
-  const map = buildSourceRepresentationMap(targets);
+  const map = buildSourceRoleRepresentationMap(targets, groups);
   const represented = representedSourceOwners(map, core, title, residuals);
   const owned = map.entries.filter(entry => represented.has(entry.id) &&
     entry.target.sourceBlockIds.some(id => item.sourceBlockIds!.includes(id)));

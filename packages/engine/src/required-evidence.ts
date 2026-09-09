@@ -1,5 +1,5 @@
 import { countWords, isInstructionalNoiseText } from "./review-content.js";
-import { buildSourceRepresentationMap, representedSourceOwners } from './reviewer-source-representation.js';
+import { buildSourceRoleRepresentationMap, representedSourceOwners } from './reviewer-source-representation.js';
 import type {
   NormalizedSourceBlock,
   PlannedSection,
@@ -130,7 +130,7 @@ export function findMissingRequiredEvidenceTargets(
   if (!output) return targets;
   const presentation = output.deterministicEvidence?.presentation;
   if (presentation || output.sourceCore.evidence) {
-    const map = buildSourceRepresentationMap(targets);
+    const map = buildSourceRoleRepresentationMap(targets, section.evidenceGroups);
     const represented = representedSourceOwners(map, presentation
       ? {...presentation, explanation: output.sourceCore.explanation} : output.sourceCore,
       output.title === section.title ? section.title : undefined, section.residualSourceEvidence);

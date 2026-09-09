@@ -1,3 +1,4 @@
+import {compositeRoleRegressionCases} from './reviewer-composite-roles.eval.js';
 import type { GenerationProvider, GenerationRequest } from "../src/provider.js";
 import {
   assembleDeterministicSectionEvidence,
@@ -88,6 +89,7 @@ export const reviewerDeterministicEvidenceSuite: EvalSuite = {
     ...sourceRepresentationRegressionCases(),
     ...sourceAncestryRegressionCases(),
     ...finalPresentationRegressionCases(),
+    ...compositeRoleRegressionCases(),
   ],
 };
 

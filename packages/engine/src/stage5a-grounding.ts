@@ -562,7 +562,7 @@ function checkOmissions(args: {
       (span.classification === 'PRESENTATION_ONLY' && span.displayText === '' ||
         span.displayText.length > 0 && args.visibleCoreTexts.some(text => containsSourceSpan(text, span.displayText!))));
     const represented = titleRepresentsHeading || residualPresentation ||
-      sourceItemHasVisibleOwnedEvidence(item, args.section.requiredEvidence ?? [], args.visibleCore, args.visibleTitle, args.section.residualSourceEvidence) ||
+      sourceItemHasVisibleOwnedEvidence(item, args.section.requiredEvidence ?? [], args.visibleCore, args.visibleTitle, args.section.residualSourceEvidence, args.section.evidenceGroups) ||
       representedItemKeys.has(itemKey) ||
       (itemKey.length >= 3 && [...representedItemKeys].some((key) => key.includes(itemKey))) ||
       args.visibleCoreTexts.some((text) => sourceItemTokenRecall(item.text, text) >= 0.8);

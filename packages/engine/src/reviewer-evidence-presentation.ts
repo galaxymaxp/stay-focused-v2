@@ -1,16 +1,17 @@
-import { buildSourceRepresentationMap, containsSourceSpan, sourceBoundaryPresentation } from './reviewer-source-representation.js';
-import type { RequiredEvidenceTarget, ResidualSourceEvidence, ReviewerEvidenceBlock, SourceGroundedCore } from './types.js';
+import { buildSourceRoleRepresentationMap, containsSourceSpan, sourceBoundaryPresentation } from './reviewer-source-representation.js';
+import type { RequiredEvidenceTarget, ResidualSourceEvidence, ReviewerEvidenceBlock, SourceGroundedCore, TypedEvidenceGroup } from './types.js';
 import { visibleResidualSourceEvidence } from './reviewer-source-ancestry.js';
 import { displayProseKey, standaloneSourceClause, withoutRepeatedSourceHeading } from './reviewer-presentation-prose.js';
 
 /** Projects immutable factual identities into source-owned visible spans. */
-export function presentDeterministicEvidence(targets: readonly RequiredEvidenceTarget[], residuals: readonly ResidualSourceEvidence[] = [], title?: string): SourceGroundedCore {
+export function presentDeterministicEvidence(targets: readonly RequiredEvidenceTarget[], residuals: readonly ResidualSourceEvidence[] = [], title?: string, groups: readonly TypedEvidenceGroup[] = []): SourceGroundedCore {
   const keyPoints: string[] = [];
   const evidence: ReviewerEvidenceBlock[] = [];
-  const map = buildSourceRepresentationMap(targets);
+  const map = buildSourceRoleRepresentationMap(targets, groups);
   const tables = new Set<string>();
   for (const entry of map.entries) {
     const target = entry.target;
+    if (title && entry.sourceHeading === title) continue;
     // A complete source item can visibly own a truncated manifest phrase.
     if (!['code', 'formula', 'result-value', 'table-row', 'table-cell'].includes(target.kind) &&
         visibleResidualSourceEvidence(residuals).some(span => target.sourceBlockIds.includes(span.sourceBlockId) &&
@@ -26,8 +27,8 @@ export function presentDeterministicEvidence(targets: readonly RequiredEvidenceT
       evidence.push({kind: 'table', text: rows.map(row => row.text).join('\n')});
       continue;
     }
-    const kind = entry.prose ? undefined : target.kind === 'code' ? 'code' : target.kind === 'formula' ? 'formula'
-      : target.kind === 'result-value' ? 'result' : target.kind === 'example' ? 'example' : undefined;
+    const kind = entry.displayKind ?? (entry.prose ? undefined : target.kind === 'code' ? 'code' : target.kind === 'formula' ? 'formula'
+      : target.kind === 'result-value' ? 'result' : target.kind === 'example' ? 'example' : undefined);
     if (kind) evidence.push({kind, text: entry.text});
     else keyPoints.push(standaloneSourceClause(sourceBoundaryPresentation(entry, residuals).text));
   }
