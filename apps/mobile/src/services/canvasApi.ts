@@ -483,7 +483,7 @@ export type CanvasReviewerSourceType =
   | "announcement"
   | "file";
 
-export type CanvasReviewerFileKind = "pdf" | "image" | "unsupported";
+export type CanvasReviewerFileKind = "pdf" | "image" | "text" | "unsupported";
 
 export type CanvasReviewerFilePreparationStatus =
   | "ready"
@@ -3366,7 +3366,8 @@ function isCanvasStructuredSource(
     typeof value.title === "string" &&
     (value.fileKind === undefined ||
       value.fileKind === "pdf" ||
-      value.fileKind === "image") &&
+      value.fileKind === "image" ||
+      value.fileKind === "text") &&
     (value.pageCount === undefined || isNonNegativeInteger(value.pageCount)) &&
     isCanvasStructuredSourceDuplicateSummary(value.duplicateSummary) &&
     Array.isArray(value.blocks) &&
@@ -3456,7 +3457,8 @@ function isCanvasPreviewSourceSummary(
     (value.updatedAt === null || typeof value.updatedAt === "string") &&
     (value.fileKind === undefined ||
       value.fileKind === "pdf" ||
-      value.fileKind === "image") &&
+      value.fileKind === "image" ||
+      value.fileKind === "text") &&
     (value.pageCount === undefined || isNonNegativeInteger(value.pageCount))
   );
 }
@@ -3548,7 +3550,12 @@ function isCanvasReviewerSourceType(
 function isCanvasReviewerFileKind(
   value: unknown,
 ): value is CanvasReviewerFileKind {
-  return value === "pdf" || value === "image" || value === "unsupported";
+  return (
+    value === "pdf" ||
+    value === "image" ||
+    value === "text" ||
+    value === "unsupported"
+  );
 }
 
 function isCanvasReviewerFilePreparationStatus(

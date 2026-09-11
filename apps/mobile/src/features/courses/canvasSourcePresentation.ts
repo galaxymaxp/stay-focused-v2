@@ -104,6 +104,7 @@ export function groupCanvasSourcesForSelection(
   const byKey = new Map<string, (typeof groups)[number]>();
 
   for (const source of sources) {
+    if (source.type === "announcement") continue;
     const placement = source.placement;
     const title =
       placement.group === "module" && placement.moduleTitle

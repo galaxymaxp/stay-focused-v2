@@ -104,9 +104,15 @@ export function createCanvasFileInventoryPayload({
   }[];
   readonly pages: readonly CanvasPageDetail[];
 }): CanvasFileInventoryPayload {
-  const mappedFiles = dedupeByIdentity(files.map(mapCanvasFile), (file) => {
+  const attachmentFiles = assignments.flatMap(
+    (assignment) => assignment.attachments ?? [],
+  );
+  const mappedFiles = dedupeByIdentity(
+    [...files, ...attachmentFiles].map(mapCanvasFile),
+    (file) => {
     return file.canvas_file_id;
-  });
+    },
+  );
   const knownFileIds = new Set(mappedFiles.map((file) => file.canvas_file_id));
   const referenceAccumulator = createReferenceAccumulator(knownFileIds);
 
@@ -172,6 +178,22 @@ export function createCanvasFileInventoryPayload({
         canvas_page_url: null,
         reference_identity: `assignment:${assignment.id}:file:${canvasFileId}`,
         reference_type: "assignment",
+      });
+    }
+    for (const attachment of assignment.attachments ?? []) {
+      const canvasFileId = nullableIdentifier(attachment.id);
+      if (!canvasFileId || !knownFileIds.has(canvasFileId)) {
+        continue;
+      }
+      referenceAccumulator.add({
+        canvas_assignment_id: requiredIdentifier(assignment.id, "assignment"),
+        canvas_announcement_id: null,
+        canvas_file_id: canvasFileId,
+        canvas_module_id: null,
+        canvas_module_item_id: null,
+        canvas_page_url: null,
+        reference_identity: `assignment:${assignment.id}:attachment:${canvasFileId}`,
+        reference_type: "typed_attachment",
       });
     }
   }

@@ -355,7 +355,7 @@ export type CanvasReviewerSourceType =
   | "announcement"
   | "file";
 
-export type CanvasReviewerFileKind = "pdf" | "image" | "unsupported";
+export type CanvasReviewerFileKind = "pdf" | "image" | "text" | "unsupported";
 
 export type CanvasReviewerFilePreparationStatus =
   | "ready"
@@ -463,6 +463,7 @@ export interface CanvasUsableContentResolutionResponse {
     | "synchronized_announcement_html"
     | "stored_image_ocr"
     | "stored_pdf_ocr"
+    | "stored_plain_text"
     | "module_reference";
   readonly sourceText?: string;
   readonly contentFingerprint?: string;

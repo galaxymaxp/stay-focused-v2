@@ -230,11 +230,13 @@ function fileCandidate(
     expectedUserId: boundary.userId,
     extractFile: async () => {
       if (kind === "unsupported") return { status: "unsupported" };
-      let provider: OcrProvider;
-      try {
-        provider = injectedProvider ?? createServerOcrProvider();
-      } catch {
-        return { status: "failed" };
+      let provider = injectedProvider;
+      if (kind !== "text" && !provider) {
+        try {
+          provider = createServerOcrProvider();
+        } catch {
+          return { status: "failed" };
+        }
       }
       const extraction = await extractPreparedCanvasFileText({
         client,
@@ -271,7 +273,12 @@ function fileCandidate(
         },
       };
     },
-    method: kind === "image" ? "stored_image_ocr" : "stored_pdf_ocr",
+    method:
+      kind === "image"
+        ? "stored_image_ocr"
+        : kind === "text"
+          ? "stored_plain_text"
+          : "stored_pdf_ocr",
     provenance: {
       resourceId: row.id,
       canvasObjectId: row.canvas_file_id,

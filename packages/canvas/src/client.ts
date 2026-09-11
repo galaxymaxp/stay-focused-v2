@@ -223,7 +223,13 @@ export class CanvasClient {
     moduleId: string,
   ): Promise<readonly CanvasModuleItem[]> {
     return this.collectPaginatedItems(
-      `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items?per_page=${DEFAULT_PER_PAGE}`,
+      createPathWithQuery(
+        `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items`,
+        [
+          ["per_page", String(DEFAULT_PER_PAGE)],
+          ["include[]", "content_details"],
+        ],
+      ),
       normalizeModuleItem,
     );
   }
@@ -235,7 +241,13 @@ export class CanvasClient {
   ): Promise<CanvasPaginatedPage<CanvasModuleItem>> {
     return this.requestNormalizedPage(
       cursor ??
-        `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items?per_page=${DEFAULT_PER_PAGE}`,
+        createPathWithQuery(
+          `/courses/${encodeCanvasPathSegment(courseId)}/modules/${encodeCanvasPathSegment(moduleId)}/items`,
+          [
+            ["per_page", String(DEFAULT_PER_PAGE)],
+            ["include[]", "content_details"],
+          ],
+        ),
       normalizeModuleItem,
     );
   }
@@ -295,6 +307,16 @@ export class CanvasClient {
       `/courses/${encodeCanvasPathSegment(courseId)}/assignments?per_page=${DEFAULT_PER_PAGE}`,
       normalizeAssignment,
     );
+  }
+
+  public async getAssignment(
+    courseId: string,
+    assignmentId: string,
+  ): Promise<CanvasAssignment> {
+    const parsed = await this.requestJson(
+      `/courses/${encodeCanvasPathSegment(courseId)}/assignments/${encodeCanvasPathSegment(assignmentId)}`,
+    );
+    return normalizeAssignment(parsed);
   }
 
   public async listAssignmentsPage(
@@ -477,6 +499,13 @@ export class CanvasClient {
   ): Promise<CanvasFile> {
     const parsed = await this.requestJson(
       `/courses/${encodeCanvasPathSegment(courseId)}/files/${encodeCanvasPathSegment(fileId)}`,
+    );
+    return normalizeFile(parsed);
+  }
+
+  public async getFile(fileId: string): Promise<CanvasFile> {
+    const parsed = await this.requestJson(
+      `/files/${encodeCanvasPathSegment(fileId)}`,
     );
     return normalizeFile(parsed);
   }
@@ -1431,6 +1460,7 @@ function normalizeModuleItem(value: unknown): CanvasModuleItem {
     indent: integerOrNull(value.indent),
     type,
     contentId: normalizeId(value.content_id),
+    apiUrl: stringOrNull(value.url),
     pageUrl: stringOrNull(value.page_url),
     externalUrl: stringOrNull(value.external_url),
     htmlUrl: stringOrNull(value.html_url),
@@ -1559,6 +1589,9 @@ function normalizeAssignment(value: unknown): CanvasAssignment {
     assignmentVisible: assignmentVisibleOrNull(value),
     createdAt: stringOrNull(value.created_at),
     updatedAt: stringOrNull(value.updated_at),
+    attachments: Array.isArray(value.attachments)
+      ? value.attachments.map(normalizeFile)
+      : [],
   };
 }
 

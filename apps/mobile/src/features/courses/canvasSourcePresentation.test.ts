@@ -68,6 +68,21 @@ describe("Canvas source selection presentation", () => {
     ).toMatchObject({ action: "retry", selectable: true });
   });
 
+  it("does not present announcements as learner material", () => {
+    const announcement = {
+      ...source("ready", "Course notice", null, null, null),
+      id: "announcement:00000000-0000-4000-8000-000000000009",
+      type: "announcement" as const,
+    };
+    const page = source("ready", "Lesson page", "Module one", 1, 1);
+
+    expect(groupCanvasSourcesForSelection([announcement, page])).toEqual([
+      expect.objectContaining({
+        sources: [expect.objectContaining({ title: "Lesson page", type: "page" })],
+      }),
+    ]);
+  });
+
   it("merges only a continuous, duplicate-free source inventory page", () => {
     const first = sourceListPage([source("ready", "First", null, null, null)], 0, 1, true);
     const next = sourceListPage([source("ready", "Second", null, null, 2)], 1, 1, false);

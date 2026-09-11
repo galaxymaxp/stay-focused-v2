@@ -46,6 +46,7 @@ import {
   isStructuredBlockManifestItem,
   normalizeCanvasHtmlToStructuredBlockDrafts,
   normalizeOcrResultToStructuredBlockDrafts,
+  normalizePlainTextToStructuredBlockDrafts,
   toPublicStructuredBlock,
   type CanvasStructuredBlockManifestItem,
   type CanvasStructuredBlockPublic,
@@ -386,7 +387,10 @@ export async function listCanvasReviewerSources({
     return sources;
   }
 
-  const ordered = sources.value.map((source) => source.descriptor).sort(compareSources);
+  const ordered = sources.value
+    .map((source) => source.descriptor)
+    .filter((source) => source.type !== "announcement")
+    .sort(compareSources);
   const normalizedLimit = normalizeListLimit(limit);
   const normalizedOffset = normalizeListOffset(offset);
   const page = ordered.slice(normalizedOffset, normalizedOffset + normalizedLimit);
@@ -1814,11 +1818,14 @@ async function extractFileStructuredRecord({
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<StructuredSourceRecord>> {
   const descriptor = mapFileSource(file).descriptor;
-  const provider = ocrProvider
-    ? ({ ok: true, value: ocrProvider } as const)
-    : createOcrProviderForCanvasPreview();
-  if (!provider.ok) {
-    return provider;
+  const fileKind = classifyStoredCanvasFileKind(file);
+  let provider = ocrProvider;
+  if (fileKind !== "text" && !provider) {
+    const createdProvider = createOcrProviderForCanvasPreview();
+    if (!createdProvider.ok) {
+      return createdProvider;
+    }
+    provider = createdProvider.value;
   }
 
   const extraction = await resolveStoredFileForReviewer({
@@ -1826,7 +1833,7 @@ async function extractFileStructuredRecord({
     connection,
     course,
     fileRow: file,
-    ocrProvider: provider.value,
+    ocrProvider: provider,
     userId,
   });
   if (!extraction.ok) {
@@ -1838,10 +1845,14 @@ async function extractFileStructuredRecord({
     value: {
       createBlocks: (sourceOrdinal) =>
         finalizeStructuredBlockDrafts({
-          drafts: normalizeOcrResultToStructuredBlockDrafts(
-            extraction.value.ocrResult,
-          ),
-          ocrVersion: CANVAS_OCR_STRUCTURED_BLOCKS_VERSION,
+          drafts: extraction.value.ocrResult
+            ? normalizeOcrResultToStructuredBlockDrafts(
+                extraction.value.ocrResult,
+              )
+            : normalizePlainTextToStructuredBlockDrafts(extraction.value.text),
+          ocrVersion: extraction.value.ocrResult
+            ? CANVAS_OCR_STRUCTURED_BLOCKS_VERSION
+            : null,
           parserVersion: CANVAS_STORED_FILE_EXTRACTION_VERSION,
           sourceOrdinal,
         }),
@@ -1859,7 +1870,9 @@ async function extractFileStructuredRecord({
           extraction: extraction.value,
           row: file,
         }),
-        ocr_version: CANVAS_OCR_STRUCTURED_BLOCKS_VERSION,
+        ocr_version: extraction.value.ocrResult
+          ? CANVAS_OCR_STRUCTURED_BLOCKS_VERSION
+          : null,
       },
     },
   };
@@ -1881,11 +1894,14 @@ async function extractFilePreviewRecord({
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<PreviewSourceRecord>> {
   const descriptor = mapFileSource(file).descriptor;
-  const provider = ocrProvider
-    ? ({ ok: true, value: ocrProvider } as const)
-    : createOcrProviderForCanvasPreview();
-  if (!provider.ok) {
-    return provider;
+  const fileKind = classifyStoredCanvasFileKind(file);
+  let provider = ocrProvider;
+  if (fileKind !== "text" && !provider) {
+    const createdProvider = createOcrProviderForCanvasPreview();
+    if (!createdProvider.ok) {
+      return createdProvider;
+    }
+    provider = createdProvider.value;
   }
 
   const extraction = await resolveStoredFileForReviewer({
@@ -1893,7 +1909,7 @@ async function extractFilePreviewRecord({
     connection,
     course,
     fileRow: file,
-    ocrProvider: provider.value,
+    ocrProvider: provider,
     userId,
   });
   if (!extraction.ok) {
@@ -1933,7 +1949,7 @@ async function resolveStoredFileForReviewer({
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourseRow;
   readonly fileRow: CanvasFileRow;
-  readonly ocrProvider: OcrProvider;
+  readonly ocrProvider?: OcrProvider;
   readonly userId: string;
 }): Promise<CanvasStoredFileExtractionResult> {
   const holder: { extraction?: CanvasStoredFileExtractionResult } = {};
@@ -1960,7 +1976,8 @@ async function resolveStoredFileForReviewer({
         return {
           status:
             code === "canvas_source_image_ocr_empty" ||
-            code === "canvas_source_pdf_ocr_empty"
+            code === "canvas_source_pdf_ocr_empty" ||
+            code === "canvas_source_ocr_empty"
               ? "empty"
               : code === "canvas_source_not_found"
                 ? "inaccessible"
@@ -1982,7 +1999,7 @@ async function resolveStoredFileForReviewer({
         },
       };
     },
-    method: fileKind === "image" ? "stored_image_ocr" : "stored_pdf_ocr",
+    method: methodForStoredFileKind(fileKind),
     provenance: {
       resourceId: fileRow.id,
       canvasObjectId: fileRow.canvas_file_id,
@@ -2008,7 +2025,9 @@ async function resolveStoredFileForReviewer({
           ? "canvas_source_not_found"
           : fileKind === "image"
             ? "canvas_source_image_ocr_empty"
-            : "canvas_source_pdf_ocr_empty",
+            : fileKind === "pdf"
+              ? "canvas_source_pdf_ocr_empty"
+              : "canvas_source_ocr_empty",
       message: "The prepared Canvas file does not contain usable text.",
     };
   }
@@ -2019,7 +2038,9 @@ async function resolveStoredFileForReviewer({
       code:
         fileKind === "image"
           ? "canvas_source_image_ocr_empty"
-          : "canvas_source_pdf_ocr_empty",
+          : fileKind === "pdf"
+            ? "canvas_source_pdf_ocr_empty"
+            : "canvas_source_ocr_empty",
       message: "The prepared Canvas file does not contain usable text.",
     };
   }
@@ -2360,14 +2381,16 @@ function createFileSourceProvenance({
     canvas_updated_at: row.canvas_modified_at ?? row.canvas_updated_at,
     course_id: row.course_id,
     file_id: row.canvas_file_id,
-    file_kind: extraction.fileKind,
+    file_kind: extraction.fileKind === "text" ? null : extraction.fileKind,
     local_synced_at: row.last_synced_at,
     mime_type: mimeType,
     module_id: null,
     module_item_id: null,
     normalized_content_sha256: sha256Utf8Hex(extraction.text),
     ocr_version:
-      extraction.fileKind === "pdf"
+      extraction.fileKind === "text"
+        ? null
+        : extraction.fileKind === "pdf"
         ? CANVAS_STORED_PDF_OCR_VERSION
         : CANVAS_STORED_IMAGE_OCR_VERSION,
     page_count:
@@ -2545,7 +2568,15 @@ function isDeclaredByteCountWithinKindLimit(
 function fileEligibilityForKind(
   kind: Exclude<CanvasStoredFileKind, "unsupported">,
 ): "eligible_document" | "eligible_image" {
-  return kind === "pdf" ? "eligible_document" : "eligible_image";
+  return kind === "image" ? "eligible_image" : "eligible_document";
+}
+
+function methodForStoredFileKind(
+  kind: CanvasStoredFileKind,
+): CanvasUsableContentMethod {
+  if (kind === "image") return "stored_image_ocr";
+  if (kind === "text") return "stored_plain_text";
+  return "stored_pdf_ocr";
 }
 
 function isSupportedFileForSourcePreparation(file: CanvasFileRow): boolean {

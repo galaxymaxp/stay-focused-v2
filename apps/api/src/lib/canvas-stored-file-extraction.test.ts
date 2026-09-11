@@ -116,6 +116,27 @@ describe("Canvas stored file extraction", () => {
     });
   });
 
+  it("extracts a ready UTF-8 text file without configuring OCR", async () => {
+    const bytes = new TextEncoder().encode("Fictional study notes.\n\nSecond section.");
+    const file = makeReadyFile({
+      bytes,
+      contentType: "text/plain",
+      displayName: "Fictional notes.txt",
+      filename: "fictional-notes.txt",
+    });
+    const storage = createStorageClient([[file.storage_object_key ?? "", bytes]]);
+
+    const result = await extract(file, storage.client);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        fileKind: "text",
+        text: "Fictional study notes.\n\nSecond section.",
+      },
+    });
+  });
+
   it("preserves requested PDF page order for multi-page OCR", async () => {
     const bytes = await makePdfBytes(3);
     const file = makeReadyFile({
@@ -349,7 +370,7 @@ describe("Canvas stored file extraction", () => {
 function extract(
   fileRow: CanvasFileRow,
   client: SupabaseClient<Database>,
-  ocrProvider: OcrProvider,
+  ocrProvider?: OcrProvider,
 ) {
   return extractPreparedCanvasFileText({
     client,
@@ -489,7 +510,9 @@ function makeReadyFile({
     hidden_for_user: false,
     id: FILE_ID,
     ingestion_eligibility:
-      contentType === "application/pdf" ? "eligible_document" : "eligible_image",
+      contentType === "application/pdf" || contentType.startsWith("text/")
+        ? "eligible_document"
+        : "eligible_image",
     ingestion_status: "stored",
     last_successful_ingestion_at: NOW,
     last_successful_inventory_at: NOW,

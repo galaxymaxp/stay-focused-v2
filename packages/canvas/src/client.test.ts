@@ -338,6 +338,7 @@ describe("CanvasClient", () => {
         indent: null,
         type: "Page",
         contentId: null,
+        apiUrl: null,
         pageUrl: null,
         externalUrl: null,
         htmlUrl: null,
@@ -353,6 +354,7 @@ describe("CanvasClient", () => {
         indent: 1,
         type: "ExternalTool",
         contentId: "99",
+        apiUrl: null,
         pageUrl: "week-one",
         externalUrl: "https://tool.example.invalid/launch",
         htmlUrl: "https://canvas.test/courses/1/modules/items/2",
@@ -363,7 +365,7 @@ describe("CanvasClient", () => {
       },
     ]);
     expect(fetchImpl.mock.calls[0]?.[0]).toBe(
-      "https://canvas.test/api/v1/courses/course%201/modules/module%2F1/items?per_page=50",
+      "https://canvas.test/api/v1/courses/course%201/modules/module%2F1/items?per_page=50&include%5B%5D=content_details",
     );
   });
 
@@ -481,6 +483,40 @@ describe("CanvasClient", () => {
         discussionTopicId: null,
       },
     ]);
+  });
+
+  it("resolves one module-linked assignment and normalizes typed attachments", async () => {
+    const fetchImpl = createFetch([
+      jsonResponse({
+        id: 51,
+        name: "Read the reference",
+        description: "<p>Study the attached reference.</p>",
+        attachments: [
+          {
+            id: 91,
+            display_name: "Reference.pdf",
+            filename: "reference.pdf",
+            content_type: "application/pdf",
+            url: "https://canvas.test/files/91/download",
+          },
+        ],
+      }),
+    ]);
+    const client = createClient(fetchImpl);
+
+    await expect(client.getAssignment("course/7", "assignment/51")).resolves.toMatchObject({
+      id: "51",
+      attachments: [
+        {
+          id: "91",
+          contentType: "application/pdf",
+          filename: "reference.pdf",
+        },
+      ],
+    });
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe(
+      "https://canvas.test/api/v1/courses/course%2F7/assignments/assignment%2F51",
+    );
   });
 
   it("lists Phase 5E course assignments with safe grade metadata", async () => {
@@ -1238,6 +1274,16 @@ describe("CanvasClient", () => {
         url: "https://canvas.test/files/10/download",
         hidden_for_user: false,
       }),
+      jsonResponse({
+        id: 10,
+        display_name: "Lecture Notes.pdf",
+        filename: "lecture-notes.pdf",
+        content_type: "application/pdf",
+        size: 1024,
+        folder_id: 2,
+        url: "https://canvas.test/files/10/download",
+        hidden_for_user: false,
+      }),
     ]);
     const client = createClient(fetchImpl, "file-token");
 
@@ -1268,12 +1314,19 @@ describe("CanvasClient", () => {
       contentType: "application/pdf",
       downloadUrl: "https://canvas.test/files/10/download",
     });
+    await expect(client.getFile("10")).resolves.toMatchObject({
+      id: "10",
+      contentType: "application/pdf",
+    });
 
     expect(fetchImpl.mock.calls[0]?.[0]).toBe(
       "https://canvas.test/api/v1/courses/course%2F7/files?per_page=50",
     );
     expect(fetchImpl.mock.calls[1]?.[0]).toBe(
       "https://canvas.test/api/v1/courses/course%2F7/files/10",
+    );
+    expect(fetchImpl.mock.calls[2]?.[0]).toBe(
+      "https://canvas.test/api/v1/files/10",
     );
     expect(fetchImpl.mock.calls[0]?.[1]).toMatchObject({
       headers: { Authorization: "Bearer file-token" },

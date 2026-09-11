@@ -30,13 +30,13 @@ import {
 } from "@/lib/ocr/upload-policy";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
-export type CanvasStoredFileKind = "pdf" | "image" | "unsupported";
+export type CanvasStoredFileKind = "pdf" | "image" | "text" | "unsupported";
 
 export interface CanvasStoredFileExtraction {
   readonly text: string;
   readonly fileKind: Exclude<CanvasStoredFileKind, "unsupported">;
   readonly pageCount?: number;
-  readonly ocrResult: OcrResult;
+  readonly ocrResult?: OcrResult;
 }
 
 export type CanvasStoredFileExtractionResult =
@@ -57,6 +57,13 @@ export function classifyStoredCanvasFileKind(
   }
   if (contentType === "image/png" || contentType === "image/jpeg") {
     return "image";
+  }
+  if (
+    contentType === "text/plain" ||
+    contentType === "text/markdown" ||
+    contentType === "text/x-markdown"
+  ) {
+    return "text";
   }
   return "unsupported";
 }
@@ -90,7 +97,7 @@ export async function extractPreparedCanvasFileText({
   readonly connectionId: string;
   readonly courseId: string;
   readonly fileRow: CanvasFileRow;
-  readonly ocrProvider: OcrProvider;
+  readonly ocrProvider?: OcrProvider;
   readonly userId: string;
 }): Promise<CanvasStoredFileExtractionResult> {
   const ownership = validateOwnedFileRow({
@@ -179,9 +186,36 @@ export async function extractPreparedCanvasFileText({
     return corruptStoredFile();
   }
 
+  if (fileKind === "text") {
+    return extractPlainText(bytes);
+  }
+  if (!ocrProvider) {
+    return mapOcrFailure("ocr_not_configured");
+  }
   return fileKind === "pdf"
     ? extractPdf({ bytes, contentType, fileRow, ocrProvider })
     : extractImage({ bytes, contentType, fileRow, ocrProvider });
+}
+
+function extractPlainText(bytes: Uint8Array): CanvasStoredFileExtractionResult {
+  let decoded: string;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return corruptStoredFile();
+  }
+
+  const text = sanitizeExtractedText(decoded);
+  if (!text) {
+    return {
+      ok: false,
+      status: 422,
+      code: "canvas_source_ocr_empty",
+      message: "The prepared Canvas text file does not contain usable text.",
+    };
+  }
+
+  return { ok: true, value: { fileKind: "text", text } };
 }
 
 async function extractImage({
@@ -451,7 +485,7 @@ function isActualByteCountAllowed(
 function fileEligibilityForKind(
   fileKind: Exclude<CanvasStoredFileKind, "unsupported">,
 ): "eligible_document" | "eligible_image" {
-  return fileKind === "pdf" ? "eligible_document" : "eligible_image";
+  return fileKind === "image" ? "eligible_image" : "eligible_document";
 }
 
 function mapOcrFailure(

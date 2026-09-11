@@ -26,6 +26,7 @@ export type CanvasUsableContentMethod =
   | "synchronized_announcement_html"
   | "stored_image_ocr"
   | "stored_pdf_ocr"
+  | "stored_plain_text"
   | "module_reference";
 
 export interface CanvasUsableContentProvenance {
@@ -115,7 +116,8 @@ export async function resolveCanvasUsableContent(
   if (candidate.sourceKind === "file") {
     if (
       (candidate.method !== "stored_image_ocr" &&
-        candidate.method !== "stored_pdf_ocr") ||
+        candidate.method !== "stored_pdf_ocr" &&
+        candidate.method !== "stored_plain_text") ||
       !candidate.extractFile
     ) {
       return terminal(candidate, "unsupported");

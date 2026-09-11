@@ -273,12 +273,17 @@ class StagedCanvasProvider implements CanvasCourseSyncProvider {
     _courseId: string,
     pageUrl: string,
   ): Promise<CanvasPageDetail> {
-    this.throwIfFailed(["page_detail", "page_detail_reuse"], pageUrl);
     const details = this.itemPayloads<CanvasPageDetail>([
+      "module_page_detail",
       "page_detail",
       "page_detail_reuse",
     ]);
     const detail = details.find((item) => item.url === pageUrl);
+    if (detail) return detail;
+    this.throwIfFailed(
+      ["module_page_detail", "page_detail", "page_detail_reuse"],
+      pageUrl,
+    );
     if (!detail) {
       throw new CanvasClientError(
         "canvas_not_found",
@@ -296,12 +301,58 @@ class StagedCanvasProvider implements CanvasCourseSyncProvider {
     return this.pageItems<CanvasAssignment>("assignments_page");
   }
 
+  public async getAssignment(
+    _courseId: string,
+    assignmentId: string,
+  ): Promise<CanvasAssignment> {
+    const assignments = this.itemPayloads<CanvasAssignment>([
+      "module_assignment",
+    ]);
+    const assignment = assignments.find((item) => item.id === assignmentId);
+    if (assignment) return assignment;
+    const collectionAssignment = this.staging
+      .filter(
+        (row) =>
+          this.unitById.get(row.unit_id)?.unit_kind === "assignments_page",
+      )
+      .flatMap((row) => readArray(readRecord(row.payload).items))
+      .find((item) => readString(readRecord(item).id) === assignmentId);
+    if (collectionAssignment) return collectionAssignment as unknown as CanvasAssignment;
+    this.throwIfFailed(["module_assignment"], assignmentId);
+    throw new CanvasClientError(
+      "canvas_not_found",
+      "Canvas assignment was unavailable.",
+    );
+  }
+
   public async listAnnouncements(): Promise<readonly CanvasAnnouncement[]> {
     return this.pageItems<CanvasAnnouncement>("announcements_page");
   }
 
   public async listCourseFiles(): Promise<readonly CanvasFile[]> {
     return this.pageItems<CanvasFile>("files_page");
+  }
+
+  public async getCourseFile(
+    _courseId: string,
+    fileId: string,
+  ): Promise<CanvasFile> {
+    return this.getFile(fileId);
+  }
+
+  public async getFile(fileId: string): Promise<CanvasFile> {
+    const files = this.itemPayloads<CanvasFile>(["module_file"]);
+    const file = files.find((item) => item.id === fileId);
+    if (file) return file;
+    const collectionFile = this.staging
+      .filter(
+        (row) => this.unitById.get(row.unit_id)?.unit_kind === "files_page",
+      )
+      .flatMap((row) => readArray(readRecord(row.payload).items))
+      .find((item) => readString(readRecord(item).id) === fileId);
+    if (collectionFile) return collectionFile as unknown as CanvasFile;
+    this.throwIfFailed(["module_file"], fileId);
+    throw new CanvasClientError("canvas_not_found", "Canvas file was unavailable.");
   }
 
   public async listCourseAssignments(): Promise<readonly CanvasGradeAssignment[]> {
@@ -367,7 +418,9 @@ class StagedCanvasProvider implements CanvasCourseSyncProvider {
       const checkpoint = readRecord(unit.checkpoint);
       return (
         readString(checkpoint.parentSourceId) === sourceId ||
-        readString(checkpoint.pageUrl) === sourceId
+        readString(checkpoint.pageUrl) === sourceId ||
+        readString(checkpoint.assignmentId) === sourceId ||
+        readString(checkpoint.fileId) === sourceId
       );
     });
     if (!failed) return;
@@ -452,14 +505,25 @@ function healthItemsForFailedUnit(
   if (
     unit.status !== "failed" ||
     (unit.unit_kind !== "page_detail" &&
-      unit.unit_kind !== "page_detail_reuse")
+      unit.unit_kind !== "page_detail_reuse" &&
+      unit.unit_kind !== "module_page_detail" &&
+      unit.unit_kind !== "module_assignment" &&
+      unit.unit_kind !== "module_file")
   ) {
     return [];
   }
   const checkpoint = readRecord(unit.checkpoint);
   const summary = readRecord(checkpoint.pageSummary ?? {});
-  const pageUrl = readString(checkpoint.pageUrl) ?? readString(summary.url);
-  if (!pageUrl) return [];
+  const source =
+    unit.unit_kind === "module_assignment"
+      ? { id: readString(checkpoint.assignmentId), kind: "assignment" }
+      : unit.unit_kind === "module_file"
+        ? { id: readString(checkpoint.fileId), kind: "file" }
+        : {
+            id: readString(checkpoint.pageUrl) ?? readString(summary.url),
+            kind: "page",
+          };
+  if (!source.id) return [];
   const itemState: CanvasSyncItemState =
     unit.safe_error_code === "canvas_permission_denied"
       ? "permission_denied"
@@ -467,11 +531,11 @@ function healthItemsForFailedUnit(
         ? "temporarily_failed"
         : "stale";
   return [{
-    itemKeyHash: canvasSyncItemKeyHash("content", "page", pageUrl),
-    itemKind: "page",
+    itemKeyHash: canvasSyncItemKeyHash(unit.scope, source.kind, source.id),
+    itemKind: source.kind,
     itemState,
     safeErrorCode: unit.safe_error_code,
-    scope: "content",
+    scope: unit.scope,
     sourceFingerprint: fingerprintCanvasSyncItem(summary),
     sourceUpdatedAt: readString(summary.updatedAt),
   }];
@@ -484,7 +548,10 @@ function healthItemsForStaging(
   if (unit.unit_kind === "pages_page") return [];
   const payload = readRecord(staging.payload);
   const items = unit.unit_kind === "page_detail" ||
-      unit.unit_kind === "page_detail_reuse"
+      unit.unit_kind === "page_detail_reuse" ||
+      unit.unit_kind === "module_page_detail" ||
+      unit.unit_kind === "module_assignment" ||
+      unit.unit_kind === "module_file"
     ? [payload.item].filter((item): item is Json => item !== undefined)
     : readArray(payload.items);
   return items.flatMap((item) => {
@@ -529,14 +596,17 @@ function readItemIdentity(
       return identity("module_item", item.id);
     case "page_detail":
     case "page_detail_reuse":
+    case "module_page_detail":
       return identity("page", item.url);
     case "assignment_groups_page":
       return identity("assignment_group", item.id);
     case "assignments_page":
+    case "module_assignment":
       return identity("assignment", item.id);
     case "announcements_page":
       return identity("announcement", item.id);
     case "files_page":
+    case "module_file":
       return identity("file", item.id);
     case "grade_assignments_page":
       return identity("grade_assignment", item.canvasAssignmentId);

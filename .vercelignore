@@ -2,5 +2,7 @@
 **/dist
 **/node_modules
 .git
+.local
 .turbo
 coverage
+tmp

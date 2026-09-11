@@ -1248,7 +1248,7 @@ export function CanvasSourceReviewerScreen({
             />
           ) : sourceList && sourceList.sources.length === 0 ? (
             <StatusCard
-              message="No synchronized pages, assignment descriptions, announcements, images, or PDFs are available yet."
+              message="No synchronized pages, assignment study text, images, or PDFs are available yet."
               testID="canvas-sources-empty"
               title="No course content found"
             />

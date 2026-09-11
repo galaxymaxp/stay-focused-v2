@@ -74,6 +74,7 @@ export interface CanvasModuleItem {
   readonly indent: number | null;
   readonly type: string;
   readonly contentId: string | null;
+  readonly apiUrl?: string | null;
   readonly pageUrl: string | null;
   readonly externalUrl: string | null;
   readonly htmlUrl: string | null;
@@ -136,6 +137,7 @@ export interface CanvasAssignment {
   readonly assignmentVisible?: boolean | null;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
+  readonly attachments?: readonly CanvasFile[];
 }
 
 export interface CanvasRawAssignmentResponse {

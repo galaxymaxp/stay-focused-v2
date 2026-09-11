@@ -281,12 +281,55 @@ async function runUnit({
         parentSourceId,
         cursor,
       );
-      return pageResult(
+      const resourceUnits = page.items.flatMap((item) => {
+        if (item.type === "Page" && item.pageUrl) {
+          return [
+            createCanvasSyncUnit("module_page_detail", "content", 0, false, {
+              moduleId: parentSourceId,
+              moduleItemId: item.id,
+              pageUrl: item.pageUrl,
+            }),
+          ];
+        }
+        if (item.type === "Assignment" && item.contentId) {
+          return [
+            createCanvasSyncUnit("module_assignment", "content", 0, false, {
+              assignmentId: item.contentId,
+              moduleId: parentSourceId,
+              moduleItemId: item.id,
+            }),
+          ];
+        }
+        if (item.type === "File" && item.contentId) {
+          return [
+            createCanvasSyncUnit("module_file", "files", 0, false, {
+              fileId: item.contentId,
+              moduleId: parentSourceId,
+              moduleItemId: item.id,
+            }),
+          ];
+        }
+        return [];
+      });
+      return pageResult(unit, page.items, [
+        ...next(page.nextCursor, { parentSourceId }),
+        ...resourceUnits,
+      ], { parentSourceId });
+    }
+    case "module_page_detail": {
+      const pageUrl = requireCheckpointString(checkpoint, "pageUrl");
+      return itemResult(unit, await canvas.getPage(courseCanvasId, pageUrl));
+    }
+    case "module_assignment": {
+      const assignmentId = requireCheckpointString(checkpoint, "assignmentId");
+      return itemResult(
         unit,
-        page.items,
-        next(page.nextCursor, { parentSourceId }),
-        { parentSourceId },
+        await canvas.getAssignment(courseCanvasId, assignmentId),
       );
+    }
+    case "module_file": {
+      const fileId = requireCheckpointString(checkpoint, "fileId");
+      return itemResult(unit, await canvas.getFile(fileId));
     }
     case "pages_page": {
       const page = await canvas.listPagesPage(courseCanvasId, cursor);
@@ -393,9 +436,9 @@ function pageResult<TItem>(
   };
 }
 
-function itemResult(
+function itemResult<TItem>(
   unit: CanvasSyncJobUnitRow,
-  item: CanvasPageDetail,
+  item: TItem,
 ): UnitRunResult {
   return {
     payloadKind: unit.unit_kind,

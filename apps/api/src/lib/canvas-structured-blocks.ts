@@ -153,6 +153,12 @@ export function normalizeOcrResultToStructuredBlockDrafts(
   return cleanDraftBlocks(drafts);
 }
 
+export function normalizePlainTextToStructuredBlockDrafts(
+  text: string,
+): readonly CanvasStructuredBlockDraft[] {
+  return cleanDraftBlocks([{ kind: "paragraph", text }]);
+}
+
 export function finalizeStructuredBlockDrafts({
   drafts,
   ocrVersion,

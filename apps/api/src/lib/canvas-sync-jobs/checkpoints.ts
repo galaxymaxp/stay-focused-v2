@@ -29,6 +29,9 @@ export const CANVAS_SYNC_MAX_RETRY_AFTER_MS = 5 * 60_000;
 export type CanvasSyncUnitKind =
   | "modules_page"
   | "module_items_page"
+  | "module_page_detail"
+  | "module_assignment"
+  | "module_file"
   | "pages_page"
   | "page_detail"
   | "page_detail_reuse"

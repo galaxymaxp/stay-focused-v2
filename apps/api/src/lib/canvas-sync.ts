@@ -116,6 +116,9 @@ export type CanvasCourseSyncProvider = Pick<
   | "listModuleItems"
   | "listPages"
   | "getPage"
+  | "getAssignment"
+  | "getFile"
+  | "getCourseFile"
   | "listAssignmentGroups"
   | "listAssignments"
   | "listAnnouncements"
@@ -209,12 +212,16 @@ interface CourseSnapshot {
   readonly pages: readonly CanvasPageDetail[];
   readonly assignmentGroups: readonly CanvasAssignmentGroup[];
   readonly assignments: readonly CanvasAssignment[];
+  readonly moduleFiles: readonly CanvasFile[];
 }
 
 interface CourseSnapshotResult {
   readonly snapshot: CourseSnapshot;
   readonly retryCount: number;
   readonly recoveredByRetry: boolean;
+  readonly nonFatalFailureCodes: readonly CanvasSyncFailureCode[];
+  readonly pagesCollectionComplete: boolean;
+  readonly assignmentsCollectionComplete: boolean;
 }
 
 interface CanvasOperationResult<TValue> {
@@ -321,6 +328,7 @@ interface CourseSyncSuccess {
     | CanvasCourseAcademicSnapshotWithSyncStateResult
     | null;
   readonly snapshot: CourseSnapshot;
+  readonly nonFatalFailureCodes: readonly CanvasSyncFailureCode[];
 }
 
 interface CourseSyncFailure {
@@ -600,6 +608,9 @@ export async function syncCanvasAcademicGraph({
         }
         totals.succeeded = totals.changed + totals.unchanged;
         resourceCounts = addResourceCounts(resourceCounts, result.counts);
+        for (const failureCode of result.nonFatalFailureCodes) {
+          failures.set(failureCode, (failures.get(failureCode) ?? 0) + 1);
+        }
       } else {
         totals.failed += 1;
         failures.set(result.code, (failures.get(result.code) ?? 0) + 1);
@@ -707,13 +718,17 @@ export async function syncCanvasAcademicGraph({
     userId,
   }).catch(() => undefined);
 
-  const status = statusForScopes({
+  const scopeStatus = statusForScopes({
     announcements,
     files,
     plannerItems,
     totals,
   });
   const failureSummaries = summarizeFailures(failures);
+  const status =
+    scopeStatus === "succeeded" && failureSummaries.length > 0
+      ? "partial"
+      : scopeStatus;
   const summary = createSummary({
     announcements,
     failures: failureSummaries,
@@ -878,6 +893,9 @@ export async function syncSelectedCanvasCourse({
     }
     totals.succeeded = 1;
     resourceCounts = addResourceCounts(resourceCounts, coreResult.counts);
+    for (const failureCode of coreResult.nonFatalFailureCodes) {
+      failures.set(failureCode, (failures.get(failureCode) ?? 0) + 1);
+    }
   } else {
     totals.failed = 1;
     failures.set(coreResult.code, 1);
@@ -1018,6 +1036,14 @@ async function syncOneCourse({
       limiters,
       retryPolicy,
     );
+    snapshotResult = await preserveIncompleteCourseCollections({
+      assignmentsCollectionComplete: snapshotResult.assignmentsCollectionComplete,
+      client,
+      connectionId: connection.id,
+      pagesCollectionComplete: snapshotResult.pagesCollectionComplete,
+      snapshotResult,
+      userId,
+    });
   } catch (error) {
     const diagnostics = createCourseFailureDiagnostics({
       courseFingerprint,
@@ -1207,6 +1233,7 @@ async function syncOneCourse({
         diagnostics,
         persistence: null,
         snapshot: snapshotResult.snapshot,
+        nonFatalFailureCodes: snapshotResult.nonFatalFailureCodes,
       };
     }
   }
@@ -1282,6 +1309,7 @@ async function syncOneCourse({
     diagnostics,
     persistence: persistence.row,
     snapshot: snapshotResult.snapshot,
+    nonFatalFailureCodes: snapshotResult.nonFatalFailureCodes,
   };
 }
 
@@ -1291,32 +1319,12 @@ async function fetchCourseSnapshot(
   limiters: CanvasSyncLimiters,
   retryPolicy: CanvasSyncRetryPolicy,
 ): Promise<CourseSnapshotResult> {
-  const [modules, pages, assignmentGroups, assignments] = await Promise.all([
-    runCanvasOperation({
-      action: () => canvas.listModules(course.id),
-      failureCode: "canvas_course_modules_failed",
-      operation: "modules",
-      retryPolicy,
-    }),
-    runCanvasOperation({
-      action: () => canvas.listPages(course.id),
-      failureCode: "canvas_course_pages_failed",
-      operation: "pages",
-      retryPolicy,
-    }),
-    runCanvasOperation({
-      action: () => canvas.listAssignmentGroups(course.id),
-      failureCode: "canvas_course_assignment_groups_failed",
-      operation: "assignment_groups",
-      retryPolicy,
-    }),
-    runCanvasOperation({
-      action: () => canvas.listAssignments(course.id),
-      failureCode: "canvas_course_assignments_failed",
-      operation: "assignments",
-      retryPolicy,
-    }),
-  ]);
+  const modules = await runCanvasOperation({
+    action: () => canvas.listModules(course.id),
+    failureCode: "canvas_course_modules_failed",
+    operation: "modules",
+    retryPolicy,
+  });
 
   const moduleItemResults = await mapWithConcurrency(
     modules.value,
@@ -1341,12 +1349,95 @@ async function fetchCourseSnapshot(
     },
   );
 
+  const [pageCollection, assignmentGroups, assignmentCollection] = await Promise.all([
+    attemptCanvasOperation({
+      action: () => canvas.listPages(course.id),
+      failureCode: "canvas_course_pages_failed",
+      operation: "pages",
+      retryPolicy,
+    }),
+    runCanvasOperation({
+      action: () => canvas.listAssignmentGroups(course.id),
+      failureCode: "canvas_course_assignment_groups_failed",
+      operation: "assignment_groups",
+      retryPolicy,
+    }),
+    attemptCanvasOperation({
+      action: () => canvas.listAssignments(course.id),
+      failureCode: "canvas_course_assignments_failed",
+      operation: "assignments",
+      retryPolicy,
+    }),
+  ]);
+
+  const moduleItems = moduleItemResults.flatMap((result) => result.value.items);
+  const modulePageUrls = uniqueNonBlank(
+    moduleItems
+      .filter((item) => item.type === "Page")
+      .map((item) => item.pageUrl),
+  );
+  const moduleAssignmentIds = uniqueNonBlank(
+    moduleItems
+      .filter((item) => item.type === "Assignment")
+      .map((item) => item.contentId),
+  );
+  const moduleFileIds = uniqueNonBlank(
+    moduleItems
+      .filter((item) => item.type === "File")
+      .map((item) => item.contentId),
+  );
+
+  const [modulePageAttempts, moduleAssignmentAttempts, moduleFileAttempts] =
+    await Promise.all([
+      mapWithConcurrency(modulePageUrls, PAGE_DETAIL_CONCURRENCY_LIMIT, (pageUrl) =>
+        limiters.pageDetails.run(() =>
+          attemptCanvasOperation({
+            action: () => canvas.getPage(course.id, pageUrl),
+            failureCode: "canvas_course_page_detail_failed",
+            operation: "page_detail",
+            retryPolicy,
+          }),
+        ),
+      ),
+      mapWithConcurrency(
+        moduleAssignmentIds,
+        PAGE_DETAIL_CONCURRENCY_LIMIT,
+        (assignmentId) =>
+          limiters.pageDetails.run(() =>
+            attemptCanvasOperation({
+              action: () => canvas.getAssignment(course.id, assignmentId),
+              failureCode: "canvas_course_assignments_failed",
+              operation: "assignments",
+              retryPolicy,
+            }),
+          ),
+      ),
+      mapWithConcurrency(moduleFileIds, PAGE_DETAIL_CONCURRENCY_LIMIT, (fileId) =>
+        limiters.pageDetails.run(() =>
+          attemptCanvasOperation({
+            action: () => canvas.getFile(fileId),
+            failureCode: "canvas_course_files_failed",
+            operation: "unknown",
+            retryPolicy,
+          }),
+        ),
+      ),
+    ]);
+
+  const modulePages = successfulAttemptValues(modulePageAttempts);
+  const moduleAssignments = successfulAttemptValues(moduleAssignmentAttempts);
+  const moduleFiles = successfulAttemptValues(moduleFileAttempts);
+  const resolvedPageUrls = new Set(modulePages.map((page) => page.url));
+  const remainingPageSummaries = pageCollection.ok
+    ? pageCollection.result.value.filter((page) => !resolvedPageUrls.has(page.url))
+    : [];
+
   const pageDetails = await mapWithConcurrency(
-    pages.value,
+    remainingPageSummaries,
     PAGE_DETAIL_CONCURRENCY_LIMIT,
     (page) =>
       limiters.pageDetails.run(() =>
-        runCanvasOperation({
+        attemptCanvasOperation({
           action: () => canvas.getPage(course.id, page.url),
           failureCode: "canvas_course_page_detail_failed",
           operation: "page_detail",
@@ -1355,30 +1446,242 @@ async function fetchCourseSnapshot(
       ),
   );
 
-  const operationResults: readonly CanvasOperationResult<unknown>[] = [
+  const requiredOperationResults: readonly CanvasOperationResult<unknown>[] = [
     modules,
-    pages,
     assignmentGroups,
-    assignments,
     ...moduleItemResults,
+  ];
+  const optionalAttempts: readonly CanvasOperationAttempt<unknown>[] = [
+    pageCollection,
+    assignmentCollection,
+    ...modulePageAttempts,
+    ...moduleAssignmentAttempts,
+    ...moduleFileAttempts,
     ...pageDetails,
   ];
+  const collectionAndDetailAttempts: readonly CanvasOperationAttempt<unknown>[] = [
+    pageCollection,
+    assignmentCollection,
+    ...pageDetails,
+  ];
+  const nonFatalFailureCodes = [
+    ...new Set(
+      collectionAndDetailAttempts.flatMap((attempt) =>
+        attempt.ok ? [] : [attempt.failureCode],
+      ),
+    ),
+  ];
+  const retryCount =
+    requiredOperationResults.reduce((sum, result) => sum + result.retryCount, 0) +
+    optionalAttempts.reduce((sum, attempt) => sum + attempt.retryCount, 0);
 
   return {
-    recoveredByRetry: operationResults.some((result) => result.recoveredByRetry),
-    retryCount: operationResults.reduce(
-      (sum, result) => sum + result.retryCount,
-      0,
-    ),
+    assignmentsCollectionComplete: assignmentCollection.ok,
+    nonFatalFailureCodes,
+    pagesCollectionComplete:
+      pageCollection.ok && pageDetails.every((attempt) => attempt.ok),
+    recoveredByRetry:
+      requiredOperationResults.some((result) => result.recoveredByRetry) ||
+      optionalAttempts.some((attempt) => attempt.ok && attempt.result.recoveredByRetry),
+    retryCount,
     snapshot: {
       assignmentGroups: assignmentGroups.value,
-      assignments: assignments.value,
+      assignments: dedupeCanvasResources(
+        [
+          ...moduleAssignments,
+          ...(assignmentCollection.ok ? assignmentCollection.result.value : []),
+        ],
+        (assignment) => assignment.id,
+      ),
       course,
+      moduleFiles: dedupeCanvasResources(moduleFiles, (file) => file.id),
       moduleItemsByModule: moduleItemResults.map((result) => result.value),
       modules: modules.value,
-      pages: pageDetails.map((result) => result.value),
+      pages: dedupeCanvasResources(
+        [...modulePages, ...successfulAttemptValues(pageDetails)],
+        (page) => page.url,
+      ),
     },
   };
+}
+
+type CanvasOperationAttempt<TValue> =
+  | {
+      readonly ok: true;
+      readonly result: CanvasOperationResult<TValue>;
+      readonly retryCount: number;
+    }
+  | {
+      readonly ok: false;
+      readonly failureCode: CanvasSyncFailureCode;
+      readonly retryCount: number;
+    };
+
+async function attemptCanvasOperation<TValue>(
+  input: Parameters<typeof runCanvasOperation<TValue>>[0],
+): Promise<CanvasOperationAttempt<TValue>> {
+  try {
+    const result = await runCanvasOperation(input);
+    return { ok: true, result, retryCount: result.retryCount };
+  } catch (error) {
+    if (error instanceof CanvasCourseOperationError) {
+      return {
+        ok: false,
+        failureCode: error.failureCode,
+        retryCount: error.retryCount,
+      };
+    }
+    return { ok: false, failureCode: input.failureCode, retryCount: 0 };
+  }
+}
+
+function successfulAttemptValues<TValue>(
+  attempts: readonly CanvasOperationAttempt<TValue>[],
+): readonly TValue[] {
+  return attempts.flatMap((attempt) =>
+    attempt.ok ? [attempt.result.value] : [],
+  );
+}
+
+function uniqueNonBlank(
+  values: readonly (string | null | undefined)[],
+): readonly string[] {
+  return [...new Set(values.map((value) => value?.trim()).filter(isNonBlankString))];
+}
+
+function isNonBlankString(value: string | undefined): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function dedupeCanvasResources<TValue>(
+  values: readonly TValue[],
+  identity: (value: TValue) => string,
+): readonly TValue[] {
+  const byIdentity = new Map<string, TValue>();
+  for (const value of values) {
+    byIdentity.set(identity(value), value);
+  }
+  return [...byIdentity.values()];
+}
+
+async function preserveIncompleteCourseCollections({
+  assignmentsCollectionComplete,
+  client,
+  connectionId,
+  pagesCollectionComplete,
+  snapshotResult,
+  userId,
+}: {
+  readonly assignmentsCollectionComplete: boolean;
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly pagesCollectionComplete: boolean;
+  readonly snapshotResult: CourseSnapshotResult;
+  readonly userId: string;
+}): Promise<CourseSnapshotResult> {
+  if (assignmentsCollectionComplete && pagesCollectionComplete) {
+    return snapshotResult;
+  }
+
+  const { data: courseRows, error: courseError } = await client
+    .from("canvas_courses")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("canvas_course_id", snapshotResult.snapshot.course.id)
+    .limit(1);
+  if (courseError || !courseRows) throw incompleteCollectionPreservationError();
+  const localCourseId = courseRows[0]?.id;
+  if (!localCourseId) return snapshotResult;
+
+  let pages = snapshotResult.snapshot.pages;
+  let assignments = snapshotResult.snapshot.assignments;
+  if (!pagesCollectionComplete) {
+    const { data, error } = await client
+      .from("canvas_pages")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("canvas_connection_id", connectionId)
+      .eq("course_id", localCourseId);
+    if (error || !data) throw incompleteCollectionPreservationError();
+    const existing = data.map((row) => ({
+      body: row.body_html,
+      createdAt: row.canvas_created_at,
+      editingRoles: row.editing_roles,
+      frontPage: row.front_page,
+      lockAt: row.lock_at,
+      lockInfo: isJsonObject(row.lock_info) ? row.lock_info : null,
+      pageId: row.canvas_page_id,
+      published: row.published,
+      title: row.title,
+      unlockAt: row.unlock_at,
+      updatedAt: row.canvas_updated_at,
+      url: row.canvas_page_url,
+    } satisfies CanvasPageDetail));
+    pages = dedupeCanvasResources([...existing, ...pages], (page) => page.url);
+  }
+
+  if (!assignmentsCollectionComplete) {
+    const { data, error } = await client
+      .from("canvas_assignments")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("canvas_connection_id", connectionId)
+      .eq("course_id", localCourseId);
+    if (error || !data) throw incompleteCollectionPreservationError();
+    const existing = data.map((row) => ({
+      allowedAttempts: null,
+      allowedAttemptsUnlimited: null,
+      anonymousGrading: row.anonymous_grading,
+      assignmentGroupId: row.canvas_assignment_group_id,
+      assignmentVisible: null,
+      attachments: [],
+      createdAt: row.canvas_created_at,
+      description: row.description_html,
+      discussionTopicId: row.discussion_topic_id,
+      dueAt: row.due_at,
+      gradingType: row.grading_type,
+      hideInGradebook: null,
+      htmlUrl: row.html_url,
+      id: row.canvas_assignment_id,
+      lockAt: row.lock_at,
+      muted: row.muted,
+      name: row.name,
+      omitFromFinalGrade: row.omit_from_final_grade,
+      pointsPossible: row.points_possible,
+      position: row.position,
+      postManually: null,
+      published: row.published,
+      quizId: row.quiz_id,
+      submissionTypes: row.submission_types,
+      unlockAt: row.unlock_at,
+      updatedAt: row.canvas_updated_at,
+    } satisfies CanvasAssignment));
+    assignments = dedupeCanvasResources(
+      [...existing, ...assignments],
+      (assignment) => assignment.id,
+    );
+  }
+
+  return {
+    ...snapshotResult,
+    snapshot: { ...snapshotResult.snapshot, assignments, pages },
+  };
+}
+
+function incompleteCollectionPreservationError(): CanvasCourseOperationError {
+  return new CanvasCourseOperationError({
+    failedOperation: "persistence",
+    failureCategory: "persistence_failure",
+    failureCode: "canvas_course_persistence_failed",
+    httpStatusClass: "none",
+    retryable: false,
+    retryCount: 0,
+  });
+}
+
+function isJsonObject(value: Json | null): value is Record<string, Json | undefined> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function syncPlannerItems({
@@ -1574,21 +1877,36 @@ async function syncOneCourseFiles({
   readonly syncedAt: string;
   readonly userId: string;
 }): Promise<CanvasFilesSyncResult> {
-  let operation: CanvasOperationResult<readonly CanvasFile[]>;
-  try {
-    operation = await runSecondaryCanvasOperation({
-      action: () => canvas.listCourseFiles(courseResult.snapshot.course.id),
-      failureCode: "canvas_course_files_failed",
-      retryPolicy,
-    });
-  } catch (error) {
+  const collectionAttempt = await attemptSecondaryCanvasOperation({
+    action: () => canvas.listCourseFiles(courseResult.snapshot.course.id),
+    failureCode: "canvas_course_files_failed",
+    retryPolicy,
+  });
+  const preservedFiles = collectionAttempt.ok
+    ? ({ ok: true, value: [] } as const)
+    : await loadExistingCourseFiles({
+        canvasCourseId: courseResult.snapshot.course.id,
+        client,
+        connectionId: connection.id,
+        courseId: null,
+        userId,
+      });
+  if (!preservedFiles.ok) {
     return {
       ...emptyFilesSyncSummary(),
       coursesFailed: 1,
-      failureCodes: [secondaryFailureCode(error, "canvas_course_files_failed")],
-      retryCount: secondaryRetryCount(error),
+      failureCodes: ["canvas_file_persistence_failed"],
+      retryCount: collectionAttempt.retryCount,
     };
   }
+  const discoveredFiles = dedupeCanvasResources(
+    [
+      ...preservedFiles.value,
+      ...courseResult.snapshot.moduleFiles,
+      ...(collectionAttempt.ok ? collectionAttempt.result.value : []),
+    ],
+    (file) => file.id,
+  );
 
   let payload: CanvasFileInventoryPayload;
   try {
@@ -1597,7 +1915,7 @@ async function syncOneCourseFiles({
       assignments: courseResult.snapshot.assignments,
       canvasBaseUrl: connection.base_url,
       canvasCourseId: courseResult.snapshot.course.id,
-      files: operation.value,
+      files: discoveredFiles,
       moduleItemsByModule: courseResult.snapshot.moduleItemsByModule,
       pages: courseResult.snapshot.pages,
     });
@@ -1606,7 +1924,7 @@ async function syncOneCourseFiles({
       ...emptyFilesSyncSummary(),
       coursesFailed: 1,
       failureCodes: ["canvas_file_metadata_invalid"],
-      retryCount: operation.retryCount,
+      retryCount: collectionAttempt.retryCount,
     };
   }
 
@@ -1626,7 +1944,7 @@ async function syncOneCourseFiles({
       coursesFailed: 1,
       discovered: payload.files.length,
       failureCodes: ["canvas_file_persistence_failed"],
-      retryCount: operation.retryCount,
+      retryCount: collectionAttempt.retryCount,
     };
   }
 
@@ -1636,7 +1954,7 @@ async function syncOneCourseFiles({
     coursesSucceeded: 1,
     deactivated: persistence.row.files_deactivated,
     discovered: payload.files.length,
-    failureCodes: [],
+    failureCodes: collectionAttempt.ok ? [] : [collectionAttempt.failureCode],
     htmlFileReferences: persistence.row.html_file_references,
     inserted: persistence.row.files_inserted,
     metadataOnly: persistence.row.metadata_only_files,
@@ -1644,7 +1962,7 @@ async function syncOneCourseFiles({
     references: payload.references.length,
     referencesDeleted: persistence.row.references_deleted,
     referencesInserted: persistence.row.references_inserted,
-    retryCount: operation.retryCount,
+    retryCount: collectionAttempt.retryCount,
     unchanged: persistence.row.files_unchanged,
     updated: persistence.row.files_updated,
   };
@@ -1889,6 +2207,88 @@ async function runSecondaryCanvasOperation<TValue>({
       await retryPolicy.sleep(delayMs);
     }
   }
+}
+
+async function attemptSecondaryCanvasOperation<TValue>(input: {
+  readonly action: () => Promise<TValue>;
+  readonly failureCode: CanvasSyncFailureCode;
+  readonly retryPolicy: CanvasSyncRetryPolicy;
+}): Promise<CanvasOperationAttempt<TValue>> {
+  try {
+    const result = await runSecondaryCanvasOperation(input);
+    return { ok: true, result, retryCount: result.retryCount };
+  } catch (error) {
+    if (error instanceof CanvasSecondaryOperationError) {
+      return {
+        ok: false,
+        failureCode: error.failureCode,
+        retryCount: error.retryCount,
+      };
+    }
+    return { ok: false, failureCode: input.failureCode, retryCount: 0 };
+  }
+}
+
+async function loadExistingCourseFiles({
+  canvasCourseId,
+  client,
+  connectionId,
+  courseId,
+  userId,
+}: {
+  readonly canvasCourseId: string;
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly courseId: string | null;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasFile[] }
+  | { readonly ok: false }
+> {
+  let resolvedCourseId = courseId;
+  if (!resolvedCourseId) {
+    const { data, error } = await client
+      .from("canvas_courses")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("canvas_connection_id", connectionId)
+      .eq("canvas_course_id", canvasCourseId)
+      .limit(1);
+    if (error || !data) return { ok: false };
+    resolvedCourseId = data[0]?.id ?? null;
+  }
+  if (!resolvedCourseId) return { ok: true, value: [] };
+
+  const { data, error } = await client
+    .from("canvas_files")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .eq("course_id", resolvedCourseId);
+  if (error || !data) return { ok: false };
+  return {
+    ok: true,
+    value: data.map((row) => ({
+      contentType: row.content_type,
+      createdAt: row.canvas_created_at,
+      displayName: row.display_name,
+      downloadUrl: null,
+      filename: row.filename,
+      folderId: row.folder_id,
+      hidden: row.hidden,
+      hiddenForUser: row.hidden_for_user,
+      id: row.canvas_file_id,
+      lockAt: row.lock_at,
+      locked: row.locked,
+      mediaClass: row.media_class,
+      mediaEntryId: row.media_entry_id,
+      modifiedAt: row.canvas_modified_at,
+      size: row.size_bytes,
+      unlockAt: row.unlock_at,
+      updatedAt: row.canvas_updated_at,
+      visibilityLevel: row.visibility_level,
+    })),
+  };
 }
 
 function classifySecondaryOperationFailure({
@@ -3126,7 +3526,11 @@ function courseScopedStatus({
   if (!coreResult.ok) {
     return announcements.coursesSucceeded > 0 ? "partial" : "failed";
   }
-  if (announcements.coursesFailed > 0 || files.coursesFailed > 0) {
+  if (
+    coreResult.nonFatalFailureCodes.length > 0 ||
+    announcements.coursesFailed > 0 ||
+    files.coursesFailed > 0
+  ) {
     return "partial";
   }
   return "success";

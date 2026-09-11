@@ -124,6 +124,20 @@ vi.mock("@stay-focused/canvas", () => {
       return getFixture(courseId).assignments;
     }
 
+    public async getAssignment(
+      courseId: string,
+      assignmentId: string,
+    ): Promise<CanvasAssignmentFixture> {
+      throwIfConfigured(`assignment:${courseId}:${assignmentId}`);
+      const assignment = getFixture(courseId).assignments.find(
+        (entry) => entry.id === assignmentId,
+      );
+      if (!assignment) {
+        throw new CanvasClientError("canvas_not_found", "Fixture assignment missing.");
+      }
+      return assignment;
+    }
+
     public async listPlannerItems(): Promise<readonly CanvasPlannerItemFixture[]> {
       throwIfConfigured("plannerItems");
       return mocks.canvas.plannerItems;
@@ -143,6 +157,27 @@ vi.mock("@stay-focused/canvas", () => {
     ): Promise<readonly CanvasFileFixture[]> {
       throwIfConfigured(`files:${courseId}`);
       return withFileConcurrency(async () => getFixture(courseId).files);
+    }
+
+    public async getCourseFile(
+      courseId: string,
+      fileId: string,
+    ): Promise<CanvasFileFixture> {
+      throwIfConfigured(`file:${courseId}:${fileId}`);
+      const file = getFixture(courseId).files.find((entry) => entry.id === fileId);
+      if (!file) {
+        throw new CanvasClientError("canvas_not_found", "Fixture file missing.");
+      }
+      return file;
+    }
+
+    public async getFile(fileId: string): Promise<CanvasFileFixture> {
+      throwIfConfigured(`file:${fileId}`);
+      for (const fixture of mocks.canvas.fixtures.values()) {
+        const file = fixture.files.find((entry) => entry.id === fileId);
+        if (file) return file;
+      }
+      throw new CanvasClientError("canvas_not_found", "Fixture file missing.");
     }
   }
 
@@ -602,7 +637,7 @@ describe("POST /api/canvas/sync", () => {
     expect(db.persistedCourseIds()).toEqual(["course-1", "course-2", "course-3"]);
   });
 
-  it("commits successful courses and preserves failed courses during a partial run", async () => {
+  it("commits module data while preserving a Page whose detail is temporarily unavailable", async () => {
     const db = createSyncDb({ connectionRows: [connectionRow()] });
     db.seedGraph(USER_A, CONNECTION_A, "course-2", {
       modules: ["old-module"],
@@ -631,31 +666,20 @@ describe("POST /api/canvas/sync", () => {
     expect(body).toMatchObject({
       ok: true,
       status: "partial",
-      courses: { discovered: 2, succeeded: 1, failed: 1 },
+      courses: { discovered: 2, succeeded: 2, failed: 0 },
       failures: [{ code: "canvas_course_page_detail_failed", count: 1 }],
     });
     expect(db.courseResults()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          failedOperation: "page_detail",
-          failureCategory: "server_error",
-          failureCode: "canvas_course_page_detail_failed",
-          retryCount: 2,
-          retryable: true,
-          status: "failed",
-        }),
-        expect.objectContaining({
           failureCode: null,
-          retryCount: 0,
           status: "succeeded",
         }),
       ]),
     );
     expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).not.toBeNull();
     expect(db.graphFor(USER_A, CONNECTION_A, "course-2")).toMatchObject({
-      modules: [expect.objectContaining({ canvasId: "old-module" })],
       pages: [expect.objectContaining({ canvasId: "old-page" })],
-      assignments: [expect.objectContaining({ canvasId: "old-assignment" })],
     });
     expect(text).not.toContain("Private Course Title");
     expect(text).not.toContain("stored-secret-token");
@@ -778,17 +802,25 @@ describe("POST /api/canvas/sync", () => {
       expect(response.status).toBe(200);
       expect(db.courseResults()).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({
-            failedOperation: expectedOperation,
-            failureCode: expectedCode,
-            status: "failed",
-          }),
+          expect.objectContaining(
+            failure === "assignment"
+              ? { failureCode: null, status: "succeeded" }
+              : {
+                  failedOperation: expectedOperation,
+                  failureCode: expectedCode,
+                  status: "failed",
+                },
+          ),
         ]),
       );
       expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).toMatchObject({
-        modules: [expect.objectContaining({ canvasId: "old-module" })],
-        moduleItems: [expect.objectContaining({ canvasId: "old-item" })],
-        assignments: [expect.objectContaining({ canvasId: "old-assignment" })],
+        ...(failure === "assignment"
+          ? { assignments: expect.arrayContaining([expect.objectContaining({ canvasId: "old-assignment" })]) }
+          : {
+              modules: [expect.objectContaining({ canvasId: "old-module" })],
+              moduleItems: [expect.objectContaining({ canvasId: "old-item" })],
+              assignments: [expect.objectContaining({ canvasId: "old-assignment" })],
+            }),
       });
     }
   });
@@ -846,16 +878,13 @@ describe("POST /api/canvas/sync", () => {
     expect(response.status).toBe(200);
     expect(db.courseResults()).toEqual([
       expect.objectContaining({
-        failedOperation: "page_detail",
-        failureCategory: "resource_not_found",
-        failureCode: "canvas_course_page_detail_failed",
+        failureCode: null,
         retryCount: 0,
-        retryable: false,
-        status: "failed",
+        status: "succeeded",
       }),
     ]);
     expect(db.graphFor(USER_A, CONNECTION_A, "course-1")).toMatchObject({
-      modules: [expect.objectContaining({ canvasId: "old-module" })],
+      modules: [expect.objectContaining({ canvasId: "module-1" })],
       pages: [expect.objectContaining({ canvasId: "old-page" })],
     });
   });
@@ -1013,7 +1042,7 @@ describe("POST /api/canvas/sync", () => {
     expect(db.replacementCallCount()).toBe(3);
   });
 
-  it("preserves fingerprint and graph when an incremental fetch fails", async () => {
+  it("uses module-linked Pages when the Page collection is unavailable", async () => {
     const db = createSyncDb({ connectionRows: [connectionRow()] });
     setCanvasFixture([course("course-1")], [courseFixture("course-1")]);
     mocks.createCanvasServiceClient.mockReturnValue(db);
@@ -1040,7 +1069,7 @@ describe("POST /api/canvas/sync", () => {
       ok: true,
       mode: "incremental",
       status: "partial",
-      courses: { changed: 0, unchanged: 0, failed: 1 },
+      courses: { changed: 0, unchanged: 1, failed: 0 },
       failures: [{ code: "canvas_course_pages_failed", count: 1 }],
     });
     expect(db.replacementCallCount()).toBe(1);
@@ -1049,12 +1078,59 @@ describe("POST /api/canvas/sync", () => {
     expect(stateAfter?.lastSuccessfulSyncAt).toBe(
       stateBefore?.lastSuccessfulSyncAt,
     );
-    expect(stateAfter?.consecutiveFailureCount).toBe(1);
-    expect(stateAfter?.lastFailureCode).toBe("canvas_course_pages_failed");
+    expect(stateAfter?.consecutiveFailureCount).toBe(0);
+    expect(stateAfter?.lastFailureCode).toBeNull();
     expect(db.courseResults().at(-1)).toMatchObject({
-      failureCategory: "resource_not_found",
-      retryable: false,
-      status: "failed",
+      failureCategory: null,
+      retryable: null,
+      status: "unchanged",
+    });
+  });
+
+  it("persists a module-linked PDF when the course Files collection is denied", async () => {
+    const db = createSyncDb({ connectionRows: [connectionRow()] });
+    setCanvasFixture(
+      [course("course-1")],
+      [
+        courseFixture("course-1", {
+          files: [canvasFile("file-1")],
+          moduleItems: new Map([
+            [
+              "module-1",
+              [
+                moduleItem("item-1", {
+                  contentId: "file-1",
+                  pageUrl: null,
+                  type: "File",
+                }),
+              ],
+            ],
+          ]),
+        }),
+      ],
+    );
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+    mocks.canvas.errors.set(
+      "files:course-1",
+      new CanvasClientError("canvas_forbidden", "Files collection denied", {
+        status: 403,
+      }),
+    );
+
+    const response = await syncRoute.POST(createRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      status: "partial",
+      courses: { succeeded: 1, failed: 0 },
+      files: {
+        coursesSucceeded: 1,
+        discovered: 1,
+        moduleFileReferences: 1,
+      },
+      failures: [{ code: "canvas_course_files_failed", count: 1 }],
     });
   });
 
@@ -1301,7 +1377,14 @@ function createSyncDb(options: {
       },
     })),
     from: vi.fn((table: string) => {
-      if (table !== "canvas_connections" && table !== "canvas_course_sync_states") {
+      if (
+        table !== "canvas_connections" &&
+        table !== "canvas_course_sync_states" &&
+        table !== "canvas_courses" &&
+        table !== "canvas_pages" &&
+        table !== "canvas_assignments" &&
+        table !== "canvas_files"
+      ) {
         throw new Error(`Unexpected table ${table}`);
       }
       const filters = new Map<string, string>();
@@ -1310,6 +1393,7 @@ function createSyncDb(options: {
           filters.set(column, value);
           return query;
         }),
+        limit: vi.fn(() => query),
         maybeSingle: vi.fn(async () => {
           if (table === "canvas_connections") {
             const userId = filters.get("user_id") ?? "";
@@ -1334,6 +1418,72 @@ function createSyncDb(options: {
             error: null,
           };
         }),
+        then: (resolve: (value: unknown) => void) => {
+          if (table === "canvas_courses") {
+            const userId = filters.get("user_id") ?? "";
+            const connectionId = filters.get("canvas_connection_id") ?? "";
+            const canvasCourseId = filters.get("canvas_course_id") ?? "";
+            const stored = graph.get(graphKey(userId, connectionId, canvasCourseId));
+            resolve({
+              data: stored?.courseInternalId ? [{ id: stored.courseInternalId }] : [],
+              error: null,
+            });
+            return;
+          }
+          const localCourseId = filters.get("course_id") ?? "";
+          const stored = [...graph.values()].find(
+            (entry) => entry.courseInternalId === localCourseId,
+          );
+          if (table === "canvas_pages") {
+            resolve({
+              data: (stored?.pages ?? []).map((page) => ({
+                body_html: "<p>Previously synchronized Page.</p>",
+                canvas_created_at: null,
+                canvas_page_id: page.canvasId,
+                canvas_page_url: page.canvasId,
+                canvas_updated_at: null,
+                editing_roles: null,
+                front_page: false,
+                lock_at: null,
+                lock_info: null,
+                published: true,
+                title: `Stored ${page.canvasId}`,
+                unlock_at: null,
+              })),
+              error: null,
+            });
+            return;
+          }
+          if (table === "canvas_assignments") {
+            resolve({
+              data: (stored?.assignments ?? []).map((assignment) => ({
+                anonymous_grading: null,
+                canvas_assignment_group_id: null,
+                canvas_assignment_id: assignment.canvasId,
+                canvas_created_at: null,
+                canvas_updated_at: null,
+                description_html: "<p>Previously synchronized assignment.</p>",
+                discussion_topic_id: null,
+                due_at: null,
+                grading_type: null,
+                html_url: null,
+                lock_at: null,
+                muted: null,
+                name: `Stored ${assignment.canvasId}`,
+                omit_from_final_grade: null,
+                points_possible: null,
+                position: null,
+                published: true,
+                quiz_id: null,
+                submission_types: [],
+                unlock_at: null,
+              })),
+              error: null,
+            });
+            return;
+          }
+          resolve({ data: [], error: null });
+        },
       };
       return {
         select: vi.fn(() => query),
@@ -1989,6 +2139,33 @@ function assignment(
     discussionTopicId: null,
     createdAt: null,
     updatedAt: null,
+    ...overrides,
+  };
+}
+
+function canvasFile(
+  id: string,
+  overrides: Partial<CanvasFileFixture> = {},
+): CanvasFileFixture {
+  return {
+    contentType: "application/pdf",
+    createdAt: null,
+    displayName: `Fictional ${id}.pdf`,
+    downloadUrl: `https://canvas.example.invalid/files/${id}/download`,
+    filename: `${id}.pdf`,
+    folderId: null,
+    hidden: false,
+    hiddenForUser: false,
+    id,
+    lockAt: null,
+    locked: false,
+    mediaClass: null,
+    mediaEntryId: null,
+    modifiedAt: null,
+    size: 1024,
+    unlockAt: null,
+    updatedAt: null,
+    visibilityLevel: "course_members",
     ...overrides,
   };
 }

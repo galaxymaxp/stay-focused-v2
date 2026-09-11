@@ -151,14 +151,14 @@ describe("Canvas reviewer source service", () => {
       synchronizedSourcesAvailable: true,
       failureCategories: ["files", "timeout"],
     });
-    expect(result.value.availableSourceCount).toBe(3);
+    expect(result.value.availableSourceCount).toBe(2);
     expect(result.value.unavailableSourceCount).toBe(1);
     expect(result.value.sources.map((entry) => entry.id)).toEqual([
       `page:${PAGE_ID}`,
       `assignment:${ASSIGNMENT_ID}`,
-      `announcement:${ANNOUNCEMENT_ID}`,
       `file:${FILE_ID}`,
     ]);
+    expect(result.value.sources.some((entry) => entry.type === "announcement")).toBe(false);
     expect(result.value.sources.find((entry) => entry.type === "file")).toMatchObject({
       availability: "unavailable",
       file: {
@@ -313,8 +313,8 @@ describe("Canvas reviewer source service", () => {
         {
           ...baseFileRow(),
           content_type: "text/plain",
-          ingestion_eligibility: "metadata_only_unsupported",
-          ingestion_status: "metadata_only",
+          ingestion_eligibility: "eligible_document",
+          ingestion_status: "not_requested",
         },
       ],
     });
@@ -334,7 +334,7 @@ describe("Canvas reviewer source service", () => {
       result.value.sources.find((source) => source.type === "assignment")?.capability,
     ).toBe("empty");
     expect(result.value.sources.find((source) => source.type === "file")?.capability).toBe(
-      "unsupported",
+      "needs_preparation",
     );
     expect(fake.storageCalls).toHaveLength(0);
   });
@@ -374,21 +374,21 @@ describe("Canvas reviewer source service", () => {
       },
     ],
     [
-      "unsupported plain text",
+      "supported plain text awaiting preparation",
       {
         content_type: "text/plain",
         display_name: "Fictional notes.txt",
         filename: "fictional-notes.txt",
-        ingestion_eligibility: "metadata_only_unsupported",
-        ingestion_status: "metadata_only",
+        ingestion_eligibility: "eligible_document",
+        ingestion_status: "not_requested",
       },
       {
         file: {
-          canPrepare: false,
-          kind: "unsupported",
-          preparationStatus: "unsupported",
+          canPrepare: true,
+          kind: "text",
+          preparationStatus: "not_prepared",
         },
-        reason: "This file type is not supported yet.",
+        reason: "Prepare this file before using it.",
       },
     ],
   ])("lists %s file descriptors with safe state", async (_name, overrides, expected) => {

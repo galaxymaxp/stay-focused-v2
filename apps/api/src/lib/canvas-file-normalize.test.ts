@@ -113,6 +113,54 @@ describe("Canvas file inventory normalization", () => {
       wrongCourse: 1,
     });
   });
+
+  it("deduplicates repeated module files and persists typed assignment attachments", () => {
+    const shared = canvasFile({ id: "10" });
+    const attachment = canvasFile({
+      displayName: "Diagram.png",
+      filename: "diagram.png",
+      contentType: "image/png",
+      id: "20",
+    });
+    const payload = createCanvasFileInventoryPayload({
+      announcements: [],
+      assignments: [assignment({ attachments: [attachment] })],
+      canvasBaseUrl: "https://canvas.test",
+      canvasCourseId: "course-1",
+      files: [shared, shared],
+      moduleItemsByModule: [
+        {
+          module: moduleFixture(),
+          items: [
+            moduleItem({ id: "item-1", contentId: "10" }),
+            moduleItem({ id: "item-2", contentId: "10" }),
+          ],
+        },
+      ],
+      pages: [],
+    });
+
+    expect(payload.files.map((file) => file.canvas_file_id)).toEqual(["10", "20"]);
+    expect(payload.references).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canvas_file_id: "20",
+          canvas_assignment_id: "assignment-1",
+          reference_type: "typed_attachment",
+        }),
+        expect.objectContaining({
+          canvas_file_id: "10",
+          canvas_module_item_id: "item-1",
+          reference_type: "module_item",
+        }),
+        expect.objectContaining({
+          canvas_file_id: "10",
+          canvas_module_item_id: "item-2",
+          reference_type: "module_item",
+        }),
+      ]),
+    );
+  });
 });
 
 function canvasFile(overrides: Partial<CanvasFile> = {}): CanvasFile {
