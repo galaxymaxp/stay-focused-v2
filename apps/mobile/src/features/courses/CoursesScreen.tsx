@@ -699,21 +699,30 @@ function ConnectedCanvasState({
   readonly savedSelectedCourseIds: readonly string[];
   readonly selectedCourseIds: readonly string[];
 }) {
+  const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const selectedChanged = !sameStringSet(selectedCourseIds, savedSelectedCourseIds);
   const selectedCourses = courses.filter((course) =>
     selectedCourseIds.includes(course.id),
   );
   const likelyCurrent = courses.filter(
-    (course) => course.classification === "likely_current",
+    (course) =>
+      course.classification === "likely_current" &&
+      !selectedCourseIds.includes(course.id),
   );
   const past = courses.filter(
-    (course) => course.classification === "past_or_concluded",
+    (course) =>
+      course.classification === "past_or_concluded" &&
+      !selectedCourseIds.includes(course.id),
   );
   const uncertain = courses.filter(
-    (course) => course.classification === "other_or_uncertain",
+    (course) =>
+      course.classification === "other_or_uncertain" &&
+      !selectedCourseIds.includes(course.id),
   );
   const unavailable = courses.filter(
-    (course) => course.classification === "unavailable",
+    (course) =>
+      course.classification === "unavailable" &&
+      !selectedCourseIds.includes(course.id),
   );
 
   return (
@@ -756,21 +765,29 @@ function ConnectedCanvasState({
           >
             Disconnect
           </Button>
+          <Button
+            onPress={() => setShowConnectionDetails((visible) => !visible)}
+            variant="secondary"
+          >
+            {showConnectionDetails ? "Hide connection details" : "Connection details"}
+          </Button>
         </View>
       </Card>
 
-      <Card style={styles.summaryCard}>
-        <Text style={styles.statusTitle}>Capability summary</Text>
-        <View style={styles.capabilityList}>
-          {SUMMARY_CAPABILITIES.map((capability) => (
-            <CapabilitySummaryRow
-              capability={capability}
-              key={capability}
-              status={findCapabilityStatus(capabilities, capability)}
-            />
-          ))}
-        </View>
-      </Card>
+      {showConnectionDetails ? (
+        <Card style={styles.summaryCard} testID="canvas-connection-details">
+          <Text style={styles.statusTitle}>Canvas access</Text>
+          <View style={styles.capabilityList}>
+            {SUMMARY_CAPABILITIES.map((capability) => (
+              <CapabilitySummaryRow
+                capability={capability}
+                key={capability}
+                status={findCapabilityStatus(capabilities, capability)}
+              />
+            ))}
+          </View>
+        </Card>
+      ) : null}
 
       <Card style={styles.summaryCard}>
         <Text style={styles.statusTitle}>Selected courses</Text>
@@ -934,6 +951,10 @@ function CourseSelectionRow({
   const canCreateReviewer = course.selected && hasCompletedSourceSync(course);
   const canOpenGrades = course.selected && course.selectable;
   const needsSync = course.selected && !hasCompletedSourceSync(course);
+  const [showSyncDetails, setShowSyncDetails] = useState(false);
+  const overallHealth = health?.overallHealth ?? course.syncHealth?.overallHealth;
+  const needsAttention =
+    overallHealth === "needs_attention" || overallHealth === "stale";
 
   return (
     <Pressable
@@ -954,12 +975,17 @@ function CourseSelectionRow({
           <Text style={styles.courseWarning}>{course.unavailableReason}</Text>
         ) : null}
         <Text style={styles.summaryMeta}>
-          {formatCourseSyncState(syncState, course)}
+          {canCreateReviewer
+            ? "Course materials ready"
+            : formatCourseSyncState(syncState, course)}
         </Text>
-        <Text style={styles.summaryMeta}>
-          Health: {formatSyncHealth(health?.overallHealth ?? course.syncHealth?.overallHealth)}
-        </Text>
-        {health ? (
+        {needsAttention ? (
+          <Text style={styles.courseWarning}>
+            Some Canvas areas could not refresh. Available module materials can
+            still be studied.
+          </Text>
+        ) : null}
+        {health && showSyncDetails ? (
           <View style={styles.scopeHealthList} testID={`canvas-sync-health-${course.id}`}>
             {(["content", "announcements", "files", "grades"] as const).map(
               (scope) => (
@@ -969,6 +995,14 @@ function CourseSelectionRow({
               ),
             )}
           </View>
+        ) : null}
+        {health && needsAttention ? (
+          <Button
+            onPress={() => setShowSyncDetails((visible) => !visible)}
+            variant="secondary"
+          >
+            {showSyncDetails ? "Hide sync details" : "Sync details"}
+          </Button>
         ) : null}
         {syncState?.status === "running" && syncState.job &&
         syncState.job.stage !== "promoting_scopes" &&
@@ -1002,7 +1036,7 @@ function CourseSelectionRow({
             testID={`canvas-create-reviewer-${course.id}`}
             variant="primary"
           >
-            Create reviewer
+            Study materials
           </Button>
         ) : needsSync ? (
           <Text style={styles.courseWarning}>Sync this course first</Text>

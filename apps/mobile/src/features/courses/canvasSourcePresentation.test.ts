@@ -31,10 +31,10 @@ describe("Canvas source selection presentation", () => {
   });
 
   it.each([
-    ["ready", true, "Ready to review", "preview"],
+    ["ready", true, "Ready", "preview"],
     ["empty", false, "No study text found", "none"],
-    ["needs_preparation", true, "Prepare file", "prepare"],
-    ["unsupported", false, "Not supported yet", "none"],
+    ["needs_preparation", true, "Prepare", "prepare"],
+    ["unsupported", false, "This file type isn't supported yet.", "none"],
     ["inaccessible", false, "Unavailable", "none"],
     ["failed", true, "Try preparation again", "retry"],
   ] as const)(
@@ -54,6 +54,19 @@ describe("Canvas source selection presentation", () => {
       );
     },
   );
+
+  it("keeps unsupported PowerPoint and Word materials visible with a concise reason", () => {
+    expect(
+      presentCanvasSourceCapability(
+        source("unsupported", "Mobile design.pptx", "Week 1", 1, 1),
+      ).explanation,
+    ).toBe("PowerPoint files aren't supported yet.");
+    expect(
+      presentCanvasSourceCapability(
+        source("unsupported", "Project brief.docx", "Week 1", 1, 2),
+      ).explanation,
+    ).toBe("Word files aren't supported yet.");
+  });
 
   it("keeps inaccessible sources opaque and gives failed preparation a safe retry", () => {
     expect(

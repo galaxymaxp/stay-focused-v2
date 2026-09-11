@@ -51,9 +51,9 @@ export function presentCanvasSourceCapability(
     case "ready":
       return {
         action: "preview",
-        explanation: "This item has study text ready to check.",
+        explanation: "This material is ready to turn into a reviewer.",
         selectable: true,
-        statusLabel: "Ready to review",
+        statusLabel: "Ready",
       };
     case "empty":
       return {
@@ -65,16 +65,16 @@ export function presentCanvasSourceCapability(
     case "needs_preparation":
       return {
         action: "prepare",
-        explanation: "Prepare this file before checking its study text.",
+        explanation: "Prepare this material before creating a reviewer.",
         selectable: true,
-        statusLabel: "Prepare file",
+        statusLabel: "Prepare",
       };
     case "unsupported":
       return {
         action: "none",
-        explanation: "This item type cannot create a reviewer yet.",
+        explanation: unsupportedCanvasSourceExplanation(source),
         selectable: false,
-        statusLabel: "Not supported yet",
+        statusLabel: unsupportedCanvasSourceExplanation(source),
       };
     case "inaccessible":
       return {
@@ -126,6 +126,19 @@ export function groupCanvasSourcesForSelection(
   return groups;
 }
 
+function unsupportedCanvasSourceExplanation(
+  source: CanvasReviewerSourceDescriptor,
+): string {
+  const extension = source.title.trim().split(".").pop()?.toLowerCase();
+  if (extension === "ppt" || extension === "pptx") {
+    return "PowerPoint files aren't supported yet.";
+  }
+  if (extension === "doc" || extension === "docx") {
+    return "Word files aren't supported yet.";
+  }
+  return "This file type isn't supported yet.";
+}
+
 export function formatCanvasSourceType(type: CanvasReviewerSourceType): string {
   switch (type) {
     case "page":
@@ -143,14 +156,14 @@ export function sourceSelectionHelp(
   selected: CanvasReviewerSourceDescriptor | null,
 ): string {
   if (!selected) {
-    return "Choose one ready item to continue.";
+    return "Choose one course material to continue.";
   }
   const presentation = presentCanvasSourceCapability(selected);
   switch (presentation.action) {
     case "preview":
-      return "Check the exact study text before creating your reviewer.";
+      return "Choose Reviewer to create study notes from this material.";
     case "prepare":
-      return "Prepare this file, then check the extracted study text.";
+      return "Prepare this material, then choose Reviewer.";
     case "retry":
       return "Try preparing this file again.";
     case "none":

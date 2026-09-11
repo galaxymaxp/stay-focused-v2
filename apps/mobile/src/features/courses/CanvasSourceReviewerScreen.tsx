@@ -101,6 +101,12 @@ import {
   presentCanvasSourceCapability,
   sourceSelectionHelp,
 } from "./canvasSourcePresentation";
+import {
+  canvasReviewerProgressLabel,
+  canvasSourceModuleLabel,
+  createCanvasReviewerJobDraft,
+  persistCanvasReviewerAutomatically,
+} from "./canvasStudyWorkflow";
 
 const SOURCE_TEXT_HEIGHT = 320;
 
@@ -157,6 +163,7 @@ export function CanvasSourceReviewerScreen({
     AppState.currentState === "active",
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [showSourceDetails, setShowSourceDetails] = useState(false);
 
   const inventoryAbortRef = useRef<AbortController | null>(null);
   const preparationAbortRef = useRef<AbortController | null>(null);
@@ -409,6 +416,7 @@ export function CanvasSourceReviewerScreen({
     setIsPreparing(false);
     setSelectedSourceId(source.id);
     selectedSourceIdRef.current = source.id;
+    setShowSourceDetails(false);
     clearDependentState(source.id);
   };
 
@@ -528,6 +536,7 @@ export function CanvasSourceReviewerScreen({
     const clearSourceSelection = () => {
       selectedSourceIdRef.current = null;
       setSelectedSourceId(null);
+      setShowSourceDetails(false);
       clearDependentState(null);
     };
     if (hasMeaningfulEdit || hasUnsavedReviewer) {
@@ -639,7 +648,110 @@ export function CanvasSourceReviewerScreen({
     );
   };
 
-  const handlePreview = async () => {
+  const submitReviewerJob = async ({
+    previewToGenerate,
+    requestToken,
+    selectionKey,
+    sourceText,
+    sourceTitle,
+  }: {
+    readonly previewToGenerate: CanvasReviewerSourcePreviewPayload;
+    readonly requestToken: number;
+    readonly selectionKey: string;
+    readonly sourceText: string;
+    readonly sourceTitle: string;
+  }) => {
+    if (isGenerating || !tryBeginCanvasSingleFlight(generationLockRef)) return;
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) {
+      finishCanvasSingleFlight(generationLockRef);
+      setError(context.error);
+      return;
+    }
+
+    const finalSourceText = sourceText.trim();
+    if (!finalSourceText) {
+      setError({
+        message: "This material does not contain readable study text.",
+        title: "Material is empty",
+      });
+      finishCanvasSingleFlight(generationLockRef);
+      return;
+    }
+    if (finalSourceText.length > previewToGenerate.limits.existingReviewerRequestLimit) {
+      setError({
+        message: "Choose a smaller part of this material and try again.",
+        title: "Material is too long",
+      });
+      finishCanvasSingleFlight(generationLockRef);
+      return;
+    }
+
+    const idempotencyKey =
+      generationIdempotencyKeyRef.current ??
+      createProcessingJobIdempotencyKey("reviewer_generation");
+    generationIdempotencyKeyRef.current = idempotencyKey;
+    pendingGenerationRef.current = {
+      requestToken,
+      resolutionFingerprint: previewToGenerate.resolutionFingerprint,
+      selectionKey,
+      sourceText: finalSourceText,
+      sourceTitle,
+    };
+    setIsGenerating(true);
+    setError(null);
+    setReviewer(null);
+    setSourceSnapshotId(null);
+    setGeneratedBinding(null);
+    setSavedReviewer(null);
+
+    let accepted = false;
+    try {
+      const draft = createCanvasReviewerJobDraft({
+        courseId,
+        preview: previewToGenerate,
+        sourceText: finalSourceText,
+        sourceTitle,
+      });
+      const result = await createReviewerJob({
+        ...context.value,
+        ...draft,
+        idempotencyKey,
+      });
+      if (
+        resolutionTokenRef.current !== requestToken ||
+        currentResolutionSelectionKeyRef.current !== selectionKey
+      ) {
+        return;
+      }
+      if (result.ok) {
+        accepted = true;
+        const ownerUserId = session?.user.id;
+        if (ownerUserId) {
+          await upsertActiveProcessingJob(ownerUserId, result.data);
+        }
+        setActiveReviewerJob(result.data);
+        generationIdempotencyKeyRef.current = null;
+      } else {
+        const displayError = formatProcessingJobError(result.error);
+        if (canvasGenerationNeedsNewPreview(result.error.code)) {
+          clearPreviewState(selectionKey);
+        }
+        setError(displayError);
+        if (!result.error.retryable) {
+          generationIdempotencyKeyRef.current = null;
+          pendingGenerationRef.current = null;
+        }
+      }
+    } finally {
+      if (resolutionTokenRef.current === requestToken && !accepted) {
+        finishCanvasSingleFlight(generationLockRef);
+        setIsGenerating(false);
+      }
+    }
+  };
+
+  const handlePreview = async (generateAfterPreview = false) => {
     if (
       !selectedSource ||
       !structure ||
@@ -724,6 +836,15 @@ export function CanvasSourceReviewerScreen({
           type: "resolved",
         });
         setSaveTitle(result.data.suggestedTitle || selectedSource.title);
+        if (generateAfterPreview) {
+          await submitReviewerJob({
+            previewToGenerate: result.data,
+            requestToken,
+            selectionKey: activeSelectionKey,
+            sourceText: result.data.sourceText,
+            sourceTitle: selectedSource.title,
+          });
+        }
       } else {
         dispatchResolution({
           requestToken,
@@ -767,6 +888,73 @@ export function CanvasSourceReviewerScreen({
     }
     clearPreviewState(blockSelectionKey);
   };
+
+  const persistCompletedReviewer = useCallback(
+    async ({
+      courseLabel,
+      output,
+      requestToken,
+      snapshotId,
+      sourceText,
+      sourceTitle,
+      title,
+    }: {
+      readonly courseLabel: string;
+      readonly output: ReviewerOutput;
+      readonly requestToken: number;
+      readonly snapshotId: string;
+      readonly sourceText: string;
+      readonly sourceTitle: string;
+      readonly title: string;
+    }): Promise<void> => {
+      if (!tryBeginCanvasSingleFlight(saveLockRef)) return;
+      const context = createRequestContext(session?.accessToken);
+      if (!context.ok) {
+        finishCanvasSingleFlight(saveLockRef);
+        setSaveError(context.error);
+        return;
+      }
+
+      saveAbortRef.current?.abort();
+      const controller = new AbortController();
+      saveAbortRef.current = controller;
+      setIsSaving(true);
+      setSaveError(null);
+
+      try {
+        const result = await persistCanvasReviewerAutomatically(
+          {
+            courseName: courseLabel,
+            reviewer: output,
+            sourceSnapshotId: snapshotId,
+            sourceText,
+            sourceTitle,
+            title,
+          },
+          (draft) =>
+            saveReviewer({
+              ...context.value,
+              ...draft,
+              signal: controller.signal,
+            }),
+        );
+        if (resolutionTokenRef.current !== requestToken) return;
+        if (result.ok) {
+          setSavedReviewer(result.data);
+          setSaveTitle(result.data.title);
+        } else {
+          setSaveError(formatLibraryError(result.error));
+        }
+      } finally {
+        if (resolutionTokenRef.current === requestToken) {
+          saveAbortRef.current = null;
+          finishCanvasSingleFlight(saveLockRef);
+          setIsSaving(false);
+        }
+      }
+    },
+    [session?.accessToken],
+  );
 
   const applyObservedReviewerJob = useCallback(
     async (job: ProcessingJobStatusView): Promise<void> => {
@@ -833,28 +1021,55 @@ export function CanvasSourceReviewerScreen({
         return;
       }
 
+      const snapshotId = result.data.sourceSnapshotId ?? null;
+      const sourceTitle =
+        pending?.sourceTitle.trim() ||
+        selectedSource?.title.trim() ||
+        result.data.reviewer.title.trim() ||
+        "Canvas reviewer";
+      const title = sourceTitle;
+      const sourceText = pending?.sourceText ?? resolution.sourceText;
+      const requestToken = pending?.requestToken ?? resolutionTokenRef.current;
       setReviewer(result.data.reviewer);
-      setSourceSnapshotId(result.data.sourceSnapshotId ?? null);
+      setSourceSnapshotId(snapshotId);
+      setSaveTitle(title);
+      setActiveReviewerJob(null);
       if (pending) {
         setGeneratedBinding({
           fingerprint: pending.resolutionFingerprint,
           selectionKey: pending.selectionKey,
           sourceText: pending.sourceText,
         });
-        setSaveTitle(
-          pending.sourceTitle.trim() ||
-            result.data.reviewer.title.trim() ||
-            "Canvas reviewer",
-        );
-      } else {
-        setSaveTitle(result.data.reviewer.title.trim() || "Canvas reviewer");
       }
-      setActiveReviewerJob(null);
       pendingGenerationRef.current = null;
       generationIdempotencyKeyRef.current = null;
       await removeActiveProcessingJob(job.id);
+      if (snapshotId) {
+        await persistCompletedReviewer({
+          courseLabel: sourceList?.courseName || courseName,
+          output: result.data.reviewer,
+          requestToken,
+          snapshotId,
+          sourceText,
+          sourceTitle,
+          title,
+        });
+      } else {
+        setSaveError({
+          message: "Try creating the reviewer again before saving it.",
+          title: "Reviewer could not be saved automatically",
+        });
+      }
     },
-    [session?.accessToken, session?.user.id],
+    [
+      persistCompletedReviewer,
+      resolution.sourceText,
+      selectedSource?.title,
+      sourceList?.courseName,
+      courseName,
+      session?.accessToken,
+      session?.user.id,
+    ],
   );
 
   const reconcileReviewerJob = useCallback(async (): Promise<void> => {
@@ -895,13 +1110,6 @@ export function CanvasSourceReviewerScreen({
   }, [activeReviewerJob, appIsActive, reconcileReviewerJob]);
 
   const handleGenerate = async () => {
-    if (isGenerating || !tryBeginCanvasSingleFlight(generationLockRef)) return;
-    const context = createRequestContext(session?.accessToken);
-    if (!context.ok) {
-      finishCanvasSingleFlight(generationLockRef);
-      setError(context.error);
-      return;
-    }
     if (
       !preview ||
       !isCanvasGenerationCurrent(resolution, selectionIds, blockSelectionKey)
@@ -910,91 +1118,15 @@ export function CanvasSourceReviewerScreen({
         message: "Check the current source again before creating a reviewer.",
         title: "Source preview changed",
       });
-      finishCanvasSingleFlight(generationLockRef);
       return;
     }
-
-    const finalSourceText = resolution.sourceText.trim();
-    if (!finalSourceText) {
-      setError({
-        message: "Keep at least one readable line in the preview.",
-        title: "Preview is empty",
-      });
-      finishCanvasSingleFlight(generationLockRef);
-      return;
-    }
-    if (finalSourceText.length > preview.limits.existingReviewerRequestLimit) {
-      setError({
-        message: `Keep the edited preview under ${preview.limits.existingReviewerRequestLimit.toLocaleString()} characters.`,
-        title: "Preview is too long",
-      });
-      finishCanvasSingleFlight(generationLockRef);
-      return;
-    }
-
-    const requestToken = resolutionTokenRef.current;
-    const activeSelectionKey = blockSelectionKey;
-    const idempotencyKey =
-      generationIdempotencyKeyRef.current ??
-      createProcessingJobIdempotencyKey("reviewer_generation");
-    generationIdempotencyKeyRef.current = idempotencyKey;
-    pendingGenerationRef.current = {
-      requestToken,
-      resolutionFingerprint: preview.resolutionFingerprint,
-      selectionKey: activeSelectionKey,
-      sourceText: finalSourceText,
+    await submitReviewerJob({
+      previewToGenerate: preview,
+      requestToken: resolutionTokenRef.current,
+      selectionKey: blockSelectionKey,
+      sourceText: resolution.sourceText,
       sourceTitle: resolution.sourceTitle,
-    };
-    setIsGenerating(true);
-    setError(null);
-    setReviewer(null);
-    setSourceSnapshotId(null);
-    setGeneratedBinding(null);
-    setSavedReviewer(null);
-
-    let accepted = false;
-    try {
-      const result = await createReviewerJob({
-        ...context.value,
-        canvasCourseId: courseId,
-        canvasItemIds: preview.sources.map((source) => source.id),
-        canvasPreviewSessionId: preview.previewSessionId,
-        canvasResolutionFingerprint: preview.resolutionFingerprint,
-        idempotencyKey,
-        sourceText: finalSourceText,
-        sourceTitle: resolution.sourceTitle,
-      });
-      if (
-        resolutionTokenRef.current !== requestToken ||
-        currentResolutionSelectionKeyRef.current !== activeSelectionKey
-      ) {
-        return;
-      }
-      if (result.ok) {
-        accepted = true;
-        const ownerUserId = session?.user.id;
-        if (ownerUserId) {
-          await upsertActiveProcessingJob(ownerUserId, result.data);
-        }
-        setActiveReviewerJob(result.data);
-        generationIdempotencyKeyRef.current = null;
-      } else {
-        const displayError = formatProcessingJobError(result.error);
-        if (canvasGenerationNeedsNewPreview(result.error.code)) {
-          clearPreviewState(activeSelectionKey);
-        }
-        setError(displayError);
-        if (!result.error.retryable) {
-          generationIdempotencyKeyRef.current = null;
-          pendingGenerationRef.current = null;
-        }
-      }
-    } finally {
-      if (resolutionTokenRef.current === requestToken && !accepted) {
-        finishCanvasSingleFlight(generationLockRef);
-        setIsGenerating(false);
-      }
-    }
+    });
   };
 
   const handleCancelReviewerJob = async () => {
@@ -1029,13 +1161,7 @@ export function CanvasSourceReviewerScreen({
   };
 
   const handleSave = async () => {
-    if (isSaving || !reviewer || !tryBeginCanvasSingleFlight(saveLockRef)) return;
-    const context = createRequestContext(session?.accessToken);
-    if (!context.ok) {
-      finishCanvasSingleFlight(saveLockRef);
-      setSaveError(context.error);
-      return;
-    }
+    if (isSaving || !reviewer) return;
     const finalSourceText = resolution.sourceText.trim();
     if (
       !sourceSnapshotId ||
@@ -1051,69 +1177,47 @@ export function CanvasSourceReviewerScreen({
         message: "Create the reviewer again from the current preview before saving.",
         title: "Reviewer is no longer current",
       });
-      finishCanvasSingleFlight(saveLockRef);
       return;
     }
     const title = saveTitle.trim();
     if (!title) {
       setSaveError({ message: "Enter a title before saving.", title: "Title needed" });
-      finishCanvasSingleFlight(saveLockRef);
       return;
     }
-
-    saveAbortRef.current?.abort();
-    const controller = new AbortController();
-    saveAbortRef.current = controller;
-    const requestToken = resolutionTokenRef.current;
-    setIsSaving(true);
-    setSaveError(null);
-
-    try {
-      const result = await saveReviewer({
-        ...context.value,
-        reviewerOutput: reviewer,
-        signal: controller.signal,
-        sourceMetadata: {
-          sourceCharacterCount: finalSourceText.length,
-          sourceLabel: resolution.sourceTitle,
-          sourceMode: "canvas",
-        },
-        sourceSnapshotId,
-        title,
-      });
-      if (resolutionTokenRef.current !== requestToken) return;
-      if (result.ok) {
-        setSavedReviewer(result.data);
-        setSaveTitle(result.data.title);
-      } else {
-        setSaveError(formatLibraryError(result.error));
-      }
-    } finally {
-      if (resolutionTokenRef.current === requestToken) {
-        saveAbortRef.current = null;
-        finishCanvasSingleFlight(saveLockRef);
-        setIsSaving(false);
-      }
-    }
+    await persistCompletedReviewer({
+      courseLabel: sourceList?.courseName || courseName,
+      output: reviewer,
+      requestToken: resolutionTokenRef.current,
+      snapshotId: sourceSnapshotId,
+      sourceText: finalSourceText,
+      sourceTitle: resolution.sourceTitle,
+      title,
+    });
   };
 
   const displayCourseName = sourceList?.courseName || courseName;
   const stage = reviewer
-    ? "REVIEWER READY"
-    : preview
-      ? "CHECK SOURCE"
+    ? "STUDY"
+    : activeReviewerJob || isGenerating
+      ? "CREATING REVIEWER"
       : selectedSourceAction === "preview"
-        ? "SELECT BLOCKS"
+        ? showSourceDetails
+          ? preview
+            ? "CHECK SOURCE"
+            : "CHOOSE SECTIONS"
+          : "CHOOSE STUDY ACTION"
         : "CHOOSE SOURCE";
 
   const showsBlockSelection =
     !isLoadingSources &&
     !reviewer &&
     !preview &&
+    showSourceDetails &&
     selectedSourceAction === "preview" &&
     Boolean(selectedSource) &&
     structure !== null;
-  const showsPreviewEditor = !isLoadingSources && !reviewer && preview !== null;
+  const showsPreviewEditor =
+    showSourceDetails && !isLoadingSources && !reviewer && preview !== null;
 
   return (
     <Screen
@@ -1171,10 +1275,6 @@ export function CanvasSourceReviewerScreen({
           />
           <SaveCanvasReviewerPanel
             isSaving={isSaving}
-            onChangeTitle={(value) => {
-              setSaveTitle(value);
-              setSaveError(null);
-            }}
             onOpenLibrary={onOpenLibrary}
             savedReviewer={savedReviewer}
             saveError={saveError}
@@ -1185,6 +1285,26 @@ export function CanvasSourceReviewerScreen({
             Change source
           </Button>
         </View>
+      ) : activeReviewerJob ? (
+        <CanvasReviewerJobCard
+          job={activeReviewerJob}
+          onCancel={() => void handleCancelReviewerJob()}
+          onRetry={() => void handleRetryReviewerJob()}
+        />
+      ) : selectedSourceAction === "preview" &&
+        selectedSource &&
+        !showSourceDetails ? (
+        <CanvasStudyActionStage
+          courseName={displayCourseName}
+          isCreating={isGenerating || isPreviewing}
+          isLoadingMaterial={isStructuring}
+          material={selectedSource}
+          onChangeMaterial={requestChangeSource}
+          onChooseSections={() => setShowSourceDetails(true)}
+          onCreateReviewer={() => void handlePreview(true)}
+          onRetryMaterial={() => setStructureRetryToken((value) => value + 1)}
+          structureReady={structure !== null}
+        />
       ) : preview ? (
         <PreviewStage
           activeJob={activeReviewerJob}
@@ -1530,6 +1650,101 @@ function SelectionAction({
   );
 }
 
+function CanvasStudyActionStage({
+  courseName,
+  isCreating,
+  isLoadingMaterial,
+  material,
+  onChangeMaterial,
+  onChooseSections,
+  onCreateReviewer,
+  onRetryMaterial,
+  structureReady,
+}: {
+  readonly courseName: string;
+  readonly isCreating: boolean;
+  readonly isLoadingMaterial: boolean;
+  readonly material: CanvasReviewerSourceDescriptor;
+  readonly onChangeMaterial: () => void;
+  readonly onChooseSections: () => void;
+  readonly onCreateReviewer: () => void;
+  readonly onRetryMaterial: () => void;
+  readonly structureReady: boolean;
+}) {
+  return (
+    <View style={styles.stack} testID="canvas-study-action-stage">
+      <Card accent style={styles.actionCard}>
+        <Text style={styles.sectionLabel}>YOUR MATERIAL</Text>
+        <Text style={styles.cardTitle}>{material.title}</Text>
+        <Text style={styles.statusText}>{courseName}</Text>
+        <Text style={styles.statusText}>{canvasSourceModuleLabel(material)}</Text>
+        <Text style={styles.statusText}>
+          {formatCanvasSourceType(material.type)} · Ready
+        </Text>
+      </Card>
+
+      <Card style={styles.previewCard}>
+        <View style={styles.actionTitleRow}>
+          <BookOpen color={colors.accent} size={22} strokeWidth={2} />
+          <View style={styles.actionTitleCopy}>
+            <Text style={styles.sectionLabel}>STUDY ACTION</Text>
+            <Text style={styles.cardTitle}>Reviewer</Text>
+          </View>
+        </View>
+        <Text style={styles.bodyText}>
+          Create organized explanations and key points from this material. It
+          will be saved to your Study Library automatically.
+        </Text>
+        {!structureReady ? (
+          <View accessibilityLiveRegion="polite" style={styles.progressRow}>
+            {isLoadingMaterial ? (
+              <ActivityIndicator color={colors.accent} size="small" />
+            ) : null}
+            <Text style={styles.statusText}>
+              {isLoadingMaterial
+                ? "Getting your material ready."
+                : "This material could not be read yet."}
+            </Text>
+          </View>
+        ) : null}
+        {!structureReady && !isLoadingMaterial ? (
+          <Button fullWidth onPress={onRetryMaterial} variant="primary">
+            Try again
+          </Button>
+        ) : (
+          <Button
+            disabled={!structureReady || isCreating}
+            fullWidth
+            loading={isCreating}
+            onPress={onCreateReviewer}
+            testID="canvas-create-reviewer-action"
+            variant="primary"
+          >
+            Create Reviewer
+          </Button>
+        )}
+        <Button
+          disabled={!structureReady || isCreating}
+          fullWidth
+          onPress={onChooseSections}
+          testID="canvas-choose-sections-action"
+          variant="secondary"
+        >
+          Choose specific sections
+        </Button>
+        <Button
+          disabled={isCreating}
+          fullWidth
+          onPress={onChangeMaterial}
+          variant="secondary"
+        >
+          Change material
+        </Button>
+      </Card>
+    </View>
+  );
+}
+
 function BlockSelectionStage({
   isPreviewing,
   onChangeSource,
@@ -1846,8 +2061,10 @@ function CanvasReviewerJobCard({
     job.progress.unitLabel !== null;
   return (
     <Card style={styles.previewCard} testID="canvas-reviewer-job-status">
-      <Text style={styles.cardTitle}>{processingJobLabel(job)}</Text>
-      <Text style={styles.statusText}>{job.progress.message}</Text>
+      <Text style={styles.cardTitle}>{canvasReviewerProgressLabel(job)}</Text>
+      <Text style={styles.statusText}>
+        Stay Focused is turning your selected material into study notes.
+      </Text>
       {hasUnits ? (
         <Text style={styles.statusText}>
           {job.progress.completedUnits} of {job.progress.totalUnits}{" "}
@@ -1887,7 +2104,6 @@ function CanvasReviewerJobCard({
  */
 function SaveCanvasReviewerPanel({
   isSaving,
-  onChangeTitle,
   onOpenLibrary,
   savedReviewer,
   saveError,
@@ -1895,7 +2111,6 @@ function SaveCanvasReviewerPanel({
   sourceSnapshotReady,
 }: {
   readonly isSaving: boolean;
-  readonly onChangeTitle: (value: string) => void;
   readonly onOpenLibrary: () => void;
   readonly savedReviewer: SavedReviewerSummary | null;
   readonly saveError: CanvasSourceDisplayError | null;
@@ -1905,20 +2120,19 @@ function SaveCanvasReviewerPanel({
   return (
     <Card style={styles.previewCard} testID="canvas-reviewer-save-card">
       <Text accessibilityRole="header" style={styles.cardTitle}>
-        Save to Study Library
+        {savedReviewer
+          ? "Saved automatically"
+          : isSaving
+            ? "Saving to Study Library"
+            : "Save needs attention"}
       </Text>
       <Text style={styles.bodyText}>
         {savedReviewer
-          ? "The saved copy keeps its verified Canvas source snapshot."
-          : "Save a source-bound copy so you can return to it from Study Library."}
+          ? `You can reopen ${saveTitle} later without creating it again.`
+          : isSaving
+            ? "Your reviewer is ready to study. Stay Focused is saving it now."
+            : "Your reviewer is ready to study, but it has not been saved yet."}
       </Text>
-      <TextField
-        editable={!savedReviewer && !isSaving}
-        label="Reviewer title"
-        onChangeText={onChangeTitle}
-        testID="canvas-reviewer-save-title-input"
-        value={saveTitle}
-      />
       {!sourceSnapshotReady ? (
         <Text style={styles.prerequisiteCopy}>
           Create the reviewer again before saving.
@@ -1931,7 +2145,12 @@ function SaveCanvasReviewerPanel({
           <Text style={styles.successText}>Reviewer saved.</Text>
         </View>
       ) : null}
-      <Button disabled={isSaving} fullWidth onPress={onOpenLibrary} variant="secondary">
+      <Button
+        disabled={!savedReviewer || isSaving}
+        fullWidth
+        onPress={onOpenLibrary}
+        variant="secondary"
+      >
         Open Study Library
       </Button>
     </Card>
@@ -1964,12 +2183,12 @@ function ReviewerSaveFooter({
           style={styles.selectionCount}
           testID="canvas-reviewer-save-state"
         >
-          Saved to Study Library.
+          Saved automatically to Study Library.
         </Text>
       ) : isSaving ? (
         <View accessibilityLiveRegion="polite" style={styles.progressRow}>
           <ActivityIndicator color={colors.accent} size="small" />
-          <Text style={styles.statusText}>Saving to Study Library.</Text>
+          <Text style={styles.statusText}>Saving automatically to Study Library.</Text>
         </View>
       ) : !sourceSnapshotReady ? (
         <Text style={styles.prerequisiteCopy}>
@@ -1981,14 +2200,23 @@ function ReviewerSaveFooter({
         </Text>
       ) : null}
       <Button
-        disabled={Boolean(savedReviewer) || !saveTitle.trim() || !sourceSnapshotReady}
+        disabled={
+          Boolean(savedReviewer) ||
+          isSaving ||
+          !saveTitle.trim() ||
+          !sourceSnapshotReady
+        }
         fullWidth
         loading={isSaving}
         onPress={onSave}
         testID="canvas-reviewer-save-button"
         variant="primary"
       >
-        {savedReviewer ? "Saved" : "Save reviewer"}
+        {savedReviewer
+          ? "Saved automatically"
+          : isSaving
+            ? "Saving reviewer"
+            : "Try saving again"}
       </Button>
     </>
   );
@@ -2166,29 +2394,6 @@ function formatProcessingJobError(
   };
 }
 
-function processingJobLabel(job: ProcessingJobStatusView): string {
-  if (job.status === "queued") return "Waiting to start";
-  if (job.status === "succeeded") return "Complete";
-  if (job.status === "failed" || job.status === "expired") return "Needs attention";
-  if (job.status === "cancelled") return "Cancelled";
-  if (job.status === "cancellation_requested") return "Stopping safely";
-  switch (job.stage) {
-    case "preparing_source":
-    case "normalizing_source":
-      return "Preparing source";
-    case "detecting_outline":
-    case "planning_sections":
-      return "Organizing topics";
-    case "generating_sections":
-      return "Creating reviewer sections";
-    case "verifying_coverage":
-    case "retrying_sections":
-      return "Checking coverage";
-    default:
-      return "Finishing reviewer";
-  }
-}
-
 function formatLibraryError(error: ReviewerLibraryError): CanvasSourceDisplayError {
   if (error.code === "unauthorized") {
     return { message: "Sign in again before saving.", title: "Session expired" };
@@ -2354,6 +2559,12 @@ const styles = StyleSheet.create({
   },
   radioSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
   actionCard: { gap: spacing[3] },
+  actionTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing[3],
+  },
+  actionTitleCopy: { flex: 1, gap: spacing[1] },
   blockSelectionHeader: { gap: spacing[3] },
   selectionActions: {
     alignItems: "center",
