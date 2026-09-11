@@ -1,190 +1,218 @@
-# B21 Canvas learner-material ingestion
+# B21.1 Canvas learner-material production acceptance
 
 Date: 2026-09-11 (Asia/Manila)
 
-Verdict: **PARTIAL — V2 Canvas learner-material discovery is implemented, but current real courses provide no supported material for final E2E proof.**
+Verdict: **PASS — B21 Canvas learner-material ingestion proven end-to-end on physical Android.**
 
-## 1. Starting state
+## Scope and starting state
+
+B21.1 deployed the committed B21 implementation, ran a new sync for only the
+three selected real Canvas courses, repaired two database contract gaps exposed
+by production, and completed Canvas → Reviewer → save → Study Library reopen on
+a physical Android phone. No local upload substituted for the Canvas source,
+no emulator was used, and no DOCX/PPTX/OAuth/Reviewer redesign was added.
 
 - Branch: `main`
-- Starting HEAD: `ffd2316 docs(ai): record B20 mobile Reviewer validation`
-- Ahead/behind: 28 ahead, 0 behind `origin/main`
-- Working tree: pre-existing untracked `docs/ai/acceptance/b8/`, preserved
-- Git fsck: clean except two dangling blobs (`e69de29...`, `625ec80...`)
-- Baselines: Canvas typecheck + 72/72, API typecheck + 607/607, mobile typecheck + 376/376 passed
+- Starting HEAD: `67241d9987de86f6776c36861a10f43daf1085ac`
+- Starting divergence: 29 ahead, 0 behind `origin/main`
+- Starting dirty path: pre-existing untracked `docs/ai/acceptance/b8/`, preserved
+- Git integrity: `git fsck --full` found no corruption and two dangling blobs
+- Physical target: realme RMX3151, Android 13, USB debugging authorized
 
-## 2. V1 learner-material behavior
+The fresh pre-deployment gates passed: Canvas 73/73, API 624/624, and mobile
+377/377, with typechecking passing for each workspace.
 
-| Area | V1 behavior | Relevant V1 files |
-| --- | --- | --- |
-| Discovery | Course modules and ordered module items were primary | `lib/canvas.ts`, `actions/canvas.ts` |
-| Resolution | Resolved Page, assignment, announcement, discussion, and File URLs | `lib/canvas-content-resolution.ts` |
-| Attachments | Combined typed/HTML-linked attachments with body text | `lib/canvas-resource-extraction.ts` |
-| Extraction | PDF, selected images/OCR, plain text/Markdown/CSV/HTML, explicit readiness | `lib/canvas-resource-extraction.ts`, `app/api/sources/ocr/route.ts` |
-| Repair/Learn | Repaired individual sources; Learn chose ready/repair/generate | `app/api/sources/repair/route.ts`, `app/api/cron/resource-refresh/route.ts`, `app/modules/[id]/learn/page.tsx` |
+## Production deployment
 
-Restore module-first discovery, exact resolution, attachments, and honest readiness states. Do not copy V1 storage, queue, OCR, authorization, or UI internals; V2 ownership, RLS, durable jobs, fingerprints, provenance, and Reviewer gates remain authoritative.
+The API was deployed with `npx vercel deploy --prod --yes` and promoted to
+`https://stay-focused-v2-prototype.vercel.app`. The final production deployment
+is `dpl_DkGEwcPWN5FEpziqE5Lj9Z4rSYu5`, built from
+`f60cf770c64cedfa0c1e484c7ae1f1b047cf7096`. It is `READY`; `/api/health`
+returned HTTP 200 with `{"status":"ok","version":"2.0.0"}`.
 
-## 3. V2 pre-B21 architecture
+The production environment contained the required Supabase, Canvas-token
+encryption, OpenAI, Google Cloud, and processing-backend variables. Values were
+not printed. The build reported the repository's dependency-audit and
+`allowScripts` warnings, but compilation, type validation, deployment, aliasing,
+and runtime health all succeeded.
 
-`PAT -> CanvasClient -> protected connection/capability routes -> canvas-sync.ts + canvas-sync-jobs/* -> Canvas graph tables -> canvas-reviewer-sources.ts -> CanvasSourceReviewerScreen.tsx -> /api/reviewer/generate`.
+## Fresh real Canvas sync
 
-Modules/items were fetched, but broad Pages was required for final content persistence and course Files was the sole file inventory. Their failures became “no material”; the picker then surfaced remaining announcements.
+The final fresh run began on 2026-09-11 at 12:41 UTC from the installed Android
+app. All three jobs reached terminal `succeeded` with a safe `partial` result:
+their exact module resources succeeded while the same supplemental broad
+collections remained unavailable.
 
-## 4. Root cause
-
-Multiple causes: broad collection dependency; no independent module Page/Assignment/File resolution; incorrect loss of successful staged module data when Pages failed; and announcement picker filtering. Real permissions (`canvas_permission_denied` for Files, `canvas_resource_not_found` for Pages) exposed these defects but did not prove exact module resources were inaccessible.
-
-## 5. Real Canvas API findings
-
-| Course | Resource | Result | Accessible through module? | Notes |
-| --- | --- | --- | ---: | --- |
-| CC17 Mobile Application Design and Development | Modules/items | API units succeeded | Yes | Pre-B21 finalizer later persisted zero rows |
-| CIT6 Capstone Project 1 | Modules/items | API units succeeded | Yes | Pre-B21 finalizer later persisted zero rows |
-| CC16 IT Security | Modules/items | API units succeeded | Yes | Pre-B21 finalizer later persisted zero rows |
-| All three | Files collection | `canvas_permission_denied` | Exact access unknown | B21 uses documented global `/files/:id` |
-| All three | Pages collection | `canvas_resource_not_found` | Exact access unknown | B21 resolves module Page URLs individually |
-| All three | Assignments/announcements | Collection units succeeded | N/A | Announcements excluded from learner materials |
-
-No credentials, IDs, headers, signed URLs, or secrets are recorded.
-
-## 6. B21 architecture
-
-```text
-Course -> Modules -> ordered Module Items (+ content_details)
-  -> exact Page / Assignment / global File resolver
-  -> supported learner material
-  -> canonical V2 rows + reference relationships
-  -> existing Storage/extraction/OCR/structured blocks
-  -> existing provenance/fingerprint/Reviewer pipeline -> Android
-```
-
-Broad collections are supplemental. A failure produces a partial result and preserves last-known-good owned rows; it no longer means an empty course.
-
-## 7. Material support matrix
-
-| Type | Discovery | Ingestion | Reviewer selectable | Status |
-| --- | ---: | ---: | ---: | --- |
-| PDF | Module File/attachment | Existing PDF path | Yes when prepared | SUPPORTED |
-| Image | Module File/attachment | Existing OCR path | Yes when prepared | SUPPORTED |
-| Canvas Page/text | Exact Page; TXT/Markdown | Existing structured/stored-source path | Yes when substantive | SUPPORTED |
-| Assignment material | Exact description/attachments | Existing HTML/file paths | Yes when substantive | SUPPORTED |
-| DOCX | Classified | No parser added | No | UNSUPPORTED |
-| PPTX | Classified | No parser added | No | UNSUPPORTED |
-
-## 8. Files changed
-
-- `.vercelignore`: excludes local evidence/temp output from deployment.
-- `packages/canvas/src/{types,client}.ts` + test: module API URL/content details, exact assignments/attachments, exact global File endpoint.
-- `apps/api/src/lib/canvas-module-material.ts` + test: eight-state classifier and DOCX/PPTX handling.
-- `apps/api/src/lib/canvas-sync.ts` + route tests: module-first exact resolution, optional collections, safe preservation, partial reporting, deduplication.
-- `apps/api/src/lib/canvas-sync-jobs/{checkpoints,unit-executor,finalize}.ts`: durable exact resource units and fallback finalization.
-- `apps/api/src/lib/canvas-file-normalize.ts` + test: assignment attachment discovery and canonical File/reference deduplication.
-- `apps/api/src/lib/canvas-stored-file-extraction.ts` + test: UTF-8 TXT/Markdown through private stored-source extraction without OCR.
-- `apps/api/src/lib/canvas-structured-blocks.ts`, `canvas-usable-content.ts`, `canvas-usable-content-service.ts`, `canvas-reviewer-sources.ts`, `types/canvas.ts` + tests: shared plain-text method and learner-material filtering.
-- `apps/mobile/src/services/canvasApi.ts`, `CanvasSourceReviewerScreen.tsx`, `canvasSourcePresentation.ts` + test: text contract, clearer copy, announcement exclusion.
-
-## 9. Tests added
-
-| Test area | Scenarios | Result |
-| --- | --- | --- |
-| Canvas client | content details/API URL, exact assignment attachments, exact global File | PASS, 73/73 |
-| Classifier | PDF/image/Page/Assignment, empty/task-only, DOCX/PPTX, external/navigation, missing/inaccessible/unknown | PASS |
-| Sync/API | denied Files + module PDF; unavailable Pages + module Page; preservation, duplicates, repeat sync, owner/auth | PASS, 624/624 |
-| Extraction | UTF-8 text without OCR plus existing PDF/image safety | PASS |
-| Mobile | grouping, selectable source types/IDs, unsupported state, announcement exclusion | PASS, 377/377 |
-
-Intermediate API runs exposed stale fixture expectations (5, then 1, then 2 after the intentional text-contract change); fixtures were corrected and final full runs passed.
-
-## 10. Fresh three-course sync
-
-This is the fresh pre-repair runtime evidence that exposed the defect. Deployment of repaired code failed, so these are honest persisted counts, not invented post-repair results.
-
-| Course | Modules | Module Items | PDF | Image | Page | Assignment Material | Unsupported | Selectable |
+| Course | Modules | Module items | PDF | Image | Page | Assignment material | Unsupported | Selectable |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| CC17 Mobile Application Design and Development | 0 persisted | 0 persisted | 0 | 0 | 0 | 0 | 0 | 0 |
-| CIT6 Capstone Project 1 | 0 persisted | 0 persisted | 0 | 0 | 0 | 0 | 0 | 0 |
-| CC16 IT Security | 0 persisted | 0 persisted | 0 | 0 | 0 | 0 | 0 | 0 |
+| CC17 Mobile Application Design and Development | 3 | 5 | 0 | 0 | 0 | 1 | 3 | 1 |
+| CIT6 Capstone Project 1 | 2 | 6 | 2 | 0 | 0 | 4 | 0 | 5 |
+| CC16 IT Security | 7 | 42 | 8 | 1 | 19 | 12 | 0 | 31 |
 
-| Course | Files collection | Pages collection |
+`Selectable` is the final picker state. CIT6 contains four substantive
+assignment sources and one prepared PDF; its other PDF still honestly reports
+`Prepare file`. Empty roll-call assignments remain unavailable.
+
+| Course | Broad Files | Broad Pages | Exact File | Exact Page | Exact Assignment | Final state |
+| --- | --- | --- | --- | --- | --- | --- |
+| CC17 | `canvas_permission_denied` | `canvas_resource_not_found` | 3/3 succeeded | No module Page candidate | 1/1 succeeded | succeeded / partial |
+| CIT6 | `canvas_permission_denied` | `canvas_resource_not_found` | 2/2 succeeded | No module Page candidate | 3/3 succeeded | succeeded / partial |
+| CC16 | `canvas_permission_denied` | `canvas_resource_not_found` | 9/9 succeeded | 19/19 succeeded | 8/8 succeeded | succeeded / partial |
+
+The exact Canvas routes were `/api/v1/files/:id`,
+`/api/v1/courses/:courseId/pages/:url`, and
+`/api/v1/courses/:courseId/assignments/:id`. The broad failures are Canvas
+permission/content limitations, not evidence that exact module resources are
+unavailable.
+
+## Persistence regression proof
+
+The critical old defect is closed against production. Despite Files and Pages
+collection failures in every course, the successful module-owned results
+persisted independently:
+
+- CC17: 3 modules, 5 module items, 3 exact file rows, and 2 assignment rows;
+- CIT6: 2 modules, 6 module items, 2 exact file rows, and 5 assignment rows;
+- CC16: 7 modules, 42 module items, 9 exact file rows, 19 Page rows, and 14
+  assignment rows.
+
+The corresponding job-unit evidence shows every candidate-bearing
+`module_items_page`, `module_file`, `module_page_detail`, and
+`module_assignment` unit succeeded. Supplemental `files_page` and `pages_page`
+units failed once with sanitized codes, while the content and files scope
+outcomes were recorded as succeeded. No successful owned graph was cleared.
+
+## Selected real Canvas learner material
+
+- Course: CIT6 Capstone Project 1
+- Module: Week 1: Deliverables, Policies and Guidelines
+- Module item: position 4, Canvas module-item `2761992`
+- Material: `CIT6 Course Introduction and Orientation 2026.pdf`
+- Type: PDF, 167,395 bytes, 23 pages
+- Canvas resource ID: `11437391`
+- Canonical V2 source ID: `file:b08d03f7-9e36-44e0-a9f0-0bc9c6d9cd2a`
+- Resolver: Canvas `/api/v1/files/11437391`
+- V2 ingestion: `/api/canvas/courses/[courseId]/sources/prepare`, using the
+  owner-scoped Canvas file-ingestion service and private Storage
+- OCR required: no; all 23 pages had usable native text
+
+The persisted file row is `stored`, retains matching source/stored byte counts
+and SHA-256 identity, has a successful non-retryable ingestion result, and is
+linked back to Canvas module `451507` / item `2761992`. Private bucket keys and
+user identifiers are intentionally omitted from this report.
+
+## Physical Android Reviewer E2E
+
+The B21 preview APK build `ede2ae05-99de-4a74-b5e2-a0ee28e008cc` was installed
+on the physical realme device. Package `com.galaxymaxp.stayfocusedv2`, app
+version `2.0.0`, targeted the production API and retained the authenticated
+session.
+
+The picker displayed real Canvas sources grouped by module, including ready
+assignments, two CIT6 PDFs requiring preparation, and an unavailable empty
+roll-call item. Preparing the selected PDF stored it privately, extracted 23/23
+pages, exposed 23 selectable blocks, and produced an exact editable preview.
+
+The durable Reviewer job `0ff834b1-4eb6-4789-95d7-fa62fe3b5010` ran through
+the production Vercel Workflow backend and completed on its first worker
+attempt. It processed 20/20 sections in 44.820 seconds. The phone rendered the
+result, saved it, listed it in Study Library, and reopened the saved record
+without regeneration. The saved reviewer is
+`e0d48aa1-833d-4e49-bee1-eaf54a2c1adc`, with the same title and 20 sections.
+
+| Step | Result | Evidence |
 | --- | --- | --- |
-| CC17 | `canvas_permission_denied` | `canvas_resource_not_found` |
-| CIT6 | `canvas_permission_denied` | `canvas_resource_not_found` |
-| CC16 | `canvas_permission_denied` | `canvas_resource_not_found` |
+| Canvas source visible | PASS | Real CIT6 PDF shown under the correct module |
+| Source selected | PASS | Canonical Canvas-backed V2 source selected |
+| Ingestion | PASS | 167,395 bytes stored; 23/23 native-text pages |
+| Reviewer job | PASS | Durable production job succeeded, attempt 1 |
+| Generation | PASS | 20/20 sections, fresh mode, production `gpt-4o` |
+| Rendering | PASS | Grounded reviewer rendered on the phone |
+| Save | PASS | Server reviewer row created with snapshot provenance |
+| Study Library reopen | PASS | Same title, source context, and 20 sections reopened |
 
-Each job ended safely `partial`; module/item units succeeded, but the pre-B21 finalizer persisted zero graph rows after Pages failed—the behavior now regression-covered.
+ADB warning-log inspection for the active app found zero fatal exceptions, zero
+unhandled React Native errors, and zero transport exceptions. Screenshots of
+block selection, exact preview, reviewer, Library listing, and reopen were
+captured under ignored `.local/b21/` evidence and were not committed.
 
-## 11. Canvas Reviewer E2E
+## Reviewer verification
 
-- Source/course/type: no genuine persisted Canvas learner material across the three selected courses
-- Discovery route: module units succeeded pre-B21; repaired exact resources not re-probed
-- Physical Android, ingestion, Reviewer generation, coverage, grounding, leakage, rendering, save, Library reopen: not run
-- Durable job: three sync jobs succeeded with safe `partial` outcomes; no Reviewer job created
+- Final sections: 20
+- Coverage: 1.00, passed
+- Grounding: 1.00, passed
+- Leakage: passed
+- Grounding/leakage issues: none reported by the persisted verifier metrics
+- Source: 7,211 characters before normalization; 7,097 normalized characters
+- Provenance: one Canvas file snapshot item, 23 selected snapshot blocks, page
+  numbers 1–23, matching normalized and stored hashes
+- Runtime behavior: four provider calls and four bounded explanation retries;
+  some sections used the visible source-only safety fallback rather than
+  accepting text that could not be safely verified
 
-The Vercel deploy returned `fetch failed`; using the old Android/API runtime would only repeat known pre-B21 behavior. B20's independent PDF-upload E2E remains PASS.
+Student-visible inspection showed the correct course/source context, sensible
+course-outline sections, readable key points, and explicit grounded/fallback
+status. No unsupported enrichment or source leakage was observed.
 
-## 12. V1 vs V2 after B21
+## Production defects found and repaired
 
-| Capability | V1 | V2 after B21 | Winner / Notes |
-| --- | --- | --- | --- |
-| Material discovery | Working module/resource reference | Module-first exact resolution | V2 design; runtime re-proof pending |
-| PDF/Page/Image/Assignment | Supported paths | Shared hardened V2 paths | V2 |
-| DOCX/PPTX | Limited/unsupported | Explicitly unsupported | Honest parity |
-| Provenance/security | Weaker | Canonical IDs, hashes, owner/RLS boundaries | V2 |
-| OCR/durable processing | Older queue | Existing bounded OCR + durable jobs | V2 |
-| Reviewer quality | Earlier Learn path | Stages 0–6 + coverage/grounding/leakage | V2 |
-| Mobile | Not V2 architecture | Native grouped picker | V2 implementation; live proof pending |
+### 1. Exact-resource unit constraint
 
-## 13. Regression verification
+Classification: `B21_IMPLEMENTATION_DEFECT`.
 
-| Suite | Fresh result |
+The application emitted B21's new `module_page_detail`, `module_assignment`, and
+`module_file` unit kinds, but the deployed database check constraint still
+allowed only the older kinds. Candidate-bearing module pages therefore failed
+before exact resolution.
+
+Repair: `20260911122809_allow_canvas_module_material_sync_units.sql` updates and
+validates the bounded allow-list. The database contract test now asserts every
+B21 exact kind. A production migration dry-run contained only that migration,
+the error-level advisor reported no issues, the migration applied, and the
+fresh three-course run succeeded as listed above.
+
+### 2. Reviewer snapshot PDF page ceiling
+
+Classification: `B21_IMPLEMENTATION_DEFECT`.
+
+The current synchronous Canvas PDF extractor accepts up to 40 pages, but the
+immutable reviewer-provenance item constraint still allowed only 1–5. The real
+23-page preview therefore failed before a job could be created.
+
+Repair: `20260911125600_allow_canvas_snapshot_document_page_limit.sql` aligns
+snapshot provenance to the existing 1–40 Canvas limit with a `NOT VALID` add
+followed by validation. A focused regression checks the exact bound. The only
+pending production migration was this change, the advisor was clean, and the
+same physical preview then created a successful Reviewer job.
+
+### Other observed limitations
+
+- `CANVAS_PERMISSION_OR_CONTENT_LIMITATION`: broad Files is denied and broad
+  Pages is unavailable for all three courses; exact module resources still work.
+- `UNSUPPORTED_FORMAT`: CC17 contains three PPTX files that remain safely
+  metadata-only and unselectable, as required by scope.
+- `DEPLOYMENT_ENVIRONMENT`: npm reported 58 dependency audit findings and six
+  pending install scripts during Vercel builds; these did not block build or
+  runtime health and were not broadened into dependency remediation.
+
+## Fresh final regression
+
+| Suite | Result |
 | --- | --- |
 | Canvas typecheck/tests | PASS; 73/73 |
-| Engine typecheck/build/eval | PASS; 606/606 (157/157 architecture) |
-| API typecheck/tests | PASS; 624/624 |
-| Mobile typecheck/tests | PASS; 377/377 |
-| Reader | PASS; 32/32 |
-| Root typecheck | PASS; 7/7 workspaces |
-| Root lint | PASS; 7/7, 0 errors, 4 pre-existing warnings |
-| Root build | INCOMPLETE; command hung and was terminated; engine build passed independently |
-| Production deploy | FAIL; Vercel CLI `fetch failed`, no promotion |
+| API typecheck/tests | PASS; 626/626 across 71 files |
+| Mobile typecheck/tests | PASS; 377/377 across 31 files |
+| Engine typecheck/build/eval | PASS; 606/606, including 157/157 architecture |
+| Supabase migration parity/advisor | PASS; both B21.1 migrations remote, no error-level findings |
+| Vercel production build/health | PASS; READY, HTTP 200 |
 
-## 14. Remaining gaps
+## Result
 
-### DEMO_BLOCKING
+The purpose of B21.1 is satisfied: a genuine learner PDF was discovered from a
+module through the repaired Canvas path, persisted despite failed supplemental
+collections, ingested and resolved into exact blocks, generated through the
+real production Reviewer workflow, rendered on a physical Android phone, saved,
+and reopened from Study Library. B22 was not started and nothing was pushed.
 
-Deploy B21; fresh-sync the three courses; complete one genuine Canvas PDF/Page/image Android generation/save/reopen.
-
-### NON_BLOCKING_UX
-
-Unsupported-format labels may become more specific later.
-
-### NON_BLOCKING_PRESENTATION
-
-None beyond lack of a real runtime sample.
-
-### CANVAS_PERMISSION_OR_CONTENT_LIMITATION
-
-Broad Files is denied and Pages unavailable for all three; exact module-resource access remains unproved post-repair.
-
-### UNSUPPORTED_FORMAT
-
-DOCX and PPTX remain intentionally unsupported and fail safely.
-
-### DEFERRED_PRODUCT_WORK
-
-Canvas OAuth and broader parsers remain out of scope.
-
-## 15. Verdict
-
-**PARTIAL — V2 Canvas learner-material discovery is implemented, but current real courses provide no supported material for final E2E proof.**
-
-Automated evidence proves module-first exact fallback, safe persistence, and shared ingestion contracts. Real pre-B21 evidence proves module APIs succeed while collections fail, but no material survived that old finalizer. Failed deployment prevented post-repair real-course and Android proof, so PASS is not claimed.
-
-## 16. Git result
-
-The final response records the implementation commit and final HEAD. `.local/`, credentials, signed URLs, generated build drift, and unrelated B8 files are excluded; nothing was pushed.
-
-## 17. Next recommended task
-
-Deploy the committed B21 API, rerun only the three selected courses, and complete one genuine Canvas-originated physical-Android Reviewer generation/save/reopen. Do not start B22 before this smallest runtime proof is resolved.
+Next: begin B22 only as a separately scoped task; keep the known broad Canvas
+permission/content limitations and intentional PPTX/DOCX exclusions explicit.

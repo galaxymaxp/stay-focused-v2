@@ -1,8 +1,8 @@
 # Roadmap
 
-## B21 Canvas learner-material acquisition — current result (2026-09-11)
+## B21.1 Canvas learner-material production acceptance — current result (2026-09-11)
 
-**PARTIAL — module-first acquisition is implemented and regression-verified; runtime proof remains.** Exact Page, Assignment/attachment, and global File resolution no longer depends on broad collection success; incomplete evidence preserves owned rows; PDF/image/plain-text reuse V2 ingestion; DOCX/PPTX are unsupported; announcements no longer populate the learner-material picker. Fresh Canvas 73/73, API 624/624, mobile 377/377, Reader 32/32, engine 606/606, root typecheck and lint pass. A hung root build was terminated and Vercel deployment failed with `fetch failed`. Next: deploy B21 and validate one genuine Canvas source through Android Reviewer/save/reopen before B22. See [B21 acceptance](ai/acceptance/b21/canvas-learner-material-ingestion.md). Earlier entries below are historical.
+**PASS — B21 is deployed and physically proven.** Fresh production syncs persisted exact module Files, Pages, and Assignments for the three selected courses while unavailable broad collections remained safe partial warnings. Production repairs aligned the durable sync-unit constraint with B21's exact resolver kinds and reviewer snapshot provenance with the existing 40-page Canvas PDF limit. A real module-owned 23-page CIT6 PDF completed prepare, native-text extraction, 20-section grounded Reviewer generation, rendering, save, and Study Library reopen on a physical Android 13 phone. Fresh Canvas 73/73, API 626/626, mobile 377/377, and engine 606/606 pass. PPTX/DOCX and broader Canvas permission expansion remain out of scope. Next: begin B22 as a new bounded milestone. See [B21.1 acceptance](ai/acceptance/b21/canvas-learner-material-ingestion.md). Earlier entries below are historical.
 
 ## B20 real mobile Reviewer E2E — current result (2026-09-10)
 
