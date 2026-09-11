@@ -1,10 +1,15 @@
-import { router } from "expo-router";
-import { useCallback, useEffect } from "react";
+import { router, usePathname } from "expo-router";
+import { useCallback, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth";
 import { getApiBaseUrl } from "../config/apiBaseUrl";
 import { readNotificationDestination } from "../navigation/notificationRoutes";
+import {
+  COURSE_REVIEWER_PATHNAME,
+  courseRouteParams,
+} from "../navigation/appRoutes";
+import { readCanvasReviewerRecovery } from "../services/canvasReviewerRecoveryStore";
 import { subscribeToProcessingNotificationResponses } from "../services/completionNotifications";
 import { reconcileReviewerProcessingOutbox } from "../services/processingOutboxReconciliation";
 
@@ -24,6 +29,8 @@ export function AppLifecycle() {
   const { session } = useAuth();
   const accessToken = session?.accessToken;
   const ownerUserId = session?.user.id;
+  const pathname = usePathname();
+  const routedRecoveryKeyRef = useRef<string | null>(null);
 
   const reconcileOutbox = useCallback(async () => {
     const apiBaseUrl = getApiBaseUrl();
@@ -67,6 +74,33 @@ export function AppLifecycle() {
     });
     return () => subscription.remove();
   }, [ownerUserId]);
+
+  useEffect(() => {
+    if (!ownerUserId) {
+      routedRecoveryKeyRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const recovery = await readCanvasReviewerRecovery(ownerUserId);
+      if (!recovery || cancelled) return;
+      const recoveryKey = `${recovery.ownerUserId}:${recovery.jobId ?? recovery.requestIdempotencyKey}`;
+      if (routedRecoveryKeyRef.current === recoveryKey) return;
+      routedRecoveryKeyRef.current = recoveryKey;
+      const expectedPath = `/courses/${encodeURIComponent(recovery.courseId)}/reviewer`;
+      if (pathname === expectedPath) return;
+      router.replace({
+        pathname: COURSE_REVIEWER_PATHNAME,
+        params: courseRouteParams({
+          courseId: recovery.courseId,
+          courseName: recovery.courseName,
+        }),
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerUserId, pathname]);
 
   return null;
 }

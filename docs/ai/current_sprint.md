@@ -1,5 +1,13 @@
 # Current Sprint
 
+## B23 mobile recovery foundation — current result (2026-09-12)
+
+**PASS — B23 mobile recovery foundation proven; ready for B24 full UX/UI redesign.** Minimal SecureStore state binds the authenticated owner, Canvas source, idempotency request, accepted job, and immutable snapshot without storing source or generated content. Exact-job polling resumes after backgrounding, process recreation, and transient network failure; a unique owner/snapshot database contract makes automatic Library persistence replay-safe. Physical Android acceptance proved the running-job recovery path, large-text reachability, save, and reopen, while production counts showed two intentional jobs and one Reviewer for each of two distinct snapshots. Fresh Canvas 73/73, API 626/626, mobile 411/411, engine 606/606, and root gates pass. See [B23 acceptance](acceptance/b23/mobile-recovery-foundation.md). Earlier entries below are historical.
+
+B23 establishes accessibility/recovery behavior contracts only. Final UI accessibility and visual polish will be performed against the redesigned interface during B25–B28.
+
+Next: B24 — Complete Stay Focused V2 mobile UX/UI redesign specification, followed by B25 — Design system + app shell implementation, B26 — Core experience redesign, B27 — Remaining application redesign, and B28 — Full design QA + pilot freeze.
+
 ## B22 mobile Canvas-to-Reviewer workflow — current result (2026-09-12)
 
 **PASS — B22 mobile Canvas-to-Reviewer study workflow is proven end-to-end on physical Android.** The mobile flow now leads with course/module/material context, keeps Ready/Prepare/unsupported/empty states understandable, turns default source resolution and durable job submission into one Create Reviewer action, shows coarse progress, and auto-saves against the immutable Canvas snapshot. A fresh production job from the real 23-page CIT6 PDF produced a grounded 20-section Reviewer (coverage/grounding 1.00, zero issues, leakage passed), rendered on the realme Android 13 phone, appeared in Study Library, and reopened without regeneration. Real CC17 PPTX and CIT6 empty rows remained visible and disabled. Fresh Canvas 73/73, API 626/626, mobile 389/389, engine 606/606, and root gates pass. B22 required no API or schema deployment; production health is green. Next: scope B23 separately. See [B22 acceptance](acceptance/b22/mobile-canvas-study-workflow.md). Earlier entries below are historical.

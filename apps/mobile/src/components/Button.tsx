@@ -29,6 +29,7 @@ export function Button({
   fullWidth = false,
   loading = false,
   disabled = false,
+  accessibilityState,
   style,
   textStyle,
   ...props
@@ -39,6 +40,11 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{
+        ...accessibilityState,
+        busy: loading,
+        disabled: isDisabled,
+      }}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
@@ -81,9 +87,11 @@ const styles = StyleSheet.create({
     opacity: 0.54,
   },
   text: {
+    flexShrink: 1,
     fontFamily: typography.fontFamily,
     fontSize: typography.body,
     fontWeight: "700",
+    textAlign: "center",
   },
 });
 

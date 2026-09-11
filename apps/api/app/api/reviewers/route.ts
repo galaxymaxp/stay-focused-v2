@@ -152,7 +152,9 @@ export async function POST(request: Request): Promise<Response> {
 
   const { data, error } = await auth.value.client
     .from("reviewers")
-    .insert(createReviewerInsert(auth.value.user.id, validation.value))
+    .upsert(createReviewerInsert(auth.value.user.id, validation.value), {
+      onConflict: "user_id,source_snapshot_id",
+    })
     .select(
       `${REVIEWER_SUMMARY_COLUMNS},reviewer_output`,
     )

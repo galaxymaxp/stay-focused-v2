@@ -79,6 +79,19 @@ describe("Canvas reviewer student workflow", () => {
     });
   });
 
+  it("recreates an exact save draft without persisting private source text", () => {
+    const draft = createCanvasReviewerSaveDraft({
+      courseName: "CIT6 Capstone Project 1",
+      reviewer: reviewer(),
+      sourceSnapshotId: "snapshot-id",
+      sourceCharacterCount: 20,
+      sourceTitle: "Course Introduction.pdf",
+    });
+
+    expect(draft.sourceMetadata.sourceCharacterCount).toBe(20);
+    expect(JSON.stringify(draft)).not.toContain("Prepared Canvas text");
+  });
+
   it("leaves an automatic save failure available to the retrying caller", async () => {
     const failure = { code: "network_error", retryable: true } as const;
 

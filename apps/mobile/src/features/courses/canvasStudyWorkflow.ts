@@ -26,6 +26,17 @@ export interface CanvasReviewerSaveDraft {
   readonly title: string;
 }
 
+export type CanvasReviewerSaveInput = {
+  readonly courseName?: string;
+  readonly reviewer: ReviewerOutput;
+  readonly sourceSnapshotId: string;
+  readonly sourceTitle: string;
+  readonly title?: string;
+} & (
+  | { readonly sourceText: string; readonly sourceCharacterCount?: never }
+  | { readonly sourceCharacterCount: number; readonly sourceText?: never }
+);
+
 /**
  * Keep the generated job bound to the server-resolved Canvas identities. The
  * screen never reconstructs or guesses a source ID from a title or module.
@@ -47,18 +58,15 @@ export function createCanvasReviewerJobDraft(input: {
 }
 
 /** A completed Canvas reviewer is saved with the same immutable snapshot. */
-export function createCanvasReviewerSaveDraft(input: {
-  readonly courseName?: string;
-  readonly reviewer: ReviewerOutput;
-  readonly sourceSnapshotId: string;
-  readonly sourceText: string;
-  readonly sourceTitle: string;
-  readonly title?: string;
-}): CanvasReviewerSaveDraft {
+export function createCanvasReviewerSaveDraft(
+  input: CanvasReviewerSaveInput,
+): CanvasReviewerSaveDraft {
+  const sourceCharacterCount =
+    input.sourceCharacterCount ?? input.sourceText.trim().length;
   return {
     reviewerOutput: input.reviewer,
     sourceMetadata: {
-      sourceCharacterCount: input.sourceText.trim().length,
+      sourceCharacterCount,
       sourceLabel: [input.courseName?.trim(), input.sourceTitle.trim()]
         .filter((part): part is string => Boolean(part))
         .join(" · "),
@@ -74,7 +82,7 @@ export function createCanvasReviewerSaveDraft(input: {
 }
 
 export async function persistCanvasReviewerAutomatically<TResult>(
-  input: Parameters<typeof createCanvasReviewerSaveDraft>[0],
+  input: CanvasReviewerSaveInput,
   persist: (draft: CanvasReviewerSaveDraft) => Promise<TResult>,
 ): Promise<TResult> {
   return persist(createCanvasReviewerSaveDraft(input));

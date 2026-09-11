@@ -1030,6 +1030,7 @@ function CourseSelectionRow({
         ) : null}
         {canCreateReviewer ? (
           <Button
+            accessibilityLabel={`Study materials for ${course.displayName}`}
             onPress={() =>
               onCreateReviewerFromCanvas(course.id, course.displayName)
             }

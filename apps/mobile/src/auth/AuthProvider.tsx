@@ -24,6 +24,8 @@ import {
   pauseOfflineProcessingIntents,
   resumeOfflineProcessingIntents,
 } from "../services/processingOutboxStore";
+import { clearProcessingJobReferencesForOwner } from "../services/activeProcessingJobStore";
+import { clearCanvasReviewerRecoveryForOwner } from "../services/canvasReviewerRecoveryStore";
 
 export type AuthStatus = "restoring" | "signedOut" | "signedIn";
 
@@ -181,7 +183,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const result = await signOutSession();
       if (result.ok) {
         if (ownerUserId) {
-          await pauseOfflineProcessingIntents(ownerUserId);
+          await Promise.all([
+            pauseOfflineProcessingIntents(ownerUserId),
+            clearProcessingJobReferencesForOwner(ownerUserId),
+            clearCanvasReviewerRecoveryForOwner(ownerUserId),
+          ]);
         }
         applySession(null);
       } else {

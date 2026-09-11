@@ -1,5 +1,13 @@
 # Current State
 
+## B23 mobile recovery foundation — current result (2026-09-12)
+
+**PASS — B23 mobile recovery foundation proven; ready for B24 full UX/UI redesign.** Canvas Reviewer creation now persists a minimal owner/source/job recovery record before submission, reconnects the exact durable job after backgrounding or Android process death, retains identity through temporary network errors, fails closed on unsafe state, and makes snapshot-bound Library saves replay-safe. Production physical acceptance on a realme RMX3151 / Android 13 proved background/foreground, running-job force-stop/relaunch, network interruption/recovery, large text at font scale 1.35, automatic save, and Library reopen without regeneration. Exactly two intentional jobs produced two distinct snapshots and one saved Reviewer per snapshot. Fresh Canvas 73/73, API 626/626, mobile 411/411, engine 606/606, and forced root gates pass. See [B23 acceptance](ai/acceptance/b23/mobile-recovery-foundation.md). Earlier entries below are historical.
+
+B23 establishes accessibility/recovery behavior contracts only. Final UI accessibility and visual polish will be performed against the redesigned interface during B25–B28.
+
+Next milestones: B24 — Complete Stay Focused V2 mobile UX/UI redesign specification; B25 — Design system + app shell implementation; B26 — Core experience redesign; B27 — Remaining application redesign; B28 — Full design QA + pilot freeze.
+
 ## B22 mobile Canvas-to-Reviewer workflow — current result (2026-09-12)
 
 **PASS — B22 mobile Canvas-to-Reviewer study workflow is proven end-to-end on physical Android.** The normal path is now Study materials → material → Create Reviewer → automatic save → Library → reopen. Course diagnostics are disclosed instead of leading, Canvas materials retain module order, Ready/Prepare/PPTX-DOCX unsupported/empty states are explicit, and the accepted single-source snapshot/durable-job architecture remains intact. Physical production acceptance used the real 23-page CIT6 PDF and created one fresh 20-section Reviewer with 1.00 coverage/grounding, zero grounding/fabrication/leakage issues, automatic snapshot-bound persistence, and reopen without a second job. Fresh Canvas 73/73, API 626/626, mobile 389/389, engine 606/606, and root gates pass. No API, engine, Supabase, or Vercel deployment change was required. See [B22 acceptance](ai/acceptance/b22/mobile-canvas-study-workflow.md). Earlier entries below are historical.

@@ -57,6 +57,7 @@ import {
   createReviewerJob,
   getProcessingJobStatus,
   getReviewerJobResult,
+  listProcessingJobsPage,
   MOBILE_JOB_POLL_INTERVAL_MS,
   retryProcessingJob,
   type ProcessingJobApiError,
@@ -65,6 +66,18 @@ import {
   removeActiveProcessingJob,
   upsertActiveProcessingJob,
 } from "../../services/activeProcessingJobStore";
+import {
+  acceptCanvasReviewerRecovery,
+  beginCanvasReviewerRecovery,
+  findCanvasReviewerRecoveryCandidate,
+  isUncertainCanvasReviewerSubmissionExpired,
+  matchesCanvasReviewerRecoveryJob,
+  prepareCanvasReviewerRetryRecovery,
+  readCanvasReviewerRecovery,
+  removeCanvasReviewerRecovery,
+  shouldDiscardCanvasReviewerRecoveryAfterStatusError,
+  type CanvasReviewerRecoveryRecord,
+} from "../../services/canvasReviewerRecoveryStore";
 import { cacheCompletedArtifact } from "../../services/completedArtifactCache";
 import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
 import {
@@ -157,6 +170,7 @@ export function CanvasSourceReviewerScreen({
   const [isStructuring, setIsStructuring] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRestoringReviewerJob, setIsRestoringReviewerJob] = useState(true);
   const [activeReviewerJob, setActiveReviewerJob] =
     useState<ProcessingJobStatusView | null>(null);
   const [appIsActive, setAppIsActive] = useState(
@@ -182,6 +196,8 @@ export function CanvasSourceReviewerScreen({
   const generationLockRef = useRef(false);
   const saveLockRef = useRef(false);
   const generationIdempotencyKeyRef = useRef<string | null>(null);
+  const recoveryRecordRef = useRef<CanvasReviewerRecoveryRecord | null>(null);
+  const recoveryLockRef = useRef(false);
   const currentResolutionSelectionKeyRef = useRef("");
   const [structureRetryToken, setStructureRetryToken] = useState(0);
   const pendingGenerationRef = useRef<{
@@ -691,6 +707,36 @@ export function CanvasSourceReviewerScreen({
       generationIdempotencyKeyRef.current ??
       createProcessingJobIdempotencyKey("reviewer_generation");
     generationIdempotencyKeyRef.current = idempotencyKey;
+    const ownerUserId = session?.user.id;
+    if (!ownerUserId) {
+      finishCanvasSingleFlight(generationLockRef);
+      setError({
+        message: "Sign in again before creating a reviewer.",
+        title: "Login session expired",
+      });
+      return;
+    }
+    let recoveryRecord: CanvasReviewerRecoveryRecord;
+    try {
+      recoveryRecord = await beginCanvasReviewerRecovery({
+        ownerUserId,
+        requestIdempotencyKey: idempotencyKey,
+        courseId,
+        courseName: sourceList?.courseName || courseName,
+        canvasItemIds: previewToGenerate.sources.map((source) => source.id),
+        canvasResolutionFingerprint: previewToGenerate.resolutionFingerprint,
+        sourceTitle,
+        sourceCharacterCount: finalSourceText.length,
+      });
+      recoveryRecordRef.current = recoveryRecord;
+    } catch {
+      finishCanvasSingleFlight(generationLockRef);
+      setError({
+        message: "Stay Focused could not safely remember this request. Try again.",
+        title: "Reviewer could not start safely",
+      });
+      return;
+    }
     pendingGenerationRef.current = {
       requestToken,
       resolutionFingerprint: previewToGenerate.resolutionFingerprint,
@@ -725,12 +771,38 @@ export function CanvasSourceReviewerScreen({
         return;
       }
       if (result.ok) {
-        accepted = true;
-        const ownerUserId = session?.user.id;
-        if (ownerUserId) {
-          await upsertActiveProcessingJob(ownerUserId, result.data);
+        let acceptedRecovery: CanvasReviewerRecoveryRecord | null;
+        try {
+          acceptedRecovery = await acceptCanvasReviewerRecovery(
+            recoveryRecord,
+            result.data,
+          );
+        } catch {
+          setIsRestoringReviewerJob(true);
+          setError({
+            message:
+              "The server accepted this reviewer. Stay Focused will reconnect without starting another one.",
+            title: "Recovering accepted reviewer",
+          });
+          return;
         }
+        if (!acceptedRecovery) {
+          finishCanvasSingleFlight(generationLockRef);
+          setIsGenerating(false);
+          setError({
+            message: "The accepted job did not match the selected material.",
+            title: "Reviewer recovery was stopped safely",
+          });
+          return;
+        }
+        accepted = true;
+        recoveryRecordRef.current = acceptedRecovery;
         setActiveReviewerJob(result.data);
+        try {
+          await upsertActiveProcessingJob(ownerUserId, result.data);
+        } catch {
+          // The Canvas recovery record is authoritative for relaunch recovery.
+        }
         generationIdempotencyKeyRef.current = null;
       } else {
         const displayError = formatProcessingJobError(result.error);
@@ -738,7 +810,13 @@ export function CanvasSourceReviewerScreen({
           clearPreviewState(selectionKey);
         }
         setError(displayError);
-        if (!result.error.retryable) {
+        if (
+          !result.error.retryable ||
+          (result.error.code !== "network_error" &&
+            result.error.code !== "request_timeout")
+        ) {
+          await removeCanvasReviewerRecovery(ownerUserId);
+          recoveryRecordRef.current = null;
           generationIdempotencyKeyRef.current = null;
           pendingGenerationRef.current = null;
         }
@@ -874,6 +952,9 @@ export function CanvasSourceReviewerScreen({
   const handleSourceTextChange = (value: string) => {
     if (activeReviewerJob && !isActiveProcessingJobStatus(activeReviewerJob.status)) {
       void removeActiveProcessingJob(activeReviewerJob.id);
+      const ownerUserId = session?.user.id;
+      if (ownerUserId) void removeCanvasReviewerRecovery(ownerUserId);
+      recoveryRecordRef.current = null;
       setActiveReviewerJob(null);
     }
     dispatchResolution({ sourceText: value, type: "edited" });
@@ -884,6 +965,9 @@ export function CanvasSourceReviewerScreen({
   const handleReturnToBlockSelection = () => {
     if (activeReviewerJob && !isActiveProcessingJobStatus(activeReviewerJob.status)) {
       void removeActiveProcessingJob(activeReviewerJob.id);
+      const ownerUserId = session?.user.id;
+      if (ownerUserId) void removeCanvasReviewerRecovery(ownerUserId);
+      recoveryRecordRef.current = null;
       setActiveReviewerJob(null);
     }
     clearPreviewState(blockSelectionKey);
@@ -895,7 +979,7 @@ export function CanvasSourceReviewerScreen({
       output,
       requestToken,
       snapshotId,
-      sourceText,
+      sourceCharacterCount,
       sourceTitle,
       title,
     }: {
@@ -903,16 +987,16 @@ export function CanvasSourceReviewerScreen({
       readonly output: ReviewerOutput;
       readonly requestToken: number;
       readonly snapshotId: string;
-      readonly sourceText: string;
+      readonly sourceCharacterCount: number;
       readonly sourceTitle: string;
       readonly title: string;
-    }): Promise<void> => {
-      if (!tryBeginCanvasSingleFlight(saveLockRef)) return;
+    }): Promise<SavedReviewerSummary | null> => {
+      if (!tryBeginCanvasSingleFlight(saveLockRef)) return null;
       const context = createRequestContext(session?.accessToken);
       if (!context.ok) {
         finishCanvasSingleFlight(saveLockRef);
         setSaveError(context.error);
-        return;
+        return null;
       }
 
       saveAbortRef.current?.abort();
@@ -927,7 +1011,7 @@ export function CanvasSourceReviewerScreen({
             courseName: courseLabel,
             reviewer: output,
             sourceSnapshotId: snapshotId,
-            sourceText,
+            sourceCharacterCount,
             sourceTitle,
             title,
           },
@@ -938,12 +1022,14 @@ export function CanvasSourceReviewerScreen({
               signal: controller.signal,
             }),
         );
-        if (resolutionTokenRef.current !== requestToken) return;
+        if (resolutionTokenRef.current !== requestToken) return null;
         if (result.ok) {
           setSavedReviewer(result.data);
           setSaveTitle(result.data.title);
+          return result.data;
         } else {
           setSaveError(formatLibraryError(result.error));
+          return null;
         }
       } finally {
         if (resolutionTokenRef.current === requestToken) {
@@ -962,8 +1048,28 @@ export function CanvasSourceReviewerScreen({
       const ownerUserId = session?.user.id;
       if (!context.ok || !ownerUserId) return;
 
+      const recovery = recoveryRecordRef.current;
+      if (!recovery || !matchesCanvasReviewerRecoveryJob(recovery, job)) {
+        await Promise.all([
+          removeActiveProcessingJob(job.id),
+          removeCanvasReviewerRecovery(ownerUserId),
+        ]);
+        recoveryRecordRef.current = null;
+        finishCanvasSingleFlight(generationLockRef);
+        setIsGenerating(false);
+        setError({
+          message: "The saved recovery details did not match this server job.",
+          title: "Reviewer recovery was stopped safely",
+        });
+        return;
+      }
+
       setActiveReviewerJob(job);
-      await upsertActiveProcessingJob(ownerUserId, job);
+      try {
+        await upsertActiveProcessingJob(ownerUserId, job);
+      } catch {
+        // The job-specific Canvas recovery record remains authoritative.
+      }
       if (isActiveProcessingJobStatus(job.status)) {
         setIsGenerating(true);
         return;
@@ -1024,11 +1130,11 @@ export function CanvasSourceReviewerScreen({
       const snapshotId = result.data.sourceSnapshotId ?? null;
       const sourceTitle =
         pending?.sourceTitle.trim() ||
+        recovery.sourceTitle ||
         selectedSource?.title.trim() ||
         result.data.reviewer.title.trim() ||
         "Canvas reviewer";
       const title = sourceTitle;
-      const sourceText = pending?.sourceText ?? resolution.sourceText;
       const requestToken = pending?.requestToken ?? resolutionTokenRef.current;
       setReviewer(result.data.reviewer);
       setSourceSnapshotId(snapshotId);
@@ -1043,17 +1149,23 @@ export function CanvasSourceReviewerScreen({
       }
       pendingGenerationRef.current = null;
       generationIdempotencyKeyRef.current = null;
-      await removeActiveProcessingJob(job.id);
       if (snapshotId) {
-        await persistCompletedReviewer({
-          courseLabel: sourceList?.courseName || courseName,
+        const persisted = await persistCompletedReviewer({
+          courseLabel: recovery.courseName,
           output: result.data.reviewer,
           requestToken,
           snapshotId,
-          sourceText,
+          sourceCharacterCount: recovery.sourceCharacterCount,
           sourceTitle,
           title,
         });
+        if (persisted) {
+          await Promise.all([
+            removeActiveProcessingJob(job.id),
+            removeCanvasReviewerRecovery(ownerUserId, job.id),
+          ]);
+          recoveryRecordRef.current = null;
+        }
       } else {
         setSaveError({
           message: "Try creating the reviewer again before saving it.",
@@ -1063,14 +1175,131 @@ export function CanvasSourceReviewerScreen({
     },
     [
       persistCompletedReviewer,
-      resolution.sourceText,
       selectedSource?.title,
-      sourceList?.courseName,
-      courseName,
       session?.accessToken,
       session?.user.id,
     ],
   );
+
+  const restoreReviewerJob = useCallback(async (): Promise<void> => {
+    if (recoveryLockRef.current) return;
+    const context = createRequestContext(session?.accessToken);
+    const ownerUserId = session?.user.id;
+    if (!context.ok || !ownerUserId) {
+      setIsRestoringReviewerJob(false);
+      return;
+    }
+    recoveryLockRef.current = true;
+    try {
+      let recovery = await readCanvasReviewerRecovery(ownerUserId);
+      if (!recovery || recovery.courseId !== courseId) {
+        recoveryRecordRef.current = null;
+        setIsRestoringReviewerJob(false);
+        return;
+      }
+      recoveryRecordRef.current = recovery;
+
+      let job: ProcessingJobStatusView | null = null;
+      if (recovery.jobId) {
+        const status = await getProcessingJobStatus({
+          ...context.value,
+          jobId: recovery.jobId,
+        });
+        if (!status.ok) {
+          if (shouldDiscardCanvasReviewerRecoveryAfterStatusError(status.error)) {
+            await removeCanvasReviewerRecovery(ownerUserId);
+            recoveryRecordRef.current = null;
+            setIsRestoringReviewerJob(false);
+          } else {
+            setError(formatProcessingJobError(status.error));
+            setIsRestoringReviewerJob(true);
+          }
+          return;
+        }
+        job = status.data;
+      } else {
+        const history = await listProcessingJobsPage({
+          ...context.value,
+          limit: 20,
+        });
+        if (!history.ok) {
+          setError(formatProcessingJobError(history.error));
+          setIsRestoringReviewerJob(true);
+          return;
+        }
+        job = findCanvasReviewerRecoveryCandidate(recovery, history.data.jobs);
+        if (!job) {
+          if (isUncertainCanvasReviewerSubmissionExpired(recovery)) {
+            await removeCanvasReviewerRecovery(ownerUserId);
+            recoveryRecordRef.current = null;
+            setError({
+              message: "No accepted server job was found. You can create the reviewer again.",
+              title: "Previous request was not accepted",
+            });
+            setIsRestoringReviewerJob(false);
+          } else {
+            setIsRestoringReviewerJob(true);
+          }
+          return;
+        }
+        let accepted: CanvasReviewerRecoveryRecord | null;
+        try {
+          accepted = await acceptCanvasReviewerRecovery(recovery, job);
+        } catch {
+          setError({
+            message:
+              "The existing server job is safe. Stay Focused will keep trying to reconnect.",
+            title: "Recovery temporarily unavailable",
+          });
+          setIsRestoringReviewerJob(true);
+          return;
+        }
+        if (!accepted) {
+          recoveryRecordRef.current = null;
+          setIsRestoringReviewerJob(false);
+          setError({
+            message: "The discovered job did not match the selected material.",
+            title: "Reviewer recovery was stopped safely",
+          });
+          return;
+        }
+        recovery = accepted;
+        recoveryRecordRef.current = accepted;
+      }
+
+      if (!matchesCanvasReviewerRecoveryJob(recovery, job)) {
+        await Promise.all([
+          removeActiveProcessingJob(job.id),
+          removeCanvasReviewerRecovery(ownerUserId),
+        ]);
+        recoveryRecordRef.current = null;
+        setIsRestoringReviewerJob(false);
+        setError({
+          message: "The server job belongs to different study material.",
+          title: "Reviewer recovery was stopped safely",
+        });
+        return;
+      }
+
+      setError(null);
+      setIsRestoringReviewerJob(false);
+      await applyObservedReviewerJob(job);
+    } finally {
+      recoveryLockRef.current = false;
+    }
+  }, [applyObservedReviewerJob, courseId, session?.accessToken, session?.user.id]);
+
+  useEffect(() => {
+    void restoreReviewerJob();
+  }, [restoreReviewerJob]);
+
+  useEffect(() => {
+    if (!appIsActive || !isRestoringReviewerJob) return;
+    const timer = setInterval(() => {
+      void restoreReviewerJob();
+    }, MOBILE_JOB_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [appIsActive, isRestoringReviewerJob, restoreReviewerJob]);
 
   const reconcileReviewerJob = useCallback(async (): Promise<void> => {
     const context = createRequestContext(session?.accessToken);
@@ -1083,8 +1312,25 @@ export function CanvasSourceReviewerScreen({
       await applyObservedReviewerJob(result.data);
     } else {
       setError(formatProcessingJobError(result.error));
+      if (shouldDiscardCanvasReviewerRecoveryAfterStatusError(result.error)) {
+        const ownerUserId = session?.user.id;
+        if (ownerUserId) {
+          await Promise.all([
+            removeActiveProcessingJob(activeReviewerJob.id),
+            removeCanvasReviewerRecovery(ownerUserId),
+          ]);
+        }
+        recoveryRecordRef.current = null;
+        setActiveReviewerJob(null);
+        setIsGenerating(false);
+      }
     }
-  }, [activeReviewerJob, applyObservedReviewerJob, session?.accessToken]);
+  }, [
+    activeReviewerJob,
+    applyObservedReviewerJob,
+    session?.accessToken,
+    session?.user.id,
+  ]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -1143,35 +1389,73 @@ export function CanvasSourceReviewerScreen({
   const handleRetryReviewerJob = async () => {
     const context = createRequestContext(session?.accessToken);
     const ownerUserId = session?.user.id;
-    if (!context.ok || !ownerUserId || !activeReviewerJob) return;
+    const recovery = recoveryRecordRef.current;
+    if (!context.ok || !ownerUserId || !activeReviewerJob || !recovery) return;
+    const retryIdempotencyKey = createProcessingJobIdempotencyKey(
+      "reviewer_generation",
+    );
     const result = await retryProcessingJob({
       ...context.value,
       jobId: activeReviewerJob.id,
-      idempotencyKey: createProcessingJobIdempotencyKey("reviewer_generation"),
+      idempotencyKey: retryIdempotencyKey,
     });
     if (!result.ok) {
       setError(formatProcessingJobError(result.error));
       return;
     }
+    const rebound = await acceptCanvasReviewerRecovery(
+      prepareCanvasReviewerRetryRecovery(recovery, retryIdempotencyKey),
+      result.data,
+    );
+    if (!rebound) {
+      setError({
+        message: "The retry did not match the original study material.",
+        title: "Reviewer retry was stopped safely",
+      });
+      return;
+    }
     await removeActiveProcessingJob(activeReviewerJob.id);
     await upsertActiveProcessingJob(ownerUserId, result.data);
+    recoveryRecordRef.current = rebound;
     setActiveReviewerJob(result.data);
     setIsGenerating(true);
+    setError(null);
+  };
+
+  const handleDismissReviewerJob = async () => {
+    const ownerUserId = session?.user.id;
+    const jobId = activeReviewerJob?.id;
+    if (ownerUserId) {
+      await Promise.all([
+        jobId ? removeActiveProcessingJob(jobId) : Promise.resolve(),
+        removeCanvasReviewerRecovery(ownerUserId),
+      ]);
+    }
+    recoveryRecordRef.current = null;
+    setActiveReviewerJob(null);
+    setIsGenerating(false);
     setError(null);
   };
 
   const handleSave = async () => {
     if (isSaving || !reviewer) return;
     const finalSourceText = resolution.sourceText.trim();
+    const recovery = recoveryRecordRef.current;
+    if (!sourceSnapshotId) {
+      setSaveError({
+        message: "Create the reviewer again from the current preview before saving.",
+        title: "Reviewer is no longer current",
+      });
+      return;
+    }
     if (
-      !sourceSnapshotId ||
-      !preview ||
-      !isCanvasGeneratedBindingCurrent(
+      !recovery &&
+      (!preview || !isCanvasGeneratedBindingCurrent(
         generatedBinding,
         resolution,
         selectionIds,
         blockSelectionKey,
-      )
+      ))
     ) {
       setSaveError({
         message: "Create the reviewer again from the current preview before saving.",
@@ -1184,21 +1468,33 @@ export function CanvasSourceReviewerScreen({
       setSaveError({ message: "Enter a title before saving.", title: "Title needed" });
       return;
     }
-    await persistCompletedReviewer({
-      courseLabel: sourceList?.courseName || courseName,
+    const persisted = await persistCompletedReviewer({
+      courseLabel: recovery?.courseName ?? sourceList?.courseName ?? courseName,
       output: reviewer,
       requestToken: resolutionTokenRef.current,
       snapshotId: sourceSnapshotId,
-      sourceText: finalSourceText,
-      sourceTitle: resolution.sourceTitle,
+      sourceCharacterCount:
+        recovery?.sourceCharacterCount ?? finalSourceText.length,
+      sourceTitle: recovery?.sourceTitle ?? resolution.sourceTitle,
       title,
     });
+    const ownerUserId = session?.user.id;
+    if (persisted && recovery && ownerUserId) {
+      await Promise.all([
+        recovery.jobId
+          ? removeActiveProcessingJob(recovery.jobId)
+          : Promise.resolve(),
+        removeCanvasReviewerRecovery(ownerUserId),
+      ]);
+      recoveryRecordRef.current = null;
+    }
   };
 
-  const displayCourseName = sourceList?.courseName || courseName;
+  const displayCourseName =
+    sourceList?.courseName || recoveryRecordRef.current?.courseName || courseName;
   const stage = reviewer
     ? "STUDY"
-    : activeReviewerJob || isGenerating
+    : activeReviewerJob || isGenerating || isRestoringReviewerJob
       ? "CREATING REVIEWER"
       : selectedSourceAction === "preview"
         ? showSourceDetails
@@ -1255,7 +1551,14 @@ export function CanvasSourceReviewerScreen({
 
       {error ? <ErrorCard error={error} /> : null}
 
-      {isLoadingSources ? (
+      {isRestoringReviewerJob ? (
+        <StatusCard
+          message="Checking the server for your existing reviewer. No new generation will be started."
+          loading
+          testID="canvas-reviewer-recovery-loading"
+          title="Recovering reviewer"
+        />
+      ) : isLoadingSources ? (
         <StatusCard
           message="Loading the synchronized items for this course."
           loading
@@ -1267,7 +1570,8 @@ export function CanvasSourceReviewerScreen({
           <ReviewerPreview
             context={{
               courseName: displayCourseName,
-              sourceLabel: selectedSource?.title ?? null,
+              sourceLabel:
+                selectedSource?.title ?? recoveryRecordRef.current?.sourceTitle ?? null,
               sourceMode: "canvas",
               selectedBlockCount: selectedBlockIds.length,
             }}
@@ -1289,6 +1593,7 @@ export function CanvasSourceReviewerScreen({
         <CanvasReviewerJobCard
           job={activeReviewerJob}
           onCancel={() => void handleCancelReviewerJob()}
+          onDismiss={() => void handleDismissReviewerJob()}
           onRetry={() => void handleRetryReviewerJob()}
         />
       ) : selectedSourceAction === "preview" &&
@@ -1516,7 +1821,11 @@ function SourceSection({
   readonly title: string;
 }) {
   return (
-    <View style={styles.section}>
+    <View
+      accessibilityLabel={`${title} study materials`}
+      accessibilityRole="radiogroup"
+      style={styles.section}
+    >
       <Text style={styles.sectionLabel}>{title.toUpperCase()}</Text>
       <Card style={styles.sourceCard}>
         {sources.map((source, index) => (
@@ -2038,6 +2347,7 @@ function PreviewStage({
         <CanvasReviewerJobCard
           job={activeJob}
           onCancel={onCancel}
+          onDismiss={onBack}
           onRetry={onRetry}
         />
       ) : null}
@@ -2048,10 +2358,12 @@ function PreviewStage({
 function CanvasReviewerJobCard({
   job,
   onCancel,
+  onDismiss,
   onRetry,
 }: {
   readonly job: ProcessingJobStatusView;
   readonly onCancel: () => void;
+  readonly onDismiss: () => void;
   readonly onRetry: () => void;
 }) {
   const active = isActiveProcessingJobStatus(job.status);
@@ -2060,7 +2372,14 @@ function CanvasReviewerJobCard({
     job.progress.totalUnits !== null &&
     job.progress.unitLabel !== null;
   return (
-    <Card style={styles.previewCard} testID="canvas-reviewer-job-status">
+    <Card
+      accessibilityLabel={`${canvasReviewerProgressLabel(job)}. ${job.progress.message}`}
+      accessibilityLiveRegion="polite"
+      accessibilityRole={active ? "progressbar" : "alert"}
+      accessibilityState={{ busy: active }}
+      style={styles.previewCard}
+      testID="canvas-reviewer-job-status"
+    >
       <Text style={styles.cardTitle}>{canvasReviewerProgressLabel(job)}</Text>
       <Text style={styles.statusText}>
         Stay Focused is turning your selected material into study notes.
@@ -2091,6 +2410,11 @@ function CanvasReviewerJobCard({
       {job.status === "failed" && job.retryable ? (
         <Button fullWidth onPress={onRetry} variant="primary">
           Retry
+        </Button>
+      ) : null}
+      {!active ? (
+        <Button fullWidth onPress={onDismiss} variant="secondary">
+          Choose another material
         </Button>
       ) : null}
     </Card>
@@ -2235,8 +2559,10 @@ function StatusCard({
 }) {
   return (
     <Card
+      accessibilityLabel={`${title}. ${message}`}
       accessibilityLiveRegion="polite"
-      accessibilityRole="alert"
+      accessibilityRole={loading ? "progressbar" : "alert"}
+      accessibilityState={{ busy: loading }}
       style={styles.statusCard}
       testID={testID}
     >

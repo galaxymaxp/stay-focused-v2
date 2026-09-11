@@ -1,5 +1,17 @@
 # Roadmap
 
+## B23 mobile recovery foundation — current result (2026-09-12)
+
+**PASS — B23 mobile recovery foundation proven; ready for B24 full UX/UI redesign.** The physical Android flow now survives backgrounding, process death during a running Reviewer job, and temporary network loss while preserving one exact durable identity. Relaunch restores the owning course, terminal results render and save once per immutable snapshot, unsafe state fails closed, and explicit retry is the only path to a new identity. Large-text behavior remains usable at font scale 1.35. Fresh Canvas 73/73, API 626/626, mobile 411/411, engine 606/606, and root gates pass. See [B23 acceptance](ai/acceptance/b23/mobile-recovery-foundation.md). Earlier entries below are historical.
+
+B23 establishes accessibility/recovery behavior contracts only. Final UI accessibility and visual polish will be performed against the redesigned interface during B25–B28.
+
+1. B24 — Complete Stay Focused V2 mobile UX/UI redesign specification
+2. B25 — Design system + app shell implementation
+3. B26 — Core experience redesign
+4. B27 — Remaining application redesign
+5. B28 — Full design QA + pilot freeze
+
 ## B22 mobile Canvas-to-Reviewer workflow — current result (2026-09-12)
 
 **PASS — the Canvas learner-material capability is now a coherent physical-mobile study workflow.** Students choose a synced course, see ordered module materials with honest states, confirm a material, create a durable Reviewer with one primary action, study the completed output, receive automatic snapshot-bound persistence, and reopen it from Study Library without regeneration. The physical CIT6 run produced one fresh 20-section Reviewer from all 23 PDF pages with 1.00 coverage/grounding, zero verifier issues, passed leakage, and safe fallback disclosure. Unsupported PPTX and empty items remained visible and blocked. All final package and root gates pass; no backend deployment was needed. Next: define B23 as a separate accessibility and interrupted-session/resume hardening slice rather than broadening B22 into format ingestion or Canvas permission expansion. See [B22 acceptance](ai/acceptance/b22/mobile-canvas-study-workflow.md). Earlier entries below are historical.

@@ -241,6 +241,9 @@ describe("/api/reviewers", () => {
       source_snapshot_id: "22222222-2222-4222-8222-222222222222",
       user_id: "user-1",
     });
+    expect(client.upsertOptions).toEqual({
+      onConflict: "user_id,source_snapshot_id",
+    });
     expect(body.reviewer.sourceProvenance).toMatchObject({
       sourceSnapshotId: "22222222-2222-4222-8222-222222222222",
       sourceCount: 2,
@@ -466,14 +469,18 @@ function createInsertClient(options: {
   readonly row: unknown | null;
   readonly error?: unknown;
 }) {
-  const state: { insertPayload?: unknown } = {};
+  const state: { insertPayload?: unknown; upsertOptions?: unknown } = {};
   return {
     get insertPayload() {
       return state.insertPayload;
     },
+    get upsertOptions() {
+      return state.upsertOptions;
+    },
     from: vi.fn(() => ({
-      insert: vi.fn((payload: unknown) => {
+      upsert: vi.fn((payload: unknown, upsertOptions: unknown) => {
         state.insertPayload = payload;
+        state.upsertOptions = upsertOptions;
         return {
           select: vi.fn(() => ({
             single: vi.fn(async () => ({
