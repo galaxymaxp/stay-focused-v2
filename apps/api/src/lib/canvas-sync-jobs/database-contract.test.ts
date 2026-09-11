@@ -12,6 +12,9 @@ const retryMigration = readMigration(
 const incrementalMigration = readMigration(
   "20260728201000_canvas_incremental_resumable_sync.sql",
 );
+const moduleMaterialUnitMigration = readMigration(
+  "20260911122809_allow_canvas_module_material_sync_units.sql",
+);
 
 describe("durable Canvas sync database contract", () => {
   it("persists strict job state with owner-only reads", () => {
@@ -84,6 +87,22 @@ describe("durable Canvas sync database contract", () => {
         ),
       );
     }
+  });
+
+  it("allows every B21 exact module-resource resolver unit", () => {
+    expect(moduleMaterialUnitMigration).toContain(
+      "drop constraint if exists canvas_sync_job_units_kind_allowed",
+    );
+    for (const unitKind of [
+      "module_page_detail",
+      "module_assignment",
+      "module_file",
+    ]) {
+      expect(moduleMaterialUnitMigration).toContain(`'${unitKind}'`);
+    }
+    expect(moduleMaterialUnitMigration).toContain(
+      "validate constraint canvas_sync_job_units_kind_allowed",
+    );
   });
 
   it("claims units atomically with connection limits and recoverable leases", () => {
