@@ -1,5 +1,28 @@
 # Roadmap
 
+## B24.5 backend experience contracts (2026-09-12)
+
+**PARTIAL — core contracts are aligned but a product capability still requires
+backend implementation.** Shared student DTOs and authenticated API experience
+services now compose Today, Learn, Activities and Library. Reviewer admission
+reuses source preparation, snapshot/freshness gates and durable jobs; Library
+opens persisted output and deduplicates the existing automatic save path.
+Capabilities explicitly disable missing Quiz, Activity Maker and calendar
+implementations. No UI redesign, migration, model/provider selection change or
+planner algorithm change. The standalone provider contract's pre-existing import
+resolution issue is repaired with an equivalent relative import.
+
+Fresh verification: API 710, mobile 443, Canvas 73, OCR 27, shared 44 (22 distinct source tests), engine 606,
+Workflow runtime 1 and provider contract 18; forced typecheck/lint/build each pass
+7/7 with zero cache hits and zero lint warnings. Hosted RLS/new APK acceptance
+NOT RUN. Pre-existing persistence edits are preserved and excluded from this commit.
+
+Next: B24.6 Activity Maker generation and owner-scoped draft persistence, then a
+separate Quiz generation/attempt/results slice. Reconcile the completed B24
+specification (not found in this checkout) before B25 app-shell implementation.
+See [B24.5 contract](ai/acceptance/b24-5/backend-ui-contract.md) and [verification](ai/acceptance/b24-5/verification.md).
+
+
 ## B23 mobile recovery foundation — current result (2026-09-12)
 
 **PASS — B23 mobile recovery foundation proven; ready for B24 full UX/UI redesign.** The physical Android flow now survives backgrounding, process death during a running Reviewer job, and temporary network loss while preserving one exact durable identity. Relaunch restores the owning course, terminal results render and save once per immutable snapshot, unsafe state fails closed, and explicit retry is the only path to a new identity. Large-text behavior remains usable at font scale 1.35. Fresh Canvas 73/73, API 626/626, mobile 411/411, engine 606/606, and root gates pass. See [B23 acceptance](ai/acceptance/b23/mobile-recovery-foundation.md). Earlier entries below are historical.

@@ -6,7 +6,7 @@ import type {
 import OpenAI from "openai";
 import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 
-import { REVIEWER_PROVIDER_CALL_TIMEOUT_MS } from "@/lib/processing-jobs/constants";
+import { REVIEWER_PROVIDER_CALL_TIMEOUT_MS } from "../lib/processing-jobs/constants";
 
 // Each generation call has a provider-level deadline. The durable worker may
 // retry a retryable job, but no individual HTTP call may wait indefinitely.
