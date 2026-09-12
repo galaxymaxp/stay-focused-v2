@@ -8,6 +8,14 @@ export class ExperienceFailure extends Error {
 export function normalizeExperienceError(error: unknown): { status: number; error: ExperienceError } {
   const failure = error instanceof ExperienceFailure ? error : new ExperienceFailure(503, 'unavailable');
   const copy: Record<ExperienceError['code'], Omit<ExperienceError, 'code'>> = {
+    activity_not_found: { title: 'Activity Maker', message: 'Activity could not be found.', retryable: false, action: 'none' },
+    activity_generation_unavailable: { title: 'Activity Maker', message: 'Activity generation is temporarily unavailable.', retryable: false, action: 'none' },
+    activity_source_unavailable: { title: 'Activity Maker', message: 'Required activity sources are unavailable. Prepare the assignment resources and try again.', retryable: false, action: 'none' },
+    activity_template_unreadable: { title: 'Activity Maker', message: 'The instructor template could not be read safely.', retryable: false, action: 'none' },
+    unsupported_attachment_type: { title: 'Activity Maker', message: 'This attachment type is unsupported. Convert legacy DOC or PPT files to DOCX or PPTX.', retryable: false, action: 'none' },
+    activity_draft_not_found: { title: 'Activity Maker', message: 'Draft could not be found.', retryable: false, action: 'none' },
+    activity_generation_failed: { title: 'Activity Maker', message: 'The draft did not pass instruction and source validation.', retryable: false, action: 'none' },
+    activity_draft_conflict: { title: 'Activity Maker', message: 'The draft or template requirements have changed. Reopen before saving.', retryable: false, action: 'none' },
     sign_in_required: { title: 'Sign in again', message: 'Your session is unavailable. Sign in to continue.', retryable: false, action: 'sign_in' },
     not_found: { title: 'Item unavailable', message: 'This item could not be found.', retryable: false, action: 'none' },
     invalid_request: { title: 'Check your request', message: 'Some request details are invalid.', retryable: false, action: 'none' },

@@ -7,7 +7,10 @@ import {
 } from "@stay-focused/ocr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import { zipSync, strToU8 } from "fflate";
+import { OFFICE_MIME } from './activity-maker/office-extraction';
+import { createTaskSpecification } from './activity-maker/generation';
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,6 +32,34 @@ const PNG_BYTES = new Uint8Array([
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x66, 0x69, 0x78]);
 
 describe("Canvas stored file extraction", () => {
+  it.each(['native PDF','scanned PDF','PNG','JPEG'])('%s instructions survive private extraction into exact task requirements',async kind=>{
+    const instructions='Provide exactly three reasons. No conclusion required. Use only the supplied biology reading. Explain diffusion using source evidence and keep each requested reason distinct.';
+    let bytes:Uint8Array;
+    const contentType=kind.includes('PDF')?'application/pdf':kind==='PNG'?'image/png':'image/jpeg';
+    if(kind==='native PDF'){
+      const pdf=await PDFDocument.create();const font=await pdf.embedFont(StandardFonts.Helvetica);
+      const page=pdf.addPage([800,500]);page.drawText(instructions,{x:30,y:400,size:8,font});
+      bytes=await pdf.save();
+    }else bytes=kind==='scanned PDF'?await makePdfBytes(1):kind==='PNG'?PNG_BYTES:JPEG_BYTES;
+    const filename=kind.includes('PDF')?'instructions.pdf':kind==='PNG'?'instructions.png':'instructions.jpg';
+    const file=makeReadyFile({bytes,contentType,filename,displayName:filename});const provider=createFakeOcrProvider(instructions);
+    const result=await extract(file,createStorageClient([[file.storage_object_key??'',bytes]]).client,provider);
+    expect(result.ok).toBe(true);if(!result.ok)throw new Error('Expected instructions');
+    const spec=createTaskSpecification('activity','Biology',[{id:'instructions',title:'Instructions',text:result.value.text,role:'instructions',materialId:null}]);
+    expect(spec.wordOrLengthRequirements.items).toBe(3);expect(spec.constraints).toEqual(['No conclusion']);
+    expect(provider.calls).toHaveLength(kind==='native PDF'?0:1);
+  });
+  it('extracts an owned DOCX template through private Storage into task structure without OCR',async()=>{
+    const bytes=zipSync({'word/document.xml':strToU8('<w:document xmlns:w="urn:w"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Observations</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Analysis</w:t></w:r></w:p></w:body></w:document>')});
+    const file=makeReadyFile({bytes,contentType:OFFICE_MIME.docx,displayName:'Lab template.docx',filename:'lab-template.docx'});
+    const storage=createStorageClient([[file.storage_object_key??'',bytes]]);
+    const result=await extract(file,storage.client);
+    expect(result.ok).toBe(true);
+    if(!result.ok)throw new Error('Expected Office extraction');
+    const spec=createTaskSpecification('canvas:activity','Lab report',[{id:'instructions',title:'Lab',text:'Use the attached template.',role:'instructions',materialId:null},{id:'template',title:'Lab template',text:result.value.text,role:'template',materialId:null}]);
+    expect(spec.requiredOrder).toEqual(['Observations','Analysis']);
+    expect(storage.calls).toHaveLength(1);
+  });
   it("extracts ready PNG files through private Storage and fake OCR", async () => {
     const file = makeReadyFile({
       bytes: PNG_BYTES,
@@ -510,7 +541,7 @@ function makeReadyFile({
     hidden_for_user: false,
     id: FILE_ID,
     ingestion_eligibility:
-      contentType === "application/pdf" || contentType.startsWith("text/")
+      contentType === "application/pdf" || contentType.startsWith("text/") || contentType===OFFICE_MIME.docx || contentType===OFFICE_MIME.pptx
         ? "eligible_document"
         : "eligible_image",
     ingestion_status: "stored",

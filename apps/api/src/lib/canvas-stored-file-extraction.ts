@@ -30,7 +30,8 @@ import {
 } from "@/lib/ocr/upload-policy";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
-export type CanvasStoredFileKind = "pdf" | "image" | "text" | "unsupported";
+import { OFFICE_MIME, extractOfficeText } from "./activity-maker/office-extraction";
+export type CanvasStoredFileKind = "pdf" | "image" | "text" | "docx" | "pptx" | "unsupported";
 
 export interface CanvasStoredFileExtraction {
   readonly text: string;
@@ -52,6 +53,8 @@ export function classifyStoredCanvasFileKind(
   file: CanvasFileRow,
 ): CanvasStoredFileKind {
   const contentType = normalizeMimeType(file.stored_content_type) ?? normalizeMimeType(file.content_type);
+  if (contentType === OFFICE_MIME.docx) return "docx";
+  if (contentType === OFFICE_MIME.pptx) return "pptx";
   if (contentType === OCR_PDF_MIME_TYPE) {
     return "pdf";
   }
@@ -186,6 +189,10 @@ export async function extractPreparedCanvasFileText({
     return corruptStoredFile();
   }
 
+  if (fileKind === "docx" || fileKind === "pptx") {
+    try { return { ok: true, value: { fileKind, text: extractOfficeText(bytes, fileKind) } }; }
+    catch { return { ok: false, status: 422, code: "canvas_source_unsupported_file_type", message: "The document could not be read safely." }; }
+  }
   if (fileKind === "text") {
     return extractPlainText(bytes);
   }

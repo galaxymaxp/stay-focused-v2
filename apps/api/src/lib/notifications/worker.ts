@@ -138,7 +138,7 @@ export function createNotificationMessage(
   target: {
     readonly token: string;
     readonly jobId?: string;
-    readonly jobType?: "document_extraction" | "reviewer_generation";
+    readonly jobType?: "document_extraction" | "reviewer_generation" | "activity_generation";
   },
 ): ExpoPushMessage {
   const content = notificationContent(kind);

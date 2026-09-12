@@ -241,7 +241,7 @@ export async function loadDeliveryTarget(
 ): Promise<{
   readonly token: string;
   readonly jobId?: string;
-  readonly jobType?: "document_extraction" | "reviewer_generation";
+  readonly jobType?: "document_extraction" | "reviewer_generation" | "activity_generation";
 }> {
   const { data: device, error } = await client
     .from("push_notification_devices")

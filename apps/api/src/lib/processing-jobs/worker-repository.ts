@@ -52,7 +52,7 @@ export async function claimProcessingJobs(
 ): Promise<readonly ProcessingJobDatabaseRow[]> {
   const { data, error } = await client.rpc("claim_processing_jobs_v2", {
     p_worker_id: workerId,
-    p_job_types: ["document_extraction", "reviewer_generation"],
+    p_job_types: ["document_extraction", "reviewer_generation", "activity_generation"],
     p_limit: limit,
     p_lease_seconds: JOB_WORKER_LEASE_SECONDS,
   });
@@ -143,7 +143,7 @@ export async function completeProcessingJob(
     readonly metrics: Json;
   },
 ): Promise<ProcessingJobDatabaseRow> {
-  const { data, error } = await client.rpc("complete_processing_job_v2", {
+  const { data, error } = await client.rpc(input.resultType === "activity_generation" ? "complete_activity_processing_job" : "complete_processing_job_v2", {
     p_job_id: input.jobId,
     p_worker_id: input.workerId,
     p_result_type: input.resultType,

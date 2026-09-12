@@ -17,6 +17,7 @@ import {
   CANVAS_FILE_MAX_SINGLE_BYTES,
   CANVAS_SOURCE_FILE_BUCKET,
   isEligibleForBinaryIngestion,
+  isNewlySupportedOfficeFile,
   normalizeMimeType,
   safeObjectKeyForCanvasFile,
   validateDownloadedCanvasFileContent,
@@ -580,7 +581,7 @@ function availabilityStatusForResult(
 }
 
 function eligibilityForRow(file: CanvasFileRow): CanvasFileIngestionEligibility {
-  const eligibility = file.ingestion_eligibility;
+  const eligibility = isNewlySupportedOfficeFile(file) ? 'eligible_document' : file.ingestion_eligibility;
   if (isCanvasFileIngestionEligibility(eligibility)) {
     return eligibility;
   }

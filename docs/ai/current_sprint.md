@@ -1,5 +1,31 @@
 # Current Sprint
 
+## B24.6 Activity Maker backend (2026-09-12)
+
+**PASS — V1-informed Activity Maker backend is ready for the redesigned UI.**
+The verified GitHub V1 audit informed owned Canvas assignment/resource assembly,
+DOCX/PPTX structural ingestion, TaskSpecification, source-grounded structured
+generation, transactional editable drafts and Library/Activity Detail integration.
+Activity Maker is available in the new code; Quiz remains unavailable. No UI,
+Reviewer-engine rewrite, planner replacement or Canvas submission behavior added.
+
+Fresh verification: API 768 passed plus one opt-in live test skipped; mobile 443,
+Canvas 73, OCR 27, shared 44 and engine 606. Root typecheck/lint/build passed 7/7
+with zero cache hits and no lint warnings. Provider contract 18 and existing
+Workflow runtime 1 passed. Two live provider fixtures passed instruction/grounding
+checks and local Postgres persistence/reopen/edit/regeneration validation.
+Database policies, retention and account deletion passed deterministic SQL tests.
+
+Deployment prerequisite: apply `20260912100000_activity_maker.sql` before the API
+that reads Activity drafts. Hosted migration/RLS/deployed Activity execution were
+not run. Legacy DOC/PPT, advanced Office layout/media and output export remain
+outside this slice. Earlier phase entries below are historical; B24.6 supersedes
+their Activity Maker/DOCX/PPTX missing-capability statements.
+
+Next: B24.7 — Quiz generation, attempts, results, weak-area mapping and Library
+persistence. Acceptance evidence is under `docs/ai/acceptance/b24-6/`.
+
+
 ## B24.5 backend experience contracts (2026-09-12)
 
 **PARTIAL — core contracts are aligned but a product capability still requires

@@ -5,6 +5,8 @@ import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
 import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
 import { composeActivities, composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, record, reviewerReader, text } from './mappers';
+import { activityGenerationState, draftView } from '../activity-maker/service';
+import type { ActivityDraft } from '@stay-focused/shared';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 
 export interface ExperienceDependencies {
@@ -48,7 +50,8 @@ export class ExperienceService {
   }
   async getActivityList(userId: string, filters: { courseId?: string; status?: ActivitySummary['status']; offsetMinutes?: number } = {}): Promise<readonly ActivitySummary[]> {
     const { activities } = await this.activityContext(userId, undefined, filters.offsetMinutes);
-    return activities.filter(a => (!filters.courseId || a.course?.id === filters.courseId) && (!filters.status || a.status === filters.status));
+    const drafts = await this.activityDraftRecords(userId);
+    return activities.map(a=>({...a,hasGeneratedDraft:drafts.some(d=>d.summary.activityId===a.id)})).filter(a => (!filters.courseId || a.course?.id === filters.courseId) && (!filters.status || a.status === filters.status));
   }
   async getActivityDetail(userId: string, activityId: string): Promise<ActivityDetail> {
     const context = await this.activityContext(userId);
@@ -62,13 +65,20 @@ export class ExperienceService {
       try { courseMaterials = await this.getCourseMaterials(userId, activity.course.id); }
       catch (error) { if (!(error instanceof ExperienceFailure && error.status === 404)) throw error; }
     }
-    return { ...activity, instructions: assignment ? normalizeCanvasHtmlToText(assignment.description_html) || null : task?.notes ?? null,
-      resources: assignment ? assignmentResources(assignment.description_html) : [], courseMaterials, generation: generationCapability(false), outputs: [] };
+    const drafts = (await this.activityDraftRecords(userId)).filter(r => r.summary.activityId === activityId);
+    return { ...activity, hasGeneratedDraft: drafts.length > 0, latestDraftId: drafts[0]?.draft.id ?? null, instructions: assignment ? normalizeCanvasHtmlToText(assignment.description_html) || null : task?.notes ?? null,
+      resources: assignment ? assignmentResources(assignment.description_html) : [], courseMaterials, generation: { ...generationCapability(false), activityAssistance: assignment && activity.course ? { status: 'available' } : { status: 'unavailable', reasonCode: 'unsupported_material' } }, outputs: drafts.map(d => d.summary) };
   }
   async getTodayOverview(userId: string, date: string, offset = 0): Promise<TodayOverview> {
     dayWindow(date, offset);
     const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
     return composeToday({ userId, date, offset, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
+  }
+  private async activityDraftRecords(userId: string): Promise<{summary:LibraryArtifactSummary;draft:ActivityDraft}[]> {
+    const [drafts,courses] = await Promise.all([this.rows('activity_drafts',userId),this.getCourses(userId)]);
+    return drafts.map(row => { const draft=draftView(row); const course=courses.find(c=>c.id===row.course_id);
+      return {draft,summary:{id:`activity:${row.id}`,type:'activity_output' as const,title:draft.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:draft.activityId,sourceTitle:draft.title,activityId:draft.activityId,createdAt:draft.createdAt,updatedAt:draft.updatedAt,lastOpenedAt:null,status:'completed' as const,relatedArtifactIds:[]}};
+    }).sort((a,b)=>Date.parse(b.draft.createdAt)-Date.parse(a.draft.createdAt)||a.draft.id.localeCompare(b.draft.id));
   }
   private async artifactRecords(userId: string): Promise<ArtifactRecord[]> {
     const [reviewers, artifacts, versions, jobs, results, snapshots, courses] = await Promise.all([
@@ -118,18 +128,23 @@ export class ExperienceService {
   async getLibrary(userId: string, filters: { type?: LibraryArtifactType; courseId?: string; offset?: number; limit?: number } = {}): Promise<LibraryOverview> {
     const capabilities = experienceCapabilities();
     const categories = { reviewer: { status: 'available' as const }, quiz: capabilities.quizGeneration, activity_output: capabilities.activityMaker };
-    if (filters.type && filters.type !== 'reviewer') return { items: [], categories, nextOffset: null };
-    const records = (await this.artifactRecords(userId)).filter(r => !filters.courseId || r.summary.course?.id === filters.courseId);
+    if (filters.type === 'quiz') return { items: [], categories, nextOffset: null };
+    const records = [...(await this.artifactRecords(userId)),...(await this.activityDraftRecords(userId))].filter(r => (!filters.type || r.summary.type===filters.type) && (!filters.courseId || r.summary.course?.id === filters.courseId)).sort((a,b)=>Date.parse(b.summary.updatedAt)-Date.parse(a.summary.updatedAt)||a.summary.id.localeCompare(b.summary.id));
     const offset = filters.offset ?? 0; const limit = filters.limit ?? 50;
     return { items: records.slice(offset, offset + limit).map(r => r.summary), categories, nextOffset: offset + limit < records.length ? offset + limit : null };
   }
-  async getLibraryArtifact(userId: string, artifactId: string): Promise<{ artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel }> {
+  async getLibraryArtifact(userId: string, artifactId: string): Promise<{ artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel } | { artifact: LibraryArtifactSummary; draft: ActivityDraft }> {
+    if (artifactId.startsWith('activity:')) { const entry=requireFound((await this.activityDraftRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,draft:entry.draft}; }
     const entry = requireFound((await this.artifactRecords(userId)).find(r => r.aliases.includes(artifactId)));
     const freshness = entry.reviewerId && this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.reviewerId) : 'unknown';
     return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
   }
   async getGeneration(userId: string, generationId: string): Promise<GenerationView> {
-    const job = requireFound((await this.rows('processing_jobs', userId)).find(j => j.id === generationId && j.job_type === 'reviewer_generation'));
+    const job = requireFound((await this.rows('processing_jobs', userId)).find(j => j.id === generationId && (j.job_type === 'reviewer_generation' || j.job_type === 'activity_generation')));
+    if (job.job_type === 'activity_generation') {
+      const draft=job.status==='succeeded'?(await this.activityDraftRecords(userId)).find(r=>r.draft.generationId===job.id):null;
+      return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:draft?.summary.id??null,error:job.status==='failed'?{code:'activity_generation_failed',title:'Activity Maker',message:'Draft generation did not finish.',retryable:false,action:'none'}:null};
+    }
     const artifact = job.status === 'succeeded' ? (await this.artifactRecords(userId)).find(r => r.aliases.includes(`generation:${job.id}`)) : null;
     if (job.status === 'succeeded' && !artifact) throw new ExperienceFailure(404, 'not_found');
     return generationView(toProcessingJobStatusView(job), artifact?.summary.id ?? null);

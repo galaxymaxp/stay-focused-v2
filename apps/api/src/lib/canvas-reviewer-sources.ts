@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
 import {
   CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST,
+  isNewlySupportedOfficeFile,
   normalizeMimeType,
 } from "@/lib/canvas-file-policy";
 import { readConnection } from "@/lib/canvas-routes";
@@ -1820,7 +1821,7 @@ async function extractFileStructuredRecord({
   const descriptor = mapFileSource(file).descriptor;
   const fileKind = classifyStoredCanvasFileKind(file);
   let provider = ocrProvider;
-  if (fileKind !== "text" && !provider) {
+  if ((fileKind === "pdf" || fileKind === "image") && !provider) {
     const createdProvider = createOcrProviderForCanvasPreview();
     if (!createdProvider.ok) {
       return createdProvider;
@@ -1896,7 +1897,7 @@ async function extractFilePreviewRecord({
   const descriptor = mapFileSource(file).descriptor;
   const fileKind = classifyStoredCanvasFileKind(file);
   let provider = ocrProvider;
-  if (fileKind !== "text" && !provider) {
+  if ((fileKind === "pdf" || fileKind === "image") && !provider) {
     const createdProvider = createOcrProviderForCanvasPreview();
     if (!createdProvider.ok) {
       return createdProvider;
@@ -2381,14 +2382,14 @@ function createFileSourceProvenance({
     canvas_updated_at: row.canvas_modified_at ?? row.canvas_updated_at,
     course_id: row.course_id,
     file_id: row.canvas_file_id,
-    file_kind: extraction.fileKind === "text" ? null : extraction.fileKind,
+    file_kind: extraction.fileKind === "pdf" || extraction.fileKind === "image" ? extraction.fileKind : null,
     local_synced_at: row.last_synced_at,
     mime_type: mimeType,
     module_id: null,
     module_item_id: null,
     normalized_content_sha256: sha256Utf8Hex(extraction.text),
     ocr_version:
-      extraction.fileKind === "text"
+      !["pdf", "image"].includes(extraction.fileKind)
         ? null
         : extraction.fileKind === "pdf"
         ? CANVAS_STORED_PDF_OCR_VERSION
@@ -2437,6 +2438,7 @@ function buildCanvasReviewerFileState(row: CanvasFileRow): CanvasReviewerFileSta
     };
   }
 
+  if (isNewlySupportedOfficeFile(row)) return {canPrepare:true,kind,preparationStatus:'not_prepared'};
   if (row.ingestion_eligibility !== fileEligibilityForKind(kind)) {
     return {
       canPrepare: false,
@@ -2575,7 +2577,7 @@ function methodForStoredFileKind(
   kind: CanvasStoredFileKind,
 ): CanvasUsableContentMethod {
   if (kind === "image") return "stored_image_ocr";
-  if (kind === "text") return "stored_plain_text";
+  if (kind === "text" || kind === "docx" || kind === "pptx") return "stored_plain_text";
   return "stored_pdf_ocr";
 }
 

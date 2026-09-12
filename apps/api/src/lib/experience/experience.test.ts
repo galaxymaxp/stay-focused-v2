@@ -112,7 +112,7 @@ describe('Learn and Activity details', () => {
     expect(detail.instructions).toContain('Read the chapter.');
     expect(detail.resources[0]?.url).toBe('https://canvas.example/files/1');
     expect(detail.courseMaterials?.items).toHaveLength(1);
-    expect(detail.generation.activityAssistance.status).toBe('unavailable'); expect(detail.outputs).toEqual([]);
+    expect(detail.generation.activityAssistance.status).toBe('available'); expect(detail.outputs).toEqual([]);
   });
   it('denies another owner activity in list and detail', async () => {
     const { api } = service({ canvas_courses: [course], canvas_assignments: [{ ...assignment, user_id: 'other' }], tasks: [{ ...task, user_id: 'other' }] });
@@ -130,6 +130,7 @@ describe('Library ownership and persisted output', () => {
     const library = await api.getLibrary('owner');
     expect(library.items[0]).toMatchObject({ id: 'artifact:artifact', course: { id: course.id }, sourceId: 'snapshot' });
     const open = await api.getLibraryArtifact('owner', 'generation:job');
+    if (!('reviewer' in open)) throw new Error('Expected reviewer');
     expect(open.reviewer.sections[0]?.blocks[0]?.evidence).toHaveLength(2);
     expect(JSON.stringify(open)).not.toMatch(/sourceCore|plannedSectionId|metadata|prompt|provider_id|enrichment/);
     expect(materials).not.toHaveBeenCalled();
@@ -138,7 +139,7 @@ describe('Library ownership and persisted output', () => {
   it('deduplicates automatic snapshot save and preserves old artifact and generation links', async () => {
     const { api } = service({ ...libraryData, reviewers: [{ id: 'saved', user_id: 'owner', title: 'Saved title', source_snapshot_id: 'snapshot', source_metadata: {}, reviewer_output: payload.reviewer, created_at: date, updated_at: date }] });
     expect((await api.getLibrary('owner')).items.map(i => i.id)).toEqual(['reviewer:saved']);
-    for (const id of ['artifact:artifact', 'generation:job', 'reviewer:saved']) expect((await api.getLibraryArtifact('owner', id)).reviewer.title).toBe('Saved title');
+    for (const id of ['artifact:artifact', 'generation:job', 'reviewer:saved']) { const opened=await api.getLibraryArtifact('owner', id); if (!('reviewer' in opened)) throw new Error('Expected reviewer'); expect(opened.reviewer.title).toBe('Saved title'); }
   });
   it('does not expose deleted artifacts', async () => {
     const { api } = service({ ...libraryData, generated_artifacts: [{ ...libraryData.generated_artifacts![0], deleted_at: date }] });
@@ -167,7 +168,7 @@ describe('Library ownership and persisted output', () => {
     const { api } = service(libraryData);
     for (const type of ['quiz', 'activity_output'] as const) {
       const result = await api.getLibrary('owner', { type });
-      expect(result.items).toEqual([]); expect(result.categories[type].status).toBe('unavailable');
+      expect(result.items).toEqual([]); expect(result.categories[type].status).toBe(type === 'activity_output' ? 'available' : 'unavailable');
     }
     expect(experienceCapabilities().calendar.status).toBe('unavailable');
   });

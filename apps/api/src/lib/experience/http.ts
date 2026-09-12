@@ -8,9 +8,26 @@ import { ExperienceFailure, normalizeExperienceError } from './errors';
 import { ExperienceService } from './service';
 import { experienceRepository } from './repository';
 
-const headers = { 'Cache-Control': 'private, no-store', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, idempotency-key', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Max-Age': '600' };
+const headers = { 'Cache-Control': 'private, no-store', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, idempotency-key', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS', 'Access-Control-Max-Age': '600' };
 export function experienceOptions() { return new Response(null, { status: 204, headers }); }
 export function experienceJson<T>(data: T, status = 200) { return Response.json({ ok: true, data } satisfies ExperienceResponse<T>, { status, headers }); }
+export async function readBoundedExperienceJson(request:Request,maximumBytes:number):Promise<unknown> {
+  const reader=request.body?.getReader();
+  if(!reader)throw new ExperienceFailure(400,'invalid_request');
+  const chunks:Uint8Array[]=[];let size=0;
+  try{
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      size+=value.byteLength;
+      if(size>maximumBytes){await reader.cancel();throw new ExperienceFailure(400,'invalid_request');}
+      chunks.push(value);
+    }
+    const body=new Uint8Array(size);let offset=0;
+    for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.byteLength;}
+    return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(body));
+  }catch{throw new ExperienceFailure(400,'invalid_request');}
+  finally{reader.releaseLock();}
+}
 export function createExperienceService(accessToken: string) {
   const client = createReviewerUserClient(accessToken);
   return new ExperienceService({ repository: experienceRepository(client),

@@ -393,6 +393,7 @@ export type CanvasCourseSyncPreferencesReplacementResult =
   Database["public"]["Functions"]["replace_canvas_course_sync_preferences"]["Returns"][number];
 
 export type ProcessingJobType =
+  | "activity_generation"
   | "document_extraction"
   | "reviewer_generation";
 export type ProcessingJobStatus =
@@ -1071,6 +1072,12 @@ export interface Database {
             referencedColumns: ["id"];
           },
         ];
+      };
+      activity_drafts: {
+        Row: { id:string;user_id:string;activity_id:string;course_id:string;canvas_connection_id:string;generation_id:string;activity_type:string;content:Json;specification:Json;sources:Json;warnings:Json;status:string;revision:number;created_at:string;updated_at:string };
+        Insert: { id?:string;user_id:string;activity_id:string;course_id:string;canvas_connection_id:string;generation_id:string;activity_type:string;content:Json;specification:Json;sources:Json;warnings?:Json;status?:string;revision?:number;created_at?:string;updated_at?:string };
+        Update: { content?:Json;revision?:number;status?:string };
+        Relationships: [];
       };
       canvas_module_items: {
         Row: {
@@ -4148,6 +4155,14 @@ export interface Database {
           p_now?: string;
         };
         Returns: ProcessingNotificationDeliveryRow[];
+      };
+      create_activity_processing_job: {
+        Args: {p_user_id:string;p_activity_id:string;p_idempotency_key:string;p_material_ids:Json};
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      complete_activity_processing_job: {
+        Args: {p_job_id:string;p_worker_id:string;p_result_type:string;p_payload:Json;p_metrics?:Json};
+        Returns: ProcessingJobDatabaseRow[];
       };
       create_processing_job: {
         Args: {

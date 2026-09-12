@@ -51,6 +51,8 @@ import {
   WorkerRepositoryError,
 } from "./worker-repository";
 
+import { processActivityJob } from "../activity-maker/service";
+
 export interface ProcessClaimedJobResult {
   readonly jobId: string;
   readonly status: "succeeded" | "failed" | "queued" | "cancelled";
@@ -73,7 +75,9 @@ export async function processClaimedJob({
     const source = await findProcessingJobSource(client, job);
     await assertJobMayContinue(client, job.id, workerId, heartbeat);
 
-    const output = job.job_type === "document_extraction"
+    const output = job.job_type === "activity_generation"
+      ? await processActivityJob(client, job, workerId)
+      : job.job_type === "document_extraction"
       ? await processExtractionJob({ client, heartbeat, job, source, workerId })
       : await processReviewerJob({ client, heartbeat, job, source, workerId });
     await assertJobMayContinue(client, job.id, workerId, heartbeat);

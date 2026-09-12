@@ -48,7 +48,10 @@ export const SOURCE_REVISION_KINDS = [
 
 export type SourceRevisionKind = (typeof SOURCE_REVISION_KINDS)[number];
 
+export type * from "./activity-maker";
+
 export const PROCESSING_JOB_TYPES = [
+  "activity_generation",
   "document_extraction",
   "reviewer_generation",
 ] as const;

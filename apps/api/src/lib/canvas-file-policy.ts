@@ -8,6 +8,14 @@ import {
   OCR_MAX_PDF_BYTES,
 } from "@/lib/ocr/upload-policy";
 
+import { OFFICE_MIME } from "./activity-maker/office-extraction";
+import type { CanvasFileRow } from '@stay-focused/db';
+
+export function isNewlySupportedOfficeFile(file: CanvasFileRow): boolean {
+  if (file.ingestion_eligibility !== 'metadata_only_unsupported' || !Object.values(OFFICE_MIME).some(m=>m===normalizeMimeType(file.content_type))) return false;
+  return classifyCanvasFileForIngestion({contentType:file.content_type,displayName:file.display_name,filename:file.filename,size:file.size_bytes,locked:file.locked,hidden:file.hidden,hiddenForUser:file.hidden_for_user,lockAt:file.lock_at,unlockAt:file.unlock_at,mediaClass:file.media_class,mediaEntryId:file.media_entry_id})==='eligible_document';
+}
+
 export const CANVAS_SOURCE_FILE_BUCKET = "canvas-source-files";
 export const CANVAS_FILE_MAX_SINGLE_BYTES = OCR_MAX_PDF_BYTES;
 export const CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST = 3;
@@ -135,6 +143,9 @@ export function validateDownloadedCanvasFileContent(
   if (hasDangerousMismatch({ contentType: effectiveContentType, extension })) {
     return { ok: false, code: "canvas_file_content_mismatch" };
   }
+  if (effectiveContentType === OFFICE_MIME.docx || effectiveContentType === OFFICE_MIME.pptx) {
+    return input.bytes[0] === 0x50 && input.bytes[1] === 0x4b && input.bytes[2] === 3 && input.bytes[3] === 4 ? { ok: true } : { ok: false, code: "canvas_file_content_mismatch" };
+  }
   if (effectiveContentType === "application/pdf") {
     return hasPdfSignature(input.bytes)
       ? { ok: true }
@@ -245,6 +256,8 @@ function hasDangerousMismatch({
   if (DANGEROUS_EXTENSIONS.has(extension)) {
     return true;
   }
+  if (contentType === OFFICE_MIME.docx) return extension !== "docx";
+  if (contentType === OFFICE_MIME.pptx) return extension !== "pptx";
   if (contentType === "application/pdf") {
     return extension !== "pdf";
   }
@@ -277,7 +290,7 @@ function isEligibleImageMimeType(
 }
 
 function isEligibleDocumentMimeType(contentType: string | null): boolean {
-  return contentType === "application/pdf" || isPlainTextMimeType(contentType);
+  return contentType === OFFICE_MIME.docx || contentType === OFFICE_MIME.pptx || contentType === "application/pdf" || isPlainTextMimeType(contentType);
 }
 
 function isPlainTextMimeType(contentType: string | null): boolean {

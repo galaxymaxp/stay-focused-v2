@@ -96,7 +96,7 @@ type WorkflowOutcome =
 
 interface ClaimedWorkflowJob {
   readonly claimed: boolean;
-  readonly jobType?: "document_extraction" | "reviewer_generation";
+  readonly jobType?: "document_extraction" | "reviewer_generation" | "activity_generation";
 }
 
 interface ExtractionWorkflowPlan {
@@ -179,7 +179,9 @@ export async function processingJobWorkflow(
       return { status: "skipped", jobId };
     }
 
-    if (claimed.jobType === "document_extraction") {
+    if (claimed.jobType === "activity_generation") {
+      await processActivityStep(jobId, workerId);
+    } else if (claimed.jobType === "document_extraction") {
       const plan = await prepareExtractionStep(jobId, workerId);
       if (plan.kind === "image") {
         await extractImageStep(jobId, workerId);
@@ -212,6 +214,20 @@ export async function processingJobWorkflow(
     await finalizeWorkflowFailureStep(jobId, workerId);
     return { status: "failed", jobId };
   }
+}
+
+async function processActivityStep(jobId: string, workerId: string): Promise<void> {
+  "use step";
+  const { processActivityJob } = await import("@/lib/activity-maker/service");
+  const client = createProcessingJobServiceClient();
+  const existing = await readProcessingJobState(client, jobId);
+  if (existing.status === "succeeded") return;
+  await withWorkflowLease(client, jobId, workerId, async () => {
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    const output = await processActivityJob(client, existing, workerId);
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    await completeProcessingJob(client, { jobId, workerId, resultType: "activity_generation", payload: JSON.parse(JSON.stringify(output.payload)) as Json, metrics: {} });
+  });
 }
 
 async function claimWorkflowJobStep(

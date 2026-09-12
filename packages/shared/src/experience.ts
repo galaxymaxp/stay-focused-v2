@@ -5,6 +5,7 @@ export interface FeatureCapability {
   readonly reasonCode?: 'not_implemented' | 'service_unavailable' | 'source_not_ready' | 'unsupported_material';
 }
 export interface ExperienceCapabilities {
+  readonly fileIngestion?: Readonly<Record<'pdf' | 'scanned_pdf' | 'image' | 'docx' | 'pptx' | 'doc' | 'ppt' | 'text' | 'canvas_text', FeatureCapability>>;
   readonly reviewerGeneration: FeatureCapability;
   readonly quizGeneration: FeatureCapability;
   readonly activityMaker: FeatureCapability;
@@ -62,6 +63,7 @@ export interface ActivitySummary {
 }
 export interface ActivityResource { readonly title: string; readonly url: string }
 export interface ActivityDetail extends ActivitySummary {
+  readonly latestDraftId?: string | null;
   readonly instructions: string | null;
   readonly resources: readonly ActivityResource[];
   readonly courseMaterials: CourseMaterials | null;
@@ -150,7 +152,7 @@ export interface GenerationView {
   readonly error: ExperienceError | null;
 }
 export interface ExperienceError {
-  readonly code: 'sign_in_required' | 'not_found' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict';
+  readonly code: 'sign_in_required' | 'not_found' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict';
   readonly title: string;
   readonly message: string;
   readonly retryable: boolean;
@@ -164,7 +166,7 @@ export interface QuizSummary {
   readonly reviewerId: string | null;
   readonly sourceId: string | null;
 }
-/** Future storage boundary. No write API exists until generation/storage is implemented. */
+/** Legacy B24.5 placeholder. New integrations use ActivityDraft from activity-maker. */
 export interface ActivityOutputDraft {
   readonly id: string;
   readonly activityId: string;

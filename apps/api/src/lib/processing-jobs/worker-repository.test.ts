@@ -16,7 +16,7 @@ describe("processing job worker repository", () => {
     await claimProcessingJobs({ rpc } as never, "worker-a", 2);
 
     expect(rpc).toHaveBeenCalledWith("claim_processing_jobs_v2", {
-      p_job_types: ["document_extraction", "reviewer_generation"],
+      p_job_types: ["document_extraction", "reviewer_generation", "activity_generation"],
       p_lease_seconds: 90,
       p_limit: 2,
       p_worker_id: "worker-a",

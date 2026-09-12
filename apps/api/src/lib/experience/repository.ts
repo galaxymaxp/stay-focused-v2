@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { ExperienceFailure } from './errors';
 
 // Allow-list deliberately excludes credentials, prompts and private storage tables.
-export type ExperienceTable = 'tasks' | 'canvas_courses' | 'canvas_assignments' | 'canvas_assignment_submissions' | 'study_sessions' | 'study_plans' | 'reviewers' | 'reviewer_source_snapshots' | 'generated_artifacts' | 'generated_artifact_versions' | 'processing_jobs' | 'processing_job_results';
+export type ExperienceTable = 'activity_drafts' | 'tasks' | 'canvas_courses' | 'canvas_assignments' | 'canvas_assignment_submissions' | 'study_sessions' | 'study_plans' | 'reviewers' | 'reviewer_source_snapshots' | 'generated_artifacts' | 'generated_artifact_versions' | 'processing_jobs' | 'processing_job_results';
 export type ExperienceRow<T extends ExperienceTable> = Database['public']['Tables'][T]['Row'];
 export interface ExperienceRepository {
   rows<T extends ExperienceTable>(table: T, userId: string): Promise<readonly ExperienceRow<T>[]>;
