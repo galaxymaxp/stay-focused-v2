@@ -19,9 +19,12 @@ describe('student experience contract fixtures', () => {
     expect(fixtures.fixtureLibrary.items[0]?.id).toBe(fixtures.fixtureReader.id);
     expect(fixtures.fixtureEmptyLibrary.items).toEqual([]);
   });
-  it('does not advertise absent generators', () => {
-    expect(fixtures.fixtureCapabilities.quizGeneration.status).toBe('unavailable');
-    expect(fixtures.fixtureCapabilities.activityMaker.status).toBe('unavailable');
+  it('advertises implemented generators', () => {
+    expect(fixtures.fixtureCapabilities.quizGeneration.status).toBe('available');
+    expect(fixtures.fixtureLibrary.categories.quiz.status).toBe('available');
+    expect(fixtures.fixtureWorkspace.materials.items[0]?.generation.quiz.status).toBe('available');
+    expect(fixtures.fixtureWorkspace.materials.items[1]?.generation.quiz).toEqual({ status: 'unavailable', reasonCode: 'unsupported_material' });
+    expect(fixtures.fixtureCapabilities.activityMaker.status).toBe('available');
   });
   it('contains no diagnostic or secret fields', () => {
     expect(JSON.stringify(fixtures)).not.toMatch(/sourceCore|encrypted_token|provider_id|prompt|fingerprint|storage_object_path|ocrDiagnostics/);

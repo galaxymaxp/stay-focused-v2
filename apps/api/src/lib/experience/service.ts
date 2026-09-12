@@ -1,3 +1,5 @@
+import type { Quiz } from '@stay-focused/shared';
+import { quizView } from '../quiz/service';
 import type { ActivityDetail, ActivitySummary, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerationView, LibraryArtifactSummary, LibraryArtifactType, LibraryOverview, ReviewerReaderModel, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
@@ -74,6 +76,14 @@ export class ExperienceService {
     const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
     return composeToday({ userId, date, offset, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
   }
+  private async quizRecords(userId: string): Promise<{summary:LibraryArtifactSummary;quiz:Quiz;generationId:string|null}[]> {
+    const [rows,attempts,courses] = await Promise.all([this.rows('quizzes',userId),this.rows('quiz_attempts',userId),this.getCourses(userId)]);
+    return rows.map(row=>{
+      const quiz=quizView(row,attempts), course=courses.find(c=>c.id===quiz.courseId);
+      const summary = { ...quiz, questions: undefined };
+      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceTitle:null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerId?[`reviewer:${quiz.reviewerId}`]:[],quiz:summary}};
+    });
+  }
   private async activityDraftRecords(userId: string): Promise<{summary:LibraryArtifactSummary;draft:ActivityDraft}[]> {
     const [drafts,courses] = await Promise.all([this.rows('activity_drafts',userId),this.getCourses(userId)]);
     return drafts.map(row => { const draft=draftView(row); const course=courses.find(c=>c.id===row.course_id);
@@ -128,19 +138,23 @@ export class ExperienceService {
   async getLibrary(userId: string, filters: { type?: LibraryArtifactType; courseId?: string; offset?: number; limit?: number } = {}): Promise<LibraryOverview> {
     const capabilities = experienceCapabilities();
     const categories = { reviewer: { status: 'available' as const }, quiz: capabilities.quizGeneration, activity_output: capabilities.activityMaker };
-    if (filters.type === 'quiz') return { items: [], categories, nextOffset: null };
-    const records = [...(await this.artifactRecords(userId)),...(await this.activityDraftRecords(userId))].filter(r => (!filters.type || r.summary.type===filters.type) && (!filters.courseId || r.summary.course?.id === filters.courseId)).sort((a,b)=>Date.parse(b.summary.updatedAt)-Date.parse(a.summary.updatedAt)||a.summary.id.localeCompare(b.summary.id));
+    const records = [...(await this.artifactRecords(userId)),...(await this.activityDraftRecords(userId)),...(await this.quizRecords(userId))].filter(r => (!filters.type || r.summary.type===filters.type) && (!filters.courseId || r.summary.course?.id === filters.courseId)).sort((a,b)=>Date.parse(b.summary.updatedAt)-Date.parse(a.summary.updatedAt)||a.summary.id.localeCompare(b.summary.id));
     const offset = filters.offset ?? 0; const limit = filters.limit ?? 50;
     return { items: records.slice(offset, offset + limit).map(r => r.summary), categories, nextOffset: offset + limit < records.length ? offset + limit : null };
   }
-  async getLibraryArtifact(userId: string, artifactId: string): Promise<{ artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel } | { artifact: LibraryArtifactSummary; draft: ActivityDraft }> {
+  async getLibraryArtifact(userId: string, artifactId: string): Promise<{ artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel } | { artifact: LibraryArtifactSummary; draft: ActivityDraft } | { artifact: LibraryArtifactSummary; quiz: Quiz }> {
+    if (artifactId.startsWith('quiz:')) { const entry=requireFound((await this.quizRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,quiz:entry.quiz}; }
     if (artifactId.startsWith('activity:')) { const entry=requireFound((await this.activityDraftRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,draft:entry.draft}; }
     const entry = requireFound((await this.artifactRecords(userId)).find(r => r.aliases.includes(artifactId)));
     const freshness = entry.reviewerId && this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.reviewerId) : 'unknown';
     return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
   }
   async getGeneration(userId: string, generationId: string): Promise<GenerationView> {
-    const job = requireFound((await this.rows('processing_jobs', userId)).find(j => j.id === generationId && (j.job_type === 'reviewer_generation' || j.job_type === 'activity_generation')));
+    const job = requireFound((await this.rows('processing_jobs', userId)).find(j => j.id === generationId && (j.job_type === 'reviewer_generation' || j.job_type === 'activity_generation' || j.job_type === 'quiz_generation')));
+    if (job.job_type === 'quiz_generation') {
+      const quiz=job.status==='succeeded'?(await this.quizRecords(userId)).find(r=>r.generationId===job.id):null;
+      return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:quiz?.summary.id??null,error:['failed','expired'].includes(job.status)?{code:'quiz_generation_failed',title:'Quiz',message:'Quiz generation did not finish.',retryable:false,action:'none'}:null};
+    }
     if (job.job_type === 'activity_generation') {
       const draft=job.status==='succeeded'?(await this.activityDraftRecords(userId)).find(r=>r.draft.generationId===job.id):null;
       return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:draft?.summary.id??null,error:job.status==='failed'?{code:'activity_generation_failed',title:'Activity Maker',message:'Draft generation did not finish.',retryable:false,action:'none'}:null};

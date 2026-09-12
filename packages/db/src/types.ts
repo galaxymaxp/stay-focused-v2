@@ -393,7 +393,7 @@ export type CanvasCourseSyncPreferencesReplacementResult =
   Database["public"]["Functions"]["replace_canvas_course_sync_preferences"]["Returns"][number];
 
 export type ProcessingJobType =
-  | "activity_generation"
+  | "activity_generation" | "quiz_generation"
   | "document_extraction"
   | "reviewer_generation";
 export type ProcessingJobStatus =
@@ -1072,6 +1072,24 @@ export interface Database {
             referencedColumns: ["id"];
           },
         ];
+      };
+      quizzes: {
+        Row: {id:string;user_id:string;course_id:string;reviewer_id:string|null;generation_id:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at:string;updated_at:string};
+        Insert: {id?:string;user_id:string;course_id:string;reviewer_id?:string|null;generation_id?:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at?:string;updated_at?:string};
+        Update: {reviewer_id?:string|null;generation_id?:string|null};
+        Relationships: [];
+      };
+      quiz_keys: {
+        Row: {quiz_id:string;user_id:string;questions:Json;provenance:Json};
+        Insert: {quiz_id:string;user_id:string;questions:Json;provenance:Json};
+        Update: never;
+        Relationships: [];
+      };
+      quiz_attempts: {
+        Row: {id:string;user_id:string;quiz_id:string;request_key:string;status:string;answers:Json;started_at:string;completed_at:string|null;percentage:number|null};
+        Insert: {user_id:string;quiz_id:string;request_key:string};
+        Update: never;
+        Relationships: [];
       };
       activity_drafts: {
         Row: { id:string;user_id:string;activity_id:string;course_id:string;canvas_connection_id:string;generation_id:string;activity_type:string;content:Json;specification:Json;sources:Json;warnings:Json;status:string;revision:number;created_at:string;updated_at:string };
@@ -4155,6 +4173,26 @@ export interface Database {
           p_now?: string;
         };
         Returns: ProcessingNotificationDeliveryRow[];
+      };
+      create_quiz_processing_job: {
+        Args: {p_user_id:string;p_course_id:string;p_reviewer_id:string|null;p_idempotency_key:string;p_input:Json};
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      complete_quiz_processing_job: {
+        Args: {p_job_id:string;p_worker_id:string;p_result_type:string;p_payload:Json;p_metrics?:Json};
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      start_quiz_attempt: {
+        Args: {p_user_id:string;p_quiz_id:string;p_request_key:string};
+        Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
+      };
+      save_quiz_answer: {
+        Args: {p_user_id:string;p_attempt_id:string;p_question_id:string;p_selected:Json;p_finalize:boolean};
+        Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
+      };
+      complete_quiz_attempt: {
+        Args: {p_user_id:string;p_attempt_id:string;p_abandon?:boolean};
+        Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
       };
       create_activity_processing_job: {
         Args: {p_user_id:string;p_activity_id:string;p_idempotency_key:string;p_material_ids:Json};

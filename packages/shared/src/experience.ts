@@ -106,6 +106,7 @@ export interface TodayOverview {
 export type LibraryArtifactType = 'reviewer' | 'quiz' | 'activity_output';
 export type GenerationState = 'queued' | 'preparing' | 'generating' | 'finalizing' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
 export interface LibraryArtifactSummary {
+  readonly quiz?: import('./quiz').QuizSummary;
   readonly id: string;
   readonly type: LibraryArtifactType;
   readonly title: string;
@@ -152,20 +153,13 @@ export interface GenerationView {
   readonly error: ExperienceError | null;
 }
 export interface ExperienceError {
-  readonly code: 'sign_in_required' | 'not_found' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict';
+  readonly code: 'sign_in_required' | 'not_found' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable';
   readonly title: string;
   readonly message: string;
   readonly retryable: boolean;
   readonly action: 'sign_in' | 'retry' | 'choose_material' | 'none';
 }
 export type ExperienceResponse<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: ExperienceError };
-/** Future boundary only: no question schema or invented generation engine. */
-export interface QuizSummary {
-  readonly id: string;
-  readonly title: string;
-  readonly reviewerId: string | null;
-  readonly sourceId: string | null;
-}
 /** Legacy B24.5 placeholder. New integrations use ActivityDraft from activity-maker. */
 export interface ActivityOutputDraft {
   readonly id: string;

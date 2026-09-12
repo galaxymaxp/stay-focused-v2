@@ -8,6 +8,16 @@ export class ExperienceFailure extends Error {
 export function normalizeExperienceError(error: unknown): { status: number; error: ExperienceError } {
   const failure = error instanceof ExperienceFailure ? error : new ExperienceFailure(503, 'unavailable');
   const copy: Record<ExperienceError['code'], Omit<ExperienceError, 'code'>> = {
+    quiz_generation_unavailable: { title: 'Quiz', message: 'Quiz generation is temporarily unavailable.', retryable: false, action: 'none' },
+    quiz_source_unavailable: { title: 'Quiz', message: 'Prepare the selected course material or choose another source.', retryable: false, action: 'none' },
+    quiz_not_found: { title: 'Quiz', message: 'Quiz could not be found.', retryable: false, action: 'none' },
+    quiz_generation_failed: { title: 'Quiz', message: 'The questions did not pass source and correctness validation.', retryable: false, action: 'none' },
+    quiz_attempt_not_found: { title: 'Quiz', message: 'Quiz attempt could not be found.', retryable: false, action: 'none' },
+    quiz_attempt_completed: { title: 'Quiz', message: 'This attempt is already complete.', retryable: false, action: 'none' },
+    quiz_question_not_found: { title: 'Quiz', message: 'Question could not be found.', retryable: false, action: 'none' },
+    quiz_answer_invalid: { title: 'Quiz', message: 'Select a valid answer for this question.', retryable: false, action: 'none' },
+    quiz_answer_already_finalized: { title: 'Quiz', message: 'This answer has already been finalized.', retryable: false, action: 'none' },
+    quiz_result_unavailable: { title: 'Quiz', message: 'Complete every question to view results.', retryable: false, action: 'none' },
     activity_not_found: { title: 'Activity Maker', message: 'Activity could not be found.', retryable: false, action: 'none' },
     activity_generation_unavailable: { title: 'Activity Maker', message: 'Activity generation is temporarily unavailable.', retryable: false, action: 'none' },
     activity_source_unavailable: { title: 'Activity Maker', message: 'Required activity sources are unavailable. Prepare the assignment resources and try again.', retryable: false, action: 'none' },

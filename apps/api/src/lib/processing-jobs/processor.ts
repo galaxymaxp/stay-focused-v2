@@ -1,3 +1,5 @@
+import { ExperienceFailure } from '../experience/errors';
+import { processQuizJob } from '../quiz/service';
 import type {
   Json,
   ProcessingJobDatabaseRow,
@@ -75,7 +77,9 @@ export async function processClaimedJob({
     const source = await findProcessingJobSource(client, job);
     await assertJobMayContinue(client, job.id, workerId, heartbeat);
 
-    const output = job.job_type === "activity_generation"
+    const output = job.job_type === "quiz_generation"
+      ? await processQuizJob(client, job, workerId)
+      : job.job_type === "activity_generation"
       ? await processActivityJob(client, job, workerId)
       : job.job_type === "document_extraction"
       ? await processExtractionJob({ client, heartbeat, job, source, workerId })
@@ -632,6 +636,9 @@ export function mapWorkerFailure(error: unknown): WorkerJobError {
     );
   }
   if (error instanceof WorkerJobError) return error;
+  if (error instanceof ExperienceFailure && error.code.startsWith('quiz_')) {
+    return new WorkerJobError(error.code, 'Quiz generation could not be completed.', error.status >= 500);
+  }
   if (error instanceof PipelineAssemblyError) {
     return new WorkerJobError(
       "reviewer_validation_failed",

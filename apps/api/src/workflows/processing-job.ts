@@ -96,7 +96,7 @@ type WorkflowOutcome =
 
 interface ClaimedWorkflowJob {
   readonly claimed: boolean;
-  readonly jobType?: "document_extraction" | "reviewer_generation" | "activity_generation";
+  readonly jobType?: "document_extraction" | "reviewer_generation" | "activity_generation" | "quiz_generation";
 }
 
 interface ExtractionWorkflowPlan {
@@ -179,7 +179,9 @@ export async function processingJobWorkflow(
       return { status: "skipped", jobId };
     }
 
-    if (claimed.jobType === "activity_generation") {
+    if (claimed.jobType === "quiz_generation") {
+      await processQuizStep(jobId, workerId);
+    } else if (claimed.jobType === "activity_generation") {
       await processActivityStep(jobId, workerId);
     } else if (claimed.jobType === "document_extraction") {
       const plan = await prepareExtractionStep(jobId, workerId);
@@ -214,6 +216,27 @@ export async function processingJobWorkflow(
     await finalizeWorkflowFailureStep(jobId, workerId);
     return { status: "failed", jobId };
   }
+}
+
+async function processQuizStep(jobId: string, workerId: string): Promise<void> {
+  "use step";
+  const { processQuizJob } = await import("@/lib/quiz/service");
+  const client = createProcessingJobServiceClient();
+  const existing = await readProcessingJobState(client, jobId);
+  if (existing.status === "succeeded") return;
+  await withWorkflowLease(client, jobId, workerId, async () => {
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    const { ExperienceFailure } = await import("@/lib/experience/errors");
+    const output = await processQuizJob(client, existing, workerId).catch(async (error: unknown) => {
+      if (error instanceof ExperienceFailure && error.status < 500) {
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Quiz questions could not pass source validation.", retryable: false, automaticRetryable: false });
+        throw new FatalError(error.code);
+      }
+      throw error;
+    });
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    await completeProcessingJob(client, { jobId, workerId, resultType: "quiz_generation", payload: JSON.parse(JSON.stringify(output.payload)) as Json, metrics: {} });
+  });
 }
 
 async function processActivityStep(jobId: string, workerId: string): Promise<void> {

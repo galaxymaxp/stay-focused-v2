@@ -6,10 +6,10 @@ import { ExperienceFailure, normalizeExperienceError } from './errors';
 const available: FeatureCapability = { status: 'available' };
 const missing: FeatureCapability = { status: 'unavailable', reasonCode: 'not_implemented' };
 export function experienceCapabilities(): ExperienceCapabilities {
-  return { fileIngestion: {pdf:available,scanned_pdf:available,image:available,docx:available,pptx:available,doc:{status:'unavailable',reasonCode:'unsupported_material'},ppt:{status:'unavailable',reasonCode:'unsupported_material'},text:available,canvas_text:available}, reviewerGeneration: available, quizGeneration: missing, activityMaker: available, planner: available, calendar: missing };
+  return { fileIngestion: {pdf:available,scanned_pdf:available,image:available,docx:available,pptx:available,doc:{status:'unavailable',reasonCode:'unsupported_material'},ppt:{status:'unavailable',reasonCode:'unsupported_material'},text:available,canvas_text:available}, reviewerGeneration: available, quizGeneration: available, activityMaker: available, planner: available, calendar: missing };
 }
 export function generationCapability(ready: boolean, unsupported = false): GenerationCapability {
-  return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: missing, activityAssistance: missing };
+  return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, activityAssistance: missing };
 }
 export function courseSummary(row: CanvasCourseRow): CourseSummary {
   return { id: row.id, code: row.course_code, name: row.name, status: row.workflow_state, materialCount: null, reviewerCount: null, lastActivityAt: row.last_synced_at };

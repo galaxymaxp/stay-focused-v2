@@ -168,7 +168,7 @@ describe('Library ownership and persisted output', () => {
     const { api } = service(libraryData);
     for (const type of ['quiz', 'activity_output'] as const) {
       const result = await api.getLibrary('owner', { type });
-      expect(result.items).toEqual([]); expect(result.categories[type].status).toBe(type === 'activity_output' ? 'available' : 'unavailable');
+      expect(result.items).toEqual([]); expect(result.categories[type].status).toBe('available');
     }
     expect(experienceCapabilities().calendar.status).toBe('unavailable');
   });

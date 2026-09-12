@@ -46,7 +46,7 @@ describe('authenticated student routes', () => {
   });
   it('returns empty missing Library categories', async () => {
     const response = await GET(request('library?type=quiz'), context('library'));
-    const body = await response.json(); expect(body.data.items).toEqual([]); expect(body.data.categories.quiz.status).toBe('unavailable');
+    const body = await response.json(); expect(body.data.items).toEqual([]); expect(body.data.categories.quiz.status).toBe('available');
   });
   it('returns CORS options without exposing data', () => { expect(OPTIONS().status).toBe(204); });
 });

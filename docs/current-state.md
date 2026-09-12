@@ -1,5 +1,32 @@
 # Current State
 
+## B24.7 Quiz backend (2026-09-13)
+
+**PASS — Quiz backend is ready and core backend capability is complete for the UI redesign.**
+Owned prepared material and saved Reviewer source relationships now feed durable,
+source-grounded quizzes with server-only answer keys, persisted attempts,
+deterministic exact-set scoring, weak-area navigation and Library reopen.
+Reviewer, Activity Maker and Quiz capabilities are available in the new code.
+Quiz uses the existing provider adapter with its own pinned GPT-5.4 model;
+Reviewer and Activity model defaults and behavior are unchanged.
+
+Fresh verification: API 906 passed plus three opt-in live tests skipped; mobile
+443, Canvas 73, OCR 27, shared 44 and engine 606. Forced root typecheck/lint/build
+passed 7/7 each with zero cached tasks and no lint warnings; Workflow runtime 1
+and provider contract 18 passed. Both five-question live fixtures passed final
+whole-set verification, local SQL attempts/scoring and Library reopen after
+three rejected questions were repaired. Earlier academic failures are documented;
+the limited sample is not a production reliability benchmark.
+
+Pending rollout: apply Activity migration `20260912100000_activity_maker.sql`
+then Quiz migration `20260912110000_quiz_maker.sql`, deploy API and smoke test.
+No hosted migration, deployment, UI redesign or push occurred in B24.7.
+This entry supersedes earlier Quiz-missing statements. Acceptance evidence is
+under `docs/ai/acceptance/b24-7/`, including quality limits and failure history.
+
+Next: B24.8 — Backend rollout readiness, then B25 — Apple-inspired 2026 design
+system + mobile app shell.
+
 ## B24.6 Activity Maker backend (2026-09-12)
 
 **PASS — V1-informed Activity Maker backend is ready for the redesigned UI.**

@@ -52,6 +52,7 @@ export type * from "./activity-maker";
 
 export const PROCESSING_JOB_TYPES = [
   "activity_generation",
+  "quiz_generation",
   "document_extraction",
   "reviewer_generation",
 ] as const;
@@ -220,3 +221,5 @@ export function isActiveProcessingJobStatus(
 }
 
 export type * from './experience';
+
+export type * from './quiz';
