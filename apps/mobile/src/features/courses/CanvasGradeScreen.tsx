@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo , useCallback, useEffect, useRef, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
+
 import {
   ActivityIndicator,
   AppState,
@@ -13,7 +15,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, hitTarget, spacing, typography } from "../../design/tokens";
+import { hitTarget, spacing, typography } from "../../design/tokens";
 import {
   CANVAS_GRADE_LIST_DEFAULT_LIMIT,
   getCanvasCourseGradeAssignment,
@@ -68,6 +70,9 @@ export function CanvasGradeScreen({
   courseName,
   onBackToCourses,
 }: CanvasGradeScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { session } = useAuth();
   const [summary, setSummary] = useState<CanvasCourseGradeSummary | null>(null);
   const [syncStatus, setSyncStatus] =
@@ -539,6 +544,9 @@ function CanvasGradeAssignmentDetailView({
   readonly courseName: string;
   readonly onBack: () => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { session } = useAuth();
   const [assignment, setAssignment] =
     useState<CanvasGradeAssignmentDetail | null>(null);
@@ -638,6 +646,9 @@ function Header({
   readonly onBackToCourses: () => void;
   readonly syncStatus: CanvasGradeSyncStatusPayload | null;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.header} testID="canvas-grades-screen">
       <Button onPress={onBackToCourses} variant="ghost">
@@ -658,6 +669,9 @@ function CourseSummaryCard({
 }: {
   readonly summary: CanvasCourseGradeSummary;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.sectionCard} testID="canvas-grade-summary">
       <View style={styles.summaryHeader}>
@@ -688,6 +702,9 @@ function SyncStatusCard({
 }: {
   readonly sync: CanvasGradeSyncStatusPayload;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.sectionCard} testID="canvas-grade-sync-status">
       <Text style={styles.statusTitle}>{formatSyncStatusLabel(sync)}</Text>
@@ -723,6 +740,9 @@ function AssignmentList({
   readonly onOpenAssignment: (assignmentId: string) => void;
   readonly page: GradePage | null;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.sectionCard} testID="canvas-grade-assignment-list">
       <View style={styles.summaryHeader}>
@@ -762,6 +782,9 @@ function AssignmentRow({
   readonly assignment: CanvasGradeAssignmentListItem;
   readonly onOpenAssignment: (assignmentId: string) => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const status = getAssignmentStatusPresentation(assignment.normalizedStatus);
   return (
     <Pressable
@@ -800,6 +823,9 @@ function AssignmentDetailCard({
 }: {
   readonly assignment: CanvasGradeAssignmentDetail;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const status = getAssignmentStatusPresentation(assignment.normalizedStatus);
   const secondsLate = formatSecondsLate(assignment.secondsLate);
   return (
@@ -890,6 +916,9 @@ function GradeValueRow({
   readonly label: string;
   readonly value: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.valueRow}>
       <Text style={styles.valueLabel}>{label}</Text>
@@ -905,8 +934,11 @@ function StatusPill({
   readonly label: string;
   readonly tone: "neutral" | "success" | "warning" | "danger" | "muted";
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
-    <View style={[styles.statusPill, statusToneStyle(tone)]}>
+    <View style={[styles.statusPill, statusToneStyle(tone, styles)]}>
       <Text style={styles.statusPillText}>{label}</Text>
     </View>
   );
@@ -921,6 +953,9 @@ function CanvasSyncJobCard({
   readonly onCancel: () => void;
   readonly onRetry: () => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const active =
     job.status === "queued" ||
     job.status === "running" ||
@@ -970,6 +1005,9 @@ function ErrorCard({
   readonly onAction: () => void;
   readonly testID: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.errorBox} testID={testID}>
       <Text style={styles.errorTitle}>{error.title}</Text>
@@ -983,6 +1021,9 @@ function ErrorCard({
 }
 
 function WarningCard({ error }: { readonly error: CanvasGradeDisplayError }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.warningBox} testID="canvas-grades-warning">
       <Text style={styles.errorTitle}>{error.title}</Text>
@@ -1108,6 +1149,7 @@ function formatNullableDate(value: string | null): string {
 
 function statusToneStyle(
   tone: "neutral" | "success" | "warning" | "danger" | "muted",
+  styles: ReturnType<typeof createStyles>,
 ) {
   switch (tone) {
     case "success":
@@ -1123,7 +1165,7 @@ function statusToneStyle(
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[5],
   },

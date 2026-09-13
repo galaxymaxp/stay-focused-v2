@@ -1,6 +1,7 @@
+import { useMemo , useCallback, useRef, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import { ChevronDown, ChevronRight } from "lucide-react-native";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +18,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
+import { hitTarget, radius, spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
 } from "../../services/reviewerApi";
@@ -86,6 +87,9 @@ interface SourceStatusState {
  * never lead the reading experience.
  */
 export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { isSigningOut, session, signOut } = useAuth();
   const [reviewers, setReviewers] = useState<readonly SavedReviewerSummary[]>([]);
   const [openedReviewer, setOpenedReviewer] =
@@ -522,6 +526,9 @@ function RenameCard({
   readonly onSubmit: () => void;
   readonly title: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.formCard} testID="study-library-rename-card">
       <Text style={styles.noticeTitle}>Rename reviewer</Text>
@@ -566,6 +573,9 @@ function SavedReviewerEntry({
   readonly onOpen: () => void;
   readonly reviewer: SavedReviewerSummary;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const presentation = presentSavedReviewer(reviewer);
 
   return (
@@ -638,6 +648,9 @@ function SourceDetailsDisclosure({
   readonly status: ReviewerSourceStatusPayload | null;
   readonly summary: SavedReviewerSourceProvenanceSummary;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const statusActions = status ? describeSourceStatusActions(status.actions) : null;
 
   return (
@@ -739,6 +752,9 @@ function SourceDetailsDisclosure({
 }
 
 function ErrorCard({ error }: { readonly error: LibraryDisplayError }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -753,6 +769,9 @@ function ErrorCard({ error }: { readonly error: LibraryDisplayError }) {
 }
 
 function SuccessCard({ message }: { readonly message: string }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -867,7 +886,7 @@ function operationErrorTitle(operation: LibraryOperation): string {
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[5],
   },

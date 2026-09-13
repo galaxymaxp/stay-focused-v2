@@ -1,9 +1,11 @@
+import { router } from "expo-router";
+import { useMemo , useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { ReviewerOutput } from "@stay-focused/engine";
 import {
   isActiveProcessingJobStatus,
   type ProcessingJobStatusView,
 } from "@stay-focused/shared";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   Alert,
   AppState,
@@ -21,7 +23,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, spacing, typography } from "../../design/tokens";
+import { spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
 } from "../../services/reviewerApi";
@@ -100,6 +102,9 @@ export function ReviewerGenerateScreen({
   onOpenLibrary,
   onOpenProcessing,
 }: ReviewerGenerateScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { isSigningOut, session, signOut } = useAuth();
   const [sourceTitle, setSourceTitle] = useState("");
   const [imageSourceMode, setImageSourceMode] =
@@ -409,6 +414,7 @@ export function ReviewerGenerateScreen({
         reviewerIdempotencyKeyRef.current = null;
         setActiveReviewerJob(result.data);
         await upsertActiveProcessingJob(ownerUserId, result.data);
+        router.push({ pathname: "/generation", params: { id: result.data.id } });
       } else {
         if (
           result.error.code === "network_error" ||
@@ -1121,6 +1127,9 @@ function ProcessingJobCard({
   readonly onReturn: () => void;
   readonly onView: () => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isActive = isActiveProcessingJobStatus(job.status);
   const hasUnits =
     job.progress.completedUnits !== null &&
@@ -1223,6 +1232,9 @@ function ImageImportPanel({
   readonly selectedImage: SelectedGalleryImage | null;
   readonly status: "idle" | "selected" | "uploading" | "ready" | "failed";
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isUploading = status === "uploading";
 
   return (
@@ -1366,6 +1378,9 @@ function PdfImportPanel({
   readonly selectedPdf: SelectedPdfDocument | null;
   readonly status: "idle" | "selected" | "uploading" | "ready" | "failed";
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isUploading = status === "uploading";
 
   return (
@@ -1474,6 +1489,9 @@ function SaveReviewerPanel({
   readonly saveError: GenerationDisplayError | null;
   readonly saveTitle: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.saveCard} testID="reviewer-save-card">
       <View style={styles.saveHeader}>
@@ -1720,7 +1738,7 @@ function revokeWebObjectUrl(uri: string | undefined): void {
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[6],
   },

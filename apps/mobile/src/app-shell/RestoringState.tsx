@@ -1,8 +1,10 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../design/theme";
 import { ActivityIndicator, StyleSheet, Text } from "react-native";
 
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
-import { colors, spacing, typography } from "../design/tokens";
+import { spacing, typography } from "../design/tokens";
 
 /**
  * Shown while the persisted Supabase session is being restored, before any
@@ -10,6 +12,9 @@ import { colors, spacing, typography } from "../design/tokens";
  * every layout that has to wait for auth renders the same thing.
  */
 export function RestoringState() {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Screen centered scroll={false}>
       <Card elevated style={styles.restoringCard} testID="auth-restoring-state">
@@ -21,7 +26,7 @@ export function RestoringState() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   restoringCard: {
     alignItems: "center",
     gap: spacing[3],

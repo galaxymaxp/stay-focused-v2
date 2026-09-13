@@ -1,11 +1,12 @@
+import { useMemo , useCallback, useEffect, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { TaskView } from "@stay-focused/shared/task-planning";
-import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { Screen } from "../../components/Screen";
-import { colors } from "../../design/tokens";
+
 import { createTask, deleteTask, listTasks, updateTask } from "../../services/taskApi";
 import { TaskEditor, type TaskDraft } from "./TaskEditor";
 
@@ -17,6 +18,9 @@ interface TaskEditorScreenProps {
 }
 
 export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { session } = useAuth();
   const accessToken = session?.accessToken;
   const [task, setTask] = useState<TaskView | null>(null);
@@ -113,7 +117,7 @@ export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenP
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   loading: {
     alignItems: "center",
     justifyContent: "center",

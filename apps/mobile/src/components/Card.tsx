@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../design/theme";
 import type { ReactNode } from "react";
 import {
   StyleSheet,
@@ -7,7 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { colors, radius, shadows, spacing } from "../design/tokens";
+import { radius, shadows, spacing } from "../design/tokens";
 
 interface CardProps extends ViewProps {
   readonly children: ReactNode;
@@ -23,6 +25,9 @@ export function Card({
   style,
   ...props
 }: CardProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       style={[
@@ -38,7 +43,7 @@ export function Card({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderColor: colors.border,

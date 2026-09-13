@@ -72,10 +72,9 @@ describe("course route params read back", () => {
 
 describe("shell destinations", () => {
   it("lands an authenticated session on a working surface", () => {
-    // Today is the intended landing route but is still a placeholder; this
-    // guard fails the moment it is made the default before it renders data.
-    expect(POST_SIGN_IN_ROUTE).not.toBe(APP_ROUTES.today);
-    expect(POST_SIGN_IN_ROUTE).toBe(APP_ROUTES.courses);
+    // The authenticated shell now opens the backend-connected Today surface.
+    expect(POST_SIGN_IN_ROUTE).toBe(APP_ROUTES.today);
+    expect(POST_SIGN_IN_ROUTE).not.toBe(APP_ROUTES.courses);
   });
 
   it("keeps every route absolute so pushes do not resolve relatively", () => {

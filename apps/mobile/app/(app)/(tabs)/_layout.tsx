@@ -1,38 +1,11 @@
 import { Tabs } from "expo-router";
-
-import { colors, hitTarget, typography } from "../../../src/design/tokens";
-
-/**
- * Primary navigation: Today, Work, Courses, Library.
- *
- * Deliberately unstyled beyond the existing tokens. Icons, tab-bar treatment,
- * and accent colour are open design decisions, so this uses labels and the
- * palette already in `tokens.ts` rather than introducing a new visual language
- * during a structural migration.
- */
+import { BookOpen, CheckSquare, Clock, Sparkles } from "lucide-react-native";
+import { useTheme } from "../../../src/design/theme";
+import { primaryTabs } from "../../../src/features/redesign/presentation";
+const icons = { today: Clock, courses: Sparkles, work: CheckSquare, library: BookOpen };
 export default function TabsLayout() {
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.textPrimary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          minHeight: hitTarget.min,
-        },
-        tabBarLabelStyle: {
-          fontFamily: typography.fontFamily,
-          fontSize: typography.caption,
-          fontWeight: "700",
-        },
-      }}
-    >
-      <Tabs.Screen name="today" options={{ title: "Today" }} />
-      <Tabs.Screen name="work" options={{ title: "Work" }} />
-      <Tabs.Screen name="courses" options={{ title: "Courses" }} />
-      <Tabs.Screen name="library" options={{ title: "Library" }} />
-    </Tabs>
-  );
+ const { colors } = useTheme();
+ return <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.textSecondary, tabBarStyle: { backgroundColor: colors.surfacePrimary, borderTopColor: colors.separator, paddingTop: 6 }, tabBarLabelStyle: { fontSize: 12, fontWeight: "500" }, tabBarItemStyle: { minHeight: 48 } }}>
+ {primaryTabs.map(tab => <Tabs.Screen key={tab.route} name={tab.route} options={{ title: tab.title, tabBarAccessibilityLabel: tab.title, tabBarIcon: ({ color, size }) => { const Icon = icons[tab.route]; return <Icon color={color} size={size} strokeWidth={1.8} />; } }} />)}
+ </Tabs>;
 }

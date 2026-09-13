@@ -1,11 +1,12 @@
+import { useMemo , useCallback, useEffect, useRef, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { TaskView } from "@stay-focused/shared/task-planning";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, spacing } from "../../design/tokens";
+import { spacing } from "../../design/tokens";
 import { listTasks, updateTask } from "../../services/taskApi";
 import { WorkView } from "./WorkView";
 
@@ -25,6 +26,9 @@ interface WorkScreenProps {
  * correctly instead of silently truncating at the first page.
  */
 export function WorkScreen({ onAddTask, onOpenTask, reloadToken }: WorkScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { session } = useAuth();
   const accessToken = session?.accessToken;
   const [tasks, setTasks] = useState<readonly TaskView[]>([]);
@@ -142,7 +146,7 @@ export function WorkScreen({ onAddTask, onOpenTask, reloadToken }: WorkScreenPro
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   safeArea: {
     backgroundColor: colors.background,
     flex: 1,

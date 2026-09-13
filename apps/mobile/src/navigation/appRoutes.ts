@@ -29,15 +29,8 @@ export const TASK_EDITOR_PATHNAME = "/task" as const;
 export const COURSE_REVIEWER_PATHNAME = "/courses/[courseId]/reviewer" as const;
 export const COURSE_GRADES_PATHNAME = "/courses/[courseId]/grades" as const;
 
-/**
- * Where an authenticated session lands.
- *
- * Today is the intended destination, but it is still a placeholder, so landing
- * there would replace a working screen with an empty one. Courses is the
- * closest working equivalent to the switcher's previous default. Flip this to
- * `APP_ROUTES.today` when the Today surface ships.
- */
-export const POST_SIGN_IN_ROUTE: AppRoute = APP_ROUTES.courses;
+/** Authenticated sessions land on the implemented day-planning surface. */
+export const POST_SIGN_IN_ROUTE: AppRoute = APP_ROUTES.today;
 
 export interface CourseRouteInput {
   readonly courseId: string;

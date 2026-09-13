@@ -1,11 +1,12 @@
+import { useMemo , useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { TaskPriority, TaskView } from "@stay-focused/shared/task-planning";
-import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "../../components/Button";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
-import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
+import { hitTarget, radius, spacing, typography } from "../../design/tokens";
 import { PRIORITY_LABELS } from "./workPresentation";
 import {
   MAX_TASK_TITLE_LENGTH,
@@ -51,6 +52,9 @@ export function TaskEditor({
   onDelete,
   onCancel,
 }: TaskEditorProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isCanvasTask = task?.sourceType === "canvas";
   const [title, setTitle] = useState(task?.title ?? "");
   const [notes, setNotes] = useState(task?.notes ?? "");
@@ -233,7 +237,7 @@ export function TaskEditor({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[5],
   },

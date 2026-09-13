@@ -1,3 +1,12 @@
+import { router } from "expo-router";
+import { useMemo ,
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { ReviewerOutput } from "@stay-focused/engine";
 import {
   isActiveProcessingJobStatus,
@@ -14,14 +23,6 @@ import {
   RotateCcw,
 } from "lucide-react-native";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
-import {
   ActivityIndicator,
   Alert,
   AppState,
@@ -37,7 +38,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
+import { hitTarget, radius, spacing, typography } from "../../design/tokens";
 import {
   listCanvasReviewerSources,
   prepareCanvasReviewerSources,
@@ -141,6 +142,9 @@ export function CanvasSourceReviewerScreen({
   onBackToCourses,
   onOpenLibrary,
 }: CanvasSourceReviewerScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { session } = useAuth();
   const [sourceList, setSourceList] =
     useState<CanvasReviewerSourceListPayload | null>(null);
@@ -798,6 +802,7 @@ export function CanvasSourceReviewerScreen({
         accepted = true;
         recoveryRecordRef.current = acceptedRecovery;
         setActiveReviewerJob(result.data);
+        router.push({ pathname: "/generation", params: { id: result.data.id } });
         try {
           await upsertActiveProcessingJob(ownerUserId, result.data);
         } catch {
@@ -1768,6 +1773,9 @@ function Header({
   readonly onBackToCourses: () => void;
   readonly stage: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.header} testID="canvas-source-reviewer-screen">
       <Pressable
@@ -1793,6 +1801,9 @@ function CourseFreshnessCard({
 }: {
   readonly courseSync: CanvasReviewerSourceListPayload["courseSync"];
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const copy =
     courseSync.status === "success"
       ? "Course content is synchronized."
@@ -1820,6 +1831,9 @@ function SourceSection({
   readonly sources: readonly CanvasReviewerSourceDescriptor[];
   readonly title: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       accessibilityLabel={`${title} study materials`}
@@ -1856,6 +1870,9 @@ function SourceRow({
   readonly onSelect: (source: CanvasReviewerSourceDescriptor) => void;
   readonly source: CanvasReviewerSourceDescriptor;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const presentation = presentCanvasSourceCapability(source);
   return (
     <Pressable
@@ -1901,6 +1918,8 @@ function SourceRow({
 }
 
 function SourceTypeIcon({ type }: { readonly type: CanvasReviewerSourceType }) {
+  const colors = useLegacyTheme();
+
   const props = { color: colors.textSecondary, size: 21, strokeWidth: 1.7 } as const;
   switch (type) {
     case "page":
@@ -1980,6 +1999,9 @@ function CanvasStudyActionStage({
   readonly onRetryMaterial: () => void;
   readonly structureReady: boolean;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.stack} testID="canvas-study-action-stage">
       <Card accent style={styles.actionCard}>
@@ -2073,6 +2095,9 @@ function BlockSelectionStage({
   readonly source: CanvasReviewerSourceDescriptor;
   readonly structure: CanvasSourceStructurePayload;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const selected = new Set(selectedBlockIds);
 
   return (
@@ -2197,6 +2222,9 @@ function BlockSelectionFooter({
   readonly selectedBlockIds: readonly string[];
   readonly structure: CanvasSourceStructurePayload;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const selection = describeCanvasBlockSelection({
     maximumSelectedBlocks: structure.limits.maximumSelectedBlocks,
     selectableCount: countSelectableCanvasBlocks(structure),
@@ -2253,6 +2281,9 @@ function PreviewActionFooter({
   readonly onGenerate: () => void;
   readonly sourceText: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <>
       {sourceText.trim() ? null : (
@@ -2295,6 +2326,9 @@ function PreviewStage({
   readonly source: CanvasReviewerSourceDescriptor | null;
   readonly sourceText: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.stack} testID="canvas-source-preview-editor">
       <Card style={styles.previewCard}>
@@ -2366,6 +2400,9 @@ function CanvasReviewerJobCard({
   readonly onDismiss: () => void;
   readonly onRetry: () => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const active = isActiveProcessingJobStatus(job.status);
   const hasUnits =
     job.progress.completedUnits !== null &&
@@ -2441,6 +2478,9 @@ function SaveCanvasReviewerPanel({
   readonly saveTitle: string;
   readonly sourceSnapshotReady: boolean;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.previewCard} testID="canvas-reviewer-save-card">
       <Text accessibilityRole="header" style={styles.cardTitle}>
@@ -2499,6 +2539,9 @@ function ReviewerSaveFooter({
   readonly saveTitle: string;
   readonly sourceSnapshotReady: boolean;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <>
       {savedReviewer ? (
@@ -2557,6 +2600,9 @@ function StatusCard({
   readonly testID?: string;
   readonly title: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card
       accessibilityLabel={`${title}. ${message}`}
@@ -2576,6 +2622,9 @@ function StatusCard({
 }
 
 function ErrorCard({ error }: { readonly error: CanvasSourceDisplayError }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorBox}>
       <AlertCircle color={colors.error} size={20} strokeWidth={1.8} />
@@ -2786,7 +2835,7 @@ function blockHierarchyIndent(block: CanvasStructuredBlock): { paddingLeft: numb
   return { paddingLeft: spacing[4] + Math.min(contentDepth, 5) * spacing[2] };
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: { gap: spacing[5] },
   stack: { gap: spacing[4] },
   // Reading stack: the document is followed by its save details with enough

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo , useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "../../auth";
@@ -6,7 +7,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
-import { colors, spacing, typography } from "../../design/tokens";
+import { spacing, typography } from "../../design/tokens";
 
 interface SignInScreenProps {
   readonly onCreateAccount: () => void;
@@ -18,6 +19,9 @@ interface SignInScreenProps {
  * point, without which the sign-up route would be unreachable.
  */
 export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { clearError, error, isSigningIn, signInWithEmailPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -105,7 +109,7 @@ export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   authContent: {
     gap: spacing[6],
   },

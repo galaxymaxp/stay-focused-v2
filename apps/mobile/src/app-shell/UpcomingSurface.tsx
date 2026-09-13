@@ -1,8 +1,10 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../design/theme";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
-import { colors, spacing, typography } from "../design/tokens";
+import { spacing, typography } from "../design/tokens";
 
 interface UpcomingSurfaceProps {
   readonly title: string;
@@ -21,6 +23,9 @@ interface UpcomingSurfaceProps {
  * than showing a mock of data the app cannot load.
  */
 export function UpcomingSurface({ title, summary, reads, testID }: UpcomingSurfaceProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Screen>
       <View style={styles.content} testID={testID}>
@@ -42,7 +47,7 @@ export function UpcomingSurface({ title, summary, reads, testID }: UpcomingSurfa
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[4],
   },

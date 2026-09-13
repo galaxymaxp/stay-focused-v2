@@ -1,8 +1,10 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { ReviewerOutput } from "@stay-focused/engine";
 import { AlertCircle, Check } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { colors, radius, spacing, typography } from "../../design/tokens";
+import { radius, spacing, typography } from "../../design/tokens";
 import {
   describeGroundingStatus,
   describeReviewerQualityNotice,
@@ -37,6 +39,9 @@ interface ReviewerPreviewProps {
  * metadata the payload does not contain.
  */
 export function ReviewerPreview({ reviewer, context }: ReviewerPreviewProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const sections = presentReviewerSections(reviewer);
   const sourceLine = describeReviewerSource(reviewer, context);
   const grounding = describeGroundingStatus(reviewer.metadata);
@@ -94,6 +99,9 @@ function GroundingChip({
 }: {
   readonly grounding: ReviewerGroundingPresentation;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isGrounded = grounding.tone === "grounded";
 
   return (
@@ -124,6 +132,9 @@ function ReaderSection({
   readonly isFirst: boolean;
   readonly section: ReviewerReaderSection;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       style={[styles.section, isFirst ? styles.firstSection : null]}
@@ -156,6 +167,9 @@ function ReaderSection({
 }
 
 function ReaderBlock({ block }: { readonly block: ReviewerReaderBlock }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.block}>
       {block.heading ? (
@@ -226,7 +240,7 @@ function ReaderBlock({ block }: { readonly block: ReviewerReaderBlock }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   evidenceRow: { flexDirection: "row" },
   evidenceCell: { width: 180, padding: spacing[2], borderBottomWidth: StyleSheet.hairlineWidth },
   technicalText: { fontFamily: "monospace" },

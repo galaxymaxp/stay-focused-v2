@@ -45,7 +45,7 @@ export async function GET(request: Request, context: Context): Promise<Response>
         return experienceJson(await service.getLibrary(userId, { ...(type && type !== 'all' ? { type: type as LibraryArtifactType } : {}), ...(query.get('courseId') ? { courseId: requireId(query.get('courseId')!) } : {}), offset: readInteger(query.get('offset'), 0, 0, 10000), limit: readInteger(query.get('limit'), 50, 1, 100) }));
       }
       if (path.length === 2) {
-        if (!/^(reviewer|artifact|generation):/.test(id!)) throw new ExperienceFailure(404, 'not_found');
+        if (!/^(reviewer|artifact|generation|quiz|activity):/.test(id!)) throw new ExperienceFailure(404, 'not_found');
         requireId(id!.slice(id!.indexOf(':') + 1));
         return experienceJson(await service.getLibraryArtifact(userId, id!));
       }

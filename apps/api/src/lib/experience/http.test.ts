@@ -11,11 +11,22 @@ vi.mock('@/lib/experience/repository', async importOriginal => {
 import { GET as todayGet } from '@/../app/api/today/route';
 import { GET, POST, OPTIONS } from '@/../app/api/experience/[...path]/route';
 import { experienceRepository } from './repository';
+import { ExperienceService } from './service';
 const id = '11111111-1111-4111-8111-111111111111';
 function request(path: string, method = 'GET', body?: string) { return new Request(`https://app.example/api/experience/${path}`, { method, headers: { authorization: 'Bearer token', 'content-type': 'application/json' }, ...(body ? { body } : {}) }); }
 function context(path: string) { return { params: Promise.resolve({ path: path.split('?')[0]!.split('/') }) }; }
 beforeEach(() => { vi.resetAllMocks(); mocks.auth.mockResolvedValue({ id: 'owner' }); mocks.client.mockReturnValue({}); mocks.rows.mockResolvedValue([]); });
 describe('authenticated student routes', () => {
+  it.each(['quiz', 'activity'])('opens persisted %s aliases through the Library service', async prefix => {
+    const artifactId = `${prefix}:${id}`;
+    const open = vi.spyOn(ExperienceService.prototype, 'getLibraryArtifact').mockResolvedValue({
+      artifact: { id: artifactId, type: prefix === 'quiz' ? 'quiz' : 'activity_output', title: 'Saved output', course: null, sourceId: null, sourceTitle: null, activityId: null, createdAt: '2026-09-13', updatedAt: '2026-09-13', lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] },
+      reviewer: { id: artifactId, title: 'Saved output', course: null, source: { id: null, title: null }, generatedAt: '2026-09-13', freshness: 'unknown', sections: [] },
+    });
+    const path = `library/${artifactId}`;
+    try { const response = await GET(request(path), context(path)); expect(response.status).toBe(200); expect(open).toHaveBeenCalledWith('owner', artifactId); }
+    finally { open.mockRestore(); }
+  });
   it.each(['capabilities', 'courses', `courses/${id}`, `courses/${id}/materials`, 'activities', `activities/canvas:${id}`, 'library', `library/reviewer:${id}`, `generations/${id}`])('rejects missing JWT for %s', async path => {
     mocks.auth.mockResolvedValue(null);
     const response = await GET(request(path), context(path));

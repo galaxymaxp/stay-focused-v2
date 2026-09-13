@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../design/theme";
 import type { ReactNode } from "react";
 import {
   ScrollView,
@@ -9,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors, spacing } from "../design/tokens";
+import { spacing } from "../design/tokens";
 
 interface ScreenProps {
   readonly children: ReactNode;
@@ -33,6 +35,9 @@ export function Screen({
   contentContainerStyle,
   footer,
 }: ScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const contentStyle = [
     styles.content,
     centered ? styles.centered : null,
@@ -41,7 +46,7 @@ export function Screen({
 
   return (
     <SafeAreaView style={[styles.safeArea, style]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={colors.background === "#000000" ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       {scroll ? (
         <ScrollView
           contentContainerStyle={contentStyle}
@@ -58,7 +63,7 @@ export function Screen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   safeArea: {
     backgroundColor: colors.background,
     flex: 1,

@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../design/theme";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -10,7 +12,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { colors, hitTarget, radius, spacing, typography } from "../design/tokens";
+import { hitTarget, radius, spacing, typography } from "../design/tokens";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -34,8 +36,11 @@ export function Button({
   textStyle,
   ...props
 }: ButtonProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const isDisabled = disabled || loading;
-  const palette = variantStyles[variant];
+  const palette = variantStyles(colors)[variant];
 
   return (
     <Pressable
@@ -65,7 +70,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   base: {
     alignItems: "center",
     borderRadius: radius.control,
@@ -95,7 +100,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const variantStyles = {
+const variantStyles = (colors: LegacyColors) => ({
   primary: {
     container: {
       backgroundColor: colors.accent,
@@ -143,4 +148,4 @@ const variantStyles = {
     readonly text: TextStyle;
     readonly indicatorColor: string;
   }
->;
+>);

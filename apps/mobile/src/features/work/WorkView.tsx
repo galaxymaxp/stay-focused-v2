@@ -1,10 +1,11 @@
+import { useMemo , useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { TaskView } from "@stay-focused/shared/task-planning";
-import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
+import { hitTarget, radius, spacing, typography } from "../../design/tokens";
 import { TaskRow } from "./TaskRow";
 import {
   describeWorkload,
@@ -45,6 +46,9 @@ export function WorkView({
   onToggleComplete,
   onRetry,
 }: WorkViewProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [showCompleted, setShowCompleted] = useState(false);
 
   const summary = useMemo(() => summarizeWork(tasks, now), [tasks, now]);
@@ -149,6 +153,9 @@ function WorkHeader({
   readonly onAddTask: () => void;
   readonly subtitle: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.header}>
       <View style={styles.headerText}>
@@ -169,6 +176,9 @@ function EmptyState({
   readonly hasCompleted: boolean;
   readonly onAddTask: () => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.emptyCard} testID="work-empty-state">
       <Text style={styles.emptyTitle}>
@@ -187,6 +197,9 @@ function EmptyState({
 }
 
 function LoadingRows() {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View
       accessibilityLabel="Loading your work"
@@ -199,7 +212,7 @@ function LoadingRows() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   container: {
     gap: spacing[6],
   },

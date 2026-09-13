@@ -1,9 +1,10 @@
+import { useMemo , useCallback, useEffect, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { ReviewerOutput } from "@stay-focused/engine";
 import {
   isActiveProcessingJobStatus,
   type ProcessingJobStatusView,
 } from "@stay-focused/shared";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "../../auth";
@@ -12,7 +13,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, radius, spacing, typography } from "../../design/tokens";
+import { radius, spacing, typography } from "../../design/tokens";
 import {
   readActiveProcessingJobs,
   removeActiveProcessingJob,
@@ -75,6 +76,9 @@ interface OpenedReviewerResult {
 }
 
 export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { session } = useAuth();
   const [jobs, setJobs] = useState<readonly ProcessingJobStatusView[]>([]);
   const [offlineIntents, setOfflineIntents] =
@@ -622,6 +626,9 @@ function JobSection({
   readonly children: React.ReactNode;
   readonly title: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.section}>
       <Text accessibilityRole="header" style={styles.sectionTitle}>
@@ -653,6 +660,9 @@ function ProcessingJobCard({
   readonly onRetry: () => void;
   readonly onViewSource: () => void;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const presentation = presentProcessingJob(job);
   const timestamp = processingTimestamp(job);
 
@@ -669,7 +679,7 @@ function ProcessingJobCard({
 
       <View style={styles.statusBlock}>
         <Text
-          style={[styles.statusLabel, { color: toneColor[presentation.tone] }]}
+          style={[styles.statusLabel, { color: toneColor(colors)[presentation.tone] }]}
         >
           {presentation.statusLabel}
         </Text>
@@ -850,7 +860,7 @@ function isReviewerOutput(value: unknown): value is ReviewerOutput {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   // The opened reviewer is a reading surface, so its chrome is spaced apart
   // from the document instead of stacking flush against it.
   readerContent: { gap: spacing[6] },
@@ -974,10 +984,10 @@ const styles = StyleSheet.create({
  * Tone reinforces the status word; it never carries the status on its own,
  * because every card also states its status in text.
  */
-const toneColor: Record<ProcessingStatusTone, string> = {
+const toneColor = (colors: LegacyColors): Record<ProcessingStatusTone, string> => ({
   active: colors.accentPressed,
   waiting: colors.textSecondary,
   ready: colors.success,
   attention: colors.error,
   neutral: colors.textMuted,
-};
+});

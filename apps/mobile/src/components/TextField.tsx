@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../design/theme";
 import {
   StyleSheet,
   Text,
@@ -8,7 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { colors, radius, spacing, typography } from "../design/tokens";
+import { radius, spacing, typography } from "../design/tokens";
 
 interface TextFieldProps extends Omit<TextInputProps, "style"> {
   readonly label: string;
@@ -24,6 +26,9 @@ export function TextField({
   inputStyle,
   ...props
 }: TextFieldProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={[styles.container, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
@@ -39,7 +44,7 @@ export function TextField({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   container: {
     gap: spacing[2],
   },

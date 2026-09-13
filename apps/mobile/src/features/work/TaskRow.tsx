@@ -1,7 +1,9 @@
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { TaskView } from "@stay-focused/shared/task-planning";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, hitTarget, radius, spacing, typography } from "../../design/tokens";
+import { hitTarget, radius, spacing, typography } from "../../design/tokens";
 import {
   describeSource,
   formatDueLabel,
@@ -25,6 +27,9 @@ interface TaskRowProps {
  * carries no signal.
  */
 export function TaskRow({ task, now, busy = false, onOpen, onToggleComplete }: TaskRowProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const completed = task.status === "completed";
   const due = formatDueLabel(task.dueAt, now);
   const source = describeSource(task);
@@ -87,7 +92,7 @@ function taskAccessibilityLabel(
   return [task.title, due, source].filter(Boolean).join(", ");
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   row: {
     alignItems: "flex-start",
     backgroundColor: colors.card,

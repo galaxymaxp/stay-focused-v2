@@ -1,10 +1,13 @@
+import { router } from "expo-router";
+import { useMemo } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
-import { colors, spacing, typography } from "../../design/tokens";
+import { spacing, typography } from "../../design/tokens";
 
 interface SettingsScreenProps {
   readonly onBack: () => void;
@@ -19,6 +22,9 @@ interface SettingsScreenProps {
  * still live in `CoursesScreen` and moving them is its own milestone.
  */
 export function SettingsScreen({ onBack }: SettingsScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { isSigningOut, session, signOut } = useAuth();
 
   return (
@@ -47,24 +53,17 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         </Card>
 
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Not moved here yet</Text>
-          <Text style={styles.body}>
-            These still live on their current screens and will move in a later
-            milestone:
-          </Text>
-          <View style={styles.list}>
-            <Text style={styles.listItem}>•  Canvas connection and disconnect</Text>
-            <Text style={styles.listItem}>•  Course inventory and selection</Text>
-            <Text style={styles.listItem}>•  Completion notifications</Text>
-            <Text style={styles.listItem}>•  Appearance</Text>
-          </View>
+          <Text style={styles.cardTitle}>Preferences</Text>
+          <Button variant="secondary" onPress={() => router.push("/appearance")}>Appearance</Button>
+          <Button variant="secondary" onPress={() => router.push("/canvas-settings")}>Canvas connection and sync</Button>
+          <Button variant="secondary" onPress={() => router.push("/processing")}>Uploads and notifications</Button>
         </Card>
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[4],
   },

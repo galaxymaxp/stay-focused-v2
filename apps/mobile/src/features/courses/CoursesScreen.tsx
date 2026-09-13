@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo , useCallback, useEffect, useRef, useState } from "react";
+import { useLegacyTheme, type LegacyColors } from "../../design/theme";
+
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +18,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
-import { colors, spacing, typography } from "../../design/tokens";
+import { spacing, typography } from "../../design/tokens";
 import {
   API_BASE_URL_SETUP_HINT,
 } from "../../services/reviewerApi";
@@ -80,6 +82,9 @@ export function CoursesScreen({
   onOpenGrades,
   onOpenLibrary,
 }: CoursesScreenProps) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { isSigningOut, session, signOut } = useAuth();
   const [baseUrl, setBaseUrl] = useState("");
   const [personalAccessToken, setPersonalAccessToken] = useState("");
@@ -607,6 +612,9 @@ function DisconnectedCanvasState({
   readonly onSubmit: () => void;
   readonly personalAccessToken: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Card style={styles.formCard} testID="canvas-disconnected-state">
       <Text style={styles.statusTitle}>Connect Canvas</Text>
@@ -699,6 +707,9 @@ function ConnectedCanvasState({
   readonly savedSelectedCourseIds: readonly string[];
   readonly selectedCourseIds: readonly string[];
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const selectedChanged = !sameStringSet(selectedCourseIds, savedSelectedCourseIds);
   const selectedCourses = courses.filter((course) =>
@@ -896,6 +907,9 @@ function CourseSection({
   readonly selectedCourseIds: readonly string[];
   readonly title: string;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (courses.length === 0) {
     return null;
   }
@@ -947,6 +961,9 @@ function CourseSelectionRow({
   readonly onToggle: (courseId: string) => void;
   readonly syncState: CourseSyncDisplayState | undefined;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const disabled = !course.selectable;
   const canCreateReviewer = course.selected && hasCompletedSourceSync(course);
   const canOpenGrades = course.selected && course.selectable;
@@ -1063,10 +1080,13 @@ function CapabilitySummaryRow({
   readonly capability: CanvasCapability;
   readonly status: CanvasCapabilityStatus;
 }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.capabilityRow}>
       <Text style={styles.capabilityName}>{formatCapabilityName(capability)}</Text>
-      <Text style={[styles.capabilityStatus, capabilityStatusStyle(status)]}>
+      <Text style={[styles.capabilityStatus, capabilityStatusStyle(status, styles)]}>
         {formatCapabilityStatus(status)}
       </Text>
     </View>
@@ -1074,6 +1094,9 @@ function CapabilitySummaryRow({
 }
 
 function ErrorCard({ error }: { readonly error: CoursesDisplayError }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.errorBox} testID="courses-error">
       <Text style={styles.errorTitle}>{error.title}</Text>
@@ -1084,6 +1107,9 @@ function ErrorCard({ error }: { readonly error: CoursesDisplayError }) {
 }
 
 function SuccessCard({ message }: { readonly message: string }) {
+  const colors = useLegacyTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.successBox} testID="courses-success">
       <Text style={styles.successText}>{message}</Text>
@@ -1258,7 +1284,7 @@ function formatCapabilityStatus(status: CanvasCapabilityStatus): string {
   }
 }
 
-function capabilityStatusStyle(status: CanvasCapabilityStatus) {
+function capabilityStatusStyle(status: CanvasCapabilityStatus, styles: ReturnType<typeof createStyles>) {
   if (status === "available") return styles.capabilityAvailable;
   if (status === "permission_denied" || status === "not_tested") {
     return styles.capabilityMuted;
@@ -1430,7 +1456,7 @@ function formatDateTime(value: string): string {
   });
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: LegacyColors) => StyleSheet.create({
   content: {
     gap: spacing[5],
   },
