@@ -6,9 +6,11 @@ import type {
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { CheckCircle2, CircleDashed, Clock3, AlertCircle } from "lucide-react-native";
 
 import { useAuth } from "../../auth";
-import { Action, Copy, Notice, Page, Surface } from "../../design/primitives";
+import { Action, Copy, Notice, Page, Surface, RowLink, ContentIcon } from "../../design/primitives";
+import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
   acceptGeneration,
@@ -72,18 +74,13 @@ export function GenerationScreen() {
     <Page
       title=""
       back
-      footer={
-        <Action secondary onPress={() => router.push("/generation-queue")}>
-          View Queue
-        </Action>
-      }
     >
       <View
         style={{
-          minHeight: 520,
-          justifyContent: "center",
+          paddingTop: 40,
+          paddingBottom: 32,
           alignItems: "center",
-          gap: 16,
+          gap: 24,
         }}
       >
         {intent && (
@@ -93,9 +90,9 @@ export function GenerationScreen() {
         )}
         <View
           accessibilityLiveRegion="polite"
-          style={{ alignItems: "center", gap: 8 }}
+          style={{ alignItems: "center", gap: 20 }}
         >
-          <Copy size="h2" style={{ textAlign: "center" }}>
+          <Copy size="h2" style={{ textAlign: "center", maxWidth: 270, fontSize: 24, lineHeight: 30 }}>
             {data
               ? generationMessages[data.state]
               : id
@@ -103,13 +100,14 @@ export function GenerationScreen() {
                 : "Preparing your request…"}
           </Copy>
           <GenerationOrb running={running && !!id} />
-          <Copy muted style={{ textAlign: "center" }}>
+          <Copy muted size="bodySmall" style={{ textAlign: "center", maxWidth: 260, lineHeight: 20 }}>
             {id
               ? running
                 ? "You can leave this screen. We’ll keep working."
                 : "View your saved work or return to Queue."
               : "You can leave this screen. Keep the app open until your request is accepted; Queue can reconnect it."}
           </Copy>
+          <View style={{ width: 240 }}><Action secondary pill onPress={() => router.push("/generation-queue")}>View Queue</Action></View>
         </View>
         {(error || generation.error) && (
           <Notice>{error ?? generation.error}</Notice>
@@ -208,19 +206,16 @@ export function QueueScreen() {
   return (
     <Page
       title="Queue"
-      subtitle="Your work keeps going."
       back
       onRefresh={queue.refresh}
+      actions={[{ label: "Uploads & recovery tools", onPress: () => router.push("/processing") }]}
     >
       {queue.error && <Notice>{queue.error}</Notice>}
       {error && <Notice>{error}</Notice>}
       {queue.loading && <Notice>Loading your generations…</Notice>}
       {pending.map((item) => (
         <Surface key={item.key}>
-          <Copy size="h3">{item.title}</Copy>
-          <Copy muted>Request needs confirmation</Copy>
-          <Action
-            secondary
+          <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}
             onPress={() =>
               router.push({
                 pathname: "/generation",
@@ -228,8 +223,9 @@ export function QueueScreen() {
               })
             }
           >
-            Reconnect request
-          </Action>
+            <Copy size="h3">{item.title}</Copy>
+            <Copy muted size="caption">Request needs confirmation</Copy>
+          </RowLink>
         </Surface>
       ))}
       {(["Generating", "Queued", "Completed", "Needs attention"] as const).map(
@@ -249,19 +245,13 @@ export function QueueScreen() {
                     ].includes(job.status),
           );
           return (
-            <View key={group} style={{ gap: 12 }}>
-              <Copy size="h2">{group}</Copy>
+            <View key={group} style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}><Copy size={selected.length ? "h2" : "bodySmall"} muted={!selected.length}>{group}</Copy><Copy muted size="caption">{selected.length ? selected.length : "None"}</Copy></View>
               {selected.length ? (
                 selected.map((job) => (
                   <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
                 ))
-              ) : (
-                <Copy muted>
-                  {group === "Completed"
-                    ? "No completed generations yet."
-                    : "Nothing here right now."}
-                </Copy>
-              )}
+              ) : null}
             </View>
           );
         },
@@ -271,9 +261,6 @@ export function QueueScreen() {
           Older generations
         </Action>
       )}
-      <Action secondary onPress={() => router.push("/processing")}>
-        Uploads & recovery tools
-      </Action>
     </Page>
   );
 }
@@ -285,6 +272,7 @@ function QueueCard({
   onRefresh: () => void;
 }) {
   const client = useExperienceClient();
+  const { colors } = useTheme();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [retryKey] = useState(newRequestKey);
@@ -351,11 +339,10 @@ function QueueCard({
   }
   return (
     <Surface>
-      <Copy muted size="caption">
-        {type}
-      </Copy>
+      <RowLink inset disabled={busy} label={job.status === "succeeded" ? `Open saved output: ${job.source.displayName || type}` : `View generation: ${job.source.displayName || type}`} onPress={() => void open()} icon={<ContentIcon kind={job.jobType === "quiz_generation" ? "quiz" : job.jobType === "activity_generation" ? "activity_output" : "reviewer"} />} trailing={job.status === "succeeded" ? <CheckCircle2 size={19} color={colors.success} /> : job.status === "running" ? <CircleDashed size={19} color={colors.accent} /> : job.status === "queued" ? <Clock3 size={19} color={colors.textMuted} /> : <AlertCircle size={19} color={colors.warning} />}>
+      <Copy muted size="caption">{type}</Copy>
       <Copy size="h3">{job.source.displayName || type}</Copy>
-      <Copy muted>
+      <Copy muted size="caption">
         {job.status === "succeeded"
           ? "Completed"
           : job.status === "running"
@@ -368,11 +355,9 @@ function QueueCard({
                   ? "Queued"
                   : "Cancelled"}
       </Copy>
-      <Action secondary disabled={busy} onPress={() => void open()}>
-        {job.status === "succeeded" ? "Open saved output" : "View generation"}
-      </Action>
+      </RowLink>
       {job.retryable && ["failed", "expired"].includes(job.status) && (
-        <Action disabled={busy} onPress={() => void retry()}>
+        <Action secondary disabled={busy} onPress={() => void retry()}>
           Retry
         </Action>
       )}

@@ -5,7 +5,7 @@ import type {
   LearningMaterial,
 } from "@stay-focused/shared";
 import { router } from "expo-router";
-import { ChevronDown, ChevronRight, FileText } from "lucide-react-native";
+import { ChevronDown, ChevronRight } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 
@@ -17,6 +17,7 @@ import {
   Page,
   Sheet,
   Surface,
+  ContentIcon,
 } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
@@ -50,6 +51,8 @@ export function GenerateScreen() {
   const { session } = useAuth(),
     { colors } = useTheme();
   const client = useExperienceClient();
+  const groups = moduleGroups([...(workspace.data?.materials.items ?? []), ...extra]);
+  const moduleCount = groups.filter(group => group.title !== null).length;
   useEffect(() => {
     setExtra([]);
     setSelected(null);
@@ -152,6 +155,10 @@ export function GenerateScreen() {
       title="Generate"
       subtitle="Turn course materials into study tools."
       onRefresh={workspace.data ? workspace.refresh : courses.refresh}
+      actions={[
+        { label: "Canvas connection & sync", onPress: () => router.push("/canvas-settings") },
+        { label: "Use text, camera or a local file", onPress: () => router.push("/generate") },
+      ]}
     >
       <Surface>
         <Pressable
@@ -165,16 +172,16 @@ export function GenerateScreen() {
             alignItems: "center",
           }}
         >
-          <FileText color={colors.accent} size={28} />
+          <ContentIcon kind="document" />
           <View style={{ flex: 1 }}>
             <Copy muted size="caption">
-              {workspace.data?.course.code ?? "Your courses"}
+              {workspace.data?.course.code ?? "Canvas course"}
             </Copy>
             <Copy size="h3">
               {workspace.data?.course.name ?? "Choose a course"}
             </Copy>
           </View>
-          <ChevronDown color={colors.textSecondary} size={20} />
+          <View style={{ backgroundColor: colors.blueSoft, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5 }}><Copy size="caption" color={colors.blue}>Change</Copy></View>
         </Pressable>
         {choosing &&
           courses.data?.items.map((course) => (
@@ -192,7 +199,8 @@ export function GenerateScreen() {
           ))}
         {workspace.data && (
           <Copy muted size="caption">
-            {workspace.data.materials.totalKnown} materials in Canvas order
+            {moduleCount > 0 ? `${moduleCount} ${nextOffset !== null ? "loaded " : ""}${moduleCount === 1 ? "module" : "modules"} · ` : ""}
+            {workspace.data.materials.totalKnown} {workspace.data.materials.totalKnown === 1 ? "material" : "materials"}
           </Copy>
         )}
       </Surface>
@@ -205,7 +213,7 @@ export function GenerateScreen() {
         <Notice>Connect Canvas and sync your courses to get started.</Notice>
       )}
       {workspace.data &&
-        moduleGroups([...workspace.data.materials.items, ...extra]).map(
+        groups.map(
           (group) => (
             <ModuleGroup
               key={group.key}
@@ -286,12 +294,6 @@ export function GenerateScreen() {
         </Sheet>
       )}
       {error && <Notice>{error}</Notice>}
-      <Action secondary onPress={() => router.push("/canvas-settings")}>
-        Canvas connection & sync
-      </Action>
-      <Action secondary onPress={() => router.push("/generate")}>
-        Use text, camera or a local file
-      </Action>
     </Page>
   );
 }
@@ -316,20 +318,22 @@ function ModuleGroup({
           accessibilityState={{ expanded: open }}
           onPress={() => setOpen(!open)}
           style={{
-            minHeight: 56,
-            padding: 18,
+            minHeight: 48,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
           }}
         >
           <View style={{ flex: 1 }}>
-            <Copy size="h3">{title}</Copy>
+            <Copy size="body" style={{ fontWeight: "600" }}>{title}</Copy>
           </View>
+          <Copy size="caption" color={colors.accent}>{items.length}</Copy>
           {open ? (
-            <ChevronDown color={colors.textSecondary} size={20} />
+            <ChevronDown color={colors.textSecondary} size={16} />
           ) : (
-            <ChevronRight color={colors.textSecondary} size={20} />
+            <ChevronRight color={colors.textSecondary} size={16} />
           )}
         </Pressable>
       )}
@@ -341,20 +345,21 @@ function ModuleGroup({
             accessibilityState={{ selected: selected === item.id }}
             onPress={() => onSelect(item)}
             style={{
-              padding: 18,
-              minHeight: 72,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              minHeight: 56,
               flexDirection: "row",
               alignItems: "center",
-              gap: 12,
+              gap: 10,
               backgroundColor:
                 selected === item.id ? colors.surfaceSecondary : undefined,
               borderTopWidth: 1,
               borderColor: colors.separator,
             }}
           >
-            <FileText color={colors.accent} size={24} />
+            <ContentIcon kind={item.kind} small />
             <View style={{ flex: 1 }}>
-              <Copy size="body">{item.title}</Copy>
+              <Copy size="bodySmall" style={{ fontWeight: "500" }}>{item.title}</Copy>
               <Copy muted size="caption">
                 {materialTypes[item.kind]}
                 {item.count !== null

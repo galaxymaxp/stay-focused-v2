@@ -9,7 +9,7 @@ import type {
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Platform, TextInput, View } from "react-native";
+import { Alert, Platform, ScrollView, TextInput, View } from "react-native";
 
 import {
   Action,
@@ -18,6 +18,8 @@ import {
   Page,
   RowLink,
   Surface,
+  ContentIcon,
+  FilterChip,
 } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
@@ -31,6 +33,7 @@ const filters = [
   { value: "activity_output", label: "Activity Outputs" },
 ] as const;
 export function LibraryScreen() {
+  const { colors } = useTheme();
   const [filter, setFilter] =
     useState<(typeof filters)[number]["value"]>("all");
   const library = useExperience<LibraryOverview>(
@@ -68,20 +71,19 @@ export function LibraryScreen() {
   return (
     <Page
       title="Library"
-      subtitle="Keep what you learn."
       onRefresh={library.refresh}
+      actions={[{ label: "Manage saved Reviewers", onPress: () => router.push("/saved-reviewers") }]}
     >
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", gap: 0 }} style={{ flexGrow: 0 }}>
         {filters.map((item) => (
-          <Action
-            secondary={filter !== item.value}
+          <FilterChip
+            selected={filter === item.value}
+            label={item.label}
             key={item.value}
             onPress={() => setFilter(item.value)}
-          >
-            {item.label}
-          </Action>
+          />
         ))}
-      </View>
+      </ScrollView>
       {library.error && <Notice>{library.error}</Notice>}
       {error && <Notice>{error}</Notice>}
       {library.loading && <Notice>Loading your Library…</Notice>}
@@ -110,12 +112,14 @@ export function LibraryScreen() {
       {[...(library.data?.items ?? []), ...extra].map((item) => (
         <Surface key={item.id}>
           <RowLink
+            inset
+            icon={<ContentIcon kind={item.type} />}
             label={`${item.type === "reviewer" ? "Read & study" : item.type === "quiz" ? "Practice" : "Resume draft"}: ${item.title}`}
             onPress={() =>
               router.push({ pathname: "/artifact", params: { id: item.id } })
             }
           >
-            <Copy muted size="caption">
+            <Copy size="caption" color={item.type === "quiz" ? colors.violet : item.type === "activity_output" ? colors.green : colors.blue}>
               {item.course?.code ?? item.course?.name ?? "Your study tools"} ·{" "}
               {item.type === "activity_output"
                 ? "Activity Output"
@@ -147,9 +151,6 @@ export function LibraryScreen() {
           More saved work
         </Action>
       )}
-      <Action secondary onPress={() => router.push("/saved-reviewers")}>
-        Manage saved Reviewers
-      </Action>
     </Page>
   );
 }

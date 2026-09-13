@@ -1,8 +1,9 @@
 import type { TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "@react-navigation/native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Sun, Moon } from "lucide-react-native";
 import { Animated, PanResponder, Vibration, View } from "react-native";
-import Svg, { Circle, Path, Line } from "react-native-svg";
+import Svg, { Circle, Path, Line, Defs, LinearGradient, RadialGradient, Stop, Text as SvgText } from "react-native-svg";
 
 import { Copy } from "../../design/primitives";
 import { contentColors, motion, useTheme } from "../../design/theme";
@@ -13,14 +14,14 @@ import {
   timelineSegments,
 } from "./presentation";
 
-const SIZE = 288,
+const SIZE = 320,
   CENTER = SIZE / 2,
-  RADIUS = 116;
-function point(minutes: number) {
-  const angle = (minutes / 1440) * Math.PI * 2 - Math.PI / 2;
+  RADIUS = 126;
+function point(minutes: number, radius = RADIUS) {
+  const angle = (minutes / 1440) * Math.PI * 2 + Math.PI / 2;
   return {
-    x: CENTER + RADIUS * Math.cos(angle),
-    y: CENTER + RADIUS * Math.sin(angle),
+    x: CENTER + radius * Math.cos(angle),
+    y: CENTER + radius * Math.sin(angle),
   };
 }
 function arc(from: number, to: number) {
@@ -45,7 +46,8 @@ export function DayRingClock({
   onCommit: (start: number, end: number) => void;
   disabled?: boolean;
 }) {
-  const { colors, active } = useTheme();
+  const { colors, active, mode } = useTheme();
+  const gradientId = useId().replace(/:/g, "");
   const focused = useIsFocused();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -59,8 +61,10 @@ export function DayRingClock({
     [timeline, date],
   );
   const marker = point(now.getHours() * 60 + now.getMinutes());
+  const markerInner = point(now.getHours() * 60 + now.getMinutes(), 103);
+  const daytime = now.getHours() >= 6 && now.getHours() < 18;
   return (
-    <View style={{ alignItems: "center", gap: 12 }}>
+    <View style={{ alignItems: "center", gap: 0 }}>
       <View style={{ width: SIZE, height: SIZE }} testID="day-ring">
         <Svg
           width={SIZE}
@@ -68,21 +72,35 @@ export function DayRingClock({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
+          <Defs>
+            <LinearGradient id={`${gradientId}-rim`} x1="0%" y1="0%" x2="90%" y2="100%">
+              <Stop offset="0" stopColor={mode === "dark" ? "#505355" : "#DFE3E1"} />
+              <Stop offset="0.45" stopColor={mode === "dark" ? "#25282A" : "#F1F0EC"} />
+              <Stop offset="1" stopColor={mode === "dark" ? "#444548" : "#CFD6D3"} />
+            </LinearGradient>
+            <RadialGradient id={`${gradientId}-face`} cx="40%" cy="30%" r="75%">
+              <Stop offset="0" stopColor={mode === "dark" ? "#1A1D1E" : "#FFFFFF"} />
+              <Stop offset="1" stopColor={colors.backgroundPrimary} />
+            </RadialGradient>
+            <LinearGradient id={`${gradientId}-free`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0" stopColor="#B4E6D2" /><Stop offset="1" stopColor="#5FAF91" />
+            </LinearGradient>
+          </Defs>
+          <Circle cx={CENTER} cy={CENTER} r={116} fill={`url(#${gradientId}-face)`} />
           <Circle
             cx={CENTER}
             cy={CENTER}
             r={RADIUS}
-            stroke={colors.surfaceSecondary}
-            strokeWidth={17}
+            stroke={`url(#${gradientId}-rim)`}
+            strokeWidth={22}
             fill="none"
           />
           <Path
             d={arc(start, end)}
-            stroke={contentColors.free}
-            strokeWidth={17}
+            stroke={`url(#${gradientId}-free)`}
+            strokeWidth={22}
             fill="none"
-            strokeLinecap="round"
-            opacity={0.75}
+            strokeLinecap="butt"
           />
           {segments.map((segment) => (
             <Path
@@ -95,30 +113,39 @@ export function DayRingClock({
                     ? contentColors.classes
                     : contentColors.other
               }
-              strokeWidth={17}
+              strokeWidth={22}
               fill="none"
-              strokeLinecap="round"
+              strokeLinecap="butt"
             />
           ))}
-          {Array.from({ length: 24 }, (_, index) => {
-            const angle = (index * Math.PI) / 12;
+          {Array.from({ length: 96 }, (_, index) => {
+            const angle = (index * Math.PI) / 48;
+            const major = index % 4 === 0;
             return (
               <Line
                 key={index}
-                x1={CENTER + Math.sin(angle) * 94}
-                y1={CENTER - Math.cos(angle) * 94}
-                x2={CENTER + Math.sin(angle) * (index % 6 ? 99 : 103)}
-                y2={CENTER - Math.cos(angle) * (index % 6 ? 99 : 103)}
+                x1={CENTER + Math.sin(angle) * (major ? 98 : 108)}
+                y1={CENTER - Math.cos(angle) * (major ? 98 : 108)}
+                x2={CENTER + Math.sin(angle) * 112}
+                y2={CENTER - Math.cos(angle) * 112}
                 stroke={colors.textMuted}
-                strokeWidth={index % 6 ? 1 : 2}
+                strokeWidth={major ? 1 : 0.6}
+                opacity={major ? 0.8 : 0.35}
               />
             );
           })}
+          <Circle cx={CENTER} cy={CENTER} r={137} fill="none" stroke={colors.textMuted} strokeWidth={0.5} opacity={0.25} />
+          {[{ label: "12 AM", minutes: 0 }, { label: "6 AM", minutes: 360 }, { label: "12 PM", minutes: 720 }, { label: "6 PM", minutes: 1080 }].map(hour => {
+            const p = point(hour.minutes, 146);
+            return <SvgText key={hour.label} x={p.x} y={p.y + 4} fontFamily="sans-serif" fontSize={9} fill={colors.textSecondary} textAnchor="middle">{hour.label}</SvgText>;
+          })}
+          <Line x1={markerInner.x} y1={markerInner.y} x2={marker.x} y2={marker.y} stroke={contentColors.classes} strokeWidth={2} />
+          <Circle cx={markerInner.x} cy={markerInner.y} r={3} fill={contentColors.classes} />
           <Circle
             cx={marker.x}
             cy={marker.y}
             r={4}
-            fill={colors.textPrimary}
+            fill={contentColors.classes}
             stroke={colors.backgroundPrimary}
             strokeWidth={2}
           />
@@ -127,23 +154,21 @@ export function DayRingClock({
           pointerEvents="none"
           style={{
             position: "absolute",
-            inset: 64,
+            inset: 75,
             justifyContent: "center",
             alignItems: "center",
           }}
         >
-          <Copy size="display">
+          {daytime ? <Sun size={23} color={colors.warning} strokeWidth={1.5} /> : <Moon size={23} color={colors.accent} strokeWidth={1.5} />}
+          <Copy size="display" style={{ fontSize: 29, lineHeight: 36 }}>
             {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
           </Copy>
-          <Copy muted size="caption">
+          <Copy color={colors.accent} size="caption">
             {now.toLocaleDateString([], {
               weekday: "short",
               month: "short",
               day: "numeric",
             })}
-          </Copy>
-          <Copy size="caption" color={colors.success}>
-            {end - start} min selected
           </Copy>
         </View>
         <RingHandle
@@ -161,23 +186,18 @@ export function DayRingClock({
           onCommit={(value) => onCommit(start, Math.max(value, start + 15))}
         />
       </View>
-      <Copy muted size="caption">
-        Hold a ring handle, then drag to set your free time.
-      </Copy>
+      <Copy size="caption" color={colors.success}>{end - start} min free time · Hold a handle to adjust</Copy>
       <View
         style={{
           flexDirection: "row",
           flexWrap: "wrap",
-          gap: 16,
+          gap: 12,
           justifyContent: "center",
         }}
       >
-        <Copy size="caption">● Study</Copy>
-        <Copy color={colors.success} size="caption">
-          ○ Free time selection
-        </Copy>
+        {segments.some((s) => s.kind === "study_session") && <Copy size="caption" color={colors.accent}>Study</Copy>}
         {segments.some((s) => s.kind === "calendar_block") && (
-          <Copy size="caption">◷ Classes</Copy>
+          <Copy size="caption" color={colors.warning}>Classes</Copy>
         )}
       </View>
     </View>
@@ -243,10 +263,10 @@ function RingHandle({
         if (!held.current) return;
         const next = ringDragMinutes(
           latest.current,
-          clockMinutes(
+          (clockMinutes(
             origin.current.x - CENTER + gesture.dx,
             origin.current.y - CENTER + gesture.dy,
-          ),
+          ) + 720) % 1440,
         );
         latest.current = next;
         current.current.onChange(next);
@@ -304,12 +324,12 @@ function RingHandle({
     >
       <View
         style={{
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          backgroundColor: colors.accent,
-          borderColor: colors.surfaceElevated,
-          borderWidth: 3,
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: colors.violet,
+          borderColor: colors.backgroundPrimary,
+          borderWidth: 2,
         }}
       />
     </Animated.View>

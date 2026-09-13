@@ -1,7 +1,7 @@
 export type ThemePreference = "system" | "light" | "dark";
 export const palettes = {
   light: {
-    backgroundPrimary: "#F7F7F5",
+    backgroundPrimary: "#F7F6F2",
     surfacePrimary: "rgba(255,255,255,0.84)",
     surfaceElevated: "#FFFFFF",
     surfaceSecondary: "#F1F0EC",
@@ -15,6 +15,16 @@ export const palettes = {
     warning: "#975416",
     danger: "#AC3838",
     shadow: "#433B30",
+    blue: "#285FC1",
+    blueSoft: "#E5EDFF",
+    orange: "#A84B16",
+    orangeSoft: "#FFF0E3",
+    green: "#26724E",
+    greenSoft: "#E4F2E9",
+    violet: "#7250AE",
+    violetSoft: "#EEE8FA",
+    red: "#B13C36",
+    redSoft: "#FCE9E5",
   },
   dark: {
     backgroundPrimary: "#000000",
@@ -31,6 +41,16 @@ export const palettes = {
     warning: "#F2BF80",
     danger: "#FFA39B",
     shadow: "#000000",
+    blue: "#A9C8FF",
+    blueSoft: "#263A59",
+    orange: "#F2B679",
+    orangeSoft: "#48301F",
+    green: "#91D5B1",
+    greenSoft: "#203E33",
+    violet: "#CFBAF2",
+    violetSoft: "#352A49",
+    red: "#FFABA3",
+    redSoft: "#4B2928",
   },
 } as const;
 export type ThemeColors = {

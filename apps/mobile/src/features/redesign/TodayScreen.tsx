@@ -15,6 +15,7 @@ import {
   Page,
   RowLink,
   Surface,
+  ContentIcon,
 } from "../../design/primitives";
 import { experienceRequest } from "../../services/experienceApi";
 import { DayRingClock } from "./DayRingClock";
@@ -122,6 +123,7 @@ export function TodayScreen() {
         day: "numeric",
       })}
       onRefresh={today.refresh}
+      actions={[{ label: "Schedule & availability", onPress: () => setExpanded(!expanded) }]}
     >
       <DayRingClock
         date={date}
@@ -169,6 +171,7 @@ export function TodayScreen() {
         <Notice>Loading your day…</Notice>
       ) : (
         <>
+          <View style={{ gap: 8 }}>
           <Copy size="h2">Up Next</Copy>
           {today.data?.next ? (
             <Surface>
@@ -176,24 +179,26 @@ export function TodayScreen() {
             </Surface>
           ) : (
             <Surface>
-              <Copy size="h3">Room to focus</Copy>
-              <Copy muted>
-                No immediate item is scheduled. Set your available time or open
-                Tasks.
-              </Copy>
-              <Action secondary onPress={() => router.navigate("/work")}>
-                Open Tasks
-              </Action>
+              <RowLink inset icon={<ContentIcon kind="task" />} label="Open Tasks" onPress={() => router.navigate("/work")}>
+                <Copy size="h3">Room to focus</Copy>
+                <Copy muted size="bodySmall">Nothing scheduled next. Plan your time or open Tasks.</Copy>
+              </RowLink>
             </Surface>
           )}
+          </View>
+          <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Copy size="h2">Later Today</Copy>
+          <Action secondary onPress={() => setExpanded(!expanded)}>{expanded ? "Close schedule" : "See schedule"}</Action>
+          </View>
           {today.data?.later.length ? (
             today.data.later.map((item) => (
               <TodayRow key={item.id} item={item} />
             ))
           ) : (
-            <Copy muted>No more items planned for today.</Copy>
+            <Copy muted size="bodySmall">Your day is clear. Make room for what matters.</Copy>
           )}
+          </View>
           {today.data?.plannerState.needsTaskImport && (
             <Notice>
               Some Canvas activities need to be added to your tasks before they
@@ -202,9 +207,6 @@ export function TodayScreen() {
           )}
         </>
       )}
-      <Action secondary onPress={() => setExpanded(!expanded)}>
-        {expanded ? "Close schedule" : "Schedule & availability"}
-      </Action>
       {expanded && (
         <Surface>
           <Copy size="h2">Your available time</Copy>
@@ -274,6 +276,8 @@ function TodayRow({
 }) {
   return (
     <RowLink
+      inset={dominant}
+      icon={<ContentIcon kind={item.kind === "study_session" ? "reviewer" : "task"} small={!dominant} />}
       label={`${dominant ? "Open next item" : "Open"}: ${item.title}`}
       onPress={() =>
         router.push(
@@ -291,7 +295,7 @@ function TodayRow({
           item.course?.name ??
           (item.kind === "study_session" ? "Study" : "Personal")}
       </Copy>
-      <Copy size={dominant ? "h2" : "h3"}>{item.title}</Copy>
+      <Copy size="h3">{item.title}</Copy>
       <Copy muted size="caption">
         {timeLabel(item.startAt ?? item.dueAt)}
         {item.estimatedMinutes ? ` � ${item.estimatedMinutes} min` : ""} �{" "}

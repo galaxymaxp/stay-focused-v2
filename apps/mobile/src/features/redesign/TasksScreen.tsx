@@ -1,5 +1,6 @@
 import type { ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
+import { Plus, Circle } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Linking, View } from "react-native";
 
@@ -11,6 +12,8 @@ import {
   Page,
   RowLink,
   Surface,
+  ContentIcon,
+  IconAction,
 } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
 import { createGenerationIntent } from "../../services/generationRecovery";
@@ -18,18 +21,17 @@ import { available, capabilityNote, deadline } from "./presentation";
 import { useExperience } from "./useExperience";
 
 export function TasksScreen() {
+  const { colors } = useTheme();
   const tasks = useExperience<{ items: ActivitySummary[] }>(
     `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
   );
   return (
     <Page
       title="Tasks"
-      subtitle="Make room for what matters."
       onRefresh={tasks.refresh}
+      headerAction={<IconAction label="Add a task" onPress={() => router.push("/task")}><Plus size={18} color={colors.accent} /></IconAction>}
+      actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >
-      <Action secondary onPress={() => router.push("/task")}>
-        Add a task
-      </Action>
       {tasks.loading && <Notice>Loading your activities…</Notice>}
       {tasks.error && <Notice>{tasks.error}</Notice>}
       {(["now", "next", "later"] as const).map((group) => {
@@ -41,21 +43,18 @@ export function TasksScreen() {
               item.status !== "submitted",
           ) ?? [];
         return (
-          <View key={group} style={{ gap: 12 }}>
+          <View key={group} style={{ gap: 8 }}>
             <Copy size="h2">
               {group === "now" ? "Now" : group === "next" ? "Next" : "Later"}
             </Copy>
             {items.length ? (
               items.map((item) => <ActivityCard key={item.id} item={item} />)
             ) : (
-              <Copy muted>Nothing here right now.</Copy>
+              <Copy muted size="bodySmall">Nothing here right now.</Copy>
             )}
           </View>
         );
       })}
-      <Action secondary onPress={() => router.push("/personal-tasks")}>
-        Manage personal & completed tasks
-      </Action>
     </Page>
   );
 }
@@ -63,7 +62,11 @@ function ActivityCard({ item }: { item: ActivitySummary }) {
   const { colors } = useTheme();
   return (
     <Surface>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={{ flex: 1 }}>
       <RowLink
+        inset
+        icon={<ContentIcon kind="task" small />}
         label={`Open activity: ${item.title}`}
         onPress={() =>
           router.push({ pathname: "/activity", params: { id: item.id } })
@@ -83,6 +86,9 @@ function ActivityCard({ item }: { item: ActivitySummary }) {
         </Copy>
         {item.hasGeneratedDraft && <Copy size="caption">Draft ready</Copy>}
       </RowLink>
+      </View>
+      {item.taskId && <IconAction label={`Edit completion: ${item.title}`} onPress={() => router.push({ pathname: "/task", params: { taskId: item.taskId! } })}><Circle size={18} color={colors.textMuted} /></IconAction>}
+      </View>
     </Surface>
   );
 }

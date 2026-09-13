@@ -123,7 +123,7 @@ describe("appearance and ambient lifecycle", () => {
   it("uses neutral dark surfaces and an independent warm light canvas", () => {
     expect(palettes.dark.backgroundPrimary).toBe("#000000");
     expect(palettes.dark.surfacePrimary).toBe("#1C1C1E");
-    expect(palettes.light.backgroundPrimary).toBe("#F7F7F5");
+    expect(palettes.light.backgroundPrimary).toBe("#F7F6F2");
   });
   it.each([
     [true, true, true],

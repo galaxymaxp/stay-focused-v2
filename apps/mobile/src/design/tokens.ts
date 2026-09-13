@@ -35,7 +35,7 @@ export const spacing = {
 
 export const radius = {
   page: 24,
-  card: 24,
+  card: 16,
   control: 12,
   tight: 12,
   pill: 999,
@@ -44,10 +44,10 @@ export const radius = {
 export const typography = {
   fontFamily: "System",
   display: 34,
-  h1: 30,
-  h2: 22,
-  h3: 18,
-  body: 16,
+  h1: 27,
+  h2: 19,
+  h3: 16,
+  body: 15,
   bodySmall: 13,
   caption: 12,
   kicker: 11,
@@ -65,4 +65,18 @@ export const shadows = {
 
 export const hitTarget = {
   min: 48,
+} as const;
+
+/** Visible dimensions are independent of the 48-point interaction bounds. */
+export const density = {
+  screenGap: 14,
+  cardPadding: 12,
+  cardGap: 6,
+  utilitySize: 30,
+  utilityIcon: 18,
+  filterHeight: 30,
+  rowHeight: 56,
+  tabHeight: 52,
+  tabIcon: 20,
+  tabLabel: 10,
 } as const;

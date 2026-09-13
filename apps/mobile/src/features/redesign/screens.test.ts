@@ -52,9 +52,13 @@ vi.mock("../../design/primitives", () => ({
   Surface: "Surface",
   Notice: "Notice",
   Copy: "Copy",
+  ContentIcon: "ContentIcon",
+  IconAction: "IconAction",
+  FilterChip: "FilterChip",
 }));
 vi.mock("react-native", () => ({
   View: "View",
+  ScrollView: "ScrollView",
   Pressable: "Pressable",
   TextInput: "TextInput",
   Linking: { openURL: vi.fn() },
@@ -74,11 +78,20 @@ vi.mock("react-native-svg", () => ({
   Circle: "Circle",
   Path: "Path",
   Line: "Line",
+  Defs: "Defs",
+  LinearGradient: "LinearGradient",
+  RadialGradient: "RadialGradient",
+  Stop: "Stop",
+  Text: "SvgText",
 }));
 vi.mock("lucide-react-native", () => ({
   FileText: "FileText",
   ChevronDown: "ChevronDown",
   ChevronRight: "ChevronRight",
+  Plus: "Plus",
+  Circle: "Circle",
+  Sun: "Sun",
+  Moon: "Moon",
 }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({
@@ -158,6 +171,40 @@ const workspace: CourseLearningWorkspace = {
   },
 };
 describe("B25 screen interactions", () => {
+  it("keeps Canvas and local intake actions reachable from Generate options", async () => {
+    const root = await render(createElement(GenerateScreen));
+    const page = root.findAll(node => String(node.type) === "Page")[0]!;
+    await act(async () => page.props.actions.find((item: { label: string }) => item.label === "Canvas connection & sync").onPress());
+    expect(mocks.push).toHaveBeenLastCalledWith("/canvas-settings");
+    await act(async () => page.props.actions.find((item: { label: string }) => item.label === "Use text, camera or a local file").onPress());
+    expect(mocks.push).toHaveBeenLastCalledWith("/generate");
+  });
+  it("opens the existing completion editor only for a linked task", async () => {
+    mocks.data[`/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = { items: [
+      { id: "linked", taskId: "task-1", title: "Linked", urgency: "next", status: "pending", dueAt: null, course: null },
+      { id: "unlinked", taskId: null, title: "Canvas only", urgency: "next", status: "unknown", dueAt: null, course: null },
+    ] };
+    const root = await render(createElement(TasksScreen));
+    const controls = root.findAll(node => String(node.type) === "IconAction" && node.props.label.startsWith("Edit completion:"));
+    expect(controls).toHaveLength(1);
+    await act(async () => controls[0]!.props.onPress());
+    expect(mocks.push).toHaveBeenCalledWith({ pathname: "/task", params: { taskId: "task-1" } });
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it("maps the displayed noon-to-evening ring drag to the same availability time", async () => {
+    vi.useFakeTimers();
+    const onCommit = vi.fn();
+    const root = await render(createElement(DayRingClock, { date: "2026-09-14", timeline: [], start: 360, end: 720, onChange: vi.fn(), onCommit }));
+    const handle = root.findAll(node => String(node.type) === "AnimatedView").find(node => node.props.accessibilityLabel === "Availability end")!;
+    await act(async () => {
+      handle.props.onPanResponderGrant();
+      vi.advanceTimersByTime(300);
+      // Noon is at the top; a quarter-circle clockwise is 6 PM at the right.
+      handle.props.onPanResponderMove(null, { dx: 126, dy: 126 });
+      handle.props.onPanResponderRelease();
+    });
+    expect(onCommit).toHaveBeenLastCalledWith(360, 1080);
+  });
   it("selects real material, disables unavailable Quiz and persists Reviewer intent before navigation", async () => {
     mocks.data["/api/experience/courses"] = { items: [workspace.course] };
     mocks.data["/api/experience/courses/course"] = workspace;
