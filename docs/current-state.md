@@ -1,5 +1,12 @@
 # Current State
 
+## B25 mobile redesign foundation (2026-09-13)
+
+Implemented the Today / Generate / Tasks / Library shell, shared light/dark/system themes, interactive day-ring planner entry, hidden durable Generation/Queue, Canvas material actions, Activity Maker entry and saved-artifact consumption. Existing deep functionality remains reachable. No production AI model, schema or planner changes.
+
+Automated verification is passing; physical acceptance is pending because the connected realme remains locked. Component-only dark/light renders were compared with the approved references. Hosted B24.6/B24.7 rollout is not certified by this mobile work. B25 is PARTIAL until authenticated device validation is completed; then proceed to B26 deep screens and advanced animation polish. See [B25 acceptance](ai/acceptance/b25/ui-redesign-foundation.md).
+
+
 ## B24.7 Quiz backend (2026-09-13)
 
 **PASS — Quiz backend is ready and core backend capability is complete for the UI redesign.**
