@@ -8,6 +8,24 @@ export type ExperienceRow<T extends ExperienceTable> = Database['public']['Table
 export interface ExperienceRepository {
   rows<T extends ExperienceTable>(table: T, userId: string): Promise<readonly ExperienceRow<T>[]>;
 }
+
+/**
+ * Binds trusted server reads to the identity established by verifyBearerToken.
+ * Callers cannot substitute a route, query, or body user ID at this boundary.
+ */
+export function trustedExperienceReadRepository(
+  client: SupabaseClient<Database>,
+  authenticatedUserId: string,
+): ExperienceRepository {
+  if (!authenticatedUserId) throw new Error('Authenticated experience owner is required.');
+  const repository = experienceRepository(client);
+  return {
+    rows<T extends ExperienceTable>(table: T): Promise<readonly ExperienceRow<T>[]> {
+      return repository.rows(table, authenticatedUserId);
+    },
+  };
+}
+
 export function experienceRepository(client: SupabaseClient<Database>): ExperienceRepository {
   return {
     async rows<T extends ExperienceTable>(table: T, userId: string): Promise<readonly ExperienceRow<T>[]> {

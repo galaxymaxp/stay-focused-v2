@@ -1,12 +1,11 @@
 import type { ExperienceResponse } from '@stay-focused/shared';
 import { verifyBearerToken } from '@/lib/auth';
-import { createReviewerUserClient } from '@/lib/reviewer-db';
 import { createCanvasServiceClient } from '@/lib/canvas-db';
 import { listCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { readReviewerSourceStatus } from '@/lib/reviewer-source-status';
 import { ExperienceFailure, normalizeExperienceError } from './errors';
 import { ExperienceService } from './service';
-import { experienceRepository } from './repository';
+import { trustedExperienceReadRepository } from './repository';
 
 const headers = { 'Cache-Control': 'private, no-store', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, idempotency-key', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS', 'Access-Control-Max-Age': '600' };
 export function experienceOptions() { return new Response(null, { status: 204, headers }); }
@@ -28,12 +27,14 @@ export async function readBoundedExperienceJson(request:Request,maximumBytes:num
   }catch{throw new ExperienceFailure(400,'invalid_request');}
   finally{reader.releaseLock();}
 }
-export function createExperienceService(accessToken: string) {
-  const client = createReviewerUserClient(accessToken);
-  return new ExperienceService({ repository: experienceRepository(client),
-    materials: (userId, courseId, offset) => listCanvasReviewerSources({ client: createCanvasServiceClient(), userId, courseId, offset, limit: 100 }),
-    freshness: async (userId, reviewerId) => {
-      const status = await readReviewerSourceStatus({ client, userId, reviewerId });
+export function createExperienceService(authenticatedUserId: string) {
+  // This client is created only after experienceRoute verifies the bearer token.
+  // Every read dependency is then bound to that verified identity.
+  const client = createCanvasServiceClient();
+  return new ExperienceService({ repository: trustedExperienceReadRepository(client, authenticatedUserId),
+    materials: (_userId, courseId, offset) => listCanvasReviewerSources({ client, userId: authenticatedUserId, courseId, offset, limit: 100 }),
+    freshness: async (_userId, reviewerId) => {
+      const status = await readReviewerSourceStatus({ client, userId: authenticatedUserId, reviewerId });
       return status.ok ? status.value.overallStatus : 'unknown';
     },
   });
@@ -42,8 +43,7 @@ export async function experienceRoute(request: Request, action: (service: Experi
   try {
     const user = await verifyBearerToken(request);
     if (!user) throw new ExperienceFailure(401, 'sign_in_required');
-    const token = request.headers.get('authorization')!.slice('Bearer '.length);
-    return await action(createExperienceService(token), user.id);
+    return await action(createExperienceService(user.id), user.id);
   } catch (error) {
     const normalized = normalizeExperienceError(error);
     // No error messages/stacks: provider and database errors may contain content.
