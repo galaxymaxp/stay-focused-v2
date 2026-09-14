@@ -67,3 +67,9 @@ No private academic source text, provider output, answer key, user/course/materi
 The structural planner defect is repaired and synthetic live validation succeeds, but the real production author/verifier combination still cannot reliably satisfy the unchanged academic-value/difficulty gate within its bounded repair rounds. A follow-up must diagnose that semantic convergence problem using a new explicitly authorized provider attempt before B25 can close.
 
 **PARTIAL — Quiz repair improved but acceptance remains incomplete.**
+
+## B25.3.1 follow-up (2026-09-15)
+
+Commit `bd5eb15` adds finding-specific structured feedback, direct correction, full same-support reauthoring, alternate-unused-support reauthoring, source-affordance difficulty planning, deterministic academic-value examples, and immutable accepted questions. The focused, full, and bounded synthetic-live validations pass without weakening any gate. Deployment `dpl_3UxRUwZDy5iGgkX1j8HnLpJBqpnD` is `READY` on the canonical production alias.
+
+The single authorized real-material retest still failed safely: 1/5 questions accepted, `q1`, `q2`, `q3`, and `q5` pending after the alternate-support phase, terminal `repair_exhausted`. No complete Quiz was persisted, so attempt/score/result/reopen remain unaccepted. The exact current verdict is **PARTIAL — Quiz semantic convergence remains incomplete**. See [the B25.3.1 report](../b25.3.1/quiz-semantic-convergence.md). B26 was not started.

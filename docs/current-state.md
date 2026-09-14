@@ -1,5 +1,11 @@
 # Current State
 
+## B25.3.1 real-material Quiz semantic convergence (2026-09-15)
+
+Quiz repair now uses structured finding-specific feedback, direct correction, full same-support reauthoring, alternate unused support, source-affordance difficulty planning, immutable accepted questions, and deterministic academic-value checks. All fresh package/root gates pass, and the second/final bounded synthetic-live validation accepted all five questions. Commit `bd5eb15` is deployed as production `dpl_3UxRUwZDy5iGgkX1j8HnLpJBqpnD` (`READY`, healthy canonical alias).
+
+The one authorized authenticated real-lecture retest still ended `repair_exhausted`: 1/5 accepted, with four slots pending after alternate-support repair. No Quiz artifact reached Library, so take/submit/score/result/reopen remain unaccepted. **PARTIAL — Quiz semantic convergence remains incomplete.** No gates were weakened, no retry was submitted, and B26 was not started. See [B25.3.1 report](ai/acceptance/b25.3.1/quiz-semantic-convergence.md).
+
 ## B25.2.1 Generation orb animation repair (2026-09-14)
 
 The Generation orb now uses independently animated halo, deforming body, spectrum wash, highlights and orbital light rather than moving one static SVG composition. Press/hold compresses and brightens it; tap pulses; blur, background, terminal state and unmount stop the native-driven loops; reduced motion holds a stable phase.
