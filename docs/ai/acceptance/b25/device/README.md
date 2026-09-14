@@ -38,3 +38,11 @@ The repair was deployed from a clean worktree as Vercel production deployment `d
 The PNG files in this directory record the initial physical rendering and pre-repair hosted failure state. New populated post-repair screenshots were intentionally not committed because they contain private academic titles. Queue screenshots were also withheld for the same reason.
 
 No screenshot in this directory contains Canvas course, assignment, material, or artifact titles.
+
+## B25.3 follow-up (2026-09-14)
+
+The structural planner repair and synthetic regressions are recorded in [quiz-generation-repair.md](../quiz-generation-repair.md). Fresh post-change API, Mobile, Canvas, Engine, OCR, Shared, Workflow, provider-contract, forced typecheck, forced lint, and forced build gates passed. A single bounded live provider test on the pinned Quiz model accepted all five questions; its second allowed attempt was not used. Commit `04ddf26` was deployed to the existing production project, whose final deployment `dpl_6PnfPKwDZPyrCSq8NSN2Hfv8xV5c` reached `READY` at `https://stay-focused-v2-prototype.vercel.app`.
+
+The realme RMX3151 remained authorized over ADB on Android 13. From Expo Go, a real Canvas lecture PDF prepared successfully and the authenticated Quiz request reached Generation. The orb remained responsive; leaving for Today did not cancel server work; Queue restored the job. The production workflow nevertheless exhausted its third bounded semantic-repair round with three of five questions accepted. Its exact terminal diagnostic was `repair_exhausted`; the two remaining questions failed `academicValue`, with one also failing `difficulty_mismatch`. Earlier rounds also recorded option/distractor, distinctness, leakage, explanation-grounding, and one answer-key-mismatch finding. No quality gate was bypassed.
+
+Per the acceptance stop rule, no further provider attempt was made. An accidental second queued request was cancelled before processing. No Quiz artifact reached Library, so physical answer selection, pre-submit answer secrecy, scoring, result persistence, and reopen remain **unaccepted**. The existing PNGs remain historical B25.1 evidence; no private B25.3 academic screenshots were committed.
