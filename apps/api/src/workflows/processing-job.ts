@@ -235,7 +235,14 @@ async function processQuizStep(jobId: string, workerId: string): Promise<void> {
       throw error;
     });
     await assertWorkflowJobMayContinue(client, jobId, workerId);
-    await completeProcessingJob(client, { jobId, workerId, resultType: "quiz_generation", payload: JSON.parse(JSON.stringify(output.payload)) as Json, metrics: {} });
+    console.info("quiz_generation.persistence", { jobId, outcome: "start" });
+    try {
+      await completeProcessingJob(client, { jobId, workerId, resultType: "quiz_generation", payload: JSON.parse(JSON.stringify(output.payload)) as Json, metrics: {} });
+      console.info("quiz_generation.persistence", { jobId, outcome: "succeeded" });
+    } catch (error) {
+      console.info("quiz_generation.persistence", { jobId, outcome: "failed", errorCode: readSafeErrorCode(error) ?? "quiz_persistence_failed" });
+      throw error;
+    }
   });
 }
 

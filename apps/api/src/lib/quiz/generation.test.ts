@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { GenerationProvider, GenerationRequest } from '@stay-focused/engine';
-import { makeQuizPlan, generateQuiz, validateCandidate, conflictingQuestions } from './generation';
+import { makeQuizPlan, generateQuiz, validateCandidate, conflictingQuestionFindings, conflictingQuestions, QuizGenerationFailure, type QuizGenerationDiagnostic, type QuizPlan, type QuizRegion } from './generation';
 import { candidate, fixtureRegions, fixtureSources, request, acceptingProvider, fixturePlan } from './fixtures';
 import { readQuizRequest, regionsFromBlocks } from './sources';
 import { learnerQuestion } from './service';
@@ -26,6 +26,33 @@ describe('Quiz source contracts and coverage', () => {
         expect(plan.allocation.map(s => s.topicId)).toEqual(regions.map(r => r.id));
     });
     it('refuses insufficient source instead of inventing padding', () => expect(() => makeQuizPlan([{ ...fixtureRegions()[0]!, text: 'Hello' }], request)).toThrow());
+    it('refuses one verbose claim instead of treating character count as five-question coverage', () => {
+        const singleClaim = { ...fixtureRegions()[0]!, text: `A single unsupported claim ${'without another independent concept '.repeat(8)}` };
+        expect(() => makeQuizPlan([singleClaim], request)).toThrow('quiz_source_unavailable');
+    });
+    it('splits a coarse prepared region into distinct support units before allocation', async () => {
+        const text = [
+            'Authentication establishes a learner identity before protected access is considered.',
+            'Authorization determines which protected actions that established identity may perform.',
+            'Integrity detects unauthorized changes to stored or transmitted academic records.',
+            'Availability keeps approved learning resources reachable when authorized users need them.',
+            'Confidentiality restricts disclosure of private learning records to approved recipients.',
+            'Audit records associate each protected change with the identity that initiated it.',
+        ].join('\n');
+        const coarse: QuizRegion = { ...fixtureRegions()[0]!, id: 'coarse-source', text };
+        const plan = makeQuizPlan([coarse], { ...request, questionTypes: ['single_select', 'true_false'] });
+        expect(plan.topics).toHaveLength(5);
+        expect(new Set(plan.allocation.map(slot => slot.topicId)).size).toBe(5);
+        expect(plan.topics.every(topic => text.includes(topic.text))).toBe(true);
+        expect(await generateQuiz(acceptingProvider(plan), plan)).toHaveLength(5);
+    });
+    it('does not repeatedly allocate a tiny heading group when a coarse body has enough support units', () => {
+        const tiny: QuizRegion = { ...fixtureRegions()[0]!, id: 'tiny', text: 'Access is limited. Identity is checked.' };
+        const body: QuizRegion = { ...fixtureRegions()[1]!, id: 'body', text: Array.from({ length: 8 }, (_, index) => `Control ${index + 1} validates a distinct protected operation using its own recorded evidence and outcome.`).join('\n') };
+        const plan = makeQuizPlan([tiny, body], { ...request, questionTypes: ['single_select', 'true_false'] });
+        expect(new Set(plan.allocation.map(slot => slot.topicId)).size).toBe(5);
+        expect(plan.allocation.some(slot => slot.topicId.startsWith('tiny'))).toBe(false);
+    });
     it('keeps solution and procedure-step headings with their academic topic', () => {
         const regions = regionsFromBlocks('page:1', 'Statistics', [
             { id: 'h', kind: 'heading', text: 'Grouped median' },
@@ -80,6 +107,44 @@ describe('Quiz authoring and bounded verification', () => {
             }[];
         };
         expect(second.pending.map(s => s.id)).toEqual(['q2']);
+    });
+    it('reports the demonstrated coarse-plan failure as duplicate evidence before bounded repair exhaustion', async () => {
+        const topic: QuizRegion = { ...fixtureRegions()[0]!, id: 'legacy-coarse-topic', text: 'A single coarse source region repeats this exact evidence passage even though the old planner allocated every requested question to it.' };
+        const plan: QuizPlan = { requestedQuestionCount: 5, requestedDifficulty: 'mixed', topics: [topic], allocation: Array.from({ length: 5 }, (_, index) => ({ id: `q${index + 1}`, topicId: topic.id, type: index % 2 ? 'true_false' : 'single_select', difficulty: index % 2 ? 'medium' : 'easy' })) };
+        const diagnostics: QuizGenerationDiagnostic[] = [];
+        const provider = acceptingProvider(plan);
+        await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'repair_exhausted' });
+        expect(provider.calls).toHaveLength(6);
+        expect(diagnostics.some(diagnostic => diagnostic.failureClass === 'set_validation' && diagnostic.findings.includes('duplicate_evidence'))).toBe(true);
+        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', round: 3, acceptedCount: 1, pendingCount: 4 });
+    });
+    it('reproduces the hosted two-topic q2/q4-only acceptance pattern without private source text', async () => {
+        const tiny: QuizRegion = { ...fixtureRegions()[0]!, id: 'tiny', text: 'Access is limited. Identity is checked.' };
+        const firstFact = 'Authentication establishes the identity used to evaluate access to a protected learning resource.';
+        const secondFact = 'Authorization determines whether that established identity may perform a particular protected action.';
+        const body: QuizRegion = { ...fixtureRegions()[1]!, id: 'body', text: `${firstFact}\n${secondFact}` };
+        const legacyPlan: QuizPlan = { requestedQuestionCount: 5, requestedDifficulty: 'mixed', topics: [tiny, body], allocation: Array.from({ length: 5 }, (_, index) => ({ id: `q${index + 1}`, topicId: index % 2 ? body.id : tiny.id, type: index % 2 ? 'true_false' : 'single_select', difficulty: index === 3 ? 'hard' : index % 2 ? 'medium' : 'easy' })) };
+        const diagnostics: QuizGenerationDiagnostic[] = [];
+        const provider = acceptingProvider(legacyPlan, questions => ({ questions: questions.map(q => {
+            if (q.id === 'q2') return { ...q, prompt: firstFact, sourceEvidence: [{ regionId: body.id, quote: firstFact }] };
+            if (q.id === 'q4') return { ...q, prompt: secondFact, sourceEvidence: [{ regionId: body.id, quote: secondFact }] };
+            return { ...q, sourceEvidence: [{ regionId: tiny.id, quote: 'Unsupported evidence' }] };
+        }) }));
+        await expect(generateQuiz(provider, legacyPlan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'repair_exhausted' });
+        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', questionIds: ['q1', 'q3', 'q5'], acceptedCount: 2, pendingCount: 3 });
+        const repairedPlan = makeQuizPlan([tiny, { ...body, text: Array.from({ length: 6 }, (_, index) => `Protected rule ${index + 1} uses distinct evidence to distinguish an authorized learning action from an unauthorized one.`).join('\n') }], request);
+        expect(new Set(repairedPlan.allocation.map(slot => slot.topicId)).size).toBe(5);
+        expect(repairedPlan.allocation.every(slot => !slot.topicId.startsWith('tiny'))).toBe(true);
+    });
+    it('reports evidence failures separately while preserving valid questions during targeted repair', async () => {
+        const plan = fixturePlan(), diagnostics: QuizGenerationDiagnostic[] = [];
+        const provider = acceptingProvider(plan, questions => ({ questions: questions.map(q => q.id === 'q2' ? { ...q, sourceEvidence: [{ regionId: q.topicId, quote: 'not present in source' }] } : q) }));
+        await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toBeInstanceOf(QuizGenerationFailure);
+        expect(diagnostics.some(diagnostic => diagnostic.failureClass === 'evidence_validation' && diagnostic.questionIds.includes('q2'))).toBe(true);
+        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', acceptedCount: 4, pendingCount: 1 });
+        const second = JSON.parse(provider.calls[2]!.slice(provider.calls[2]!.lastIndexOf('\n') + 1)) as { pending: { id: string }[]; accepted: { id: string }[] };
+        expect(second.pending.map(slot => slot.id)).toEqual(['q2']);
+        expect(second.accepted.map(question => question.id)).toEqual(['q1', 'q3', 'q4', 'q5']);
     });
     it.each(['keyCorrect', 'distractorsWrong', 'unambiguous', 'explanationGrounded', 'sourceSufficient', 'noExternalFacts', 'distinctConcept', 'noLeakage', 'plausibleOptions', 'learnerSelfContained', 'arithmeticCorrect', 'academicValue'])('fails closed on semantic %s rejection', async (check) => {
         const plan = fixturePlan(), base = acceptingProvider(plan);
@@ -166,6 +231,13 @@ describe('Quiz authoring and bounded verification', () => {
         const plan = fixturePlan(), a = validateCandidate(candidate(plan, 'q1'), plan), b = validateCandidate(candidate(plan, 'q4'), plan);
         expect(conflictingQuestions([a, { ...b, prompt: a.prompt }]).has(b.id)).toBe(true);
         expect(conflictingQuestions([a, { ...b, prompt: `Given that ${a.options[0]!.text}, what follows?` }]).has(b.id)).toBe(true);
+    });
+    it('classifies duplicate evidence independently from prompt and concept duplication', () => {
+        const plan = fixturePlan(), a = validateCandidate(candidate(plan, 'q1'), plan), b = validateCandidate(candidate(plan, 'q4'), plan);
+        const quote = 'A sufficiently long exact evidence passage establishes one protected academic rule and is deliberately reused by this regression.';
+        const findings = conflictingQuestionFindings([{ ...a, sourceEvidence: [{ regionId: a.topicId, quote }] }, { ...b, topicId: a.topicId, prompt: 'Apply a different scenario to choose the supported outcome.', concept: 'different concept', sourceEvidence: [{ regionId: a.topicId, quote }] }]);
+        expect(findings.get(b.id)).toContain('duplicate_evidence');
+        expect(findings.get(b.id)).not.toContain('duplicate_concept');
     });
     it('rejects reused long evidence even when question wording and keys differ', () => {
         const plan = fixturePlan(), a = validateCandidate(candidate(plan, 'q1'), plan), b = validateCandidate(candidate(plan, 'q4'), plan);
