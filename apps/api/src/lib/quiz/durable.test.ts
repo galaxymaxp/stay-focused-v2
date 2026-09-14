@@ -46,8 +46,8 @@ describe('Quiz existing durable job integration', () => {
         mocks.provider.mockReturnValue(provider);
         const first = await processQuizJob(client, job, 'worker');
         expect(first.payload.questions).toHaveLength(5);
-        expect(checkpoints.has('quiz:plan:v2')).toBe(true);
-        expect(checkpoints.has('quiz:accepted:v2')).toBe(true);
+        expect(checkpoints.has('quiz:plan:v3')).toBe(true);
+        expect(checkpoints.has('quiz:accepted:v3')).toBe(true);
         const second = await processQuizJob(client, job, 'worker');
         expect(second.payload).toEqual(first.payload);
         expect(provider.calls).toHaveLength(2);
@@ -55,8 +55,8 @@ describe('Quiz existing durable job integration', () => {
     });
     it('resumes only missing slots after interrupted work', async () => {
         const plan = fixturePlan(), accepted = plan.allocation.slice(0, 3).map(s => validateCandidate(candidate(plan, s.id), plan));
-        checkpoints.set('quiz:plan:v2', JSON.parse(JSON.stringify({ plan, materialIds: request.sourceIds })) as Json);
-        checkpoints.set('quiz:accepted:v2', JSON.parse(JSON.stringify({ questions: accepted })) as Json);
+        checkpoints.set('quiz:plan:v3', JSON.parse(JSON.stringify({ plan, materialIds: request.sourceIds })) as Json);
+        checkpoints.set('quiz:accepted:v3', JSON.parse(JSON.stringify({ questions: accepted })) as Json);
         const provider = acceptingProvider(plan);
         mocks.provider.mockReturnValue(provider);
         await processQuizJob({} as SupabaseClient<Database>, job, 'worker');
@@ -76,7 +76,7 @@ describe('Quiz existing durable job integration', () => {
     it('provider failure leaves no final payload and retains the frozen source', async () => {
         mocks.provider.mockReturnValue({ generate: vi.fn().mockRejectedValue(new Error('private provider detail')) });
         await expect(processQuizJob({} as SupabaseClient<Database>, job, 'worker')).rejects.toThrow('quiz_generation_failed');
-        expect(checkpoints.has('quiz:plan:v2')).toBe(true);
-        expect(checkpoints.has('quiz:accepted:v2')).toBe(false);
+        expect(checkpoints.has('quiz:plan:v3')).toBe(true);
+        expect(checkpoints.has('quiz:accepted:v3')).toBe(false);
     });
 });

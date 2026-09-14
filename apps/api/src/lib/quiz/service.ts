@@ -46,7 +46,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     const metadata = record(source.metadata), input = readQuizRequest(metadata.quizInput);
     let plan: QuizPlan;
     let materialIds: string[];
-    const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:plan:v2');
+    const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:plan:v3');
     if (saved) {
         const value = record(saved.payload);
         plan = value.plan as QuizPlan;
@@ -65,15 +65,15 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
             throw error;
         }
         materialIds = sources.materialIds;
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:plan:v2', payload: json({ plan, materialIds }) });
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:plan:v3', payload: json({ plan, materialIds }) });
     }
     // Checkpoints are private server data, not an experience endpoint. A resumed
     // workflow retains the exact source plan and already verified questions.
-    const previous = await readProcessingJobCheckpoint(client, job.id, 'quiz:accepted:v2');
+    const previous = await readProcessingJobCheckpoint(client, job.id, 'quiz:accepted:v3');
     const accepted = previous && Array.isArray(record(previous.payload).questions) ? record(previous.payload).questions as StoredQuestion[] : [];
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Generating and validating quiz questions' });
     const questions = await generateQuiz(createServerOpenAIProvider(), plan, async (questions) => {
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:accepted:v2', payload: json({ questions }) });
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:accepted:v3', payload: json({ questions }) });
     }, accepted, (diagnostic: QuizGenerationDiagnostic) => {
         console.info('quiz_generation.diagnostic', { jobId: job.id, ...diagnostic });
     });
@@ -82,7 +82,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving quiz' });
     return { payload: { courseId: metadata.courseId, reviewerId: metadata.reviewerId, materialIds, title: `${questions.length}-question quiz`, questions,
-            provenance: { policy: 'quiz-v2', provider: `openai:${QUIZ_MODEL}`, plan, sourceSha256: createHash('sha256').update(JSON.stringify(plan.topics)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: plan.topics.length } };
+            provenance: { policy: 'quiz-v3', provider: `openai:${QUIZ_MODEL}`, plan, sourceSha256: createHash('sha256').update(JSON.stringify([...plan.topics, ...(plan.reserveTopics ?? [])])).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: plan.topics.length } };
 }
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
     return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : 'Choose one answer.' };

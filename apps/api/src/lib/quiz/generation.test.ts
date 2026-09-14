@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { GenerationProvider, GenerationRequest } from '@stay-focused/engine';
-import { makeQuizPlan, generateQuiz, validateCandidate, conflictingQuestionFindings, conflictingQuestions, QuizGenerationFailure, type QuizGenerationDiagnostic, type QuizPlan, type QuizRegion } from './generation';
+import { academicValueFindings, makeQuizPlan, generateQuiz, repairInstruction, supportAffordsDifficulty, validateCandidate, conflictingQuestionFindings, conflictingQuestions, QuizGenerationFailure, type QuizGenerationDiagnostic, type QuizPlan, type QuizRegion } from './generation';
 import { candidate, fixtureRegions, fixtureSources, request, acceptingProvider, fixturePlan } from './fixtures';
 import { readQuizRequest, regionsFromBlocks } from './sources';
 import { learnerQuestion } from './service';
@@ -53,6 +53,26 @@ describe('Quiz source contracts and coverage', () => {
         expect(new Set(plan.allocation.map(slot => slot.topicId)).size).toBe(5);
         expect(plan.allocation.some(slot => slot.topicId.startsWith('tiny'))).toBe(false);
     });
+    it('reserves unused support for final slot-only replan and assigns difficulty by source affordance', () => {
+        const facts = [
+            'A syllabus names the course and its instructor for enrolled learners.',
+            'A prerequisite must be completed before enrollment because it supplies required foundations.',
+            'Formative feedback occurs during practice, whereas summative evaluation judges performance after instruction.',
+            'A rubric states criteria before work begins so learners can connect evidence to expected performance.',
+            'Retrieval practice strengthens recall when learners reconstruct an answer before checking feedback.',
+            'Spacing separates study sessions over time, while cramming concentrates the same practice into one session.',
+            'Transfer requires applying a learned principle when surface details differ from the original example.',
+            'Metacognitive monitoring compares confidence with demonstrated performance so a learner can revise study choices.',
+        ];
+        const source: QuizRegion = { ...fixtureRegions()[0]!, id: 'lecture', text: facts.join('\n') };
+        const plan = makeQuizPlan([source], request);
+        expect(plan.topics).toHaveLength(5);
+        expect(plan.reserveTopics).toHaveLength(3);
+        expect(plan.allocation.filter(slot => slot.difficulty === 'medium').every(slot => supportAffordsDifficulty(plan.topics.find(topic => topic.id === slot.topicId)!, 'medium'))).toBe(true);
+    });
+    it('does not assign explicit hard slots to short declarative support', () => {
+        expect(() => makeQuizPlan(fixtureRegions(), { ...request, difficulty: 'hard' })).toThrow('quiz_source_unavailable');
+    });
     it('keeps solution and procedure-step headings with their academic topic', () => {
         const regions = regionsFromBlocks('page:1', 'Statistics', [
             { id: 'h', kind: 'heading', text: 'Grouped median' },
@@ -72,15 +92,34 @@ describe('Quiz source contracts and coverage', () => {
     });
 });
 describe('Quiz authoring and bounded verification', () => {
+    it('classifies deterministic academic-value examples without weakening semantic audit', () => {
+        expect(academicValueFindings('A learner authenticates successfully but lacks course authorization. Which access decision follows from the distinction?', ['Deny course access until authorization succeeds.'])).toEqual([]);
+        expect(academicValueFindings('Which word is bold on the source slide?', ['Authorization'])).toContain('formatting_trivia');
+        expect(academicValueFindings('Complete the sentence: Authorization ______ access.', ['determines allowed course access'])).toContain('sentence_fragment_completion');
+        expect(academicValueFindings('Which option merely repeats the wording in the source text?', ['Authorization determines allowed course access.'])).toContain('wording_only_recognition');
+        expect(academicValueFindings('Authorization determines whether an identified learner may open a protected course. Which statement is correct?', ['Authorization determines whether an identified learner may open a protected course.'])).toContain('answer_restatement');
+    });
+    it.each([
+        ['academicValue', 'meaningful'],
+        ['difficulty_mismatch', 'requested level'],
+        ['distractorsWrong', 'demonstrably false'],
+        ['option_analysis_invalid', 'demonstrably false'],
+        ['explanationGrounded', 'only facts'],
+        ['noLeakage', 'answer phrase'],
+        ['answer_key_mismatch', 'options and answer key together'],
+        ['distinctConcept', 'accepted question'],
+    ])('maps %s to finding-specific repair guidance', (finding, phrase) => {
+        expect(repairInstruction(finding)).toContain(phrase);
+    });
     it.each([5, 10, 15, 20])('generates the exact requested %i questions with stable allocation', async (questionCount) => {
         const regions = Array.from({ length: questionCount }, (_, i) => ({ ...fixtureRegions()[i % 5]!, id: `topic-${i + 1}`, text: `Source unit ${i + 1}: ${fixtureRegions()[i % 5]!.text}` }));
-        const plan = makeQuizPlan(regions, { ...request, questionCount });
+        const plan = makeQuizPlan(regions, { ...request, questionCount, difficulty: 'easy' });
         const questions = await generateQuiz(acceptingProvider(plan), plan);
         expect(questions).toHaveLength(questionCount);
         expect(new Set(questions.map(q => q.id)).size).toBe(questionCount);
     });
     it.each(fixtureSources.map((s, i) => [s[0], i] as const))('validates schema and coverage for %s', async (_name, i) => {
-        const plan = makeQuizPlan(fixtureRegions(i), request), provider = acceptingProvider(plan);
+        const plan = makeQuizPlan(fixtureRegions(i), { ...request, difficulty: 'easy' }), provider = acceptingProvider(plan);
         // This test validates deterministic contracts. The mocked semantic verdicts
         // are not evidence that the fixture distractors meet live academic quality.
         const questions = await generateQuiz(provider, plan);
@@ -108,6 +147,81 @@ describe('Quiz authoring and bounded verification', () => {
         };
         expect(second.pending.map(s => s.id)).toEqual(['q2']);
     });
+    it('converges a lecture-shaped two-slot semantic failure through direct repair and full reauthor', async () => {
+        const facts = [
+            'Diagnostic assessment occurs before instruction because it identifies prior knowledge that should shape the lesson plan.',
+            'Formative assessment supplies feedback during learning, whereas summative assessment evaluates achievement after instruction.',
+            'A valid assessment measures the intended learning outcome, while reliability concerns consistency across repeated measurements.',
+            'Criterion-referenced interpretation compares performance with a stated standard rather than ranking learners against one another.',
+            'Authentic assessment asks learners to apply knowledge in a realistic task and justify decisions using relevant evidence.',
+            'A rubric makes evaluation criteria explicit before submission so performance can be judged against the same dimensions.',
+            'Feedback is actionable when it identifies a gap and a next step, not merely whether an answer was right or wrong.',
+            'Mastery learning uses evidence from a check to trigger corrective practice before the learner advances to later material.',
+        ];
+        const region: QuizRegion = { ...fixtureRegions()[0]!, id: 'lecture-like-extraction', label: 'Assessment lecture', text: facts.join('\n') };
+        const plan = makeQuizPlan([region], { ...request, questionTypes: ['single_select', 'true_false'] });
+        const base = acceptingProvider(plan);
+        const difficultyRejected = plan.allocation.find(slot => slot.difficulty === 'medium')!.id;
+        const academicRejected = [...plan.allocation].reverse().find(slot => slot.id !== difficultyRejected)!.id;
+        const initiallyRejected = [difficultyRejected, academicRejected];
+        let verifierRound = 0;
+        const provider: GenerationProvider & { calls: string[] } = { calls: base.calls, async generate<T>(input: GenerationRequest<T>) {
+                const value = await base.generate<Record<string, unknown>>(input);
+                if (input.schema.name === 'quiz_verification' && verifierRound < 2) {
+                    for (const verdict of value.verdicts as Record<string, unknown>[]) {
+                        if (initiallyRejected.includes(String(verdict.id)))
+                            verdict.academicValue = false;
+                        if (verdict.id === academicRejected) {
+                            verdict.distractorsWrong = false;
+                            const analysis = verdict.optionAnalysis as Record<string, unknown>[];
+                            analysis[1] = { ...analysis[1], supported: true, contradicted: false, reasoning: 'This distractor remains a defensible interpretation of the assigned support.' };
+                            verdict.defensibleOptionIds = [String((verdict.defensibleOptionIds as string[])[0]), String(analysis[1]!.id)];
+                        }
+                        if (verdict.id === difficultyRejected)
+                            verdict.assessedDifficulty = verdict.assessedDifficulty === 'easy' ? 'medium' : 'easy';
+                    }
+                    verifierRound++;
+                }
+                return value as T;
+            } };
+        const questions = await generateQuiz(provider, plan);
+        expect(questions).toHaveLength(5);
+        const direct = JSON.parse(provider.calls[2]!.slice(provider.calls[2]!.lastIndexOf('\n') + 1)) as Record<string, unknown>;
+        const reauthor = JSON.parse(provider.calls[4]!.slice(provider.calls[4]!.lastIndexOf('\n') + 1)) as Record<string, unknown>;
+        expect(direct).toMatchObject({ strategy: 'direct_correction' });
+        expect(JSON.stringify(direct)).toContain('academicValue');
+        expect(JSON.stringify(direct)).toContain('previousQuestion');
+        expect(JSON.stringify(direct)).toContain('distractor_is_defensible');
+        expect(JSON.stringify(direct)).toContain('answer_key_mismatch');
+        expect(reauthor).toMatchObject({ strategy: 'full_reauthor' });
+        expect(JSON.stringify(reauthor)).not.toContain('previousQuestion');
+        expect(reauthor).toMatchObject({ acceptedContext: expect.arrayContaining([expect.objectContaining({ id: 'q2' })]) });
+    });
+    it('uses a compatible unused support unit only on the final repair stage', async () => {
+        const facts = Array.from({ length: 8 }, (_, index) => `When lecture condition ${index + 1} occurs, the learner compares the recorded observation with the stated rule because the appropriate response depends on that relationship rather than on wording alone.`);
+        const region: QuizRegion = { ...fixtureRegions()[0]!, id: 'reserve-lecture', text: facts.join('\n') };
+        const plan = makeQuizPlan([region], request);
+        const originalTopic = plan.allocation[4]!.topicId;
+        const base = acceptingProvider(plan);
+        let verifierRound = 0;
+        const provider: GenerationProvider & { calls: string[] } = { calls: base.calls, async generate<T>(input: GenerationRequest<T>) {
+                const value = await base.generate<Record<string, unknown>>(input);
+                if (input.schema.name === 'quiz_verification') {
+                    if (verifierRound++ < 3) {
+                        const q5 = (value.verdicts as Record<string, unknown>[]).find(verdict => verdict.id === 'q5');
+                        if (q5)
+                            q5.academicValue = false;
+                    }
+                }
+                return value as T;
+            } };
+        const questions = await generateQuiz(provider, plan);
+        expect(questions).toHaveLength(5);
+        expect(questions.find(question => question.id === 'q5')!.topicId).not.toBe(originalTopic);
+        const alternate = JSON.parse(provider.calls[6]!.slice(provider.calls[6]!.lastIndexOf('\n') + 1)) as Record<string, unknown>;
+        expect(alternate).toMatchObject({ strategy: 'alternate_support' });
+        expect(JSON.stringify(alternate)).toContain('alternate_support');
+    });
     it('reports the demonstrated coarse-plan failure as duplicate evidence before bounded repair exhaustion', async () => {
         const topic: QuizRegion = { ...fixtureRegions()[0]!, id: 'legacy-coarse-topic', text: 'A single coarse source region repeats this exact evidence passage even though the old planner allocated every requested question to it.' };
         const plan: QuizPlan = { requestedQuestionCount: 5, requestedDifficulty: 'mixed', topics: [topic], allocation: Array.from({ length: 5 }, (_, index) => ({ id: `q${index + 1}`, topicId: topic.id, type: index % 2 ? 'true_false' : 'single_select', difficulty: index % 2 ? 'medium' : 'easy' })) };
@@ -116,7 +230,7 @@ describe('Quiz authoring and bounded verification', () => {
         await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'repair_exhausted' });
         expect(provider.calls).toHaveLength(6);
         expect(diagnostics.some(diagnostic => diagnostic.failureClass === 'set_validation' && diagnostic.findings.includes('duplicate_evidence'))).toBe(true);
-        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', round: 3, acceptedCount: 1, pendingCount: 4 });
+        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', round: 4, acceptedCount: 1, pendingCount: 4 });
     });
     it('reproduces the hosted two-topic q2/q4-only acceptance pattern without private source text', async () => {
         const tiny: QuizRegion = { ...fixtureRegions()[0]!, id: 'tiny', text: 'Access is limited. Identity is checked.' };
@@ -142,9 +256,9 @@ describe('Quiz authoring and bounded verification', () => {
         await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toBeInstanceOf(QuizGenerationFailure);
         expect(diagnostics.some(diagnostic => diagnostic.failureClass === 'evidence_validation' && diagnostic.questionIds.includes('q2'))).toBe(true);
         expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', acceptedCount: 4, pendingCount: 1 });
-        const second = JSON.parse(provider.calls[2]!.slice(provider.calls[2]!.lastIndexOf('\n') + 1)) as { pending: { id: string }[]; accepted: { id: string }[] };
+        const second = JSON.parse(provider.calls[2]!.slice(provider.calls[2]!.lastIndexOf('\n') + 1)) as { pending: { id: string }[]; acceptedContext: { id: string }[] };
         expect(second.pending.map(slot => slot.id)).toEqual(['q2']);
-        expect(second.accepted.map(question => question.id)).toEqual(['q1', 'q3', 'q4', 'q5']);
+        expect(second.acceptedContext.map(question => question.id)).toEqual(['q1', 'q3', 'q4', 'q5']);
     });
     it.each(['keyCorrect', 'distractorsWrong', 'unambiguous', 'explanationGrounded', 'sourceSufficient', 'noExternalFacts', 'distinctConcept', 'noLeakage', 'plausibleOptions', 'learnerSelfContained', 'arithmeticCorrect', 'academicValue'])('fails closed on semantic %s rejection', async (check) => {
         const plan = fixturePlan(), base = acceptingProvider(plan);
@@ -178,7 +292,8 @@ describe('Quiz authoring and bounded verification', () => {
         await expect(generateQuiz(provider, plan)).rejects.toThrow('quiz_generation_failed');
     });
     it('rejects recall for an explicit hard request', async () => {
-        const plan = makeQuizPlan(fixtureRegions(), { ...request, difficulty: 'hard' }), base = acceptingProvider(plan);
+        const hardRegions = fixtureRegions().map((region, index) => ({ ...region, text: `When condition ${index + 1} occurs, the learner must first infer an intermediate result from the stated relationship; then the learner combines that result with a second rule because the final action depends on both conclusions. This support explicitly contrasts a correct two-step application with a one-step near miss.` }));
+        const plan = makeQuizPlan(hardRegions, { ...request, difficulty: 'hard' }), base = acceptingProvider(plan);
         const provider: GenerationProvider = { async generate<T>(input: GenerationRequest<T>) {
                 const value = await base.generate<Record<string, unknown>>(input);
                 if (input.schema.name === 'quiz_verification')
@@ -200,7 +315,7 @@ describe('Quiz authoring and bounded verification', () => {
                 return value as T;
             } };
         const questions = await generateQuiz(provider, plan);
-        expect(questions.map(q => q.difficulty)).toEqual(['easy', 'medium', 'easy', 'medium', 'medium']);
+        expect(questions.map(q => q.difficulty)).toEqual(plan.allocation.map(slot => slot.id === 'q4' ? 'medium' : slot.difficulty));
     });
     it('mixed rejects a set with only recall questions', async () => {
         const plan = fixturePlan(), base = acceptingProvider(plan);

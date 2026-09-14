@@ -7,10 +7,10 @@ import { request } from './fixtures';
 const checks = ['keyCorrect', 'distractorsWrong', 'unambiguous', 'explanationGrounded', 'sourceSufficient', 'noExternalFacts', 'plausibleOptions', 'distinctConcept', 'noLeakage', 'learnerSelfContained', 'arithmeticCorrect', 'academicValue'] as const;
 const asRecord = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
-describe('B25.3 bounded live Quiz validation', () => {
-    it.skipIf(process.env.B25_3_LIVE !== '1')('generates five grounded questions from a synthetic prepared source', async () => {
-        if (process.env.B25_3_ENV_FILE)
-            process.loadEnvFile(process.env.B25_3_ENV_FILE);
+describe('B25.3.1 bounded live Quiz validation', () => {
+    it.skipIf(process.env.B25_3_1_LIVE !== '1')('generates five grounded questions from a lecture-shaped synthetic prepared source', async () => {
+        if (process.env.B25_3_1_ENV_FILE)
+            process.loadEnvFile(process.env.B25_3_1_ENV_FILE);
         const facts = [
             'Authentication checks a learner identity using credentials, whereas authorization separately checks whether that authenticated learner may open a particular course; a successful login alone does not grant course access.',
             'Least privilege grants a learner only the permissions needed for assigned work; adding unrelated permissions violates least privilege even when the learner uses a strong password.',
@@ -50,7 +50,7 @@ describe('B25.3 bounded live Quiz validation', () => {
             expect(new Set(questions.map(question => question.topicId)).size).toBe(5);
         }
         finally {
-            console.info('b25_3_live_quiz_verdict', JSON.stringify({ model: QUIZ_MODEL, authorCalls, verifierCalls, verdicts, diagnostics }));
+            console.info('b25_3_1_live_quiz_verdict', JSON.stringify({ model: QUIZ_MODEL, authorCalls, verifierCalls, verdicts, diagnostics }));
         }
     }, 300000);
 });
