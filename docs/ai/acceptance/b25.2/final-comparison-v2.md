@@ -22,7 +22,7 @@ All six core screen implementations were updated, together with shared primitive
 
 Settings and appearance remain in More options. Queue remains directly reachable on primary screens. Error notices use a small information icon and compact wrapping text. The screen hierarchy remains available while notices render.
 
-The React best-practices review covered stable hook order, derived presentation data, effect cleanup, accessible labels and disabled states. Orb animation uses native-driver wrapper transforms/opacity, pauses when inactive, and respects reduced motion. It adds no shader package, network request or per-frame React state update.
+The React best-practices review covered stable hook order, derived presentation data, effect cleanup, accessible labels and disabled states. At B25.2, “orb animation” meant native-driver transforms/opacity on one wrapper around otherwise static SVG layers. It paused when inactive and respected reduced motion, but the wording overstated the visible result: it appeared static on the physical device. B25.2.1 supersedes that claim with independently animated layers. Neither implementation adds a shader package, network request or per-frame React state update.
 
 ## 3. Today before/after
 
@@ -46,7 +46,7 @@ All four filters fit in one strip at the target viewport, with horizontal scroll
 
 ## 7. Generation before/after
 
-The simple shaded globe became layered gradients with rim light, clipped light paths, restrained glow and decorative light points. Slow wrapper rotation joins breathing motion. The second cycle enlarged the orb; the third fixed Queue-label alignment. Status, orb, reassurance and the compact Queue pill now form one composition. Background-safe reassurance still depends on accepted generation state. The hidden flow remains separate from primary tabs.
+The simple shaded globe became layered gradients with rim light, clipped light paths, restrained glow and decorative light points. In this B25.2 snapshot those internal layers were static; only the complete wrapper breathed and rotated slowly, which was insufficient to make the orb feel alive on device. B25.2.1 adds independent halo, deformation, color, highlight and orbital motion without changing the surrounding composition. The second cycle enlarged the orb; the third fixed Queue-label alignment. Status, orb, reassurance and the compact Queue pill remain one composition. Background-safe reassurance still depends on accepted generation state. The hidden flow remains separate from primary tabs.
 
 ## 8. Queue before/after
 
@@ -75,7 +75,7 @@ The main sheets retain the accepted baseline's isolated-component setup, without
 
 ## 10. Remaining visual deviations
 
-The dominant settings-menu appearance is removed, but full resemblance is not certified. The orb remains more geometric and smoothly shaded than the reference's fine luminous light field; native animation feel and GPU cost need observation. The ring keeps an intentionally neutral unused track; its populated schedule treatment is not visible with the locked fixture. Typography and vertical positions differ from the illustrated devices, especially Queue, whose reference aspect ratio is unusually tall. The reference's richer course imagery is absent from the available data; adding fictitious content would invalidate this comparison.
+The dominant settings-menu appearance is removed, but full resemblance is not certified. This report's captured orb remains more geometric and smoothly shaded than the reference's fine luminous light field. B25.2.1 later repaired and physically profiled its motion; the static screenshots here remain historical B25.2 evidence. The ring keeps an intentionally neutral unused track; its populated schedule treatment is not visible with the locked fixture. Typography and vertical positions differ from the illustrated devices, especially Queue, whose reference aspect ratio is unusually tall. The reference's richer course imagery is absent from the available data; adding fictitious content would invalidate this comparison.
 
 The primary navigation is visibly quiet in web captures, but Android safe-area behavior, native font rendering, font scaling, TalkBack, haptics and animation performance remain unverified. The connected realme RMX3151 reported NotificationShade and `mDreamingLockscreen=true` on the latest check. No lock bypass was attempted.
 
