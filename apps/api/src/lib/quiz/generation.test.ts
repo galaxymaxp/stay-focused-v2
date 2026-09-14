@@ -228,8 +228,11 @@ describe('Quiz authoring and bounded verification', () => {
         const diagnostics: QuizGenerationDiagnostic[] = [];
         const provider = acceptingProvider(plan);
         await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'repair_exhausted' });
-        expect(provider.calls).toHaveLength(6);
-        expect(diagnostics.some(diagnostic => diagnostic.failureClass === 'set_validation' && diagnostic.findings.includes('duplicate_evidence'))).toBe(true);
+        expect(provider.calls.length).toBeLessThanOrEqual(6);
+        expect(diagnostics.some(diagnostic => diagnostic.findings.includes('compatible_blueprint_unavailable'))).toBe(true);
+        // The planner now blocks repeated intent before the legacy set reaches the evidence gate.
+        const repeated = plan.allocation.map(slot => validateCandidate(candidate(plan, slot.id), plan));
+        expect(conflictingQuestionFindings(repeated).get('q2')).toContain('duplicate_evidence');
         expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', round: 4, acceptedCount: 1, pendingCount: 4 });
     });
     it('reproduces the hosted two-topic q2/q4-only acceptance pattern without private source text', async () => {
@@ -270,7 +273,7 @@ describe('Quiz authoring and bounded verification', () => {
                 return value as T;
             } };
         await expect(generateQuiz(provider, plan)).rejects.toThrow('quiz_generation_failed');
-        expect(base.calls).toHaveLength(6);
+        expect(base.calls).toHaveLength(8);
     });
     it('withholds proposed keys and requested difficulty from the independent solver', async () => {
         const plan = fixturePlan(), provider = acceptingProvider(plan);

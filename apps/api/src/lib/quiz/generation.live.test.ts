@@ -3,14 +3,15 @@ import type { GenerationRequest } from '@stay-focused/engine';
 import { createServerOpenAIProvider } from '@/providers';
 import { generateQuiz, makeQuizPlan, QUIZ_MODEL, type QuizGenerationDiagnostic, type QuizRegion } from './generation';
 import { request } from './fixtures';
+import { writeFileSync } from 'node:fs';
 
 const checks = ['keyCorrect', 'distractorsWrong', 'unambiguous', 'explanationGrounded', 'sourceSufficient', 'noExternalFacts', 'plausibleOptions', 'distinctConcept', 'noLeakage', 'learnerSelfContained', 'arithmeticCorrect', 'academicValue'] as const;
 const asRecord = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
-describe('B25.3.1 bounded live Quiz validation', () => {
-    it.skipIf(process.env.B25_3_1_LIVE !== '1')('generates five grounded questions from a lecture-shaped synthetic prepared source', async () => {
-        if (process.env.B25_3_1_ENV_FILE)
-            process.loadEnvFile(process.env.B25_3_1_ENV_FILE);
+describe('B25.3.2 bounded live Quiz validation', () => {
+    it.skipIf(process.env.B25_3_2_LIVE !== '1')('generates five grounded questions from a lecture-shaped synthetic prepared source', async () => {
+        if (process.env.B25_3_2_ENV_FILE)
+            process.loadEnvFile(process.env.B25_3_2_ENV_FILE);
         const facts = [
             'Authentication checks a learner identity using credentials, whereas authorization separately checks whether that authenticated learner may open a particular course; a successful login alone does not grant course access.',
             'Least privilege grants a learner only the permissions needed for assigned work; adding unrelated permissions violates least privilege even when the learner uses a strong password.',
@@ -29,6 +30,8 @@ describe('B25.3.1 bounded live Quiz validation', () => {
         const verdicts: unknown[] = [];
         let authorCalls = 0;
         let verifierCalls = 0;
+        let acceptedCount = 0;
+        const started = Date.now();
         try {
             const questions = await generateQuiz({ async generate<T>(input: GenerationRequest<T>): Promise<T> {
                 if (input.schema.name === 'quiz_verification') {
@@ -48,9 +51,12 @@ describe('B25.3.1 bounded live Quiz validation', () => {
             } }, plan, undefined, [], diagnostic => diagnostics.push(diagnostic));
             expect(questions).toHaveLength(5);
             expect(new Set(questions.map(question => question.topicId)).size).toBe(5);
+            acceptedCount = questions.length;
         }
         finally {
-            console.info('b25_3_1_live_quiz_verdict', JSON.stringify({ model: QUIZ_MODEL, authorCalls, verifierCalls, verdicts, diagnostics }));
+            const summary = { model: QUIZ_MODEL, authorCalls, verifierCalls, acceptedCount, durationMs: Date.now() - started, verdicts, diagnostics };
+            console.info('b25_3_2_live_quiz_verdict', JSON.stringify(summary));
+            if (process.env.B25_3_2_REPORT_FILE) writeFileSync(process.env.B25_3_2_REPORT_FILE, JSON.stringify(summary, null, 2));
         }
     }, 300000);
 });
