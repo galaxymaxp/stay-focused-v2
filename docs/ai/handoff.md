@@ -1,5 +1,9 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## B25.3.3 migration update (2026-09-16)
+
+The user approved scoped provider transfers. Live comparison and production caller migration are complete; deterministic checks pass. Deployment and physical acceptance remain in progress. See the current B25.3.3 acceptance report.
+
 ## B25.3.3 AI-first spike checkpoint (2026-09-15)
 
 Standalone AI-first Reviewer, Quiz and Activity generators plus coherent context and thin contract tests are implemented in the isolated b25-3-3-ai-first branch. Production cutover, legacy retirement and real-material/device acceptance are pending private-source OCR/OpenAI authorization after an automatic approval rejection. B25 remains PARTIAL; B26 may not begin. See docs/ai/acceptance/b25.3.3/architecture-simplification.md.

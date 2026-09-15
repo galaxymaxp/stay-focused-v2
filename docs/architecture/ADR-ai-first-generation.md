@@ -1,6 +1,6 @@
 # ADR: AI-first educational generation
 
-Status: Accepted architecture decision; implementation rollout pending validation.
+Status: Accepted. Production caller migration implemented; deployment/device acceptance tracked separately.
 
 ## Context
 
@@ -40,7 +40,7 @@ displayed as an independently verified factual-grounding claim.
 - Real material and human inspection are mandatory; deterministic contracts do
   not establish student usefulness or factual completeness.
 - Coarse condensation is lossy and must be disclosed in telemetry/evaluation.
-- The current spike uses a conservative 80,000 UTF-8 byte context budget, reserves
+- The shared context builder uses a conservative 80,000 UTF-8 byte context budget, reserves
   space for schema/instructions, a 24,000-byte correction, and up to 12,000 output
   tokens. It fails rather than clipping an oversized indivisible source block.
   This is a safe upper-bound token estimate, not model-specific tokenization.
@@ -52,8 +52,6 @@ Audit -> implementation -> contract tests -> real-material spike and inspection
 -> cut over callers/workflows -> retire obsolete implementation/tests -> full
 regression -> existing-project deployment -> physical Android acceptance.
 
-At this checkpoint, new standalone generators are implemented but production
-callers still use the legacy architecture. External source/provider validation
-requires resolution of the automatic approval rejection documented in the
-[acceptance report](../ai/acceptance/b25.3.3/architecture-simplification.md).
-No deployment or B25 PASS is implied by accepting this ADR.
+All production Reviewer routes, the worker and durable Workflow now use the AI-first Reviewer. Quiz and Activity use the shared provider/context/contract foundation. Whole valid artifacts are checkpointed before completion; call reservations survive retries. No rejected output is added to durable checkpoints. Historical Reviewer semantic modules remain deprecated for historical evaluations and are bypassed by all production callers. Quiz and Activity semantic planners are removed.
+
+The [acceptance report](../ai/acceptance/b25.3.3/architecture-simplification.md) records live quality, deterministic regression, rollout and physical-device results. B25 PASS requires the actual production Quiz attempt and reopen flow.

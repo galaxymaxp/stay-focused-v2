@@ -1,18 +1,8 @@
 # Current State
 
-## B25.3.3 AI-first architecture spike (2026-09-15)
+## B25.3.3 AI-first generator migration (2026-09-16)
 
-The former feasibility/blueprint expansion proposal is superseded by
-[ADR-ai-first-generation](architecture/ADR-ai-first-generation.md). An isolated
-spike implements coherent source context, standalone AI-first Reviewer/Quiz/
-Activity generators, thin contracts, one optional repair, trusted instructions
-and output budgets. Production callers and legacy semantic stages are not yet
-cut over: the required real-material validation is awaiting resolution of an
-automatic approval rejection for private-source OCR/provider transfers.
-
-**PARTIAL — AI-first architecture requires further validation.** Existing
-production remains `79e54dd` / `dpl_peVBgRctKVmGTfkNfQqTev74QCda`, READY and healthy.
-B25 remains PARTIAL and B26 may not begin. See the [spike checkpoint](ai/acceptance/b25.3.3/architecture-simplification.md).
+Real-material comparison is complete. Reviewer routes/worker/Workflow, whole-set Quiz and Activity now use the shared coherent-context/AI/thin-contract boundary. Legacy Quiz and Activity semantic planners and the duplicate Reviewer Workflow pipeline are removed. Full deterministic regression, typecheck, lint and build pass. Deployment and physical acceptance are in progress; B25 remains PARTIAL and B26 may not begin. See docs/ai/acceptance/b25.3.3/architecture-simplification.md and the accepted ADR.
 
 ## B25.3.2 candidate convergence (2026-09-15)
 

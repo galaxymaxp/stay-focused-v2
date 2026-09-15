@@ -1,10 +1,6 @@
-# B25.3.3 architecture simplification checkpoint
+# B25.3.3 architecture simplification
 
-Date: 2026-09-15. Status: **PARTIAL — AI-first architecture requires further validation.**
-
-This is an implemented standalone spike, not a completed production migration.
-The required live-material gate is blocked by an automatic approval rejection.
-Production generation remains on B25.3.2. B25 is PARTIAL; B26 may not begin.
+Date: 2026-09-16. Migration and live-material comparison complete; deployment and physical acceptance in progress. **B25 remains PARTIAL until production Quiz acceptance.** B26 may not begin.
 
 ## Starting state and isolation
 
@@ -19,127 +15,47 @@ Production generation remains on B25.3.2. B25 is PARTIAL; B26 may not begin.
 - Existing production implementation: `79e54dd`; deployment
   `dpl_peVBgRctKVmGTfkNfQqTev74QCda`, freshly inspected READY. Canonical alias
   `https://stay-focused-v2-prototype.vercel.app`; fresh health
-  `{"status":"ok","version":"2.0.0"}`. No deployment was made.
+  `{"status":"ok","version":"2.0.0"}`. This records the starting deployment.
 
-## Architecture audit
 
-The [pre-edit inventory](architecture-inventory.md) records actual paths and
-KEEP / SIMPLIFY / REMOVE / ADAPT decisions before implementation.
+## Implemented architecture
 
-## Implemented standalone flow
+Existing extraction/OCR -> ordered full source context -> OpenAI -> thin product contract -> bounded optional one repair -> owner-bound durable artifact -> existing mobile UI.
 
-Ordered extracted blocks -> coherent context -> existing GenerationProvider ->
-trusted purpose-specific instructions + Structured Outputs -> objective contract
-validation -> optional one complete-output repair -> existing product DTO.
+Reviewer synchronous routes, worker and durable Workflow all use runAIReviewer. The separate Workflow section-plan/generate/verify/retry implementation is removed. Historical engine semantic modules remain explicitly deprecated for old evaluations; no production caller uses them. Extraction, normalization, source blocks and provenance snapshots remain.
 
-- Context preserves text, order, IDs, headings and page/slide metadata. It uses
-  a conservative UTF-8-byte token bound, complete source when within budget,
-  and coarse AI condensation when several source groups are required. No local
-  educational ranking, affordance inference or question-slot evidence selection.
-- Reviewer lets AI organize source material and adapts its sections to existing
-  `ReviewerOutput`/`sourceCore`. Existing extraction and normalization remain.
-- Quiz requests the entire set with count, mix and difficulty. Contract checks
-  cover fields, exact count, option IDs/counts, valid answer keys, known source
-  IDs and normalized exact duplicate prompts/options. Keys remain in the private
-  stored object; existing `learnerQuestion` produces the public projection.
-- Activity lets AI interpret requirements and return the draft structure. It
-  adapts sections/slides and missing-information warnings to the existing DTO.
-- OpenAI adapters now accept separate trusted instructions and explicit output
-  token limits. Old callers retain their existing request behavior.
-- The reader hides its independent-grounding badge for `ai-first-contract`
-  metadata; contract validation does not establish semantic truth or coverage.
+Quiz generates one complete set. Legacy blueprints, affordances, candidate pools, per-question repair and partial acceptance checkpoints are removed. Exact count, option/key structure, requested types, normalized exact duplicates and valid source IDs remain checked. The existing learner projection, SQL scoring, attempts and ownership contracts remain intact.
 
-## Deliberately incomplete migration work
+Activity retains deterministic assignment/link/material gathering and native/Office/OCR extraction. Local requirement/type/template semantic inference and independent semantic verifier are removed. AI interprets instructions/template precedence and returns sections or slides. Rubric data is not available in the existing assignment record; no new schema is introduced.
 
-No production caller or durable workflow has been cut over. No legacy semantic
-implementation or associated test has been deleted yet. The user's prescribed
-order requires real-material validation before these steps. Remaining work:
+Durability: source context is frozen per job; whole contract-valid products are checkpointed. Call counts are reserved before provider requests and survive restart (two per product, one per coarse condensation group). A crash may consume a reserved call; the system fails truthfully rather than resetting the budget. Existing leases, cancellation checks and completion transactions prevent publishing cancelled work. Checkpoints never store rejected outputs. Transport retry remains separately bounded by the existing adapter.
 
-1. Resolve private-source transfer approval, run all real-material generators,
-   inspect quality and preserve aggregate comparison evidence.
-2. Preserve headings/full source in production Quiz source assembly; migrate
-   Reviewer synchronous/worker/durable paths, Quiz whole-set durable checkpoints,
-   and Activity assembly/generation. Carry retry bounds across durable resumes.
-3. Retire old semantic implementations and only their obsolete tests.
-4. Run complete post-cutover regression/security checks, deploy the existing
-   project, then perform the physical Android flows.
+## Fresh checks
 
-## Fresh deterministic checks
-
-| Suite | Result | Count / scope |
+| Suite | Result | Notes |
 |---|---|---|
-| API full pre-cutover suite | PASS | 968 passed, 4 skipped |
-| AI-first contracts, final focused suite | PASS | 26 passed; full API run above included the first 24 |
-| Mobile full final suite | PASS | 450; clean HEAD had 449, one new badge-truthfulness test |
+| API | PASS | 864 passed, 3 opt-in live tests skipped, 83 files |
+| Mobile | PASS | 450, 38 files |
 | Canvas | PASS | 73 |
-| Engine | PASS | 606 legacy/extraction cases; no legacy retirement yet |
+| Engine | PASS | 606 historical/extraction cases |
 | OCR | PASS | 27 |
-| Shared | PASS | 22 Vitest cases; reported historical 44 is not reproduced by this clean-HEAD runner |
-| Workflow runtime | PASS | 1; unchanged production workflow |
-| Provider contract | PASS | 19, including new instruction/output-limit contract |
-| Root typecheck | PASS | 7/7, force, zero cached |
-| Root lint | PASS with baseline warnings | 7/7, zero cached; four existing mobile import-order warnings |
-| Root build | PASS with local dependency harness | 7/7, force, zero cached, 1m58s; Metro config restored |
-| Diff hygiene | PASS at checkpoint | `git diff --check` |
+| Shared | PASS | 44 |
+| Workflow runtime | PASS on retry | 1; first run hit existing 1 ms sleep replay divergence |
+| Provider contract | PASS | 19 |
+| Root typecheck | PASS | 7/7, zero cached |
+| Root lint | PASS | 7/7, four baseline mobile import-order warnings |
+| Root build | PASS | 7/7, zero cached; local junction harness restored Metro configuration |
 
-No test was deleted. Mobile's difference from the user's 481-test baseline is
-the unrelated dirty work deliberately excluded from this clean clone. The
-historical baseline remains recorded without presenting it as a fresh result.
+Test count changes: obsolete Quiz convergence/blueprint/candidate tests and Activity regex requirement/semantic-verifier tests were removed with their implementations. SQL scoring, RLS, ownership, API secrecy, Office extraction and cancellation tests remain. Eight new durable-budget tests were added. Mobile differs from the user's dirty-tree baseline because 32 unrelated persistence tests are outside this isolated HEAD checkout; the new reader badge test adds one to its 449 baseline. Shared 44 was reproduced in the final full run, correcting the earlier spike report's 22-case observation. Intermediate fixture/type/assertion failures were corrected; they were not production failures.
 
-Initial failures are retained in local logs: missing API/mobile dependency links,
-a table-driven test typing error (fixed), root `test` absent in clean HEAD (used
-workspace scripts directly), and sandbox ancestor-directory restrictions in
-ESLint/Workflow/build. Reviewed local execution resolved the filesystem issue.
-Metro additionally needed the real dependency directory added to watchFolders
-for validation; the harness restores tracked config byte-for-byte.
+## Live material
 
-## Real-material and physical acceptance
+See [comparison and inspection](real-material-generation-comparison.md). All three full sources generated Reviewers and five-question Quizzes; each final generation used one request. Activity followed the two-heading fixture. Initial prompt/model quality failures and remaining source defects are recorded there.
 
-See [real-material comparison](real-material-generation-comparison.md). No live
-Reviewer/Quiz/Activity output was generated; no production Quiz, attempt, score,
-result persistence or reopen was newly validated. `adb devices` saw the authorized
-Android device, but no new generation was submitted or device acceptance claimed.
+## Deployment and device
 
-## Security/product invariants
+Pending at this commit. Starting deployment remains the rollback target. No B25 PASS is claimed before physical Quiz generation, Library, secrecy, attempt, authoritative score and reopen are accepted.
 
-Existing authentication, RLS, owner checks, answer secrecy, server scoring,
-attempt/result persistence, durable jobs and secret handling remain unchanged.
-New contract tests verify exact count, key validity, source references, public
-projection and exact-set scoring. These tests do not certify a production
-cutover that has not occurred. No schema migration, push or B26 work occurred.
+## Git and privacy
 
-## Approval blocker
-
-Automatic approval review rejected use of the configured OCR provider on the
-private B25 lecture, citing missing explicit payload/destination authorization.
-An asynchronous question requests approval for Google Cloud Vision OCR and
-OpenAI validation, or a narrower alternative. The answer is pending. The blocked
-operation has not been bypassed.
-
-## Files and continuation
-
-Implementation commit: `20c7a4b` (`feat(ai): add gated AI-first generator spike`).
-Production implementation files:
-
-- `packages/engine/src/generation-context.ts`
-- `packages/engine/src/ai-first-reviewer.ts`
-- `packages/engine/src/provider.ts`
-- `packages/engine/src/providers/openai-provider.ts`
-- `packages/engine/src/types.ts`
-- `packages/engine/src/index.ts`
-- `apps/api/src/lib/quiz/ai-first.ts`
-- `apps/api/src/lib/activity-maker/ai-first.ts`
-- `apps/api/src/providers/openai-provider.ts`
-- `apps/mobile/src/features/reviewer/reviewerReaderPresentation.ts`
-
-Tests: `quiz/ai-first.test.ts`, provider contract, Reviewer presentation test.
-Local source retrieval/spike/build helpers are retained under `.local/` in the
-isolated clone and are not committed. All verification logs are sibling
-`b25-3-3-*.log` files outside the repository. No private source/provider captures
-are committed.
-
-The original repository remains at `d00a543`, with the same dirty-path inventory.
-Implementation/docs commits are retained only on the isolated branch; no merge,
-cherry-pick, remote mutation or push was performed. Retain this checkout to resume
-after approval; no Git worktree cleanup applies. Final `fsck` reports only
-unreachable/dangling history objects inherited in the local clone, not corruption.
+No push. Original dirty working tree remains untouched. Isolated branch b25-3-3-ai-first holds all work. No schema migration or secret changes. Temporary live source/output inspection files are removed; hashes and aggregate metrics remain. Source material is not added to Git or Vercel uploads.

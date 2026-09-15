@@ -1,13 +1,8 @@
 # Roadmap
 
-## B25.3.3 superseding architecture direction (2026-09-15)
+## B25.3.3 AI-first generator migration (2026-09-16)
 
-Implement the AI-first boundary in [ADR-ai-first-generation](architecture/ADR-ai-first-generation.md).
-Do not build support/distractor feasibility, larger candidate pools or local
-pedagogical planners. Standalone generators and contract tests exist in the
-isolated spike; real-material approval/validation precedes production cutover,
-legacy retirement, regression, deployment and physical acceptance. B25 remains
-PARTIAL; B26 is blocked. [Current checkpoint](ai/acceptance/b25.3.3/architecture-simplification.md).
+Real-material comparison is complete. Reviewer routes/worker/Workflow, whole-set Quiz and Activity now use the shared coherent-context/AI/thin-contract boundary. Legacy Quiz and Activity semantic planners and the duplicate Reviewer Workflow pipeline are removed. Full deterministic regression, typecheck, lint and build pass. Deployment and physical acceptance are in progress; B25 remains PARTIAL and B26 may not begin. See docs/ai/acceptance/b25.3.3/architecture-simplification.md and the accepted ADR.
 
 ## B25.3.2 candidate convergence (2026-09-15)
 
