@@ -2,7 +2,7 @@
 
 ## B25.3.3 migration update (2026-09-16)
 
-The user approved scoped provider transfers. Live comparison and production caller migration are complete; deterministic checks pass. Deployment and physical acceptance remain in progress. See the current B25.3.3 acceptance report.
+The user approved scoped provider transfers. Live comparison and production caller migration are complete; deterministic checks pass. Deployment dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4 is READY and healthy. Physical acceptance requires direct device sign-in and selected Activity assignment. See the current B25.3.3 acceptance report.
 
 ## B25.3.3 AI-first spike checkpoint (2026-09-15)
 
