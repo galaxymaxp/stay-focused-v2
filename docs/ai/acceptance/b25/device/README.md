@@ -52,3 +52,12 @@ Per the acceptance stop rule, no further provider attempt was made. An accidenta
 The same realme RMX3151 / Android 13 restored the authenticated application and selected one ready real lecture PDF. Exactly one five-question mixed Quiz was submitted against deployment `dpl_3UxRUwZDy5iGgkX1j8HnLpJBqpnD`. Generation and its animated orb remained responsive, Queue loaded the owner-scoped history, and the newest Quiz opened to the generic failure detail.
 
 The production workflow accepted only `q4`. Direct correction, full same-support reauthoring, and alternate-unused-support reauthoring left `q1`, `q2`, `q3`, and `q5` pending, terminal `repair_exhausted`. No retry was submitted. No Quiz artifact, attempt, score, result, or reopen exists to accept. Redacted-safe screenshots were retained outside the repository; no private course text, provider output, key, token, account ID, or device serial was committed. B25 remains **PARTIAL** and B26 was not started.
+
+
+## B25.3.2 device status (2026-09-15)
+
+The authorized realme RMX3151 (Android 13) was unlocked and its existing authenticated app session used to select the original ready material and submit exactly one Quiz. The Generation screen rendered its orb and later displayed "This generation couldn't finish" with the public Quiz failure message. View Queue opened and refreshed. Orb motion was not measured in this task, and the failed job's Queue row was not separately inspected. No success-path device acceptance is claimed. Temporary screenshot and navigation XML were deleted; the task Metro helper and ADB forwarding were stopped.
+
+Because 5/5 generation did not complete and no Quiz persisted, Library Quiz open, production pre-attempt secrecy inspection, answering, submit, expected/actual score, result persistence and result reopen were not performed and remain unaccepted. Automated secrecy/scoring/owner-isolation gates passed; they do not substitute for physical production acceptance.
+
+B25 remains PARTIAL; B26 may not begin. See [B25.3.2 report](../../b25.3.2/quiz-candidate-convergence.md).
