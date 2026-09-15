@@ -1,16 +1,16 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest';
-import type { Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
+import type { Database,Json,ProcessingJobDatabaseRow } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { beforeEach,describe,expect,it,vi } from 'vitest';
+import { acceptingProvider,fixturePlan,fixtureRegions,request } from './fixtures';
+import { processQuizJob,startQuizGeneration } from './service';
 const mocks = vi.hoisted(() => ({ resolve: vi.fn(), assemble: vi.fn(), source: vi.fn(), read: vi.fn(), write: vi.fn(), progress: vi.fn(), dispatch: vi.fn(), provider: vi.fn() }));
 vi.mock('./sources', async (original) => ({ ...await original<typeof import('./sources')>(), resolveQuizSources: mocks.resolve, assembleQuizSources: mocks.assemble }));
 vi.mock('../processing-jobs/repository', () => ({ findProcessingJobSource: mocks.source }));
 vi.mock('../processing-jobs/workflow-repository', () => ({ readProcessingJobCheckpoint: mocks.read, writeProcessingJobCheckpoint: mocks.write }));
 vi.mock('../processing-jobs/worker-repository', () => ({ updateProcessingJobProgress: mocks.progress }));
 vi.mock('../processing-jobs/workflow-dispatch', () => ({ dispatchAcceptedProcessingJob: mocks.dispatch }));
-vi.mock('@/providers', () => ({ createServerOpenAIProvider: mocks.provider }));
-import { processQuizJob, startQuizGeneration } from './service';
-import { acceptingProvider, candidate, fixturePlan, fixtureRegions, request } from './fixtures';
-import { validateCandidate } from './generation';
+vi.mock('../processing-jobs/ai-generation', () => ({ durableGenerationProvider: mocks.provider }));
+
 const job = { id: 'job', user_id: 'owner', job_type: 'quiz_generation' } as ProcessingJobDatabaseRow;
 const resolved = { courseId: 'course', reviewerId: null, materialIds: [...request.sourceIds] };
 const checkpoints = new Map<string, Json>();
@@ -46,27 +46,19 @@ describe('Quiz existing durable job integration', () => {
         mocks.provider.mockReturnValue(provider);
         const first = await processQuizJob(client, job, 'worker');
         expect(first.payload.questions).toHaveLength(5);
-        expect(checkpoints.has('quiz:plan:v4')).toBe(true);
-        expect(checkpoints.has('quiz:accepted:v4')).toBe(true);
+        expect(checkpoints.has('quiz:source:ai-first')).toBe(true);
+        expect(checkpoints.has('quiz:complete:ai-first')).toBe(true);
         const second = await processQuizJob(client, job, 'worker');
         expect(second.payload).toEqual(first.payload);
-        expect(provider.calls).toHaveLength(2);
+        expect(provider.calls).toHaveLength(1);
         expect(mocks.assemble).toHaveBeenCalledTimes(1);
     });
-    it('resumes only missing slots after interrupted work', async () => {
-        const plan = fixturePlan(), accepted = plan.allocation.slice(0, 3).map(s => validateCandidate(candidate(plan, s.id), plan));
-        checkpoints.set('quiz:plan:v4', JSON.parse(JSON.stringify({ plan, materialIds: request.sourceIds })) as Json);
-        checkpoints.set('quiz:accepted:v4', JSON.parse(JSON.stringify({ questions: accepted })) as Json);
-        const provider = acceptingProvider(plan);
-        mocks.provider.mockReturnValue(provider);
-        await processQuizJob({} as SupabaseClient<Database>, job, 'worker');
-        const input = JSON.parse(provider.calls[0]!.slice(provider.calls[0]!.lastIndexOf('\n') + 1)) as {
-            pending: {
-                id: string;
-            }[];
-        };
-        expect(input.pending.map(s => s.id)).toEqual(['q4', 'q5']);
-        expect(mocks.assemble).not.toHaveBeenCalled();
+    it('ignores legacy partial-question checkpoints and creates one complete set', async () => {
+        checkpoints.set('quiz:accepted:v4', {questions:[]} as Json);
+        const provider = acceptingProvider(fixturePlan()); mocks.provider.mockReturnValue(provider);
+        const output = await processQuizJob({} as SupabaseClient<Database>, job, 'worker');
+        expect(output.payload.questions).toHaveLength(5); expect(provider.calls).toHaveLength(1);
+        expect(mocks.assemble).toHaveBeenCalledTimes(1);
     });
     it('rechecks ownership before finalizing even on a complete checkpoint', async () => {
         await processQuizJob({} as SupabaseClient<Database>, job, 'worker');
@@ -76,7 +68,7 @@ describe('Quiz existing durable job integration', () => {
     it('provider failure leaves no final payload and retains the frozen source', async () => {
         mocks.provider.mockReturnValue({ generate: vi.fn().mockRejectedValue(new Error('private provider detail')) });
         await expect(processQuizJob({} as SupabaseClient<Database>, job, 'worker')).rejects.toThrow('quiz_generation_failed');
-        expect(checkpoints.has('quiz:plan:v4')).toBe(true);
-        expect(checkpoints.get('quiz:accepted:v4')).toMatchObject({ questions: [], convergence: { nextRound: 1, authorCalls: { q1: 1 } } });
+        expect(checkpoints.has('quiz:source:ai-first')).toBe(true);
+        expect(checkpoints.has('quiz:complete:ai-first')).toBe(false);
     });
 });

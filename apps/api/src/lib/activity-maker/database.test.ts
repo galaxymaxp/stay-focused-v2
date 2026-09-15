@@ -1,12 +1,12 @@
-import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { createServerOpenAIProvider } from '@/providers';
 import { PGlite } from '@electric-sql/pglite';
+import type { Database } from '@stay-focused/db';
+import type { ActivitySource } from '@stay-focused/shared';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { ActivitySource } from '@stay-focused/shared';
-import { createServerOpenAIProvider } from '@/providers';
-import { createTaskSpecification, generateActivity } from './generation';
-import { draftView, validateEditableContent } from './service';
-import type { Database } from '@stay-focused/db';
+import { afterAll,beforeAll,describe,expect,it } from 'vitest';
+import { generateActivityDocument } from './ai-first';
+import { draftView,validateEditableContent } from './service';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
 const activity = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', connection = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -150,15 +150,14 @@ describe('Activity Maker real Postgres ownership and transactions', () => {
             const sources: ActivitySource[] = [{ id: 'instructions', title: 'Biology activity', role: 'instructions', materialId: null, text: kind === 'document' ? 'Use this template to explain diffusion and osmosis using only the reading. No conclusion required.' : 'Answer questions 1–2 using only the reading.\n1. What is diffusion?\n2. What is osmosis?' }, reference];
             if (kind === 'document')
                 sources.push({ id: 'template', title: 'Teacher structure', role: 'template', materialId: null, text: '# Diffusion\n[Write the explanation from the reading]\n# Osmosis\n[Write the explanation from the reading]' });
-            const spec = createTaskSpecification(`canvas:${activity}`, 'Biology activity', sources);
-            const generated = await generateActivity(provider, spec, sources);
+            const generated = await generateActivityDocument(provider, 'Biology activity', sources);
             validateEditableContent(generated.content, sources.map(s => s.id));
             expect(generated.content.sections).toHaveLength(2);
             expect(generated.warnings).toEqual([]);
             if (kind === 'document')
                 expect(generated.content.sections.map(s => s.heading)).toEqual(['Diffusion', 'Osmosis']);
             expect(generated.content.sections.every(s => s.sourceRefs.includes('reading'))).toBe(true);
-            const value = { ...payload, type: spec.activityType, content: generated.content, specification: spec, sources: sources.map(({ id, title, role }) => ({ id, title, role })), warnings: generated.warnings };
+            const value = { ...payload, type: generated.activityType, content: generated.content, specification: { policy: 'ai-first' }, sources: sources.map(({ id, title, role }) => ({ id, title, role })), warnings: generated.warnings };
             const first = await queue(`b24-6-live-${kind}`);
             await finish(first, value);
             const reopen = async (id: string) => asUser(A, async () => draftView((await db.query<Database['public']['Tables']['activity_drafts']['Row']>('select * from activity_drafts where generation_id=$1', [id])).rows[0]!));

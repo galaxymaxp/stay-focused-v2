@@ -138,6 +138,7 @@ export class PipelineAssemblyError extends Error {
   }
 }
 
+/** @deprecated Historical evaluation pipeline. Production uses runAIReviewer. */
 export async function runPipeline(
   args: RunPipelineArgs,
 ): Promise<ReviewerOutput> {

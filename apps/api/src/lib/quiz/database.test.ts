@@ -1,15 +1,15 @@
-import { beforeAll, afterAll, describe, it, expect } from 'vitest';
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fixturePlan, candidate, request } from './fixtures';
-import { generateQuiz, makeQuizPlan, validateCandidate, type StoredQuestion } from './generation';
-import { regionsFromBlocks } from './sources';
 import { createServerOpenAIProvider } from '@/providers';
-import { structuredBlockText, type StructuredDocument } from '../../../../../packages/engine/src/structured-document';
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync,writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterAll,beforeAll,describe,expect,it } from 'vitest';
+import { structuredBlockText,type StructuredDocument } from '../../../../../packages/engine/src/structured-document';
+import type { ExperienceRepository,ExperienceRow,ExperienceTable } from '../experience/repository';
 import { ExperienceService } from '../experience/service';
-import type { ExperienceRepository, ExperienceRow, ExperienceTable } from '../experience/repository';
-import { attemptView, resultView, quizView, type AttemptRow, type QuizRow } from './service';
+import { generateQuizSet } from './ai-first';
+import { candidate,fixturePlan,makeQuizPlan,request,validateCandidate } from './fixtures';
+import { attemptView,quizView,resultView,type AttemptRow,type QuizRow } from './service';
+import { regionsFromBlocks } from './sources';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 let db: PGlite, quizId: string, jobId: string;
@@ -68,28 +68,8 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const securityRegions = regionsFromBlocks(request.sourceIds[0]!, 'IT Security', [{ id: 'source-body', kind: 'paragraph', text: security }]);
         const regions = name === 'statistics' ? statsRegions : securityRegions;
         const livePlan = makeQuizPlan(regions, request);
-        if (process.env.B24_7_LIVE_OUTPUT)
-            writeFileSync(resolve(process.env.B24_7_LIVE_OUTPUT, `b24-7-live-${name}-plan.json`), JSON.stringify(livePlan, null, 2));
         let calls = 0;
-        const seedDir = process.env.B24_7_SEED_DIR;
-        const initial = seedDir ? (JSON.parse(readFileSync(resolve(seedDir, `b24-7-live-${name}-seed.json`), 'utf8')) as {
-            questions: StoredQuestion[];
-        }).questions : [];
-        let checkpointQuestions = initial;
-        const liveQuestions = await generateQuiz({ async generate<T>(r: import('@stay-focused/engine').GenerationRequest<T>) {
-                calls++;
-                const replay = process.env.B24_7_REPLAY_DIR;
-                const value = replay ? (JSON.parse(readFileSync(resolve(replay, `b24-7-live-${name}-call-${calls}.json`), 'utf8')) as {
-                    value: T;
-                }).value : await provider.generate<T>(r);
-                if (process.env.B24_7_LIVE_OUTPUT)
-                    writeFileSync(resolve(process.env.B24_7_LIVE_OUTPUT!, `b24-7-live-${name}-call-${calls}.json`), JSON.stringify({ schema: r.schema.name, value }, null, 2));
-                return value;
-            } }, livePlan, async (accepted) => {
-            checkpointQuestions = accepted;
-            if (process.env.B24_7_LIVE_OUTPUT)
-                writeFileSync(resolve(process.env.B24_7_LIVE_OUTPUT, `b24-7-live-${name}-checkpoint.json`), JSON.stringify({ questions: checkpointQuestions }, null, 2));
-        }, initial);
+        const liveQuestions = await generateQuizSet({ async generate<T>(r: import('@stay-focused/engine').GenerationRequest<T>) { calls++; return provider.generate<T>(r); } }, request, regions);
         expect(liveQuestions).toHaveLength(5);
         const id = await queue(`live-${name}`);
         await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [id]);

@@ -1,11 +1,12 @@
 import type { Database } from '@stay-focused/db';
-import type { QuizGenerationRequest, QuizSourceReference } from '@stay-focused/shared';
+import type { QuizGenerationRequest,QuizSourceReference } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { prepareCanvasReviewerSources, structureCanvasReviewerSources } from '../canvas-reviewer-sources';
+import { prepareCanvasReviewerSources,structureCanvasReviewerSources } from '../canvas-reviewer-sources';
+import { sanitizeCanvasTitleText } from '../canvas-source-safety';
 import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
-import { sanitizeCanvasTitleText } from '../canvas-source-safety';
-import { normalized, type QuizRegion } from './generation';
+import { createServerOcrProvider } from '../ocr/create-server-ocr-provider';
+import { normalized,type QuizRegion } from './generation';
 type Client = SupabaseClient<Database>;
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const isId = (id: unknown): id is string => typeof id === 'string' && new RegExp(`^${uuid}$`, 'i').test(id);
@@ -82,13 +83,11 @@ export function regionsFromBlocks(materialId: string, title: string, blocks: rea
         group = [];
     };
     for (const block of blocks) {
-        if (block.kind === 'heading' && !/^(?:solution\s*:?|\d+[.)]\s*(?:substitute|calculate|compute|find|look|arrange|determine|locate|identify)\b.*)$/i.test(block.text.trim())) {
+        if (block.kind === 'heading') {
             flush();
             label = block.text.replace(/^#+\s*/, '').trim();
-            continue;
         }
-        if (!block.text.trim() || /^(?:prepared by|contact|email|copyright)\b/i.test(block.text.trim()))
-            continue;
+        if (!block.text.trim()) continue;
         if (group.length && (group.reduce((n, b) => n + b.text.length, 0) + block.text.length > 8000 || (block.slide !== undefined && group[0]!.slide !== block.slide)))
             flush();
         group.push(block);
@@ -106,7 +105,7 @@ export async function assembleQuizSources(client: Client, userId: string, reques
             if (!prepared.ok || prepared.value.results.some(r => r.status !== 'ready'))
                 throw new ExperienceFailure(409, 'quiz_source_unavailable');
         }
-        const structure = await structureCanvasReviewerSources({ client, userId, courseId: resolved.courseId, sourceIds: [materialId] });
+        const structure = await structureCanvasReviewerSources({ client, userId, courseId: resolved.courseId, sourceIds: [materialId], ...(materialId.startsWith('file:') ? { ocrProvider: createServerOcrProvider() } : {}) });
         if (!structure.ok)
             throw new ExperienceFailure(409, 'quiz_source_unavailable');
         for (const source of structure.value.sources)

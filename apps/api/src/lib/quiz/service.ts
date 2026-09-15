@@ -1,17 +1,19 @@
-import type { Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
-import type { Quiz, QuizAttempt, QuizAttemptAnswer, QuizGenerationRequest, QuizQuestion, QuizQuestionResult, QuizResult, QuizTopicPerformance } from '@stay-focused/shared';
+import type { Database,Json,ProcessingJobDatabaseRow } from '@stay-focused/db';
+import { GenerationContractError } from '@stay-focused/engine';
+import type { Quiz,QuizAttempt,QuizAttemptAnswer,QuizGenerationRequest,QuizQuestion,QuizQuestionResult,QuizResult,QuizTopicPerformance } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
-import { createServerOpenAIProvider } from '@/providers';
 import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
+import { durableGenerationProvider } from '../processing-jobs/ai-generation';
 import { validateIdempotencyKey } from '../processing-jobs/creation';
-import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
 import { findProcessingJobSource } from '../processing-jobs/repository';
 import { updateProcessingJobProgress } from '../processing-jobs/worker-repository';
-import { readProcessingJobCheckpoint, writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
-import { assembleQuizSources, readQuizRequest, resolveQuizSources } from './sources';
-import { generateQuiz, makeQuizPlan, QUIZ_MODEL, type QuizConvergenceState, type QuizGenerationDiagnostic, type QuizPlan, type StoredQuestion } from './generation';
+import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
+import { readProcessingJobCheckpoint,writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
+import { AI_FIRST_QUIZ_MODEL,generateQuizSet } from './ai-first';
+import type { QuizRegion,StoredQuestion } from './generation';
+import { assembleQuizSources,readQuizRequest,resolveQuizSources } from './sources';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
 export type AttemptRow = Database['public']['Tables']['quiz_attempts']['Row'];
@@ -44,46 +46,39 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     if (job.job_type !== 'quiz_generation' || source.user_id !== job.user_id)
         throw new ExperienceFailure(404, 'quiz_source_unavailable');
     const metadata = record(source.metadata), input = readQuizRequest(metadata.quizInput);
-    let plan: QuizPlan;
+    let regions: QuizRegion[];
     let materialIds: string[];
-    const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:plan:v4');
+    const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:source:ai-first');
     if (saved) {
         const value = record(saved.payload);
-        plan = value.plan as QuizPlan;
+        regions = value.regions as QuizRegion[];
         materialIds = value.materialIds as string[];
-    }
-    else {
+    } else {
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'preparing_source', statusMessage: 'Preparing quiz material' });
         const sources = await assembleQuizSources(client, job.user_id, input);
-        if (sources.courseId !== metadata.courseId || sources.reviewerId !== metadata.reviewerId)
-            throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        try {
-            plan = makeQuizPlan(sources.regions, input);
-        }
-        catch (error) {
-            console.info('quiz_generation.diagnostic', { jobId: job.id, failureClass: 'planning_failure', regionCount: sources.regions.length, requestedQuestionCount: input.questionCount });
-            throw error;
-        }
-        materialIds = sources.materialIds;
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:plan:v4', payload: json({ plan, materialIds }) });
+        if (sources.courseId !== metadata.courseId || sources.reviewerId !== metadata.reviewerId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        regions = sources.regions; materialIds = sources.materialIds;
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:source:ai-first', payload: json({ regions, materialIds }) });
     }
-    // Checkpoints are private server data, not an experience endpoint. A resumed
-    // workflow retains the exact source plan and already verified questions.
-    const previous = await readProcessingJobCheckpoint(client, job.id, 'quiz:accepted:v4');
-    const accepted = previous && Array.isArray(record(previous.payload).questions) ? record(previous.payload).questions as StoredQuestion[] : [];
-    await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Generating and validating quiz questions' });
-    const questions = await generateQuiz(createServerOpenAIProvider(), plan, async (questions, convergence) => {
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:accepted:v4', payload: json({ questions, convergence }) });
-    }, accepted, (diagnostic: QuizGenerationDiagnostic) => {
-        console.info('quiz_generation.diagnostic', { jobId: job.id, ...diagnostic });
-    }, previous ? record(previous.payload).convergence as QuizConvergenceState | undefined : undefined);
+    const complete = await readProcessingJobCheckpoint(client, job.id, 'quiz:complete:ai-first');
+    let questions: StoredQuestion[];
+    if (complete) questions = record(complete.payload).questions as StoredQuestion[];
+    else {
+        await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Creating your quiz' });
+        try { questions = await generateQuizSet(durableGenerationProvider(client, job.id, workerId), input, regions); }
+        catch (error) {
+            console.info('quiz_generation.failed', { jobId: job.id, category: error instanceof GenerationContractError ? 'contract' : 'provider' });
+            throw new ExperienceFailure(error instanceof GenerationContractError ? 422 : 503, 'quiz_generation_failed');
+        }
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:complete:ai-first', payload: json({ questions }) });
+    }
     if (questions.length !== input.questionCount) throw new ExperienceFailure(422, 'quiz_generation_failed');
     const owned = await resolveQuizSources(client, job.user_id, input);
     if (owned.courseId !== metadata.courseId || owned.reviewerId !== metadata.reviewerId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving quiz' });
     return { payload: { courseId: metadata.courseId, reviewerId: metadata.reviewerId, materialIds, title: `${questions.length}-question quiz`, questions,
-            provenance: { policy: 'quiz-v4', provider: `openai:${QUIZ_MODEL}`, plan, sourceSha256: createHash('sha256').update(JSON.stringify([...plan.topics, ...(plan.reserveTopics ?? [])])).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: plan.topics.length } };
+            provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
 }
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
     return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : 'Choose one answer.' };

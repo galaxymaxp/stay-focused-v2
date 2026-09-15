@@ -1,91 +1,65 @@
 import type {
-  Json,
-  ProcessingJobDatabaseRow,
-  ProcessingJobSourceRow,
+Json,
+ProcessingJobDatabaseRow,
+ProcessingJobSourceRow,
 } from "@stay-focused/db";
 import {
-  assembleReviewer,
-  buildGenerationPlan,
-  detectOutline,
-  diagnoseStudentVisibleUsefulness,
-  generateSections,
-  normalizeSource,
-  retryFailedSections,
-  validateGrounding,
-  validateLeakage,
-  verifyCoverage,
-  type CoverageReport,
-  type GenerationPlan,
-  type GroundingReport,
-  type LeakageReport,
-  type NormalizedSource,
-  type NormalizedSourceKind,
-  type ReviewerSectionQualityStatus,
-  type ReviewerGenerationMetrics,
-  type SectionOutput,
-  type SourceOutline,
-  type StructuredDocument,
+type StructuredDocument
 } from "@stay-focused/engine";
 import {
-  normalizeDocumentTextWithEvidence,
-  verifyDocumentExtraction,
-  type DocumentExtractionDiagnostics,
-  type OcrPage,
-  type OcrWarning,
+normalizeDocumentTextWithEvidence,
+verifyDocumentExtraction,
+type DocumentExtractionDiagnostics,
+type OcrPage,
+type OcrWarning,
 } from "@stay-focused/ocr";
-import { FatalError, getWorkflowMetadata } from "workflow";
+import { FatalError,getWorkflowMetadata } from "workflow";
 
 import { readDocumentParserConfig } from "@/lib/document-parsers/config";
 import {
-  createDocumentSignalsFromInspections,
-  createStructuredExtractionPayload,
-  tryParseStructuredPdf,
+createDocumentSignalsFromInspections,
+createStructuredExtractionPayload,
+tryParseStructuredPdf,
 } from "@/lib/document-parsers/structured-parser-service";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import {
-  createInspectedPdfPages,
-  extractPreparedPdfOcrChunk,
-  extractWithOcrProvider,
+createInspectedPdfPages,
+extractPreparedPdfOcrChunk,
+extractWithOcrProvider,
 } from "@/lib/ocr/extraction-service";
 import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
 import {
-  getConfiguredDurableDocumentMaxOcrPages,
-  OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
+getConfiguredDurableDocumentMaxOcrPages,
+OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
 } from "@/lib/ocr/upload-policy";
 import {
-  OCR_PROVIDER_CALL_TIMEOUT_MS,
+OCR_PROVIDER_CALL_TIMEOUT_MS,
 } from "@/lib/processing-jobs/constants";
 import {
-  createProcessingJobServiceClient,
-  findProcessingJobSource,
-  type ProcessingJobServiceClient,
+createProcessingJobServiceClient,
+findProcessingJobSource,
+type ProcessingJobServiceClient,
 } from "@/lib/processing-jobs/repository";
-import { readStructuredSourceBlocks } from "@/lib/processing-jobs/structured-source-blocks";
 import {
-  claimProcessingJobForWorkflow,
-  attachProcessingJobWorkflow,
-  listProcessingJobCheckpoints,
-  readProcessingJobCheckpoint,
-  WORKFLOW_JOB_LEASE_SECONDS,
-  writeProcessingJobCheckpoint,
-} from "@/lib/processing-jobs/workflow-repository";
-import {
-  completeProcessingJob,
-  failProcessingJob,
-  heartbeatProcessingJob,
-  readProcessingJobState,
-  updateProcessingJobProgress,
+completeProcessingJob,
+failProcessingJob,
+heartbeatProcessingJob,
+readProcessingJobState,
+updateProcessingJobProgress,
 } from "@/lib/processing-jobs/worker-repository";
-import { createServerOpenAIProvider } from "@/providers";
+import {
+attachProcessingJobWorkflow,
+claimProcessingJobForWorkflow,
+listProcessingJobCheckpoints,
+readProcessingJobCheckpoint,
+WORKFLOW_JOB_LEASE_SECONDS,
+writeProcessingJobCheckpoint,
+} from "@/lib/processing-jobs/workflow-repository";
 
 const EXTRACTION_PLAN_CHECKPOINT = "extraction.plan";
 const EXTRACTION_STRUCTURED_CHECKPOINT = "extraction.structured";
 const EXTRACTION_IMAGE_CHECKPOINT = "extraction.image";
 const EXTRACTION_CHUNK_PREFIX = "extraction.chunk.";
-const REVIEWER_PREPARED_CHECKPOINT = "reviewer.prepared";
-const REVIEWER_INITIAL_PREFIX = "reviewer.initial.";
-const REVIEWER_VERIFICATION_CHECKPOINT = "reviewer.verification.initial";
-const REVIEWER_RETRY_PREFIX = "reviewer.retry.";
 const WORKFLOW_STEP_HEARTBEAT_INTERVAL_MS = 60_000;
 const WORKFLOW_OCR_CHUNK_CONCURRENCY = 2;
 
@@ -116,49 +90,6 @@ interface StoredExtractionPlan {
   readonly nativeTextPageCount: number;
   readonly ocrPageCount: number;
   readonly preparedAt: string;
-}
-
-interface StoredReviewerPreparation {
-  readonly source: NormalizedSource;
-  readonly outline: SourceOutline;
-  readonly plan: GenerationPlan;
-  readonly sourceCharacterCount: number;
-  readonly sourceTitle?: string;
-  readonly reviewerSourceSnapshotId?: string;
-  readonly preparedAt: string;
-}
-
-interface StoredInitialSection {
-  readonly sectionId: string;
-  readonly output: SectionOutput | null;
-  readonly validationFailure: boolean;
-  readonly providerFailure: boolean;
-  readonly providerRequestCount?: number;
-  readonly sectionsPerProviderRequest?: readonly number[];
-  readonly providerWaitDurationMs?: number;
-  readonly deterministicEvidenceDurationMs?: number;
-}
-
-function readReviewerSourceKind(value: unknown): NormalizedSourceKind | undefined {
-  return value === "document" || value === "presentation" || value === "webpage" ||
-    value === "plain-text" || value === "unknown" ? value : undefined;
-}
-
-interface StoredReviewerVerification {
-  readonly coverage: CoverageReport;
-  readonly grounding: GroundingReport;
-  readonly leakage: LeakageReport;
-  readonly usefulnessFailedSectionIds?: readonly string[];
-}
-
-interface StoredRetriedSection {
-  readonly sectionId: string;
-  readonly output: SectionOutput | null;
-  readonly qualityStatus: ReviewerSectionQualityStatus | null;
-  readonly retryCount: number;
-  readonly providerRequestCount?: number;
-  readonly sectionsPerProviderRequest?: readonly number[];
-  readonly providerWaitDurationMs?: number;
 }
 
 export async function processingJobWorkflow(
@@ -204,11 +135,7 @@ export async function processingJobWorkflow(
       }
       await finalizeExtractionStep(jobId, workerId);
     } else {
-      const sectionIds = await prepareReviewerStep(jobId, workerId);
-      await generateReviewerSectionsStep(jobId, workerId, sectionIds);
-      const retrySectionIds = await verifyReviewerStep(jobId, workerId);
-      await retryReviewerSectionsStep(jobId, workerId, retrySectionIds);
-      await finalizeReviewerStep(jobId, workerId);
+      await processAIReviewerStep(jobId, workerId);
     }
 
     return { status: "succeeded", jobId };
@@ -254,7 +181,14 @@ async function processActivityStep(jobId: string, workerId: string): Promise<voi
   if (existing.status === "succeeded") return;
   await withWorkflowLease(client, jobId, workerId, async () => {
     await assertWorkflowJobMayContinue(client, jobId, workerId);
-    const output = await processActivityJob(client, existing, workerId);
+    const { ExperienceFailure } = await import("@/lib/experience/errors");
+    const output = await processActivityJob(client, existing, workerId).catch(async (error: unknown) => {
+      if (error instanceof ExperienceFailure && error.status < 500) {
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Activity generation could not be completed.", retryable: false, automaticRetryable: false });
+        throw new FatalError(error.code);
+      }
+      throw error;
+    });
     await assertWorkflowJobMayContinue(client, jobId, workerId);
     await completeProcessingJob(client, { jobId, workerId, resultType: "activity_generation", payload: JSON.parse(JSON.stringify(output.payload)) as Json, metrics: {} });
   });
@@ -738,578 +672,25 @@ async function finalizeExtractionStep(
   safeStepLog("finalize_extraction", "done", jobId);
 }
 
-async function prepareReviewerStep(
-  jobId: string,
-  workerId: string,
-): Promise<readonly string[]> {
+async function processAIReviewerStep(jobId: string, workerId: string): Promise<void> {
   "use step";
-  safeStepLog("prepare_reviewer", "start", jobId);
+  const { processAIReviewerJob } = await import("@/lib/processing-jobs/ai-reviewer");
+  const { ExperienceFailure } = await import("@/lib/experience/errors");
   const client = createProcessingJobServiceClient();
-  return await withWorkflowLease(client, jobId, workerId, async () => {
-    const existing = await readProcessingJobCheckpoint(
-      client,
-      jobId,
-      REVIEWER_PREPARED_CHECKPOINT,
-    );
-    if (existing) {
-      const prepared = readStoredReviewerPreparation(existing.payload);
-      safeStepLog("prepare_reviewer", "checkpoint", jobId);
-      return prepared.plan.sections.map((section) => section.id);
-    }
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    const job = await readProcessingJobState(client, jobId);
-    const sourceRow = await findProcessingJobSource(client, job);
-    if (sourceRow.source_kind !== "text" || !sourceRow.source_text?.trim()) {
-      throw new FatalError("processing_job_source_missing");
-    }
-    const privateMetadata = isRecord(sourceRow.metadata)
-      ? sourceRow.metadata
-      : {};
-    const sourceTitle = typeof privateMetadata.sourceTitle === "string"
-      ? privateMetadata.sourceTitle
-      : undefined;
-    const reviewerSourceSnapshotId =
-      typeof privateMetadata.reviewerSourceSnapshotId === "string"
-        ? privateMetadata.reviewerSourceSnapshotId
-        : undefined;
-    const sourceBlocks = readStructuredSourceBlocks(
-      privateMetadata.reviewerSourceBlocks,
-    ) ?? [];
-    const sourceKind = readReviewerSourceKind(privateMetadata.reviewerSourceKind);
-
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "normalizing_source",
-      statusMessage: "Preparing source",
-    });
-    const source = await normalizeSource({
-      ...(sourceBlocks.length > 0
-        ? { blocks: sourceBlocks, kind: sourceKind ?? "unknown" }
-        : { text: sourceRow.source_text }),
-      ...(sourceTitle ? { title: sourceTitle } : {}),
-    });
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "detecting_outline",
-      statusMessage: "Organizing topics",
-      metrics: toJson({
-        sourceCharacterCount: sourceRow.source_text.length,
-        normalizedCharacterCount: normalizedSourceCharacterCount(source),
-      }),
-    });
-    const outline = await detectOutline(source);
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "planning_sections",
-      statusMessage: "Planning reviewer sections",
-      metrics: toJson({
-        sourceCharacterCount: sourceRow.source_text.length,
-        normalizedCharacterCount: normalizedSourceCharacterCount(source),
-        outlineItemCount: outline.sections.length,
-      }),
-    });
-    const plan = buildGenerationPlan(outline, source);
-    const prepared: StoredReviewerPreparation = {
-      source,
-      outline,
-      plan,
-      sourceCharacterCount: sourceRow.source_text.length,
-      ...(sourceTitle ? { sourceTitle } : {}),
-      ...(reviewerSourceSnapshotId ? { reviewerSourceSnapshotId } : {}),
-      preparedAt: new Date().toISOString(),
-    };
-    await writeProcessingJobCheckpoint(client, {
-      jobId,
-      checkpointKey: REVIEWER_PREPARED_CHECKPOINT,
-      payload: toJson(prepared),
-    });
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "generating_sections",
-      statusMessage: "Creating reviewer sections",
-      completedUnits: 0,
-      totalUnits: plan.sections.length,
-      unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, 0, 0),
-    });
-    safeStepLog("prepare_reviewer", "done", jobId);
-    return plan.sections.map((section) => section.id);
-  });
-}
-
-async function generateReviewerSectionsStep(
-  jobId: string,
-  workerId: string,
-  sectionIds: readonly string[],
-): Promise<void> {
-  "use step";
-  safeStepLog("generate_sections", "start", jobId);
-  const client = createProcessingJobServiceClient();
-  await withWorkflowLease(client, jobId, workerId, async () => {
-    const existing = await readInitialReviewerSections(client, jobId);
-    const existingIds = new Set(existing.map((section) => section.sectionId));
-    const missingIds = sectionIds.filter((sectionId) => !existingIds.has(sectionId));
-    if (missingIds.length === 0) {
-      safeStepLog("generate_sections", "checkpoint", jobId);
-      return;
-    }
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    const prepared = await requireReviewerPreparation(client, jobId);
-    const sections = prepared.plan.sections.filter(
-      (candidate) => missingIds.includes(candidate.id),
-    );
-    if (sections.length !== missingIds.length) {
-      throw new FatalError("reviewer_section_missing");
-    }
-    const upstream = createServerOpenAIProvider();
-    let providerRequestCount = 0;
-    let providerWaitDurationMs = 0;
-    const sectionsPerProviderRequest: number[] = [];
-    const result = await generateSections({
-      sections,
-      plan: prepared.plan,
-      source: prepared.source,
-      provider: {
-        generate: async (request) => {
-          providerRequestCount += 1;
-          sectionsPerProviderRequest.push(
-            Array.isArray(request.metadata?.explanationBatchSectionIds)
-              ? request.metadata.explanationBatchSectionIds.length
-              : 1,
-          );
-          const startedAt = Date.now();
-          try {
-            return await upstream.generate(request);
-          } finally {
-            providerWaitDurationMs += Date.now() - startedAt;
-          }
-        },
-      },
-    });
-    const outputs = new Map(result.outputs.map((output) => [output.plannedSectionId, output] as const));
-    const validationFailures = new Set(result.validationFailures.map((failure) => failure.sectionId));
-    const failed = new Set(result.failedSectionIds);
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    for (const [index, sectionId] of missingIds.entries()) {
-      const stored: StoredInitialSection = {
-        sectionId,
-        output: outputs.get(sectionId) ?? null,
-        validationFailure: validationFailures.has(sectionId),
-        providerFailure: failed.has(sectionId) && result.providerErrors.length > 0,
-        providerRequestCount: index === 0 ? providerRequestCount : 0,
-        sectionsPerProviderRequest: index === 0 ? sectionsPerProviderRequest : [],
-        providerWaitDurationMs: index === 0 ? providerWaitDurationMs : 0,
-        deterministicEvidenceDurationMs:
-          index === 0 ? result.deterministicAssemblyDurationMs : 0,
-      };
-      await writeProcessingJobCheckpoint(client, {
-        jobId,
-        checkpointKey: `${REVIEWER_INITIAL_PREFIX}${sectionId}`,
-        payload: toJson(stored),
-      });
-    }
-    const completed = (
-      await listProcessingJobCheckpoints(client, jobId, REVIEWER_INITIAL_PREFIX)
-    ).map((row) => readStoredInitialSection(row.payload));
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "generating_sections",
-      statusMessage: "Creating reviewer sections",
-      completedUnits: Math.min(completed.length, prepared.plan.sections.length),
-      totalUnits: prepared.plan.sections.length,
-      unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, sumInitialProviderRequests(completed), 0),
-    });
-  });
-  safeStepLog("generate_sections", "done", jobId);
-}
-
-async function verifyReviewerStep(
-  jobId: string,
-  workerId: string,
-): Promise<readonly string[]> {
-  "use step";
-  safeStepLog("verify_reviewer", "start", jobId);
-  const client = createProcessingJobServiceClient();
-  return await withWorkflowLease(client, jobId, workerId, async () => {
-    const existing = await readProcessingJobCheckpoint(
-      client,
-      jobId,
-      REVIEWER_VERIFICATION_CHECKPOINT,
-    );
-    if (existing) {
-      const verification = readStoredReviewerVerification(existing.payload);
-      return retryableSectionIds(verification);
-    }
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    const prepared = await requireReviewerPreparation(client, jobId);
-    const initial = await readInitialReviewerSections(client, jobId);
-    const outputs = initial.flatMap((section) =>
-      section.output ? [section.output] : []
-    );
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "verifying_coverage",
-      statusMessage: "Checking coverage",
-      completedUnits: outputs.length,
-      totalUnits: prepared.plan.sections.length,
-      unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, sumInitialProviderRequests(initial), 0),
-    });
-    const verification: StoredReviewerVerification = {
-      coverage: verifyCoverage({
-        outputs,
-        plan: prepared.plan,
-        source: prepared.source,
-        outline: prepared.outline,
-      }),
-      grounding: validateGrounding({
-        outputs,
-        plan: prepared.plan,
-        source: prepared.source,
-        outline: prepared.outline,
-      }),
-      leakage: validateLeakage({
-        outputs,
-        plan: prepared.plan,
-        source: prepared.source,
-      }),
-      usefulnessFailedSectionIds: prepared.plan.sections.flatMap((section) => {
-        const output = outputs.find((candidate) => candidate.plannedSectionId === section.id);
-        return output && diagnoseStudentVisibleUsefulness({
-          section,
-          source: prepared.source,
-          output,
-        }).length > 0 ? [section.id] : [];
-      }),
-    };
-    await writeProcessingJobCheckpoint(client, {
-      jobId,
-      checkpointKey: REVIEWER_VERIFICATION_CHECKPOINT,
-      payload: toJson(verification),
-    });
-    const retryIds = retryableSectionIds(verification);
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: retryIds.length > 0 ? "retrying_sections" : "assembling_reviewer",
-      statusMessage: retryIds.length > 0
-        ? "Improving reviewer sections"
-        : "Finishing reviewer",
-      completedUnits: outputs.length,
-      totalUnits: prepared.plan.sections.length,
-      unitLabel: "sections",
-      metrics: reviewerMetrics(prepared, sumInitialProviderRequests(initial), 0),
-    });
-    safeStepLog("verify_reviewer", "done", jobId);
-    return retryIds;
-  });
-}
-
-async function retryReviewerSectionsStep(
-  jobId: string,
-  workerId: string,
-  sectionIds: readonly string[],
-): Promise<void> {
-  "use step";
-  if (sectionIds.length === 0) return;
-  safeStepLog("retry_sections", "start", jobId);
-  const client = createProcessingJobServiceClient();
-  await withWorkflowLease(client, jobId, workerId, async () => {
-    const existingRows = await listProcessingJobCheckpoints(
-      client,
-      jobId,
-      REVIEWER_RETRY_PREFIX,
-    );
-    const existing = existingRows.map((row) => readStoredRetriedSection(row.payload));
-    const existingIds = new Set(existing.map((section) => section.sectionId));
-    const missingIds = sectionIds.filter((sectionId) => !existingIds.has(sectionId));
-    if (missingIds.length === 0) {
-      safeStepLog("retry_sections", "checkpoint", jobId);
-      return;
-    }
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    const prepared = await requireReviewerPreparation(client, jobId);
-    const verificationRow = await readProcessingJobCheckpoint(
-      client,
-      jobId,
-      REVIEWER_VERIFICATION_CHECKPOINT,
-    );
-    const verification = readStoredReviewerVerification(verificationRow?.payload);
-    const initial = await readInitialReviewerSections(client, jobId);
-    const retriedById = new Map(existing.map((section) => [section.sectionId, section] as const));
-    const outputs = initial.flatMap((section) => {
-      const retried = retriedById.get(section.sectionId)?.output;
-      return retried ? [retried] : section.output ? [section.output] : [];
-    });
-    const qualityById = new Map<string, ReviewerSectionQualityStatus>();
-    const retryCountById = new Map<string, number>();
-    const upstream = createServerOpenAIProvider();
-    let providerRequestCount = 0;
-    let providerWaitDurationMs = 0;
-    const sectionsPerProviderRequest: number[] = [];
-    const finalOutputs = await retryFailedSections({
-      outputs,
-      coverage: verification.coverage,
-      grounding: verification.grounding,
-      leakage: verification.leakage,
-      plan: prepared.plan,
-      source: prepared.source,
-      outline: prepared.outline,
-      provider: {
-        generate: async (request) => {
-          providerRequestCount += 1;
-          sectionsPerProviderRequest.push(
-            Array.isArray(request.metadata?.explanationBatchSectionIds)
-              ? request.metadata.explanationBatchSectionIds.length
-              : 1,
-          );
-          const startedAt = Date.now();
-          try {
-            return await upstream.generate(request);
-          } finally {
-            providerWaitDurationMs += Date.now() - startedAt;
-          }
-        },
-      },
-      retryPolicy: {
-        maxRetries: 2,
-        retryWeakSections: true,
-        retryFailedSections: true,
-      },
-      onRetryAttempt: (section, attempt) => {
-        retryCountById.set(
-          section.id,
-          Math.max(retryCountById.get(section.id) ?? 0, attempt),
-        );
-      },
-      onSectionRecovered: (section, status) => {
-        qualityById.set(section.id, status);
-      },
-    });
-    await assertWorkflowJobMayContinue(client, jobId, workerId);
-    for (const [index, sectionId] of missingIds.entries()) {
-      const stored: StoredRetriedSection = {
-        sectionId,
-        output: finalOutputs.find((candidate) => candidate.plannedSectionId === sectionId) ?? null,
-        qualityStatus: qualityById.get(sectionId) ?? null,
-        retryCount: retryCountById.get(sectionId) ?? 0,
-        providerRequestCount: index === 0 ? providerRequestCount : 0,
-        sectionsPerProviderRequest: index === 0 ? sectionsPerProviderRequest : [],
-        providerWaitDurationMs: index === 0 ? providerWaitDurationMs : 0,
-      };
-      await writeProcessingJobCheckpoint(client, {
-        jobId,
-        checkpointKey: `${REVIEWER_RETRY_PREFIX}${sectionId}`,
-        payload: toJson(stored),
-      });
-    }
-    const retryRows = await listProcessingJobCheckpoints(
-      client,
-      jobId,
-      REVIEWER_RETRY_PREFIX,
-    );
-    const totalRetryCount = retryRows.reduce(
-      (total, row) => total + readNumber(row.payload, "retryCount"),
-      0,
-    );
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "retrying_sections",
-      statusMessage: "Improving reviewer sections",
-      completedUnits: Math.min(
-        initial.filter((section) => section.output).length + retryRows.length,
-        prepared.plan.sections.length,
-      ),
-      totalUnits: prepared.plan.sections.length,
-      unitLabel: "sections",
-      metrics: reviewerMetrics(
-        prepared,
-        sumInitialProviderRequests(initial) + sumRetryProviderRequests(retryRows),
-        totalRetryCount,
-      ),
-    });
-  });
-  safeStepLog("retry_sections", "done", jobId);
-}
-
-async function finalizeReviewerStep(
-  jobId: string,
-  workerId: string,
-): Promise<void> {
-  "use step";
-  safeStepLog("finalize_reviewer", "start", jobId);
-  const client = createProcessingJobServiceClient();
+  const job = await readProcessingJobState(client, jobId);
+  if (job.status === "succeeded") return;
   await withWorkflowLease(client, jobId, workerId, async () => {
     await assertWorkflowJobMayContinue(client, jobId, workerId);
-    const job = await readProcessingJobState(client, jobId);
-    const prepared = await requireReviewerPreparation(client, jobId);
-    const [initial, retryRows] = await Promise.all([
-      readInitialReviewerSections(client, jobId),
-      listProcessingJobCheckpoints(client, jobId, REVIEWER_RETRY_PREFIX),
-    ]);
-    const retried = retryRows.map((row) => readStoredRetriedSection(row.payload));
-    const retryBySection = new Map(
-      retried.map((section) => [section.sectionId, section] as const),
-    );
-    const initialBySection = new Map(
-      initial.map((section) => [section.sectionId, section] as const),
-    );
-    const outputs: SectionOutput[] = [];
-    const sectionQualityById: Record<string, ReviewerSectionQualityStatus> = {};
-    let retryCount = 0;
-    for (const section of prepared.plan.sections) {
-      const retry = retryBySection.get(section.id);
-      const output = retry?.output ?? initialBySection.get(section.id)?.output ?? null;
-      if (output) outputs.push(output);
-      sectionQualityById[section.id] =
-        retry?.qualityStatus ?? "generated";
-      retryCount += retry?.retryCount ?? 0;
-    }
-    const coverage = verifyCoverage({
-      outputs,
-      plan: prepared.plan,
-      source: prepared.source,
-      outline: prepared.outline,
+    const output = await processAIReviewerJob(client, job, workerId).catch(async (error: unknown) => {
+      if (error instanceof ExperienceFailure && error.status < 500) {
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Reviewer generation could not be completed.", retryable: false, automaticRetryable: false });
+        throw new FatalError(error.code);
+      }
+      throw error;
     });
-    const grounding = validateGrounding({
-      outputs,
-      plan: prepared.plan,
-      source: prepared.source,
-      outline: prepared.outline,
-    });
-    const leakage = validateLeakage({
-      outputs,
-      plan: prepared.plan,
-      source: prepared.source,
-    });
-    const providerRequestCount = sumInitialProviderRequests(initial) +
-      retried.reduce((total, section) => total + (section.providerRequestCount ?? 0), 0);
-    const providerWaitDurationMs = initial.reduce(
-      (total, section) => total + (section.providerWaitDurationMs ?? 0),
-      0,
-    ) + retried.reduce(
-      (total, section) => total + (section.providerWaitDurationMs ?? 0),
-      0,
-    );
-    const deterministicEvidenceDurationMs = initial.reduce(
-      (total, section) => total + (section.deterministicEvidenceDurationMs ?? 0),
-      0,
-    );
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "assembling_reviewer",
-      statusMessage: "Finishing reviewer",
-      completedUnits: outputs.length,
-      totalUnits: prepared.plan.sections.length,
-      unitLabel: "sections",
-      metrics: reviewerMetrics(
-        prepared,
-        providerRequestCount,
-        retryCount,
-      ),
-    });
-    const fallbackPlanUsed = prepared.plan.sections.every(
-        (section) =>
-          sectionQualityById[section.id] === "extractive_fallback",
-      );
-    const startedAt = Date.parse(job.started_at ?? job.updated_at);
-    const assemblyStartedAt = Date.now();
-    const generationMetrics: ReviewerGenerationMetrics = {
-      totalDurationMs: Math.max(0, assemblyStartedAt - startedAt),
-      planningDurationMs: Math.max(0, Date.parse(prepared.preparedAt) - startedAt),
-      deterministicEvidenceDurationMs,
-      providerWaitDurationMs,
-      validationDurationMs: 0,
-      assemblyDurationMs: 0,
-      providerRequestCount,
-      sectionsPerProviderRequest: [
-        ...initial.flatMap((section) => section.sectionsPerProviderRequest ?? []),
-        ...retried.flatMap((section) => section.sectionsPerProviderRequest ?? []),
-      ],
-      providerRetryCount: retried.reduce(
-        (total, section) => total + (section.providerRequestCount ?? 0),
-        0,
-      ),
-      factualCompletionRetryCount: 0,
-      explanationRetryCount: retried.reduce(
-        (total, section) => total + (section.providerRequestCount ?? 0),
-        0,
-      ),
-    };
-    const assembledReviewer = assembleReviewer({
-      outputs,
-      coverage,
-      grounding,
-      leakage,
-      plan: prepared.plan,
-      source: prepared.source,
-      sectionQualityById,
-      fallbackPlanUsed,
-      generationMetrics,
-    });
-    const reviewer = {
-      ...assembledReviewer,
-      metadata: {
-        ...assembledReviewer.metadata,
-        generationMetrics: {
-          ...generationMetrics,
-          totalDurationMs: Math.max(0, Date.now() - startedAt),
-          assemblyDurationMs: Math.max(0, Date.now() - assemblyStartedAt),
-        },
-      },
-    };
-    await updateProcessingJobProgress(client, {
-      jobId,
-      workerId,
-      stage: "storing_reviewer",
-      statusMessage: "Storing reviewer",
-      completedUnits: reviewer.sections.length,
-      totalUnits: reviewer.sections.length,
-      unitLabel: "sections",
-    });
-    const metrics = {
-      sourceCharacterCount: prepared.sourceCharacterCount,
-      normalizedCharacterCount: normalizedSourceCharacterCount(prepared.source),
-      outlineItemCount: prepared.outline.sections.length,
-      plannedSectionCount: prepared.plan.sections.length,
-      providerCallCount: providerRequestCount,
-      providerWaitDurationMs,
-      deterministicEvidenceDurationMs,
-      factualCompletionRetryCount: 0,
-      retryCount,
-      finalReviewerSectionCount: reviewer.sections.length,
-      coverageStatus: reviewer.metadata.coverageStatus,
-      coverageScore: reviewer.metadata.coverageScore,
-      groundingStatus: reviewer.metadata.groundingStatus,
-      groundingScore: reviewer.metadata.groundingScore,
-      leakageStatus: reviewer.metadata.leakageStatus,
-      generationDurationMs: Math.max(0, Date.now() - startedAt),
-      queueWaitMs: queueWaitMs(job),
-      workerExecutionMs: Math.max(0, Date.now() - startedAt),
-    };
-    await completeProcessingJob(client, {
-      jobId,
-      workerId,
-      resultType: "reviewer_generation",
-      payload: toJson({
-        reviewer,
-        ...(prepared.reviewerSourceSnapshotId
-          ? { sourceSnapshotId: prepared.reviewerSourceSnapshotId }
-          : {}),
-      }),
-      metrics: toJson(metrics),
-    });
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    await completeProcessingJob(client, { jobId, workerId, resultType: "reviewer_generation", payload: toJson(output.payload), metrics: toJson(output.metrics) });
   }, { heartbeatAfterOperation: false });
-  safeStepLog("finalize_reviewer", "done", jobId);
 }
 
 async function finalizeWorkflowFailureStep(
@@ -1445,88 +826,6 @@ async function downloadSourceBytes(
   return new Uint8Array(await download.data.arrayBuffer());
 }
 
-async function requireReviewerPreparation(
-  client: ProcessingJobServiceClient,
-  jobId: string,
-): Promise<StoredReviewerPreparation> {
-  const checkpoint = await readProcessingJobCheckpoint(
-    client,
-    jobId,
-    REVIEWER_PREPARED_CHECKPOINT,
-  );
-  return readStoredReviewerPreparation(checkpoint?.payload);
-}
-
-async function readInitialReviewerSections(
-  client: ProcessingJobServiceClient,
-  jobId: string,
-): Promise<readonly StoredInitialSection[]> {
-  const rows = await listProcessingJobCheckpoints(
-    client,
-    jobId,
-    REVIEWER_INITIAL_PREFIX,
-  );
-  return rows.map((row) => readStoredInitialSection(row.payload));
-}
-
-function retryableSectionIds(
-  verification: StoredReviewerVerification,
-): readonly string[] {
-  const ids = new Set<string>();
-  for (const section of verification.coverage.sections) {
-    if (section.retryable && section.status !== "passed") {
-      ids.add(section.plannedSectionId);
-    }
-  }
-  for (const section of verification.grounding.sections) {
-    if (section.retryable && section.status === "failed") {
-      ids.add(section.plannedSectionId);
-    }
-  }
-  for (const section of verification.leakage.sections) {
-    if (section.retryable && section.status === "failed") {
-      ids.add(section.plannedSectionId);
-    }
-  }
-  for (const sectionId of verification.usefulnessFailedSectionIds ?? []) {
-    ids.add(sectionId);
-  }
-  return [...ids];
-}
-
-function sumInitialProviderRequests(
-  sections: readonly StoredInitialSection[],
-): number {
-  return sections.reduce(
-    (total, section) => total + (section.providerRequestCount ?? 1),
-    0,
-  );
-}
-
-function sumRetryProviderRequests(
-  rows: readonly { readonly payload: Json }[],
-): number {
-  return rows.reduce(
-    (total, row) => total + (readOptionalNumber(row.payload, "providerRequestCount") ?? 1),
-    0,
-  );
-}
-
-function reviewerMetrics(
-  prepared: StoredReviewerPreparation,
-  providerCallCount: number,
-  retryCount: number,
-): Json {
-  return toJson({
-    sourceCharacterCount: prepared.sourceCharacterCount,
-    normalizedCharacterCount: normalizedSourceCharacterCount(prepared.source),
-    outlineItemCount: prepared.outline.sections.length,
-    plannedSectionCount: prepared.plan.sections.length,
-    providerCallCount,
-    retryCount,
-  });
-}
-
 function readStoredExtractionPlan(value: unknown): StoredExtractionPlan {
   const record = requireRecord(value, "extraction plan");
   if (
@@ -1542,67 +841,6 @@ function readStoredExtractionPlan(value: unknown): StoredExtractionPlan {
     throw new FatalError("processing_checkpoint_invalid");
   }
   return record as unknown as StoredExtractionPlan;
-}
-
-function readStoredReviewerPreparation(
-  value: unknown,
-): StoredReviewerPreparation {
-  const record = requireRecord(value, "reviewer preparation");
-  if (
-    !isRecord(record.source) ||
-    !isRecord(record.outline) ||
-    !isRecord(record.plan) ||
-    typeof record.sourceCharacterCount !== "number" ||
-    typeof record.preparedAt !== "string"
-  ) {
-    throw new FatalError("processing_checkpoint_invalid");
-  }
-  return record as unknown as StoredReviewerPreparation;
-}
-
-function readStoredInitialSection(value: unknown): StoredInitialSection {
-  const record = requireRecord(value, "initial reviewer section");
-  if (
-    typeof record.sectionId !== "string" ||
-    (record.output !== null && !isRecord(record.output)) ||
-    typeof record.validationFailure !== "boolean" ||
-    typeof record.providerFailure !== "boolean"
-  ) {
-    throw new FatalError("processing_checkpoint_invalid");
-  }
-  return record as unknown as StoredInitialSection;
-}
-
-function readStoredReviewerVerification(
-  value: unknown,
-): StoredReviewerVerification {
-  const record = requireRecord(value, "reviewer verification");
-  if (
-    !isRecord(record.coverage) ||
-    !isRecord(record.grounding) ||
-    !isRecord(record.leakage)
-  ) {
-    throw new FatalError("processing_checkpoint_invalid");
-  }
-  return record as unknown as StoredReviewerVerification;
-}
-
-function readStoredRetriedSection(value: unknown): StoredRetriedSection {
-  const record = requireRecord(value, "retried reviewer section");
-  if (
-    typeof record.sectionId !== "string" ||
-    (record.output !== null && !isRecord(record.output)) ||
-    (
-      record.qualityStatus !== null &&
-      record.qualityStatus !== "generated" &&
-      record.qualityStatus !== "repaired" &&
-      record.qualityStatus !== "extractive_fallback"
-    ) ||
-    typeof record.retryCount !== "number"
-  ) {
-    throw new FatalError("processing_checkpoint_invalid");
-  }
-  return record as unknown as StoredRetriedSection;
 }
 
 function readOcrPages(value: unknown): readonly OcrPage[] {
@@ -1649,10 +887,6 @@ function chunkPageNumbers(
   return chunks;
 }
 
-function normalizedSourceCharacterCount(source: NormalizedSource): number {
-  return source.blocks.reduce((total, block) => total + block.text.length, 0);
-}
-
 function queueWaitMs(job: ProcessingJobDatabaseRow): number {
   return Math.max(
     0,
@@ -1689,18 +923,6 @@ function readArray(record: Json, key: string): readonly Json[] {
   return isRecord(record) && Array.isArray(record[key])
     ? record[key] as readonly Json[]
     : [];
-}
-
-function readNumber(record: Json, key: string): number {
-  return isRecord(record) && typeof record[key] === "number"
-    ? record[key]
-    : 0;
-}
-
-function readOptionalNumber(record: Json, key: string): number | undefined {
-  return isRecord(record) && typeof record[key] === "number"
-    ? record[key]
-    : undefined;
 }
 
 function readString(record: Readonly<Record<string, unknown>>, key: string): string {
