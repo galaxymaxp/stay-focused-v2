@@ -25,6 +25,8 @@ export interface OpenAITextFormat {
 }
 
 export interface OpenAIResponsesCreateRequest {
+  readonly instructions?: string;
+  readonly max_output_tokens?: number;
   readonly model: string;
   readonly input: string;
   readonly temperature?: number;
@@ -104,6 +106,8 @@ export class OpenAIProvider implements GenerationProvider {
     const openAIRequest: OpenAIResponsesCreateRequest = {
       model,
       input: prompt,
+      ...(request.instructions ? { instructions: request.instructions } : {}),
+      ...(request.maxOutputTokens ? { max_output_tokens: request.maxOutputTokens } : {}),
       ...(request.temperature !== undefined
         ? { temperature: request.temperature }
         : {}),
@@ -180,6 +184,8 @@ function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
         const sdkRequest: ResponseCreateParamsNonStreaming = {
           model: request.model,
           input: request.input,
+          ...(request.instructions ? { instructions: request.instructions } : {}),
+          ...(request.max_output_tokens ? { max_output_tokens: request.max_output_tokens } : {}),
           text: {
             format: {
               type: request.text.format.type,

@@ -36,6 +36,16 @@ const testSchema: StructuredOutputSchema = {
 
 const checks: readonly ContractCheck[] = [
   {
+    name: 'separates trusted instructions and applies the generation output budget',
+    run: async () => {
+      const client = new FakeClient({ output_text: '{"value":"ok"}' });
+      await new OpenAIProvider({ client }).generate({ ...createRequest(), instructions: 'Trusted rules', maxOutputTokens: 12000 });
+      assertEqual(client.lastRequest?.instructions, 'Trusted rules');
+      assertEqual(client.lastRequest?.max_output_tokens, 12000);
+      assertEqual(client.lastRequest?.input, 'Generate contract output.');
+    },
+  },
+  {
     name: "maps prompt to input",
     run: async () => {
       const client = new FakeClient({ output_text: '{"value":"ok"}' });

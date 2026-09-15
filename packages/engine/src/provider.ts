@@ -1,6 +1,8 @@
 import type { StructuredOutputSchema } from "./schemas";
 
 export interface GenerationRequest<TOutput> {
+  readonly instructions?: string;
+  readonly maxOutputTokens?: number;
   readonly prompt: string;
   readonly schema: StructuredOutputSchema;
   readonly model: string;

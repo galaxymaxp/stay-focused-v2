@@ -142,6 +142,8 @@ export function describeReviewerScale(
 export function describeGroundingStatus(
   metadata: ReviewerMetadata,
 ): ReviewerGroundingPresentation | null {
+  // AI-first checks establish valid references, not independent factual proof.
+  if (metadata.validationPolicy === 'ai-first-contract') return null;
   const status = metadata.groundingStatus as unknown;
 
   if (!isGroundingStatus(status)) {

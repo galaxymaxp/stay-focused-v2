@@ -1,4 +1,6 @@
 export * from "./generate";
+export * from "./generation-context";
+export * from "./ai-first-reviewer";
 export * from "./leakage-guard";
 export * from "./provider";
 export * from "./required-evidence";

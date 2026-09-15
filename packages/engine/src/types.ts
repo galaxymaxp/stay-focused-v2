@@ -341,7 +341,7 @@ export type SectionOutput =
 
 export type CoverageStatus = "passed" | "weak" | "failed";
 export type CoverageReportStatus = "passed" | "failed";
-export type CoverageBasis = "source-outline";
+export type CoverageBasis = "source-outline" | "source-references";
 
 export type CoverageIssueSeverity = "warning" | "error";
 export type CoverageIssueType =
@@ -544,6 +544,7 @@ export interface ReviewerSection {
 }
 
 export interface ReviewerMetadata {
+  readonly validationPolicy?: 'ai-first-contract';
   readonly sourceId: string;
   readonly planId: string;
   readonly coverageReportId: string;
