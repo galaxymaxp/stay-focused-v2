@@ -1,5 +1,14 @@
 # Roadmap
 
+## B25.3.3 superseding architecture direction (2026-09-15)
+
+Implement the AI-first boundary in [ADR-ai-first-generation](architecture/ADR-ai-first-generation.md).
+Do not build support/distractor feasibility, larger candidate pools or local
+pedagogical planners. Standalone generators and contract tests exist in the
+isolated spike; real-material approval/validation precedes production cutover,
+legacy retirement, regression, deployment and physical acceptance. B25 remains
+PARTIAL; B26 is blocked. [Current checkpoint](ai/acceptance/b25.3.3/architecture-simplification.md).
+
 ## B25.3.2 candidate convergence (2026-09-15)
 
 Commit `79e54dd` adds source-compatible blueprints, two-candidate pools, deterministic selection, cumulative semantic-intent exclusions and v4 durable call bounds. Strict quality, secrecy, ownership and exact-count gates remain. Focused Quiz 117; full Quiz 168 passed / 3 skipped; API 944, Mobile 481, Canvas 73, Engine 606, OCR 27, Shared 44; Workflow 1, provider contract 18; fresh root typecheck/lint/build 7/7 each. One live fixture passed 5/5 in 63.331 seconds with two author/two verifier calls and 14 candidates. Deployment `dpl_peVBgRctKVmGTfkNfQqTev74QCda` is READY and canonical health is OK.

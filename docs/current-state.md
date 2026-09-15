@@ -1,5 +1,19 @@
 # Current State
 
+## B25.3.3 AI-first architecture spike (2026-09-15)
+
+The former feasibility/blueprint expansion proposal is superseded by
+[ADR-ai-first-generation](architecture/ADR-ai-first-generation.md). An isolated
+spike implements coherent source context, standalone AI-first Reviewer/Quiz/
+Activity generators, thin contracts, one optional repair, trusted instructions
+and output budgets. Production callers and legacy semantic stages are not yet
+cut over: the required real-material validation is awaiting resolution of an
+automatic approval rejection for private-source OCR/provider transfers.
+
+**PARTIAL — AI-first architecture requires further validation.** Existing
+production remains `79e54dd` / `dpl_peVBgRctKVmGTfkNfQqTev74QCda`, READY and healthy.
+B25 remains PARTIAL and B26 may not begin. See the [spike checkpoint](ai/acceptance/b25.3.3/architecture-simplification.md).
+
 ## B25.3.2 candidate convergence (2026-09-15)
 
 Commit `79e54dd` adds source-compatible blueprints, two-candidate pools, deterministic selection, cumulative semantic-intent exclusions and v4 durable call bounds. Strict quality, secrecy, ownership and exact-count gates remain. Focused Quiz 117; full Quiz 168 passed / 3 skipped; API 944, Mobile 481, Canvas 73, Engine 606, OCR 27, Shared 44; Workflow 1, provider contract 18; fresh root typecheck/lint/build 7/7 each. One live fixture passed 5/5 in 63.331 seconds with two author/two verifier calls and 14 candidates. Deployment `dpl_peVBgRctKVmGTfkNfQqTev74QCda` is READY and canonical health is OK.

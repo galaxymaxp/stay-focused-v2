@@ -1,5 +1,10 @@
 # B25 — UI redesign foundation
 
+## B25.3.3 AI-first spike checkpoint (2026-09-15)
+
+Standalone AI-first Reviewer, Quiz and Activity generators plus coherent context and thin contract tests are implemented in the isolated b25-3-3-ai-first branch. Production cutover, legacy retirement and real-material/device acceptance are pending private-source OCR/OpenAI authorization after an automatic approval rejection. B25 remains PARTIAL; B26 may not begin. See docs/ai/acceptance/b25.3.3/architecture-simplification.md.
+
+
 Date: 2026-09-13. Implementation checkout: `C:/Projects/stay-focused-v2`, branch `main`.
 Starting HEAD: `061aed3ac9c12a4df55f56b2525317d2cfa61297` (B24.7 Quiz backend). Starting origin comparison: 37 ahead, 0 behind. `git fsck --full` exited 0 with seven dangling blobs. No fetch, remote mutation, reset, clean, stash or push.
 

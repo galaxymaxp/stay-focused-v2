@@ -1,5 +1,16 @@
 # Current Sprint
 
+## B25.3.3 AI-first generator simplification (2026-09-15)
+
+The previous support-feasibility proposal is abandoned. The pre-edit audit and
+standalone Reviewer/Quiz/Activity spike are implemented. Complete real-material
+validation after private-source OCR/OpenAI authorization is resolved, then cut
+over all production callers/workflows and retire the old semantic engines.
+Deployment requires all requested gates; physical Quiz generation, secrecy,
+attempt, score, persistence and reopen still decide B25 acceptance.
+
+Status: PARTIAL; B26 may not begin. See [acceptance checkpoint](acceptance/b25.3.3/architecture-simplification.md).
+
 ## B25.3.2 candidate convergence (2026-09-15)
 
 Commit `79e54dd` adds source-compatible blueprints, two-candidate pools, deterministic selection, cumulative semantic-intent exclusions and v4 durable call bounds. Strict quality, secrecy, ownership and exact-count gates remain. Focused Quiz 117; full Quiz 168 passed / 3 skipped; API 944, Mobile 481, Canvas 73, Engine 606, OCR 27, Shared 44; Workflow 1, provider contract 18; fresh root typecheck/lint/build 7/7 each. One live fixture passed 5/5 in 63.331 seconds with two author/two verifier calls and 14 candidates. Deployment `dpl_peVBgRctKVmGTfkNfQqTev74QCda` is READY and canonical health is OK.
