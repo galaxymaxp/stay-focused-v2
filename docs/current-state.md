@@ -1,5 +1,9 @@
 # Current State
 
+## B25.4 physical-device acceptance (2026-09-16)
+
+Physical realme RMX3151 / Android 13 acceptance reached the production AI-first API for a real CIT6 Reviewer and five-question Quiz plus a real CC16 Learning Contract Activity. All three completed in Queue and reopened from Library; the Quiz attempt scored 5/5 on the server and its result reopened. A malformed mobile generation-admission cache initially blocked Quiz submission and is repaired in `9bdc03e`, with regression coverage and a successful Expo Go physical retest. Full post-fix regression passes. A patched preview APK build is pending install/retest; therefore B25 remains **PARTIAL** and B26 may not begin. See [B25.4 device checkpoint](ai/acceptance/b25.3.3/device-acceptance.md).
+
 ## B25.3.3 AI-first generator migration (2026-09-16)
 
 Real-material comparison is complete. Reviewer routes/worker/Workflow, whole-set Quiz and Activity now use the shared coherent-context/AI/thin-contract boundary. Legacy Quiz and Activity semantic planners and the duplicate Reviewer Workflow pipeline are removed. Full deterministic regression, typecheck, lint and build pass. Production 09835be / dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4 is READY and healthy. Physical acceptance is blocked on direct device sign-in and Activity assignment selection; B25 remains PARTIAL and B26 may not begin. See docs/ai/acceptance/b25.3.3/architecture-simplification.md and the accepted ADR.

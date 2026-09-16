@@ -1,6 +1,6 @@
 # ADR: AI-first educational generation
 
-Status: Accepted. Production caller migration implemented; deployment/device acceptance tracked separately.
+Status: Accepted. Production caller migration deployed; B25.4 physical API flows passed. Patched standalone-client release acceptance is tracked in `docs/ai/acceptance/b25.3.3/device-acceptance.md`.
 
 ## Context
 
