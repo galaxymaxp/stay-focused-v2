@@ -1,5 +1,9 @@
 # Roadmap
 
+## B25.3.4 standalone and AI-first production acceptance (2026-09-17)
+
+**PASS — B25 is complete; B26 may begin.** The repaired existing APK passed physical standalone acceptance on the realme RMX3151: session/Canvas, one new completed Reviewer, five-question server-scored Quiz, one Canvas-instruction-grounded Activity draft, and Queue/Library cold-relaunch persistence. AI-first production paths, API security/health, and mobile regressions passed. See [B25.3.4 acceptance](ai/acceptance/b25.3.4/device-standalone-ai-first-acceptance.md). Next: B26 generation-quality evaluation across multiple real Reviewer materials and Activity assignment types. Earlier PARTIAL entries are historical.
+
 ## B25.4 physical-device acceptance (2026-09-16)
 
 Authenticated physical production-API runs completed a real CIT6 Reviewer, exact 5/5 Quiz with server-scored 100% attempt, and CC16 Learning Contract Activity. Queue and Library persisted all three and the result reopened. A corrupt local generation cache defect was fixed and retested in Expo Go; the full regression passed. The patched standalone APK is being built for installation and release-path retest, so **B25 remains PARTIAL; B26 may not begin**. See [B25.4 device checkpoint](ai/acceptance/b25.3.3/device-acceptance.md).

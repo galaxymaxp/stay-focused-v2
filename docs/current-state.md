@@ -1,5 +1,9 @@
 # Current State
 
+## B25.3.4 standalone and AI-first production acceptance (2026-09-17)
+
+**PASS — B25 is complete; B26 may begin.** The existing preview APK was verified to contain the generation-cache repair, installed with app data preserved on the realme RMX3151, and launched directly outside Expo Go. Authentication/Canvas, fresh Reviewer/Quiz/Activity jobs, server Quiz scoring, Queue, Library and all three artifact reopens passed through cold relaunch. A read-only trace confirms AI-first production ownership for all three generators. Production health/protected-route checks and fresh mobile regressions pass. See [B25.3.4 acceptance](ai/acceptance/b25.3.4/device-standalone-ai-first-acceptance.md). Historical PARTIAL entries below remain as checkpoints, not current status.
+
 ## B25.4 physical-device acceptance (2026-09-16)
 
 Physical realme RMX3151 / Android 13 acceptance reached the production AI-first API for a real CIT6 Reviewer and five-question Quiz plus a real CC16 Learning Contract Activity. All three completed in Queue and reopened from Library; the Quiz attempt scored 5/5 on the server and its result reopened. A malformed mobile generation-admission cache initially blocked Quiz submission and is repaired in `9bdc03e`, with regression coverage and a successful Expo Go physical retest. Full post-fix regression passes. A patched preview APK build is pending install/retest; therefore B25 remains **PARTIAL** and B26 may not begin. See [B25.4 device checkpoint](ai/acceptance/b25.3.3/device-acceptance.md).

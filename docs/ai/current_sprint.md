@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B25.3.4 standalone and AI-first production acceptance (2026-09-17)
+
+**PASS — B25 is complete; B26 may begin.** The existing repaired APK installed data-preservingly and ran standalone on the realme RMX3151. Authenticated Canvas access, fresh AI-first Reviewer/Quiz/Activity generations, server Quiz scoring, and all three Library reopens plus Queue after cold relaunch passed. Production health/401 security checks and fresh mobile regressions pass. See [B25.3.4 acceptance](acceptance/b25.3.4/device-standalone-ai-first-acceptance.md). Next: B26 generation-quality evaluation across multiple real Reviewer materials and Activity assignment types. Earlier PARTIAL entries remain historical.
+
 ## B25.4 physical-device acceptance (2026-09-16)
 
 The signed-in realme completed a production-API Reviewer from the real CIT6 PDF, an exact five-question Quiz with a persisted 5/5 server-scored result, and a CC16 Learning Contract Activity matching its four-by-five complete-sentence instruction. Queue and Library reopened the new records. A malformed local admission cache was repaired in `9bdc03e` and physically retested via Expo Go; all post-fix regression gates pass. A patched preview APK still needs installation/retest before B25 can close. **PARTIAL — B26 may not begin.** See [B25.4 device checkpoint](acceptance/b25.3.3/device-acceptance.md).
