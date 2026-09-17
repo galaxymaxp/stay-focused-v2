@@ -92,6 +92,16 @@ describe('AI-first context and product contracts', () => {
     const result = await generateActivityDocument(provider(activity), 'Assignment', sources);
     expect(result.activityType).toBe('reflection'); expect(result.content.sections[0]!.id).toBe('section-1'); expect(result.warnings).toHaveLength(1);
   });
+  it('makes mandatory non-text Activity requirements salient and supports placeholders', async () => {
+    const calls: GenerationRequest<unknown>[] = [];
+    const pictureSources: ActivitySource[] = [{ id: 'instructions', title: 'Profile', text: 'Include your picture and name.', role: 'instructions', materialId: null }];
+    const result = await generateActivityDocument(provider({ title: 'Profile', activityType: 'reflection', parts: [{ heading: 'Profile', content: '[Insert your required picture here]\nName: [Enter your name]', sourceRefs: ['instructions'], missingInformation: true }] }, calls), 'Profile', pictureSources);
+    expect(calls[0]!.instructions).toContain('Represent every explicit mandatory requirement');
+    expect(calls[0]!.instructions).toContain('pictures or images');
+    expect(calls[0]!.instructions).toContain('student-facing placeholder or action cue');
+    expect(result.content.sections[0]!.content).toContain('[Insert your required picture here]');
+    expect(result.warnings).toHaveLength(1);
+  });
   it('rejects invented Activity source IDs', () => expect(() => validateActivityDocument({ ...activity, parts: [{ ...activity.parts[0], sourceRefs: ['invented'] }] }, sources)).toThrow());
   it('adapts presentations to existing slide contract', () => expect(validateActivityDocument({ ...activity, activityType: 'presentation' }, sources).content.slides[0]?.number).toBe(1));
 });
