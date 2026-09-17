@@ -390,7 +390,7 @@ export async function listCanvasReviewerSources({
 
   const ordered = sources.value
     .map((source) => source.descriptor)
-    .filter((source) => source.type !== "announcement")
+    .filter(isCanvasGenerateCandidate)
     .sort(compareSources);
   const normalizedLimit = normalizeListLimit(limit);
   const normalizedOffset = normalizeListOffset(offset);
@@ -422,6 +422,58 @@ export async function listCanvasReviewerSources({
       unavailableSourceCount,
     },
   };
+}
+
+/**
+ * Generate is a learning-material surface, not a raw Canvas-object browser.
+ * Canvas object type is authoritative for assignments and announcements. For
+ * otherwise ambiguous Pages/files, use the small set of administrative labels
+ * observed in synchronized Canvas metadata and module placement. The source
+ * remains persisted for Tasks/announcement handling; it is only omitted from
+ * the study-material picker.
+ */
+function isCanvasGenerateCandidate(
+  source: CanvasReviewerSourceDescriptor,
+): boolean {
+  if (source.type === "assignment" || source.type === "announcement") {
+    return false;
+  }
+
+  const title = normalizeRoutingLabel(source.title);
+  const moduleTitle = normalizeRoutingLabel(source.placement.moduleTitle ?? "");
+
+  if (
+    /^(?:welcome|course syllabus|syllabus|course outline|course overview|instructor s profile|instructor profile|student orientation(?: .*)?|course requirements|grading (?:policy|system))$/.test(
+      title,
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    /\bcourse (?:introduction(?: and orientation)?|orientation|outline|syllabus|pacing)\b/.test(
+      title,
+    ) ||
+    /^(?:house rules|room assignment)(?: .*)?$/.test(title)
+  ) {
+    return false;
+  }
+
+  return !(
+    /^(?:general information|week 0 orientation)$/.test(moduleTitle) ||
+    /\b(?:orientation|policies and guidelines|course requirements)\b/.test(
+      moduleTitle,
+    )
+  );
+}
+
+function normalizeRoutingLabel(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[’']/g, " ")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 export async function previewCanvasReviewerSources({

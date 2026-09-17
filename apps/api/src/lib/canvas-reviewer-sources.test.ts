@@ -151,13 +151,13 @@ describe("Canvas reviewer source service", () => {
       synchronizedSourcesAvailable: true,
       failureCategories: ["files", "timeout"],
     });
-    expect(result.value.availableSourceCount).toBe(2);
+    expect(result.value.availableSourceCount).toBe(1);
     expect(result.value.unavailableSourceCount).toBe(1);
     expect(result.value.sources.map((entry) => entry.id)).toEqual([
       `page:${PAGE_ID}`,
-      `assignment:${ASSIGNMENT_ID}`,
       `file:${FILE_ID}`,
     ]);
+    expect(result.value.sources.some((entry) => entry.type === "assignment")).toBe(false);
     expect(result.value.sources.some((entry) => entry.type === "announcement")).toBe(false);
     expect(result.value.sources.find((entry) => entry.type === "file")).toMatchObject({
       availability: "unavailable",
@@ -176,6 +176,43 @@ describe("Canvas reviewer source service", () => {
     );
     expect(fake.storageCalls).toHaveLength(0);
     expect(provider.calls).toHaveLength(0);
+  });
+
+  it("routes learning materials to Generate while excluding coursework and administrative content", async () => {
+    const administrativePage = {
+      ...basePageRow(),
+      canvas_page_id: "course-syllabus",
+      id: OTHER_PAGE_ID,
+      title: "Course Syllabus",
+    };
+    const administrativeFile = {
+      ...baseFileRow(),
+      canvas_file_id: "orientation-file",
+      display_name: "Course Introduction and Orientation 2026.pdf",
+      filename: "course-introduction-and-orientation-2026.pdf",
+      id: OTHER_FILE_ID,
+    };
+    const fake = createFakeCanvasClient({
+      canvas_files: [baseFileRow(), administrativeFile],
+      canvas_pages: [basePageRow(), administrativePage],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map((source) => source.id)).toEqual([
+      `page:${PAGE_ID}`,
+      `file:${FILE_ID}`,
+    ]);
+    expect(result.value.sources.map((source) => source.title)).toEqual([
+      "Fictional Page",
+      "Fictional handout.pdf",
+    ]);
   });
 
   it("lists ready PDF and image descriptors as selectable without private fields", async () => {
@@ -306,7 +343,7 @@ describe("Canvas reviewer source service", () => {
     expect(result.value.sources.at(-1)?.placement.group).toBe("ungrouped");
   });
 
-  it("returns safe source capabilities without resolving content or calling providers", async () => {
+  it("returns safe learning-material capabilities without resolving content or calling providers", async () => {
     const fake = createFakeCanvasClient({
       canvas_assignments: [{ ...baseAssignmentRow(), description_html: null }],
       canvas_files: [
@@ -330,9 +367,9 @@ describe("Canvas reviewer source service", () => {
     expect(result.value.sources.find((source) => source.type === "page")?.capability).toBe(
       "ready",
     );
-    expect(
-      result.value.sources.find((source) => source.type === "assignment")?.capability,
-    ).toBe("empty");
+    expect(result.value.sources.some((source) => source.type === "assignment")).toBe(
+      false,
+    );
     expect(result.value.sources.find((source) => source.type === "file")?.capability).toBe(
       "needs_preparation",
     );
