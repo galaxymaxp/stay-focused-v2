@@ -102,6 +102,16 @@ describe('AI-first context and product contracts', () => {
     expect(result.content.sections[0]!.content).toContain('[Insert your required picture here]');
     expect(result.warnings).toHaveLength(1);
   });
+  it('keeps personal Activity details student-supplied while preserving sentence structure', async () => {
+    const calls: GenerationRequest<unknown>[] = [];
+    const personalSources: ActivitySource[] = [{ id: 'instructions', title: 'Learning contract', text: 'Write five complete-sentence motivations and five complete-sentence hindrances.', role: 'instructions', materialId: null }];
+    const result = await generateActivityDocument(provider({ title: 'Learning contract', activityType: 'reflection', parts: [{ heading: 'Motivations', content: '- I am motivated by [add your own reason].', sourceRefs: ['instructions'], missingInformation: true }, { heading: 'Hindrances', content: '- One challenge I may face is [add your own obstacle].', sourceRefs: ['instructions'], missingInformation: true }] }, calls), 'Learning contract', personalSources);
+    expect(calls[0]!.instructions).toContain('never assert biographical details');
+    expect(calls[0]!.instructions).toContain('family circumstances');
+    expect(calls[0]!.instructions).toContain('complete-sentence formats with explicit editable placeholders');
+    expect(result.content.sections.map(section => section.content)).toEqual(['- I am motivated by [add your own reason].', '- One challenge I may face is [add your own obstacle].']);
+    expect(result.warnings).toHaveLength(2);
+  });
   it('rejects invented Activity source IDs', () => expect(() => validateActivityDocument({ ...activity, parts: [{ ...activity.parts[0], sourceRefs: ['invented'] }] }, sources)).toThrow());
   it('adapts presentations to existing slide contract', () => expect(validateActivityDocument({ ...activity, activityType: 'presentation' }, sources).content.slides[0]?.number).toBe(1));
 });
