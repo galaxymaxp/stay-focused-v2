@@ -1,5 +1,9 @@
 # Roadmap
 
+## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
+
+**PASS — B26 Canvas routing and Activity reliability acceptance is complete. B27 may begin.** The routing repair and two generic Activity requirement/personalization repairs are live in READY production deployment `dpl_GKBaGect3Gvh4Nq6w7Ny8HzYVz7v`. Standalone realme validation before and after normal sync confirms learning Pages/PDF/PPTX in Generate, assignments in Tasks, announcements separated, and retained orientation material excluded. Five completed fresh Activity types passed all prewritten mandatory checks; a sixth was consistently source-limited before provider execution. Full verification passes except the existing local Expo external-link export limitation. See [B26.1 acceptance](ai/acceptance/b26.1/deployed-routing-and-activity-reliability.md). Next milestone: B27 remaining application redesign, beginning with a student-facing announcement experience.
+
 ## B25.3.4 standalone and AI-first production acceptance (2026-09-17)
 
 **PASS — B25 is complete; B26 may begin.** The repaired existing APK passed physical standalone acceptance on the realme RMX3151: session/Canvas, one new completed Reviewer, five-question server-scored Quiz, one Canvas-instruction-grounded Activity draft, and Queue/Library cold-relaunch persistence. AI-first production paths, API security/health, and mobile regressions passed. See [B25.3.4 acceptance](ai/acceptance/b25.3.4/device-standalone-ai-first-acceptance.md). Next: B26 generation-quality evaluation across multiple real Reviewer materials and Activity assignment types. Earlier PARTIAL entries are historical.

@@ -1,5 +1,9 @@
 # Current State
 
+## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
+
+**PASS — B26 Canvas routing and Activity reliability acceptance is complete. B27 may begin.** The final production deployment `dpl_GKBaGect3Gvh4Nq6w7Ny8HzYVz7v` is READY and healthy. Physical standalone validation confirms study Pages/PDF/PPTX in Generate, Canvas assignments in Tasks, announcements excluded from Generate/Tasks, and the retained CIT6 orientation PDF excluded after normal synchronization. Generic Activity prompt repairs preserve mandatory non-text/count/format/reference requirements and use editable sentence starters instead of inventing personal facts. Five completed assignment types passed their prewritten checklists; one scenario-dependent type stopped before generation because its referenced Group Announcement was unavailable. Automated and production gates pass apart from the existing local Expo external-link limitation. See [B26.1 acceptance](ai/acceptance/b26.1/deployed-routing-and-activity-reliability.md).
+
 ## B25.3.4 standalone and AI-first production acceptance (2026-09-17)
 
 **PASS — B25 is complete; B26 may begin.** The existing preview APK was verified to contain the generation-cache repair, installed with app data preserved on the realme RMX3151, and launched directly outside Expo Go. Authentication/Canvas, fresh Reviewer/Quiz/Activity jobs, server Quiz scoring, Queue, Library and all three artifact reopens passed through cold relaunch. A read-only trace confirms AI-first production ownership for all three generators. Production health/protected-route checks and fresh mobile regressions pass. See [B25.3.4 acceptance](ai/acceptance/b25.3.4/device-standalone-ai-first-acceptance.md). Historical PARTIAL entries below remain as checkpoints, not current status.
