@@ -232,6 +232,12 @@ describe("Canvas reviewer source service", () => {
     });
     const fake = createFakeCanvasClient({
       canvas_files: [pdfFile, imageFile],
+      canvas_modules: [moduleRow("module-fictional-1", "Lecture diagrams", 1)],
+      canvas_module_items: [{
+        ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888883", pageUrl: "" }),
+        item_type: "File",
+        canvas_content_id: imageFile.canvas_file_id,
+      }],
     });
 
     const result = await listCanvasReviewerSources({
@@ -270,6 +276,56 @@ describe("Canvas reviewer source service", () => {
     const serialized = JSON.stringify(result.value);
     expect(serialized).not.toContain("storage_object_key");
     expect(serialized).not.toContain("current_sha256");
+  });
+
+  it("excludes ungrouped artwork and administrative images but retains a module teaching image", async () => {
+    const artwork = {
+      ...baseFileRow(),
+      content_type: "image/png",
+      display_name: "Course banner.png",
+      filename: "course-banner.png",
+      ingestion_eligibility: "eligible_image",
+    };
+    const administrative = {
+      ...artwork,
+      id: OTHER_FILE_ID,
+      canvas_file_id: "apa-example",
+      display_name: "APA Sample.png",
+    };
+    const teaching = {
+      ...artwork,
+      id: "44444444-4444-4444-8444-444444444446",
+      canvas_file_id: "teaching-diagram",
+      display_name: "Cell structure diagram.png",
+    };
+    const fake = createFakeCanvasClient({
+      canvas_files: [artwork, administrative, teaching],
+      canvas_modules: [
+        moduleRow("module-admin", "General Information", 1),
+        moduleRow("module-lesson", "Cell Biology", 2),
+      ],
+      canvas_module_items: [
+        {
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888884", pageUrl: "" }),
+          module_id: "module-admin",
+          item_type: "File",
+          canvas_content_id: "apa-example",
+        },
+        {
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888885", pageUrl: "" }),
+          module_id: "module-lesson",
+          item_type: "File",
+          canvas_content_id: "teaching-diagram",
+        },
+      ],
+    });
+
+    const result = await listCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.filter((source) => source.type === "file").map((source) => source.title)).toEqual([
+      "Cell structure diagram.png",
+    ]);
   });
 
   it("orders proven module sources by module and item position before stable ungrouped sources", async () => {
@@ -431,6 +487,14 @@ describe("Canvas reviewer source service", () => {
   ])("lists %s file descriptors with safe state", async (_name, overrides, expected) => {
     const fake = createFakeCanvasClient({
       canvas_files: [{ ...baseFileRow(), ...overrides }],
+      ...(overrides.ingestion_eligibility === "eligible_image" ? {
+        canvas_modules: [moduleRow("module-fictional-1", "Lecture diagrams", 1)],
+        canvas_module_items: [{
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888886", pageUrl: "" }),
+          item_type: "File",
+          canvas_content_id: "file-1",
+        }],
+      } : {}),
     });
 
     const result = await listCanvasReviewerSources({

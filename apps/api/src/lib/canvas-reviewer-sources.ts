@@ -439,6 +439,12 @@ function isCanvasGenerateCandidate(
     return false;
   }
 
+  // Canvas file inventory also contains course artwork, avatars, and banners.
+  // Only a direct module File item establishes image learning-material intent.
+  if (source.file?.kind === "image" && source.placement.group !== "module") {
+    return false;
+  }
+
   const title = normalizeRoutingLabel(source.title);
   const moduleTitle = normalizeRoutingLabel(source.placement.moduleTitle ?? "");
 
