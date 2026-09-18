@@ -1,5 +1,9 @@
 # Roadmap
 
+## B29 live OCR and learning-image acceptance (2026-09-19)
+
+**PARTIAL — live one-page scanned-PDF OCR, instructional-image OCR, fresh Reviewer generation, persistence, and Android Library retrieval pass.** The synchronized Canvas account provides no eligible direct-module teaching image, so Canvas learning-image discovery and the local routing repair remain physically unexercised. Generate now rejects ungrouped Canvas images such as course banners/profile artwork while retaining direct teaching-module images; administrative exclusions remain. One 16-page image-only accounting scan stalled before OCR and was cancelled safely. See [B29 acceptance](ai/acceptance/b29/live-ocr-learning-image-acceptance.md). Next bounded task: B30 deploy and physically accept one consented direct-module Canvas instructional PNG/JPEG, including provenance and decorative-image exclusion.
+
 ## B28 ingestion coverage and document-format acceptance (2026-09-19)
 
 **PARTIAL — fresh production PDF, PPTX, and Canvas Page ingestion and generation passed; live OCR and Canvas DOCX coverage remain.** Three new owner-linked Reviewers completed and opened on physical Android from substantive CC16, CC17, and CC13 materials. The source snapshots retained 33 PDF pages, 39 PPTX slide markers, and 137 Page blocks. DOCX is implemented and extracted from a local fixture but absent in the Canvas account; scanned PDF and instructional image OCR await real sources. The accepted B27 deployment remains live. See [B28 acceptance](ai/acceptance/b28/ingestion-document-format-acceptance.md). Next bounded task: B29 live scanned-PDF and instructional-image OCR, including a decision on whether module-linked learning images should appear in Generate.
