@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B28 ingestion coverage and document-format acceptance (2026-09-19)
+
+**PARTIAL — fresh real Canvas PDF, PPTX, and Page Reviewer ingestion is accepted; scanned PDF, instructional image OCR, and Canvas DOCX need live evidence.** The authenticated realme generated and reopened three new Reviewers from CC16 Firewalls PDF (33 pages, 7,984 characters), CC17 Android Platform PPTX (39 slide markers, 9,873 characters), and CC13 Fact Gathering Methods Page (8,227 characters). Owner-linked source versions, provenance snapshots, result records, and artifacts were confirmed read-only. Local DOCX extraction worked; no Canvas DOCX learning file exists in the synchronized account. Full relevant tests pass, and the root build reaches the known local `expo-router` junction problem; isolated API build passes. No production repair or migration was needed. See [B28 acceptance](acceptance/b28/ingestion-document-format-acceptance.md). Next: bounded B29 live scanned-PDF/instructional-image OCR acceptance and image discoverability decision.
+
 ## B27 student-facing Canvas announcements (2026-09-18)
 
 **PASS — B27 student-facing Canvas announcements are deployed and physically accepted.** The author/attachment migration is applied, production deployment `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT` is READY and healthy, and a signed B27 APK retained the authenticated realme session. Fresh Canvas sync populated CC17 author metadata; physical Today, list, details, native HTML readability, Canvas handoff, and Generate/Tasks separation passed. Links and attachments had no live source example. The remote migration-history version differs from the local filename and needs reconciliation before a future CLI push; the applied schema is verified. See [B27.1 acceptance](acceptance/b27/student-facing-announcements.md). Next: B28 ingestion coverage and document-format acceptance.

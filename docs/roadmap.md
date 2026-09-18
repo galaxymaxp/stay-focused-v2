@@ -1,5 +1,9 @@
 # Roadmap
 
+## B28 ingestion coverage and document-format acceptance (2026-09-19)
+
+**PARTIAL — fresh production PDF, PPTX, and Canvas Page ingestion and generation passed; live OCR and Canvas DOCX coverage remain.** Three new owner-linked Reviewers completed and opened on physical Android from substantive CC16, CC17, and CC13 materials. The source snapshots retained 33 PDF pages, 39 PPTX slide markers, and 137 Page blocks. DOCX is implemented and extracted from a local fixture but absent in the Canvas account; scanned PDF and instructional image OCR await real sources. The accepted B27 deployment remains live. See [B28 acceptance](ai/acceptance/b28/ingestion-document-format-acceptance.md). Next bounded task: B29 live scanned-PDF and instructional-image OCR, including a decision on whether module-linked learning images should appear in Generate.
+
 ## B27 student-facing Canvas announcements (2026-09-18)
 
 **PASS — B27 production rollout and authenticated physical announcement acceptance are complete.** Implementation commit `6b0a806` is live in READY deployment `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT`; the metadata schema is applied, a fresh Canvas sync retained author data, and the signed Android app passed real Today/list/detail/Canvas-handoff and B26 routing checks. Links and attachments have no current source example. Reconcile the connector-assigned remote migration-history version with the local filename before a future CLI push. See [B27.1 acceptance](ai/acceptance/b27/student-facing-announcements.md). Next: B28 ingestion coverage and document-format acceptance.

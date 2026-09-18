@@ -1,5 +1,9 @@
 # Current State
 
+## B28 ingestion coverage and document-format acceptance (2026-09-19)
+
+**PARTIAL — the production Canvas PDF, PPTX, and Page source paths completed fresh Reviewer jobs on the authenticated realme and reopened in Library.** Read-only database checks found 7,984/9,873/8,227 source characters respectively, matching source versions, Canvas provenance, persisted results, and owner links. The OOXML DOCX extractor produced readable text from a local fixture; no Canvas DOCX learning file was present. Scanned PDF and meaningful image OCR were not run live, though the existing Google Cloud Vision paths and failure behavior pass automated tests. B27 remains the active READY production deployment. No code or schema repair was made; the B27 migration-history mismatch still blocks a future CLI push until reconciled. See [B28 acceptance](ai/acceptance/b28/ingestion-document-format-acceptance.md). Next: B29 scanned-PDF/instructional-image OCR acceptance.
+
 ## B27 student-facing Canvas announcements (2026-09-18)
 
 **PASS — B27 student-facing Canvas announcements are deployed and physically accepted.** The production schema supports author and attachment metadata without changing RLS or grants; deployment `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT` is READY and healthy. A signed B27 APK preserved the realme's authenticated session, and fresh sync plus physical Today/list/detail/native-text/Canvas-handoff and routing checks passed. Live announcements have no body links or attachments. The remote migration-history version differs from the local filename and needs reconciliation before a future CLI push; the applied schema is verified. See [B27.1 acceptance](ai/acceptance/b27/student-facing-announcements.md). Next: B28 ingestion coverage and document-format acceptance.
