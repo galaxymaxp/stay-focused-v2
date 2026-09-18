@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B27 student-facing Canvas announcements (2026-09-18)
+
+**PARTIAL — announcement routing is correct but student-facing acceptance has remaining presentation issues.** Commit `6b0a806` adds author/attachment retention, an owner-scoped announcements experience endpoint, safe readable HTML/link adaptation, compact Today discovery, and a native list/detail surface. Canvas 73, API 871 passed/3 skipped, mobile 455, shared 44, root typecheck/lint, DB build, and API production build pass. The realme Android 13 device rendered the new entry/error state, but authenticated real-announcement detail could not be exercised because Expo Go cannot share the standalone app's valid session. The migration and Vercel production deployment also await direct approval. See [B27 acceptance](acceptance/b27/student-facing-announcements.md). Do not begin B28 until rollout and authenticated physical acceptance finish.
+
 ## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
 
 **PASS — B26 Canvas routing and Activity reliability acceptance is complete. B27 may begin.** Production deployment `dpl_GKBaGect3Gvh4Nq6w7Ny8HzYVz7v` is READY and healthy. On the standalone realme app, lesson Pages/PDF/PPTX stayed in Generate, assignments stayed in Tasks, and the retained CIT6 orientation PDF stayed excluded before and after normal Canvas sync. Five completed fresh Activity types preserved every prewritten mandatory requirement after two generic prompt repairs; a sixth stopped consistently before provider execution because its referenced Group Announcement/scenario was unavailable. Personal details now remain explicit editable placeholders. Full package, contract, typecheck, lint, API-build, deployment-health, and physical gates pass; the known local Expo external-link limitation remains. See [B26.1 acceptance](acceptance/b26.1/deployed-routing-and-activity-reliability.md). Next: B27.

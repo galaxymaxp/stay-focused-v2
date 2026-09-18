@@ -1,5 +1,9 @@
 # Current State
 
+## B27 student-facing Canvas announcements (2026-09-18)
+
+**PARTIAL — announcement routing is correct but student-facing acceptance has remaining presentation issues.** The committed B27 implementation adds Canvas author/attachment normalization and migration, a safe owner-scoped announcement read model/API, compact Today discovery, and native list/detail/error/empty presentation while preserving B26 Generate/Tasks boundaries. Full touched-package, typecheck, lint, database-build, and API-build verification passes. The connected realme rendered the new Expo Go entry point, but its Expo sandbox lacks the standalone app's valid auth session, so live announcement rows and detail were not physically accepted. Production migration/deployment were not run without direct approval. See [B27 acceptance](ai/acceptance/b27/student-facing-announcements.md). B28 is not yet authorized.
+
 ## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
 
 **PASS — B26 Canvas routing and Activity reliability acceptance is complete. B27 may begin.** The final production deployment `dpl_GKBaGect3Gvh4Nq6w7Ny8HzYVz7v` is READY and healthy. Physical standalone validation confirms study Pages/PDF/PPTX in Generate, Canvas assignments in Tasks, announcements excluded from Generate/Tasks, and the retained CIT6 orientation PDF excluded after normal synchronization. Generic Activity prompt repairs preserve mandatory non-text/count/format/reference requirements and use editable sentence starters instead of inventing personal facts. Five completed assignment types passed their prewritten checklists; one scenario-dependent type stopped before generation because its referenced Group Announcement was unavailable. Automated and production gates pass apart from the existing local Expo external-link limitation. See [B26.1 acceptance](ai/acceptance/b26.1/deployed-routing-and-activity-reliability.md).
