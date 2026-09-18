@@ -12,6 +12,7 @@ import { TasksScreen } from "./TasksScreen";
 import { TodayScreen } from "./TodayScreen";
 import { DayRingClock } from "./DayRingClock";
 import { localDate } from "./presentation";
+import { AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 
 const mocks = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
@@ -171,6 +172,37 @@ const workspace: CourseLearningWorkspace = {
   },
 };
 describe("B25 screen interactions", () => {
+  it("shows an intentional announcement empty state", async () => {
+    mocks.data["/api/experience/announcements?limit=100"] = { items: [], nextOffset: null };
+    const root = await render(createElement(AnnouncementsScreen));
+    expect(root.findAll(node => String(node.type) === "Copy").map(node => node.props.children)).toContain("No announcements");
+  });
+
+  it("opens a readable announcement detail without raw HTML or missing metadata crashes", async () => {
+    mocks.data["/api/experience/announcements?limit=100"] = {
+      items: [{
+        id: "announcement",
+        course: { id: "course", code: null, name: "Biology" },
+        title: "Schedule updated",
+        body: "Monday class moves online.\n\n- Use the course room.",
+        preview: "Monday class moves online.",
+        postedAt: null,
+        authorName: null,
+        htmlUrl: null,
+        attachments: [],
+        links: [],
+      }],
+      nextOffset: null,
+    };
+    const root = await render(createElement(AnnouncementsScreen));
+    const row = root.findAll(node => String(node.type) === "RowLink").find(node => node.props.label === "Read announcement: Schedule updated")!;
+    await act(async () => row.props.onPress());
+    const renderedText = root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ");
+    expect(renderedText).toContain("Monday class moves online.");
+    expect(renderedText).toContain("Posted date unavailable");
+    expect(renderedText).not.toMatch(/<p>|<li>/);
+  });
+
   it("keeps Canvas and local intake actions reachable from Generate options", async () => {
     const root = await render(createElement(GenerateScreen));
     const page = root.findAll(node => String(node.type) === "Page")[0]!;

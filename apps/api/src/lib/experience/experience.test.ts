@@ -84,6 +84,65 @@ describe('Today and activity composition', () => {
     expect(result.urgent).toEqual([]); expect(result.timeline).toEqual([]); expect(result.plannerState.status).toBe('not_planned');
   });
 });
+describe('Student announcements', () => {
+  const announcement = {
+    id: 'announcement-row',
+    user_id: 'owner',
+    course_id: course.id,
+    title: 'Schedule updated',
+    message_html: '<p><strong>Monday</strong> class moves online.</p><ul><li>Use the course room.</li></ul><a href="https://school.example/room">Join class</a><script>unsafe()</script>',
+    posted_at: '2026-09-12T08:00:00Z',
+    delayed_post_at: null,
+    todo_date: null,
+    published: true,
+    locked: false,
+    author_name: 'Instructor Example',
+    html_url: 'https://canvas.example/courses/1/announcements/2',
+    attachments: [{ display_name: 'Updated schedule.pdf', content_type: 'application/pdf', size: 512, url: 'https://canvas.example/files/3/download' }],
+  };
+
+  it('retains course, title, body, date, author, links and attachments without raw HTML', async () => {
+    const result = await service({ canvas_courses: [course], canvas_announcements: [announcement] }).api.getAnnouncements('owner');
+    expect(result.items[0]).toMatchObject({
+      id: 'announcement-row',
+      course: { id: course.id, code: 'BIO', name: 'Biology' },
+      title: 'Schedule updated',
+      postedAt: '2026-09-12T08:00:00Z',
+      authorName: 'Instructor Example',
+      attachments: [{ label: 'Updated schedule.pdf', contentType: 'application/pdf', size: 512 }],
+      links: [{ label: 'Join class', url: 'https://school.example/room' }],
+    });
+    expect(result.items[0]?.body).toContain('Monday class moves online.');
+    expect(result.items[0]?.body).toContain('- Use the course room.');
+    expect(JSON.stringify(result)).not.toMatch(/<p>|<script>|unsafe\(\)/);
+  });
+
+  it('orders newest first, tolerates missing metadata, and excludes other owners', async () => {
+    const result = await service({
+      canvas_courses: [course],
+      canvas_announcements: [
+        { ...announcement, id: 'older', posted_at: null, message_html: null, author_name: null, attachments: [] },
+        { ...announcement, id: 'foreign', user_id: 'other', posted_at: '2026-09-14T08:00:00Z' },
+        { ...announcement, id: 'newer', posted_at: '2026-09-13T08:00:00Z' },
+      ],
+    }).api.getAnnouncements('owner');
+    expect(result.items.map(item => item.id)).toEqual(['newer', 'older']);
+    expect(result.items[1]).toMatchObject({ body: '', preview: null, postedAt: null, authorName: null });
+  });
+
+  it('returns an intentional empty dataset', async () => {
+    await expect(service({ canvas_courses: [course] }).api.getAnnouncements('owner')).resolves.toEqual({ items: [], nextOffset: null });
+  });
+
+  it('drops unsafe URLs and credential-like query parameters', async () => {
+    const result = await service({
+      canvas_courses: [course],
+      canvas_announcements: [{ ...announcement, html_url: 'javascript:alert(1)', message_html: '<a href="https://school.example/?access_token=secret">bad</a>', attachments: [{ display_name: 'Bad', url: 'https://u:p@school.example/file' }] }],
+    }).api.getAnnouncements('owner');
+    expect(result.items[0]).toMatchObject({ htmlUrl: null, links: [], attachments: [] });
+    expect(JSON.stringify(result)).not.toContain('secret');
+  });
+});
 describe('Learn and Activity details', () => {
   it.each(['ready', 'needs_preparation', 'empty', 'unsupported', 'inaccessible', 'failed'] as const)('maps material %s without diagnostics', capability => {
     const mapped = learningMaterial({ ...descriptor, capability, availability: capability === 'ready' ? 'available' : 'unavailable' }, course.id);

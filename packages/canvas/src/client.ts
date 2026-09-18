@@ -6,6 +6,7 @@ import {
   type CanvasAssignmentGroup,
   type CanvasAssignmentSubmissionType,
   type CanvasAnnouncement,
+  type CanvasAnnouncementAttachment,
   type CanvasAnnouncementsListOptions,
   type CanvasClientErrorCode,
   type CanvasClientOptions,
@@ -1936,7 +1937,35 @@ function normalizeAnnouncement(value: unknown): CanvasAnnouncement {
     published: booleanOrNull(value.published),
     locked: booleanOrNull(value.locked),
     htmlUrl: stringOrNull(value.html_url),
+    authorName: normalizeAnnouncementAuthorName(value.author),
+    attachments: normalizeAnnouncementAttachments(value.attachments),
   };
+}
+
+function normalizeAnnouncementAuthorName(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  return stringOrNull(value.display_name) ?? stringOrNull(value.name);
+}
+
+function normalizeAnnouncementAttachments(
+  value: unknown,
+): readonly CanvasAnnouncementAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): readonly CanvasAnnouncementAttachment[] => {
+    if (!isRecord(entry)) return [];
+    const url = stringOrNull(entry.url);
+    const displayName =
+      stringOrNull(entry.display_name) ?? stringOrNull(entry.filename);
+    if (!url || !displayName) return [];
+    return [{
+      id: normalizeId(entry.id),
+      displayName,
+      contentType:
+        stringOrNull(entry["content-type"]) ?? stringOrNull(entry.content_type),
+      size: numberOrNull(entry.size),
+      url,
+    }];
+  });
 }
 
 function normalizeFile(value: unknown): CanvasFile {

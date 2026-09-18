@@ -19,6 +19,13 @@ export async function GET(request: Request, context: Context): Promise<Response>
     const query = new URL(request.url).searchParams;
     const [surface, id, action] = path;
     if (path.length === 1 && surface === 'capabilities') return experienceJson(experienceCapabilities());
+    if (path.length === 1 && surface === 'announcements') {
+      return experienceJson(await service.getAnnouncements(userId, {
+        ...(query.get('courseId') ? { courseId: requireId(query.get('courseId')!) } : {}),
+        offset: readInteger(query.get('offset'), 0, 0, 10000),
+        limit: readInteger(query.get('limit'), 50, 1, 100),
+      }));
+    }
     if (surface === 'courses') {
       if (path.length === 1) return experienceJson({ items: await service.getCourses(userId) });
       requireId(id!);

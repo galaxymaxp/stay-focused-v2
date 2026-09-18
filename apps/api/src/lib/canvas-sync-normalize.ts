@@ -180,6 +180,8 @@ export interface CanvasSyncAnnouncementPayload extends SyncJsonObject {
   readonly published: boolean | null;
   readonly locked: boolean | null;
   readonly html_url: string | null;
+  readonly author_name: string | null;
+  readonly attachments: readonly SyncJsonObject[];
   readonly source_fingerprint: string;
 }
 
@@ -489,6 +491,17 @@ function mapAnnouncement(
     published: announcement.published,
     locked: announcement.locked,
     html_url: nullableText(announcement.htmlUrl),
+    author_name: nullableText(announcement.authorName),
+    attachments: announcement.attachments.map((attachment) => ({
+      id: attachment.id === null ? null : nullableIdentifier(attachment.id),
+      display_name: requiredText(
+        attachment.displayName,
+        "announcement attachment name",
+      ),
+      content_type: nullableText(attachment.contentType),
+      size: attachment.size,
+      url: requiredText(attachment.url, "announcement attachment URL"),
+    })),
   } satisfies Omit<CanvasSyncAnnouncementPayload, "source_fingerprint">;
 
   return {

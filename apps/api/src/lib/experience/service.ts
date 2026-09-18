@@ -1,6 +1,6 @@
 import type { Quiz } from '@stay-focused/shared';
 import { quizView } from '../quiz/service';
-import type { ActivityDetail, ActivitySummary, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerationView, LibraryArtifactSummary, LibraryArtifactType, LibraryOverview, ReviewerReaderModel, TodayOverview } from '@stay-focused/shared';
+import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerationView, LibraryArtifactSummary, LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
@@ -75,6 +75,48 @@ export class ExperienceService {
     dayWindow(date, offset);
     const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
     return composeToday({ userId, date, offset, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
+  }
+  async getAnnouncements(
+    userId: string,
+    filters: { courseId?: string; offset?: number; limit?: number } = {},
+  ): Promise<StudentAnnouncementList> {
+    const [announcements, courses] = await Promise.all([
+      this.rows('canvas_announcements', userId),
+      this.rows('canvas_courses', userId),
+    ]);
+    const courseMap = new Map(courses.map(course => [course.id, courseSummary(course)]));
+    const items = announcements
+      .filter(row => row.published !== false && row.locked !== true)
+      .flatMap((row): readonly StudentAnnouncement[] => {
+        const course = courseMap.get(row.course_id);
+        if (!course || (filters.courseId && course.id !== filters.courseId)) return [];
+        const attachments = announcementAttachments(row.attachments);
+        const attachmentUrls = new Set(attachments.map(item => item.url));
+        const links = announcementResources(row.message_html).filter(link => !attachmentUrls.has(link.url));
+        const body = normalizeCanvasHtmlToText(row.message_html);
+        return [{
+          id: row.id,
+          course: { id: course.id, code: course.code, name: course.name },
+          title: row.title.trim(),
+          body,
+          preview: announcementPreview(body),
+          postedAt: row.posted_at ?? row.delayed_post_at ?? row.todo_date,
+          authorName: row.author_name?.trim() || null,
+          htmlUrl: safeAnnouncementUrl(row.html_url),
+          attachments,
+          links,
+        }];
+      })
+      .sort((left, right) =>
+        announcementTime(right.postedAt) - announcementTime(left.postedAt) ||
+        left.title.localeCompare(right.title) ||
+        left.id.localeCompare(right.id));
+    const offset = filters.offset ?? 0;
+    const limit = filters.limit ?? 50;
+    return {
+      items: items.slice(offset, offset + limit),
+      nextOffset: offset + limit < items.length ? offset + limit : null,
+    };
   }
   private async quizRecords(userId: string): Promise<{summary:LibraryArtifactSummary;quiz:Quiz;generationId:string|null}[]> {
     const [rows,attempts,courses] = await Promise.all([this.rows('quizzes',userId),this.rows('quiz_attempts',userId),this.getCourses(userId)]);
@@ -181,4 +223,71 @@ export function assignmentResources(html: string | null): ActivityDetail['resour
   }
   walk(parseFragment(html ?? ''));
   return result;
+}
+
+export function announcementResources(html: string | null): readonly AnnouncementLink[] {
+  const result: AnnouncementLink[] = [];
+  function walk(node: DefaultTreeAdapterMap['node']) {
+    if ('tagName' in node && node.tagName === 'a') {
+      const href = node.attrs.find(attribute => attribute.name === 'href')?.value;
+      const url = safeAnnouncementUrl(href ?? null);
+      if (url) {
+        const label = normalizeCanvasHtmlToText(
+          'childNodes' in node
+            ? node.childNodes.map(child => 'value' in child ? child.value : '').join(' ')
+            : '',
+        ) || 'Open link';
+        if (!result.some(link => link.url === url)) result.push({ label, url });
+      }
+    }
+    if ('childNodes' in node) node.childNodes.forEach(walk);
+  }
+  walk(parseFragment(html ?? ''));
+  return result;
+}
+
+function announcementAttachments(value: unknown): readonly AnnouncementAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): readonly AnnouncementAttachment[] => {
+    const item = record(entry);
+    const label = text(item.display_name) ?? text(item.filename);
+    const url = safeAnnouncementUrl(text(item.url));
+    if (!label || !url) return [];
+    return [{
+      label,
+      url,
+      contentType: text(item.content_type),
+      size: typeof item.size === 'number' && Number.isFinite(item.size) && item.size >= 0
+        ? item.size
+        : null,
+    }];
+  });
+}
+
+function safeAnnouncementUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      [...url.searchParams.keys()].some(key => /token|signature|credential|key/i.test(key))
+    ) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function announcementPreview(body: string): string | null {
+  const compact = body.replace(/\s+/g, ' ').trim();
+  if (!compact) return null;
+  return compact.length <= 180 ? compact : `${compact.slice(0, 177).trimEnd()}...`;
+}
+
+function announcementTime(value: string | null): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
 }

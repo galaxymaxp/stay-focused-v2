@@ -2606,6 +2606,8 @@ export interface Database {
           published: boolean | null;
           locked: boolean | null;
           html_url: string | null;
+          author_name: string | null;
+          attachments: Json;
           source_fingerprint: string;
           first_synced_at: string;
           last_synced_at: string;
@@ -2629,6 +2631,8 @@ export interface Database {
           published?: boolean | null;
           locked?: boolean | null;
           html_url?: string | null;
+          author_name?: string | null;
+          attachments?: Json;
           source_fingerprint: string;
           first_synced_at?: string;
           last_synced_at?: string;
@@ -2652,6 +2656,8 @@ export interface Database {
           published?: boolean | null;
           locked?: boolean | null;
           html_url?: string | null;
+          author_name?: string | null;
+          attachments?: Json;
           source_fingerprint?: string;
           first_synced_at?: string;
           last_synced_at?: string;

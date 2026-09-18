@@ -103,6 +103,31 @@ export interface TodayOverview {
     readonly needsTaskImport: boolean;
   };
 }
+export interface AnnouncementLink {
+  readonly label: string;
+  readonly url: string;
+}
+export interface AnnouncementAttachment extends AnnouncementLink {
+  readonly contentType: string | null;
+  readonly size: number | null;
+}
+export interface StudentAnnouncement {
+  readonly id: string;
+  readonly course: CourseReference;
+  readonly title: string;
+  /** Readable text converted from Canvas HTML; raw markup is never returned. */
+  readonly body: string;
+  readonly preview: string | null;
+  readonly postedAt: string | null;
+  readonly authorName: string | null;
+  readonly htmlUrl: string | null;
+  readonly attachments: readonly AnnouncementAttachment[];
+  readonly links: readonly AnnouncementLink[];
+}
+export interface StudentAnnouncementList {
+  readonly items: readonly StudentAnnouncement[];
+  readonly nextOffset: number | null;
+}
 export type LibraryArtifactType = 'reviewer' | 'quiz' | 'activity_output';
 export type GenerationState = 'queued' | 'preparing' | 'generating' | 'finalizing' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
 export interface LibraryArtifactSummary {

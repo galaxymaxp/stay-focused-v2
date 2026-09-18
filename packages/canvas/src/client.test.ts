@@ -1212,6 +1212,14 @@ describe("CanvasClient", () => {
           locked: false,
           html_url: "https://canvas.test/courses/7/discussion_topics/1",
           context_code: "course_7",
+          author: { display_name: "Instructor Example" },
+          attachments: [{
+            id: 9,
+            display_name: "Week 1 guide.pdf",
+            "content-type": "application/pdf",
+            size: 1024,
+            url: "https://canvas.test/files/9/download",
+          }],
         },
       ], {
         link: '<https://canvas.test/api/v1/announcements?page=2>; rel="next"',
@@ -1240,6 +1248,14 @@ describe("CanvasClient", () => {
         published: true,
         locked: false,
         htmlUrl: "https://canvas.test/courses/7/discussion_topics/1",
+        authorName: "Instructor Example",
+        attachments: [{
+          id: "9",
+          displayName: "Week 1 guide.pdf",
+          contentType: "application/pdf",
+          size: 1024,
+          url: "https://canvas.test/files/9/download",
+        }],
       },
     ]);
 

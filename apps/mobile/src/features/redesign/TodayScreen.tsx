@@ -2,6 +2,7 @@ import type {
   ExperienceCapabilities,
   TodayItem,
   TodayOverview,
+  StudentAnnouncementList,
 } from "@stay-focused/shared";
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { router } from "expo-router";
@@ -26,6 +27,10 @@ import {
   timeLabel,
 } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
+import {
+  announcementCourseLabel,
+  formatAnnouncementDate,
+} from "../announcements/announcementPresentation";
 
 export function TodayScreen() {
   const date = localDate();
@@ -35,6 +40,10 @@ export function TodayScreen() {
   );
   const capabilities = useExperience<ExperienceCapabilities>(
     "/api/experience/capabilities",
+  );
+  const announcements = useExperience<StudentAnnouncementList>(
+    "/api/experience/announcements?limit=3",
+    60000,
   );
   const client = useExperienceClient();
   const requestBusy = useRef(false);
@@ -122,7 +131,10 @@ export function TodayScreen() {
         month: "long",
         day: "numeric",
       })}
-      onRefresh={today.refresh}
+      onRefresh={() => {
+        today.refresh();
+        announcements.refresh();
+      }}
       actions={[{ label: "Schedule & availability", onPress: () => setExpanded(!expanded) }]}
     >
       <DayRingClock
@@ -165,6 +177,37 @@ export function TodayScreen() {
           </Action>
         </Surface>
       )}
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Copy size="h2">Announcements</Copy>
+          <Action secondary onPress={() => router.push("/announcements")}>View all</Action>
+        </View>
+        {announcements.loading ? (
+          <Notice>Checking Canvas updates...</Notice>
+        ) : announcements.error ? (
+          <Surface>
+            <RowLink inset label="Open announcements" onPress={() => router.push("/announcements")}>
+              <Copy size="h3">Canvas updates</Copy>
+              <Copy muted size="bodySmall">Announcements are unavailable right now.</Copy>
+            </RowLink>
+          </Surface>
+        ) : announcements.data?.items.length ? (
+          <Surface>
+            {announcements.data.items.map(item => (
+              <RowLink
+                key={item.id}
+                label={`Read announcement: ${item.title}`}
+                onPress={() => router.push({ pathname: "/announcements", params: { announcementId: item.id } })}
+              >
+                <Copy muted size="caption">{announcementCourseLabel(item)} · {formatAnnouncementDate(item.postedAt)}</Copy>
+                <Copy size="h3">{item.title}</Copy>
+              </RowLink>
+            ))}
+          </Surface>
+        ) : (
+          <Copy muted size="bodySmall">No recent Canvas announcements.</Copy>
+        )}
+      </View>
       {today.error ? (
         <Notice>{today.error}</Notice>
       ) : today.loading ? (

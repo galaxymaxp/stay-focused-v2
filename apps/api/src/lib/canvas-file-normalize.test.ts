@@ -285,6 +285,8 @@ function announcement(
     published: true,
     locked: false,
     htmlUrl: "https://canvas.test/courses/course-1/discussion_topics/1",
+    authorName: null,
+    attachments: [],
     ...overrides,
   };
 }

@@ -2210,6 +2210,8 @@ function announcement(
     published: true,
     locked: false,
     htmlUrl: "https://canvas.example.invalid/announcement",
+    authorName: null,
+    attachments: [],
     ...overrides,
   };
 }
@@ -2505,6 +2507,14 @@ interface CanvasAnnouncementFixture {
   readonly published: boolean | null;
   readonly locked: boolean | null;
   readonly htmlUrl: string | null;
+  readonly authorName: string | null;
+  readonly attachments: readonly {
+    readonly id: string | null;
+    readonly displayName: string;
+    readonly contentType: string | null;
+    readonly size: number | null;
+    readonly url: string;
+  }[];
 }
 
 interface CanvasFileFixture {
