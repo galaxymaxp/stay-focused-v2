@@ -2,7 +2,7 @@
 
 ## B27 student-facing Canvas announcements (2026-09-18)
 
-**PARTIAL — announcement routing is correct but student-facing acceptance has remaining presentation issues.** Implementation commit `6b0a806` provides a dedicated announcement contract/API, safe native presentation, Today preview, chronological course-labeled list/detail, and optional author/link/attachment handling without reopening B26 routing. Automated verification passes. Remaining gates are explicit production migration/deployment approval and authenticated real-data acceptance on the connected Android device; Expo Go cannot share the installed standalone app's session. See [B27 acceptance](ai/acceptance/b27/student-facing-announcements.md). Complete those B27 gates before starting B28 ingestion coverage and document-format acceptance.
+**PASS — B27 production rollout and authenticated physical announcement acceptance are complete.** Implementation commit `6b0a806` is live in READY deployment `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT`; the metadata schema is applied, a fresh Canvas sync retained author data, and the signed Android app passed real Today/list/detail/Canvas-handoff and B26 routing checks. Links and attachments have no current source example. Reconcile the connector-assigned remote migration-history version with the local filename before a future CLI push. See [B27.1 acceptance](ai/acceptance/b27/student-facing-announcements.md). Next: B28 ingestion coverage and document-format acceptance.
 
 ## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
 

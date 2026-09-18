@@ -2,7 +2,7 @@
 
 ## B27 student-facing Canvas announcements (2026-09-18)
 
-**PARTIAL — announcement routing is correct but student-facing acceptance has remaining presentation issues.** The committed B27 implementation adds Canvas author/attachment normalization and migration, a safe owner-scoped announcement read model/API, compact Today discovery, and native list/detail/error/empty presentation while preserving B26 Generate/Tasks boundaries. Full touched-package, typecheck, lint, database-build, and API-build verification passes. The connected realme rendered the new Expo Go entry point, but its Expo sandbox lacks the standalone app's valid auth session, so live announcement rows and detail were not physically accepted. Production migration/deployment were not run without direct approval. See [B27 acceptance](ai/acceptance/b27/student-facing-announcements.md). B28 is not yet authorized.
+**PASS — B27 student-facing Canvas announcements are deployed and physically accepted.** The production schema supports author and attachment metadata without changing RLS or grants; deployment `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT` is READY and healthy. A signed B27 APK preserved the realme's authenticated session, and fresh sync plus physical Today/list/detail/native-text/Canvas-handoff and routing checks passed. Live announcements have no body links or attachments. The remote migration-history version differs from the local filename and needs reconciliation before a future CLI push; the applied schema is verified. See [B27.1 acceptance](ai/acceptance/b27/student-facing-announcements.md). Next: B28 ingestion coverage and document-format acceptance.
 
 ## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
 

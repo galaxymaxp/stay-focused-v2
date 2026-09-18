@@ -130,3 +130,44 @@ B28 must not begin until production rollout and authenticated physical B27 accep
 ## Final verdict
 
 **PARTIAL — announcement routing is correct but student-facing acceptance has remaining presentation issues.**
+
+## B27.1 production rollout and authenticated physical acceptance (2026-09-18)
+
+Current verdict: **PASS — B27 student-facing Canvas announcements are deployed and physically accepted.** This section supersedes the earlier B27 rollout and device blockers above; that earlier checkpoint is retained as history.
+
+### Migration and deployment
+
+- Applied `packages/db/migrations/20260918120000_canvas_announcement_student_metadata.sql` once to the existing production Supabase project. The connector recorded it as remote version `20260918123510` with name `20260918120000_canvas_announcement_student_metadata`. The schema change succeeded; the version mismatch remains a migration-history housekeeping limitation. Automatic approval review rejected a direct history-row correction, so no further history mutation was attempted.
+- Remote `author_name` is nullable text; `attachments` is non-null JSONB with an empty-array default and validated array constraint. The six prior rows remained valid. Announcement RLS remains enabled; table and snapshot-RPC access remain limited to `service_role` grants. The RPC still validates the running sync, owner, connection, and course.
+- Deployed clean commit `08018a8` (containing implementation commit `6b0a806`) to the existing Vercel production project as `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT`. The canonical URL `https://stay-focused-v2-prototype.vercel.app` points to this `READY` deployment. `/api/health` returned HTTP 200 with version `2.0.0`; an unauthenticated announcements request returned HTTP 401.
+- EAS preview APK build `4b062ac8-9697-4e32-b8ff-d77f6d8e3563` was signed from `08018a8` and installed with `adb install -r` over the existing `com.galaxymaxp.stayfocusedv2` app. The app kept its normal authenticated session and production API configuration; no token was copied or forged.
+
+### Fresh Canvas data and production API
+
+- Normal authenticated Canvas synchronization succeeded after migration. Three CC17 announcements were refreshed with author metadata; their bodies, dates, course identity, Canvas destinations, and fingerprints remain present. A CC16 course sync also succeeded but Canvas returned zero announcements in its current fetch window, so three older CC16 rows retained their prior sync date. The store has six rows across two courses; four are currently unlocked and displayed by the student API.
+- All six stored bodies contain Canvas markup and all six have Canvas destinations. Three fresh CC17 rows have authors. No stored announcement has an attachment or embedded body anchor, so live link and attachment interaction are **N/A — no source example available**. Automated normalization, URL filtering, and attachment coverage passed.
+- The authenticated standalone app loaded real owner-scoped announcements from the production API. The visible course, title, date, native body/preview, author, and Canvas action match the `StudentAnnouncement` contract. Automated API coverage excludes another owner's row; a second production account was not used.
+
+### Physical realme RMX3151, Android 13
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Today preview and `View all` | PASS | Three readable recent CC17 entries with course and date context; preview stayed contained within Today; `View all` opened the list. |
+| Loading and list | PASS | Physical loading copy appeared before four real eligible rows; rows were newest first and spanned CC17 and CC16. All four fit on the device, so scrolling was not needed. |
+| Detail and navigation | PASS | Opened ordinary CC17 items and a CC16 item; title, course, date, author where supplied, body, close, and return navigation worked. No incorrect unavailable-body state appeared. |
+| HTML to native text | PASS | Real stored `<p>` and `<br>` bodies rendered as readable native text; raw tags were absent from visible detail UI. |
+| Author | PASS | Fresh CC17 author metadata appeared in detail. |
+| Safe body links | N/A | The live six-row dataset has no embedded body anchor. HTTPS and credential-bearing URL behavior passed automated tests. |
+| Attachments | N/A | Fresh sync found no attachment-bearing announcement. Normalization/storage tests passed. |
+| Open in Canvas | PASS | Tapping the action launched the external browser and reached the institution's SSO sign-in. All six stored destination paths match their course and announcement identities; content beyond SSO was not inspected. |
+| Empty/error state | N/A | The authenticated dataset was nonempty and no network error was induced on the device; component coverage passed. |
+
+### Routing, isolation, and verification
+
+- Physical Generate showed CC16 learning Canvas Pages and PDFs and CC17 learning PPTX files, with no announcement title in either course. CIT6 showed no Generate materials, consistent with its retained but excluded orientation source. Physical Tasks showed CC16 assignments and no announcement title. The B26 classifier/routing implementation was unchanged. No synchronized DOCX learning example was available.
+- The API's owner-filtered announcement test excluded a foreign owner's record, while the physical production session demonstrated the authorized owner's read. No second-user production session was available for a live cross-account request.
+- Fresh package suites: Canvas 73/73; API 871 passed, 3 skipped; Mobile 455/455; Shared 44/44. Root typecheck passed 7/7 (2 cached); root lint passed 7/7 (5 cached), with four existing import-order warnings. `git diff --check` and `git fsck --full` passed; fsck listed only dangling objects.
+- The first local root build could not traverse the checkout's externally linked files under the sandbox. The elevated rerun reached Mobile but Metro could not resolve the externally junctioned `expo-router`. The production Vercel API build and signed EAS Android build both completed from `08018a8`. This is a local dependency-layout limitation, not an observed production failure.
+- No B27 implementation repair or test change was required. No private Canvas IDs, account credentials, full announcement bodies, tokens, or device screenshots were committed.
+
+Remaining limitation: remote Supabase migration history uses connector version `20260918123510` for the SQL file named `20260918120000_canvas_announcement_student_metadata.sql`. The schema is applied and verified; a future CLI migration push should reconcile this metadata first to avoid considering the file unapplied. The automatic approval reviewer rejected changing that history row, and user approval has been requested.
