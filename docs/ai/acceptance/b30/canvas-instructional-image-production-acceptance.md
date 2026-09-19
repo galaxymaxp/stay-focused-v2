@@ -2,7 +2,7 @@
 
 Date: 2026-09-19 (Asia/Manila)
 
-Verdict: **PARTIAL — B30 production path works but required acceptance remains incomplete.** The reviewed B29 routing guard is deployed and READY, fresh production Canvas synchronization completed, and physical Android plus persisted-data checks prove that the administrative APA image and five ungrouped artwork/profile images remain excluded while Announcements and Tasks stay separate. The authenticated Canvas account has Student access only and no editable course. It cannot create the required direct teaching-module File item, so positive Canvas discovery, Canvas image acquisition, OCR, provenance, fresh Reviewer generation, and Library reopen could not be exercised.
+Status: **PARTIAL / CLOSED WITH PLATFORM LIMITATION.** The reviewed B29 routing guard is deployed and READY, fresh production Canvas synchronization completed, and physical Android plus persisted-data checks prove that the administrative APA image and five ungrouped artwork/profile images remain excluded while Announcements and Tasks stay separate. The authenticated Canvas account has Student access only and no editable course. It cannot create the direct teaching-module File item, so positive Canvas discovery, Canvas image acquisition, OCR, provenance, fresh Reviewer generation, and Library reopen were not exercised. This is an external Canvas-permission limitation and is not a required future product milestone.
 
 ## Starting state
 
@@ -48,7 +48,7 @@ The effective rule is unchanged: an OCR-supported Canvas image must have a direc
 | MIME | `image/jpeg` intended; no Canvas object created |
 | Size | 314,868-byte source fixture; no Canvas object created |
 
-No instructor material was moved or changed. No database row was injected. Completion requires a Teacher/Designer collaborator or an editable Canvas sandbox.
+No instructor material was moved or changed. No database row was injected. Teacher/Designer cooperation and editable sandbox access will not be pursued.
 
 ## Fresh synchronization and negative routing
 
@@ -113,14 +113,14 @@ On the physical device after sync, CC13 displayed 6 modules / 10 learning materi
 
 No production repair was required. B30 deployed the already reviewed B29 implementation. No database schema, migration, Canvas data, OCR, generation, or UI code was changed.
 
-## Remaining acceptance dependency
+## Closure decision
 
-B30 can resume without further product implementation after either of these is available:
-
-1. a Teacher/Designer collaborator with permission to upload an instructional PNG/JPEG and attach it as a direct File item in a non-administrative teaching module; or
-2. an editable Canvas sandbox course for the authenticated account.
-
-Resume from fixture creation, then run sync, positive Generate discovery, Canvas acquisition/OCR/provenance, fresh Reviewer generation, owner-link verification, Queue behavior, and physical Library reopen. The READY deployment and completed negative-routing evidence can be reused if production remains unchanged.
+- B30 is closed as `PARTIAL / CLOSED WITH PLATFORM LIMITATION`.
+- Teacher/Designer cooperation and editable Canvas sandbox access are unavailable and will not be pursued.
+- The positive instructional-image fixture is classified as an external Canvas-permission limitation.
+- Automated routing coverage remains the acceptance evidence for direct teaching-module image eligibility.
+- The positive production path may be exercised later only if a naturally occurring student-accessible instructional PNG/JPEG becomes available.
+- Stay Focused V2 does not depend on instructor cooperation for development, demonstration, or capstone acceptance.
 
 ## Other retained limitations
 
@@ -132,4 +132,4 @@ Resume from fixture creation, then run sync, positive Generate discovery, Canvas
 
 ## Recommended B31
 
-Run one bounded permission-enabled Canvas image acceptance handoff: a Teacher/Designer or sandbox owner creates the direct teaching-module File item, then the current authenticated Android flow completes the remaining B30 discovery, acquisition, OCR, provenance, generation, persistence, and Library checks without further routing changes.
+Run student-accessible Canvas material acceptance using only real materials already available to the authenticated Student account. Exercise fresh synchronization, Generate routing, owner-scoped acquisition, extraction/OCR where applicable, provenance, fresh Reviewer generation, persistence, Queue behavior, Android Library reopen, and relaunch retrieval without requiring instructor cooperation or Canvas modification.

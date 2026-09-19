@@ -2,7 +2,52 @@
 
 ## B30 Canvas instructional-image production acceptance (2026-09-19)
 
-**PARTIAL — the image-routing guard is deployed, READY, healthy, and verified to exclude administrative and ungrouped image noise after fresh physical-device synchronization.** The available Canvas identity is Student-only and has no editable course, preventing creation of the required direct teaching-module image fixture. Positive Canvas discovery, acquisition, OCR provenance, fresh Reviewer generation, and Library reopen remain unexercised; no implementation defect was found. See [B30 acceptance](ai/acceptance/b30/canvas-instructional-image-production-acceptance.md). Next bounded task: permission-enabled handoff to a Teacher/Designer collaborator or editable sandbox owner for the remaining positive image path.
+**PARTIAL / CLOSED WITH PLATFORM LIMITATION — the image-routing guard is deployed, READY, healthy, and verified to exclude administrative and ungrouped image noise after fresh physical-device synchronization.** The Student-only Canvas identity cannot create a direct teaching-module image fixture. Teacher/Designer cooperation and sandbox access will not be pursued. Automated routing tests remain the acceptance evidence unless a suitable student-accessible instructional image occurs naturally. This external Canvas-permission limitation does not block the student product roadmap. See [B30 acceptance](ai/acceptance/b30/canvas-instructional-image-production-acceptance.md).
+
+## B31 student-accessible Canvas material acceptance
+
+Status: Next.
+
+Use real instructional materials already accessible through the normal Canvas Student account. Do not require instructor cooperation, modify course content, or fabricate Canvas fixtures.
+
+Priority source types:
+
+1. multi-page PDF;
+2. scanned or image-based PDF;
+3. DOCX;
+4. PPTX;
+5. Canvas Page;
+6. an existing instructional PNG/JPEG only when naturally available.
+
+For every available type, validate fresh Canvas synchronization, Generate routing, Announcements/Tasks separation, owner-scoped acquisition, MIME/signature validation, extraction or OCR quality, source ordering, provenance, fresh Reviewer generation, owner-linked persistence, Queue/background behavior, Android Library reopen, and relaunch retrieval where practical. Exclude outlines, administrative syllabi, announcements, profile images, banners, logos, decorative images, and fabricated fixtures.
+
+## B32 scanned-PDF reliability
+
+Status: Planned after B31 and higher priority than forcing a Canvas-image fixture.
+
+Resolve multi-page scanned-PDF ordering, the 16-page Accounting inspection stall, OCR timeout and failure handling, page-order preservation, partial-extraction protection, and long-running generation behavior using realistic student materials that require no instructor access.
+
+## B33 DOCX and PPTX production acceptance
+
+Status: Planned after B32.
+
+Validate real student-accessible Canvas DOCX acquisition, extraction, provenance, generation, persistence, and Android Library reopen, then repeat for PPTX when a suitable file exists. If Canvas lacks a suitable file, validate the matching direct-upload extractor while keeping Canvas-specific acceptance explicitly untested.
+
+## B34 generation quality acceptance
+
+Status: Planned after available student-material ingestion is reliable.
+
+Evaluate Reviewer, Quiz, and Activity/task quality; grounding; source fidelity; formatting; larger-context behavior; and malformed or low-information handling using real instructional materials rather than administrative outlines.
+
+## B35 mobile product acceptance
+
+Status: Planned after B34.
+
+Validate Today, Generate, Tasks, Queue, Library, Reviewer, Quiz, Activity, relaunch persistence, authentication persistence, failure/retry states, and background generation on the physical Android device.
+
+## Canvas permission boundary
+
+Stay Focused V2 will not depend on teacher or instructor cooperation for development, testing, demonstration, or capstone acceptance. Features requiring Teacher/Designer privileges must be supported by automated tests, exercised only through naturally available student-accessible content, or documented as external platform-permission limitations. They do not block the core student product roadmap.
 
 ## B29 live OCR and learning-image acceptance (2026-09-19)
 

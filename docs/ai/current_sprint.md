@@ -1,8 +1,12 @@
 # Current Sprint
 
+## B31 student-accessible Canvas material acceptance (planned)
+
+Use only real instructional materials already accessible through the normal Canvas Student account. Prioritize substantive multi-page PDF, scanned/image-based PDF, DOCX, PPTX, Canvas Page, and any naturally occurring instructional image. For every available type, validate production discovery, Generate routing, owner-scoped acquisition, MIME/signature checks, extraction or OCR, ordering, provenance, fresh Reviewer generation, persistence, Queue/background behavior, Android Library reopen, and relaunch retrieval where practical. Do not require instructor cooperation, modify Canvas course content, or fabricate a Canvas fixture.
+
 ## B30 Canvas instructional-image production acceptance (2026-09-19)
 
-**PARTIAL — the B29 routing guard is deployed and negative production acceptance passes, but the required positive Canvas fixture cannot be authored with the available Student account.** Deployment `dpl_3LCFzi9ao68Upsiir8GFL1kroX82` is READY, healthy, and serves the canonical production alias. Four fresh Android-triggered Canvas sync jobs succeeded. Physical Generate checks kept CC16 `APA Sample.png` under `General Information` and five ungrouped CC13 logos/banner/profile images excluded; Announcements and Tasks remained separate. The authenticated account has no Teacher/Designer access or editable sandbox, so direct teaching-module placement, Canvas image OCR/provenance, fresh Reviewer generation, and Library reopen are `NOT EXERCISED`. All required regressions and the isolated production build pass. See [B30 acceptance](acceptance/b30/canvas-instructional-image-production-acceptance.md). Next: a bounded permission-enabled handoff using a Teacher/Designer collaborator or editable Canvas sandbox.
+**PARTIAL / CLOSED WITH PLATFORM LIMITATION — the B29 routing guard is deployed and negative production acceptance passes.** Deployment `dpl_3LCFzi9ao68Upsiir8GFL1kroX82` is READY, healthy, and serves the canonical production alias. Four fresh Android-triggered Canvas sync jobs succeeded. Physical Generate checks kept CC16 `APA Sample.png` under `General Information` and five ungrouped CC13 logos/banner/profile images excluded; Announcements and Tasks remained separate. The Student account cannot author the positive direct-module fixture. Teacher/Designer cooperation and sandbox access will not be pursued; automated routing coverage remains the evidence unless a suitable student-accessible image occurs naturally. See [B30 acceptance](acceptance/b30/canvas-instructional-image-production-acceptance.md). Next: B31 student-accessible Canvas material acceptance.
 
 ## B29 live OCR and learning-image acceptance (2026-09-19)
 
