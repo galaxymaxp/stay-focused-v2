@@ -6,6 +6,7 @@ import { createOrReuseReviewerSourceSnapshot, validateCanvasPreviewSessionForGen
 import { createReviewerProcessingJob, validateIdempotencyKey, ProcessingJobCreationError } from '@/lib/processing-jobs/creation';
 import { findProcessingJobByIdempotencyKey, findProcessingJobSource } from '@/lib/processing-jobs/repository';
 import { scheduleAcceptedProcessingJobDispatch } from '@/lib/processing-jobs/background-dispatch';
+import { DEFERRED_CANVAS_REVIEWER_VERSION } from '@/lib/processing-jobs/deferred-canvas-reviewer-contract';
 import { ExperienceFailure } from './errors';
 import { record } from './mappers';
 
@@ -39,6 +40,32 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     if (!prepared.ok || !prepared.value.results.every(r => r.status === 'ready')) throw new ExperienceFailure(409, 'not_ready');
   } else if (descriptor.capability !== 'ready' || descriptor.availability !== 'available') {
     throw new ExperienceFailure(409, 'not_ready');
+  }
+  if (descriptor.file?.kind === 'pdf' && descriptor.file.preparationStatus === 'ready') {
+    try {
+      const job = await createReviewerProcessingJob({ client, userId, idempotencyKey: key, source: {
+        sourceText: `canvas-source-reference:${input.courseId}:${input.materialId}`,
+        sourceTitle: descriptor.title,
+        sourcePrivateMetadata: {
+          canvasCourseId: input.courseId,
+          canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
+          canvasItemIds: [input.materialId],
+        },
+      } });
+      const storedSource = await findProcessingJobSource(client, job);
+      const metadata = record(storedSource.metadata);
+      if (job.user_id !== userId || job.job_type !== 'reviewer_generation' || metadata.canvasCourseId !== input.courseId || !Array.isArray(metadata.canvasItemIds) || metadata.canvasItemIds.length !== 1 || metadata.canvasItemIds[0] !== input.materialId) throw new ExperienceFailure(409, 'conflict');
+      logGenerationAdmissionMemory('deferred_job_created', { jobCount: 1 });
+      scheduleAcceptedProcessingJobDispatch(job);
+      logGenerationAdmissionMemory('workflow_dispatch_scheduled', { jobCount: 1 });
+      return job;
+    } catch (error) {
+      if (error instanceof ProcessingJobCreationError) {
+        if (error.code === 'processing_job_idempotency_conflict') throw new ExperienceFailure(409, 'conflict');
+        if (error.code.includes('limit_reached')) throw new ExperienceFailure(429, 'rate_limited');
+      }
+      throw error;
+    }
   }
   const structure = await structureCanvasReviewerSources({ client, userId, courseId: input.courseId, sourceIds: [input.materialId] });
   if (!structure.ok) throw new ExperienceFailure(409, 'not_ready');

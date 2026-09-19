@@ -4141,6 +4141,16 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      attach_deferred_canvas_reviewer_source_v1: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_source_text: string;
+          p_source_title: string;
+          p_source_metadata: Json;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       import_canvas_assignments_as_tasks_v1: {
         Args: {
           p_user_id: string;

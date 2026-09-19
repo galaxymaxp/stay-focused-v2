@@ -66,6 +66,25 @@ describe('student Reviewer admission adapter', () => {
     await startReviewerGeneration(client, 'owner', input, 'request-key');
     expect(mocks.prepare).toHaveBeenCalledWith({ client, userId: 'owner', courseId: 'course', sourceIds: [input.materialId] });
   });
+  it('durably accepts a ready PDF reference before OCR or source assembly', async () => {
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: input.materialId, title: 'Scanned notes.pdf', capability: 'ready', availability: 'available', file: { kind: 'pdf', preparationStatus: 'ready' } }], pagination: { hasMore: false } } });
+    expect(await startReviewerGeneration(client, 'owner', input, 'request-key')).toEqual(job);
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'owner',
+      source: expect.objectContaining({
+        sourceText: 'canvas-source-reference:course:file:material',
+        sourceTitle: 'Scanned notes.pdf',
+        sourcePrivateMetadata: expect.objectContaining({
+          canvasCourseId: 'course',
+          canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1',
+          canvasItemIds: [input.materialId],
+        }),
+      }),
+    }));
+    expect(mocks.structure).not.toHaveBeenCalled();
+    expect(mocks.preview).not.toHaveBeenCalled();
+    expect(mocks.schedule).toHaveBeenCalledWith(job);
+  });
   it('requires an idempotency key before doing any source work', async () => {
     await expect(startReviewerGeneration(client, 'owner', input, null)).rejects.toMatchObject({ status: 400 });
     expect(mocks.list).not.toHaveBeenCalled();

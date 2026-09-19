@@ -135,6 +135,7 @@ export async function processingJobWorkflow(
       }
       await finalizeExtractionStep(jobId, workerId);
     } else {
+      await prepareCanvasReviewerStep(jobId, workerId);
       await processAIReviewerStep(jobId, workerId);
     }
 
@@ -143,6 +144,37 @@ export async function processingJobWorkflow(
     await finalizeWorkflowFailureStep(jobId, workerId);
     return { status: "failed", jobId };
   }
+}
+
+async function prepareCanvasReviewerStep(jobId: string, workerId: string): Promise<void> {
+  "use step";
+  safeStepLog("prepare_canvas_reviewer", "start", jobId);
+  const client = createProcessingJobServiceClient();
+  const job = await readProcessingJobState(client, jobId);
+  await withWorkflowLease(client, jobId, workerId, async () => {
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    try {
+      const { prepareDeferredCanvasReviewerSource } = await import(
+        "@/lib/processing-jobs/deferred-canvas-reviewer"
+      );
+      await prepareDeferredCanvasReviewerSource({ client, job, workerId });
+    } catch (error) {
+      const { ExperienceFailure } = await import("@/lib/experience/errors");
+      if (error instanceof ExperienceFailure && error.status < 500) {
+        await failProcessingJob(client, {
+          jobId,
+          workerId,
+          errorCode: error.code,
+          safeErrorMessage: "The Canvas source could not be prepared completely.",
+          retryable: false,
+          automaticRetryable: false,
+        });
+        throw new FatalError(error.code);
+      }
+      throw error;
+    }
+  });
+  safeStepLog("prepare_canvas_reviewer", "done", jobId);
 }
 
 async function processQuizStep(jobId: string, workerId: string): Promise<void> {
