@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), prepare: vi.fn(), structure: vi.fn(), preview: vi.fn(), validate: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), existing: vi.fn(), source: vi.fn(), create: vi.fn(), dispatch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), prepare: vi.fn(), structure: vi.fn(), preview: vi.fn(), validate: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), existing: vi.fn(), source: vi.fn(), create: vi.fn(), schedule: vi.fn() }));
 vi.mock('@/lib/canvas-reviewer-sources', () => ({ listCanvasReviewerSources: mocks.list, prepareCanvasReviewerSources: mocks.prepare, structureCanvasReviewerSources: mocks.structure, previewSelectiveCanvasReviewerSources: mocks.preview }));
 vi.mock('@/lib/reviewer-source-provenance', () => ({ validateCanvasPreviewSessionForGeneration: mocks.validate, createOrReuseReviewerSourceSnapshot: mocks.snapshot }));
 vi.mock('@/lib/canvas-reviewer-generation-gate', () => ({ validateCanvasReviewerGenerationGate: mocks.gate }));
 vi.mock('@/lib/processing-jobs/repository', () => ({ findProcessingJobByIdempotencyKey: mocks.existing, findProcessingJobSource: mocks.source }));
 vi.mock('@/lib/processing-jobs/creation', () => ({ createReviewerProcessingJob: mocks.create, validateIdempotencyKey: (key: string | null) => { if (!key || key.length < 8) throw new Error('bad key'); return key; }, ProcessingJobCreationError: class extends Error {} }));
-vi.mock('@/lib/processing-jobs/workflow-dispatch', () => ({ dispatchAcceptedProcessingJob: mocks.dispatch }));
+vi.mock('@/lib/processing-jobs/background-dispatch', () => ({ scheduleAcceptedProcessingJobDispatch: mocks.schedule }));
 import { startReviewerGeneration } from './generation';
 const client = {} as SupabaseClient<Database>;
 const input = { courseId: 'course', materialId: 'file:material' };
@@ -21,7 +21,7 @@ beforeEach(() => {
   mocks.validate.mockResolvedValue({ ok: true, value: { row: { user_id: 'owner' } } });
   mocks.gate.mockResolvedValue({ ok: true });
   mocks.snapshot.mockResolvedValue({ ok: true, value: { sourceSnapshotId: 'snapshot' } });
-  mocks.create.mockResolvedValue(job); mocks.dispatch.mockImplementation(async value => value);
+  mocks.create.mockResolvedValue(job);
   mocks.source.mockResolvedValue({ metadata: { canvasCourseId: input.courseId, canvasItemIds: [input.materialId] } });
 });
 describe('student Reviewer admission adapter', () => {
@@ -30,19 +30,20 @@ describe('student Reviewer admission adapter', () => {
     expect(mocks.preview).toHaveBeenCalledWith(expect.objectContaining({ selectedBlockIds: ['a'], userId: 'owner' }));
     expect(mocks.gate).toHaveBeenCalledWith(expect.objectContaining({ userId: 'owner', itemIds: [input.materialId], resolutionFingerprint: 'fingerprint' }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'owner', source: expect.objectContaining({ sourceText: 'Accepted source', sourcePrivateMetadata: expect.objectContaining({ reviewerSourceSnapshotId: 'snapshot' }) }) }));
-    expect(mocks.dispatch).toHaveBeenCalledOnce();
+    expect(mocks.schedule).toHaveBeenCalledWith(job);
   });
   it('reconnects an accepted owner/material identity without preparing again', async () => {
     mocks.existing.mockResolvedValue(job);
     mocks.source.mockResolvedValue({ metadata: { canvasCourseId: 'course', canvasItemIds: [input.materialId] } });
     await startReviewerGeneration(client, 'owner', input, 'request-key');
     expect(mocks.list).not.toHaveBeenCalled(); expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.schedule).toHaveBeenCalledWith(job);
   });
   it('rejects reuse for a different material', async () => {
     mocks.existing.mockResolvedValue(job);
     mocks.source.mockResolvedValue({ metadata: { canvasCourseId: 'course', canvasItemIds: ['file:other'] } });
     await expect(startReviewerGeneration(client, 'owner', input, 'request-key')).rejects.toMatchObject({ status: 409 });
-    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.dispatch).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.schedule).not.toHaveBeenCalled();
   });
   it('denies a foreign course/material before generation', async () => {
     mocks.list.mockResolvedValue({ ok: false, status: 404 });
@@ -72,6 +73,6 @@ describe('student Reviewer admission adapter', () => {
   it('rejects a concurrently accepted different material even with matching text', async () => {
     mocks.source.mockResolvedValue({ metadata: { canvasCourseId: input.courseId, canvasItemIds: ['file:other'] } });
     await expect(startReviewerGeneration(client, 'owner', input, 'request-key')).rejects.toMatchObject({ status: 409 });
-    expect(mocks.dispatch).not.toHaveBeenCalled();
+    expect(mocks.schedule).not.toHaveBeenCalled();
   });
 });

@@ -5,12 +5,13 @@ import { validateCanvasReviewerGenerationGate } from '@/lib/canvas-reviewer-gene
 import { createOrReuseReviewerSourceSnapshot, validateCanvasPreviewSessionForGeneration } from '@/lib/reviewer-source-provenance';
 import { createReviewerProcessingJob, validateIdempotencyKey, ProcessingJobCreationError } from '@/lib/processing-jobs/creation';
 import { findProcessingJobByIdempotencyKey, findProcessingJobSource } from '@/lib/processing-jobs/repository';
-import { dispatchAcceptedProcessingJob } from '@/lib/processing-jobs/workflow-dispatch';
+import { scheduleAcceptedProcessingJobDispatch } from '@/lib/processing-jobs/background-dispatch';
 import { ExperienceFailure } from './errors';
 import { record } from './mappers';
 
 export interface StartReviewerGeneration { readonly courseId: string; readonly materialId: string }
 export async function startReviewerGeneration(client: SupabaseClient<Database>, userId: string, input: StartReviewerGeneration, requestKey: string | null): Promise<ProcessingJobDatabaseRow> {
+  logGenerationAdmissionMemory('request_started', { sourceCount: 1 });
   let key: string;
   try { key = validateIdempotencyKey(requestKey); } catch { throw new ExperienceFailure(400, 'invalid_request'); }
   // Reconnect accepted work before preparing the source again. Material identity
@@ -21,7 +22,9 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     const source = await findProcessingJobSource(client, existing);
     const metadata = record(source.metadata);
     if (existing.user_id !== userId || existing.job_type !== 'reviewer_generation' || metadata.canvasCourseId !== input.courseId || !Array.isArray(metadata.canvasItemIds) || metadata.canvasItemIds.length !== 1 || metadata.canvasItemIds[0] !== input.materialId) throw new ExperienceFailure(409, 'conflict');
-    return dispatchAcceptedProcessingJob(existing);
+    scheduleAcceptedProcessingJobDispatch(existing);
+    logGenerationAdmissionMemory('existing_job_dispatch_scheduled', { jobCount: 1 });
+    return existing;
   }
   let descriptor;
   for (let offset = 0; offset <= 1000; offset += 100) {
@@ -39,9 +42,25 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
   }
   const structure = await structureCanvasReviewerSources({ client, userId, courseId: input.courseId, sourceIds: [input.materialId] });
   if (!structure.ok) throw new ExperienceFailure(409, 'not_ready');
+  const pageNumbers = [...new Set(structure.value.sources.flatMap(source => source.blocks.flatMap(block => block.pageNumber === undefined ? [] : [block.pageNumber])))].sort((left, right) => left - right);
+  logGenerationAdmissionMemory('source_structured', {
+    expectedPageCount: structure.value.sources.reduce((total, source) => total + (source.pageCount ?? 0), 0),
+    accountedPageCount: pageNumbers.length,
+    firstPageNumber: pageNumbers[0] ?? 0,
+    lastPageNumber: pageNumbers.at(-1) ?? 0,
+    selectedBlockCount: structure.value.selectedByDefaultCount,
+  });
+  console.info('experience_generation.page_accounting', {
+    expectedPageCount: structure.value.sources.map(source => source.pageCount ?? null),
+    accountedPageNumbers: pageNumbers,
+  });
   const selectedBlockIds = structure.value.sources.flatMap(source => source.blocks.filter(block => block.selectedByDefault).map(block => block.id));
   const preview = await previewSelectiveCanvasReviewerSources({ client, userId, courseId: input.courseId, structureSessionId: structure.value.structureSessionId, selectedBlockIds });
   if (!preview.ok) throw new ExperienceFailure(409, 'not_ready');
+  logGenerationAdmissionMemory('preview_created', {
+    sourceCharacterCount: preview.value.sourceText.length,
+    selectedBlockCount: preview.value.selectedBlockCount ?? selectedBlockIds.length,
+  });
   const accepted = await validateCanvasPreviewSessionForGeneration({ client, userId, previewSessionId: preview.value.previewSessionId });
   if (!accepted.ok || !accepted.value) throw new ExperienceFailure(409, 'not_ready');
   const gate = await validateCanvasReviewerGenerationGate({ client, userId, courseId: input.courseId, itemIds: [input.materialId], previewSession: accepted.value, resolutionFingerprint: preview.value.resolutionFingerprint });
@@ -59,7 +78,10 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     const storedSource = await findProcessingJobSource(client, job);
     const metadata = record(storedSource.metadata);
     if (metadata.canvasCourseId !== input.courseId || !Array.isArray(metadata.canvasItemIds) || metadata.canvasItemIds.length !== 1 || metadata.canvasItemIds[0] !== input.materialId) throw new ExperienceFailure(409, 'conflict');
-    return await dispatchAcceptedProcessingJob(job);
+    logGenerationAdmissionMemory('job_created', { jobCount: 1 });
+    scheduleAcceptedProcessingJobDispatch(job);
+    logGenerationAdmissionMemory('workflow_dispatch_scheduled', { jobCount: 1 });
+    return job;
   } catch (error) {
     if (error instanceof ProcessingJobCreationError) {
       if (error.code === 'processing_job_idempotency_conflict') throw new ExperienceFailure(409, 'conflict');
@@ -67,4 +89,19 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     }
     throw error;
   }
+}
+
+function logGenerationAdmissionMemory(
+  stage: string,
+  fields: Readonly<Record<string, number>>,
+): void {
+  const memory = process.memoryUsage();
+  console.info('experience_generation.memory', {
+    stage,
+    rssBytes: memory.rss,
+    heapUsedBytes: memory.heapUsed,
+    externalBytes: memory.external,
+    arrayBufferBytes: memory.arrayBuffers,
+    ...fields,
+  });
 }
