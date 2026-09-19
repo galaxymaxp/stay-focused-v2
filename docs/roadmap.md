@@ -1,35 +1,22 @@
 # Roadmap
 
+## B31 student-accessible Canvas material acceptance (2026-09-19)
+
+**PARTIAL — fresh Student-accessible Canvas text PDF, DOCX, PPTX, and Page Reviewers pass production generation, persistence, Queue/background use, Android Library retrieval, and relaunch reopen.** A proven FL 100 administrative-module routing defect was narrowly repaired and deployed as READY production `dpl_DKat3ypp6q4V5UETSKuDbJjLymcK`. The real 16-page Accounting scan now prepares to `PDF · ready`, but generation submission OOMs before durable job creation; exact internal provenance/byte/signature fields were not safely inspectable from student-facing surfaces. No eligible instructional image exists. See [B31 acceptance](ai/acceptance/b31/student-accessible-canvas-material-production-acceptance.md). Next: B32 scanned-PDF reliability.
+
 ## B30 Canvas instructional-image production acceptance (2026-09-19)
 
 **PARTIAL / CLOSED WITH PLATFORM LIMITATION — the image-routing guard is deployed, READY, healthy, and verified to exclude administrative and ungrouped image noise after fresh physical-device synchronization.** The Student-only Canvas identity cannot create a direct teaching-module image fixture. Teacher/Designer cooperation and sandbox access will not be pursued. Automated routing tests remain the acceptance evidence unless a suitable student-accessible instructional image occurs naturally. This external Canvas-permission limitation does not block the student product roadmap. See [B30 acceptance](ai/acceptance/b30/canvas-instructional-image-production-acceptance.md).
 
-## B31 student-accessible Canvas material acceptance
-
-Status: Next.
-
-Use real instructional materials already accessible through the normal Canvas Student account. Do not require instructor cooperation, modify course content, or fabricate Canvas fixtures.
-
-Priority source types:
-
-1. multi-page PDF;
-2. scanned or image-based PDF;
-3. DOCX;
-4. PPTX;
-5. Canvas Page;
-6. an existing instructional PNG/JPEG only when naturally available.
-
-For every available type, validate fresh Canvas synchronization, Generate routing, Announcements/Tasks separation, owner-scoped acquisition, MIME/signature validation, extraction or OCR quality, source ordering, provenance, fresh Reviewer generation, owner-linked persistence, Queue/background behavior, Android Library reopen, and relaunch retrieval where practical. Exclude outlines, administrative syllabi, announcements, profile images, banners, logos, decorative images, and fabricated fixtures.
-
 ## B32 scanned-PDF reliability
 
-Status: Planned after B31 and higher priority than forcing a Canvas-image fixture.
+Status: Next and higher priority than forcing a Canvas-image fixture.
 
-Resolve multi-page scanned-PDF ordering, the 16-page Accounting inspection stall, OCR timeout and failure handling, page-order preservation, partial-extraction protection, and long-running generation behavior using realistic student materials that require no instructor access.
+Resolve the 16-page Accounting prepared-source generation memory failure, verify live multi-page OCR invocation and ordering, and retain bounded timeout, page-order, partial-extraction, and failure-safety behavior using realistic student materials that require no instructor access.
 
 ## B33 DOCX and PPTX production acceptance
 
-Status: Planned after B32.
+Status: Baseline production acceptance completed early in B31; deeper format hardening remains planned after B32 if new defects are proven.
 
 Validate real student-accessible Canvas DOCX acquisition, extraction, provenance, generation, persistence, and Android Library reopen, then repeat for PPTX when a suitable file exists. If Canvas lacks a suitable file, validate the matching direct-upload extractor while keeping Canvas-specific acceptance explicitly untested.
 

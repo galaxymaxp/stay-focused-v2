@@ -1,8 +1,8 @@
 # Current Sprint
 
-## B31 student-accessible Canvas material acceptance (planned)
+## B31 student-accessible Canvas material acceptance (2026-09-19)
 
-Use only real instructional materials already accessible through the normal Canvas Student account. Prioritize substantive multi-page PDF, scanned/image-based PDF, DOCX, PPTX, Canvas Page, and any naturally occurring instructional image. For every available type, validate production discovery, Generate routing, owner-scoped acquisition, MIME/signature checks, extraction or OCR, ordering, provenance, fresh Reviewer generation, persistence, Queue/background behavior, Android Library reopen, and relaunch retrieval where practical. Do not require instructor cooperation, modify Canvas course content, or fabricate a Canvas fixture.
+**PARTIAL — real Student-accessible Canvas text PDF, DOCX, PPTX, and Page paths completed fresh production Reviewers and Android persistence/reopen.** FL 100 and CIT5 were added as concluded-course selections without Canvas mutation. Production exposed an administrative `Module 0: Course Information Module` routing defect; the exact-label guard and regression were deployed in READY `dpl_DKat3ypp6q4V5UETSKuDbJjLymcK`, after which the eight administrative items disappeared while lesson materials remained. The 16-page Accounting scan now prepares to `PDF · ready` but two generation submissions OOM before durable job creation. Safe student/log surfaces do not expose every requested internal provenance/validation field, and no eligible instructional image exists. See [B31 acceptance](acceptance/b31/student-accessible-canvas-material-production-acceptance.md). Next: B32 scanned-PDF reliability.
 
 ## B30 Canvas instructional-image production acceptance (2026-09-19)
 
