@@ -1,9 +1,11 @@
 import type { Database, ProcessingJobDatabaseRow } from '@stay-focused/db';
+import type { CanvasFileRow } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { listCanvasReviewerSources, prepareCanvasReviewerSources, structureCanvasReviewerSources, previewSelectiveCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
+import { classifyStoredCanvasFileKind, isPreparedCanvasFileReadyForOcr } from '@/lib/canvas-stored-file-extraction';
 import { validateCanvasReviewerGenerationGate } from '@/lib/canvas-reviewer-generation-gate';
 import { createOrReuseReviewerSourceSnapshot, validateCanvasPreviewSessionForGeneration } from '@/lib/reviewer-source-provenance';
-import { createReviewerProcessingJob, validateIdempotencyKey, ProcessingJobCreationError } from '@/lib/processing-jobs/creation';
+import { createDeferredCanvasReviewerProcessingJob, createReviewerProcessingJob, validateIdempotencyKey, ProcessingJobCreationError } from '@/lib/processing-jobs/creation';
 import { findProcessingJobByIdempotencyKey, findProcessingJobSource } from '@/lib/processing-jobs/repository';
 import { scheduleAcceptedProcessingJobDispatch } from '@/lib/processing-jobs/background-dispatch';
 import { DEFERRED_CANVAS_REVIEWER_VERSION } from '@/lib/processing-jobs/deferred-canvas-reviewer-contract';
@@ -43,9 +45,12 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
   }
   if (descriptor.file?.kind === 'pdf' && descriptor.file.preparationStatus === 'ready') {
     try {
-      const job = await createReviewerProcessingJob({ client, userId, idempotencyKey: key, source: {
-        sourceText: `canvas-source-reference:${input.courseId}:${input.materialId}`,
-        sourceTitle: descriptor.title,
+      const fileRow = await readOwnedPreparedPdf(client, userId, input.courseId, input.materialId);
+      const job = await createDeferredCanvasReviewerProcessingJob({ client, userId, idempotencyKey: key, source: {
+        byteSize: fileRow.stored_byte_count!,
+        canvasFileRowId: fileRow.id,
+        contentSha256: fileRow.current_sha256!,
+        displayName: descriptor.title,
         sourcePrivateMetadata: {
           canvasCourseId: input.courseId,
           canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
@@ -116,6 +121,37 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     }
     throw error;
   }
+}
+
+async function readOwnedPreparedPdf(
+  client: SupabaseClient<Database>,
+  userId: string,
+  courseId: string,
+  materialId: string,
+): Promise<CanvasFileRow> {
+  const match = /^file:([0-9a-f-]{36})$/i.exec(materialId);
+  if (!match?.[1]) throw new ExperienceFailure(404, 'not_found');
+  const { data, error } = await client
+    .from('canvas_files')
+    .select('*')
+    .eq('id', match[1])
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .maybeSingle();
+  const file = data as CanvasFileRow | null;
+  if (error) throw new ExperienceFailure(503, 'unavailable');
+  if (!file) throw new ExperienceFailure(404, 'not_found');
+  if (
+    classifyStoredCanvasFileKind(file) !== 'pdf' ||
+    !isPreparedCanvasFileReadyForOcr(file) ||
+    !file.storage_bucket ||
+    !file.storage_object_key ||
+    !file.current_sha256 ||
+    typeof file.stored_byte_count !== 'number'
+  ) {
+    throw new ExperienceFailure(409, 'not_ready');
+  }
+  return file;
 }
 
 function logGenerationAdmissionMemory(

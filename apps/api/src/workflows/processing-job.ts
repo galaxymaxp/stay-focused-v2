@@ -26,10 +26,12 @@ import {
 createInspectedPdfPages,
 extractPreparedPdfOcrChunk,
 extractWithOcrProvider,
+validatePdfOcrBytes,
 } from "@/lib/ocr/extraction-service";
 import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
 import {
 getConfiguredDurableDocumentMaxOcrPages,
+getConfiguredDurableDocumentMaxPdfPages,
 OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
 } from "@/lib/ocr/upload-policy";
 import {
@@ -135,7 +137,25 @@ export async function processingJobWorkflow(
       }
       await finalizeExtractionStep(jobId, workerId);
     } else {
-      await prepareCanvasReviewerStep(jobId, workerId);
+      const deferredCanvasPdf = await prepareCanvasReviewerExtractionStep(jobId, workerId);
+      if (deferredCanvasPdf) {
+        const plan = await prepareExtractionStep(jobId, workerId, true);
+        if (plan.kind !== "pdf") throw new FatalError("processing_job_source_invalid");
+        for (
+          let offset = 0;
+          offset < plan.chunks.length;
+          offset += WORKFLOW_OCR_CHUNK_CONCURRENCY
+        ) {
+          await Promise.all(
+            plan.chunks
+              .slice(offset, offset + WORKFLOW_OCR_CHUNK_CONCURRENCY)
+              .map((chunk) =>
+                extractPdfChunkStep(jobId, workerId, chunk.index, chunk.pageNumbers)
+              ),
+          );
+        }
+        await finalizeCanvasReviewerExtractionStep(jobId, workerId);
+      }
       await processAIReviewerStep(jobId, workerId);
     }
 
@@ -146,35 +166,44 @@ export async function processingJobWorkflow(
   }
 }
 
-async function prepareCanvasReviewerStep(jobId: string, workerId: string): Promise<void> {
+async function prepareCanvasReviewerExtractionStep(jobId: string, workerId: string): Promise<boolean> {
   "use step";
-  safeStepLog("prepare_canvas_reviewer", "start", jobId);
+  safeStepLog("prepare_canvas_reviewer_extraction", "start", jobId);
   const client = createProcessingJobServiceClient();
   const job = await readProcessingJobState(client, jobId);
+  const { isDeferredCanvasReviewerJob } = await import(
+    "@/lib/processing-jobs/deferred-canvas-reviewer"
+  );
+  if (!await isDeferredCanvasReviewerJob({ client, job })) return false;
   await withWorkflowLease(client, jobId, workerId, async () => {
     await assertWorkflowJobMayContinue(client, jobId, workerId);
-    try {
-      const { prepareDeferredCanvasReviewerSource } = await import(
-        "@/lib/processing-jobs/deferred-canvas-reviewer"
-      );
-      await prepareDeferredCanvasReviewerSource({ client, job, workerId });
-    } catch (error) {
-      const { ExperienceFailure } = await import("@/lib/experience/errors");
-      if (error instanceof ExperienceFailure && error.status < 500) {
-        await failProcessingJob(client, {
-          jobId,
-          workerId,
-          errorCode: error.code,
-          safeErrorMessage: "The Canvas source could not be prepared completely.",
-          retryable: false,
-          automaticRetryable: false,
-        });
-        throw new FatalError(error.code);
-      }
-      throw error;
+    const source = await findProcessingJobSource(client, job);
+    if (source.source_kind !== "pdf") throw new FatalError("processing_job_source_invalid");
+    if (source.page_count) return;
+    const bytes = await downloadSourceBytes(client, source);
+    const validation = await validatePdfOcrBytes({
+      bytes,
+      documentMaxPages: getConfiguredDurableDocumentMaxPdfPages(),
+      fileName: source.display_name,
+      mimeType: source.mime_type,
+    });
+    if (!validation.ok) {
+      await failKnownWorkflowJob(client, jobId, workerId, {
+        code: validation.code,
+        message: "The Canvas PDF could not be validated for complete extraction.",
+        retryable: false,
+      });
+      throw new FatalError(validation.code);
     }
+    const { error } = await client
+      .from("processing_job_sources")
+      .update({ page_count: validation.pageCount })
+      .eq("id", source.id)
+      .eq("user_id", job.user_id);
+    if (error) throw new Error("processing_job_source_page_count_update_failed");
   });
-  safeStepLog("prepare_canvas_reviewer", "done", jobId);
+  safeStepLog("prepare_canvas_reviewer_extraction", "done", jobId);
+  return true;
 }
 
 async function processQuizStep(jobId: string, workerId: string): Promise<void> {
@@ -245,6 +274,7 @@ async function claimWorkflowJobStep(
 async function prepareExtractionStep(
   jobId: string,
   workerId: string,
+  skipStructuredParser = false,
 ): Promise<ExtractionWorkflowPlan> {
   "use step";
   safeStepLog("prepare_extraction", "start", jobId);
@@ -320,7 +350,7 @@ async function prepareExtractionStep(
       .filter((page) => page.kind === "ocr")
       .map((page) => page.pageNumber);
     const parserConfig = readDocumentParserConfig();
-    if (parserConfig.mode !== "legacy") {
+    if (!skipStructuredParser && parserConfig.mode !== "legacy") {
       const structured = await tryParseStructuredPdf({
         bytes,
         mimeType: source.mime_type,
@@ -702,6 +732,85 @@ async function finalizeExtractionStep(
     });
   }, { heartbeatAfterOperation: false });
   safeStepLog("finalize_extraction", "done", jobId);
+}
+
+async function finalizeCanvasReviewerExtractionStep(
+  jobId: string,
+  workerId: string,
+): Promise<void> {
+  "use step";
+  safeStepLog("finalize_canvas_reviewer_extraction", "start", jobId);
+  const client = createProcessingJobServiceClient();
+  const job = await readProcessingJobState(client, jobId);
+  await withWorkflowLease(client, jobId, workerId, async () => {
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    const [planRow, chunkRows] = await Promise.all([
+      readProcessingJobCheckpoint(client, jobId, EXTRACTION_PLAN_CHECKPOINT),
+      listProcessingJobCheckpoints(client, jobId, EXTRACTION_CHUNK_PREFIX),
+    ]);
+    const plan = readStoredExtractionPlan(planRow?.payload);
+    const chunkPages = chunkRows.flatMap((row) =>
+      readOcrPages(requireRecord(row.payload, "OCR chunk").pages)
+    );
+    const verification = verifyDocumentExtraction({
+      expectedPageCount: plan.pageCount,
+      pages: [...plan.pages, ...chunkPages],
+    });
+    console.info("deferred_canvas_reviewer.page_accounting", {
+      jobId,
+      expectedPageCount: plan.pageCount,
+      accountedPageNumbers: verification.pages.map((page) => page.pageNumber),
+      ordered: verification.pages.every((page, index) => page.pageNumber === index + 1),
+      sourceEligible: verification.sourceEligible,
+    });
+    if (!verification.sourceEligible) {
+      const code = verification.status === "incomplete"
+        ? "document_extraction_incomplete"
+        : "document_unreadable";
+      await failKnownWorkflowJob(client, jobId, workerId, {
+        code,
+        message: extractionFailureMessage(code),
+        retryable: code === "document_extraction_incomplete",
+      });
+      throw new FatalError(code);
+    }
+    const normalized = normalizeDocumentTextWithEvidence(verification.pages);
+    if (!normalized.text.trim()) {
+      await failKnownWorkflowJob(client, jobId, workerId, {
+        code: "no_text_detected",
+        message: "No readable text was detected in the source.",
+        retryable: false,
+      });
+      throw new FatalError("no_text_detected");
+    }
+    const { prepareDeferredCanvasReviewerSource } = await import(
+      "@/lib/processing-jobs/deferred-canvas-reviewer"
+    );
+    try {
+      await prepareDeferredCanvasReviewerSource({
+        client,
+        job,
+        normalizedText: normalized.text,
+        pages: verification.pages,
+        workerId,
+      });
+    } catch (error) {
+      const { ExperienceFailure } = await import("@/lib/experience/errors");
+      if (error instanceof ExperienceFailure && error.status < 500) {
+        await failProcessingJob(client, {
+          jobId,
+          workerId,
+          errorCode: error.code,
+          safeErrorMessage: "The Canvas source could not be prepared completely.",
+          retryable: false,
+          automaticRetryable: false,
+        });
+        throw new FatalError(error.code);
+      }
+      throw error;
+    }
+  });
+  safeStepLog("finalize_canvas_reviewer_extraction", "done", jobId);
 }
 
 async function processAIReviewerStep(jobId: string, workerId: string): Promise<void> {

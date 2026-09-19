@@ -30,6 +30,7 @@ import {
 } from "./contracts";
 import {
   createProcessingJobRecord,
+  createProcessingJobServiceClient,
   findProcessingJobByIdempotencyKey,
   ProcessingJobRepositoryError,
   type ProcessingJobServiceClient,
@@ -54,6 +55,14 @@ export interface ReviewerJobSourceInput {
   readonly language?: string;
   readonly outputMode?: string;
   readonly reuseMode?: GenerationReuseMode;
+}
+
+export interface DeferredCanvasReviewerJobSourceInput {
+  readonly byteSize: number;
+  readonly canvasFileRowId: string;
+  readonly contentSha256: string;
+  readonly displayName: string;
+  readonly sourcePrivateMetadata: Json;
 }
 
 export async function createExtractionProcessingJob({
@@ -320,6 +329,45 @@ export async function createReviewerProcessingJob({
     }
     throw mapRepositoryCreationError(error);
   }
+}
+
+export async function createDeferredCanvasReviewerProcessingJob({
+  client,
+  idempotencyKey,
+  source,
+  userId,
+}: {
+  readonly client: ProcessingJobServiceClient;
+  readonly idempotencyKey: string;
+  readonly source: DeferredCanvasReviewerJobSourceInput;
+  readonly userId: string;
+}): Promise<ProcessingJobDatabaseRow> {
+  const job = await createReviewerProcessingJob({
+    client,
+    idempotencyKey,
+    userId,
+    source: {
+      sourceText: `canvas-source-reference:${source.canvasFileRowId}:${source.contentSha256}`,
+      sourceTitle: source.displayName,
+      sourcePrivateMetadata: source.sourcePrivateMetadata,
+    },
+  });
+  const stagingClient = createProcessingJobServiceClient();
+  const { data, error } = await stagingClient.rpc("stage_deferred_canvas_reviewer_pdf_v1", {
+    p_canvas_file_id: source.canvasFileRowId,
+    p_expected_byte_size: source.byteSize,
+    p_expected_content_sha256: source.contentSha256,
+    p_job_id: job.id,
+  });
+  const staged = data?.[0];
+  if (error || !staged) {
+    throw new ProcessingJobCreationError(
+      "processing_job_persistence_failed",
+      "The Canvas PDF reference could not be staged durably.",
+      true,
+    );
+  }
+  return staged;
 }
 
 export function validateIdempotencyKey(

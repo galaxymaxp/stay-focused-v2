@@ -4151,6 +4151,15 @@ export interface Database {
         };
         Returns: ProcessingJobDatabaseRow[];
       };
+      stage_deferred_canvas_reviewer_pdf_v1: {
+        Args: {
+          p_job_id: string;
+          p_canvas_file_id: string;
+          p_expected_content_sha256: string;
+          p_expected_byte_size: number;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       import_canvas_assignments_as_tasks_v1: {
         Args: {
           p_user_id: string;

@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const repositoryMocks = vi.hoisted(() => ({
   create: vi.fn(),
   find: vi.fn(),
+  service: vi.fn(),
 }));
 
 vi.mock("./repository", () => ({
   createProcessingJobRecord: repositoryMocks.create,
+  createProcessingJobServiceClient: repositoryMocks.service,
   findProcessingJobByIdempotencyKey: repositoryMocks.find,
   ProcessingJobRepositoryError: class ProcessingJobRepositoryError extends Error {
     public constructor(public readonly code: string) {
@@ -17,6 +19,7 @@ vi.mock("./repository", () => ({
 }));
 
 import {
+  createDeferredCanvasReviewerProcessingJob,
   createExtractionProcessingJob,
   createReviewerProcessingJob,
   ProcessingJobCreationError,
@@ -27,6 +30,7 @@ describe("durable processing job creation", () => {
   beforeEach(() => {
     repositoryMocks.create.mockReset();
     repositoryMocks.find.mockReset();
+    repositoryMocks.service.mockReset();
   });
 
   it("does not report acceptance until durable persistence resolves", async () => {
@@ -157,6 +161,45 @@ describe("durable processing job creation", () => {
         }),
       }),
     );
+  });
+
+  it("creates a Canvas reviewer from a bounded private PDF reference", async () => {
+    repositoryMocks.find.mockResolvedValue(null);
+    repositoryMocks.create.mockResolvedValue(makeJob());
+    const staged = makeJob({ source_version_id: null });
+    const rpc = vi.fn(async () => ({ data: [staged], error: null }));
+    repositoryMocks.service.mockReturnValue({ rpc });
+
+    await expect(createDeferredCanvasReviewerProcessingJob({
+      client: {} as never,
+      idempotencyKey: "reviewer:canvas-pdf:1",
+      source: {
+        byteSize: 8_089_877,
+        canvasFileRowId: "00000000-0000-4000-8000-000000000001",
+        contentSha256: "a".repeat(64),
+        displayName: "Scanned notes.pdf",
+        sourcePrivateMetadata: {
+          canvasCourseId: "course",
+          canvasItemIds: ["file:item"],
+          canvasDeferredResolutionVersion: "canvas-reviewer-source-v1",
+        },
+      },
+      userId: "user-a",
+    })).resolves.toBe(staged);
+
+    expect(repositoryMocks.create).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sourceKind: "text",
+        sourceText: "canvas-source-reference:00000000-0000-4000-8000-000000000001:" + "a".repeat(64),
+      }),
+    );
+    expect(rpc).toHaveBeenCalledWith("stage_deferred_canvas_reviewer_pdf_v1", {
+      p_canvas_file_id: "00000000-0000-4000-8000-000000000001",
+      p_expected_byte_size: 8_089_877,
+      p_expected_content_sha256: "a".repeat(64),
+      p_job_id: "job-default",
+    });
   });
 
   it("removes an unreferenced staged object after a different-payload race", async () => {
