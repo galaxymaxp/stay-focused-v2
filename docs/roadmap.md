@@ -1,5 +1,9 @@
 # Roadmap
 
+## B30 Canvas instructional-image production acceptance (2026-09-19)
+
+**PARTIAL — the image-routing guard is deployed, READY, healthy, and verified to exclude administrative and ungrouped image noise after fresh physical-device synchronization.** The available Canvas identity is Student-only and has no editable course, preventing creation of the required direct teaching-module image fixture. Positive Canvas discovery, acquisition, OCR provenance, fresh Reviewer generation, and Library reopen remain unexercised; no implementation defect was found. See [B30 acceptance](ai/acceptance/b30/canvas-instructional-image-production-acceptance.md). Next bounded task: permission-enabled handoff to a Teacher/Designer collaborator or editable sandbox owner for the remaining positive image path.
+
 ## B29 live OCR and learning-image acceptance (2026-09-19)
 
 **PARTIAL — live one-page scanned-PDF OCR, instructional-image OCR, fresh Reviewer generation, persistence, and Android Library retrieval pass.** The synchronized Canvas account provides no eligible direct-module teaching image, so Canvas learning-image discovery and the local routing repair remain physically unexercised. Generate now rejects ungrouped Canvas images such as course banners/profile artwork while retaining direct teaching-module images; administrative exclusions remain. One 16-page image-only accounting scan stalled before OCR and was cancelled safely. See [B29 acceptance](ai/acceptance/b29/live-ocr-learning-image-acceptance.md). Next bounded task: B30 deploy and physically accept one consented direct-module Canvas instructional PNG/JPEG, including provenance and decorative-image exclusion.
