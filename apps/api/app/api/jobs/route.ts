@@ -10,6 +10,7 @@ import {
   ProcessingJobCreationError,
   validateIdempotencyKey,
 } from "@/lib/processing-jobs/creation";
+import { scheduleAcceptedProcessingJobDispatch } from "@/lib/processing-jobs/background-dispatch";
 import {
   createProcessingJobServiceClient,
   listOwnedActiveProcessingJobs,
@@ -17,15 +18,7 @@ import {
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
 import { readStructuredSourceBlocks } from "@/lib/processing-jobs/structured-source-blocks";
-import {
-  dispatchAcceptedProcessingJob,
-  ProcessingWorkflowDispatchError,
-} from "@/lib/processing-jobs/workflow-dispatch";
 import { readUploadDisplayName } from "@/lib/processing-jobs/source-display-name";
-import {
-  validateImageOcrBytes,
-  validatePdfOcrBytes,
-} from "@/lib/ocr/extraction-service";
 import {
   getConfiguredDurableDocumentMaxPdfPages,
   OCR_MAX_IMAGE_BYTES,
@@ -89,15 +82,6 @@ export async function POST(request: Request): Promise<Response> {
               error.code === "processing_source_version_not_found" ? 404 : 503;
       return errorResponse(
         status,
-        error.code,
-        error.safeMessage,
-        error.retryable,
-        request,
-      );
-    }
-    if (error instanceof ProcessingWorkflowDispatchError) {
-      return errorResponse(
-        503,
         error.code,
         error.safeMessage,
         error.retryable,
@@ -201,6 +185,9 @@ async function createExtractionJob(
   request: Request,
   userId: string,
 ): Promise<Response> {
+  const { validateImageOcrBytes, validatePdfOcrBytes } = await import(
+    "@/lib/ocr/extraction-service"
+  );
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -274,10 +261,8 @@ async function createExtractionJob(
       },
       userId,
     });
-    return acceptedResponse(
-      await dispatchAcceptedProcessingJob(job),
-      request,
-    );
+    scheduleAcceptedProcessingJobDispatch(job);
+    return acceptedResponse(job, request);
   }
 
   const imageValidation = validateImageOcrBytes({
@@ -307,16 +292,17 @@ async function createExtractionJob(
     },
     userId,
   });
-  return acceptedResponse(
-    await dispatchAcceptedProcessingJob(job),
-    request,
-  );
+  scheduleAcceptedProcessingJobDispatch(job);
+  return acceptedResponse(job, request);
 }
 
 async function createReviewerJob(
   request: Request,
   userId: string,
 ): Promise<Response> {
+  logReviewerAdmissionMemory("request_start", {
+    requestBytes: readContentLength(request.headers.get("content-length")),
+  });
   if (isOversizedContentLength(request.headers.get("content-length"))) {
     return errorResponse(
       413,
@@ -353,8 +339,12 @@ async function createReviewerJob(
       request,
     );
   }
+  if (body.sourceText !== undefined && typeof body.sourceText !== "string") {
+    return errorResponse(400, "invalid_source_text", "sourceText must be a string.", false, request);
+  }
   const sourceText = typeof body.sourceText === "string" ? body.sourceText.trim() : "";
-  if (!sourceText && !sourceVersionId) {
+  const canvasPreviewSessionId = readOptionalString(body.canvasPreviewSessionId);
+  if (!sourceText && !sourceVersionId && !canvasPreviewSessionId) {
     return errorResponse(400, "missing_source_text", "Source text is required.", false, request);
   }
   if (sourceText.length > REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS) {
@@ -422,12 +412,26 @@ async function createReviewerJob(
       request,
     );
   }
+  const resolvedSourceText = canvasContext.sourceText;
+  if (resolvedSourceText.length > REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS) {
+    return errorResponse(
+      413,
+      "source_text_too_large",
+      `Source text must be at most ${REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS} characters.`,
+      false,
+      request,
+    );
+  }
+  logReviewerAdmissionMemory("canvas_context_validated", {
+    sourceCharacters: resolvedSourceText.length,
+    submittedSourceCharacters: sourceText.length,
+  });
 
   const job = await createReviewerProcessingJob({
     client: createProcessingJobServiceClient(),
     idempotencyKey,
     source: {
-      sourceText,
+      sourceText: resolvedSourceText,
       ...(sourceTitle ? { sourceTitle } : {}),
       ...(sourceKind ? { sourceKind } : {}),
       ...(sourceBlocks && sourceBlocks.length > 0 ? { sourceBlocks } : {}),
@@ -441,10 +445,14 @@ async function createReviewerJob(
     },
     userId,
   });
-  return acceptedResponse(
-    await dispatchAcceptedProcessingJob(job),
-    request,
-  );
+  logReviewerAdmissionMemory("job_created", {
+    sourceCharacters: resolvedSourceText.length,
+  });
+  scheduleAcceptedProcessingJobDispatch(job);
+  logReviewerAdmissionMemory("dispatch_scheduled", {
+    sourceCharacters: resolvedSourceText.length,
+  });
+  return acceptedResponse(job, request);
 }
 
 function normalizeReviewerSourceText(value: string): string {
@@ -474,7 +482,11 @@ async function validateAndSnapshotCanvasContext({
   readonly sourceTitle?: string;
   readonly userId: string;
 }): Promise<
-  | { readonly ok: true; readonly metadata?: Record<string, string | string[]> }
+  | {
+      readonly ok: true;
+      readonly sourceText: string;
+      readonly metadata?: Record<string, string | string[]>;
+    }
   | {
       readonly ok: false;
       readonly status: 400 | 404 | 409 | 422 | 500;
@@ -484,7 +496,7 @@ async function validateAndSnapshotCanvasContext({
 > {
   const previewSessionId = readOptionalString(body.canvasPreviewSessionId);
   if (!previewSessionId) {
-    return { ok: true };
+    return { ok: true, sourceText };
   }
 
   const courseId = readOptionalString(body.canvasCourseId);
@@ -535,7 +547,7 @@ async function validateAndSnapshotCanvasContext({
   const snapshot = await createOrReuseReviewerSourceSnapshot({
     client,
     previewSession: preview.value,
-    sourceText,
+    sourceText: sourceText || preview.value.row.original_preview_text,
     sourceTitle,
     userId,
   });
@@ -545,6 +557,7 @@ async function validateAndSnapshotCanvasContext({
 
   return {
     ok: true,
+    sourceText: sourceText || preview.value.row.original_preview_text,
     metadata: {
       canvasPreviewSessionId: previewSessionId,
       canvasCourseId: courseId,
@@ -553,6 +566,26 @@ async function validateAndSnapshotCanvasContext({
       reviewerSourceSnapshotId: snapshot.value.sourceSnapshotId,
     },
   };
+}
+
+function readContentLength(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function logReviewerAdmissionMemory(
+  stage: string,
+  fields: Readonly<Record<string, number>>,
+): void {
+  const memory = process.memoryUsage();
+  console.info("reviewer_admission.memory", {
+    stage,
+    rssBytes: memory.rss,
+    heapUsedBytes: memory.heapUsed,
+    externalBytes: memory.external,
+    arrayBufferBytes: memory.arrayBuffers,
+    ...fields,
+  });
 }
 
 function acceptedResponse(

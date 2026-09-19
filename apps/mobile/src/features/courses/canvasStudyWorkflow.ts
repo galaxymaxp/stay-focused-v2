@@ -11,7 +11,7 @@ export interface CanvasReviewerJobDraft {
   readonly canvasItemIds: readonly string[];
   readonly canvasPreviewSessionId: string;
   readonly canvasResolutionFingerprint: string;
-  readonly sourceText: string;
+  readonly sourceText?: string;
   readonly sourceTitle: string;
 }
 
@@ -47,12 +47,14 @@ export function createCanvasReviewerJobDraft(input: {
   readonly sourceText: string;
   readonly sourceTitle: string;
 }): CanvasReviewerJobDraft {
+  const sourceText = input.sourceText.trim();
+  const originalPreviewText = input.preview.sourceText.trim();
   return {
     canvasCourseId: input.courseId,
     canvasItemIds: input.preview.sources.map((source) => source.id),
     canvasPreviewSessionId: input.preview.previewSessionId,
     canvasResolutionFingerprint: input.preview.resolutionFingerprint,
-    sourceText: input.sourceText,
+    ...(sourceText !== originalPreviewText ? { sourceText } : {}),
     sourceTitle: input.sourceTitle,
   };
 }

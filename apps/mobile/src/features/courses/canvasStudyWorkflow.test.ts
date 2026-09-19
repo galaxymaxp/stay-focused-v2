@@ -28,9 +28,21 @@ describe("Canvas reviewer student workflow", () => {
       canvasItemIds: ["file:canonical-source-id"],
       canvasPreviewSessionId: "preview-session",
       canvasResolutionFingerprint: "resolution-fingerprint",
-      sourceText: "Prepared Canvas text",
       sourceTitle: "Course Introduction.pdf",
     });
+  });
+
+  it("includes exact source text only when the student edited the preview", () => {
+    const draft = createCanvasReviewerJobDraft({
+      courseId: "course-cit6",
+      preview: preview(),
+      sourceText: "Prepared Canvas text with a student note",
+      sourceTitle: "Course Introduction.pdf",
+    });
+
+    expect(draft.sourceText).toBe(
+      "Prepared Canvas text with a student note",
+    );
   });
 
   it("creates the automatic library save from the same immutable snapshot", () => {

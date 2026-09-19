@@ -55,14 +55,15 @@ describe("processing jobs mobile API", () => {
 
   it("hands a selective Canvas preview identity to the durable reviewer job", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
-      expect(JSON.parse(String(init?.body))).toMatchObject({
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      expect(body).toMatchObject({
         jobType: "reviewer_generation",
-        sourceText: "Server-resolved selected block text.",
         canvasPreviewSessionId: "preview-session-1",
         canvasCourseId: "course-1",
         canvasItemIds: ["page:item-1"],
         canvasResolutionFingerprint: "resolution-fingerprint-1",
       });
+      expect(body).not.toHaveProperty("sourceText");
       return jsonResponse({ ok: true, data: jobView() }, 202);
     });
 
@@ -75,7 +76,6 @@ describe("processing jobs mobile API", () => {
         canvasResolutionFingerprint: "resolution-fingerprint-1",
         fetchImpl: fetchImpl as unknown as typeof fetch,
         idempotencyKey: "reviewer:canvas:selective-1",
-        sourceText: "Server-resolved selected block text.",
       }),
     ).resolves.toMatchObject({ ok: true });
     expect(fetchImpl).toHaveBeenCalledTimes(1);

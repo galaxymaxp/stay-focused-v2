@@ -55,7 +55,7 @@ export interface CreateExtractionJobInput extends ProcessingJobApiInput {
 
 export interface CreateReviewerJobInput extends ProcessingJobApiInput {
   readonly idempotencyKey: string;
-  readonly sourceText: string;
+  readonly sourceText?: string;
   readonly sourceTitle?: string;
   readonly sourceKind?: NormalizedSourceKind;
   readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
@@ -183,14 +183,16 @@ export async function createReviewerJob(
 ): Promise<ProcessingJobApiResult<ProcessingJobStatusView>> {
   const setup = validateApiInput(input);
   if (!setup.ok) return setup;
-  const sourceText = input.sourceText.trim();
-  if (!sourceText) return failure("missing_source_text", "Source text is required.", false);
+  const sourceText = input.sourceText?.trim() ?? "";
+  if (!sourceText && !input.sourceVersionId && !input.canvasPreviewSessionId) {
+    return failure("missing_source_text", "Source text is required.", false);
+  }
 
   return await requestJobStatusView({
     ...setup.data,
     body: JSON.stringify({
       jobType: "reviewer_generation",
-      sourceText,
+      ...(sourceText ? { sourceText } : {}),
       ...(input.sourceTitle?.trim() ? { sourceTitle: input.sourceTitle.trim() } : {}),
       ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
       ...(input.sourceBlocks && input.sourceBlocks.length > 0

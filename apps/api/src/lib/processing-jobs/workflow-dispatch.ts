@@ -1,7 +1,4 @@
 import type { ProcessingJobDatabaseRow } from "@stay-focused/db";
-import { start } from "workflow/api";
-
-import { processingJobWorkflow } from "@/workflows/processing-job";
 
 import {
   createProcessingJobServiceClient,
@@ -66,8 +63,8 @@ export async function dispatchAcceptedProcessingJob(
     run = await (
       dependencies.startWorkflow ??
       (async (jobId: string) => {
-        const started = await start(processingJobWorkflow, [jobId]);
-        return { runId: started.runId };
+        const { startProcessingJobWorkflow } = await import("./workflow-start");
+        return await startProcessingJobWorkflow(jobId);
       })
     )(job.id);
   } catch {
