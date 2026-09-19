@@ -215,6 +215,45 @@ describe("Canvas reviewer source service", () => {
     ]);
   });
 
+  it("excludes files placed in the observed Course Information Module", async () => {
+    const administrativeFile = {
+      ...baseFileRow(),
+      canvas_file_id: "student-handbook",
+      display_name: "Student Handbook-UC College.pdf",
+      filename: "student-handbook-uc-college.pdf",
+      id: OTHER_FILE_ID,
+    };
+    const fake = createFakeCanvasClient({
+      canvas_files: [baseFileRow(), administrativeFile],
+      canvas_modules: [
+        moduleRow("module-course-information", "Module 0: Course Information Module", 1),
+      ],
+      canvas_module_items: [
+        {
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888886", pageUrl: "" }),
+          module_id: "module-course-information",
+          item_type: "File",
+          canvas_content_id: "student-handbook",
+        },
+      ],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map((source) => source.title)).toContain(
+      "Fictional handout.pdf",
+    );
+    expect(result.value.sources.map((source) => source.title)).not.toContain(
+      "Student Handbook-UC College.pdf",
+    );
+  });
+
   it("lists ready PDF and image descriptors as selectable without private fields", async () => {
     const pdfBytes = await createPdfBytes(1);
     const imageBytes = createPngBytes();

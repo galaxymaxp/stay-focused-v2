@@ -466,7 +466,9 @@ function isCanvasGenerateCandidate(
   }
 
   return !(
-    /^(?:general information|week 0 orientation)$/.test(moduleTitle) ||
+    /^(?:general information|week 0 orientation|module 0 course information module)$/.test(
+      moduleTitle,
+    ) ||
     /\b(?:orientation|policies and guidelines|course requirements)\b/.test(
       moduleTitle,
     )
