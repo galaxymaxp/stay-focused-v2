@@ -44,7 +44,8 @@ export function composeActivities(input: {
   const courses = new Map(input.courses.filter(r => r.user_id === input.userId).map(r => [r.id, courseSummary(r)]));
   const tasks = input.tasks.filter(r => r.user_id === input.userId);
   const imported = new Map(tasks.filter(t => t.canvas_assignment_row_id).map(t => [t.canvas_assignment_row_id!, t]));
-  const assignments = input.assignments.filter(r => r.user_id === input.userId && courses.has(r.course_id));
+  const ownedAssignments = input.assignments.filter(r => r.user_id === input.userId && courses.has(r.course_id));
+  const assignments = ownedAssignments.filter(isActionableCanvasAssignment);
   function finish(item: Omit<ActivitySummary, 'isOverdue' | 'urgency' | 'hasGeneratedDraft'>): ActivitySummary {
     const active = item.status !== 'completed' && item.status !== 'submitted';
     const due = item.dueAt ? Date.parse(item.dueAt) : Infinity;
@@ -57,12 +58,20 @@ export function composeActivities(input: {
       title: row.name, dueAt: row.due_at, status: task?.status === 'completed' ? 'completed' : input.submittedAssignmentIds?.has(row.id) ? 'submitted' : task?.status ?? 'unknown',
       priority: task?.priority ?? 'medium', estimatedMinutes: task?.estimated_minutes ?? null, submissionTypes: [...row.submission_types], source: 'canvas' });
   });
-  const assignmentIds = new Set(assignments.map(a => a.id));
+  const assignmentIds = new Set(ownedAssignments.map(a => a.id));
   for (const task of tasks) {
     if (task.canvas_assignment_row_id && assignmentIds.has(task.canvas_assignment_row_id)) continue;
     result.push(finish({ id: `task:${task.id}`, taskId: task.id, course: null, title: task.title, dueAt: task.due_at, status: task.status, priority: task.priority, estimatedMinutes: task.estimated_minutes, submissionTypes: [], source: task.source_type === 'canvas' ? 'canvas' : 'local' }));
   }
   return result.sort(compareActivities);
+}
+
+function isActionableCanvasAssignment(assignment: CanvasAssignmentRow): boolean {
+  if (assignment.due_at !== null) return true;
+  return assignment.submission_types.some(type => {
+    const normalized = type.trim().toLowerCase();
+    return normalized !== '' && normalized !== 'none' && normalized !== 'not_graded';
+  });
 }
 export function composeToday(input: {
   userId: string; date: string; offset: number; now: number; activities: readonly ActivitySummary[];

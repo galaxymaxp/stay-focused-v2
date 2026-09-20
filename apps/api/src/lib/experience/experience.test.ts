@@ -49,6 +49,38 @@ describe('Today and activity composition', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ id: 'canvas:assignment', taskId: task.id, priority: 'high', estimatedMinutes: 30 });
   });
+  it('routes only deadline-bearing or submittable Canvas assignments to Tasks', () => {
+    const deadlineOnly = { ...assignment, id: 'deadline-only', submission_types: [] };
+    const submissionOnly = { ...assignment, id: 'submission-only', due_at: null };
+    const informational = {
+      ...assignment,
+      id: 'informational',
+      due_at: null,
+      submission_types: [],
+    };
+    const explicitlyNotSubmittable = {
+      ...assignment,
+      id: 'not-submittable',
+      due_at: null,
+      submission_types: ['none'],
+    };
+    const importedInformational = {
+      ...task,
+      id: 'imported-informational',
+      canvas_assignment_row_id: informational.id,
+      source_type: 'canvas' as const,
+    };
+
+    const result = activities(
+      [importedInformational],
+      [deadlineOnly, submissionOnly, informational, explicitlyNotSubmittable],
+    );
+
+    expect(result.map(item => item.id)).toEqual([
+      'canvas:deadline-only',
+      'canvas:submission-only',
+    ]);
+  });
   it('orders priority, then deadline, then stable identity within urgency', () => {
     const items = activities([
       { ...task, id: 'b', priority: 'high', due_at: '2026-09-12T12:00:00Z' },
