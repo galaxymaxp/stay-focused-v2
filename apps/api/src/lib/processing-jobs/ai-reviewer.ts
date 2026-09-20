@@ -25,7 +25,20 @@ export async function processAIReviewerJob(client: ProcessingJobServiceClient, j
     await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'reviewer:ai-first:complete', payload: JSON.parse(JSON.stringify(output)) as Json });
     return output;
   } catch (error) {
-    if (error instanceof GenerationContractError) throw new ExperienceFailure(422, 'generation_failed');
+    if (error instanceof GenerationContractError) {
+      console.info('reviewer_generation.failed', {
+        jobId: job.id,
+        category: 'contract',
+        findings: error.findings.filter(
+          (finding) => /^[a-z0-9_.-]{1,80}$/i.test(finding),
+        ),
+      });
+      throw new ExperienceFailure(422, 'generation_failed');
+    }
+    console.info('reviewer_generation.failed', {
+      jobId: job.id,
+      category: 'provider',
+    });
     throw error;
   }
 }
