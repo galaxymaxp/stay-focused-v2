@@ -1,5 +1,9 @@
 # Roadmap
 
+## B33 student-material ingestion closure audit (2026-09-21)
+
+**PASS — supported student-material ingestion matrix is closed.** The former standalone DOCX/PPTX production milestone was absorbed by B31, and B32 closed scanned-PDF reliability; those production jobs should not be repeated without a new reproduced defect. B33 verified the complete Page/PDF/Office/image eligibility, acquisition, extraction, provenance, durable-generation, Queue, persistence, and Library evidence chain and repaired the one remaining concrete boundary defect: Tasks now admits Canvas assignments only when deadline-bearing and/or submittable. Positive Canvas instructional-image discovery remains naturally fixture/Student-permission limited and does not block the roadmap. See [B33 acceptance](ai/acceptance/b33/student-material-ingestion-closure-audit.md). Next: B34 generation quality acceptance.
+
 ## B32 scanned-PDF runtime reliability (2026-09-20)
 
 **PASS — the 16-page Accounting scan now completes through checkpointed production inspection, OCR, ordered source attachment, AI generation, Queue, and Android Library persistence/reopen.** The final READY deployment is `dpl_EekcdmCmpfdoobvYouekuXrUmMEd`; the accepted fresh job is `a85bd672-2aed-401b-a37e-fd1c794d826f`. See [B32 acceptance](ai/acceptance/b32/scanned-pdf-runtime-reliability-acceptance.md). Next: B34 generation quality acceptance; revisit B33 only for a newly proven DOCX/PPTX defect.
@@ -12,15 +16,13 @@
 
 **PARTIAL / CLOSED WITH PLATFORM LIMITATION — the image-routing guard is deployed, READY, healthy, and verified to exclude administrative and ungrouped image noise after fresh physical-device synchronization.** The Student-only Canvas identity cannot create a direct teaching-module image fixture. Teacher/Designer cooperation and sandbox access will not be pursued. Automated routing tests remain the acceptance evidence unless a suitable student-accessible instructional image occurs naturally. This external Canvas-permission limitation does not block the student product roadmap. See [B30 acceptance](ai/acceptance/b30/canvas-instructional-image-production-acceptance.md).
 
-## B33 DOCX and PPTX production acceptance
+## Former B33 DOCX and PPTX production milestone (absorbed)
 
-Status: Baseline production acceptance completed early in B31; deeper format hardening is conditional on a newly proven defect.
-
-Validate real student-accessible Canvas DOCX acquisition, extraction, provenance, generation, persistence, and Android Library reopen, then repeat for PPTX when a suitable file exists. If Canvas lacks a suitable file, validate the matching direct-upload extractor while keeping Canvas-specific acceptance explicitly untested.
+Status: **Closed and superseded by the B33 closure audit above.** Real Student-accessible Canvas DOCX and PPTX acquisition, extraction, durable generation, persistence, Queue, physical Android rendering, and Library reopen were completed early in B31. B32 then closed the remaining scanned-PDF format blocker. Do not repeat a standalone Office-format milestone unless a new student-facing defect is reproduced.
 
 ## B34 generation quality acceptance
 
-Status: Next; available student-material ingestion is reliable through B32.
+Status: Next; the supported student-material ingestion matrix is closed through B33.
 
 Evaluate Reviewer, Quiz, and Activity/task quality; grounding; source fidelity; formatting; larger-context behavior; and malformed or low-information handling using real instructional materials rather than administrative outlines.
 
