@@ -28,7 +28,10 @@ extractPreparedPdfOcrChunk,
 extractWithOcrProvider,
 validatePdfOcrBytes,
 } from "@/lib/ocr/extraction-service";
-import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
+import {
+inspectPdfTextPages,
+type PdfPageInspection,
+} from "@/lib/ocr/pdf-native-text";
 import {
 getConfiguredDurableDocumentMaxOcrPages,
 getConfiguredDurableDocumentMaxPdfPages,
@@ -61,6 +64,7 @@ writeProcessingJobCheckpoint,
 const EXTRACTION_PLAN_CHECKPOINT = "extraction.plan";
 const EXTRACTION_STRUCTURED_CHECKPOINT = "extraction.structured";
 const EXTRACTION_IMAGE_CHECKPOINT = "extraction.image";
+const EXTRACTION_INSPECTION_PREFIX = "extraction.inspection.";
 const EXTRACTION_CHUNK_PREFIX = "extraction.chunk.";
 const WORKFLOW_STEP_HEARTBEAT_INTERVAL_MS = 60_000;
 const WORKFLOW_OCR_CHUNK_CONCURRENCY = 2;
@@ -137,8 +141,25 @@ export async function processingJobWorkflow(
       }
       await finalizeExtractionStep(jobId, workerId);
     } else {
-      const deferredCanvasPdf = await prepareCanvasReviewerExtractionStep(jobId, workerId);
-      if (deferredCanvasPdf) {
+      const deferredCanvasPageCount = await prepareCanvasReviewerExtractionStep(jobId, workerId);
+      if (deferredCanvasPageCount !== null) {
+        const pageNumbers = Array.from(
+          { length: deferredCanvasPageCount },
+          (_, index) => index + 1,
+        );
+        for (
+          let offset = 0;
+          offset < pageNumbers.length;
+          offset += WORKFLOW_OCR_CHUNK_CONCURRENCY
+        ) {
+          await Promise.all(
+            pageNumbers
+              .slice(offset, offset + WORKFLOW_OCR_CHUNK_CONCURRENCY)
+              .map((pageNumber) =>
+                inspectPdfPageStep(jobId, workerId, pageNumber, deferredCanvasPageCount)
+              ),
+          );
+        }
         const plan = await prepareExtractionStep(jobId, workerId, true);
         if (plan.kind !== "pdf") throw new FatalError("processing_job_source_invalid");
         for (
@@ -166,7 +187,7 @@ export async function processingJobWorkflow(
   }
 }
 
-async function prepareCanvasReviewerExtractionStep(jobId: string, workerId: string): Promise<boolean> {
+async function prepareCanvasReviewerExtractionStep(jobId: string, workerId: string): Promise<number | null> {
   "use step";
   safeStepLog("prepare_canvas_reviewer_extraction", "start", jobId);
   const client = createProcessingJobServiceClient();
@@ -174,12 +195,12 @@ async function prepareCanvasReviewerExtractionStep(jobId: string, workerId: stri
   const { isDeferredCanvasReviewerJob } = await import(
     "@/lib/processing-jobs/deferred-canvas-reviewer"
   );
-  if (!await isDeferredCanvasReviewerJob({ client, job })) return false;
-  await withWorkflowLease(client, jobId, workerId, async () => {
+  if (!await isDeferredCanvasReviewerJob({ client, job })) return null;
+  const pageCount = await withWorkflowLease(client, jobId, workerId, async () => {
     await assertWorkflowJobMayContinue(client, jobId, workerId);
     const source = await findProcessingJobSource(client, job);
     if (source.source_kind !== "pdf") throw new FatalError("processing_job_source_invalid");
-    if (source.page_count) return;
+    if (source.page_count) return source.page_count;
     const bytes = await downloadSourceBytes(client, source);
     const validation = await validatePdfOcrBytes({
       bytes,
@@ -201,9 +222,50 @@ async function prepareCanvasReviewerExtractionStep(jobId: string, workerId: stri
       .eq("id", source.id)
       .eq("user_id", job.user_id);
     if (error) throw new Error("processing_job_source_page_count_update_failed");
+    return validation.pageCount;
   });
   safeStepLog("prepare_canvas_reviewer_extraction", "done", jobId);
-  return true;
+  return pageCount;
+}
+
+async function inspectPdfPageStep(
+  jobId: string,
+  workerId: string,
+  pageNumber: number,
+  pageCount: number,
+): Promise<void> {
+  "use step";
+  const checkpointKey = `${EXTRACTION_INSPECTION_PREFIX}${padIndex(pageNumber)}`;
+  safeStepLog(`inspect_page_${pageNumber}`, "start", jobId);
+  const client = createProcessingJobServiceClient();
+  await withWorkflowLease(client, jobId, workerId, async () => {
+    if (await readProcessingJobCheckpoint(client, jobId, checkpointKey)) return;
+    await assertWorkflowJobMayContinue(client, jobId, workerId);
+    const job = await readProcessingJobState(client, jobId);
+    const source = await findProcessingJobSource(client, job);
+    if (source.source_kind !== "pdf") throw new FatalError("processing_job_source_invalid");
+    const bytes = await downloadSourceBytes(client, source);
+    let inspection;
+    try {
+      inspection = (await inspectPdfTextPages(bytes, pageCount, [pageNumber]))[0];
+    } catch (error) {
+      console.warn("processing_workflow.page_inspection_unavailable", {
+        jobId,
+        pageNumber,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorCode: readSafeErrorCode(error),
+      });
+    }
+    await writeProcessingJobCheckpoint(client, {
+      jobId,
+      checkpointKey,
+      payload: toJson({
+        inspection: inspection ?? { pageNumber, kind: "ocr", text: "" },
+        completedAt: new Date().toISOString(),
+      }),
+    });
+  });
+  safeStepLog(`inspect_page_${pageNumber}`, "done", jobId);
 }
 
 async function processQuizStep(jobId: string, workerId: string): Promise<void> {
@@ -324,33 +386,56 @@ async function prepareExtractionStep(
       totalUnits: source.page_count,
       unitLabel: "pages",
     });
-    const bytes = await downloadSourceBytes(client, source);
     let inspections;
     const warnings: OcrWarning[] = [];
-    try {
-      inspections = await inspectPdfTextPages(bytes, source.page_count);
-    } catch (error) {
-      console.warn("processing_workflow.native_text_inspection_unavailable", {
+    let bytes: Uint8Array | undefined;
+    if (skipStructuredParser) {
+      const inspectionRows = await listProcessingJobCheckpoints(
+        client,
         jobId,
-        errorName: error instanceof Error ? error.name : typeof error,
-        errorCode: readSafeErrorCode(error),
-      });
-      inspections = Array.from({ length: source.page_count }, (_, index) => ({
-        pageNumber: index + 1,
-        kind: "ocr" as const,
-        text: "" as const,
-      }));
-      warnings.push({
-        code: "native_text_unavailable",
-        message: "Embedded PDF text could not be inspected; affected pages used OCR.",
-      });
+        EXTRACTION_INSPECTION_PREFIX,
+      );
+      inspections = inspectionRows
+        .map((row) => readPdfPageInspection(requireRecord(row.payload, "PDF inspection").inspection))
+        .sort((left, right) => left.pageNumber - right.pageNumber);
+      if (
+        inspections.length !== source.page_count ||
+        inspections.some((page, index) => page.pageNumber !== index + 1)
+      ) {
+        await failKnownWorkflowJob(client, jobId, workerId, {
+          code: "document_extraction_incomplete",
+          message: extractionFailureMessage("document_extraction_incomplete"),
+          retryable: true,
+        });
+        throw new FatalError("document_extraction_incomplete");
+      }
+    } else {
+      bytes = await downloadSourceBytes(client, source);
+      try {
+        inspections = await inspectPdfTextPages(bytes, source.page_count);
+      } catch (error) {
+        console.warn("processing_workflow.native_text_inspection_unavailable", {
+          jobId,
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorCode: readSafeErrorCode(error),
+        });
+        inspections = Array.from({ length: source.page_count }, (_, index) => ({
+          pageNumber: index + 1,
+          kind: "ocr" as const,
+          text: "" as const,
+        }));
+        warnings.push({
+          code: "native_text_unavailable",
+          message: "Embedded PDF text could not be inspected; affected pages used OCR.",
+        });
+      }
     }
     const pages = createInspectedPdfPages(inspections);
     const ocrPageNumbers = inspections
       .filter((page) => page.kind === "ocr")
       .map((page) => page.pageNumber);
     const parserConfig = readDocumentParserConfig();
-    if (!skipStructuredParser && parserConfig.mode !== "legacy") {
+    if (!skipStructuredParser && bytes && parserConfig.mode !== "legacy") {
       const structured = await tryParseStructuredPdf({
         bytes,
         mimeType: source.mime_type,
@@ -989,6 +1074,20 @@ function readOcrPages(value: unknown): readonly OcrPage[] {
     throw new FatalError("processing_checkpoint_invalid");
   }
   return value as unknown as readonly OcrPage[];
+}
+
+function readPdfPageInspection(value: unknown): PdfPageInspection {
+  const record = requireRecord(value, "PDF inspection");
+  if (
+    typeof record.pageNumber !== "number" ||
+    !Number.isInteger(record.pageNumber) ||
+    record.pageNumber < 1 ||
+    typeof record.text !== "string" ||
+    !["native_text", "blank", "ocr"].includes(String(record.kind))
+  ) {
+    throw new FatalError("processing_checkpoint_invalid");
+  }
+  return record as unknown as PdfPageInspection;
 }
 
 function readOcrWarnings(value: unknown): readonly OcrWarning[] {

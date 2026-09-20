@@ -28,6 +28,7 @@ export interface PdfPageVisualEvidence {
 export async function inspectPdfTextPages(
   bytes: Uint8Array,
   expectedPageCount: number,
+  requestedPageNumbers?: readonly number[],
 ): Promise<readonly PdfPageInspection[]> {
   const { getDocument, OPS } = pdfJsRuntime;
   const visibleOperatorIds = new Set<number>([
@@ -58,9 +59,19 @@ export async function inspectPdfTextPages(
     if (document.numPages !== expectedPageCount) {
       throw new Error("PDF page count changed during text inspection.");
     }
+    const pageNumbers = requestedPageNumbers ??
+      Array.from({ length: document.numPages }, (_, index) => index + 1);
+    if (
+      new Set(pageNumbers).size !== pageNumbers.length ||
+      pageNumbers.some((pageNumber) =>
+        !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > document.numPages
+      )
+    ) {
+      throw new Error("PDF inspection page number is outside the source document.");
+    }
 
     const pages: PdfPageInspection[] = [];
-    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    for (const pageNumber of pageNumbers) {
       const page = await document.getPage(pageNumber);
       try {
         const textContent = await page.getTextContent({
