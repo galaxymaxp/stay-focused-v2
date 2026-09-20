@@ -41,6 +41,9 @@ import {
 OCR_PROVIDER_CALL_TIMEOUT_MS,
 } from "@/lib/processing-jobs/constants";
 import {
+resolveExtractionProgressStage,
+} from "@/lib/processing-jobs/extraction-progress";
+import {
 createProcessingJobServiceClient,
 findProcessingJobSource,
 type ProcessingJobServiceClient,
@@ -171,7 +174,7 @@ export async function processingJobWorkflow(
             plan.chunks
               .slice(offset, offset + WORKFLOW_OCR_CHUNK_CONCURRENCY)
               .map((chunk) =>
-                extractPdfChunkStep(jobId, workerId, chunk.index, chunk.pageNumbers)
+                extractPdfChunkStep(jobId, workerId, chunk.index, chunk.pageNumbers, true)
               ),
           );
         }
@@ -264,6 +267,7 @@ async function inspectPdfPageStep(
         completedAt: new Date().toISOString(),
       }),
     });
+    logWorkflowMemory("inspect_page", jobId, { pageNumber });
   });
   safeStepLog(`inspect_page_${pageNumber}`, "done", jobId);
 }
@@ -336,7 +340,7 @@ async function claimWorkflowJobStep(
 async function prepareExtractionStep(
   jobId: string,
   workerId: string,
-  skipStructuredParser = false,
+  reviewerExtraction = false,
 ): Promise<ExtractionWorkflowPlan> {
   "use step";
   safeStepLog("prepare_extraction", "start", jobId);
@@ -364,7 +368,7 @@ async function prepareExtractionStep(
       await updateProcessingJobProgress(client, {
         jobId,
         workerId,
-        stage: "preparing_ocr_chunks",
+        stage: resolveExtractionProgressStage("preparing_ocr_chunks", reviewerExtraction),
         statusMessage: "Preparing image",
         completedUnits: 0,
         totalUnits: 1,
@@ -380,7 +384,7 @@ async function prepareExtractionStep(
     await updateProcessingJobProgress(client, {
       jobId,
       workerId,
-      stage: "inspecting_document",
+      stage: resolveExtractionProgressStage("inspecting_document", reviewerExtraction),
       statusMessage: "Inspecting document",
       completedUnits: 0,
       totalUnits: source.page_count,
@@ -389,7 +393,7 @@ async function prepareExtractionStep(
     let inspections;
     const warnings: OcrWarning[] = [];
     let bytes: Uint8Array | undefined;
-    if (skipStructuredParser) {
+    if (reviewerExtraction) {
       const inspectionRows = await listProcessingJobCheckpoints(
         client,
         jobId,
@@ -435,7 +439,7 @@ async function prepareExtractionStep(
       .filter((page) => page.kind === "ocr")
       .map((page) => page.pageNumber);
     const parserConfig = readDocumentParserConfig();
-    if (!skipStructuredParser && bytes && parserConfig.mode !== "legacy") {
+    if (!reviewerExtraction && bytes && parserConfig.mode !== "legacy") {
       const structured = await tryParseStructuredPdf({
         bytes,
         mimeType: source.mime_type,
@@ -505,7 +509,10 @@ async function prepareExtractionStep(
     await updateProcessingJobProgress(client, {
       jobId,
       workerId,
-      stage: chunks.length > 0 ? "preparing_ocr_chunks" : "verifying_pages",
+      stage: resolveExtractionProgressStage(
+        chunks.length > 0 ? "preparing_ocr_chunks" : "verifying_pages",
+        reviewerExtraction,
+      ),
       statusMessage: chunks.length > 0 ? "Preparing page groups" : "Checking extraction",
       completedUnits: pages.length,
       totalUnits: source.page_count,
@@ -582,6 +589,7 @@ async function extractPdfChunkStep(
   workerId: string,
   chunkIndex: number,
   pageNumbers: readonly number[],
+  reviewerExtraction = false,
 ): Promise<void> {
   "use step";
   const checkpointKey = `${EXTRACTION_CHUNK_PREFIX}${padIndex(chunkIndex)}`;
@@ -616,6 +624,10 @@ async function extractPdfChunkStep(
         completedAt: new Date().toISOString(),
       }),
     });
+    logWorkflowMemory("extract_chunk", jobId, {
+      chunkIndex,
+      pageCount: pageNumbers.length,
+    });
     const [planRow, chunks] = await Promise.all([
       readProcessingJobCheckpoint(client, jobId, EXTRACTION_PLAN_CHECKPOINT),
       listProcessingJobCheckpoints(client, jobId, EXTRACTION_CHUNK_PREFIX),
@@ -629,7 +641,7 @@ async function extractPdfChunkStep(
     await updateProcessingJobProgress(client, {
       jobId,
       workerId,
-      stage: "extracting_ocr",
+      stage: resolveExtractionProgressStage("extracting_ocr", reviewerExtraction),
       statusMessage: "Reading pages",
       completedUnits: Math.min(
         plan.pages.length + completedOcrPages,
@@ -1202,6 +1214,23 @@ function safeStepLog(
     outcome,
     step,
     ...(unitId ? { unitId } : {}),
+  });
+}
+
+function logWorkflowMemory(
+  stage: string,
+  jobId: string,
+  fields: Readonly<Record<string, number>>,
+): void {
+  const memory = process.memoryUsage();
+  console.info("processing_workflow.memory", {
+    stage,
+    jobId,
+    rssBytes: memory.rss,
+    heapUsedBytes: memory.heapUsed,
+    externalBytes: memory.external,
+    arrayBufferBytes: memory.arrayBuffers,
+    ...fields,
   });
 }
 
