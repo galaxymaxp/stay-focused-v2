@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildGenerationContext, prepareGenerationContext, generateContract, GenerationContractError, runAIReviewer, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
+import { buildGenerationContext, prepareGenerationContext, generateContract, GenerationContractError, runAIReviewer, createReviewerDocumentSchema, validateReviewerDocument, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
 import { generateQuizSet, validateQuizSet, quizSetSchema } from './ai-first';
 import { validateActivityDocument, generateActivityDocument } from '../activity-maker/ai-first';
 import { learnerQuestion, evaluateAnswer } from './service';
@@ -85,6 +85,18 @@ describe('AI-first context and product contracts', () => {
     expect(result.sections[0]!.items[0]!.sourceCore.explanation).toBe('Explanation');
     expect(result.metadata.validationPolicy).toBe('ai-first-contract');
     expect(result.metadata.generationMetrics?.providerRequestCount).toBe(1);
+  });
+  it('constrains reviewer source references and reports targeted shape failures', () => {
+    const schema = createReviewerDocumentSchema(['page-1', 'page-2']);
+    const sectionItems = schema.schema.properties.sections as { items: { properties: Record<string, { items?: { enum?: readonly string[] } }> } };
+    expect(sectionItems.items.properties.sourceRefs.items?.enum).toEqual(['page-1', 'page-2']);
+    expect(() => validateReviewerDocument({ title: 'Reviewer', sections: [{ title: 'Topic', explanation: 'Explanation', keyPoints: [], sourceRefs: ['page-1'] }] }, ['page-1'])).toThrow(GenerationContractError);
+    try {
+      validateReviewerDocument({ title: 'Reviewer', sections: [{ title: 'Topic', explanation: 'Explanation', keyPoints: [], sourceRefs: ['page-1'] }] }, ['page-1']);
+    } catch (error) {
+      expect(error).toBeInstanceOf(GenerationContractError);
+      expect((error as GenerationContractError).findings).toEqual(['section-1:key_points']);
+    }
   });
   const sources: ActivitySource[] = [{ id: 'instructions', title: 'Assignment', text: 'Write a reflection with two sections.', role: 'instructions', materialId: null }];
   const activity = { title: 'Reflection', activityType: 'reflection', parts: [{ heading: 'Thoughts', content: 'Student must supply their own experience.', sourceRefs: ['instructions'], missingInformation: true }] };
