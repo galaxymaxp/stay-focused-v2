@@ -1,5 +1,9 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## B32 scanned-PDF runtime reliability (2026-09-20)
+
+B32 is complete and accepted. READY production deployment `dpl_EekcdmCmpfdoobvYouekuXrUmMEd` moves scanned Canvas PDF download, per-page inspection, OCR, ordered source attachment, and reviewer context generation into durable workflow steps. Fresh 16-page Accounting job `a85bd672-2aed-401b-a37e-fd1c794d826f` completed all checkpoints, attached 6,757 characters, generated `Reviewer in Journaling and Basic Accounting`, and survived physical Android force-stop/relaunch Library retrieval. Full API and engine suites pass. Direct service-role DB metadata inspection was not available because the local Vercel environment pull returned secret references, so workflow logs and owner-authenticated device behavior are the persistence evidence. See `docs/ai/acceptance/b32/scanned-pdf-runtime-reliability-acceptance.md`. Next: B34 generation quality acceptance unless a new DOCX/PPTX defect reopens B33.
+
 ## B25.3.3 migration update (2026-09-16)
 
 The user approved scoped provider transfers. Live comparison and production caller migration are complete; deterministic checks pass. Deployment dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4 is READY and healthy. Physical acceptance requires direct device sign-in and selected Activity assignment. See the current B25.3.3 acceptance report.
