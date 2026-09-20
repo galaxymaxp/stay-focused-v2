@@ -138,13 +138,28 @@ export async function prepareDeferredCanvasReviewerSource({
     suggestedTitle: file.display_name,
     userId: job.user_id,
   });
-  if (!preview.ok) throw new ExperienceFailure(503, 'unavailable');
+  if (!preview.ok) {
+    logProvenanceFailure('preview', job.id, preview);
+    throw new ExperienceFailure(503, 'unavailable');
+  }
   const accepted = await validateCanvasPreviewSessionForGeneration({
     client,
     userId: job.user_id,
     previewSessionId: preview.value.previewSessionId,
   });
-  if (!accepted.ok || !accepted.value) throw new ExperienceFailure(409, 'not_ready');
+  if (!accepted.ok) {
+    logProvenanceFailure('preview_validation', job.id, accepted);
+    throw new ExperienceFailure(409, 'not_ready');
+  }
+  if (!accepted.value) {
+    console.error('deferred_canvas_reviewer.provenance_failed', {
+      jobId: job.id,
+      stage: 'preview_validation',
+      errorCode: 'canvas_preview_session_missing',
+      status: 409,
+    });
+    throw new ExperienceFailure(409, 'not_ready');
+  }
   const gate = await validateCanvasReviewerGenerationGate({
     client,
     userId: job.user_id,
@@ -153,7 +168,10 @@ export async function prepareDeferredCanvasReviewerSource({
     previewSession: accepted.value,
     resolutionFingerprint: preview.value.resolutionFingerprint,
   });
-  if (!gate.ok) throw new ExperienceFailure(409, 'not_ready');
+  if (!gate.ok) {
+    logProvenanceFailure('generation_gate', job.id, gate);
+    throw new ExperienceFailure(409, 'not_ready');
+  }
   const snapshot = await createOrReuseReviewerSourceSnapshot({
     client,
     userId: job.user_id,
@@ -161,7 +179,10 @@ export async function prepareDeferredCanvasReviewerSource({
     sourceText: normalizedText,
     sourceTitle: file.display_name,
   });
-  if (!snapshot.ok) throw new ExperienceFailure(503, 'unavailable');
+  if (!snapshot.ok) {
+    logProvenanceFailure('snapshot', job.id, snapshot);
+    throw new ExperienceFailure(503, 'unavailable');
+  }
 
   const resolvedMetadata = toJson({
     canvasCourseId: courseId,
@@ -181,7 +202,15 @@ export async function prepareDeferredCanvasReviewerSource({
     p_source_title: file.display_name,
     p_source_metadata: resolvedMetadata,
   });
-  if (error || !data?.[0]) throw new ExperienceFailure(503, 'unavailable');
+  if (error || !data?.[0]) {
+    console.error('deferred_canvas_reviewer.provenance_failed', {
+      jobId: job.id,
+      stage: 'source_attachment',
+      errorCode: readSafeDatabaseErrorField(error, 'code'),
+      databaseCode: readSafeDatabaseErrorField(error, 'message'),
+    });
+    throw new ExperienceFailure(503, 'unavailable');
+  }
   await writeProcessingJobCheckpoint(client, {
     jobId: job.id,
     checkpointKey: CHECKPOINT_KEY,
@@ -228,6 +257,31 @@ function logMemory(stage: string, jobId: string, fields: Readonly<Record<string,
     arrayBufferBytes: memory.arrayBuffers,
     ...fields,
   });
+}
+
+function logProvenanceFailure(
+  stage: string,
+  jobId: string,
+  failure: Readonly<{ readonly code?: string; readonly status?: number }>,
+): void {
+  console.error('deferred_canvas_reviewer.provenance_failed', {
+    jobId,
+    stage,
+    errorCode: readSafeIdentifier(failure.code),
+    status: failure.status ?? null,
+  });
+}
+
+function readSafeDatabaseErrorField(
+  error: unknown,
+  field: 'code' | 'message',
+): string | null {
+  if (typeof error !== 'object' || error === null || !(field in error)) return null;
+  return readSafeIdentifier((error as Record<string, unknown>)[field]);
+}
+
+function readSafeIdentifier(value: unknown): string | null {
+  return typeof value === 'string' && /^[a-z0-9_.-]{1,120}$/i.test(value) ? value : null;
 }
 
 function toJson(value: unknown): Json {
