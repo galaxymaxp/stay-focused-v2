@@ -6,6 +6,10 @@ const migration = readFileSync(
   resolve(process.cwd(), '../../packages/db/migrations/20260919234000_attach_chunked_canvas_reviewer_source.sql'),
   'utf8',
 );
+const digestFixMigration = readFileSync(
+  resolve(process.cwd(), '../../packages/db/migrations/20260920000000_fix_deferred_canvas_reviewer_digest.sql'),
+  'utf8',
+);
 
 describe('deferred Canvas reviewer source database contract', () => {
   it('stages only an owner-scoped ready private Canvas PDF before dispatch', () => {
@@ -41,5 +45,12 @@ describe('deferred Canvas reviewer source database contract', () => {
   it('keeps staging unavailable to clients after the API verifies ownership', () => {
     expect(migration).toMatch(/revoke all on function public\.stage_deferred_canvas_reviewer_pdf_v1[\s\S]*from public, anon, authenticated/i);
     expect(migration).toMatch(/grant execute on function public\.stage_deferred_canvas_reviewer_pdf_v1[\s\S]*to service_role/i);
+  });
+
+  it('schema-qualifies pgcrypto without widening the security-definer search path', () => {
+    expect(digestFixMigration).toMatch(/extensions\.digest\(convert_to\(v_source_text, 'UTF8'\), 'sha256'\)/i);
+    expect(digestFixMigration).toMatch(/security definer[\s\S]*set search_path = public, pg_temp/i);
+    expect(digestFixMigration).toMatch(/revoke all on function public\.attach_deferred_canvas_reviewer_source_v1[\s\S]*from public, anon, authenticated/i);
+    expect(digestFixMigration).toMatch(/grant execute on function public\.attach_deferred_canvas_reviewer_source_v1[\s\S]*to service_role/i);
   });
 });
