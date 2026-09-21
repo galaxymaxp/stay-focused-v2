@@ -1,5 +1,9 @@
 # Roadmap
 
+## B34 current mobile UX repair (2026-09-21)
+
+**PARTIAL — the connected mobile UX implementation and automated gates pass; authenticated changed-build physical acceptance is pending.** The repaired surfaces are Generate information architecture, persisted Reviewer→Quiz dependency, Reviewer hierarchy, generation visual/stable layout, Library paging/loading/cards, Today handle geometry, and shared reduced-motion-aware interactions. The ADB-authorized realme loaded the local changed bundle but Expo Go has no access to the signed app's session; a signed EAS preview requires explicit upload approval. See [B34 acceptance](ai/acceptance/b34/current-mobile-ux-repair.md).
+
 ## B33 student-material ingestion closure audit (2026-09-21)
 
 **PASS — supported student-material ingestion matrix is closed.** The former standalone DOCX/PPTX production milestone was absorbed by B31, and B32 closed scanned-PDF reliability; those production jobs should not be repeated without a new reproduced defect. B33 verified the complete Page/PDF/Office/image eligibility, acquisition, extraction, provenance, durable-generation, Queue, persistence, and Library evidence chain and repaired the one remaining concrete boundary defect: Tasks now admits Canvas assignments only when deadline-bearing and/or submittable. Positive Canvas instructional-image discovery remains naturally fixture/Student-permission limited and does not block the roadmap. See [B33 acceptance](ai/acceptance/b33/student-material-ingestion-closure-audit.md). Next: B34 generation quality acceptance.
@@ -20,17 +24,29 @@
 
 Status: **Closed and superseded by the B33 closure audit above.** Real Student-accessible Canvas DOCX and PPTX acquisition, extraction, durable generation, persistence, Queue, physical Android rendering, and Library reopen were completed early in B31. B32 then closed the remaining scanned-PDF format blocker. Do not repeat a standalone Office-format milestone unless a new student-facing defect is reproduced.
 
-## B34 generation quality acceptance
+## B35 Physical UX Acceptance
 
-Status: Next; the supported student-material ingestion matrix is closed through B33.
+Status: Planned after B34's changed signed build completes its required physical matrix.
 
-Evaluate Reviewer, Quiz, and Activity/task quality; grounding; source fidelity; formatting; larger-context behavior; and malformed or low-information handling using real instructional materials rather than administrative outlines.
+Validate the repaired Today, Generate, Queue, Library, Reviewer, generation, motion, gesture-conflict, relaunch, and accessibility behavior repeatedly on physical Android.
 
-## B35 mobile product acceptance
+## B36 Generation Quality Acceptance
 
-Status: Planned after B34.
+Status: Planned after B35.
 
-Validate Today, Generate, Tasks, Queue, Library, Reviewer, Quiz, Activity, relaunch persistence, authentication persistence, failure/retry states, and background generation on the physical Android device.
+Evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, larger-context behavior, and malformed or low-information handling using real instructional materials rather than administrative outlines.
+
+## B37 Full E2E / Demo Acceptance
+
+Status: Planned after B36.
+
+Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
+
+## B38 Capstone & Release Hardening
+
+Status: Planned after B37.
+
+Close release, evidence, operational, security, and capstone presentation readiness without weakening the accepted product contracts.
 
 ## Canvas permission boundary
 
