@@ -57,11 +57,12 @@ export type ThemeColors = {
   readonly [K in keyof typeof palettes.light]: string;
 };
 export const motion = {
-  small: 220,
-  normal: 320,
-  spatial: 480,
+  press: 140,
+  small: 180,
+  normal: 240,
+  spatial: 320,
   ambient: 3200,
-  spring: { damping: 18, stiffness: 180, mass: 0.8 },
+  spring: { damping: 22, stiffness: 260, mass: 0.8 },
 } as const;
 export const iconSize = { small: 18, normal: 22, tab: 23, hero: 32 } as const;
 export const contentColors = {

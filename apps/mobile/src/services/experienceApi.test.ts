@@ -44,7 +44,7 @@ describe("experience client", () => {
         },
         "/api/experience/library",
       ),
-    ).rejects.toThrow("This feature is unavailable right now.");
+    ).rejects.toThrow("The server could not load this content.");
   });
   it("handles invalid JSON as a safe connection failure", async () => {
     await expect(

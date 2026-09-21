@@ -190,7 +190,18 @@ describe('Learn and Activity details', () => {
     const { api } = service({ canvas_courses: [course] });
     const result = await api.getCourseLearningWorkspace('owner', course.id);
     expect(result.course.materialCount).toBe(1); expect(result.materials.items[0]?.kind).toBe('pdf');
+    expect(result.materials.items[0]).toMatchObject({ reviewerId: null, generation: { quiz: { status: 'unavailable' } } });
     expect(JSON.stringify(result)).not.toContain('failureCategories');
+  });
+  it('enables Quiz only through the latest persisted Reviewer relationship', async () => {
+    const { api } = service({
+      canvas_courses: [course],
+      reviewer_source_snapshots: [{ id: 'snapshot', user_id: 'owner', course_id: course.id }],
+      reviewer_source_snapshot_items: [{ id: 'item', user_id: 'owner', course_id: course.id, source_snapshot_id: 'snapshot', source_type: 'file', source_row_id: 'source' }],
+      reviewers: [{ id: 'reviewer', user_id: 'owner', source_snapshot_id: 'snapshot', updated_at: date }],
+    });
+    const material = (await api.getCourseLearningWorkspace('owner', course.id)).materials.items[0];
+    expect(material).toMatchObject({ reviewerId: 'reviewer', generation: { reviewer: { status: 'available' }, quiz: { status: 'available' } } });
   });
   it('denies another owner course before invoking materials', async () => {
     const { api, materials } = service({ canvas_courses: [{ ...course, user_id: 'other' }] });

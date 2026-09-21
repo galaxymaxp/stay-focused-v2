@@ -28,6 +28,7 @@ const messages: Record<string, string> = {
   activity_generation_failed:
     "Your draft could not be completed. Review the assignment and its materials.",
   rate_limited: "Please wait a moment before trying again.",
+  unavailable: "The server could not load this content. Try again when your connection is stable.",
 };
 /** Safe product errors only. Never echo arbitrary server/provider response text. */
 export async function experienceRequest<T>(
@@ -74,8 +75,7 @@ export async function experienceRequest<T>(
           : "unavailable";
       throw new ExperienceApiError(
         code,
-        messages[code] ??
-          "This feature is unavailable right now. Please try again later.",
+        messages[code] ?? "This request could not be completed. Try again.",
         value?.ok === false && value.error?.retryable === true,
       );
     }

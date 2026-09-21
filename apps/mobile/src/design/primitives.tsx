@@ -77,6 +77,26 @@ export function Surface({
     </View>
   );
 }
+
+function usePressMotion(disabled = false) {
+  const { reducedMotion } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => () => scale.stopAnimation(), [scale]);
+  const animate = (value: number) => {
+    scale.stopAnimation();
+    if (reducedMotion) {
+      scale.setValue(1);
+      return;
+    }
+    Animated.spring(scale, { toValue: value, ...motion.spring, useNativeDriver: true }).start();
+  };
+  return {
+    scale,
+    onPressIn: () => { if (!disabled) animate(0.985); },
+    onPressOut: () => animate(1),
+  };
+}
+
 export function Action({
   children,
   onPress,
@@ -95,30 +115,32 @@ export function Action({
   testID?: string;
 }) {
   const { colors } = useTheme();
+  const press = usePressMotion(disabled);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      testID={testID}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: hitTarget.min,
-        alignSelf: secondary && !pill ? "flex-start" : "stretch",
-        paddingHorizontal: secondary ? spacing[2] : spacing[4],
-        paddingVertical: spacing[2],
-        borderRadius: pill ? radius.pill : radius.control,
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
-        backgroundColor: secondary ? (pressed ? colors.surfaceSecondary : pill ? colors.surfacePrimary : "transparent") : colors.accent,
-      })}
-    >
-      <Copy size={secondary ? "bodySmall" : "body"} color={secondary ? colors.accent : colors.onAccent}>
-        {children}
-      </Copy>
-    </Pressable>
+    <Animated.View style={{ alignSelf: secondary && !pill ? "flex-start" : "stretch", transform: [{ scale: press.scale }] }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        testID={testID}
+        onPress={onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={({ pressed }) => ({
+          minHeight: hitTarget.min,
+          paddingHorizontal: secondary ? spacing[2] : spacing[4],
+          paddingVertical: spacing[2],
+          borderRadius: pill ? radius.pill : radius.control,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: disabled ? 0.5 : pressed ? 0.82 : 1,
+          backgroundColor: secondary ? (pressed ? colors.surfaceSecondary : pill ? colors.surfacePrimary : "transparent") : colors.accent,
+        })}
+      >
+        <Copy size={secondary ? "bodySmall" : "body"} color={secondary ? colors.accent : colors.onAccent}>{children}</Copy>
+      </Pressable>
+    </Animated.View>
   );
 }
 export function IconAction({
@@ -300,13 +322,17 @@ export function RowLink({
   disabled?: boolean;
 }) {
   const { colors } = useTheme();
+  const press = usePressMotion(disabled);
   return (
+    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
       disabled={disabled}
       accessibilityState={{ disabled }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       style={({ pressed }) => ({
         minHeight: hitTarget.min,
         flexDirection: "row",
@@ -321,6 +347,7 @@ export function RowLink({
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>{children}</View>
       {trailing ?? <ChevronRight size={16} color={colors.textMuted} />}
     </Pressable>
+    </Animated.View>
   );
 }
 
@@ -334,7 +361,8 @@ export function ContentIcon({ kind, small = false }: { kind: string; small?: boo
 
 export function FilterChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { colors } = useTheme();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable>;
+  const press = usePressMotion();
+  return <Animated.View style={{ transform: [{ scale: press.scale }] }}><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable></Animated.View>;
 }
 
 export function Sheet({

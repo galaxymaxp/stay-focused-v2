@@ -16,7 +16,9 @@ import {
 
 const SIZE = 320,
   CENTER = SIZE / 2,
-  RADIUS = 126;
+  RADIUS = 126,
+  HANDLE_TOUCH_SIZE = 56,
+  HANDLE_VISIBLE_SIZE = 34;
 function point(minutes: number, radius = RADIUS) {
   const angle = (minutes / 1440) * Math.PI * 2 + Math.PI / 2;
   return {
@@ -313,23 +315,30 @@ function RingHandle({
       }}
       style={{
         position: "absolute",
-        left: p.x - 24,
-        top: p.y - 24,
-        width: 48,
-        height: 48,
+        left: p.x - HANDLE_TOUCH_SIZE / 2,
+        top: p.y - HANDLE_TOUCH_SIZE / 2,
+        width: HANDLE_TOUCH_SIZE,
+        height: HANDLE_TOUCH_SIZE,
         alignItems: "center",
         justifyContent: "center",
+        zIndex: 4,
+        elevation: 4,
         transform: [{ scale }],
       }}
     >
       <View
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: 10,
+          width: HANDLE_VISIBLE_SIZE,
+          height: HANDLE_VISIBLE_SIZE,
+          borderRadius: HANDLE_VISIBLE_SIZE / 2,
           backgroundColor: colors.violet,
           borderColor: colors.backgroundPrimary,
-          borderWidth: 2,
+          borderWidth: 3,
+          shadowColor: colors.shadow,
+          shadowOpacity: 0.18,
+          shadowRadius: 5,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 4,
         }}
       />
     </Animated.View>

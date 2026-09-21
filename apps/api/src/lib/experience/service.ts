@@ -30,9 +30,27 @@ export class ExperienceService {
   }
   async getCourseMaterials(userId: string, courseId: string, offset = 0): Promise<CourseMaterials> {
     requireFound((await this.rows('canvas_courses', userId)).find(c => c.id === courseId));
-    const result = await this.dependencies.materials(userId, courseId, offset);
+    const [result, reviewers, snapshots, snapshotItems] = await Promise.all([
+      this.dependencies.materials(userId, courseId, offset),
+      this.rows('reviewers', userId),
+      this.rows('reviewer_source_snapshots', userId),
+      this.rows('reviewer_source_snapshot_items', userId),
+    ]);
     if (!result.ok) throw new ExperienceFailure(result.status === 404 ? 404 : 503, result.status === 404 ? 'not_found' : 'unavailable');
-    return { items: result.value.sources.map(row => learningMaterial(row, courseId)), totalKnown: result.value.pagination.totalKnown,
+    const courseSnapshots = new Set(snapshots.filter(snapshot => snapshot.course_id === courseId).map(snapshot => snapshot.id));
+    const latestReviewerBySnapshot = new Map<string, string>();
+    for (const reviewer of [...reviewers].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))) {
+      if (reviewer.source_snapshot_id && courseSnapshots.has(reviewer.source_snapshot_id) && !latestReviewerBySnapshot.has(reviewer.source_snapshot_id)) {
+        latestReviewerBySnapshot.set(reviewer.source_snapshot_id, reviewer.id);
+      }
+    }
+    const reviewerByMaterial = new Map<string, string>();
+    for (const item of snapshotItems) {
+      if (item.course_id !== courseId || !item.source_row_id) continue;
+      const reviewerId = latestReviewerBySnapshot.get(item.source_snapshot_id);
+      if (reviewerId) reviewerByMaterial.set(`${item.source_type}:${item.source_row_id}`, reviewerId);
+    }
+    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
       nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
   }
   async getCourseLearningWorkspace(userId: string, courseId: string): Promise<CourseLearningWorkspace> {

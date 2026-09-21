@@ -33,6 +33,8 @@ export interface LearningMaterial {
   readonly readiness: 'ready' | 'needs_preparation' | 'empty' | 'unsupported' | 'unavailable';
   readonly count: number | null;
   readonly sourceId: string;
+  /** Latest owner-persisted Reviewer grounded in this exact Canvas material. */
+  readonly reviewerId: string | null;
   readonly moduleTitle: string | null;
   readonly generation: GenerationCapability;
 }

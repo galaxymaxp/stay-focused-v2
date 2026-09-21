@@ -9,8 +9,8 @@ export const fixtureCourses: readonly CourseSummary[] = [
 export const fixtureWorkspace: CourseLearningWorkspace = {
   course: fixtureCourses[0]!, capabilities: fixtureCapabilities,
   materials: { totalKnown: 2, nextOffset: null, items: [
-    { id: 'file:example', sourceId: 'file:example', courseId: 'course-a', title: 'Cells.pdf', kind: 'pdf', readiness: 'ready', count: null, moduleTitle: 'Cells', generation: { reviewer: { status: 'available' }, quiz: { status: 'available' }, activityAssistance: unavailable } },
-    { id: 'file:slides', sourceId: 'file:slides', courseId: 'course-a', title: 'Cells.pptx', kind: 'slides', readiness: 'unsupported', count: null, moduleTitle: 'Cells', generation: { reviewer: { status: 'unavailable', reasonCode: 'unsupported_material' }, quiz: { status: 'unavailable', reasonCode: 'unsupported_material' }, activityAssistance: unavailable } },
+    { id: 'file:example', sourceId: 'file:example', reviewerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', courseId: 'course-a', title: 'Cells.pdf', kind: 'pdf', readiness: 'ready', count: null, moduleTitle: 'Cells', generation: { reviewer: { status: 'available' }, quiz: { status: 'available' }, activityAssistance: unavailable } },
+    { id: 'file:slides', sourceId: 'file:slides', reviewerId: null, courseId: 'course-a', title: 'Cells.pptx', kind: 'slides', readiness: 'unsupported', count: null, moduleTitle: 'Cells', generation: { reviewer: { status: 'unavailable', reasonCode: 'unsupported_material' }, quiz: { status: 'unavailable', reasonCode: 'unsupported_material' }, activityAssistance: unavailable } },
   ] },
 };
 export const fixtureActivity: ActivitySummary = { id: 'canvas:activity', taskId: null, title: 'Cell worksheet', course: fixtureCourses[0]!, dueAt: '2026-09-12T15:00:00Z', status: 'unknown', priority: 'high', estimatedMinutes: null, submissionTypes: ['online_upload'], source: 'canvas', isOverdue: false, urgency: 'now', hasGeneratedDraft: false };

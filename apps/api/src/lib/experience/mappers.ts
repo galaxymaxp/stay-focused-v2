@@ -8,20 +8,20 @@ const missing: FeatureCapability = { status: 'unavailable', reasonCode: 'not_imp
 export function experienceCapabilities(): ExperienceCapabilities {
   return { fileIngestion: {pdf:available,scanned_pdf:available,image:available,docx:available,pptx:available,doc:{status:'unavailable',reasonCode:'unsupported_material'},ppt:{status:'unavailable',reasonCode:'unsupported_material'},text:available,canvas_text:available}, reviewerGeneration: available, quizGeneration: available, activityMaker: available, planner: available, calendar: missing };
 }
-export function generationCapability(ready: boolean, unsupported = false): GenerationCapability {
-  return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, activityAssistance: missing };
+export function generationCapability(ready: boolean, unsupported = false, quizReady = false): GenerationCapability {
+  return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: quizReady ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, activityAssistance: missing };
 }
 export function courseSummary(row: CanvasCourseRow): CourseSummary {
   return { id: row.id, code: row.course_code, name: row.name, status: row.workflow_state, materialCount: null, reviewerCount: null, lastActivityAt: row.last_synced_at };
 }
-export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string): LearningMaterial {
+export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string, reviewerId: string | null = null): LearningMaterial {
   // Legacy availability means usable right now, so it is also unavailable for
   // preparable, empty and unsupported materials. Preserve those useful states.
   const readiness = row.capability === 'failed' || row.capability === 'inaccessible' || (row.capability === 'ready' && row.availability !== 'available') ? 'unavailable' : row.capability;
   const kind = row.file?.kind === 'docx' ? 'document' : row.file?.kind === 'pptx' ? 'slides' : row.type !== 'file' ? row.type : row.file?.kind === 'unsupported'
     ? /\.pptx?$/i.test(row.title) ? 'slides' : 'document' : row.file?.kind ?? 'document';
-  return { id: row.id, courseId, title: row.title, kind, readiness, count: null, sourceId: row.id,
-    moduleTitle: row.placement.moduleTitle, generation: generationCapability(readiness === 'ready', readiness === 'unsupported') };
+  return { id: row.id, courseId, title: row.title, kind, readiness, count: null, sourceId: row.id, reviewerId,
+    moduleTitle: row.placement.moduleTitle, generation: generationCapability(readiness === 'ready', readiness === 'unsupported', reviewerId !== null) };
 }
 export function dayWindow(date: string, offset = 0) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(offset) || offset < -720 || offset > 840) throw new ExperienceFailure(400, 'invalid_request');

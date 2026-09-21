@@ -64,14 +64,18 @@ vi.mock("react-native", () => ({
   TextInput: "TextInput",
   Linking: { openURL: vi.fn() },
   Vibration: { vibrate: mocks.vibration },
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
   PanResponder: { create: (handlers: unknown) => ({ panHandlers: handlers }) },
   Animated: {
     View: "AnimatedView",
+    ScrollView: "AnimatedScrollView",
     Value: class {
       setValue() {}
       stopAnimation() {}
+      interpolate(config: unknown) { return config; }
     },
     spring: () => ({ start() {} }),
+    event: () => vi.fn(),
   },
 }));
 vi.mock("react-native-svg", () => ({
@@ -93,6 +97,8 @@ vi.mock("lucide-react-native", () => ({
   Circle: "Circle",
   Sun: "Sun",
   Moon: "Moon",
+  BookOpen: "BookOpen",
+  ClipboardList: "ClipboardList",
 }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({
@@ -148,6 +154,7 @@ const workspace: CourseLearningWorkspace = {
         id: "file:one",
         courseId: "course",
         sourceId: "file:one",
+        reviewerId: null,
         title: "Real material",
         kind: "slides",
         readiness: "ready",
@@ -242,6 +249,10 @@ describe("B25 screen interactions", () => {
     mocks.data["/api/experience/courses/course"] = workspace;
     mocks.createIntent.mockResolvedValue({ key: "saved-key" });
     const root = await render(createElement(GenerateScreen));
+    const course = root
+      .findAll((node) => String(node.type) === "RowLink")
+      .find((node) => node.props.label === "Open Course")!;
+    await act(async () => course.props.onPress());
     const row = root
       .findAll((node) => String(node.type) === "Pressable")
       .find((node) => node.props.accessibilityState?.selected === false)!;
@@ -265,8 +276,38 @@ describe("B25 screen interactions", () => {
       params: { intent: "saved-key" },
     });
   });
+  it("creates Quiz only from the persisted Reviewer linked to a material", async () => {
+    const reviewerWorkspace: CourseLearningWorkspace = {
+      ...workspace,
+      materials: {
+        ...workspace.materials,
+        items: workspace.materials.items.map((item) => ({
+          ...item,
+          reviewerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          generation: { ...item.generation, quiz: supported },
+        })),
+      },
+      capabilities: { ...workspace.capabilities, quizGeneration: supported },
+    };
+    mocks.data["/api/experience/courses"] = { items: [workspace.course] };
+    mocks.data["/api/experience/courses/course"] = reviewerWorkspace;
+    mocks.createIntent.mockResolvedValue({ key: "quiz-key" });
+    const root = await render(createElement(GenerateScreen));
+    await act(async () => root.findAll((node) => String(node.type) === "RowLink").find((node) => node.props.label === "Open Course")!.props.onPress());
+    await act(async () => root.findAll((node) => String(node.type) === "Pressable").find((node) => node.props.accessibilityState?.selected === false)!.props.onPress());
+    const quiz = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Generate Quiz")!;
+    expect(quiz.props.disabled).toBe(false);
+    await act(async () => quiz.props.onPress());
+    expect(mocks.createIntent).toHaveBeenCalledWith("owner", expect.objectContaining({
+      body: expect.objectContaining({
+        sourceType: "reviewer",
+        sourceIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+        reviewerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      }),
+    }));
+  });
   it("opens a Library artifact without calling generation", async () => {
-    mocks.data["/api/experience/library?type=all&limit=50"] = {
+    mocks.data["/api/experience/library?limit=50"] = {
       items: [
         {
           id: "quiz:saved",
@@ -293,7 +334,7 @@ describe("B25 screen interactions", () => {
     const root = await render(createElement(LibraryScreen));
     const open = root
       .findAll((node) => String(node.type) === "RowLink")
-      .find((node) => node.props.label === "Practice: Saved quiz")!;
+      .find((node) => node.props.label === "Quiz: Saved quiz")!;
     await act(async () => open.props.onPress());
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: "/artifact",

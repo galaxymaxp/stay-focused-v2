@@ -4,8 +4,8 @@ import type {
   ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, View } from "react-native";
 import { CheckCircle2, CircleDashed, Clock3, AlertCircle } from "lucide-react-native";
 
 import { useAuth } from "../../auth";
@@ -17,7 +17,7 @@ import {
   readGenerationIntents,
   type GenerationIntent,
 } from "../../services/generationRecovery";
-import { GenerationOrb } from "./GenerationOrb";
+import { GenerationVisual } from "./GenerationVisual";
 import { generationMessages } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 
@@ -90,17 +90,11 @@ export function GenerationScreen() {
         )}
         <View
           accessibilityLiveRegion="polite"
-          style={{ alignItems: "center", gap: 20 }}
+          style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
-          <Copy size="h2" style={{ textAlign: "center", maxWidth: 270, fontSize: 24, lineHeight: 30 }}>
-            {data
-              ? generationMessages[data.state]
-              : id
-                ? "Connecting to your generation…"
-                : "Preparing your request…"}
-          </Copy>
-          <GenerationOrb running={running && !!id} />
-          <Copy muted size="bodySmall" style={{ textAlign: "center", maxWidth: 260, lineHeight: 20 }}>
+          <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : "Preparing your request…"} />
+          <GenerationVisual running={running && !!id} completed={data?.state === "completed"} />
+          <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
               ? running
                 ? "You can leave this screen. We’ll keep working."
@@ -143,6 +137,40 @@ export function GenerationScreen() {
         )}
       </View>
     </Page>
+  );
+}
+
+function GenerationStatus({ message }: { message: string }) {
+  const { reducedMotion } = useTheme();
+  const opacity = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const [visible, setVisible] = useState(message);
+  useEffect(() => {
+    if (reducedMotion) {
+      setVisible(message);
+      opacity.setValue(1);
+      translateY.setValue(0);
+      return;
+    }
+    const out = Animated.parallel([
+      Animated.timing(opacity, { toValue: 0, duration: 100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: -4, duration: 100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]);
+    out.start(({ finished }) => {
+      if (!finished) return;
+      setVisible(message);
+      translateY.setValue(5);
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 180, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 180, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      ]).start();
+    });
+    return () => out.stop();
+  }, [message, opacity, reducedMotion, translateY]);
+  return (
+    <Animated.View style={{ height: 78, width: 290, alignItems: "center", justifyContent: "center", opacity, transform: [{ translateY }] }}>
+      <Copy size="h2" style={{ textAlign: "center", fontSize: 24, lineHeight: 30 }}>{visible}</Copy>
+    </Animated.View>
   );
 }
 export function QueueScreen() {
