@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CourseLearningWorkspace,
+  LibraryArtifactSummary,
   LibraryOverview,
   TodayOverview,
 } from "@stay-focused/shared";
@@ -16,6 +17,13 @@ import { AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 
 const mocks = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
+  library: {
+    items: [] as LibraryArtifactSummary[],
+    categories: null as LibraryOverview["categories"] | null,
+    localReady: true,
+    refreshing: false,
+    error: null as string | null,
+  },
   push: vi.fn(),
   navigate: vi.fn(),
   request: vi.fn(),
@@ -112,6 +120,10 @@ vi.mock("./useExperience", () => ({
     refresh: vi.fn(),
   }),
 }));
+vi.mock("./useLocalLibrary", () => ({
+  useLocalLibrary: () => ({ ...mocks.library, refresh: vi.fn() }),
+  useLocalArtifact: () => ({ data: null, loading: false, error: null, deviceCopy: false, refresh: vi.fn(), storeConfirmed: vi.fn() }),
+}));
 vi.mock("../../services/experienceApi", () => ({
   experienceRequest: mocks.request,
 }));
@@ -122,6 +134,7 @@ vi.mock("../../services/generationRecovery", () => ({
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   mocks.data = {};
+  mocks.library = { items: [], categories: null, localReady: true, refreshing: false, error: null };
   vi.clearAllMocks();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
@@ -138,6 +151,26 @@ async function render(element: ReactElement) {
 }
 const supported = { status: "available" as const },
   unavailable = { status: "unavailable" as const };
+const savedQuiz: LibraryArtifactSummary = {
+  id: "quiz:saved",
+  title: "Saved quiz",
+  type: "quiz",
+  course: null,
+  updatedAt: "2026-09-13",
+  createdAt: "2026-09-13",
+  sourceId: null,
+  sourceTitle: null,
+  activityId: null,
+  lastOpenedAt: null,
+  status: "completed",
+  relatedArtifactIds: [],
+};
+function libraryCards(root: ReactTestRenderer["root"]) {
+  return root.findAll((node) => String(node.type) === "RowLink").map((node) => node.props.label as string);
+}
+function copyText(root: ReactTestRenderer["root"]) {
+  return root.findAll((node) => String(node.type) === "Copy").map((node) => [node.props.children].flat().join(""));
+}
 const workspace: CourseLearningWorkspace = {
   course: {
     id: "course",
@@ -307,30 +340,8 @@ describe("B25 screen interactions", () => {
     }));
   });
   it("opens a Library artifact without calling generation", async () => {
-    mocks.data["/api/experience/library?limit=50"] = {
-      items: [
-        {
-          id: "quiz:saved",
-          title: "Saved quiz",
-          type: "quiz",
-          course: null,
-          updatedAt: "2026-09-13",
-          createdAt: "2026-09-13",
-          sourceId: null,
-          sourceTitle: null,
-          activityId: null,
-          lastOpenedAt: null,
-          status: "completed",
-          relatedArtifactIds: [],
-        },
-      ],
-      categories: {
-        reviewer: supported,
-        quiz: supported,
-        activity_output: supported,
-      },
-      nextOffset: null,
-    } as LibraryOverview;
+    mocks.library.items = [savedQuiz];
+    mocks.library.categories = { reviewer: supported, quiz: supported, activity_output: supported };
     const root = await render(createElement(LibraryScreen));
     const open = root
       .findAll((node) => String(node.type) === "RowLink")
@@ -342,6 +353,35 @@ describe("B25 screen interactions", () => {
     });
     expect(mocks.createIntent).not.toHaveBeenCalled();
     expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it("keeps device-saved work visible while the cloud refresh runs", async () => {
+    mocks.library.items = [savedQuiz];
+    mocks.library.refreshing = true;
+    const root = await render(createElement(LibraryScreen));
+    expect(root.findAll((node) => node.props.accessibilityLabel === "Loading Library")).toHaveLength(0);
+    expect(libraryCards(root)).toContain("Quiz: Saved quiz");
+    expect(copyText(root)).toContain("Checking for updates…");
+  });
+  it("shows device-saved work with a quiet notice when the cloud is unreachable", async () => {
+    mocks.library.items = [savedQuiz];
+    mocks.library.error = "Could not connect.";
+    const root = await render(createElement(LibraryScreen));
+    expect(libraryCards(root)).toContain("Quiz: Saved quiz");
+    expect(copyText(root)).not.toContain("Library could not be loaded");
+    expect(root.findAll((node) => String(node.type) === "Notice").map((node) => node.props.children)).toContain(
+      "Showing work saved on this device. Refresh when you are back online.",
+    );
+  });
+  it("shows the structural loading state only when nothing is saved on the device yet", async () => {
+    mocks.library.refreshing = true;
+    const root = await render(createElement(LibraryScreen));
+    // One skeleton per horizontal page: All, Reviewers, Quizzes, Activity Outputs.
+    expect(root.findAll((node) => node.props.accessibilityLabel === "Loading Library" && String(node.type) === "View")).toHaveLength(4);
+  });
+  it("keeps the B34 error surface when there is no saved work and the cloud fails", async () => {
+    mocks.library.error = "Could not connect.";
+    const root = await render(createElement(LibraryScreen));
+    expect(copyText(root)).toContain("Library could not be loaded");
   });
   it("uses server urgency groups and preserves server order", async () => {
     mocks.data[

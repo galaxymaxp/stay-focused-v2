@@ -1,9 +1,8 @@
 import type {
   ActivityDraft,
   ActivityDraftContent,
+  LibraryArtifactDetail,
   LibraryArtifactSummary,
-  LibraryOverview,
-  Quiz,
   ReviewerReaderModel,
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
@@ -24,8 +23,10 @@ import { radius, spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
 import { available } from "./presentation";
-import { useExperience, useExperienceClient } from "./useExperience";
+import { useExperienceClient } from "./useExperience";
+import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
 
+const LOCAL_PAGE_SIZE = 50;
 const filters = [
   { value: "all", label: "All" },
   { value: "reviewer", label: "Reviewers" },
@@ -37,41 +38,23 @@ export function LibraryScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const pageWidth = Math.max(280, windowWidth - 40);
   const [filter, setFilter] = useState<(typeof filters)[number]["value"]>("all");
-  const library = useExperience<LibraryOverview>("/api/experience/library?limit=50");
-  const client = useExperienceClient();
+  const library = useLocalLibrary();
   const pager = useRef<ScrollView>(null);
   const tabs = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const [extra, setExtra] = useState<LibraryArtifactSummary[]>([]);
-  const [next, setNext] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
 
-  useEffect(() => {
-    setExtra([]);
-    setNext(library.data?.nextOffset ?? null);
-  }, [library.data]);
   useEffect(() => {
     const index = filters.findIndex((item) => item.value === filter);
     tabs.current?.scrollTo({ x: Math.max(0, index * 78 - 50), animated: true });
   }, [filter]);
 
-  async function more() {
-    if (next === null || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const page = await experienceRequest<LibraryOverview>(client, `/api/experience/library?limit=50&offset=${next}`);
-      setExtra((old) => [...old, ...page.items]);
-      setNext(page.nextOffset);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load more saved work.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const items = [...(library.data?.items ?? []), ...extra];
+  // Saved work renders from the device; the skeleton appears only when nothing
+  // is stored yet and the cloud is still answering.
+  const hasLocal = library.items.length > 0;
+  const loading = !library.localReady || (!hasLocal && library.refreshing);
+  const itemsFor = (value: (typeof filters)[number]["value"]) =>
+    value === "all" ? library.items : library.items.filter((entry) => entry.type === value);
   const selectPage = (index: number) => {
     pager.current?.scrollTo({ x: index * pageWidth, animated: true });
     setFilter(filters[index]!.value);
@@ -111,13 +94,14 @@ export function LibraryScreen() {
               key={item.value}
               width={pageWidth}
               filter={item.value}
-              items={item.value === "all" ? items : items.filter((entry) => entry.type === item.value)}
-              loading={library.loading}
-              error={library.error ?? error}
-              unavailable={item.value !== "all" && library.data ? !available(library.data.categories[item.value]) : false}
-              canLoadMore={next !== null}
-              busy={busy}
-              onLoadMore={() => void more()}
+              items={itemsFor(item.value).slice(0, visible)}
+              total={itemsFor(item.value).length}
+              loading={loading}
+              error={hasLocal ? null : library.error}
+              deviceCopy={hasLocal && !!library.error}
+              refreshing={hasLocal && library.refreshing}
+              unavailable={item.value !== "all" && library.categories ? !available(library.categories[item.value]) : false}
+              onLoadMore={() => setVisible((count) => count + LOCAL_PAGE_SIZE)}
               onRetry={library.refresh}
             />
           ))}
@@ -127,15 +111,16 @@ export function LibraryScreen() {
   );
 }
 
-function LibraryPage({ width, filter, items, loading, error, unavailable, canLoadMore, busy, onLoadMore, onRetry }: {
+function LibraryPage({ width, filter, items, total, loading, error, deviceCopy, refreshing, unavailable, onLoadMore, onRetry }: {
   width: number;
   filter: (typeof filters)[number]["value"];
   items: readonly LibraryArtifactSummary[];
+  total: number;
   loading: boolean;
   error: string | null;
+  deviceCopy: boolean;
+  refreshing: boolean;
   unavailable: boolean;
-  canLoadMore: boolean;
-  busy: boolean;
   onLoadMore: () => void;
   onRetry: () => void;
 }) {
@@ -144,6 +129,8 @@ function LibraryPage({ width, filter, items, loading, error, unavailable, canLoa
     <ScrollView nestedScrollEnabled style={{ width }} contentContainerStyle={{ gap: spacing[3], paddingTop: spacing[3], paddingBottom: 36 }}>
       {loading ? <LibrarySkeleton /> : null}
       {error ? <Surface><Copy size="h3">Library could not be loaded</Copy><Copy muted>{error}</Copy><Action secondary onPress={onRetry}>Try again</Action></Surface> : null}
+      {deviceCopy ? <Notice>Showing work saved on this device. Refresh when you are back online.</Notice> : null}
+      {refreshing ? <Copy muted size="caption">Checking for updates…</Copy> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
       {!loading && !error && items.length === 0 ? (
         <Surface>
@@ -153,8 +140,8 @@ function LibraryPage({ width, filter, items, loading, error, unavailable, canLoa
         </Surface>
       ) : null}
       {items.map((item) => <LibraryCard key={item.id} item={item} />)}
-      {canLoadMore ? <Action secondary disabled={busy} onPress={onLoadMore}>More saved work</Action> : null}
-      {items.length > 0 ? <Copy muted size="caption" style={{ textAlign: "center" }}>{items.length} {items.length === 1 ? "item" : "items"}</Copy> : null}
+      {items.length < total ? <Action secondary onPress={onLoadMore}>More saved work</Action> : null}
+      {total > 0 ? <Copy muted size="caption" style={{ textAlign: "center" }}>{total} {total === 1 ? "item" : "items"}</Copy> : null}
     </ScrollView>
   );
 }
@@ -186,19 +173,15 @@ function LibrarySkeleton() {
   return <View accessibilityLabel="Loading Library" style={{ gap: spacing[3] }}>{[0, 1, 2].map((index) => <Surface key={index} style={{ minHeight: 104, justifyContent: "center", gap: spacing[2] }}><View style={{ width: "28%", height: 10, borderRadius: 5, backgroundColor: colors.surfaceSecondary }} /><View style={{ width: index === 1 ? "88%" : "68%", height: 18, borderRadius: 8, backgroundColor: colors.surfaceSecondary }} /><View style={{ width: "44%", height: 10, borderRadius: 5, backgroundColor: colors.surfaceSecondary }} /></Surface>)}</View>;
 }
 
-type ArtifactDetail = {
-  artifact: LibraryArtifactSummary;
-  reviewer?: ReviewerReaderModel;
-  quiz?: Quiz;
-  draft?: ActivityDraft;
-};
 export function ArtifactScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const result = useExperience<ArtifactDetail>(
-    id ? `/api/experience/library/${encodeURIComponent(id)}` : null,
-  );
+  const result = useLocalArtifact(id ?? null);
+  const detail = result.data;
   return (
     <Page title="Library" back>
+      {result.deviceCopy && (
+        <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice>
+      )}
       {result.error && (
         <>
           <Notice>{result.error}</Notice>
@@ -207,31 +190,31 @@ export function ArtifactScreen() {
           </Action>
         </>
       )}
-      {result.loading && <Notice>Opening saved work…</Notice>}
-      {result.data && (
+      {result.loading && !detail && <Notice>Opening saved work…</Notice>}
+      {detail && (
         <>
           <Copy muted size="caption">
-            {result.data.artifact.course?.name ?? "Your study tools"}
-            {result.data.artifact.sourceTitle ? ` · ${result.data.artifact.sourceTitle}` : ""}
+            {detail.artifact.course?.name ?? "Your study tools"}
+            {detail.artifact.sourceTitle ? ` · ${detail.artifact.sourceTitle}` : ""}
           </Copy>
-          <Copy size="h1">{result.data.artifact.title}</Copy>
+          <Copy size="h1">{detail.artifact.title}</Copy>
           <Copy muted size="caption">
-            Generated {new Date(result.data.artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
+            Generated {new Date(detail.artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
           </Copy>
-          {result.data.reviewer && (
-            <ReviewerContent reviewer={result.data.reviewer} />
+          {"reviewer" in detail && (
+            <ReviewerContent reviewer={detail.reviewer} />
           )}
-          {result.data.quiz && (
+          {"quiz" in detail && (
             <Surface>
               <Copy>
-                {result.data.quiz.questionCount} questions ·{" "}
-                {result.data.quiz.difficulty} difficulty
+                {detail.quiz.questionCount} questions ·{" "}
+                {detail.quiz.difficulty} difficulty
               </Copy>
               <Action
                 onPress={() =>
                   router.push({
                     pathname: "/quiz",
-                    params: { id: result.data!.quiz!.id },
+                    params: { id: detail.quiz.id },
                   })
                 }
               >
@@ -239,10 +222,16 @@ export function ArtifactScreen() {
               </Action>
             </Surface>
           )}
-          {result.data.draft && (
+          {"draft" in detail && (
             <DraftEditor
-              key={`${result.data.draft.id}-${result.data.draft.revision}`}
-              draft={result.data.draft}
+              key={`${detail.draft.id}-${detail.draft.revision}`}
+              draft={detail.draft}
+              onSaved={(draft) =>
+                result.storeConfirmed({
+                  artifact: { ...detail.artifact, title: draft.title, updatedAt: draft.updatedAt },
+                  draft,
+                } satisfies LibraryArtifactDetail)
+              }
             />
           )}
         </>
@@ -301,7 +290,7 @@ function ReviewerContent({ reviewer }: { reviewer: ReviewerReaderModel }) {
 function normalizedHeading(value: string): string {
   return value.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
-function DraftEditor({ draft }: { draft: ActivityDraft }) {
+function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft: ActivityDraft) => void }) {
   const navigation = useNavigation();
   const client = useExperienceClient(),
     { colors } = useTheme();
@@ -355,6 +344,7 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
       );
       setRevision(updated.revision);
       setDirty(false);
+      onSaved(updated);
       setNote("Draft saved.");
     } catch (cause) {
       setNote(

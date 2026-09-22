@@ -6,6 +6,7 @@ import { View } from "react-native";
 import { Action, Copy, Notice, Page, Surface } from "../../design/primitives";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import { useExperience, useExperienceClient } from "./useExperience";
+import { useLocalArtifact } from "./useLocalLibrary";
 
 type AttemptHistory = {
   id: string;
@@ -21,6 +22,10 @@ export function QuizScreen() {
   const history = useExperience<AttemptHistory>(
     id ? `/api/experience/quizzes/${encodeURIComponent(id)}/attempts` : null,
   );
+  // The device copy lets saved questions open offline; practice stays server-scored.
+  const saved = useLocalArtifact(id ? `quiz:${id}` : null, { refreshRemote: false });
+  const savedQuiz = saved.data && "quiz" in saved.data ? saved.data.quiz : null;
+  const quizData = quiz.data ?? savedQuiz;
   const client = useExperienceClient();
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null),
     [result, setResult] = useState<QuizResult | null>(null),
@@ -29,7 +34,7 @@ export function QuizScreen() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [key, setKey] = useState(newRequestKey);
-  const question = quiz.data?.questions[index],
+  const question = quizData?.questions[index],
     feedback = attempt?.feedback.find(
       (item) => item.questionId === question?.id,
     );
@@ -77,16 +82,30 @@ export function QuizScreen() {
     setIndex(0);
     setSelected(
       value.answers
-        .find((answer) => answer.questionId === quiz.data?.questions[0]?.id)
+        .find((answer) => answer.questionId === quizData?.questions[0]?.id)
         ?.selectedOptionIds.slice() ?? [],
     );
     setResult(null);
   }
   return (
     <Page title="Quiz" back>
-      {quiz.error && <Notice>{quiz.error}</Notice>}
-      {quiz.loading && <Notice>Loading your quiz…</Notice>}
-      {quiz.data && <Copy size="h2">{quiz.data.title}</Copy>}
+      {quiz.error && !savedQuiz && <Notice>{quiz.error}</Notice>}
+      {quiz.loading && !quizData && <Notice>Loading your quiz…</Notice>}
+      {quizData && <Copy size="h2">{quizData.title}</Copy>}
+      {!quiz.data && savedQuiz && !quiz.loading && (
+        <>
+          <Notice>Practice and scoring need a connection. These are the questions saved on this device.</Notice>
+          {savedQuiz.questions.map((item, number) => (
+            <Surface key={item.id}>
+              <Copy muted size="caption">Question {number + 1} of {savedQuiz.questionCount}</Copy>
+              <Copy size="h3">{item.prompt}</Copy>
+              {item.options.map((option) => (
+                <Copy key={option.id} muted>• {option.text}</Copy>
+              ))}
+            </Surface>
+          ))}
+        </>
+      )}
       {!attempt && !result && quiz.data && (
         <>
           <Action disabled={busy} onPress={() => void run(start)}>
@@ -117,7 +136,7 @@ export function QuizScreen() {
       {attempt && question && !result && (
         <>
           <Copy muted>
-            Question {index + 1} of {quiz.data?.questionCount}
+            Question {index + 1} of {quizData?.questionCount}
           </Copy>
           <Surface>
             <Copy size="h2">{question.prompt}</Copy>
@@ -169,7 +188,7 @@ export function QuizScreen() {
               Check answer
             </Action>
           )}
-          {feedback && index + 1 < (quiz.data?.questionCount ?? 0) && (
+          {feedback && index + 1 < (quizData?.questionCount ?? 0) && (
             <Action
               onPress={() => {
                 const next = index + 1;
@@ -178,7 +197,7 @@ export function QuizScreen() {
                   attempt.answers
                     .find(
                       (answer) =>
-                        answer.questionId === quiz.data?.questions[next]?.id,
+                        answer.questionId === quizData?.questions[next]?.id,
                     )
                     ?.selectedOptionIds.slice() ?? [],
                 );
@@ -187,7 +206,7 @@ export function QuizScreen() {
               Next question
             </Action>
           )}
-          {feedback && index + 1 === quiz.data?.questionCount && (
+          {feedback && index + 1 === quizData?.questionCount && (
             <Action
               disabled={busy}
               onPress={() =>
