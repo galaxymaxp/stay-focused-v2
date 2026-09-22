@@ -28,7 +28,8 @@
           "photosPermission": "Allow Stay Focused to import study images for OCR.",
           "cameraPermission": "Allow Stay Focused to take study photos for OCR."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true

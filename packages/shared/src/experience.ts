@@ -152,6 +152,11 @@ export interface LibraryOverview {
   readonly categories: Readonly<Record<LibraryArtifactType, FeatureCapability>>;
   readonly nextOffset: number | null;
 }
+/** Full owner-scoped artifact returned by `GET /api/experience/library/:id`. */
+export type LibraryArtifactDetail =
+  | { readonly artifact: LibraryArtifactSummary; readonly reviewer: ReviewerReaderModel }
+  | { readonly artifact: LibraryArtifactSummary; readonly quiz: import('./quiz').Quiz }
+  | { readonly artifact: LibraryArtifactSummary; readonly draft: import('./activity-maker').ActivityDraft };
 export interface ReviewerReaderModel {
   readonly id: string;
   readonly title: string;

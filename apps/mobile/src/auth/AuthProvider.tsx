@@ -26,6 +26,7 @@ import {
 } from "../services/processingOutboxStore";
 import { clearProcessingJobReferencesForOwner } from "../services/activeProcessingJobStore";
 import { clearCanvasReviewerRecoveryForOwner } from "../services/canvasReviewerRecoveryStore";
+import { purgeLocalLibraryForOwner } from "../services/localLibrary/localArtifactDatabase";
 
 export type AuthStatus = "restoring" | "signedOut" | "signedIn";
 
@@ -187,6 +188,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             pauseOfflineProcessingIntents(ownerUserId),
             clearProcessingJobReferencesForOwner(ownerUserId),
             clearCanvasReviewerRecoveryForOwner(ownerUserId),
+            purgeLocalLibraryForOwner(ownerUserId),
           ]);
         }
         applySession(null);

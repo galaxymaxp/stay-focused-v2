@@ -1,6 +1,6 @@
 import type { Quiz } from '@stay-focused/shared';
 import { quizView } from '../quiz/service';
-import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerationView, LibraryArtifactSummary, LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
+import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
@@ -202,7 +202,7 @@ export class ExperienceService {
     const offset = filters.offset ?? 0; const limit = filters.limit ?? 50;
     return { items: records.slice(offset, offset + limit).map(r => r.summary), categories, nextOffset: offset + limit < records.length ? offset + limit : null };
   }
-  async getLibraryArtifact(userId: string, artifactId: string): Promise<{ artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel } | { artifact: LibraryArtifactSummary; draft: ActivityDraft } | { artifact: LibraryArtifactSummary; quiz: Quiz }> {
+  async getLibraryArtifact(userId: string, artifactId: string): Promise<LibraryArtifactDetail> {
     if (artifactId.startsWith('quiz:')) { const entry=requireFound((await this.quizRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,quiz:entry.quiz}; }
     if (artifactId.startsWith('activity:')) { const entry=requireFound((await this.activityDraftRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,draft:entry.draft}; }
     const entry = requireFound((await this.artifactRecords(userId)).find(r => r.aliases.includes(artifactId)));

@@ -17,6 +17,8 @@ import {
   readGenerationIntents,
   type GenerationIntent,
 } from "../../services/generationRecovery";
+import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibrary";
+import { persistedArtifactId } from "../../services/localLibrary/librarySync";
 import { GenerationVisual } from "./GenerationVisual";
 import { generationMessages } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
@@ -67,6 +69,19 @@ export function GenerationScreen() {
       ["queued", "preparing", "generating", "finalizing"].includes(value.state),
   );
   const data = generation.data;
+  // Completed and cloud-persisted: keep a device copy for Library and offline reading.
+  const persistedId = persistedArtifactId(data);
+  const ownerUserId = session?.user.id;
+  const latestView = useRef(data);
+  latestView.current = data;
+  useEffect(() => {
+    // Once per persisted artifact; the polled view object changes every poll.
+    const view = latestView.current;
+    if (!persistedId || !ownerUserId || !view) return;
+    void storeCompletedGeneration(ownerUserId, client, view).catch(() => {
+      // Library reconciliation stores it on the next refresh.
+    });
+  }, [persistedId, ownerUserId, client]);
   const running =
     !data ||
     ["queued", "preparing", "generating", "finalizing"].includes(data.state);

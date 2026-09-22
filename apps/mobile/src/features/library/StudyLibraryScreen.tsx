@@ -34,6 +34,7 @@ import {
   type SavedReviewerSummary,
   type SavedReviewerSourceProvenanceSummary,
 } from "../../services/reviewerLibraryApi";
+import { removeLocalArtifact } from "../../services/localLibrary/deviceLibrary";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
 import {
   describeSavedReviewerCount,
@@ -329,6 +330,9 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       });
 
       if (result.ok) {
+        if (session?.user.id) {
+          await removeLocalArtifact(session.user.id, `reviewer:${reviewerId}`);
+        }
         setReviewers((current) =>
           current.filter((reviewer) => reviewer.id !== reviewerId),
         );
