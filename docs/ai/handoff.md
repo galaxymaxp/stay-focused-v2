@@ -1,5 +1,9 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## B35 on-device artifact persistence (2026-09-22)
+
+B35 passes. Completed Reviewers, Quizzes, and Activity outputs are stored on the device in an owner-scoped expo-sqlite store after the server has persisted them. The Library and artifact reader are local-first, with safe background reconciliation. Explicit sign-out purges that owner's local rows. Cloud architecture is unchanged. Adding expo-sqlite means a new native build is required before device acceptance; older binaries fall back to cloud-only reads. See `docs/ai/acceptance/b35/on-device-artifact-persistence.md`. Next: B36 Signed Physical UX + Offline Acceptance.
+
 ## B32 scanned-PDF runtime reliability (2026-09-20)
 
 B32 is complete and accepted. READY production deployment `dpl_EekcdmCmpfdoobvYouekuXrUmMEd` moves scanned Canvas PDF download, per-page inspection, OCR, ordered source attachment, and reviewer context generation into durable workflow steps. Fresh 16-page Accounting job `a85bd672-2aed-401b-a37e-fd1c794d826f` completed all checkpoints, attached 6,757 characters, generated `Reviewer in Journaling and Basic Accounting`, and survived physical Android force-stop/relaunch Library retrieval. Full API and engine suites pass. Direct service-role DB metadata inspection was not available because the local Vercel environment pull returned secret references, so workflow logs and owner-authenticated device behavior are the persistence evidence. See `docs/ai/acceptance/b32/scanned-pdf-runtime-reliability-acceptance.md`. Next: B34 generation quality acceptance unless a new DOCX/PPTX defect reopens B33.

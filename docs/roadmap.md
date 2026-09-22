@@ -1,5 +1,11 @@
 # Roadmap
 
+Current milestone order: B34 Current Mobile UX Repair → B35 On-Device Artifact Persistence → B36 Signed Physical UX + Offline Acceptance → B37 Generation Quality Acceptance → B38 Full E2E / Demo Acceptance → B39 Capstone & Release Hardening.
+
+## B35 on-device artifact persistence (2026-09-22)
+
+**PASS — completed Reviewers, Quizzes, and Activity outputs are stored on the device and the Library is local-first.** An owner-scoped, versioned expo-sqlite store holds the authoritative cloud copy after the server has persisted the artifact. The Library renders from it before any network call, reconciles in the background without blanking, retains local rows on failure or remote-list absence, and removes a row only on an explicit owner-authenticated `not_found`. Explicit sign-out purges that owner's rows. Supabase, RLS, durable generation, and Queue are unchanged. A new native build is required. See [B35 acceptance](ai/acceptance/b35/on-device-artifact-persistence.md). Next: B36.
+
 ## B34 current mobile UX repair (2026-09-21)
 
 **PARTIAL — the connected mobile UX implementation and automated gates pass; authenticated changed-build physical acceptance is pending.** The repaired surfaces are Generate information architecture, persisted Reviewer→Quiz dependency, Reviewer hierarchy, generation visual/stable layout, Library paging/loading/cards, Today handle geometry, and shared reduced-motion-aware interactions. The ADB-authorized realme loaded the local changed bundle but Expo Go has no access to the signed app's session; a signed EAS preview requires explicit upload approval. See [B34 acceptance](ai/acceptance/b34/current-mobile-ux-repair.md).
@@ -24,27 +30,27 @@
 
 Status: **Closed and superseded by the B33 closure audit above.** Real Student-accessible Canvas DOCX and PPTX acquisition, extraction, durable generation, persistence, Queue, physical Android rendering, and Library reopen were completed early in B31. B32 then closed the remaining scanned-PDF format blocker. Do not repeat a standalone Office-format milestone unless a new student-facing defect is reproduced.
 
-## B35 Physical UX Acceptance
+## B36 Signed Physical UX + Offline Acceptance
 
-Status: Planned after B34's changed signed build completes its required physical matrix.
+Status: Next. Requires a new signed native build (B35 added expo-sqlite).
 
-Validate the repaired Today, Generate, Queue, Library, Reviewer, generation, motion, gesture-conflict, relaunch, and accessibility behavior repeatedly on physical Android.
+Complete B34's pending physical matrix (Today, Generate, Queue, Library, Reviewer, generation, motion, gesture conflicts, relaunch, accessibility) and accept B35 on device: generation completion stored locally, force-stop/relaunch Library before network, airplane-mode Library and Reviewer/Quiz/Activity opening, reconnect reconciliation, and sign-out/account-switch isolation.
 
-## B36 Generation Quality Acceptance
-
-Status: Planned after B35.
-
-Evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, larger-context behavior, and malformed or low-information handling using real instructional materials rather than administrative outlines.
-
-## B37 Full E2E / Demo Acceptance
+## B37 Generation Quality Acceptance
 
 Status: Planned after B36.
 
-Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
+Evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, larger-context behavior, and malformed or low-information handling using real instructional materials rather than administrative outlines.
 
-## B38 Capstone & Release Hardening
+## B38 Full E2E / Demo Acceptance
 
 Status: Planned after B37.
+
+Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
+
+## B39 Capstone & Release Hardening
+
+Status: Planned after B38.
 
 Close release, evidence, operational, security, and capstone presentation readiness without weakening the accepted product contracts.
 
