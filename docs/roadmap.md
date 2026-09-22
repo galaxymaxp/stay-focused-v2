@@ -2,6 +2,10 @@
 
 Current milestone order: B34 Current Mobile UX Repair → B35 On-Device Artifact Persistence → B36 Signed Physical UX + Offline Acceptance → B37 Generation Quality Acceptance → B38 Full E2E / Demo Acceptance → B39 Capstone & Release Hardening.
 
+## B36 signed physical UX + offline acceptance (2026-09-23)
+
+**PARTIAL — signed post-B35 physical acceptance completed; two items are unreachable on this branch.** Signed preview APK `245ccaec` at `1e81edd` (expo-sqlite included, signing identity unchanged) was installed on the realme RMX3151. B34's pending physical matrix now passes: Generate synced-course browser, Reviewer hierarchy, generation visual with status-independent layout, Library paging and indicator, Today handle geometry, and motion. B35 passes on device: local-first Library before any network call, force-stop/relaunch from the device store, full airplane-mode reading of Reviewer, Quiz (read-only, no answer keys, no scoring), and Activity Output, and reconnect with no duplicates or loss. Logout clears the session and the owner re-authenticated. Two bounded layout defects were repaired in `1e81edd`. Quiz generation and the supported Reviewer deletion flow remain unreachable because the Quiz gate, quiz source resolution, and Reviewer management still read the retired `reviewers` table while artifacts live in `generated_artifacts`; that needs a migration and RPC change, not an on-device repair. No second test account exists, so cross-account isolation stays covered by automated tests. See [B36 acceptance](ai/acceptance/b36/signed-physical-offline-acceptance.md). Next: B37.
+
 ## B35 on-device artifact persistence (2026-09-22)
 
 **PASS — completed Reviewers, Quizzes, and Activity outputs are stored on the device and the Library is local-first.** An owner-scoped, versioned expo-sqlite store holds the authoritative cloud copy after the server has persisted the artifact. The Library renders from it before any network call, reconciles in the background without blanking, retains local rows on failure or remote-list absence, and removes a row only on an explicit owner-authenticated `not_found`. Explicit sign-out purges that owner's rows. Supabase, RLS, durable generation, and Queue are unchanged. A new native build is required. See [B35 acceptance](ai/acceptance/b35/on-device-artifact-persistence.md). Next: B36.
@@ -32,15 +36,15 @@ Status: **Closed and superseded by the B33 closure audit above.** Real Student-a
 
 ## B36 Signed Physical UX + Offline Acceptance
 
-Status: Next. Requires a new signed native build (B35 added expo-sqlite).
+Status: **PARTIAL and closed.** Signed post-B35 builds were produced and accepted on the realme RMX3151; see the dated entry above. Do not repeat the physical matrix without a new reproduced defect.
 
 Complete B34's pending physical matrix (Today, Generate, Queue, Library, Reviewer, generation, motion, gesture conflicts, relaunch, accessibility) and accept B35 on device: generation completion stored locally, force-stop/relaunch Library before network, airplane-mode Library and Reviewer/Quiz/Activity opening, reconnect reconciliation, and sign-out/account-switch isolation.
 
 ## B37 Generation Quality Acceptance
 
-Status: Planned after B36.
+Status: Next.
 
-Evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, larger-context behavior, and malformed or low-information handling using real instructional materials rather than administrative outlines.
+Carry the one blocker B36 could not repair within scope: retire the legacy `reviewers` dependency so the Quiz gate, quiz source resolution (`create_quiz_processing_job` and its `p_reviewer_id`), and "Manage saved Reviewers" all resolve against `generated_artifacts`. That unblocks Quiz generation and the supported Reviewer deletion flow, both of which B36 recorded as unreachable. Then evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, larger-context behavior, and malformed or low-information handling using real instructional materials rather than administrative outlines.
 
 ## B38 Full E2E / Demo Acceptance
 
