@@ -63,10 +63,10 @@ export function LibraryScreen() {
     <Page title="Library" subtitle="Your saved study tools, in one place." scroll={false} onRefresh={library.refresh} actions={[{ label: "Manage saved Reviewers", onPress: () => router.push("/saved-reviewers") }]}>
       <View style={{ flex: 1 }}>
         <ScrollView ref={tabs} horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ padding: 4 }}>
-          <View style={{ width: 378, height: 44, flexDirection: "row", alignItems: "center" }}>
-            <Animated.View style={{ position: "absolute", left: 0, height: 34, borderRadius: radius.pill, backgroundColor: colors.blueSoft, transform: [{ translateX: scrollX.interpolate({ inputRange: filters.map((_, index) => index * pageWidth), outputRange: [0, 56, 150, 226], extrapolate: "clamp" }) }], width: scrollX.interpolate({ inputRange: filters.map((_, index) => index * pageWidth), outputRange: [50, 88, 70, 144], extrapolate: "clamp" }) }} />
+          <View style={{ width: 298, height: 44, flexDirection: "row", alignItems: "center" }}>
+            <Animated.View style={{ position: "absolute", left: 0, height: 34, borderRadius: radius.pill, backgroundColor: colors.blueSoft, transform: [{ translateX: scrollX.interpolate({ inputRange: filters.map((_, index) => index * pageWidth), outputRange: [2, 48, 124, 188], extrapolate: "clamp" }) }], width: scrollX.interpolate({ inputRange: filters.map((_, index) => index * pageWidth), outputRange: [42, 72, 60, 108], extrapolate: "clamp" }) }} />
             {filters.map((item, index) => {
-              const widths = [56, 94, 76, 152];
+              const widths = [46, 76, 64, 112];
               return (
                 <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: filter === item.value }} onPress={() => selectPage(index)} style={({ pressed }) => ({ width: widths[index], height: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.65 : 1 })}>
                   <Copy size="caption" color={filter === item.value ? colors.blue : colors.textSecondary} style={{ fontWeight: filter === item.value ? "700" : "500" }}>{item.label}</Copy>
@@ -152,7 +152,7 @@ function LibraryCard({ item }: { item: LibraryArtifactSummary }) {
   const tone = item.type === "quiz" ? colors.violet : item.type === "activity_output" ? colors.green : colors.blue;
   const soft = item.type === "quiz" ? colors.violetSoft : item.type === "activity_output" ? colors.greenSoft : colors.blueSoft;
   return (
-    <Surface style={{ padding: 0, overflow: "hidden" }}>
+    <Surface style={{ overflow: "hidden" }}>
       <RowLink inset icon={<ContentIcon kind={item.type} />} label={`${typeLabel}: ${item.title}`} onPress={() => router.push({ pathname: "/artifact", params: { id: item.id } })}>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing[2] }}>
           <View style={{ backgroundColor: soft, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}><Copy size="caption" color={tone} style={{ fontWeight: "700" }}>{typeLabel}</Copy></View>

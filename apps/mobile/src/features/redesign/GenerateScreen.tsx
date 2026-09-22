@@ -199,7 +199,7 @@ export function GenerateScreen() {
 
 function CourseWorkspaceHeader({ course, onBack }: { course: CourseSummary | null; onBack: () => void }) {
   return (
-    <Surface style={{ padding: 0, overflow: "hidden" }}>
+    <Surface style={{ overflow: "hidden" }}>
       <RowLink inset label="Back to synced courses" onPress={onBack}>
         <Copy muted size="caption">{course?.code ?? "Synced course"}</Copy>
         <Copy size="h3">{course?.name ?? "Course materials"}</Copy>
@@ -211,7 +211,7 @@ function CourseWorkspaceHeader({ course, onBack }: { course: CourseSummary | nul
 
 function CourseCard({ course, onPress }: { course: CourseSummary; onPress: () => void }) {
   return (
-    <Surface style={{ padding: 0, overflow: "hidden" }}>
+    <Surface style={{ overflow: "hidden" }}>
       <RowLink inset label={`Open ${course.name}`} onPress={onPress} icon={<ContentIcon kind="module" />}>
         <Copy muted size="caption">{course.code ?? "Canvas course"}</Copy>
         <Copy size="h3">{course.name}</Copy>
