@@ -14,10 +14,10 @@ import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 export interface ExperienceDependencies {
   readonly repository: ExperienceRepository;
   readonly materials: (userId: string, courseId: string, offset: number) => Promise<CanvasReviewerSourceResult<CanvasReviewerSourceList>>;
-  readonly freshness?: (userId: string, reviewerId: string) => Promise<ReviewerReaderModel['freshness']>;
+  readonly freshness?: (userId: string, reviewerArtifactId: string) => Promise<ReviewerReaderModel['freshness']>;
   readonly now?: () => number;
 }
-interface ArtifactRecord { readonly summary: LibraryArtifactSummary; readonly payload: unknown; readonly reviewerId: string | null; readonly aliases: readonly string[] }
+interface ArtifactRecord { readonly summary: LibraryArtifactSummary; readonly payload: unknown; readonly reviewerArtifactId: string | null; readonly aliases: readonly string[] }
 export class ExperienceService {
   constructor(private readonly dependencies: ExperienceDependencies) {}
   private get now() { return this.dependencies.now?.() ?? Date.now(); }
@@ -30,25 +30,32 @@ export class ExperienceService {
   }
   async getCourseMaterials(userId: string, courseId: string, offset = 0): Promise<CourseMaterials> {
     requireFound((await this.rows('canvas_courses', userId)).find(c => c.id === courseId));
-    const [result, reviewers, snapshots, snapshotItems] = await Promise.all([
+    const [result, artifacts, versions, sourceVersions, snapshots, snapshotItems] = await Promise.all([
       this.dependencies.materials(userId, courseId, offset),
-      this.rows('reviewers', userId),
+      this.rows('generated_artifacts', userId),
+      this.rows('generated_artifact_versions', userId),
+      this.rows('source_versions', userId),
       this.rows('reviewer_source_snapshots', userId),
       this.rows('reviewer_source_snapshot_items', userId),
     ]);
     if (!result.ok) throw new ExperienceFailure(result.status === 404 ? 404 : 503, result.status === 404 ? 'not_found' : 'unavailable');
     const courseSnapshots = new Set(snapshots.filter(snapshot => snapshot.course_id === courseId).map(snapshot => snapshot.id));
+    const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
+    const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
     const latestReviewerBySnapshot = new Map<string, string>();
-    for (const reviewer of [...reviewers].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))) {
-      if (reviewer.source_snapshot_id && courseSnapshots.has(reviewer.source_snapshot_id) && !latestReviewerBySnapshot.has(reviewer.source_snapshot_id)) {
-        latestReviewerBySnapshot.set(reviewer.source_snapshot_id, reviewer.id);
+    for (const artifact of [...artifacts].filter(row => row.artifact_type === 'reviewer' && !row.deleted_at).sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))) {
+      const version = artifact.latest_version_id ? versionMap.get(artifact.latest_version_id) : null;
+      const source = version ? sourceVersionMap.get(version.source_version_id) : null;
+      const snapshotId = source ? text(record(source.metadata).reviewerSourceSnapshotId) : null;
+      if (version?.artifact_id === artifact.id && snapshotId && courseSnapshots.has(snapshotId) && !latestReviewerBySnapshot.has(snapshotId)) {
+        latestReviewerBySnapshot.set(snapshotId, artifact.id);
       }
     }
     const reviewerByMaterial = new Map<string, string>();
     for (const item of snapshotItems) {
       if (item.course_id !== courseId || !item.source_row_id) continue;
-      const reviewerId = latestReviewerBySnapshot.get(item.source_snapshot_id);
-      if (reviewerId) reviewerByMaterial.set(`${item.source_type}:${item.source_row_id}`, reviewerId);
+      const reviewerArtifactId = latestReviewerBySnapshot.get(item.source_snapshot_id);
+      if (reviewerArtifactId) reviewerByMaterial.set(`${item.source_type}:${item.source_row_id}`, reviewerArtifactId);
     }
     return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
       nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
@@ -141,7 +148,7 @@ export class ExperienceService {
     return rows.map(row=>{
       const quiz=quizView(row,attempts), course=courses.find(c=>c.id===quiz.courseId);
       const summary = { ...quiz, questions: undefined };
-      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceTitle:null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerId?[`reviewer:${quiz.reviewerId}`]:[],quiz:summary}};
+      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceTitle:null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary}};
     });
   }
   private async activityDraftRecords(userId: string): Promise<{summary:LibraryArtifactSummary;draft:ActivityDraft}[]> {
@@ -151,9 +158,9 @@ export class ExperienceService {
     }).sort((a,b)=>Date.parse(b.draft.createdAt)-Date.parse(a.draft.createdAt)||a.draft.id.localeCompare(b.draft.id));
   }
   private async artifactRecords(userId: string): Promise<ArtifactRecord[]> {
-    const [reviewers, artifacts, versions, jobs, results, snapshots, courses] = await Promise.all([
-      this.rows('reviewers', userId), this.rows('generated_artifacts', userId), this.rows('generated_artifact_versions', userId), this.rows('processing_jobs', userId),
-      this.rows('processing_job_results', userId), this.rows('reviewer_source_snapshots', userId), this.rows('canvas_courses', userId),
+    const [artifacts, versions, sourceVersions, snapshots, courses] = await Promise.all([
+      this.rows('generated_artifacts', userId), this.rows('generated_artifact_versions', userId), this.rows('source_versions', userId),
+      this.rows('reviewer_source_snapshots', userId), this.rows('canvas_courses', userId),
     ]);
     const snapshotMap = new Map(snapshots.map(s => [s.id, s]));
     const courseMap = new Map(courses.map(c => [c.id, { id: c.id, code: c.course_code, name: c.name }]));
@@ -163,35 +170,23 @@ export class ExperienceService {
         sourceId: snapshot?.id ?? sourceId, sourceTitle: snapshot?.source_title ?? sourceTitle, activityId: null,
         createdAt, updatedAt, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
     }
-    const records: ArtifactRecord[] = reviewers.map(row => ({
-      summary: summary(`reviewer:${row.id}`, row.title, row.created_at, row.updated_at, row.source_snapshot_id, row.source_snapshot_id, text(record(row.source_metadata).sourceLabel)),
-      payload: row.reviewer_output, reviewerId: row.id, aliases: [`reviewer:${row.id}`],
-    }));
-    for (const job of jobs) {
-      if (job.job_type !== 'reviewer_generation' || job.status !== 'succeeded' || !job.result_id) continue;
-      const result = results.find(r => r.id === job.result_id && r.job_id === job.id && r.result_type === 'reviewer_generation');
-      if (!result) continue;
-      const version = result.artifact_version_id ? versions.find(v => v.id === result.artifact_version_id && v.artifact_type === 'reviewer') : null;
-      const artifact = version ? artifacts.find(a => a.id === version.artifact_id) : null;
-      if (result.artifact_version_id && (!artifact || artifact.deleted_at || artifact.latest_version_id !== version?.id)) continue;
-      const payload = record(result.payload);
-      const snapshotId = text(payload.sourceSnapshotId);
-      const saved = snapshotId ? reviewers.find(r => r.source_snapshot_id === snapshotId) : null;
-      if (saved) {
-        const index = records.findIndex(r => r.reviewerId === saved.id);
-        const existing = records[index]!;
-        records[index] = { ...existing, aliases: [...existing.aliases, `generation:${job.id}`, ...(artifact ? [`artifact:${artifact.id}`] : [])] };
-        continue;
-      }
-      const existing = artifact ? records.findIndex(r => r.summary.id === `artifact:${artifact.id}`) : -1;
-      if (existing >= 0) {
-        records[existing] = { ...records[existing]!, aliases: [...records[existing]!.aliases, `generation:${job.id}`] };
-        continue;
-      }
-      const reviewer = record(payload.reviewer);
-      const id = artifact ? `artifact:${artifact.id}` : `generation:${job.id}`;
-      records.push({ summary: summary(id, artifact?.safe_title ?? text(reviewer.title) ?? 'Reviewer', artifact?.created_at ?? result.created_at, artifact?.updated_at ?? result.created_at, snapshotId, job.source_version_id, text(record(job.source_metadata).displayName)),
-        payload: result.payload, reviewerId: null, aliases: [id, `generation:${job.id}`] });
+    const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
+    const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
+    const records: ArtifactRecord[] = [];
+    for (const artifact of artifacts) {
+      if (artifact.artifact_type !== 'reviewer' || artifact.deleted_at || !artifact.latest_version_id) continue;
+      const version = versionMap.get(artifact.latest_version_id);
+      if (!version || version.artifact_id !== artifact.id) continue;
+      const source = sourceVersionMap.get(version.source_version_id);
+      if (!source) continue;
+      const snapshotId = text(record(source.metadata).reviewerSourceSnapshotId);
+      const id = `artifact:${artifact.id}`;
+      records.push({
+        summary: summary(id, artifact.safe_title, artifact.created_at, artifact.updated_at, snapshotId, source.id, text(record(source.metadata).sourceTitle)),
+        payload: version.payload,
+        reviewerArtifactId: artifact.id,
+        aliases: [id, ...(version.generation_job_id ? [`generation:${version.generation_job_id}`] : [])],
+      });
     }
     return records.sort((a, b) => Date.parse(b.summary.updatedAt) - Date.parse(a.summary.updatedAt) || a.summary.id.localeCompare(b.summary.id));
   }
@@ -206,7 +201,7 @@ export class ExperienceService {
     if (artifactId.startsWith('quiz:')) { const entry=requireFound((await this.quizRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,quiz:entry.quiz}; }
     if (artifactId.startsWith('activity:')) { const entry=requireFound((await this.activityDraftRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,draft:entry.draft}; }
     const entry = requireFound((await this.artifactRecords(userId)).find(r => r.aliases.includes(artifactId)));
-    const freshness = entry.reviewerId && this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.reviewerId) : 'unknown';
+    const freshness = entry.reviewerArtifactId && this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.reviewerArtifactId) : 'unknown';
     return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
   }
   async getGeneration(userId: string, generationId: string): Promise<GenerationView> {

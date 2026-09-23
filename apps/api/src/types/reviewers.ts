@@ -59,6 +59,7 @@ export type ReviewerApiErrorCode =
   | "canvas_preview_session_not_found"
   | "canvas_preview_session_invalid"
   | "reviewer_not_found"
+  | "reviewer_has_quizzes"
   | "reviewer_storage_not_configured"
   | "reviewer_storage_failed"
   | "source_snapshot_failed"

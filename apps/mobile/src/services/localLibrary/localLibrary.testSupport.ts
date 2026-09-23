@@ -61,7 +61,7 @@ const course = { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", code: "BIO 101", na
 
 export function reviewerDetail(overrides: Partial<LibraryArtifactSummary> = {}): LibraryArtifactDetail {
   const artifact: LibraryArtifactSummary = {
-    id: `reviewer:${REVIEWER_ROW_ID}`,
+    id: `artifact:${REVIEWER_ROW_ID}`,
     type: "reviewer",
     title: "Cells",
     course,
@@ -106,7 +106,7 @@ export function quizDetail(overrides: Partial<Quiz> = {}): LibraryArtifactDetail
     id: QUIZ_ROW_ID,
     title: "Cells quiz",
     courseId: course.id,
-    reviewerId: REVIEWER_ROW_ID,
+    reviewerArtifactId: REVIEWER_ROW_ID,
     sourceId: "material-1",
     sourceMaterialIds: ["material-1"],
     questionCount: 1,
@@ -145,7 +145,7 @@ export function quizDetail(overrides: Partial<Quiz> = {}): LibraryArtifactDetail
     updatedAt: quiz.updatedAt,
     lastOpenedAt: null,
     status: "completed",
-    relatedArtifactIds: quiz.reviewerId ? [`reviewer:${quiz.reviewerId}`] : [],
+    relatedArtifactIds: quiz.reviewerArtifactId ? [`artifact:${quiz.reviewerArtifactId}`] : [],
     quiz: summary,
   };
   return { artifact, quiz };

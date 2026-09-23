@@ -1,14 +1,16 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type { Database, ReviewerRow } from "@stay-focused/db";
+import type { Database } from "@stay-focused/db";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createCanvasServiceClient } from "@/lib/canvas-db";
 import { createReviewerUserClient } from "@/lib/reviewer-db";
+import { readCanonicalReviewerRecord } from "@/lib/canonical-reviewers";
 import { readSafeReviewerSourceProvenanceSummary } from "@/lib/reviewer-source-provenance";
 import {
-  mapReviewerDetail,
-  mapReviewerSummary,
+  canonicalReviewerSnapshotId,
+  mapCanonicalReviewerDetail,
+  mapCanonicalReviewerSummary,
   readBearerToken,
   validateRenameReviewerRequest,
   validateReviewerId,
@@ -22,10 +24,6 @@ import type {
 
 export const runtime = "nodejs";
 
-const REVIEWER_DETAIL_COLUMNS =
-  "id,title,source_metadata,reviewer_output,source_snapshot_id,section_count,created_at,updated_at,user_id";
-const REVIEWER_SUMMARY_COLUMNS =
-  "id,title,source_metadata,source_snapshot_id,section_count,created_at,updated_at,user_id";
 const CORS_ALLOWED_METHODS = "GET, PATCH, DELETE, OPTIONS";
 const CORS_ALLOWED_HEADERS = "authorization, content-type";
 const CORS_MAX_AGE_SECONDS = "600";
@@ -54,13 +52,8 @@ export async function GET(
     return notFoundResponse(request);
   }
 
-  const { data, error } = await auth.value.client
-    .from("reviewers")
-    .select(REVIEWER_DETAIL_COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
+  const result = await readCanonicalReviewerRecord(auth.value.client, auth.value.user.id, id);
+  if (!result.ok) {
     return errorResponse(
       500,
       "reviewer_storage_failed",
@@ -69,13 +62,13 @@ export async function GET(
     );
   }
 
-  if (!data) {
+  if (!result.value) {
     return notFoundResponse(request);
   }
 
   let sourceProvenance = null;
-  const row = data as ReviewerRow;
-  if (row.source_snapshot_id) {
+  const sourceSnapshotId = canonicalReviewerSnapshotId(result.value.source);
+  if (sourceSnapshotId) {
     let provenanceClient: ReturnType<typeof createCanvasServiceClient>;
     try {
       provenanceClient = createCanvasServiceClient();
@@ -90,7 +83,7 @@ export async function GET(
 
     const provenance = await readSafeReviewerSourceProvenanceSummary({
       client: provenanceClient,
-      sourceSnapshotId: row.source_snapshot_id,
+      sourceSnapshotId,
       userId: auth.value.user.id,
     });
     if (!provenance.ok) {
@@ -104,7 +97,7 @@ export async function GET(
     sourceProvenance = provenance.value;
   }
 
-  const detail = mapReviewerDetail(row, sourceProvenance);
+  const detail = mapCanonicalReviewerDetail(result.value.artifact, result.value.version, result.value.source, sourceProvenance);
   if (!detail.ok) {
     return errorResponse(
       500,
@@ -151,14 +144,12 @@ export async function PATCH(
     );
   }
 
-  const { data, error } = await auth.value.client
-    .from("reviewers")
-    .update({ title: validation.value.title })
-    .eq("id", id)
-    .select(REVIEWER_SUMMARY_COLUMNS)
-    .maybeSingle();
-
-  if (error) {
+  const { data, error } = await auth.value.client.rpc("rename_reviewer_artifact", {
+    p_artifact_id: id,
+    p_title: validation.value.title,
+  });
+  if (error && error.message === "reviewer_not_found") return notFoundResponse(request);
+  if (error || !data?.[0]) {
     return errorResponse(
       500,
       "reviewer_storage_failed",
@@ -167,12 +158,11 @@ export async function PATCH(
     );
   }
 
-  if (!data) {
-    return notFoundResponse(request);
-  }
-
+  const record = await readCanonicalReviewerRecord(auth.value.client, auth.value.user.id, id);
+  if (!record.ok) return errorResponse(500, "reviewer_storage_failed", "Saved reviewer could not be loaded.", request);
+  if (!record.value) return notFoundResponse(request);
   return jsonResponse(
-    { ok: true, reviewer: mapReviewerSummary(data as ReviewerRow) },
+    { ok: true, reviewer: mapCanonicalReviewerSummary(data[0], record.value.version, record.value.source) },
     200,
     request,
   );
@@ -192,24 +182,18 @@ export async function DELETE(
     return notFoundResponse(request);
   }
 
-  const { data, error } = await auth.value.client
-    .from("reviewers")
-    .delete()
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
+  const { data, error } = await auth.value.client.rpc("delete_reviewer_artifact", { p_artifact_id: id });
+  if (error?.message === "reviewer_not_found") return notFoundResponse(request);
+  if (error?.message === "reviewer_has_quizzes") {
+    return errorResponse(409, "reviewer_has_quizzes", "Delete the dependent Quizzes first or keep this Reviewer.", request);
+  }
+  if (error || data !== true) {
     return errorResponse(
       500,
       "reviewer_storage_failed",
       "Saved reviewer could not be deleted.",
       request,
     );
-  }
-
-  if (!data) {
-    return notFoundResponse(request);
   }
 
   return jsonResponse({ ok: true }, 200, request);
@@ -306,7 +290,7 @@ function notFoundResponse(request?: Request): Response {
 }
 
 function errorResponse(
-  status: 400 | 401 | 404 | 422 | 500,
+  status: 400 | 401 | 404 | 409 | 422 | 500,
   code: ReviewerApiErrorCode,
   message: string,
   request?: Request,
@@ -316,7 +300,7 @@ function errorResponse(
 
 function jsonResponse(
   body: ReviewerDetailResponse | ReviewerSummaryResponse | ReviewerDeleteResponse,
-  status: 200 | 400 | 401 | 404 | 422 | 500,
+  status: 200 | 400 | 401 | 404 | 409 | 422 | 500,
   request?: Request,
 ): Response {
   return NextResponse.json(body, {

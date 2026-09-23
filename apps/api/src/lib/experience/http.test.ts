@@ -129,7 +129,7 @@ describe('repository owner predicates and pagination', () => {
     chain.range.mockResolvedValue({ data: [{ id: 'owned', user_id: 'owner' }, { id: 'foreign', user_id: 'other' }], error: null });
     const client = { from: vi.fn(() => chain) } as unknown as SupabaseClient<Database>;
     const repository = original.experienceRepository(client);
-    for (const table of ['tasks', 'study_sessions', 'study_plans', 'canvas_assignments', 'reviewers', 'processing_jobs', 'processing_job_results', 'generated_artifact_versions'] as const) {
+    for (const table of ['tasks', 'study_sessions', 'study_plans', 'canvas_assignments', 'source_versions', 'processing_jobs', 'processing_job_results', 'generated_artifact_versions'] as const) {
       expect((await repository.rows(table, 'owner')).map(r => r.id)).toEqual(['owned']);
     }
     expect(chain.eq).toHaveBeenCalledWith('user_id', 'owner');

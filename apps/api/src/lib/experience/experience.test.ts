@@ -27,10 +27,11 @@ const session = { id: 'session', user_id: 'owner', task_id: task.id, starts_at: 
 const plan = { id: 'plan', user_id: 'owner', planning_starts_at: '2026-09-12T00:00:00Z', planning_ends_at: '2026-09-13T00:00:00Z', created_at: '2026-09-11T00:00:00Z' } as StudyPlanRow;
 const libraryData: TestData = {
   canvas_courses: [course], reviewer_source_snapshots: [{ id: 'snapshot', user_id: 'owner', course_id: course.id, source_title: 'Cells.pdf' }],
+  source_versions: [{ id: 'source-version', user_id: 'owner', character_count: 100, metadata: { reviewerSourceSnapshotId: 'snapshot', sourceTitle: 'Cells.pdf' } }],
   processing_jobs: [{ id: 'job', user_id: 'owner', job_type: 'reviewer_generation', status: 'succeeded', stage: 'storing_reviewer', result_id: 'result', updated_at: date, source_metadata: { displayName: 'Cells.pdf' } }],
   processing_job_results: [{ id: 'result', user_id: 'owner', job_id: 'job', result_type: 'reviewer_generation', artifact_version_id: 'version', payload, created_at: date }],
-  generated_artifacts: [{ id: 'artifact', user_id: 'owner', artifact_type: 'reviewer', safe_title: 'Cells', latest_version_id: 'version', deleted_at: null, created_at: date, updated_at: date }],
-  generated_artifact_versions: [{ id: 'version', user_id: 'owner', artifact_id: 'artifact', artifact_type: 'reviewer' }],
+  generated_artifacts: [{ id: 'artifact', user_id: 'owner', artifact_type: 'reviewer', safe_title: 'Cells', source_version_id: 'source-version', latest_version_id: 'version', deleted_at: null, created_at: date, updated_at: date }],
+  generated_artifact_versions: [{ id: 'version', user_id: 'owner', artifact_id: 'artifact', artifact_type: 'reviewer', source_version_id: 'source-version', generation_job_id: 'job', payload }],
 };
 describe('Today and activity composition', () => {
   it('combines assignments, manual tasks and sessions without importing on reads', async () => {
@@ -190,7 +191,7 @@ describe('Learn and Activity details', () => {
     const { api } = service({ canvas_courses: [course] });
     const result = await api.getCourseLearningWorkspace('owner', course.id);
     expect(result.course.materialCount).toBe(1); expect(result.materials.items[0]?.kind).toBe('pdf');
-    expect(result.materials.items[0]).toMatchObject({ reviewerId: null, generation: { quiz: { status: 'unavailable' } } });
+    expect(result.materials.items[0]).toMatchObject({ reviewerArtifactId: null, generation: { quiz: { status: 'unavailable' } } });
     expect(JSON.stringify(result)).not.toContain('failureCategories');
   });
   it('enables Quiz only through the latest persisted Reviewer relationship', async () => {
@@ -198,10 +199,12 @@ describe('Learn and Activity details', () => {
       canvas_courses: [course],
       reviewer_source_snapshots: [{ id: 'snapshot', user_id: 'owner', course_id: course.id }],
       reviewer_source_snapshot_items: [{ id: 'item', user_id: 'owner', course_id: course.id, source_snapshot_id: 'snapshot', source_type: 'file', source_row_id: 'source' }],
-      reviewers: [{ id: 'reviewer', user_id: 'owner', source_snapshot_id: 'snapshot', updated_at: date }],
+      source_versions: [{ id: 'source-version', user_id: 'owner', metadata: { reviewerSourceSnapshotId: 'snapshot' } }],
+      generated_artifacts: [{ id: 'artifact', user_id: 'owner', artifact_type: 'reviewer', latest_version_id: 'version', deleted_at: null, updated_at: date }],
+      generated_artifact_versions: [{ id: 'version', user_id: 'owner', artifact_id: 'artifact', artifact_type: 'reviewer', source_version_id: 'source-version' }],
     });
     const material = (await api.getCourseLearningWorkspace('owner', course.id)).materials.items[0];
-    expect(material).toMatchObject({ reviewerId: 'reviewer', generation: { reviewer: { status: 'available' }, quiz: { status: 'available' } } });
+    expect(material).toMatchObject({ reviewerArtifactId: 'artifact', generation: { reviewer: { status: 'available' }, quiz: { status: 'available' } } });
   });
   it('denies another owner course before invoking materials', async () => {
     const { api, materials } = service({ canvas_courses: [{ ...course, user_id: 'other' }] });
@@ -238,10 +241,10 @@ describe('Library ownership and persisted output', () => {
     expect(materials).not.toHaveBeenCalled();
     expect((await api.getGeneration('owner', 'job')).artifactId).toBe('artifact:artifact');
   });
-  it('deduplicates automatic snapshot save and preserves old artifact and generation links', async () => {
-    const { api } = service({ ...libraryData, reviewers: [{ id: 'saved', user_id: 'owner', title: 'Saved title', source_snapshot_id: 'snapshot', source_metadata: {}, reviewer_output: payload.reviewer, created_at: date, updated_at: date }] });
-    expect((await api.getLibrary('owner')).items.map(i => i.id)).toEqual(['reviewer:saved']);
-    for (const id of ['artifact:artifact', 'generation:job', 'reviewer:saved']) { const opened=await api.getLibraryArtifact('owner', id); if (!('reviewer' in opened)) throw new Error('Expected reviewer'); expect(opened.reviewer.title).toBe('Saved title'); }
+  it('opens one canonical artifact through both artifact and generation identities', async () => {
+    const { api } = service(libraryData);
+    expect((await api.getLibrary('owner')).items.map(i => i.id)).toEqual(['artifact:artifact']);
+    for (const id of ['artifact:artifact', 'generation:job']) { const opened=await api.getLibraryArtifact('owner', id); if (!('reviewer' in opened)) throw new Error('Expected reviewer'); expect(opened.reviewer.title).toBe('Cells'); }
   });
   it('does not expose deleted artifacts', async () => {
     const { api } = service({ ...libraryData, generated_artifacts: [{ ...libraryData.generated_artifacts![0], deleted_at: date }] });
@@ -249,17 +252,14 @@ describe('Library ownership and persisted output', () => {
     await expect(api.getLibraryArtifact('owner', 'generation:job')).rejects.toMatchObject({ status: 404 });
   });
   it.each(['cancelled', 'cancellation_requested', 'failed', 'running'] as const)('never publishes persisted result for %s job', async status => {
-    const { api } = service({ ...libraryData, processing_jobs: [{ ...libraryData.processing_jobs![0], status }] });
+    const { api } = service({ ...libraryData, processing_jobs: [{ ...libraryData.processing_jobs![0], status }], generated_artifacts: [] });
     expect((await api.getLibrary('owner')).items).toEqual([]);
   });
-  it.each(['reviewers', 'processing_jobs', 'processing_job_results', 'generated_artifacts', 'generated_artifact_versions'] as const)('denies foreign %s at artifact boundary', async table => {
+  it.each(['source_versions', 'generated_artifacts', 'generated_artifact_versions'] as const)('denies foreign %s at artifact boundary', async table => {
     const data = { ...libraryData, [table]: (libraryData[table] ?? [{ id: 'saved', title: 'private' }]).map(r => ({ ...r, user_id: 'other' })) };
     const { api } = service(data);
-    if (table === 'reviewers') await expect(api.getLibraryArtifact('owner', 'reviewer:saved')).rejects.toMatchObject({ status: 404 });
-    else {
-      expect((await api.getLibrary('owner')).items).toEqual([]);
-      await expect(api.getLibraryArtifact('owner', 'generation:job')).rejects.toMatchObject({ status: 404 });
-    }
+    expect((await api.getLibrary('owner')).items).toEqual([]);
+    await expect(api.getLibraryArtifact('owner', 'generation:job')).rejects.toMatchObject({ status: 404 });
   });
   it('denies foreign generation state', async () => {
     const { api } = service(libraryData);

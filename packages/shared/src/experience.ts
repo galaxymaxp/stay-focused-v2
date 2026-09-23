@@ -34,7 +34,7 @@ export interface LearningMaterial {
   readonly count: number | null;
   readonly sourceId: string;
   /** Latest owner-persisted Reviewer grounded in this exact Canvas material. */
-  readonly reviewerId: string | null;
+  readonly reviewerArtifactId: string | null;
   readonly moduleTitle: string | null;
   readonly generation: GenerationCapability;
 }

@@ -7,7 +7,6 @@ import type {
   CanvasSyncCourseResultRow,
   CanvasSyncRunRow,
   Database,
-  ReviewerRow,
   ReviewerSourceSnapshotItemRow,
   ReviewerSourceSnapshotRow,
 } from "@stay-focused/db";
@@ -90,8 +89,6 @@ export type ReviewerSourceStatusResult =
       readonly message: string;
     };
 
-const REVIEWER_STATUS_COLUMNS =
-  "id,user_id,source_snapshot_id,source_metadata,created_at,updated_at";
 const SNAPSHOT_COLUMNS =
   "id,user_id,preview_session_id,canvas_connection_id,course_id,source_mode,source_title,source_count,normalization_version,created_at";
 const SNAPSHOT_ITEM_COLUMNS =
@@ -119,15 +116,15 @@ interface SyncAuthority {
 export async function readReviewerSourceStatus({
   checkedAt = new Date().toISOString(),
   client,
-  reviewerId,
+  reviewerArtifactId,
   userId,
 }: {
   readonly checkedAt?: string;
   readonly client: SupabaseClient<Database>;
-  readonly reviewerId: string;
+  readonly reviewerArtifactId: string;
   readonly userId: string;
 }): Promise<ReviewerSourceStatusResult> {
-  const reviewer = await readOwnedReviewer({ client, reviewerId, userId });
+  const reviewer = await readOwnedReviewer({ client, reviewerArtifactId, userId });
   if (!reviewer.ok) {
     return reviewer;
   }
@@ -607,27 +604,28 @@ function isLockedByDate(
 
 async function readOwnedReviewer({
   client,
-  reviewerId,
+  reviewerArtifactId,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
-  readonly reviewerId: string;
+  readonly reviewerArtifactId: string;
   readonly userId: string;
 }): Promise<
-  | { readonly ok: true; readonly value: ReviewerRow }
+  | { readonly ok: true; readonly value: { readonly source_snapshot_id: string | null } }
   | Extract<ReviewerSourceStatusResult, { readonly ok: false }>
 > {
-  const { data, error } = await client
-    .from("reviewers")
-    .select(REVIEWER_STATUS_COLUMNS)
-    .eq("id", reviewerId)
+  const artifactResult = await client
+    .from("generated_artifacts")
+    .select("id,user_id,latest_version_id")
+    .eq("id", reviewerArtifactId)
     .eq("user_id", userId)
+    .eq("artifact_type", "reviewer")
+    .is("deleted_at", null)
     .maybeSingle();
-
-  if (error) {
+  if (artifactResult.error) {
     return storageFailed("Saved reviewer could not be checked.");
   }
-  if (!data) {
+  if (!artifactResult.data?.latest_version_id) {
     return {
       ok: false,
       status: 404,
@@ -635,7 +633,32 @@ async function readOwnedReviewer({
       message: "Saved reviewer was not found.",
     };
   }
-  return { ok: true, value: data as ReviewerRow };
+  const versionResult = await client
+    .from("generated_artifact_versions")
+    .select("id,user_id,artifact_id,source_version_id")
+    .eq("id", artifactResult.data.latest_version_id)
+    .eq("artifact_id", reviewerArtifactId)
+    .eq("user_id", userId)
+    .eq("artifact_type", "reviewer")
+    .maybeSingle();
+  if (versionResult.error) return storageFailed("Saved reviewer could not be checked.");
+  if (!versionResult.data) return { ok: false, status: 404, code: "reviewer_not_found", message: "Saved reviewer was not found." };
+  const sourceResult = await client
+    .from("source_versions")
+    .select("metadata,user_id")
+    .eq("id", versionResult.data.source_version_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (sourceResult.error) return storageFailed("Saved reviewer could not be checked.");
+  if (!sourceResult.data) return { ok: false, status: 404, code: "reviewer_not_found", message: "Saved reviewer was not found." };
+  const metadata = sourceResult.data.metadata;
+  const metadataRecord = typeof metadata === "object" && metadata !== null && !Array.isArray(metadata)
+    ? metadata as Readonly<Record<string, unknown>>
+    : {};
+  const snapshotId = typeof metadataRecord.reviewerSourceSnapshotId === "string"
+    ? metadataRecord.reviewerSourceSnapshotId
+    : null;
+  return { ok: true, value: { source_snapshot_id: snapshotId } };
 }
 
 async function readOwnedSnapshot({

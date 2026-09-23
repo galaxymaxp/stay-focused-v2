@@ -180,8 +180,8 @@ describe("local artifact store", () => {
     const quiz = quizDetail({ title: "Cells" }); // Same title as the Reviewer on purpose.
     await store.upsertDetail(OWNER_A, quiz.artifact.id, quiz);
     const stored = await store.readDetail(OWNER_A, quiz.artifact.id);
-    expect(stored && "quiz" in stored.detail ? stored.detail.quiz.reviewerId : null).toBe(REVIEWER_ROW_ID);
-    expect(stored?.detail.artifact.relatedArtifactIds).toEqual([`reviewer:${REVIEWER_ROW_ID}`]);
+    expect(stored && "quiz" in stored.detail ? stored.detail.quiz.reviewerArtifactId : null).toBe(REVIEWER_ROW_ID);
+    expect(stored?.detail.artifact.relatedArtifactIds).toEqual([`artifact:${REVIEWER_ROW_ID}`]);
     const list = await store.listSummaries(OWNER_A);
     expect(new Set(list.map((item) => item.id)).size).toBe(2);
   });
@@ -193,7 +193,7 @@ describe("local artifact store", () => {
     // The server resolves the finished generation to its saved Reviewer.
     await store.upsertDetail(OWNER_A, generationId, reviewerDetail());
     await expect(store.listSummaries(OWNER_A)).resolves.toEqual([reviewerDetail().artifact]);
-    expect((await store.readDetail(OWNER_A, generationId))?.detail.artifact.id).toBe(`reviewer:${REVIEWER_ROW_ID}`);
+    expect((await store.readDetail(OWNER_A, generationId))?.detail.artifact.id).toBe(`artifact:${REVIEWER_ROW_ID}`);
   });
 
   it("treats a body with an unknown payload schema as missing", async () => {

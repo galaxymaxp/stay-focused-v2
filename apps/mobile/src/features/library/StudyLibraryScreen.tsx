@@ -67,12 +67,12 @@ interface LibraryDisplayError {
 }
 
 interface RenameState {
-  readonly reviewerId: string;
+  readonly reviewerArtifactId: string;
   readonly title: string;
 }
 
 interface SourceStatusState {
-  readonly reviewerId: string;
+  readonly reviewerArtifactId: string;
   readonly status: ReviewerSourceStatusPayload;
 }
 
@@ -149,21 +149,21 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
     };
   }, [loadLibrary]));
 
-  const handleOpenReviewer = async (reviewerId: string) => {
+  const handleOpenReviewer = async (reviewerArtifactId: string) => {
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
       setError(context.error);
       return;
     }
 
-    setOpeningReviewerId(reviewerId);
+    setOpeningReviewerId(reviewerArtifactId);
     setError(null);
     setSuccessMessage(null);
 
     try {
       const result = await getReviewer({
         ...context.value,
-        reviewerId,
+        reviewerArtifactId,
       });
 
       if (result.ok) {
@@ -216,7 +216,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
       return;
     }
 
-    const reviewerId = openedReviewer.id;
+    const reviewerArtifactId = openedReviewer.id;
     setIsCheckingSourceStatus(true);
     setError(null);
     setSuccessMessage(null);
@@ -224,11 +224,11 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
     try {
       const result = await getReviewerSourceStatus({
         ...context.value,
-        reviewerId,
+        reviewerArtifactId,
       });
 
       if (result.ok) {
-        setSourceStatusState({ reviewerId, status: result.data });
+        setSourceStatusState({ reviewerArtifactId, status: result.data });
       } else {
         setError(formatLibraryError(result.error, "source-status"));
       }
@@ -238,7 +238,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
   };
 
   const handleStartRename = (reviewer: SavedReviewerSummary) => {
-    setRenameState({ reviewerId: reviewer.id, title: reviewer.title });
+    setRenameState({ reviewerArtifactId: reviewer.id, title: reviewer.title });
     setError(null);
     setSuccessMessage(null);
   };
@@ -270,7 +270,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
     try {
       const result = await renameReviewer({
         ...context.value,
-        reviewerId: renameState.reviewerId,
+        reviewerArtifactId: renameState.reviewerArtifactId,
         title: nextTitle,
       });
 
@@ -312,35 +312,35 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
     );
   };
 
-  const handleDelete = async (reviewerId: string) => {
+  const handleDelete = async (reviewerArtifactId: string) => {
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
       setError(context.error);
       return;
     }
 
-    setDeletingReviewerId(reviewerId);
+    setDeletingReviewerId(reviewerArtifactId);
     setError(null);
     setSuccessMessage(null);
 
     try {
       const result = await deleteReviewer({
         ...context.value,
-        reviewerId,
+        reviewerArtifactId,
       });
 
       if (result.ok) {
         if (session?.user.id) {
-          await removeLocalArtifact(session.user.id, `reviewer:${reviewerId}`);
+          await removeLocalArtifact(session.user.id, `artifact:${reviewerArtifactId}`);
         }
         setReviewers((current) =>
-          current.filter((reviewer) => reviewer.id !== reviewerId),
+          current.filter((reviewer) => reviewer.id !== reviewerArtifactId),
         );
         setOpenedReviewer((current) =>
-          current?.id === reviewerId ? null : current,
+          current?.id === reviewerArtifactId ? null : current,
         );
         setRenameState((current) =>
-          current?.reviewerId === reviewerId ? null : current,
+          current?.reviewerArtifactId === reviewerArtifactId ? null : current,
         );
         setSuccessMessage("Reviewer deleted.");
       } else {
@@ -424,7 +424,7 @@ export function StudyLibraryScreen({ onCreateReviewer }: StudyLibraryScreenProps
             onRefreshStatus={handleCheckSourceStatus}
             onToggle={() => setIsSourceDetailsOpen((current) => !current)}
             status={
-              sourceStatusState?.reviewerId === openedReviewer.id
+              sourceStatusState?.reviewerArtifactId === openedReviewer.id
                 ? sourceStatusState.status
                 : null
             }

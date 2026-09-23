@@ -53,7 +53,7 @@ describe("reviewer source status service", () => {
     const result = await readReviewerSourceStatus({
       checkedAt: LATER,
       client: fake.client,
-      reviewerId: REVIEWER_ID,
+      reviewerArtifactId: REVIEWER_ID,
       userId: USER_ID,
     });
 
@@ -104,7 +104,7 @@ describe("reviewer source status service", () => {
 
     const result = await readReviewerSourceStatus({
       client: fake.client,
-      reviewerId: REVIEWER_ID,
+      reviewerArtifactId: REVIEWER_ID,
       userId: USER_ID,
     });
 
@@ -160,7 +160,7 @@ describe("reviewer source status service", () => {
 
     const result = await readReviewerSourceStatus({
       client: fake.client,
-      reviewerId: REVIEWER_ID,
+      reviewerArtifactId: REVIEWER_ID,
       userId: USER_ID,
     });
 
@@ -225,7 +225,7 @@ describe("reviewer source status service", () => {
 
     const result = await readReviewerSourceStatus({
       client: fake.client,
-      reviewerId: REVIEWER_ID,
+      reviewerArtifactId: REVIEWER_ID,
       userId: USER_ID,
     });
 
@@ -255,13 +255,13 @@ describe("reviewer source status service", () => {
 
   it("denies cross-user reviewers through owner-scoped reads", async () => {
     const fake = createFakeStatusClient({
-      reviewers: [reviewerRow({ userId: OTHER_USER_ID })],
+      generated_artifacts: [reviewerArtifactRow({ userId: OTHER_USER_ID })],
     });
 
     await expect(
       readReviewerSourceStatus({
         client: fake.client,
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
         userId: USER_ID,
       }),
     ).resolves.toMatchObject({
@@ -273,14 +273,14 @@ describe("reviewer source status service", () => {
 
   it("handles historical reviewers without source snapshots safely", async () => {
     const fake = createFakeStatusClient({
-      reviewers: [reviewerRow({ sourceSnapshotId: null })],
+      source_versions: [sourceVersionRow({ sourceSnapshotId: null })],
     });
 
     await expect(
       readReviewerSourceStatus({
         checkedAt: LATER,
         client: fake.client,
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
         userId: USER_ID,
       }),
     ).resolves.toMatchObject({
@@ -325,6 +325,11 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
 
   public neq(column: string, value: unknown): this {
     this.filters.push((row) => row[column] !== value);
+    return this;
+  }
+
+  public is(column: string, value: unknown): this {
+    this.filters.push((row) => row[column] === value);
     return this;
   }
 
@@ -399,7 +404,9 @@ function baseStatusTables(): Record<string, readonly FakeRecord[]> {
     canvas_sync_runs: [],
     reviewer_source_snapshot_items: [],
     reviewer_source_snapshots: [snapshotRow()],
-    reviewers: [reviewerRow({})],
+    generated_artifacts: [reviewerArtifactRow({})],
+    generated_artifact_versions: [reviewerVersionRow()],
+    source_versions: [sourceVersionRow({})],
   };
 }
 
@@ -443,20 +450,37 @@ function compareFakeValues(
   return 0;
 }
 
-function reviewerRow({
-  sourceSnapshotId = SNAPSHOT_ID,
+function reviewerArtifactRow({
   userId = USER_ID,
 }: {
-  readonly sourceSnapshotId?: string | null;
   readonly userId?: string;
 }) {
   return {
     id: REVIEWER_ID,
     user_id: userId,
-    source_snapshot_id: sourceSnapshotId,
-    source_metadata: { sourceMode: "canvas" },
+    artifact_type: "reviewer",
+    latest_version_id: PREVIEW_SESSION_ID,
+    deleted_at: null,
     created_at: NOW,
     updated_at: NOW,
+  };
+}
+
+function reviewerVersionRow() {
+  return {
+    id: PREVIEW_SESSION_ID,
+    user_id: USER_ID,
+    artifact_id: REVIEWER_ID,
+    artifact_type: "reviewer",
+    source_version_id: RUN_ID,
+  };
+}
+
+function sourceVersionRow({ sourceSnapshotId = SNAPSHOT_ID }: { readonly sourceSnapshotId?: string | null }) {
+  return {
+    id: RUN_ID,
+    user_id: USER_ID,
+    metadata: sourceSnapshotId ? { reviewerSourceSnapshotId: sourceSnapshotId } : {},
   };
 }
 

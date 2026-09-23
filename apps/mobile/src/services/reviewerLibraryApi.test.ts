@@ -127,7 +127,7 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl: openFetch,
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
       }),
     ).resolves.toMatchObject({ ok: true, data: detail() });
 
@@ -136,7 +136,7 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl: createFetch({ ok: true, reviewer: canvasDetail() }),
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
       }),
     ).resolves.toMatchObject({
       ok: true,
@@ -154,7 +154,7 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl: renameFetch,
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
         title: "Renamed",
       }),
     ).resolves.toMatchObject({
@@ -167,7 +167,7 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl: deleteFetch,
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
       }),
     ).resolves.toEqual({ ok: true, data: undefined });
   });
@@ -179,7 +179,7 @@ describe("reviewer library API", () => {
       accessToken: "token-value",
       apiBaseUrl: API_BASE_URL,
       fetchImpl,
-      reviewerId: REVIEWER_ID,
+      reviewerArtifactId: REVIEWER_ID,
     });
 
     expect(result).toMatchObject({
@@ -234,7 +234,7 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl: createFetch(response),
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
       }),
     ).resolves.toMatchObject({
       ok: false,
@@ -293,7 +293,7 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl,
-        reviewerId: REVIEWER_ID,
+        reviewerArtifactId: REVIEWER_ID,
         title: " ",
       }),
     ).resolves.toMatchObject({ ok: false, error: { code: "invalid_title" } });
@@ -303,9 +303,9 @@ describe("reviewer library API", () => {
         accessToken: "token-value",
         apiBaseUrl: API_BASE_URL,
         fetchImpl,
-        reviewerId: " ",
+        reviewerArtifactId: " ",
       }),
-    ).resolves.toMatchObject({ ok: false, error: { code: "missing_reviewer_id" } });
+    ).resolves.toMatchObject({ ok: false, error: { code: "missing_reviewer_artifact_id" } });
 
     expect(fetchImpl).not.toHaveBeenCalled();
   });

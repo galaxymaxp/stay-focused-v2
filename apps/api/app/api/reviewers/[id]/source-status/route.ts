@@ -52,7 +52,7 @@ export async function GET(
 
   const result = await readReviewerSourceStatus({
     client,
-    reviewerId: params.id,
+    reviewerArtifactId: params.id,
     userId: user.id,
   });
 

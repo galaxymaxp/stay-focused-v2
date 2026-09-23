@@ -187,7 +187,7 @@ const workspace: CourseLearningWorkspace = {
         id: "file:one",
         courseId: "course",
         sourceId: "file:one",
-        reviewerId: null,
+        reviewerArtifactId: null,
         title: "Real material",
         kind: "slides",
         readiness: "ready",
@@ -316,7 +316,7 @@ describe("B25 screen interactions", () => {
         ...workspace.materials,
         items: workspace.materials.items.map((item) => ({
           ...item,
-          reviewerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          reviewerArtifactId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           generation: { ...item.generation, quiz: supported },
         })),
       },
@@ -335,7 +335,7 @@ describe("B25 screen interactions", () => {
       body: expect.objectContaining({
         sourceType: "reviewer",
         sourceIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
-        reviewerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        reviewerArtifactId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       }),
     }));
   });
