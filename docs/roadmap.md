@@ -1,5 +1,9 @@
 # Roadmap
 
+## B38.0 Generate course state and material loading repair (2026-09-24)
+
+**PASS.** This was a blocking repair before B38 quality testing. Generate now uses the Sync page's course inventory, so tapping a course follows its sync status: unsynced or incomplete courses go to Canvas sync, synced courses open Generate. What a synced course shows follows material eligibility: its materials or "No study materials found". Current courses come before previous ones. The HIST 100 "Materials could not be loaded" defect was an unselected course reported as a server outage. Deployed without a migration and accepted on Android. See [B38.0 acceptance](ai/acceptance/b38-0/generate-course-state-and-material-repair.md). Next: B38 Production Generation Quality Acceptance.
+
 ## B37.1 production migration and runtime closure (2026-09-24)
 
 **PASS.** Production migration metadata was reconciled, the canonical Reviewer migration and owner-scoped read-grant follow-up were applied, and the corrected API deployment is READY. Signed Android acceptance covered both Quiz gates, explicit-confirmation spend safety, one real canonical Quiz through the durable Queue, offline SQLite reopen, canonical management, successful disposable deletion, and dependency-protected deletion. Legacy `reviewers` remains compatibility-only with zero rows and no active runtime reads. See [B37 acceptance](ai/acceptance/b37/generated-artifact-convergence.md). Next: B38 Generation Quality Acceptance.
