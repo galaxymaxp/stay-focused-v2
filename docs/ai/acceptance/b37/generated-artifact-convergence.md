@@ -92,3 +92,51 @@ Current source has no `.from("reviewers")` call and the B37 migration contains n
 ## B38 handoff
 
 B38 is **Generation Quality Acceptance**. It must investigate `request_exceeds_context_budget`, especially on large PPTX extracted source context, and test representative PDF, scanned PDF, DOCX, PPTX, Canvas Page, Reviewer, Quiz, and Activity Output sources. B37 does not change context-budget or generation-quality behavior.
+
+## B37.1 Production Rollout Closure
+
+Date: 2026-09-24
+
+Verdict: **PASS — the canonical migration is live, the corrected runtime is deployed, and authenticated physical acceptance is complete.** This section supersedes the rollout limitations recorded above while retaining the original B37 report as an audit trail.
+
+### Migration history and data audit
+
+The production project is `stay-focused-v2` (`xfdbwfqtorelmurncyql`). Five remote timestamps were metadata aliases for committed migrations. Stored migration SQL, live schema, functions, and constraints were inspected before each guarded normalization: `20260918123510` to `20260918120000`, `20260919230122` to `20260919225500`, `20260919232413` to `20260919234000`, `20260919232542` to `20260919235500`, and `20260920075529` to `20260920000000`. No migration body was replayed. The connector-recorded aliases for the two new migrations were likewise normalized after application: `20260923124229` to `20260923000000` and `20260923131432` to `20260923010000`. Local and remote histories now match.
+
+The pre-migration, non-content audit found 50 generated artifacts, 50 active Reviewer artifacts, 50 generated artifact versions, zero legacy Reviewer rows, six Quizzes, zero legacy-linked Quizzes, no canonical Quiz column yet, and 19 Activity drafts. All current Reviewers had valid owner/type/current-version/payload/source relationships. Twenty-six exact unedited snapshot-backed Reviewers were eligible for canonical Quiz mapping; 24 older artifacts lacked snapshot metadata and remained correctly ineligible. No title-based inference or data rewrite was needed.
+
+`20260923000000_canonical_reviewer_artifacts.sql` applied successfully. Production inspection verified the nullable canonical Quiz column, indexes, validated owner-safe composite foreign key with `ON DELETE RESTRICT`, identity check, legacy compatibility column/FK, fixed-search-path RPCs, restricted job privileges, authenticated-only rename/delete, and unchanged RLS. The first authenticated management smoke exposed missing table-level read grants despite correct RLS policies. The forward-only follow-up `20260923010000_authenticated_canonical_reviewer_reads.sql` revokes prior anon/authenticated privileges on the three canonical read tables and grants authenticated `SELECT` only; RLS still limits rows to the owner. A real PGlite contract test covers owner visibility plus anon, cross-owner, and mutation denial. Production advisors showed no new privilege broadening.
+
+### Runtime deployment and signed build
+
+The corrected production deployment is `dpl_2QUkcVoZADvJ3JfzegXSDXEjzrcp`, READY at `https://stay-focused-v2-prototype.vercel.app`; health returns version `2.0.0`. Its build completed 22 workflow steps, two workflows, and 28 static pages.
+
+The prior signed binary had no Expo updates URL, so OTA alone could not close acceptance. `apps/mobile/app.json` now points preview updates at the existing project. Signed EAS preview build `f0d6d63e-2607-45ee-b125-3b5d43ec2966`, commit `a7bfceeae0f979e10485c1d99cd9b72ba24df1d7`, runtime `2.0.0`, was installed over the authenticated app on the realme RMX3151 running Android 13. No signing credential was created or rotated.
+
+### Authenticated physical acceptance
+
+- Canonical management populated from production. A newly generated disposable Reviewer was renamed through the UI, then soft-deleted. It had no dependent Quiz, disappeared immediately from management and Library, and did not return after force-stop/relaunch.
+- Exact gate behavior passed: an eligible material with an active snapshot-backed canonical Reviewer enabled the five-question Quiz action; an ineligible material displayed the Reviewer prerequisite and kept generation disabled.
+- Opening the Queue confirmation screen created no production job and consumed no quota. One explicit confirmation created exactly one Quiz job (`af84f977-6a74-4b0e-9bc9-bf63441b31b9`), one result, and one Quiz (`175590c7-2254-4c49-baa9-b813aa4426ec`). The job metadata, result, and persisted Quiz all reference canonical Reviewer artifact `87e61ff6-9130-4f7e-a189-eeac6ef8ed3b` and its exact source snapshot; `reviewer_id` remains null. Reopening the completed Queue card created no duplicate.
+- With both Wi-Fi and mobile data disabled, a cold app relaunch showed the five-question Quiz from the device store, opened its saved questions, and correctly withheld online practice/scoring. Connectivity was restored afterward.
+- Attempting to delete the Quiz-backed Reviewer as its authenticated owner returned the expected `reviewer_has_quizzes`; both Reviewer and Quiz remained intact.
+
+The disposable acceptance activity left production with 51 generated artifacts and 51 versions, 50 active Reviewers, zero legacy Reviewer rows, seven Quizzes, zero legacy-linked Quizzes, one canonical-linked Quiz, and 19 Activity drafts. No student titles, extracted text, answers, or other student content were printed or recorded here.
+
+### Verification and retirement decision
+
+| Gate | Closure result |
+|---|---|
+| Typecheck | 7/7 workspaces passed, forced |
+| Lint | 7/7 passed; 0 errors and 4 pre-existing mobile warnings |
+| Mobile | 43 files, 508/508 passed |
+| API | 90 files, 890 passed and 3 opt-in live tests skipped |
+| Canvas | 1 file, 73/73 passed |
+| Shared | 6 files, 44/44 passed |
+| Canonical DB/migration focus | 5 files, 82 passed and 2 opt-in live tests skipped |
+| DB/API production build | passed; deployed build completed 22 steps, 2 workflows, 28 pages |
+| Mobile export | Android, iOS, and web passed with 49 assets |
+| Lockfile | `npm ci --dry-run` passed; unchanged |
+| Diff hygiene | `git diff --check` passed |
+
+Active runtime source contains no `.from("reviewers")` read. Remaining legacy references are historical migrations, generated schema types, compatibility fields, tests, and documentation. The legacy table remains in this phase because the historical Quiz foreign key is deliberately preserved; it is runtime-unused and contains zero rows. No B38 work began. Next is **B38 Generation Quality Acceptance**.

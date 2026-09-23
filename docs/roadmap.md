@@ -1,5 +1,9 @@
 # Roadmap
 
+## B37.1 production migration and runtime closure (2026-09-24)
+
+**PASS.** Production migration metadata was reconciled, the canonical Reviewer migration and owner-scoped read-grant follow-up were applied, and the corrected API deployment is READY. Signed Android acceptance covered both Quiz gates, explicit-confirmation spend safety, one real canonical Quiz through the durable Queue, offline SQLite reopen, canonical management, successful disposable deletion, and dependency-protected deletion. Legacy `reviewers` remains compatibility-only with zero rows and no active runtime reads. See [B37 acceptance](ai/acceptance/b37/generated-artifact-convergence.md). Next: B38 Generation Quality Acceptance.
+
 Current milestone order: B34 Current Mobile UX Repair → B35 On-Device Artifact Persistence → B36 Signed Physical UX + Offline Acceptance → B37 Generated Artifact Model Convergence → B38 Generation Quality Acceptance → B39 Full E2E / Demo Acceptance → B40 Capstone & Release Hardening.
 
 ## B37 generated artifact model convergence (2026-09-23)
