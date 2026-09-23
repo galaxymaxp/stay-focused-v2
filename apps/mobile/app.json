@@ -40,6 +40,9 @@
         "projectId": "2b3a9db6-3712-4ed0-8365-17d9936562dd"
       }
     },
-    "owner": "galaxymaxp"
+    "owner": "galaxymaxp",
+    "updates": {
+      "url": "https://u.expo.dev/2b3a9db6-3712-4ed0-8365-17d9936562dd"
+    }
   }
 }
