@@ -12,14 +12,14 @@ vi.mock('../processing-jobs/workflow-dispatch', () => ({ dispatchAcceptedProcess
 vi.mock('../processing-jobs/ai-generation', () => ({ durableGenerationProvider: mocks.provider }));
 
 const job = { id: 'job', user_id: 'owner', job_type: 'quiz_generation' } as ProcessingJobDatabaseRow;
-const resolved = { courseId: 'course', reviewerId: null, materialIds: [...request.sourceIds] };
+const resolved = { courseId: 'course', reviewerArtifactId: request.reviewerArtifactId, materialIds: [...request.sourceIds] };
 const checkpoints = new Map<string, Json>();
 beforeEach(() => {
     vi.resetAllMocks();
     checkpoints.clear();
     mocks.resolve.mockResolvedValue(resolved);
     mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions() });
-    mocks.source.mockResolvedValue({ user_id: 'owner', metadata: { courseId: 'course', reviewerId: null, quizInput: request } });
+    mocks.source.mockResolvedValue({ user_id: 'owner', metadata: { courseId: 'course', reviewerArtifactId: request.reviewerArtifactId, quizInput: request } });
     mocks.read.mockImplementation(async (_client, _job, key: string) => checkpoints.has(key) ? { payload: checkpoints.get(key) } : null);
     mocks.write.mockImplementation(async (_client, value: {
         checkpointKey: string;
@@ -32,7 +32,7 @@ describe('Quiz existing durable job integration', () => {
         const rpc = vi.fn().mockResolvedValue({ data: [job], error: null }), client = { rpc } as unknown as SupabaseClient<Database>;
         mocks.dispatch.mockResolvedValue(job);
         expect(await startQuizGeneration(client, 'owner', request, 'request-key')).toBe(job);
-        expect(rpc).toHaveBeenCalledWith('create_quiz_processing_job', expect.objectContaining({ p_user_id: 'owner', p_course_id: 'course', p_reviewer_id: null }));
+        expect(rpc).toHaveBeenCalledWith('create_quiz_processing_job', expect.objectContaining({ p_user_id: 'owner', p_course_id: 'course', p_reviewer_artifact_id: request.reviewerArtifactId }));
         expect(mocks.dispatch).toHaveBeenCalledWith(job);
         expect(mocks.provider).not.toHaveBeenCalled();
     });

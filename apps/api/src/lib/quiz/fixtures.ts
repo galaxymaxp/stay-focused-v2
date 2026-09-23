@@ -14,7 +14,7 @@ export const fixtureSources = [
     ['Formula', 'For a rectangle, area A = length times width.', 'For a square of side s, perimeter P = 4 times s.', 'For a triangle, area A = base times height divided by 2.', 'Speed is distance traveled divided by elapsed time.', 'Density is the mass of a sample divided by its volume.'],
     ['Short source', 'A stack removes the most recently added element first.', 'A queue removes the earliest added element first.', 'A set contains distinct values without duplicate entries.', 'A tree connects nodes in a hierarchy with a root.', 'A graph contains vertices connected by edges.'],
 ] as const;
-export const request: QuizGenerationRequest = { sourceType: 'material', sourceIds: ['page:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], questionCount: 5, difficulty: 'mixed' };
+export const request: QuizGenerationRequest = { sourceType: 'reviewer', sourceIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], reviewerArtifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', questionCount: 5, difficulty: 'mixed' };
 export function fixtureRegions(index = 0): QuizRegion[] {
     const [name, ...facts] = fixtureSources[index]!;
     return facts.map((text, i) => ({ id: `topic-${i + 1}`, label: `${name} section ${i + 1}`, text,

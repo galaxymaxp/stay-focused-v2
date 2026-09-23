@@ -78,7 +78,7 @@ export function GenerateScreen() {
   async function generate(type: "reviewer" | "quiz") {
     if (!selected || !session || submitting.current || !available(selected.generation[type]) ||
       !available(type === "quiz" ? workspace.data?.capabilities.quizGeneration : workspace.data?.capabilities.reviewerGeneration)) return;
-    if (type === "quiz" && !selected.reviewerId) return;
+    if (type === "quiz" && !selected.reviewerArtifactId) return;
 
     submitting.current = true;
     setBusy(true);
@@ -92,8 +92,8 @@ export function GenerateScreen() {
           ? { courseId: selected.courseId, materialId: selected.id }
           : {
               sourceType: "reviewer",
-              sourceIds: [selected.reviewerId],
-              reviewerId: selected.reviewerId,
+              sourceIds: [selected.reviewerArtifactId],
+              reviewerArtifactId: selected.reviewerArtifactId,
               questionCount: 5,
               difficulty: "mixed",
               questionTypes: ["single_select", "true_false"],
@@ -179,9 +179,9 @@ export function GenerateScreen() {
           <View style={{ borderTopWidth: 1, borderColor: colors.separator, paddingTop: spacing[3], gap: spacing[2] }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}><BookOpen color={colors.violet} size={18} /><Copy size="h3">Quiz</Copy></View>
             <Copy muted size="bodySmall">
-              {selected.reviewerId ? "Build a 5-question quiz from the persisted Reviewer for this material." : "Generate and save a Reviewer first. Quizzes use that Reviewer as their study source."}
+              {selected.reviewerArtifactId ? "Build a 5-question quiz from the persisted Reviewer for this material." : "Generate and save a Reviewer first. Quizzes use that Reviewer as their study source."}
             </Copy>
-            <Action secondary disabled={busy || !selected.reviewerId || !available(selected.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")}>
+            <Action secondary disabled={busy || !selected.reviewerArtifactId || !available(selected.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")}>
               Generate Quiz
             </Action>
           </View>
@@ -259,7 +259,7 @@ function ModuleGroup({ title, items, selected, onSelect }: {
           <ContentIcon kind={item.kind} small />
           <View style={{ flex: 1 }}>
             <Copy size="bodySmall" style={{ fontWeight: "600" }}>{item.title}</Copy>
-            <Copy muted size="caption">{materialTypes[item.kind]} · {item.readiness.replaceAll("_", " ")}{item.reviewerId ? " · Reviewer ready" : ""}</Copy>
+            <Copy muted size="caption">{materialTypes[item.kind]} · {item.readiness.replaceAll("_", " ")}{item.reviewerArtifactId ? " · Reviewer ready" : ""}</Copy>
           </View>
           <ChevronRight color={colors.textMuted} size={18} />
         </Pressable>

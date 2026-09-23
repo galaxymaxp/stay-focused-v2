@@ -1,36 +1,46 @@
 import type { Database } from '@stay-focused/db';
 import type { QuizGenerationRequest,QuizSourceReference } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { prepareCanvasReviewerSources,structureCanvasReviewerSources } from '../canvas-reviewer-sources';
 import { sanitizeCanvasTitleText } from '../canvas-source-safety';
 import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
-import { createServerOcrProvider } from '../ocr/create-server-ocr-provider';
 import { normalized,type QuizRegion } from './generation';
 type Client = SupabaseClient<Database>;
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const isId = (id: unknown): id is string => typeof id === 'string' && new RegExp(`^${uuid}$`, 'i').test(id);
 export function readQuizRequest(value: unknown): QuizGenerationRequest {
     const v = record(value);
-    if (Object.keys(v).some(k => !['sourceType', 'sourceIds', 'reviewerId', 'questionCount', 'difficulty', 'questionTypes'].includes(k)) || !['material', 'reviewer'].includes(String(v.sourceType)) || !Array.isArray(v.sourceIds) || v.sourceIds.length > 4 || new Set(v.sourceIds).size !== v.sourceIds.length || !Number.isInteger(v.questionCount) || Number(v.questionCount) < 5 || Number(v.questionCount) > 20 || !['easy', 'medium', 'hard', 'mixed'].includes(String(v.difficulty)) || (v.reviewerId !== undefined && !isId(v.reviewerId)))
+    if (Object.keys(v).some(k => !['sourceType', 'sourceIds', 'reviewerArtifactId', 'questionCount', 'difficulty', 'questionTypes'].includes(k)) || !['material', 'reviewer'].includes(String(v.sourceType)) || !Array.isArray(v.sourceIds) || v.sourceIds.length > 4 || new Set(v.sourceIds).size !== v.sourceIds.length || !Number.isInteger(v.questionCount) || Number(v.questionCount) < 5 || Number(v.questionCount) > 20 || !['easy', 'medium', 'hard', 'mixed'].includes(String(v.difficulty)) || (v.reviewerArtifactId !== undefined && !isId(v.reviewerArtifactId)))
         throw new ExperienceFailure(400, 'invalid_request');
-    if (v.sourceType === 'reviewer' ? v.sourceIds.length !== 1 || !isId(v.sourceIds[0]) || (v.reviewerId !== undefined && v.reviewerId !== v.sourceIds[0]) : v.sourceIds.length < 1 || !v.sourceIds.every(id => typeof id === 'string' && new RegExp(`^(file|page|assignment|announcement):${uuid}$`, 'i').test(id)))
+    if (v.sourceType === 'reviewer' ? v.sourceIds.length !== 1 || !isId(v.sourceIds[0]) || (v.reviewerArtifactId !== undefined && v.reviewerArtifactId !== v.sourceIds[0]) : v.sourceIds.length < 1 || !v.sourceIds.every(id => typeof id === 'string' && new RegExp(`^(file|page|assignment|announcement):${uuid}$`, 'i').test(id)))
         throw new ExperienceFailure(400, 'invalid_request');
     if (v.questionTypes !== undefined && (!Array.isArray(v.questionTypes) || !v.questionTypes.length || new Set(v.questionTypes).size !== v.questionTypes.length || !v.questionTypes.every(t => ['single_select', 'multi_select', 'true_false'].includes(t))))
         throw new ExperienceFailure(400, 'invalid_request');
-    return { sourceType: v.sourceType as QuizGenerationRequest['sourceType'], sourceIds: (v.sourceIds as string[]).map(s => s.toLowerCase()).sort(), questionCount: Number(v.questionCount), difficulty: v.difficulty as QuizGenerationRequest['difficulty'], ...(v.reviewerId ? { reviewerId: String(v.reviewerId).toLowerCase() } : {}), ...(v.questionTypes ? { questionTypes: v.questionTypes as NonNullable<QuizGenerationRequest['questionTypes']> } : {}) };
+    return { sourceType: v.sourceType as QuizGenerationRequest['sourceType'], sourceIds: (v.sourceIds as string[]).map(s => s.toLowerCase()).sort(), questionCount: Number(v.questionCount), difficulty: v.difficulty as QuizGenerationRequest['difficulty'], ...(v.reviewerArtifactId ? { reviewerArtifactId: String(v.reviewerArtifactId).toLowerCase() } : {}), ...(v.questionTypes ? { questionTypes: v.questionTypes as NonNullable<QuizGenerationRequest['questionTypes']> } : {}) };
 }
 export async function resolveQuizSources(client: Client, userId: string, request: QuizGenerationRequest) {
-    const reviewerId = request.sourceType === 'reviewer' ? request.sourceIds[0]! : request.reviewerId ?? null;
-    let reviewer: Database['public']['Tables']['reviewers']['Row'] | null = null;
+    const reviewerArtifactId = request.sourceType === 'reviewer' ? request.sourceIds[0]! : request.reviewerArtifactId ?? null;
+    let reviewerArtifact: Database['public']['Tables']['generated_artifacts']['Row'] | null = null;
+    let reviewerVersion: Database['public']['Tables']['generated_artifact_versions']['Row'] | null = null;
     let snapshot: Database['public']['Tables']['reviewer_source_snapshots']['Row'] | null = null;
     let materialIds = [...request.sourceIds];
-    if (reviewerId) {
-        const r = await client.from('reviewers').select('*').eq('user_id', userId).eq('id', reviewerId).maybeSingle();
-        if (r.error || !r.data || r.data.user_id !== userId || !r.data.source_snapshot_id)
+    if (reviewerArtifactId) {
+        const artifactResult = await client.from('generated_artifacts').select('*').eq('user_id', userId).eq('id', reviewerArtifactId).eq('artifact_type', 'reviewer').is('deleted_at', null).maybeSingle();
+        if (artifactResult.error || !artifactResult.data || artifactResult.data.user_id !== userId || !artifactResult.data.latest_version_id)
             throw new ExperienceFailure(404, 'quiz_source_unavailable');
-        reviewer = r.data;
-        const s = await client.from('reviewer_source_snapshots').select('*').eq('user_id', userId).eq('id', r.data.source_snapshot_id).maybeSingle();
+        reviewerArtifact = artifactResult.data;
+        const versionResult = await client.from('generated_artifact_versions').select('*').eq('user_id', userId).eq('id', artifactResult.data.latest_version_id).eq('artifact_id', reviewerArtifactId).eq('artifact_type', 'reviewer').maybeSingle();
+        if (versionResult.error || !versionResult.data || versionResult.data.user_id !== userId)
+            throw new ExperienceFailure(404, 'quiz_source_unavailable');
+        reviewerVersion = versionResult.data;
+        const persisted = record(versionResult.data.payload);
+        if (!record(persisted.reviewer).sections)
+            throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        const sourceResult = await client.from('source_versions').select('*').eq('user_id', userId).eq('id', versionResult.data.source_version_id).maybeSingle();
+        const sourceSnapshotId = sourceResult.data ? record(sourceResult.data.metadata).reviewerSourceSnapshotId : null;
+        if (sourceResult.error || !sourceResult.data || sourceResult.data.user_id !== userId || !isId(sourceSnapshotId))
+            throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        const s = await client.from('reviewer_source_snapshots').select('*').eq('user_id', userId).eq('id', sourceSnapshotId).maybeSingle();
         if (s.error || !s.data || s.data.user_id !== userId || s.data.was_edited)
             throw new ExperienceFailure(409, 'quiz_source_unavailable');
         snapshot = s.data;
@@ -58,7 +68,9 @@ export async function resolveQuizSources(client: Client, userId: string, request
     }
     if (!courseId || !connectionId || (snapshot && snapshot.course_id !== courseId))
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
-    return { courseId, connectionId, reviewerId, reviewer, snapshot, materialIds };
+    if (!reviewerArtifactId || !reviewerArtifact || !reviewerVersion)
+        throw new ExperienceFailure(409, 'quiz_source_unavailable');
+    return { courseId, connectionId, reviewerArtifactId, reviewerArtifact, reviewerVersion, snapshot, materialIds };
 }
 export interface SourceBlock {
     id: string;
@@ -97,20 +109,25 @@ export function regionsFromBlocks(materialId: string, title: string, blocks: rea
 }
 export async function assembleQuizSources(client: Client, userId: string, request: QuizGenerationRequest) {
     const resolved = await resolveQuizSources(client, userId, request);
-    const regions: QuizRegion[] = [];
-    // Reuse preparation/structuring per explicitly selected material; never expand a course.
-    for (const materialId of resolved.materialIds) {
-        if (materialId.startsWith('file:')) {
-            const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: resolved.courseId, sourceIds: [materialId] });
-            if (!prepared.ok || prepared.value.results.some(r => r.status !== 'ready'))
-                throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        }
-        const structure = await structureCanvasReviewerSources({ client, userId, courseId: resolved.courseId, sourceIds: [materialId], ...(materialId.startsWith('file:') ? { ocrProvider: createServerOcrProvider() } : {}) });
-        if (!structure.ok)
-            throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        for (const source of structure.value.sources)
-            regions.push(...regionsFromBlocks(materialId, source.title, source.blocks.filter(b => b.selectable).map(b => ({ id: b.id, kind: b.kind, text: b.text, page: b.pageNumber, slide: b.slideNumber })), resolved.reviewer?.reviewer_output));
-    }
+    const root = record(resolved.reviewerVersion.payload);
+    const reviewer = record(root.reviewer);
+    const sections = Array.isArray(reviewer.sections) ? reviewer.sections.map(record) : [];
+    const regions: QuizRegion[] = sections.flatMap(section => {
+        if (typeof section.id !== 'string' || typeof section.title !== 'string' || !Array.isArray(section.items)) return [];
+        return section.items.map(record).flatMap(item => {
+            const core = record(item.sourceCore);
+            if (typeof item.id !== 'string' || typeof item.title !== 'string' || typeof core.explanation !== 'string' || !Array.isArray(core.keyPoints) || !core.keyPoints.every(point => typeof point === 'string')) return [];
+            const evidence = Array.isArray(core.evidence) ? core.evidence.map(record).map(value => value.text).filter((value): value is string => typeof value === 'string') : [];
+            const text = [core.explanation, ...(core.keyPoints as string[]).map(point => `- ${point}`), ...evidence].filter(Boolean).join('\n');
+            return [{
+                id: `reviewer:${resolved.reviewerArtifactId}/${item.id}`,
+                label: sanitizeCanvasTitleText(`${section.title}: ${item.title}`).slice(0, 220),
+                text,
+                sourceRefs: resolved.materialIds.map(materialId => ({ materialId, regionId: item.id as string, page: null, slide: null })),
+                reviewerSectionIds: [section.id as string],
+            }];
+        });
+    });
     if (!regions.length || regions.reduce((n, r) => n + r.text.length, 0) > 120000)
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     return { ...resolved, regions };

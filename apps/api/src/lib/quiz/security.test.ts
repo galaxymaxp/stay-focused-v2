@@ -17,7 +17,7 @@ vi.mock('@/lib/canvas-reviewer-sources', () => ({ prepareCanvasReviewerSources: 
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
 const asJson = (v: unknown) => JSON.parse(JSON.stringify(v)) as Json;
-const quiz: QuizRow = { id, user_id: A, course_id: id, reviewer_id: null, generation_id: id, title: 'Academic quiz', source_material_ids: asJson(input.sourceIds), question_count: 5, difficulty: 'mixed', questions: asJson(questions.map(learnerQuestion)), created_at: '2026-09-12T00:00:00Z', updated_at: '2026-09-12T00:00:00Z' };
+const quiz: QuizRow = { id, user_id: A, course_id: id, reviewer_id: null, reviewer_artifact_id: id, generation_id: id, title: 'Academic quiz', source_material_ids: asJson(['page:' + id]), question_count: 5, difficulty: 'mixed', questions: asJson(questions.map(learnerQuestion)), created_at: '2026-09-12T00:00:00Z', updated_at: '2026-09-12T00:00:00Z' };
 const attempt: AttemptRow = { id, user_id: A, quiz_id: id, request_key: 'test-request', status: 'in_progress', answers: [], started_at: quiz.created_at, completed_at: null, percentage: null };
 type Data = Record<string, Record<string, unknown>[]>;
 function client(data: Data = {}) {
@@ -26,10 +26,11 @@ function client(data: Data = {}) {
                 string,
                 unknown
             ][] = [];
-            const query = { select: vi.fn(), eq: vi.fn(), order: vi.fn(), limit: vi.fn(), range: vi.fn(), maybeSingle: vi.fn(), then: vi.fn() };
+            const query = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), order: vi.fn(), limit: vi.fn(), range: vi.fn(), maybeSingle: vi.fn(), then: vi.fn() };
             const rows = () => ({ data: (data[table] ?? []).filter(r => filters.every(([k, v]) => r[k] === v)), error: null });
             query.select.mockReturnValue(query);
             query.eq.mockImplementation((key: string, value: unknown) => { filters.push([key, value]); return query; });
+            query.is.mockImplementation((key: string, value: unknown) => { filters.push([key, value]); return query; });
             query.order.mockReturnValue(query);
             query.limit.mockImplementation(async () => rows());
             query.range.mockImplementation(async () => rows());
@@ -65,27 +66,31 @@ describe('Quiz authenticated HTTP surfaces', () => {
     it('normalizes private storage errors', async () => { mocks.client.mockImplementation(() => { throw new Error('Canvas PAT sk-secret provider response'); }); const response = await routes[1]!(); expect(response.status).toBe(503); expect(await response.text()).not.toMatch(/PAT|sk-secret|provider response/); });
 });
 describe('Quiz source selection', () => {
-    it('uses owned prepared material blocks, never course-wide sources', async () => {
-        const c = client({ canvas_pages: [{ id, user_id: A, course_id: id, canvas_connection_id: id }] });
-        mocks.structure.mockResolvedValue({ ok: true, value: { sources: [{ title: 'Topic', blocks: [{ id: 'b', kind: 'paragraph', text: 'Academic source contains a meaningful factual statement.', selectable: true }] }] } });
+    const canonical = (owner = A, artifactType = 'reviewer', snapshot = id) => ({
+        generated_artifacts: [{ id, user_id: owner, artifact_type: artifactType, latest_version_id: B, deleted_at: null }],
+        generated_artifact_versions: [{ id: B, user_id: owner, artifact_id: id, artifact_type: artifactType, source_version_id: A, payload: { reviewer: { sections: [{ id: 'section-1', title: 'Topic', items: [{ id: 'item-1', title: 'Fact', sourceCore: { explanation: 'Persisted Reviewer establishes this fact.', keyPoints: ['Grounded point'], evidence: [] } }] }] } } }],
+        source_versions: [{ id: A, user_id: owner, metadata: snapshot ? { reviewerSourceSnapshotId: snapshot } : {} }],
+        reviewer_source_snapshots: snapshot ? [{ id: snapshot, user_id: owner, course_id: id, was_edited: false }] : [],
+        reviewer_source_snapshot_items: snapshot ? [{ id: B, user_id: owner, source_snapshot_id: snapshot, source_type: 'page', source_row_id: id }] : [],
+        canvas_pages: [{ id, user_id: owner, course_id: id, canvas_connection_id: id }],
+    });
+    it('loads Quiz regions from the owned persisted Reviewer payload', async () => {
+        const c = client(canonical());
         const value = await assembleQuizSources(c, A, input);
-        expect(value.materialIds).toEqual(input.sourceIds);
+        expect(value.materialIds).toEqual([`page:${id}`]);
         expect(value.regions).toHaveLength(1);
-        expect(mocks.structure).toHaveBeenCalledWith({ client: c, userId: A, courseId: id, sourceIds: input.sourceIds });
+        expect(value.regions[0]!.text).toContain('Persisted Reviewer');
+        expect(value.reviewerArtifactId).toBe(id);
+        expect(mocks.structure).not.toHaveBeenCalled();
     });
-    it('denies a foreign material before preparation', async () => { await expect(assembleQuizSources(client({ canvas_pages: [{ id, user_id: B, course_id: id, canvas_connection_id: id }] }), A, input)).rejects.toThrow('quiz_source_unavailable'); expect(mocks.structure).not.toHaveBeenCalled(); });
-    it('does not use reviewer prose as source evidence', async () => {
-        const c = client({ reviewers: [{ id, user_id: A, source_snapshot_id: id, reviewer_output: { sections: [{ id: 'section-1', title: 'Topic' }] } }], reviewer_source_snapshots: [{ id, user_id: A, course_id: id, was_edited: false }], reviewer_source_snapshot_items: [{ id, user_id: A, source_snapshot_id: id, source_type: 'page', source_row_id: id }], canvas_pages: [{ id, user_id: A, course_id: id, canvas_connection_id: id }] });
-        mocks.structure.mockResolvedValue({ ok: true, value: { sources: [{ title: 'Topic', blocks: [{ id: 'b', kind: 'paragraph', text: 'The underlying prepared source establishes this fact.', selectable: true }] }] } });
-        const value = await assembleQuizSources(c, A, { ...input, sourceType: 'reviewer', sourceIds: [id] });
-        expect(value.regions[0]!.text).toContain('underlying prepared source');
-        expect(value.reviewerId).toBe(id);
-    });
-    it('refuses reviewer without original source relationship', async () => { await expect(assembleQuizSources(client({ reviewers: [{ id, user_id: A, source_snapshot_id: null, reviewer_output: { invented: 'facts' } }] }), A, { ...input, sourceType: 'reviewer', sourceIds: [id] })).rejects.toThrow('quiz_source_unavailable'); });
+    it('denies a foreign Reviewer artifact', async () => { await expect(assembleQuizSources(client(canonical(B)), A, input)).rejects.toThrow('quiz_source_unavailable'); expect(mocks.structure).not.toHaveBeenCalled(); });
+    it('denies a non-Reviewer artifact', async () => { await expect(assembleQuizSources(client(canonical(A, 'summary')), A, input)).rejects.toThrow('quiz_source_unavailable'); });
+    it('refuses Reviewer without its durable source relationship', async () => { await expect(assembleQuizSources(client(canonical(A, 'reviewer', '')), A, input)).rejects.toThrow('quiz_source_unavailable'); });
     it('rejects unrelated cross-course multi-material selection', async () => {
         const other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-        const c = client({ canvas_pages: [{ id, user_id: A, course_id: id, canvas_connection_id: id }, { id: other, user_id: A, course_id: other, canvas_connection_id: id }] });
-        await expect(assembleQuizSources(c, A, { ...input, sourceIds: [...input.sourceIds, `page:${other}`] })).rejects.toThrow('quiz_source_unavailable');
+        const data = canonical();
+        const c = client({ ...data, reviewer_source_snapshot_items: [...data.reviewer_source_snapshot_items, { id: other, user_id: A, source_snapshot_id: id, source_type: 'page', source_row_id: other }], canvas_pages: [...data.canvas_pages, { id: other, user_id: A, course_id: other, canvas_connection_id: id }] });
+        await expect(assembleQuizSources(c, A, { ...input, sourceType: 'material', sourceIds: [`page:${id}`, `page:${other}`], reviewerArtifactId: id })).rejects.toThrow('quiz_source_unavailable');
     });
 });
 describe('Quiz Library and weak areas', () => {

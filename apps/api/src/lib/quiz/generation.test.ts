@@ -7,8 +7,8 @@ describe('Quiz source contracts and coverage', () => {
     it.each([{ userId: 'foreign' }, { courseId: 'foreign' }, { provider: 'x' }, { model: 'x' }, { sourceIds: [] }, { sourceIds: ['https://evil.test'] }, { questionTypes: [] }, { questionTypes: ['free_response'] }, { difficulty: 'expert' }])('rejects unsafe input %j', change => expect(() => readQuizRequest({ ...request, ...change })).toThrow());
     it('accepts reviewer source and rejects mismatched reviewer association', () => {
         const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-        expect(readQuizRequest({ ...request, sourceType: 'reviewer', sourceIds: [id] }).sourceType).toBe('reviewer');
-        expect(() => readQuizRequest({ ...request, sourceType: 'reviewer', sourceIds: [id], reviewerId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' })).toThrow();
+        expect(readQuizRequest({ ...request, sourceType: 'reviewer', sourceIds: [id], reviewerArtifactId: id }).sourceType).toBe('reviewer');
+        expect(() => readQuizRequest({ ...request, sourceType: 'reviewer', sourceIds: [id], reviewerArtifactId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' })).toThrow();
     });
     it('preserves heading text, document order, pages and slides', () => {
       const blocks = [{id:'h',kind:'heading',text:'Mean'}, {id:'b',kind:'paragraph',text:'Sum divided by count.',page:4,slide:3}];

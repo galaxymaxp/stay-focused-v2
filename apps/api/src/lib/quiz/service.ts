@@ -29,7 +29,7 @@ function requestKey(value: string | null) {
 export async function startQuizGeneration(client: Client, userId: string, input: QuizGenerationRequest, key: string | null) {
     const idempotencyKey = requestKey(key);
     const source = await resolveQuizSources(client, userId, input);
-    const { data, error } = await client.rpc('create_quiz_processing_job', { p_user_id: userId, p_course_id: source.courseId, p_reviewer_id: source.reviewerId, p_idempotency_key: idempotencyKey, p_input: json(input) });
+    const { data, error } = await client.rpc('create_quiz_processing_job', { p_user_id: userId, p_course_id: source.courseId, p_reviewer_artifact_id: source.reviewerArtifactId, p_idempotency_key: idempotencyKey, p_input: json(input) });
     if (error) {
         if (error.message === 'conflict')
             throw new ExperienceFailure(409, 'conflict');
@@ -56,7 +56,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     } else {
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'preparing_source', statusMessage: 'Preparing quiz material' });
         const sources = await assembleQuizSources(client, job.user_id, input);
-        if (sources.courseId !== metadata.courseId || sources.reviewerId !== metadata.reviewerId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        if (sources.courseId !== metadata.courseId || sources.reviewerArtifactId !== metadata.reviewerArtifactId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
         regions = sources.regions; materialIds = sources.materialIds;
         await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:source:ai-first', payload: json({ regions, materialIds }) });
     }
@@ -74,10 +74,10 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     }
     if (questions.length !== input.questionCount) throw new ExperienceFailure(422, 'quiz_generation_failed');
     const owned = await resolveQuizSources(client, job.user_id, input);
-    if (owned.courseId !== metadata.courseId || owned.reviewerId !== metadata.reviewerId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
+    if (owned.courseId !== metadata.courseId || owned.reviewerArtifactId !== metadata.reviewerArtifactId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving quiz' });
-    return { payload: { courseId: metadata.courseId, reviewerId: metadata.reviewerId, materialIds, title: `${questions.length}-question quiz`, questions,
+    return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, materialIds, title: `${questions.length}-question quiz`, questions,
             provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
 }
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
@@ -87,7 +87,7 @@ export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Qui
     const attempts = history.filter(a => a.user_id === row.user_id && a.quiz_id === row.id).sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at) || b.id.localeCompare(a.id));
     const completed = attempts.filter(a => a.status === 'completed' && a.percentage !== null).sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!) || b.id.localeCompare(a.id));
     const ids = row.source_material_ids as string[];
-    return { id: row.id, title: row.title, courseId: row.course_id, reviewerId: row.reviewer_id, sourceId: ids[0] ?? null, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
+    return { id: row.id, title: row.title, courseId: row.course_id, reviewerArtifactId: row.reviewer_artifact_id, sourceId: ids[0] ?? null, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
         attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null, questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {

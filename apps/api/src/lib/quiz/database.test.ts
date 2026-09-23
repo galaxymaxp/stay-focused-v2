@@ -11,10 +11,10 @@ import { candidate,fixturePlan,makeQuizPlan,request,validateCandidate } from './
 import { attemptView,quizView,resultView,type AttemptRow,type QuizRow } from './service';
 import { regionsFromBlocks } from './sources';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
-const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 let db: PGlite, quizId: string, jobId: string;
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
-const payload = { courseId: course, reviewerId: reviewer, title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
+const payload = { courseId: course, reviewerArtifactId: reviewer, title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
 const migration = (name: string) => readFileSync(resolve('../../packages/db/migrations', name), 'utf8');
 async function asRole<T>(role: string, user: string, action: () => Promise<T>) {
     await db.exec(`begin;set local role ${role};select set_config('request.jwt.claim.sub','${user}',true);`);
@@ -42,7 +42,16 @@ beforeAll(async () => {
     grant usage on schema public,auth to authenticated,anon,service_role;
     create table canvas_courses(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
     insert into canvas_courses values('${course}','${A}');
-    create table reviewers(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);insert into reviewers values('${reviewer}','${A}');
+    create table reviewers(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+    create table source_versions(id uuid primary key,user_id uuid not null,character_count integer not null,metadata jsonb not null,unique(id,user_id));
+    create table generated_artifacts(id uuid primary key,user_id uuid not null,artifact_type text not null,safe_title text not null,source_version_id uuid not null,latest_version_id uuid,metadata jsonb not null default '{}',created_at timestamptz not null default now(),updated_at timestamptz not null default now(),deleted_at timestamptz,unique(id,user_id));
+    create table generated_artifact_versions(id uuid primary key,user_id uuid not null,artifact_id uuid not null,artifact_type text not null,source_version_id uuid not null,payload jsonb not null,unique(id,user_id));
+    create table reviewer_source_snapshots(id uuid primary key,user_id uuid not null,course_id uuid not null,was_edited boolean not null,unique(id,user_id));
+    insert into reviewer_source_snapshots values('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','${A}','${course}',false);
+    insert into source_versions values('ffffffff-ffff-4fff-8fff-ffffffffffff','${A}',42,'{"reviewerSourceSnapshotId":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"}');
+    insert into generated_artifacts(id,user_id,artifact_type,safe_title,source_version_id) values('${reviewer}','${A}','reviewer','Safe Reviewer','ffffffff-ffff-4fff-8fff-ffffffffffff');
+    insert into generated_artifact_versions values('99999999-9999-4999-8999-999999999999','${A}','${reviewer}','reviewer','ffffffff-ffff-4fff-8fff-ffffffffffff','{"reviewer":{"id":"persisted-reviewer"}}');
+    update generated_artifacts set latest_version_id='99999999-9999-4999-8999-999999999999' where id='${reviewer}';
     create table canvas_assignments(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,name text,unique(id,user_id,canvas_connection_id,course_id));
     create table processing_policy_config(id text primary key,max_queued_generation_jobs_per_user int,max_daily_generation_jobs int,event_retention_days int,failed_job_retention_days int,completed_job_retention_days int);
     insert into processing_policy_config values('default',100,1000,7,7,7);`);
@@ -50,6 +59,7 @@ beforeAll(async () => {
     await db.exec('create table processing_job_events(id uuid primary key,created_at timestamptz,delivered_at timestamptz,delivery_eligible boolean);create table processing_cleanup_queue(status text,not_before timestamptz);');
     await db.exec(migration('20260912100000_activity_maker.sql'));
     await db.exec(migration('20260912110000_quiz_maker.sql'));
+    await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{

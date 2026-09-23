@@ -5,7 +5,7 @@ export type QuizGenerationState = GenerationState;
 export interface QuizGenerationRequest {
     readonly sourceType: 'material' | 'reviewer';
     readonly sourceIds: readonly string[];
-    readonly reviewerId?: string;
+    readonly reviewerArtifactId?: string;
     readonly questionCount: number;
     readonly difficulty: QuizDifficulty | 'mixed';
     readonly questionTypes?: readonly QuizQuestionType[];
@@ -33,7 +33,7 @@ export interface QuizSummary {
     readonly id: string;
     readonly title: string;
     readonly courseId: string;
-    readonly reviewerId: string | null;
+    readonly reviewerArtifactId: string | null;
     readonly sourceId: string | null;
     readonly sourceMaterialIds: readonly string[];
     readonly questionCount: number;
