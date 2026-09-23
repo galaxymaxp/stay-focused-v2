@@ -1,6 +1,10 @@
 # Roadmap
 
-Current milestone order: B34 Current Mobile UX Repair → B35 On-Device Artifact Persistence → B36 Signed Physical UX + Offline Acceptance → B37 Generation Quality Acceptance → B38 Full E2E / Demo Acceptance → B39 Capstone & Release Hardening.
+Current milestone order: B34 Current Mobile UX Repair → B35 On-Device Artifact Persistence → B36 Signed Physical UX + Offline Acceptance → B37 Generated Artifact Model Convergence → B38 Generation Quality Acceptance → B39 Full E2E / Demo Acceptance → B40 Capstone & Release Hardening.
+
+## B37 generated artifact model convergence (2026-09-23)
+
+**PARTIAL — canonical implementation passes locally; production migration and workflow acceptance remain.** All current source consumers now use owner-scoped `generated_artifacts` identity and persisted current versions. The forward migration preserves historical Quiz rows, adds an owner-safe canonical Quiz FK, and keeps the legacy table for later audited retirement. Saved-Reviewer management/deletion and B35 local removal use canonical IDs. Queue opening no longer accepts billable work. Production was not mutated because the known remote migration-history mismatch remains unresolved and no safe Supabase access path was available. See [B37 acceptance](ai/acceptance/b37/generated-artifact-convergence.md). Next: controlled B37 production rollout/smoke, then B38.
 
 ## B36 signed physical UX + offline acceptance (2026-09-23)
 
@@ -40,21 +44,25 @@ Status: **PARTIAL and closed.** Signed post-B35 builds were produced and accepte
 
 Complete B34's pending physical matrix (Today, Generate, Queue, Library, Reviewer, generation, motion, gesture conflicts, relaunch, accessibility) and accept B35 on device: generation completion stored locally, force-stop/relaunch Library before network, airplane-mode Library and Reviewer/Quiz/Activity opening, reconnect reconciliation, and sign-out/account-switch isolation.
 
-## B37 Generation Quality Acceptance
+## B37 Generated Artifact Model Convergence
 
-Status: Next.
+Status: **PARTIAL.** Implemented and locally verified; production migration, deployment, authenticated smoke, safe deletion, and physical accidental-spend acceptance remain.
 
-Carry the one blocker B36 could not repair within scope: retire the legacy `reviewers` dependency so the Quiz gate, quiz source resolution (`create_quiz_processing_job` and its `p_reviewer_id`), and "Manage saved Reviewers" all resolve against `generated_artifacts`. That unblocks Quiz generation and the supported Reviewer deletion flow, both of which B36 recorded as unreachable. Then evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, larger-context behavior, and malformed or low-information handling using real instructional materials rather than administrative outlines.
+## B38 Generation Quality Acceptance
 
-## B38 Full E2E / Demo Acceptance
+Status: Planned after B37 production acceptance.
 
-Status: Planned after B37.
+Evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, malformed/low-information handling, and larger extracted context across PDF, scanned PDF, DOCX, PPTX, Canvas Page, Reviewer, Quiz, and Activity Output. Investigate `request_exceeds_context_budget` with special attention to large PPTX sources.
+
+## B39 Full E2E / Demo Acceptance
+
+Status: Planned after B38.
 
 Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
 
-## B39 Capstone & Release Hardening
+## B40 Capstone & Release Hardening
 
-Status: Planned after B38.
+Status: Planned after B39.
 
 Close release, evidence, operational, security, and capstone presentation readiness without weakening the accepted product contracts.
 
