@@ -28,6 +28,7 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
     activity_draft_conflict: { title: 'Activity Maker', message: 'The draft or template requirements have changed. Reopen before saving.', retryable: false, action: 'none' },
     sign_in_required: { title: 'Sign in again', message: 'Your session is unavailable. Sign in to continue.', retryable: false, action: 'sign_in' },
     not_found: { title: 'Item unavailable', message: 'This item could not be found.', retryable: false, action: 'none' },
+    course_not_synced: { title: 'Sync this course', message: 'Synchronize this course with Stay Focused before generating from it.', retryable: false, action: 'none' },
     invalid_request: { title: 'Check your request', message: 'Some request details are invalid.', retryable: false, action: 'none' },
     not_ready: { title: 'Material not ready', message: 'Prepare this material or choose another source.', retryable: false, action: 'choose_material' },
     unavailable: { title: 'Temporarily unavailable', message: 'Please try again shortly.', retryable: true, action: 'retry' },

@@ -2,6 +2,7 @@ import type { ExperienceResponse } from '@stay-focused/shared';
 import { verifyBearerToken } from '@/lib/auth';
 import { createCanvasServiceClient } from '@/lib/canvas-db';
 import { listCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
+import { loadCanvasCourseInventory } from '@/lib/canvas-course-selection';
 import { readReviewerSourceStatus } from '@/lib/reviewer-source-status';
 import { ExperienceFailure, normalizeExperienceError } from './errors';
 import { ExperienceService } from './service';
@@ -33,6 +34,7 @@ export function createExperienceService(authenticatedUserId: string) {
   const client = createCanvasServiceClient();
   return new ExperienceService({ repository: trustedExperienceReadRepository(client, authenticatedUserId),
     materials: (_userId, courseId, offset) => listCanvasReviewerSources({ client, userId: authenticatedUserId, courseId, offset, limit: 100 }),
+    courseInventory: () => loadCanvasCourseInventory({ client, userId: authenticatedUserId, allowStoredFallback: true }),
     freshness: async (_userId, reviewerArtifactId) => {
       const status = await readReviewerSourceStatus({ client, userId: authenticatedUserId, reviewerArtifactId });
       return status.ok ? status.value.overallStatus : 'unknown';

@@ -1,5 +1,7 @@
 import type {
   FeatureCapability,
+  GenerateCoursePeriod,
+  GenerateCourseSummary,
   GenerationState,
   LearningMaterial,
   TodayItem,
@@ -65,6 +67,32 @@ export function moduleGroups(items: readonly LearningMaterial[]) {
     group.items.push(item);
   }
   return groups;
+}
+/**
+ * Sync status decides where a course goes; only synced courses may request
+ * materials. Unsynced and incomplete courses go to the existing Sync flow.
+ */
+export function generateCourseDestination(course: Pick<GenerateCourseSummary, "syncState">): "generate" | "sync" {
+  return course.syncState === "synced" ? "generate" : "sync";
+}
+const periodTitles: Record<GenerateCoursePeriod, string> = {
+  current: "Current courses",
+  previous: "Previous courses",
+  other: "Other courses",
+};
+/** Groups the server-ordered list by period without re-sorting within a group. */
+export function generateCourseGroups(items: readonly GenerateCourseSummary[]) {
+  return (["current", "previous", "other"] as const)
+    .map((period) => ({ key: period, title: periodTitles[period], items: items.filter((course) => course.period === period) }))
+    .filter((group) => group.items.length > 0);
+}
+export function generateCourseStatus(course: GenerateCourseSummary): string {
+  if (course.syncState === "not_synced") return "Not synced · Tap to sync";
+  if (course.syncState === "sync_incomplete") return "Sync incomplete · Tap to retry";
+  const synced = course.lastSuccessfulSyncAt
+    ? `Synced ${new Date(course.lastSuccessfulSyncAt).toLocaleDateString([], { month: "short", day: "numeric" })}`
+    : "Synced";
+  return course.termName ? `${synced} · ${course.termName}` : synced;
 }
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;

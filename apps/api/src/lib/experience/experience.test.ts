@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CanvasAssignmentRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
 import type { ProcessingJobStatusView } from '@stay-focused/shared';
 import type { CanvasReviewerSourceDescriptor, CanvasReviewerSourceList } from '@/lib/canvas-reviewer-sources';
-import { composeActivities, composeToday, dayWindow, experienceCapabilities, generationView, learningMaterial, reviewerReader } from './mappers';
+import type { CanvasCourseInventory, CanvasCourseInventoryItem } from '@/lib/canvas-course-selection';
+import { composeActivities, composeToday, dayWindow, experienceCapabilities, generateCourseSyncState, generationView, learningMaterial, orderGenerateCourses, reviewerReader } from './mappers';
 import { ExperienceService, assignmentResources } from './service';
 import type { ExperienceRepository, ExperienceRow, ExperienceTable } from './repository';
 import { ExperienceFailure, normalizeExperienceError } from './errors';
@@ -298,5 +299,61 @@ describe('lifecycle and errors', () => {
     const normalized = normalizeExperienceError(new Error('postgres secret token OCR stack trace'));
     expect(normalized.status).toBe(503); expect(normalized.error.retryable).toBe(true);
     expect(JSON.stringify(normalized)).not.toMatch(/postgres|secret|token|OCR|stack/);
+  });
+});
+
+const synced = { status: 'success', startedAt: null, completedAt: '2026-09-20T00:00:00Z', lastCheckedAt: null, lastSuccessfulSyncAt: '2026-09-20T00:00:00Z', failureCode: null } as const;
+function inventoryItem(id: string, overrides: Partial<CanvasCourseInventoryItem> = {}): CanvasCourseInventoryItem {
+  return { id, displayName: id, courseCode: id, workflowState: 'available', startAt: null, endAt: null, term: null, classification: 'likely_current', selectable: true, unavailableReason: null, selected: true, lastSync: synced, ...overrides };
+}
+function inventory(courses: readonly CanvasCourseInventoryItem[]) {
+  return { ok: true as const, value: { courses, classificationSource: 'canvas' as const, selectedCourseIds: [], counts: { total: 0, likelyCurrent: 0, pastOrConcluded: 0, otherOrUncertain: 0, unavailable: 0 }, connection: {} as CanvasCourseInventory['connection'] } };
+}
+describe('Generate course sync state and ordering', () => {
+  it('routes only selected, completed synchronization as synced', () => {
+    expect(generateCourseSyncState({ selected: true, lastSync: synced })).toBe('synced');
+    expect(generateCourseSyncState({ selected: true, lastSync: { ...synced, status: 'partial' } })).toBe('synced');
+    expect(generateCourseSyncState({ selected: false, lastSync: synced })).toBe('not_synced');
+    expect(generateCourseSyncState({ selected: false, lastSync: null })).toBe('not_synced');
+    expect(generateCourseSyncState({ selected: true, lastSync: null })).toBe('not_synced');
+    expect(generateCourseSyncState({ selected: true, lastSync: { ...synced, status: 'failed', failureCode: 'canvas_unavailable' } })).toBe('sync_incomplete');
+    expect(generateCourseSyncState({ selected: true, lastSync: { ...synced, status: 'running', completedAt: null } })).toBe('sync_incomplete');
+    expect(generateCourseSyncState({ selected: true, lastSync: { ...synced, completedAt: null, lastCheckedAt: null } })).toBe('sync_incomplete');
+  });
+  it('orders current before previous, keeps previous courses, and is independent of input order', () => {
+    const term = (endAt: string) => ({ id: endAt, name: endAt.slice(0, 7), startAt: null, endAt });
+    const courses = [
+      inventoryItem('old-previous', { classification: 'past_or_concluded', term: term('2023-01-01T00:00:00Z') }),
+      inventoryItem('uncertain', { classification: 'other_or_uncertain' }),
+      inventoryItem('current-unsynced', { selected: false, lastSync: null }),
+      inventoryItem('recent-previous', { classification: 'past_or_concluded', term: term('2026-03-01T00:00:00Z') }),
+      inventoryItem('current-synced'),
+      inventoryItem('undated-previous', { classification: 'past_or_concluded' }),
+      inventoryItem('previous-failed', { classification: 'past_or_concluded', lastSync: { ...synced, status: 'failed' } }),
+    ];
+    const expected = ['current-synced', 'current-unsynced', 'recent-previous', 'old-previous', 'undated-previous', 'previous-failed', 'uncertain'];
+    expect(orderGenerateCourses(courses).map(c => c.id)).toEqual(expected);
+    expect(orderGenerateCourses([...courses].reverse()).map(c => c.id)).toEqual(expected);
+    expect(orderGenerateCourses(courses).map(c => [c.period, c.syncState])).toContainEqual(['previous', 'synced']);
+  });
+  it('breaks ties by course code/name then id, and tolerates missing term metadata', () => {
+    const tied = [inventoryItem('b', { displayName: 'Same' }), inventoryItem('a', { displayName: 'Same' }), inventoryItem('c', { displayName: 'Alpha', term: { id: null, name: null, startAt: null, endAt: null } })];
+    expect(orderGenerateCourses(tied).map(c => c.id)).toEqual(['c', 'a', 'b']);
+    expect(orderGenerateCourses(tied)[0]).toMatchObject({ termName: null, lastSuccessfulSyncAt: synced.lastSuccessfulSyncAt });
+  });
+  it('lists Generate courses through the bound course inventory and never reads materials', async () => {
+    const courseInventory = vi.fn(async () => inventory([inventoryItem('previous', { classification: 'past_or_concluded' }), inventoryItem('current', { selected: false, lastSync: null })]));
+    const materials = vi.fn();
+    const api = new ExperienceService({ repository: { rows: async () => [] }, materials, courseInventory });
+    const result = await api.getGenerateCourses('owner');
+    expect(result.items.map(c => [c.id, c.period, c.syncState])).toEqual([['current', 'current', 'not_synced'], ['previous', 'previous', 'synced']]);
+    expect(courseInventory).toHaveBeenCalledWith('owner'); expect(materials).not.toHaveBeenCalled();
+  });
+  it('keeps an assignment detail usable when its course is no longer selected for sync', async () => {
+    const data: TestData = { canvas_courses: [course], canvas_assignments: [assignment] };
+    const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T) { return (data[table] ?? []) as unknown as readonly ExperienceRow<T>[]; } };
+    const api = new ExperienceService({ repository, now: () => now, materials: async () => ({ ok: false, status: 400, code: 'canvas_course_not_selected', message: 'Select this course.' }) });
+    const detail = await api.getActivityDetail('owner', 'canvas:assignment');
+    expect(detail.courseMaterials).toBeNull();
   });
 });

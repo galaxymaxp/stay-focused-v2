@@ -2,6 +2,8 @@ import type {
   CourseLearningWorkspace,
   CourseMaterials,
   CourseSummary,
+  GenerateCourseList,
+  GenerateCourseSummary,
   LearningMaterial,
 } from "@stay-focused/shared";
 import { router } from "expo-router";
@@ -15,11 +17,11 @@ import { spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
 import { createGenerationIntent } from "../../services/generationRecovery";
-import { available, capabilityNote, materialTypes, moduleGroups } from "./presentation";
+import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, materialTypes, moduleGroups } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 
 export function GenerateScreen() {
-  const courses = useExperience<{ items: CourseSummary[] }>("/api/experience/courses");
+  const courses = useExperience<GenerateCourseList>("/api/experience/courses");
   const [courseId, setCourseId] = useState<string | null>(null);
   const selectedCourse = courses.data?.items.find((course) => course.id === courseId) ?? null;
   const workspace = useExperience<CourseLearningWorkspace>(
@@ -35,6 +37,16 @@ export function GenerateScreen() {
   const { colors } = useTheme();
   const client = useExperienceClient();
   const groups = moduleGroups([...(workspace.data?.materials.items ?? []), ...extra]);
+  const courseGroups = generateCourseGroups(courses.data?.items ?? []);
+
+  function openCourse(course: GenerateCourseSummary) {
+    // Unsynced courses never request materials; the Sync flow opens with that course in focus.
+    if (generateCourseDestination(course) === "sync") {
+      router.push({ pathname: "/canvas-settings", params: { courseId: course.id } });
+      return;
+    }
+    setCourseId(course.id);
+  }
 
   useEffect(() => {
     setExtra([]);
@@ -125,7 +137,7 @@ export function GenerateScreen() {
       ]}
     >
       {courseId ? <CourseWorkspaceHeader course={selectedCourse} onBack={closeCourse} /> : (
-        <Copy muted>Choose a synchronized course to browse its instructional materials.</Copy>
+        <Copy muted>Synced courses open their study materials. Courses that are not synced open Canvas sync.</Copy>
       )}
       {!courseId && courses.loading ? <GenerateSkeleton rows={3} /> : null}
       {!courseId && courses.error ? (
@@ -134,16 +146,27 @@ export function GenerateScreen() {
       {!courseId && courses.data?.items.length === 0 ? (
         <Surface>
           <Copy size="h2">Sync Canvas to begin</Copy>
-          <Copy muted>Generate only shows courses already synchronized into Stay Focused.</Copy>
+          <Copy muted>Connect Canvas, then sync a course to generate study tools from its materials.</Copy>
           <Action onPress={() => router.push("/canvas-settings")}>Open Canvas sync</Action>
         </Surface>
       ) : null}
-      {!courseId ? courses.data?.items.map((course) => (
-        <CourseCard key={course.id} course={course} onPress={() => setCourseId(course.id)} />
+      {!courseId ? courseGroups.map((group) => (
+        <View key={group.key} style={{ gap: spacing[3] }}>
+          <Copy size="h3">{group.title}</Copy>
+          {group.items.map((course) => (
+            <CourseCard key={course.id} course={course} onPress={() => openCourse(course)} />
+          ))}
+        </View>
       )) : null}
 
       {courseId && workspace.loading ? <GenerateSkeleton rows={4} /> : null}
-      {courseId && workspace.error ? (
+      {courseId && workspace.error && workspace.errorCode === "course_not_synced" ? (
+        <Surface>
+          <Copy size="h3">This course is not synced</Copy>
+          <Copy muted>Synchronize it with Stay Focused to browse its study materials.</Copy>
+          <Action onPress={() => router.push({ pathname: "/canvas-settings", params: { courseId } })}>Open Canvas sync</Action>
+        </Surface>
+      ) : courseId && workspace.error ? (
         <Surface><Copy size="h3">Materials could not be loaded</Copy><Copy muted>{workspace.error}</Copy><Action secondary onPress={workspace.refresh}>Try again</Action></Surface>
       ) : null}
       {workspace.data ? (
@@ -160,7 +183,7 @@ export function GenerateScreen() {
       {nextOffset !== null ? <Action secondary disabled={busy} onPress={() => void loadMore()}>More materials</Action> : null}
       {workspace.data && groups.length === 0 && nextOffset === null ? (
         <Surface>
-          <Copy size="h3">No study materials yet</Copy>
+          <Copy size="h3">No study materials found</Copy>
           <Copy muted>This synchronized course has no eligible instructional Pages, PDFs, documents, slides, or images.</Copy>
           <Action secondary onPress={() => router.push("/canvas-settings")}>Check Canvas sync</Action>
         </Surface>
@@ -200,24 +223,25 @@ export function GenerateScreen() {
 function CourseWorkspaceHeader({ course, onBack }: { course: CourseSummary | null; onBack: () => void }) {
   return (
     <Surface style={{ overflow: "hidden" }}>
-      <RowLink inset label="Back to synced courses" onPress={onBack}>
+      <RowLink inset label="Back to courses" onPress={onBack}>
         <Copy muted size="caption">{course?.code ?? "Synced course"}</Copy>
         <Copy size="h3">{course?.name ?? "Course materials"}</Copy>
-        <Copy muted size="caption">Back to all synced courses</Copy>
+        <Copy muted size="caption">Back to all courses</Copy>
       </RowLink>
     </Surface>
   );
 }
 
-function CourseCard({ course, onPress }: { course: CourseSummary; onPress: () => void }) {
+function CourseCard({ course, onPress }: { course: GenerateCourseSummary; onPress: () => void }) {
+  const { colors } = useTheme();
+  const status = generateCourseStatus(course);
+  const synced = course.syncState === "synced";
   return (
     <Surface style={{ overflow: "hidden" }}>
-      <RowLink inset label={`Open ${course.name}`} onPress={onPress} icon={<ContentIcon kind="module" />}>
+      <RowLink inset label={`${synced ? "Open" : "Sync"} ${course.name}, ${status}`} onPress={onPress} icon={<ContentIcon kind="module" />}>
         <Copy muted size="caption">{course.code ?? "Canvas course"}</Copy>
         <Copy size="h3">{course.name}</Copy>
-        <Copy muted size="caption">
-          {course.lastActivityAt ? `Synced ${new Date(course.lastActivityAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : "Synchronized with Stay Focused"}
-        </Copy>
+        <Copy muted={synced} color={synced ? undefined : colors.accent} size="caption">{status}</Copy>
       </RowLink>
     </Surface>
   );

@@ -3,6 +3,7 @@ import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  inventory: vi.fn(),
   materials: vi.fn(),
   rows: vi.fn(),
   serviceClient: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/auth', () => ({ verifyBearerToken: mocks.auth }));
 vi.mock('@/lib/canvas-db', () => ({ createCanvasServiceClient: mocks.serviceClient }));
 vi.mock('@/lib/canvas-reviewer-sources', () => ({ listCanvasReviewerSources: mocks.materials }));
+vi.mock('@/lib/canvas-course-selection', () => ({ loadCanvasCourseInventory: mocks.inventory }));
 vi.mock('@/lib/reviewer-source-status', () => ({ readReviewerSourceStatus: mocks.sourceStatus }));
 vi.mock('@/lib/experience/repository', async importOriginal => {
   const original = await importOriginal<typeof import('./repository')>();
@@ -72,12 +74,36 @@ describe('authenticated student routes', () => {
     expect(mocks.rows.mock.calls.every(call => call[1] === 'owner')).toBe(true);
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
-  it('returns only the authenticated owner courses', async () => {
-    mocks.rows.mockImplementation(async (table, owner) => table === 'canvas_courses' ? [{ id: 'course-a', user_id: owner, course_code: 'A', name: 'Owner course', workflow_state: 'available', last_synced_at: null }] : []);
+  it('returns only the authenticated owner courses with sync state from the course inventory', async () => {
+    mocks.inventory.mockResolvedValue({ ok: true, value: { classificationSource: 'canvas', selectedCourseIds: ['course-a'], counts: {}, connection: {}, courses: [
+      { id: 'course-a', displayName: 'Owner course', courseCode: 'A', workflowState: 'available', startAt: null, endAt: null, term: { id: 't', name: '2026-27-1T', startAt: null, endAt: null }, classification: 'likely_current', selectable: true, unavailableReason: null, selected: true,
+        lastSync: { status: 'success', startedAt: null, completedAt: '2026-09-20T00:00:00Z', lastCheckedAt: null, lastSuccessfulSyncAt: '2026-09-20T00:00:00Z', failureCode: null } },
+    ] } });
     const response = await GET(request('courses?user_id=other'), context('courses'));
     expect(response.status).toBe(200);
-    expect((await response.json()).data.items).toEqual([{ id: 'course-a', code: 'A', name: 'Owner course', status: 'available', materialCount: null, reviewerCount: null, lastActivityAt: null }]);
-    expect(mocks.rows).toHaveBeenCalledWith('canvas_courses', 'owner');
+    expect((await response.json()).data).toEqual({ classificationSource: 'canvas', items: [{ id: 'course-a', code: 'A', name: 'Owner course', status: 'available', materialCount: null, reviewerCount: null,
+      lastActivityAt: '2026-09-20T00:00:00Z', syncState: 'synced', period: 'current', termName: '2026-27-1T', lastSuccessfulSyncAt: '2026-09-20T00:00:00Z' }] });
+    expect(mocks.inventory).toHaveBeenCalledWith({ client: { kind: 'trusted-service-read-client' }, userId: 'owner', allowStoredFallback: true });
+  });
+  it('returns an empty course list without a Canvas connection and a retryable error on storage failure', async () => {
+    mocks.inventory.mockResolvedValueOnce({ ok: false, status: 404, code: 'canvas_connection_missing', message: 'Connect Canvas.' });
+    const empty = await GET(request('courses'), context('courses'));
+    expect(empty.status).toBe(200); expect((await empty.json()).data.items).toEqual([]);
+    mocks.inventory.mockResolvedValueOnce({ ok: false, status: 500, code: 'canvas_storage_failed', message: 'private detail' });
+    const failed = await GET(request('courses'), context('courses'));
+    expect(failed.status).toBe(503);
+    const body = await failed.json();
+    expect(body.error).toMatchObject({ code: 'unavailable', retryable: true }); expect(JSON.stringify(body)).not.toContain('private detail');
+  });
+  it('reports an unselected course as not synced instead of a server outage', async () => {
+    mocks.rows.mockImplementation(async (table, owner) => table === 'canvas_courses' ? [{ id, user_id: owner, course_code: 'A', name: 'Owner course', workflow_state: 'available', last_synced_at: null }] : []);
+    mocks.materials.mockResolvedValue({ ok: false, status: 400, code: 'canvas_course_not_selected', message: 'Select this Canvas course.' });
+    const response = await GET(request(`courses/${id}`), context(`courses/${id}`));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatchObject({ code: 'course_not_synced', retryable: false });
+    mocks.materials.mockResolvedValue({ ok: false, status: 500, code: 'canvas_storage_failed', message: 'private detail' });
+    const failed = await GET(request(`courses/${id}`), context(`courses/${id}`));
+    expect(failed.status).toBe(503); expect((await failed.json()).error.code).toBe('unavailable');
   });
   it('keeps Canvas material and Library reads scoped to the verified owner', async () => {
     mocks.rows.mockImplementation(async (table, owner) => table === 'canvas_courses' ? [{ id, user_id: owner, course_code: 'A', name: 'Owner course', workflow_state: 'available', last_synced_at: null }] : []);

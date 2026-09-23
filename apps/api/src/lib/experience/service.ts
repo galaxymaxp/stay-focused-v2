@@ -1,12 +1,13 @@
 import type { Quiz } from '@stay-focused/shared';
 import { quizView } from '../quiz/service';
-import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
+import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerateCourseList, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
+import type { CanvasCourseInventory, CanvasCourseSelectionResult } from '@/lib/canvas-course-selection';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
 import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
-import { composeActivities, composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, record, reviewerReader, text } from './mappers';
+import { composeActivities, composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
 import { activityGenerationState, draftView } from '../activity-maker/service';
 import type { ActivityDraft } from '@stay-focused/shared';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
@@ -14,6 +15,8 @@ import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 export interface ExperienceDependencies {
   readonly repository: ExperienceRepository;
   readonly materials: (userId: string, courseId: string, offset: number) => Promise<CanvasReviewerSourceResult<CanvasReviewerSourceList>>;
+  /** Sync page source of truth: selection, latest sync attempt, and Canvas term/enrollment classification. */
+  readonly courseInventory?: (userId: string) => Promise<CanvasCourseSelectionResult<CanvasCourseInventory>>;
   readonly freshness?: (userId: string, reviewerArtifactId: string) => Promise<ReviewerReaderModel['freshness']>;
   readonly now?: () => number;
 }
@@ -28,6 +31,17 @@ export class ExperienceService {
   async getCourses(userId: string): Promise<readonly CourseSummary[]> {
     return (await this.rows('canvas_courses', userId)).map(courseSummary).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   }
+  async getGenerateCourses(userId: string): Promise<GenerateCourseList> {
+    if (!this.dependencies.courseInventory) throw new ExperienceFailure(503, 'unavailable');
+    const inventory = await this.dependencies.courseInventory(userId);
+    if (!inventory.ok) {
+      // No Canvas connection means nothing is synchronized yet: an empty list, not an outage.
+      if (inventory.code === 'canvas_connection_missing') return { items: [], classificationSource: 'stored' };
+      console.error('experience.generate_courses.failed', { code: inventory.code, status: inventory.status });
+      throw new ExperienceFailure(503, 'unavailable');
+    }
+    return { items: orderGenerateCourses(inventory.value.courses), classificationSource: inventory.value.classificationSource };
+  }
   async getCourseMaterials(userId: string, courseId: string, offset = 0): Promise<CourseMaterials> {
     requireFound((await this.rows('canvas_courses', userId)).find(c => c.id === courseId));
     const [result, artifacts, versions, sourceVersions, snapshots, snapshotItems] = await Promise.all([
@@ -38,7 +52,13 @@ export class ExperienceService {
       this.rows('reviewer_source_snapshots', userId),
       this.rows('reviewer_source_snapshot_items', userId),
     ]);
-    if (!result.ok) throw new ExperienceFailure(result.status === 404 ? 404 : 503, result.status === 404 ? 'not_found' : 'unavailable');
+    if (!result.ok) {
+      // Unselected or disconnected courses are a sync state, not a server outage.
+      if (result.code === 'canvas_course_not_selected' || result.code === 'canvas_connection_missing') throw new ExperienceFailure(409, 'course_not_synced');
+      if (result.status === 404) throw new ExperienceFailure(404, 'not_found');
+      console.error('experience.course_materials.failed', { code: result.code, status: result.status });
+      throw new ExperienceFailure(503, 'unavailable');
+    }
     const courseSnapshots = new Set(snapshots.filter(snapshot => snapshot.course_id === courseId).map(snapshot => snapshot.id));
     const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
     const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
@@ -90,7 +110,7 @@ export class ExperienceService {
       // A deselected course can still have an assignment; that activity remains
       // usable while materials are unavailable under the existing source gate.
       try { courseMaterials = await this.getCourseMaterials(userId, activity.course.id); }
-      catch (error) { if (!(error instanceof ExperienceFailure && error.status === 404)) throw error; }
+      catch (error) { if (!(error instanceof ExperienceFailure && (error.status === 404 || error.code === 'course_not_synced'))) throw error; }
     }
     const drafts = (await this.activityDraftRecords(userId)).filter(r => r.summary.activityId === activityId);
     return { ...activity, hasGeneratedDraft: drafts.length > 0, latestDraftId: drafts[0]?.draft.id ?? null, instructions: assignment ? normalizeCanvasHtmlToText(assignment.description_html) || null : task?.notes ?? null,

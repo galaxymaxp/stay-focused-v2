@@ -45,6 +45,8 @@ import {
 } from "../../services/canvasSyncJobCoordinator";
 
 interface CoursesScreenProps {
+  /** Course opened from Generate because it is not synced yet. */
+  readonly focusCourseId?: string | null;
   readonly onCreateReviewer: () => void;
   readonly onCreateReviewerFromCanvas: (
     courseId: string,
@@ -77,6 +79,7 @@ interface CourseSyncDisplayState {
 }
 
 export function CoursesScreen({
+  focusCourseId = null,
   onCreateReviewer,
   onCreateReviewerFromCanvas,
   onOpenGrades,
@@ -111,6 +114,26 @@ export function CoursesScreen({
   const [isSyncingSelected, setIsSyncingSelected] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const appliedFocusRef = useRef<string | null>(null);
+
+  // Generate sends unsynced courses here. Add that course to the unsaved
+  // selection once, so Save then Sync completes the flow for it.
+  useEffect(() => {
+    if (!focusCourseId || appliedFocusRef.current === focusCourseId) return;
+    const course = courses.find((item) => item.id === focusCourseId);
+    if (!course) return;
+    appliedFocusRef.current = focusCourseId;
+    if (!savedSelectedCourseIds.includes(course.id)) {
+      if (!course.selectable) {
+        setSuccessMessage(`${course.displayName} cannot be synced: ${course.unavailableReason ?? "Canvas marks it unavailable."}`);
+        return;
+      }
+      setSelectedCourseIds((current) => current.includes(course.id) ? current : [...current, course.id]);
+      setSuccessMessage(`${course.displayName} was added to Selected courses. Save, then Sync selected to use it in Generate.`);
+    } else {
+      setSuccessMessage(`Sync ${course.displayName} again to use it in Generate.`);
+    }
+  }, [courses, focusCourseId, savedSelectedCourseIds]);
 
   const reconcileContentJobs = useCallback(async () => {
     const context = createRequestContext(session?.accessToken);

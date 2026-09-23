@@ -178,6 +178,19 @@ describe("Canvas reviewer source service", () => {
     expect(provider.calls).toHaveLength(0);
   });
 
+  it("refuses unselected and foreign courses before reading any course source", async () => {
+    const unselected = createFakeCanvasClient({ canvas_course_sync_preferences: [{ ...basePreferenceRow(), selected: false }] });
+    const denied = await listCanvasReviewerSources({ client: unselected.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(denied).toMatchObject({ ok: false, status: 400, code: "canvas_course_not_selected" });
+    expect(unselected.calls.some((call) => ["canvas_pages", "canvas_files", "canvas_assignments", "canvas_announcements"].includes(call.table))).toBe(false);
+
+    const foreign = createFakeCanvasClient();
+    const other = await listCanvasReviewerSources({ client: foreign.client, courseId: COURSE_ID, userId: "99999999-9999-4999-8999-999999999999" });
+    expect(other.ok).toBe(false);
+    expect(other.ok ? null : other.status).toBe(404);
+    expect(foreign.calls.some((call) => call.table === "canvas_pages")).toBe(false);
+  });
+
   it("routes learning materials to Generate while excluding coursework and administrative content", async () => {
     const administrativePage = {
       ...basePageRow(),

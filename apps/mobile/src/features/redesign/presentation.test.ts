@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { LearningMaterial, TodayItem } from "@stay-focused/shared";
+import type { GenerateCourseSummary, LearningMaterial, TodayItem } from "@stay-focused/shared";
 import {
   available,
   clockMinutes,
+  generateCourseDestination,
+  generateCourseGroups,
+  generateCourseStatus,
   generationMessages,
   moduleGroups,
   planningRequest,
@@ -136,4 +139,30 @@ describe("appearance and ambient lifecycle", () => {
   );
   it("animates only a visible active screen without reduced motion", () =>
     expect(shouldAnimate(false, true, true)).toBe(true));
+});
+
+function generateCourse(id: string, overrides: Partial<GenerateCourseSummary> = {}): GenerateCourseSummary {
+  return { id, code: id, name: id, status: "available", materialCount: null, reviewerCount: null, lastActivityAt: null, syncState: "synced", period: "current", termName: null, lastSuccessfulSyncAt: null, ...overrides };
+}
+describe("Generate course list", () => {
+  it("opens Generate only for synced courses and Sync for every other state", () => {
+    expect(generateCourseDestination({ syncState: "synced" })).toBe("generate");
+    expect(generateCourseDestination({ syncState: "not_synced" })).toBe("sync");
+    expect(generateCourseDestination({ syncState: "sync_incomplete" })).toBe("sync");
+  });
+  it("groups current before previous before other while preserving server order", () => {
+    const groups = generateCourseGroups([
+      generateCourse("current-b"), generateCourse("previous", { period: "previous" }), generateCourse("current-a", { syncState: "not_synced" }), generateCourse("other", { period: "other" }),
+    ]);
+    expect(groups.map((group) => [group.title, group.items.map((course) => course.id)])).toEqual([
+      ["Current courses", ["current-b", "current-a"]], ["Previous courses", ["previous"]], ["Other courses", ["other"]],
+    ]);
+    expect(generateCourseGroups([generateCourse("only-previous", { period: "previous" })]).map((group) => group.key)).toEqual(["previous"]);
+  });
+  it("labels every sync state without implying an unsynced course is ready", () => {
+    expect(generateCourseStatus(generateCourse("a", { syncState: "not_synced", lastActivityAt: "2026-08-29T00:00:00Z" }))).toBe("Not synced · Tap to sync");
+    expect(generateCourseStatus(generateCourse("a", { syncState: "sync_incomplete" }))).toBe("Sync incomplete · Tap to retry");
+    expect(generateCourseStatus(generateCourse("a", { termName: "2026-27-1T" }))).toBe("Synced · 2026-27-1T");
+    expect(generateCourseStatus(generateCourse("a", { lastSuccessfulSyncAt: "2026-09-20T12:00:00Z" }))).toMatch(/^Synced .+/);
+  });
 });

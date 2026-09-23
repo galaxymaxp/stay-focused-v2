@@ -25,6 +25,26 @@ export interface CourseSummary extends CourseReference {
   readonly reviewerCount: number | null;
   readonly lastActivityAt: string | null;
 }
+/**
+ * Synced: selected for sync and the latest attempt completed (fully or partially).
+ * Not synced: never selected or never synchronized. Incomplete: the latest attempt
+ * failed or is still running. Only synced courses may open Generate materials.
+ */
+export type GenerateCourseSyncState = 'synced' | 'not_synced' | 'sync_incomplete';
+/** Derived from Canvas enrollment, term, and course dates; never from titles. */
+export type GenerateCoursePeriod = 'current' | 'previous' | 'other';
+export interface GenerateCourseSummary extends CourseSummary {
+  readonly syncState: GenerateCourseSyncState;
+  readonly period: GenerateCoursePeriod;
+  readonly termName: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+}
+export interface GenerateCourseList {
+  /** Ordered: current, previous, then other; synced first; most recent term first. */
+  readonly items: readonly GenerateCourseSummary[];
+  /** 'stored' means Canvas was unreachable and periods come from saved course dates only. */
+  readonly classificationSource: 'canvas' | 'stored';
+}
 export interface LearningMaterial {
   readonly id: string;
   readonly courseId: string;
@@ -185,7 +205,7 @@ export interface GenerationView {
   readonly error: ExperienceError | null;
 }
 export interface ExperienceError {
-  readonly code: 'sign_in_required' | 'not_found' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable';
+  readonly code: 'sign_in_required' | 'not_found' | 'course_not_synced' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable';
   readonly title: string;
   readonly message: string;
   readonly retryable: boolean;

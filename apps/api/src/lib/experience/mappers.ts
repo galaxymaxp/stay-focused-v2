@@ -1,6 +1,7 @@
 import type { CanvasAssignmentRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
-import type { ActivitySummary, CourseSummary, ExperienceCapabilities, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
+import type { ActivitySummary, CourseSummary, ExperienceCapabilities, GenerateCoursePeriod, GenerateCourseSummary, GenerateCourseSyncState, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceDescriptor } from '@/lib/canvas-reviewer-sources';
+import type { CanvasCourseClassification, CanvasCourseInventoryItem } from '@/lib/canvas-course-selection';
 import { ExperienceFailure, normalizeExperienceError } from './errors';
 
 const available: FeatureCapability = { status: 'available' };
@@ -13,6 +14,34 @@ export function generationCapability(ready: boolean, unsupported = false, quizRe
 }
 export function courseSummary(row: CanvasCourseRow): CourseSummary {
   return { id: row.id, code: row.course_code, name: row.name, status: row.workflow_state, materialCount: null, reviewerCount: null, lastActivityAt: row.last_synced_at };
+}
+/**
+ * Mirrors the gate in listCanvasReviewerSources: materials require a selected
+ * course. A never-completed, failed, or running latest attempt is not synced.
+ */
+export function generateCourseSyncState(item: Pick<CanvasCourseInventoryItem, 'selected' | 'lastSync'>): GenerateCourseSyncState {
+  if (!item.selected || !item.lastSync) return 'not_synced';
+  if (item.lastSync.status === 'running' || item.lastSync.status === 'failed') return 'sync_incomplete';
+  return item.lastSync.completedAt ?? item.lastSync.lastCheckedAt ? 'synced' : 'sync_incomplete';
+}
+const periods: Record<CanvasCourseClassification, GenerateCoursePeriod> = { likely_current: 'current', past_or_concluded: 'previous', other_or_uncertain: 'other', unavailable: 'other' };
+export function generateCourseSummary(item: CanvasCourseInventoryItem): GenerateCourseSummary {
+  const lastSuccessfulSyncAt = item.lastSync?.lastSuccessfulSyncAt ?? (item.lastSync?.status === 'success' || item.lastSync?.status === 'partial' ? item.lastSync.completedAt : null);
+  return { id: item.id, code: item.courseCode, name: item.displayName, status: item.workflowState, materialCount: null, reviewerCount: null,
+    lastActivityAt: lastSuccessfulSyncAt, syncState: generateCourseSyncState(item), period: periods[item.classification], termName: item.term?.name?.trim() || null, lastSuccessfulSyncAt };
+}
+const periodRank: Record<GenerateCoursePeriod, number> = { current: 0, previous: 1, other: 2 };
+const syncRank: Record<GenerateCourseSyncState, number> = { synced: 0, sync_incomplete: 1, not_synced: 2 };
+function recency(value: string | null | undefined) { const parsed = value ? Date.parse(value) : NaN; return Number.isFinite(parsed) ? parsed : -Infinity; }
+/**
+ * Current before previous before other; Generate-ready first; newest term/course
+ * dates first (undated last); then code/name and id so order never depends on input.
+ */
+export function orderGenerateCourses(items: readonly CanvasCourseInventoryItem[]): GenerateCourseSummary[] {
+  return items.map(item => ({ course: generateCourseSummary(item), at: recency(item.term?.endAt ?? item.endAt ?? item.term?.startAt ?? item.startAt) }))
+    .sort((a, b) => periodRank[a.course.period] - periodRank[b.course.period] || syncRank[a.course.syncState] - syncRank[b.course.syncState] ||
+      (a.at === b.at ? 0 : b.at > a.at ? 1 : -1) || a.course.name.localeCompare(b.course.name) || a.course.id.localeCompare(b.course.id))
+    .map(entry => entry.course);
 }
 export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string, reviewerArtifactId: string | null = null): LearningMaterial {
   // Legacy availability means usable right now, so it is also unavailable for

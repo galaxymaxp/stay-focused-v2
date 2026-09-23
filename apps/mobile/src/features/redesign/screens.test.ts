@@ -3,6 +3,8 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CourseLearningWorkspace,
+  CourseSummary,
+  GenerateCourseSummary,
   LibraryArtifactSummary,
   LibraryOverview,
   TodayOverview,
@@ -17,6 +19,8 @@ import { AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 
 const mocks = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
+  errors: {} as Record<string, { message: string; code: string }>,
+  paths: [] as string[],
   library: {
     items: [] as LibraryArtifactSummary[],
     categories: null as LibraryOverview["categories"] | null,
@@ -113,12 +117,17 @@ vi.mock("./useExperience", () => ({
     baseUrl: "https://api.example",
     accessToken: "token",
   }),
-  useExperience: (path: string | null) => ({
-    data: path ? (mocks.data[path] ?? null) : null,
-    loading: false,
-    error: null,
-    refresh: vi.fn(),
-  }),
+  useExperience: (path: string | null) => {
+    if (path) mocks.paths.push(path);
+    const failure = path ? mocks.errors[path] : undefined;
+    return {
+      data: path && !failure ? (mocks.data[path] ?? null) : null,
+      loading: false,
+      error: failure?.message ?? null,
+      errorCode: failure?.code ?? null,
+      refresh: vi.fn(),
+    };
+  },
 }));
 vi.mock("./useLocalLibrary", () => ({
   useLocalLibrary: () => ({ ...mocks.library, refresh: vi.fn() }),
@@ -134,6 +143,8 @@ vi.mock("../../services/generationRecovery", () => ({
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   mocks.data = {};
+  mocks.errors = {};
+  mocks.paths = [];
   mocks.library = { items: [], categories: null, localReady: true, refreshing: false, error: null };
   vi.clearAllMocks();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -165,6 +176,9 @@ const savedQuiz: LibraryArtifactSummary = {
   status: "completed",
   relatedArtifactIds: [],
 };
+function generateCourse(course: Partial<GenerateCourseSummary> & Pick<CourseSummary, "id">): GenerateCourseSummary {
+  return { name: course.id, code: null, status: null, materialCount: null, reviewerCount: null, lastActivityAt: null, syncState: "synced", period: "current", termName: null, lastSuccessfulSyncAt: null, ...course };
+}
 function libraryCards(root: ReactTestRenderer["root"]) {
   return root.findAll((node) => String(node.type) === "RowLink").map((node) => node.props.label as string);
 }
@@ -277,14 +291,58 @@ describe("B25 screen interactions", () => {
     });
     expect(onCommit).toHaveBeenLastCalledWith(360, 1080);
   });
+  it("groups current before previous courses and routes only synced courses to materials", async () => {
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
+      generateCourse({ id: "current", name: "Current synced" }),
+      generateCourse({ id: "unsynced", name: "Current unsynced", syncState: "not_synced" }),
+      generateCourse({ id: "retry", name: "Previous failed", period: "previous", syncState: "sync_incomplete" }),
+      generateCourse({ id: "course", name: "Previous synced", period: "previous" }),
+    ] };
+    const root = await render(createElement(GenerateScreen));
+    const text = root.findAll((node) => String(node.type) === "Copy").map((node) => String(node.props.children));
+    expect(text.indexOf("Current courses")).toBeLessThan(text.indexOf("Previous courses"));
+    const rows = root.findAll((node) => String(node.type) === "RowLink");
+    expect(rows.map((node) => node.props.label)).toEqual([
+      "Open Current synced, Synced", "Sync Current unsynced, Not synced · Tap to sync", "Sync Previous failed, Sync incomplete · Tap to retry", "Open Previous synced, Synced",
+    ]);
+    for (const [index, id] of [[1, "unsynced"], [2, "retry"]] as const) {
+      await act(async () => rows[index]!.props.onPress());
+      expect(mocks.push).toHaveBeenLastCalledWith({ pathname: "/canvas-settings", params: { courseId: id } });
+    }
+    expect(mocks.paths.some((path) => path.startsWith("/api/experience/courses/"))).toBe(false);
+    await act(async () => rows[3]!.props.onPress());
+    expect(mocks.paths).toContain("/api/experience/courses/course");
+  });
+  it("distinguishes a synced empty course, a sync-state denial, and a real loading failure", async () => {
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [generateCourse({ id: "course" })] };
+    mocks.data["/api/experience/courses/course"] = { ...workspace, materials: { items: [], nextOffset: null, totalKnown: 0 } };
+    const copy = (root: ReactTestRenderer["root"]) => root.findAll((node) => String(node.type) === "Copy").map((node) => String(node.props.children));
+    const open = async (root: ReactTestRenderer["root"]) => act(async () => root.findAll((node) => String(node.type) === "RowLink")[0]!.props.onPress());
+    let root = await render(createElement(GenerateScreen));
+    await open(root);
+    expect(copy(root)).toContain("No study materials found");
+    expect(copy(root)).not.toContain("Materials could not be loaded");
+
+    mocks.errors["/api/experience/courses/course"] = { code: "course_not_synced", message: "This course is not synced with Stay Focused yet." };
+    await act(async () => rendered!.unmount()); root = await render(createElement(GenerateScreen));
+    await open(root);
+    expect(copy(root)).toContain("This course is not synced");
+    expect(copy(root)).not.toContain("Materials could not be loaded");
+
+    mocks.errors["/api/experience/courses/course"] = { code: "unavailable", message: "The server could not load this content." };
+    await act(async () => rendered!.unmount()); root = await render(createElement(GenerateScreen));
+    await open(root);
+    expect(copy(root)).toContain("Materials could not be loaded");
+    expect(root.findAll((node) => String(node.type) === "Action").some((node) => node.props.children === "Try again")).toBe(true);
+  });
   it("selects real material, disables unavailable Quiz and persists Reviewer intent before navigation", async () => {
-    mocks.data["/api/experience/courses"] = { items: [workspace.course] };
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [generateCourse(workspace.course)] };
     mocks.data["/api/experience/courses/course"] = workspace;
     mocks.createIntent.mockResolvedValue({ key: "saved-key" });
     const root = await render(createElement(GenerateScreen));
     const course = root
       .findAll((node) => String(node.type) === "RowLink")
-      .find((node) => node.props.label === "Open Course")!;
+      .find((node) => node.props.label.startsWith("Open Course"))!;
     await act(async () => course.props.onPress());
     const row = root
       .findAll((node) => String(node.type) === "Pressable")
@@ -322,11 +380,11 @@ describe("B25 screen interactions", () => {
       },
       capabilities: { ...workspace.capabilities, quizGeneration: supported },
     };
-    mocks.data["/api/experience/courses"] = { items: [workspace.course] };
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [generateCourse(workspace.course)] };
     mocks.data["/api/experience/courses/course"] = reviewerWorkspace;
     mocks.createIntent.mockResolvedValue({ key: "quiz-key" });
     const root = await render(createElement(GenerateScreen));
-    await act(async () => root.findAll((node) => String(node.type) === "RowLink").find((node) => node.props.label === "Open Course")!.props.onPress());
+    await act(async () => root.findAll((node) => String(node.type) === "RowLink").find((node) => node.props.label.startsWith("Open Course"))!.props.onPress());
     await act(async () => root.findAll((node) => String(node.type) === "Pressable").find((node) => node.props.accessibilityState?.selected === false)!.props.onPress());
     const quiz = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Generate Quiz")!;
     expect(quiz.props.disabled).toBe(false);

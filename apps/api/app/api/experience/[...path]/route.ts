@@ -27,7 +27,7 @@ export async function GET(request: Request, context: Context): Promise<Response>
       }));
     }
     if (surface === 'courses') {
-      if (path.length === 1) return experienceJson({ items: await service.getCourses(userId) });
+      if (path.length === 1) return experienceJson(await service.getGenerateCourses(userId));
       requireId(id!);
       if (path.length === 2) return experienceJson(await service.getCourseLearningWorkspace(userId, id!));
       if (path.length === 3 && action === 'materials') return experienceJson(await service.getCourseMaterials(userId, id!, readInteger(query.get('offset'), 0, 0, 1000)));

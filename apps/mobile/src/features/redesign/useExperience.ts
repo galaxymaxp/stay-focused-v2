@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { useTheme } from "../../design/theme";
-import { experienceRequest } from "../../services/experienceApi";
+import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
 
 export function useExperienceClient() {
   const { session } = useAuth();
@@ -30,11 +30,13 @@ export function useExperience<T>(
   const [state, setState] = useState<{
     data: T | null;
     error: string | null;
+    /** Stable server code so screens can tell a sync state from an outage. */
+    errorCode: string | null;
     loading: boolean;
-  }>({ data: null, error: null, loading: true });
+  }>({ data: null, error: null, errorCode: null, loading: true });
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
   useEffect(() => {
-    setState({ data: null, error: null, loading: !!path });
+    setState({ data: null, error: null, errorCode: null, loading: !!path });
   }, [path, client]);
   useEffect(() => {
     if (!path || !focused || !active) return;
@@ -46,7 +48,7 @@ export function useExperience<T>(
         const data = await experienceRequest<T>(client, path!, {
           signal: controller.signal,
         });
-        if (live) setState({ data, error: null, loading: false });
+        if (live) setState({ data, error: null, errorCode: null, loading: false });
         if (pollCondition.current && !pollCondition.current(data)) return;
       } catch (error) {
         if (live)
@@ -54,6 +56,7 @@ export function useExperience<T>(
             ...old,
             loading: false,
             error: error instanceof Error ? error.message : "Please try again.",
+            errorCode: error instanceof ExperienceApiError ? error.code : null,
           }));
       }
       if (live && pollMs) timer = setTimeout(() => void load(), pollMs);
