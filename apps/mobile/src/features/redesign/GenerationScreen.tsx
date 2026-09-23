@@ -30,7 +30,9 @@ export function GenerationScreen() {
   const [id, setId] = useState(params.id ?? null),
     [intent, setIntent] = useState<GenerationIntent | null>(null),
     [error, setError] = useState<string | null>(null),
-    [attempt, setAttempt] = useState(0);
+    [attempt, setAttempt] = useState(0),
+    [confirming, setConfirming] = useState(false);
+  const confirmationInFlight = useRef(false);
   useEffect(() => {
     if (!params.intent || !session) return;
     let live = true;
@@ -43,11 +45,9 @@ export function GenerationScreen() {
         throw new Error(
           "This request is no longer saved on this device. Check Queue.",
         );
-      if (live) setIntent(saved);
-      const accepted = await acceptGeneration(session.user.id, client, saved);
       if (live) {
-        setId(accepted.generationId!);
-        setIntent(accepted);
+        setIntent(saved);
+        if (saved.generationId) setId(saved.generationId);
       }
     })().catch((cause) => {
       if (live)
@@ -57,11 +57,26 @@ export function GenerationScreen() {
             : "Could not reconnect this request.",
         );
     });
-    // Deliberately do not abort admission on Back. A retry reuses the saved key.
     return () => {
       live = false;
     };
   }, [params.intent, session, client, attempt]);
+  async function confirmGeneration() {
+    if (!session || !intent || id || confirmationInFlight.current) return;
+    confirmationInFlight.current = true;
+    setConfirming(true);
+    setError(null);
+    try {
+      const accepted = await acceptGeneration(session.user.id, client, intent);
+      setId(accepted.generationId!);
+      setIntent(accepted);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not confirm this request.");
+    } finally {
+      confirmationInFlight.current = false;
+      setConfirming(false);
+    }
+  }
   const generation = useExperience<GenerationView>(
     id ? `/api/experience/generations/${encodeURIComponent(id)}` : null,
     3000,
@@ -107,21 +122,24 @@ export function GenerationScreen() {
           accessibilityLiveRegion="polite"
           style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
-          <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : "Preparing your request…"} />
+          <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent ? "Ready for confirmation" : "Preparing your request…"} />
           <GenerationVisual running={running && !!id} completed={data?.state === "completed"} />
           <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
               ? running
                 ? "You can leave this screen. We’ll keep working."
                 : "View your saved work or return to Queue."
-              : "You can leave this screen. Keep the app open until your request is accepted; Queue can reconnect it."}
+              : "Review this request, then confirm when you are ready. No generation starts until you confirm."}
           </Copy>
+          {intent && !id && (
+            <View style={{ width: 240 }}><Action disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Confirming…" : "Confirm generation"}</Action></View>
+          )}
           <View style={{ width: 240 }}><Action secondary pill onPress={() => router.push("/generation-queue")}>View Queue</Action></View>
         </View>
         {(error || generation.error) && (
           <Notice>{error ?? generation.error}</Notice>
         )}
-        {error && !id && (
+        {error && !id && !intent && (
           <Action secondary onPress={() => setAttempt((value) => value + 1)}>
             Reconnect request
           </Action>
