@@ -1,5 +1,9 @@
 # Roadmap
 
+## B38.1 production generation quality acceptance (2026-09-24)
+
+**PASS.** Fresh production PDF Reviewer, same-source Quiz, PPTX Reviewer, and assignment-grounded Activity Output passed source fidelity, coverage, correctness, readability, physical-device presentation, Queue/background, Library, and relaunch acceptance. A real PPTX contract-budget failure was traced to the response schema's per-source-ID enum, repaired without weakening local exact-reference validation, deployed as `dpl_EBwoR9gdNTvWBTMdezJD1ydqDXdk`, and successfully retested. See [B38.1 acceptance](ai/acceptance/b38-1/production-generation-quality-acceptance.md). Next: B39 Full E2E / Demo Acceptance.
+
 ## B38.0 Generate course state and material loading repair (2026-09-24)
 
 **PASS.** This was a blocking repair before B38 quality testing. Generate now uses the Sync page's course inventory, so tapping a course follows its sync status: unsynced or incomplete courses go to Canvas sync, synced courses open Generate. What a synced course shows follows material eligibility: its materials or "No study materials found". Current courses come before previous ones. The HIST 100 "Materials could not be loaded" defect was an unselected course reported as a server outage. Deployed without a migration and accepted on Android. See [B38.0 acceptance](ai/acceptance/b38-0/generate-course-state-and-material-repair.md). Next: B38 Production Generation Quality Acceptance.
@@ -58,13 +62,13 @@ Status: **PARTIAL.** Implemented and locally verified; production migration, dep
 
 ## B38 Generation Quality Acceptance
 
-Status: Planned after B37 production acceptance.
+Status: **PASS and closed by B38.1.**
 
-Evaluate Reviewer, Quiz, and Activity/task grounding, source fidelity, formatting, malformed/low-information handling, and larger extracted context across PDF, scanned PDF, DOCX, PPTX, Canvas Page, Reviewer, Quiz, and Activity Output. Investigate `request_exceeds_context_budget` with special attention to large PPTX sources.
+Fresh PDF Reviewer/Quiz, PPTX Reviewer, and Activity Output acceptance covered grounding, source fidelity, formatting, larger extracted context, durable Queue behavior, Library, and relaunch. The reproduced PPTX `request_exceeds_context_budget` defect was repaired at the structured-output contract boundary and retested in production. Previously accepted ingestion work remains historical evidence rather than being duplicated. See the dated B38.1 entry above.
 
 ## B39 Full E2E / Demo Acceptance
 
-Status: Planned after B38.
+Status: **NEXT — ready to begin after B38.1 PASS.**
 
 Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
 
