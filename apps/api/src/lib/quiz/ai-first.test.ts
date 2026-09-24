@@ -86,10 +86,12 @@ describe('AI-first context and product contracts', () => {
     expect(result.metadata.validationPolicy).toBe('ai-first-contract');
     expect(result.metadata.generationMetrics?.providerRequestCount).toBe(1);
   });
-  it('constrains reviewer source references and reports targeted shape failures', () => {
+  it('keeps the Reviewer schema bounded while validating source references exactly', () => {
     const schema = createReviewerDocumentSchema(['page-1', 'page-2']);
     const sectionItems = schema.schema.properties.sections as { items: { properties: Record<string, { items?: { enum?: readonly string[] } }> } };
-    expect(sectionItems.items.properties.sourceRefs.items?.enum).toEqual(['page-1', 'page-2']);
+    expect(sectionItems.items.properties.sourceRefs.items?.enum).toBeUndefined();
+    expect(JSON.stringify(createReviewerDocumentSchema(Array.from({ length: 100 }, (_, index) => `slide-${index}-${'x'.repeat(64)}`))).length).toBeLessThan(2000);
+    expect(() => validateReviewerDocument({ title: 'Reviewer', sections: [{ title: 'Topic', explanation: 'Explanation', keyPoints: ['Point'], sourceRefs: ['invented'] }] }, ['page-1'])).toThrow(GenerationContractError);
     expect(() => validateReviewerDocument({ title: 'Reviewer', sections: [{ title: 'Topic', explanation: 'Explanation', keyPoints: [], sourceRefs: ['page-1'] }] }, ['page-1'])).toThrow(GenerationContractError);
     try {
       validateReviewerDocument({ title: 'Reviewer', sections: [{ title: 'Topic', explanation: 'Explanation', keyPoints: [], sourceRefs: ['page-1'] }] }, ['page-1']);
@@ -97,6 +99,14 @@ describe('AI-first context and product contracts', () => {
       expect(error).toBeInstanceOf(GenerationContractError);
       expect((error as GenerationContractError).findings).toEqual(['section-1:key_points']);
     }
+  });
+  it('generates a Reviewer from a structured source with many block IDs', async () => {
+    const blocks = Array.from({ length: 100 }, (_, index) => ({ id: `slide-${index}-${'x'.repeat(64)}`, text: `Slide ${index + 1} content`, kind: 'paragraph' as const }));
+    const firstId = blocks[0]!.id;
+    const calls: GenerationRequest<unknown>[] = [];
+    const result = await runAIReviewer({ input: { id: 'presentation', blocks }, provider: provider({ title: 'Presentation Reviewer', sections: [{ title: 'Topic', explanation: 'Explanation', keyPoints: ['Point'], sourceRefs: [firstId] }] }, calls) });
+    expect(calls).toHaveLength(1);
+    expect(result.sections[0]!.sourceBlockIds).toEqual([firstId]);
   });
   const sources: ActivitySource[] = [{ id: 'instructions', title: 'Assignment', text: 'Write a reflection with two sections.', role: 'instructions', materialId: null }];
   const activity = { title: 'Reflection', activityType: 'reflection', parts: [{ heading: 'Thoughts', content: 'Student must supply their own experience.', sourceRefs: ['instructions'], missingInformation: true }] };

@@ -5,7 +5,7 @@ import { normalizeSource } from './stage0-normalize.js';
 import type { NormalizedSource,ReviewerOutput,ReviewerSection } from './types.js';
 
 const nonEmptyString = { type: 'string', minLength: 1 };
-const reviewerSectionSchema = (sourceIds?: readonly string[]) => obj({
+const reviewerSectionSchema = () => obj({
   title: nonEmptyString,
   explanation: nonEmptyString,
   keyPoints: { type: 'array', minItems: 1, maxItems: 30, items: nonEmptyString },
@@ -13,13 +13,15 @@ const reviewerSectionSchema = (sourceIds?: readonly string[]) => obj({
     type: 'array',
     minItems: 1,
     maxItems: 100,
-    items: sourceIds?.length ? { type: 'string', enum: sourceIds } : str,
+    items: str,
   },
 });
 export const reviewerDocumentSchema: StructuredOutputSchema = { name: 'reviewer_document', description: 'A coherent student reviewer', schema: obj({ title: nonEmptyString, sections: { type: 'array', minItems: 1, maxItems: 100, items: reviewerSectionSchema() } }) };
 export function createReviewerDocumentSchema(sourceIds: readonly string[]): StructuredOutputSchema {
   if (!sourceIds.length) throw new Error('empty_reviewer_source_ids');
-  return { ...reviewerDocumentSchema, schema: obj({ title: nonEmptyString, sections: { type: 'array', minItems: 1, maxItems: 100, items: reviewerSectionSchema(sourceIds) } }) };
+  // Keep the provider schema bounded for documents with many extracted blocks.
+  // validateReviewerDocument still enforces the exact source-ID allowlist.
+  return reviewerDocumentSchema;
 }
 interface ReviewerDocument { title: string; sections: { title: string; explanation: string; keyPoints: string[]; sourceRefs: string[] }[] }
 export function validateReviewerDocument(raw: unknown, ids: readonly string[]): ReviewerDocument {
