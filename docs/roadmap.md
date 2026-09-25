@@ -1,5 +1,9 @@
 # Roadmap
 
+### B38.2.1 ribbon refinement (2026-09-26)
+
+Dev-lab glow, palette flow and true ribbon-shape morphing are implemented and physically checked; mobile 576/576, typecheck and lint pass. Continuous completion and stopped failure/Reduced Motion are preserved. See [follow-up](ai/acceptance/b38-2-1/ribbon-glow-refinement.md). Original visual acceptance remains PARTIAL: approve material/shape and directly profile GL before production integration.
+
 ## B38.2.1 Knowledge Core visual prototype (2026-09-26)
 
 **PARTIAL — prototype-only; production integration remains gated.** Real GL geometry, six states, theme variants and Reduced Motion work on the realme. Complete keeps moving slowly; Error stops. Mobile 574/574, typecheck and lint pass with four existing warnings. Materials/transparency and direct GL pacing still need acceptance; UI-frame evidence alone is insufficient. See [acceptance](ai/acceptance/b38-2-1/generation-core-prototype.md). Next for this visual: refine geometry/materials, reprofile, and approve before replacing the production SVG. B39 E2E remains separate; no job/Queue behavior changed.

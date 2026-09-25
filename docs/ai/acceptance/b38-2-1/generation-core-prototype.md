@@ -1,5 +1,7 @@
 # B38.2.1 — Knowledge Core visual prototype
 
+Latest revision: [luminous, morphing ribbons](ribbon-glow-refinement.md) adds glow, flowing three-color palettes and changing width/twist/curvature, with 576 passing tests. The original measurements, transparent-ribbon implementation and screenshots below are the historical baseline, not the latest renderer. Production approval remains PARTIAL.
+
 Date: 2026-09-26. **PARTIAL — prototype works but visual/performance quality is not yet sufficient.**
 
 The user's latest motion requirement is implemented: completion decelerates into continuous motion; failure stops. Reduced Motion and offscreen/background suspension remain intentional exceptions. This is a development lab, not a production generation replacement.

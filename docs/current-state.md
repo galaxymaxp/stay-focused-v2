@@ -1,5 +1,9 @@
 # Current State
 
+### B38.2.1 ribbon refinement (2026-09-26)
+
+Latest dev-lab revision adds ribbon-edge glow, flowing theme palettes and independent width/twist/curvature changes, replacing transparent faceting with depth-tested bodies. Complete remains slowly alive; Error and Reduced Motion freeze. Fresh mobile 576/576, typecheck and lint pass (four existing warnings). Realme checks are recorded in [ribbon refinement](ai/acceptance/b38-2-1/ribbon-glow-refinement.md). Still PARTIAL for the original glass-material bar; production remains unchanged.
+
 ## B38.2.1 Knowledge Core visual prototype (2026-09-26)
 
 **PARTIAL — dev-only real 3D prototype; not approved for production integration.** Expo GL/Three.js replaces the rejected wobbling-image experiment in a dedicated lab, not in production generation. Six states, four palettes, system/simulated Reduced Motion and physical realme checks are implemented. Complete now slows continuously instead of stopping; Error settles and stops. Fresh mobile tests 574/574, typecheck and lint (0 errors, four existing warnings) pass. Short UI-frame samples show 1.35–2.04% steady-state jank and 4.40% transition jank; these are not direct GL FPS measurements. Transparent ribbon intersections, weak glass material and UC surface coloration still miss the signature-visual bar. Production jobs, Queue, auth and old SVG are untouched. See [prototype acceptance](ai/acceptance/b38-2-1/generation-core-prototype.md). Next: refine geometry/materials on the realme and repeat visual/direct-GL acceptance before integration.

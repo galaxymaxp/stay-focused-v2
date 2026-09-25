@@ -1,5 +1,9 @@
 # Current Sprint
 
+### B38.2.1 ribbon refinement (2026-09-26)
+
+Delivered in the lab: soft ribbon-edge glow, three-color palette flow, local width/twist/bend changes and depth-tested bodies. Complete keeps moving slowly; Error/Reduced Motion freeze. Fresh tests 576/576, typecheck and lint pass with four existing warnings. [Physical follow-up evidence](acceptance/b38-2-1/ribbon-glow-refinement.md) records seven screenshots and a short UI-frame sample, not direct GL FPS. Still PARTIAL for glass-artifact approval; production is unchanged.
+
 ## B38.2.1 Knowledge Core visual prototype (2026-09-26)
 
 **PARTIAL — development lab implemented and physically inspected; visual approval withheld.** Six states/four themes use true GL geometry. Successful completion decelerates into continuous movement; failure and Reduced Motion stop. Fresh mobile tests 574/574, typecheck and lint (0 errors, four existing warnings) pass. Device screenshots and short UI-frame/memory/thermal samples are recorded, with no direct GL FPS claim. Main gap: plastic-looking ribbon intersections and weak glass/refraction, especially UC coloration. Production generation and Queue are unchanged. See [acceptance](acceptance/b38-2-1/generation-core-prototype.md). Next: material/geometry refinement and repeat realme acceptance before integration.

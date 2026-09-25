@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { CORE_MOTION_PROFILES, CORE_STATES, coreAccessibilityLabel, coreMotionRate } from "./coreModel";
+import { CORE_MOTION_PROFILES, CORE_STATES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette } from "./coreModel";
 
 describe("Knowledge Core state model", () => {
+  it("uses three bounded theme-specific colors instead of a rainbow cycle", () => {
+    for (const accent of ["#245DC8", "#AACBFF", "#9E1B32", "#F08C99"]) {
+      for (const mode of ["light", "dark"] as const) {
+        const palette = coreRibbonPalette(accent, mode);
+        expect(palette).toHaveLength(3);
+        palette.forEach((color) => expect(color).toMatch(/^#[0-9A-F]{6}$/));
+      }
+    }
+    expect(coreRibbonPalette("#9E1B32", "dark")).toEqual(coreRibbonPalette("#f08c99", "dark"));
+    expect(coreRibbonPalette("#9E1B32", "dark")).not.toEqual(coreRibbonPalette("#AACBFF", "dark"));
+    expect(coreRibbonPalette("#AACBFF", "light")).not.toEqual(coreRibbonPalette("#AACBFF", "dark"));
+  });
+
   it("keeps every successful state moving, including slow settled completion", () => {
     for (const state of CORE_STATES.filter((value) => value !== "error")) {
       expect(coreMotionRate(state, false, CORE_MOTION_PROFILES[state].completion)).toBeGreaterThan(0);

@@ -1,5 +1,7 @@
 # Knowledge Core design QA
 
+Latest follow-up: [glow/palette/shape refinement](docs/ai/acceptance/b38-2-1/ribbon-glow-refinement.md). Opaque, shader-deformed ribbon bodies remove the original transparent facets; luminous edges and palette flow are now implemented. Original findings below are baseline findings: satin-like material, crossing seams and weak shell/refraction still prevent glass-artifact approval. Fresh tests 576/576, typecheck and lint pass; seven new realme captures are recorded.
+
 Status: **BLOCKED — visual approval / production integration**, 2026-09-26.
 
 Scope: B38.2.1 development prototype only. The latest motion requirement is implemented and physically checked: Complete stays slowly alive; Error stops, with Reduced Motion/background exceptions.

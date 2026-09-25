@@ -45,6 +45,17 @@ export const CORE_STATE_COPY: Record<CoreState, { readonly title: string; readon
 
 export type CoreLabTheme = "light" | "dark" | "uc_light" | "uc_dark";
 
+/** Restrained analogous palettes, not a full-spectrum hue cycle. */
+export function coreRibbonPalette(accent: string, mode: "light" | "dark"): readonly [string, string, string] {
+  const uc = ["#9e1b32", "#f08c99"].includes(accent.toLowerCase());
+  if (uc) return mode === "dark"
+    ? ["#D47A91", "#9E79CF", "#E4AE9F"]
+    : ["#A83A59", "#7955AC", "#C67F70"];
+  return mode === "dark"
+    ? ["#528DFA", "#9672E0", "#56C1CF"]
+    : ["#3567C7", "#7954B6", "#3299AB"];
+}
+
 export function coreLabTheme(
   key: CoreLabTheme,
   palettes: { readonly light: ThemeColors; readonly dark: ThemeColors },

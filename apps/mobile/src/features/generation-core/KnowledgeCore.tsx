@@ -5,7 +5,8 @@ import { AppState, Pressable, StyleSheet, View } from "react-native";
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
-import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, type CoreState } from "./coreModel";
+import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, type CoreState } from "./coreModel";
+import { createLivingRibbon } from "./livingRibbon";
 
 const DEFAULT_SIZE = 320;
 
@@ -91,7 +92,7 @@ void main() {
 }`;
 
 interface SceneController { renderForChange: () => void; dispose: () => void }
-interface RuntimeProps { state: CoreState; colors: ThemeColors; reducedMotion: boolean; active: boolean; focused: boolean }
+interface RuntimeProps { state: CoreState; colors: ThemeColors; mode: "light" | "dark"; reducedMotion: boolean; active: boolean; focused: boolean }
 
 export interface KnowledgeCoreProps {
   readonly state: CoreState;
@@ -102,18 +103,18 @@ export interface KnowledgeCoreProps {
   readonly size?: number;
 }
 
-export function KnowledgeCore({ state, colors, reducedMotion = false, active = true, size = DEFAULT_SIZE }: KnowledgeCoreProps) {
+export function KnowledgeCore({ state, colors, mode, reducedMotion = false, active = true, size = DEFAULT_SIZE }: KnowledgeCoreProps) {
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === "active");
-  const runtime = useRef<RuntimeProps>({ state, colors, reducedMotion, active: active && foreground, focused });
+  const runtime = useRef<RuntimeProps>({ state, colors, mode, reducedMotion, active: active && foreground, focused });
   const controller = useRef<SceneController | null>(null);
   const touch = useRef({ strength: 0, x: 0, y: 0 });
-  runtime.current = { state, colors, reducedMotion, active: active && foreground, focused };
+  runtime.current = { state, colors, mode, reducedMotion, active: active && foreground, focused };
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => setForeground(next === "active"));
     return () => subscription.remove();
   }, []);
-  useEffect(() => controller.current?.renderForChange(), [active, colors, focused, foreground, reducedMotion, state]);
+  useEffect(() => controller.current?.renderForChange(), [active, colors, focused, foreground, mode, reducedMotion, state]);
   useEffect(() => () => controller.current?.dispose(), []);
   const createScene = useCallback((gl: ExpoWebGLRenderingContext) => {
     controller.current?.dispose();
@@ -197,16 +198,8 @@ function buildScene(
 
   const inner = new THREE.Group();
   root.add(inner);
-  const ribbonMaterials = [0, 1, 2].map(() => new THREE.MeshPhysicalMaterial({ color: 0x536dff, emissive: 0x1d2466, emissiveIntensity: 0.6, roughness: 0.24, metalness: 0.02, clearcoat: 1, clearcoatRoughness: 0.11, transparent: true, opacity: 0.76, depthWrite: true, side: THREE.DoubleSide }));
-  const ribbonGeometries = [0, 1, 2].map((index) => createRibbonGeometry(index * 2.07));
-  const ribbons = ribbonMaterials.map((material, index) => {
-    const ribbon = new THREE.Mesh(ribbonGeometries[index], material);
-    ribbon.scale.setScalar(1.24 - index * 0.09);
-    ribbon.rotation.set(index * 0.74 - 0.32, index * 0.61, index * 0.78 + 0.18);
-    ribbon.renderOrder = 2 + index * 0.1;
-    inner.add(ribbon);
-    return ribbon;
-  });
+  const ribbons = [0, 1, 2].map(createLivingRibbon);
+  ribbons.forEach((ribbon) => inner.add(ribbon.mesh));
 
   const particlePositions = new Float32Array(270);
   let seed = 19;
@@ -253,6 +246,14 @@ function buildScene(
   const white = new THREE.Color(0xffffff);
   const accent = new THREE.Color();
   const secondary = new THREE.Color();
+  let paletteAccent = runtime.current.colors.accent;
+  let paletteMode = runtime.current.mode;
+  const palette = coreRibbonPalette(paletteAccent, paletteMode).map((color) => new THREE.Color(color));
+  ribbons.forEach(({ uniforms }) => {
+    uniforms.uColorA.value.copy(palette[0]!);
+    uniforms.uColorB.value.copy(palette[1]!);
+    uniforms.uColorC.value.copy(palette[2]!);
+  });
 
   const draw = () => {
     if (disposed) return;
@@ -280,6 +281,11 @@ function buildScene(
 
     accent.set(current.colors.accent);
     secondary.set(current.colors.violet);
+    if (paletteAccent !== current.colors.accent || paletteMode !== current.mode) {
+      paletteAccent = current.colors.accent;
+      paletteMode = current.mode;
+      coreRibbonPalette(paletteAccent, paletteMode).forEach((color, index) => palette[index]!.set(color));
+    }
     shellUniforms.uTime.value = animatedTime;
     shellUniforms.uActivity.value = activity;
     shellUniforms.uOrder.value = order;
@@ -298,17 +304,19 @@ function buildScene(
     root.position.y = breathe * (0.025 + activity * 0.018);
     root.rotation.y += motionDelta * (0.06 + activity * 0.14);
     root.rotation.x = -0.13 + Math.sin(animatedTime * 0.31) * 0.045;
-    root.scale.setScalar(1 + breathe * 0.008 + completion * 0.025);
+    root.scale.setScalar(1 + completion * 0.025);
     inner.rotation.y -= motionDelta * (0.24 + activity * 0.72);
     inner.rotation.z += motionDelta * (0.1 + activity * 0.28);
-    ribbons.forEach((ribbon, index) => {
+    ribbons.forEach(({ mesh: ribbon, uniforms }, index) => {
       const direction = index % 2 === 0 ? 1 : -1;
       ribbon.rotation.x += motionDelta * (0.08 + activity * 0.35) * direction;
       ribbon.rotation.z += motionDelta * (0.06 + activity * 0.22) * -direction;
-      const material = ribbon.material as THREE.MeshPhysicalMaterial;
-      material.color.copy(index === 1 ? secondary : accent).lerp(white, index * 0.12);
-      material.emissive.copy(index === 1 ? accent : secondary).multiplyScalar(0.5 - error * 0.38);
-      material.opacity = (0.62 + activity * 0.19) * (1 - error * 0.72);
+      uniforms.uTime.value = animatedTime;
+      uniforms.uGlow.value = (current.mode === "dark" ? 0.9 : 0.55) + activity * 0.38 + completion * 0.10;
+      uniforms.uError.value = error;
+      uniforms.uColorA.value.lerp(palette[0]!, ease);
+      uniforms.uColorB.value.lerp(palette[1]!, ease);
+      uniforms.uColorC.value.lerp(palette[2]!, ease);
     });
     particles.rotation.y += motionDelta * (0.18 + activity * 0.65);
     particleMaterial.color.copy(accent).lerp(white, 0.42);
@@ -339,57 +347,12 @@ function buildScene(
       disposed = true;
       if (requestId !== null) cancelAnimationFrame(requestId);
       shellGeometry.dispose(); shellMaterial.dispose(); core.geometry.dispose(); coreMaterial.dispose();
-      ribbonGeometries.forEach((geometry) => geometry.dispose()); ribbonMaterials.forEach((material) => material.dispose());
+      ribbons.forEach((ribbon) => ribbon.dispose());
       particleGeometry.dispose(); particleMaterial.dispose(); shardGeometry.dispose();
       shards.forEach((shard) => (shard.material as THREE.Material).dispose());
       renderer.dispose();
     },
   };
-}
-
-function createRibbonGeometry(phase: number): THREE.BufferGeometry {
-  const segments = 144;
-  const crossSegments = 8;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  const centers: THREE.Vector3[] = [];
-  for (let index = 0; index <= segments; index += 1) {
-    const t = index / segments * Math.PI * 2;
-    const radius = 0.64 + Math.sin(t * 3 + phase) * 0.075;
-    centers.push(new THREE.Vector3(
-      Math.cos(t) * radius,
-      Math.sin(t) * (0.43 + Math.cos(t * 2 - phase) * 0.055),
-      Math.sin(t * 2 + phase) * 0.31 + Math.cos(t * 3 - phase) * 0.055,
-    ));
-  }
-  for (let index = 0; index <= segments; index += 1) {
-    const previous = centers[(index - 1 + segments) % segments]!;
-    const next = centers[(index + 1) % segments]!;
-    const tangent = next.clone().sub(previous).normalize();
-    const radial = centers[index]!.clone().normalize();
-    const widthDirection = new THREE.Vector3().crossVectors(tangent, radial).normalize();
-    const width = 0.19 + Math.sin(index / segments * Math.PI * 4 + phase) * 0.045;
-    for (let cross = 0; cross <= crossSegments; cross += 1) {
-      const across = cross / crossSegments * 2 - 1;
-      const crown = radial.clone().multiplyScalar((1 - across * across) * 0.055);
-      const point = centers[index]!.clone()
-        .add(widthDirection.clone().multiplyScalar(across * width))
-        .add(crown);
-      positions.push(point.x, point.y, point.z);
-    }
-    if (index < segments) {
-      for (let cross = 0; cross < crossSegments; cross += 1) {
-        const base = index * (crossSegments + 1) + cross;
-        const nextRow = base + crossSegments + 1;
-        indices.push(base, base + 1, nextRow, base + 1, nextRow + 1, nextRow);
-      }
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
 }
 
 const styles = StyleSheet.create({
