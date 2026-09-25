@@ -19,6 +19,7 @@ import {
   startAccountCanvasSync,
   summarizeSyncJobs,
   type AccountSyncSnapshot,
+  type SyncRejection,
 } from "../../services/canvasAccountSync";
 import { getCanvasSyncJob, listCanvasCourses, type CanvasSyncJobStatusView } from "../../services/canvasApi";
 import { upsertActiveCanvasSyncJob } from "../../services/activeCanvasSyncJobStore";
@@ -60,7 +61,7 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
   const running = useRef(false);
   const lastAttemptAt = useRef<number | null>(null);
   const tracked = useRef(new Map<string, CanvasSyncJobStatusView>());
-  const rejectedCount = useRef(0);
+  const rejected = useRef<SyncRejection[]>([]);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pollStartedAt = useRef(0);
   const live = useRef(true);
@@ -88,7 +89,7 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
   }, [request]);
 
   const finish = useCallback(async () => {
-    const summary = summarizeSyncJobs([...tracked.current.values()], rejectedCount.current);
+    const summary = summarizeSyncJobs([...tracked.current.values()], rejected.current);
     diagnose("finished", { phase: summary.phase, courses: summary.total });
     running.current = false;
     const lastSyncedAt = await refreshLastSynced();
@@ -114,13 +115,13 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
           } else if (result.error.status === 404) {
             // The server no longer knows this job; it can never finish.
             tracked.current.delete(pending[index]!.id);
-            rejectedCount.current += 1;
+            rejected.current.push({ courseId: pending[index]!.course.id, code: "job_not_found" });
           }
         }
       } catch {
         diagnose("poll_failed");
       }
-      const summary = summarizeSyncJobs([...tracked.current.values()], rejectedCount.current);
+      const summary = summarizeSyncJobs([...tracked.current.values()], rejected.current);
       if (!live.current) return;
       if (summary.phase !== "syncing") {
         await finish();
@@ -146,12 +147,12 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     try {
       const started = await startAccountCanvasSync(input, {
         listCourses: listCanvasCourses,
-        startCourse: (course) =>
+        startCourse: (course, jobType) =>
           startDurableCanvasSync({
             ...input,
             courseId: course.id,
             courseDisplayName: course.displayName,
-            jobType: "course_content",
+            jobType,
           }),
       });
       diagnose("started", {
@@ -160,15 +161,14 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
         rejected: started.rejected.map((item) => item.code),
       });
       tracked.current = new Map(started.jobs.map((job) => [job.id, job]));
-      rejectedCount.current = started.rejected.length;
+      rejected.current = [...started.rejected];
       if (!live.current) return;
       if (started.phase !== "syncing") {
         running.current = false;
         setSnapshot((current) => ({
           ...current,
+          ...summarizeSyncJobs(started.jobs, started.rejected),
           phase: started.phase,
-          total: started.jobs.length + started.rejected.length,
-          finished: started.jobs.length + started.rejected.length,
           lastSyncedAt: started.lastSyncedAt ?? current.lastSyncedAt,
         }));
         if (started.jobs.length > 0) setDataVersion((value) => value + 1);
@@ -176,7 +176,7 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
       }
       setSnapshot((current) => ({
         ...current,
-        ...summarizeSyncJobs(started.jobs, started.rejected.length),
+        ...summarizeSyncJobs(started.jobs, started.rejected),
         lastSyncedAt: started.lastSyncedAt ?? current.lastSyncedAt,
       }));
       pollStartedAt.current = Date.now();
@@ -194,12 +194,12 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     const input = request();
     if (!input || running.current) return;
     const { jobs } = await reconcileCanvasSyncJobs(input);
-    const active = jobs.filter((job) => job.jobType === "course_content" && !["succeeded", "failed", "cancelled", "expired"].includes(job.status));
+    const active = jobs.filter((job) => !isFinishedSyncJob(job));
     if (active.length > 0 && live.current) {
       running.current = true;
       tracked.current = new Map(active.map((job) => [job.id, job]));
-      rejectedCount.current = 0;
-      setSnapshot((current) => ({ ...current, ...summarizeSyncJobs(active, 0) }));
+      rejected.current = [];
+      setSnapshot((current) => ({ ...current, ...summarizeSyncJobs(active, []) }));
       pollStartedAt.current = Date.now();
       pollTimer.current = setTimeout(() => void poll(), POLL_MS);
       return;

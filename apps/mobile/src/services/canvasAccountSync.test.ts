@@ -32,8 +32,14 @@ function course(id: string, overrides: Partial<CanvasCourseInventoryItem> = {}):
 function inventory(courses: CanvasCourseInventoryItem[], selected: string[]): CanvasCourseInventoryPayload {
   return { courses, selectedCourseIds: selected, counts: { total: courses.length, likelyCurrent: 0, pastOrConcluded: 0, otherOrUncertain: 0, unavailable: 0 } } as CanvasCourseInventoryPayload;
 }
-function job(id: string, status: CanvasSyncJobStatusView["status"], outcome: CanvasSyncJobStatusView["outcome"] = null) {
-  return { id, status, outcome, jobType: "course_content" } as CanvasSyncJobStatusView;
+function job(
+  id: string,
+  status: CanvasSyncJobStatusView["status"],
+  outcome: CanvasSyncJobStatusView["outcome"] = null,
+  courseId = id,
+  jobType: CanvasSyncJobStatusView["jobType"] = "course_content",
+) {
+  return { id, status, outcome, jobType, course: { id: courseId, displayName: courseId, courseCode: null } } as CanvasSyncJobStatusView;
 }
 const input = { apiBaseUrl: "https://api.example", accessToken: "token" };
 
@@ -41,10 +47,12 @@ describe("account Canvas sync", () => {
   it("refreshes only selected, selectable courses and never changes the selection", async () => {
     const payload = inventory([course("a"), course("b", { selectable: false }), course("c")], ["a", "b"]);
     expect(selectedSyncCourses(payload).map((item) => item.id)).toEqual(["a"]);
-    const startCourse = vi.fn(async () => ({ ok: true as const, data: job("job-a", "queued") }));
+    const startCourse = vi.fn(async (_course: { id: string }, jobType: CanvasSyncJobStatusView["jobType"]) => ({ ok: true as const, data: job(`job-a-${jobType}`, "queued", null, "a", jobType) }));
     const started = await startAccountCanvasSync(input, { listCourses: async () => ({ ok: true, data: payload }), startCourse });
-    expect(startCourse).toHaveBeenCalledTimes(1);
-    expect(started).toMatchObject({ phase: "syncing", jobs: [{ id: "job-a" }], rejected: [] });
+    // Content and grades (submission status) for the one eligible course.
+    expect(startCourse.mock.calls.map(([item, jobType]) => [item.id, jobType])).toEqual([["a", "course_content"], ["a", "course_grades"]]);
+    expect(started).toMatchObject({ phase: "syncing", rejected: [] });
+    expect(started.jobs).toHaveLength(2);
   });
 
   it("reports the newest successful sync among selected courses only", () => {
@@ -57,13 +65,22 @@ describe("account Canvas sync", () => {
   });
 
   it("never reports success while a job runs, and never reports partial results as success", () => {
-    expect(summarizeSyncJobs([job("a", "succeeded"), job("b", "running")], 0)).toMatchObject({ phase: "syncing", finished: 1, total: 2 });
-    expect(summarizeSyncJobs([job("a", "succeeded", "success"), job("b", "succeeded", "unchanged")], 0).phase).toBe("succeeded");
+    expect(summarizeSyncJobs([job("a", "succeeded"), job("b", "running")], [])).toMatchObject({ phase: "syncing", finished: 1, total: 2 });
+    expect(summarizeSyncJobs([job("a", "succeeded", "success"), job("b", "succeeded", "unchanged")], []).phase).toBe("succeeded");
     // Canvas withholding an area (Student permissions) is fresh-but-limited, never plain success.
-    expect(summarizeSyncJobs([job("a", "succeeded", "partial")], 0).phase).toBe("limited");
-    expect(summarizeSyncJobs([job("a", "succeeded"), job("b", "failed")], 0).phase).toBe("partial");
-    expect(summarizeSyncJobs([job("a", "succeeded")], 1).phase).toBe("partial");
-    expect(summarizeSyncJobs([job("a", "failed")], 0).phase).toBe("failed");
+    expect(summarizeSyncJobs([job("a", "succeeded", "partial")], []).phase).toBe("limited");
+    expect(summarizeSyncJobs([job("a", "succeeded"), job("b", "failed")], []).phase).toBe("partial");
+    expect(summarizeSyncJobs([job("a", "succeeded")], [{ courseId: "b", code: "course_unavailable" }]).phase).toBe("partial");
+    expect(summarizeSyncJobs([job("a", "failed")], []).phase).toBe("failed");
+  });
+
+  it("counts progress per course: a course finishes when its content and grade jobs both finish", () => {
+    const content = job("c-a", "succeeded", "success", "a");
+    const grades = job("g-a", "running", null, "a", "course_grades");
+    const other = job("c-b", "succeeded", "success", "b");
+    expect(summarizeSyncJobs([content, grades, other], [])).toMatchObject({ phase: "syncing", total: 2, finished: 1 });
+    expect(summarizeSyncJobs([content, { ...grades, status: "succeeded" }, other], [])).toMatchObject({ phase: "succeeded", total: 2, finished: 2 });
+    expect(summarizeSyncJobs([content, { ...grades, status: "failed" }, other], []).phase).toBe("partial");
   });
 
   it("maps failures to calm states without surfacing provider details", async () => {
@@ -86,10 +103,10 @@ describe("account Canvas sync", () => {
       listCourses: async () => ({ ok: true, data: payload }),
       startCourse: async (item) =>
         item.id === "a"
-          ? { ok: true as const, data: job("job-a", "running") }
+          ? { ok: true as const, data: job("job-a", "running", null, "a") }
           : { ok: false as const, error: { code: "course_unavailable" as const, message: "Private detail" } },
     });
-    expect(started.rejected).toEqual([{ courseId: "b", code: "course_unavailable" }]);
+    expect(started.rejected).toEqual([{ courseId: "b", code: "course_unavailable" }, { courseId: "b", code: "course_unavailable" }]);
     expect(started.phase).toBe("syncing");
   });
 

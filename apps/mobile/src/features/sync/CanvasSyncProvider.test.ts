@@ -66,16 +66,16 @@ describe("CanvasSyncProvider", () => {
     await mount();
     expect(latest!.snapshot.phase).toBe("idle");
 
-    mocks.start.mockImplementation(async ({ courseId }: { courseId: string }) => ({ ok: true, data: job(`job-${courseId}`, "running") }));
+    mocks.start.mockImplementation(async ({ courseId, jobType }: { courseId: string; jobType: string }) => ({ ok: true, data: { ...job(`job-${courseId}-${jobType}`, "running"), course: { id: courseId, displayName: courseId, courseCode: null } } }));
     // Reconciliation sees nothing (references lost); direct polling must still converge.
-    mocks.getJob.mockImplementation(async ({ jobId }: { jobId: string }) => ({ ok: true, data: job(jobId, "succeeded", jobId === "job-a" ? "partial" : "success") }));
+    mocks.getJob.mockImplementation(async ({ jobId }: { jobId: string }) => ({ ok: true, data: { ...job(jobId, "succeeded", jobId === "job-a-course_content" ? "partial" : "success"), course: { id: jobId.split("-")[1]!, displayName: "x", courseCode: null } } }));
 
     await act(async () => { await latest!.sync(); });
     expect(latest!.snapshot).toMatchObject({ phase: "syncing", total: 2, finished: 0 });
     const before = latest!.dataVersion;
 
     await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
-    expect(mocks.getJob).toHaveBeenCalledTimes(2);
+    expect(mocks.getJob).toHaveBeenCalledTimes(4);
     expect(latest!.snapshot).toMatchObject({ phase: "limited", total: 2, finished: 2 });
     expect(latest!.dataVersion).toBe(before + 1);
   });

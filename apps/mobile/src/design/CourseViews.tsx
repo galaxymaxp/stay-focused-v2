@@ -131,7 +131,7 @@ export function CourseTile({
           <Copy size="h3" numberOfLines={3} style={{ fontSize: 15, lineHeight: 20 }}>{identity.title}</Copy>
           {identity.subtitle ? <Copy muted size="caption" numberOfLines={1} style={{ fontSize: 11, lineHeight: 15 }}>{identity.subtitle}</Copy> : null}
         </View>
-        {footnote ? <Copy size="caption" numberOfLines={1} color={colors.textSecondary} style={{ fontSize: 11, lineHeight: 15 }}>{footnote}</Copy> : null}
+        {footnote ? <Copy size="caption" numberOfLines={2} color={colors.textSecondary} style={{ fontSize: 11, lineHeight: 15 }}>{footnote}</Copy> : null}
       </Pressable>
     </Animated.View>
   );

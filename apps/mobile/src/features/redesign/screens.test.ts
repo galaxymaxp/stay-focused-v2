@@ -523,13 +523,13 @@ describe("B25 screen interactions", () => {
     const root = await render(createElement(TasksScreen));
     const cards = root.findAll((node) => String(node.type) === "CourseCard");
     expect(cards.map((node) => node.props.accessibilityLabel)).toEqual([
-      "Capstone Project 1: 1 due, 1 missing, 1 completed",
-      "IT Security: 1 due, 0 missing, 0 completed",
+      "Capstone Project 1: 1 due, 1 past due, 1 completed",
+      "IT Security: 1 due, 0 past due, 0 completed",
     ]);
     await act(async () => cards[0]!.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith({ pathname: "/work/[courseKey]", params: { courseKey: "capstone" } });
   });
-  it("shows a course's missing work first, then due soon, with completed collapsed", async () => {
+  it("shows a course's past-due work first, then due soon, with completed collapsed", async () => {
     const day = 86_400_000, now = Date.now();
     const course = { id: "capstone", code: null, name: "Capstone" };
     mocks.data[`/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = { items: [
@@ -542,7 +542,7 @@ describe("B25 screen interactions", () => {
     mocks.params = { courseKey: "capstone" };
     const root = await render(createElement(TasksCourseScreen));
     const text = copyText(root);
-    expect(text.indexOf("Missing")).toBeLessThan(text.indexOf("Proposal"));
+    expect(text.indexOf("Past due")).toBeLessThan(text.indexOf("Proposal"));
     expect(text.indexOf("Proposal")).toBeLessThan(text.indexOf("Due soon"));
     expect(text.indexOf("Due soon")).toBeLessThan(text.indexOf("Chapter 2"));
     expect(text.indexOf("Chapter 2")).toBeLessThan(text.indexOf("Final paper"));

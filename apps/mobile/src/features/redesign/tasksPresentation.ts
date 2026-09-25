@@ -7,7 +7,7 @@ const DUE_SOON_MS = 7 * 24 * 60 * 60 * 1_000;
 export type TaskGroupKey = "missing" | "due_soon" | "upcoming" | "completed";
 
 export const taskGroupTitles: Record<TaskGroupKey, string> = {
-  missing: "Missing",
+  missing: "Past due",
   due_soon: "Due soon",
   upcoming: "Upcoming",
   completed: "Completed",
@@ -18,8 +18,10 @@ export function isDone(item: Pick<ActivitySummary, "status">): boolean {
 }
 
 /**
- * Missing means the deadline passed and the work is neither completed nor
- * submitted (the server's `isOverdue`). Everything else is classified only
+ * "Past due" means the deadline passed and the work is neither completed nor
+ * submitted (the server's `isOverdue`). It is not called "missing": submission
+ * status is only known after a grade sync, so the app claims only what it
+ * knows. Everything else is classified only
  * from the real due date; nothing is inferred from titles.
  */
 export function taskGroupOf(item: ActivitySummary, now: number): TaskGroupKey {

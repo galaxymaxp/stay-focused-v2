@@ -73,7 +73,7 @@ export function TasksScreen() {
             key={summary.key}
             identity={identity}
             testID={`task-course-${summary.key}`}
-            accessibilityLabel={`${identity.title}: ${summary.due} due, ${summary.missing} missing, ${summary.completed} completed`}
+            accessibilityLabel={`${identity.title}: ${summary.due} due, ${summary.missing} past due, ${summary.completed} completed`}
             onPress={() => router.push({ pathname: "/work/[courseKey]", params: { courseKey: summary.key } })}
           >
             <TaskCounts summary={summary} />
@@ -87,7 +87,7 @@ export function TasksScreen() {
 function TaskCounts({ summary }: { summary: TaskCourseSummary }) {
   const { colors } = useTheme();
   const parts: { label: string; color: string; strong?: boolean }[] = [];
-  if (summary.missing > 0) parts.push({ label: `${summary.missing} missing`, color: colors.danger, strong: true });
+  if (summary.missing > 0) parts.push({ label: `${summary.missing} past due`, color: colors.danger, strong: true });
   parts.push({ label: `${summary.due} due`, color: summary.due > 0 ? colors.textPrimary : colors.textMuted });
   parts.push({ label: `${summary.completed} completed`, color: colors.textMuted });
   return (
@@ -166,7 +166,7 @@ function TaskLine({ item, group, first, now }: { item: ActivitySummary; group: T
       >
         <Copy size="bodySmall" color={done ? colors.textSecondary : colors.textPrimary} style={{ fontWeight: "600", fontSize: 15, lineHeight: 20 }}>{item.title}</Copy>
         <Copy size="caption" color={group === "missing" ? colors.danger : colors.textSecondary}>
-          {group === "missing" ? "Missing · " : ""}
+          {group === "missing" ? "Past due · " : ""}
           {done ? (item.status === "submitted" ? "Submitted" : "Completed") : relativeDue(item.dueAt, now)}
           {item.hasGeneratedDraft ? " · Draft ready" : ""}
         </Copy>
