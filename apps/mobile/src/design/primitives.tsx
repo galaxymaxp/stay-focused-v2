@@ -191,6 +191,7 @@ export function Page({
   overlay,
   headerBelow,
   scrollEnabled = true,
+  scrollTouch,
 }: {
   children: ReactNode;
   title: string;
@@ -210,6 +211,11 @@ export function Page({
   /** Pinned content between the header and the scroll area (e.g. find-in-page). */
   headerBelow?: ReactNode;
   scrollEnabled?: boolean;
+  /**
+   * Raw touch observers on the scroll view. They bubble from any content and
+   * never claim the gesture, so native scrolling is unaffected.
+   */
+  scrollTouch?: Pick<React.ComponentProps<typeof ScrollView>, "onTouchStart" | "onTouchMove" | "onTouchEnd" | "onTouchCancel">;
 }) {
   const { colors, mode } = useTheme();
   const [menu, setMenu] = useState(false);
@@ -286,6 +292,7 @@ export function Page({
           ref={scrollRef}
           onScroll={onScroll}
           scrollEnabled={scrollEnabled}
+          {...scrollTouch}
           scrollEventThrottle={onScroll ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
           refreshControl={pullToRefresh ? <RefreshControl refreshing={pulling} onRefresh={pullToRefresh} tintColor={colors.textSecondary} colors={[colors.accent]} progressBackgroundColor={colors.surfaceElevated} /> : undefined}

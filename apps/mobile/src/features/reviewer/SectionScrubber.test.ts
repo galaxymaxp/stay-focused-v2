@@ -1,12 +1,13 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("react-native", () => ({
   View: "View",
   Text: "Text",
   TextInput: "TextInput",
   Pressable: "Pressable",
+  useWindowDimensions: () => ({ width: 360, height: 800, scale: 3, fontScale: 1 }),
   Animated: {
     View: "AnimatedView",
     Value: class {
@@ -26,15 +27,19 @@ vi.mock("../../design/theme", async () => {
 });
 
 const { SectionScrubber } = await import("./ReviewerReader");
+type Handle = import("./ReviewerReader").ScrubberHandle;
+const STRIP_TOP = 100;
 
 const anchors = ["Introduction", "Models", "Normalization", "Transactions"];
 let rendered: ReactTestRenderer | undefined;
-let props: { onScrub: ReturnType<typeof vi.fn>; onSettle: ReturnType<typeof vi.fn>; onActiveChange: ReturnType<typeof vi.fn> };
+let handle: { current: Handle };
+let props: { onScrub: Mock<(y: number) => void>; onSettle: Mock<(y: number) => void>; onActiveChange: Mock<(active: boolean) => void> };
 
 beforeEach(() => {
   vi.useFakeTimers();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  props = { onScrub: vi.fn(), onSettle: vi.fn(), onActiveChange: vi.fn() };
+  props = { onScrub: vi.fn<(y: number) => void>(), onSettle: vi.fn<(y: number) => void>(), onActiveChange: vi.fn<(active: boolean) => void>() };
+  handle = { current: { reveal: () => {}, touch: null } };
 });
 afterEach(async () => {
   if (rendered) await act(async () => rendered!.unmount());
@@ -45,46 +50,47 @@ afterEach(async () => {
 async function mount() {
   await act(async () => {
     rendered = create(createElement(SectionScrubber, {
-      handle: { current: { reveal: () => {} } },
+      handle,
       anchors,
       anchorOffset: (index: number) => index * 1000,
       metrics: { current: { y: 0, content: 4000, viewport: 800 } },
       ...props,
-    }));
+    }), { createNodeMock: () => ({ measureInWindow: (callback: (x: number, y: number) => void) => callback(330, STRIP_TOP) }) });
   });
   const strip = rendered!.root.find((node) => node.props.testID === "reviewer-scrubber");
   await act(async () => strip.props.onLayout({ nativeEvent: { layout: { height: 800 } } }));
-  return rendered!.root.find((node) => node.props.testID === "reviewer-scrubber");
+  return handle.current.touch!;
 }
-const at = (locationY: number, pageY = locationY) => ({ nativeEvent: { locationY, pageY } });
+/** A touch at a track position (relative to the strip), at the right edge unless given. */
+const at = (trackY: number, pageX = 350) => ({ nativeEvent: { pageX, pageY: STRIP_TOP + trackY } }) as never;
 const bubbleText = () =>
   rendered!.root.findAll((node) => String(node.type) === "Copy").map((node) => [node.props.children].flat().join("")).join(" | ");
 
 describe("Reviewer section scrubber", () => {
   it("activates only after a still hold, then scrubs topic by topic and settles on release", async () => {
     const strip = await mount();
-    await act(async () => strip.props.onTouchStart(at(100)));
+    await act(async () => strip.onTouchStart(at(100)));
     expect(props.onActiveChange).not.toHaveBeenCalled();
     await act(async () => { vi.advanceTimersByTime(170); });
     expect(props.onActiveChange).toHaveBeenLastCalledWith(true);
     expect(props.onScrub).toHaveBeenLastCalledWith(0);
     expect(bubbleText()).toContain("1 / 4");
 
-    await act(async () => strip.props.onTouchMove(at(100, 100 + 350)));
+    await act(async () => strip.onTouchMove(at(450)));
     expect(props.onScrub).toHaveBeenLastCalledWith(2000);
     expect(bubbleText()).toContain("Normalization");
 
-    await act(async () => strip.props.onTouchEnd());
+    await act(async () => strip.onTouchEnd());
     expect(props.onSettle).toHaveBeenCalledWith(2000);
     expect(props.onActiveChange).toHaveBeenLastCalledWith(false);
   });
 
   it("never activates for a quick swipe that starts on the edge", async () => {
     const strip = await mount();
-    await act(async () => strip.props.onTouchStart(at(600)));
-    await act(async () => strip.props.onTouchMove(at(600, 540)));
+    await act(async () => strip.onTouchStart(at(600)));
+    await act(async () => strip.onTouchMove(at(540)));
     await act(async () => { vi.advanceTimersByTime(500); });
-    await act(async () => strip.props.onTouchEnd());
+    await act(async () => strip.onTouchEnd());
     expect(props.onActiveChange).not.toHaveBeenCalled();
     expect(props.onScrub).not.toHaveBeenCalled();
     expect(props.onSettle).not.toHaveBeenCalled();
@@ -92,15 +98,24 @@ describe("Reviewer section scrubber", () => {
 
   it("stands down when the native scroll view takes the gesture", async () => {
     const strip = await mount();
-    await act(async () => strip.props.onTouchStart(at(300)));
-    await act(async () => strip.props.onTouchCancel());
+    await act(async () => strip.onTouchStart(at(300)));
+    await act(async () => strip.onTouchCancel());
     await act(async () => { vi.advanceTimersByTime(500); });
     expect(props.onActiveChange).not.toHaveBeenCalled();
   });
 
-  it("does not claim the touch, so native scrolling keeps working", async () => {
+  it("ignores holds that do not start at the right edge", async () => {
     const strip = await mount();
-    expect(strip.props.onStartShouldSetResponder).toBeUndefined();
-    expect(strip.props.onResponderGrant).toBeUndefined();
+    await act(async () => strip.onTouchStart(at(300, 200)));
+    await act(async () => { vi.advanceTimersByTime(500); });
+    await act(async () => strip.onTouchEnd());
+    expect(props.onActiveChange).not.toHaveBeenCalled();
+  });
+
+  it("is purely visual, so it can never block the scroll view underneath", async () => {
+    await mount();
+    const strip = rendered!.root.find((node) => node.props.testID === "reviewer-scrubber");
+    expect(strip.props.pointerEvents).toBe("none");
+    expect(strip.props.onTouchStart).toBeUndefined();
   });
 });

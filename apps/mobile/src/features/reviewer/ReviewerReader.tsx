@@ -15,6 +15,8 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
+  type GestureResponderEvent,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -71,7 +73,7 @@ export function ReviewerReaderScreen({
   const metrics = useRef({ y: 0, content: 0, viewport: 0 });
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [current, setCurrent] = useState(-1);
-  const scrubber = useRef({ reveal: (_y: number, _content: number, _viewport: number) => {} });
+  const scrubber = useRef<ScrubberHandle>({ reveal: () => {}, touch: null });
 
   const segments = useMemo(() => reviewerSegments(reviewer), [reviewer]);
   const anchors = useMemo(() => reviewerAnchors(reviewer), [reviewer]);
@@ -172,6 +174,12 @@ export function ReviewerReaderScreen({
       scrollRef={scrollRef}
       onScroll={onScroll}
       scrollEnabled={scrollEnabled}
+      scrollTouch={{
+        onTouchStart: (event) => scrubber.current.touch?.onTouchStart(event),
+        onTouchMove: (event) => scrubber.current.touch?.onTouchMove(event),
+        onTouchEnd: () => scrubber.current.touch?.onTouchEnd(),
+        onTouchCancel: () => scrubber.current.touch?.onTouchCancel(),
+      }}
       headerAction={
         searchOpen ? null : (
           <IconAction label="Search this Reviewer" onPress={() => setSearchOpen(true)}>
@@ -389,6 +397,17 @@ function SearchStep({ label, disabled, onPress, children }: { label: string; dis
   );
 }
 
+type ScrubberTouch = {
+  onTouchStart: (event: GestureResponderEvent) => void;
+  onTouchMove: (event: GestureResponderEvent) => void;
+  onTouchEnd: () => void;
+  onTouchCancel: () => void;
+};
+export type ScrubberHandle = {
+  reveal: (y: number, content: number, viewport: number) => void;
+  touch: ScrubberTouch | null;
+};
+
 /**
  * Right-edge fast navigation. While reading, a slim position thumb appears
  * briefly after scrolling and fades away. Touching and holding the right edge
@@ -406,7 +425,7 @@ export function SectionScrubber({
   onSettle,
   onActiveChange,
 }: {
-  handle: { current: { reveal: (y: number, content: number, viewport: number) => void } };
+  handle: { current: ScrubberHandle };
   anchors: readonly string[];
   anchorOffset: (index: number) => number;
   metrics: { current: { y: number; content: number; viewport: number } };
@@ -415,6 +434,9 @@ export function SectionScrubber({
   onActiveChange: (active: boolean) => void;
 }) {
   const { colors, mode, reducedMotion } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const stripRef = useRef<View>(null);
+  const stripTop = useRef(0);
   const [height, setHeight] = useState(0);
   const [active, setActive] = useState(false);
   const [preview, setPreview] = useState<{ index: number; fraction: number }>({ index: -1, fraction: 0 });
@@ -423,9 +445,9 @@ export function SectionScrubber({
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const state = useRef({ active: false, startY: 0, startPageY: 0, lastIndex: -1, lastOffset: 0 });
-  const latest = useRef({ anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion });
-  latest.current = { anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion };
+  const state = useRef({ tracking: false, active: false, startY: 0, startPageY: 0, lastIndex: -1, lastOffset: 0 });
+  const latest = useRef({ anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion, windowWidth });
+  latest.current = { anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion, windowWidth };
   const THUMB = 40;
 
   useEffect(() => () => {
@@ -496,40 +518,65 @@ export function SectionScrubber({
         Animated.timing(overlayOpacity, { toValue: 0, duration: 220, delay: 250, useNativeDriver: true }).start(done);
       }
     };
-    // Raw touch handlers observe without claiming the gesture, so a normal
-    // swipe that starts on the edge still scrolls natively. Only a still hold
-    // activates the scrubber, which then locks scrolling and follows the finger.
-    type Touch = { nativeEvent: { locationY: number; pageY: number } };
+    // The reader's scroll view reports raw touches here. Nothing is claimed,
+    // so a swipe anywhere, including on the edge, scrolls natively. A touch
+    // that starts at the right edge and holds still activates the scrubber,
+    // which then disables scrolling and follows the finger.
     return {
-      onTouchStart: (event: Touch) => {
-        state.current.startY = event.nativeEvent.locationY;
-        state.current.startPageY = event.nativeEvent.pageY;
+      onTouchStart: (event: GestureResponderEvent) => {
         clearTimeout(holdTimer.current);
-        holdTimer.current = setTimeout(activate, SCRUB_HOLD_MS);
+        const { pageX, pageY } = event.nativeEvent;
+        state.current.tracking = pageX >= latest.current.windowWidth - SCRUB_STRIP_WIDTH;
+        if (!state.current.tracking) return;
+        stripRef.current?.measureInWindow((_x, y) => {
+          stripTop.current = y;
+        });
+        state.current.startPageY = pageY;
+        state.current.startY = pageY - stripTop.current;
+        holdTimer.current = setTimeout(() => {
+          state.current.startY = state.current.startPageY - stripTop.current;
+          activate();
+        }, SCRUB_HOLD_MS);
       },
-      onTouchMove: (event: Touch) => {
+      onTouchMove: (event: GestureResponderEvent) => {
+        if (!state.current.tracking) return;
         const dy = event.nativeEvent.pageY - state.current.startPageY;
         if (!state.current.active) {
-          if (Math.abs(dy) > SCRUB_SLOP) clearTimeout(holdTimer.current);
+          if (Math.abs(dy) > SCRUB_SLOP) {
+            clearTimeout(holdTimer.current);
+            state.current.tracking = false;
+          }
           return;
         }
         update(state.current.startY + dy);
       },
-      onTouchEnd: () => deactivate(true),
+      onTouchEnd: () => {
+        state.current.tracking = false;
+        deactivate(true);
+      },
       // The native scroll view took the gesture (a swipe): never activate.
-      onTouchCancel: () => deactivate(false),
+      onTouchCancel: () => {
+        state.current.tracking = false;
+        deactivate(false);
+      },
     };
   }, [metrics, overlayOpacity, thumbOpacity]);
+
+  useEffect(() => {
+    const current = handle.current;
+    current.touch = touch;
+    return () => {
+      current.touch = null;
+    };
+  }, [handle, touch]);
 
   const hasAnchors = anchors.length >= 2;
   const bubbleTop = Math.min(Math.max(preview.fraction * height - 34, 8), Math.max(8, height - 84));
   return (
     <View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}>
       <View
-        onTouchStart={touch.onTouchStart}
-        onTouchMove={touch.onTouchMove}
-        onTouchEnd={touch.onTouchEnd}
-        onTouchCancel={touch.onTouchCancel}
+        ref={stripRef}
+        pointerEvents="none"
         testID="reviewer-scrubber"
         accessible
         accessibilityRole="adjustable"
@@ -545,7 +592,12 @@ export function SectionScrubber({
           setPreview({ index: next, fraction: next / anchors.length });
           onSettle(anchorOffset(next));
         }}
-        onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+        onLayout={(event) => {
+          setHeight(event.nativeEvent.layout.height);
+          stripRef.current?.measureInWindow((_x, y) => {
+            stripTop.current = y;
+          });
+        }}
         style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: SCRUB_STRIP_WIDTH }}
       >
         <Animated.View
