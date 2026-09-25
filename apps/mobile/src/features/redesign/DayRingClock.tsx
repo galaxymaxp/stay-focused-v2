@@ -58,6 +58,7 @@ export function DayRingClock({
   end,
   onChange,
   onCommit,
+  onAdjustingChange,
   disabled = false,
 }: {
   date: string;
@@ -66,6 +67,8 @@ export function DayRingClock({
   end: number;
   onChange: (start: number, end: number) => void;
   onCommit: (start: number, end: number) => void;
+  /** True while a handle is held, so the page can pause pull-to-refresh. */
+  onAdjustingChange?: (adjusting: boolean) => void;
   disabled?: boolean;
 }) {
   const { colors, active, mode } = useTheme();
@@ -179,7 +182,10 @@ export function DayRingClock({
           label="Availability start"
           value={start}
           disabled={disabled}
-          onHoldChange={(held) => setAdjusting(held ? "start" : null)}
+          onHoldChange={(held) => {
+            setAdjusting(held ? "start" : null);
+            onAdjustingChange?.(held);
+          }}
           onChange={(value) => onChange(Math.min(value, end - 15), end)}
           onCommit={(value) => onCommit(Math.min(value, end - 15), end)}
         />
@@ -187,7 +193,10 @@ export function DayRingClock({
           label="Availability end"
           value={end}
           disabled={disabled}
-          onHoldChange={(held) => setAdjusting(held ? "end" : null)}
+          onHoldChange={(held) => {
+            setAdjusting(held ? "end" : null);
+            onAdjustingChange?.(held);
+          }}
           onChange={(value) => onChange(start, Math.max(value, start + 15))}
           onCommit={(value) => onCommit(start, Math.max(value, start + 15))}
         />

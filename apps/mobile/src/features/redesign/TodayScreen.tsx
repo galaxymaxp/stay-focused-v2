@@ -50,6 +50,8 @@ export function TodayScreen() {
   );
   const client = useExperienceClient();
   const { sync } = useCanvasSync();
+  // Dragging a ring handle downward must never start pull-to-refresh.
+  const [ringActive, setRingActive] = useState(false);
   const requestBusy = useRef(false);
   const [start, setStart] = useState(() =>
     Math.min(
@@ -141,9 +143,11 @@ export function TodayScreen() {
         void sync();
       }}
       actions={[{ label: "Schedule & availability", onPress: () => setExpanded(!expanded) }]}
+      refreshEnabled={!ringActive}
     >
       <SyncStatus />
       <DayRingClock
+        onAdjustingChange={setRingActive}
         date={date}
         timeline={today.data?.timeline ?? []}
         start={start}

@@ -555,6 +555,21 @@ describe("B25 screen interactions", () => {
     await act(async () => open.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith({ pathname: "/activity", params: { id: "missed" } });
   });
+  it("pauses pull-to-refresh while a ring handle is held", async () => {
+    vi.useFakeTimers();
+    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    const root = await render(createElement(TodayScreen));
+    const page = () => root.findAll((node) => String(node.type) === "Page")[0]!;
+    expect(page().props.refreshEnabled).toBe(true);
+    const handle = root.findAll((node) => String(node.type) === "AnimatedView").find((node) => node.props.accessibilityLabel === "Availability end")!;
+    await act(async () => {
+      handle.props.onPanResponderGrant();
+      vi.advanceTimersByTime(300);
+    });
+    expect(page().props.refreshEnabled).toBe(false);
+    await act(async () => handle.props.onPanResponderRelease());
+    expect(page().props.refreshEnabled).toBe(true);
+  });
   it("sends a planner preview when the ring is committed, never applying silently", async () => {
     mocks.data["/api/experience/capabilities"] = workspace.capabilities;
     mocks.data[

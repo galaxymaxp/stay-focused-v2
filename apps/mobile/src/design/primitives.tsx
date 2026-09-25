@@ -192,6 +192,7 @@ export function Page({
   headerBelow,
   scrollEnabled = true,
   scrollTouch,
+  refreshEnabled = true,
 }: {
   children: ReactNode;
   title: string;
@@ -215,6 +216,8 @@ export function Page({
    * Raw touch observers on the scroll view. They bubble from any content and
    * never claim the gesture, so native scrolling is unaffected.
    */
+  /** Turn pull-to-refresh off while a gesture on the page owns vertical drags. */
+  refreshEnabled?: boolean;
   scrollTouch?: Pick<React.ComponentProps<typeof ScrollView>, "onTouchStart" | "onTouchMove" | "onTouchEnd" | "onTouchCancel">;
 }) {
   const { colors, mode } = useTheme();
@@ -295,7 +298,7 @@ export function Page({
           {...scrollTouch}
           scrollEventThrottle={onScroll ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
-          refreshControl={pullToRefresh ? <RefreshControl refreshing={pulling} onRefresh={pullToRefresh} tintColor={colors.textSecondary} colors={[colors.accent]} progressBackgroundColor={colors.surfaceElevated} /> : undefined}
+          refreshControl={pullToRefresh ? <RefreshControl enabled={refreshEnabled} refreshing={pulling} onRefresh={pullToRefresh} tintColor={colors.textSecondary} colors={[colors.accent]} progressBackgroundColor={colors.surfaceElevated} /> : undefined}
           contentContainerStyle={{
             paddingHorizontal: spacing[5],
             paddingBottom: 32,
