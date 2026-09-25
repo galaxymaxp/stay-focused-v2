@@ -13,13 +13,15 @@ import { AppState } from "react-native";
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import {
+  isFinishedSyncJob,
   latestSuccessfulSync,
   shouldAutoSync,
   startAccountCanvasSync,
   summarizeSyncJobs,
   type AccountSyncSnapshot,
 } from "../../services/canvasAccountSync";
-import { listCanvasCourses, type CanvasSyncJobStatusView } from "../../services/canvasApi";
+import { getCanvasSyncJob, listCanvasCourses, type CanvasSyncJobStatusView } from "../../services/canvasApi";
+import { upsertActiveCanvasSyncJob } from "../../services/activeCanvasSyncJobStore";
 import {
   reconcileCanvasSyncJobs,
   startDurableCanvasSync,
@@ -95,14 +97,28 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     setDataVersion((value) => value + 1);
   }, [refreshLastSynced]);
 
+  // Poll the jobs this refresh started by id. The stored references are only
+  // a recovery aid; a missing reference must never freeze the progress count.
   const poll = useCallback(async () => {
     clearTimeout(pollTimer.current);
     const input = request();
     if (!input || !live.current) return;
     if (AppState.currentState === "active") {
-      const { jobs } = await reconcileCanvasSyncJobs(input);
-      for (const job of jobs) {
-        if (job.jobType === "course_content" && tracked.current.has(job.id)) tracked.current.set(job.id, job);
+      try {
+        const pending = [...tracked.current.values()].filter((job) => !isFinishedSyncJob(job));
+        const results = await Promise.all(pending.map((job) => getCanvasSyncJob({ ...input, jobId: job.id })));
+        for (const [index, result] of results.entries()) {
+          if (result.ok) {
+            tracked.current.set(result.data.id, result.data);
+            await upsertActiveCanvasSyncJob(input.ownerUserId, result.data);
+          } else if (result.error.status === 404) {
+            // The server no longer knows this job; it can never finish.
+            tracked.current.delete(pending[index]!.id);
+            rejectedCount.current += 1;
+          }
+        }
+      } catch {
+        diagnose("poll_failed");
       }
       const summary = summarizeSyncJobs([...tracked.current.values()], rejectedCount.current);
       if (!live.current) return;

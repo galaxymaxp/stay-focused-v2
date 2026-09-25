@@ -4,9 +4,15 @@ const storage = vi.hoisted(() => new Map<string, string>());
 
 vi.mock("../auth/sessionStore", () => ({
   sessionStore: {
-    getItem: vi.fn(async (key: string) => storage.get(key) ?? null),
+    getItem: vi.fn(async (key: string) => {
+      await new Promise((resolve) => setTimeout(resolve, Math.random() * 3));
+      return storage.get(key) ?? null;
+    }),
     removeItem: vi.fn(async (key: string) => storage.delete(key)),
-    setItem: vi.fn(async (key: string, value: string) => storage.set(key, value)),
+    setItem: vi.fn(async (key: string, value: string) => {
+      await new Promise((resolve) => setTimeout(resolve, Math.random() * 3));
+      storage.set(key, value);
+    }),
   },
 }));
 
@@ -38,6 +44,17 @@ describe("active Canvas sync job store", () => {
       jobId: "job-1",
       lastKnownStatus: "queued",
     });
+  });
+
+  it("keeps every course's intent when several syncs start at once", async () => {
+    // Real SecureStore calls are asynchronous; interleaved read-modify-write
+    // cycles on the single key used to drop intents.
+    const courses = ["c1", "c2", "c3", "c4", "c5", "c6"];
+    const intents = await Promise.all(courses.map((courseId) => reserveCanvasSyncIntent({ ...intent(), courseId })));
+    await Promise.all(intents.map((item, index) => upsertActiveCanvasSyncJob("user-1", { ...acceptedJob(), id: `job-${index}`, course: { id: item.courseId, displayName: "Course", courseCode: null } })));
+    const stored = await readActiveCanvasSyncJobs("user-1");
+    expect(stored.map((item) => item.courseId).sort()).toEqual(courses);
+    expect(stored.every((item) => item.jobId?.startsWith("job-"))).toBe(true);
   });
 
   it("does not expose one owner's jobs to another owner", async () => {

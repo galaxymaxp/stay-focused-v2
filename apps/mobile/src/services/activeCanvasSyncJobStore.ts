@@ -18,6 +18,18 @@ const RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
  */
 const PENDING_INTENT_REUSE_MS = 10 * 60 * 1_000;
 
+/**
+ * All references live under one storage key, so every change is a
+ * read-modify-write. Several courses sync at once; without serialization the
+ * interleaved writes drop references, and a dropped job is never reconciled.
+ */
+let pendingWrite: Promise<unknown> = Promise.resolve();
+function serialized<T>(operation: () => Promise<T>): Promise<T> {
+  const run = pendingWrite.then(operation, operation);
+  pendingWrite = run.catch(() => undefined);
+  return run;
+}
+
 export interface ActiveCanvasSyncJobReference {
   readonly ownerUserId: string;
   readonly courseId: string;
@@ -34,83 +46,87 @@ export interface ActiveCanvasSyncJobReference {
   readonly safeErrorMessage: string | null;
 }
 
-export async function reserveCanvasSyncIntent(input: {
+export function reserveCanvasSyncIntent(input: {
   readonly ownerUserId: string;
   readonly courseId: string;
   readonly courseDisplayName: string;
   readonly jobType: CanvasSyncJobType;
 }): Promise<ActiveCanvasSyncJobReference> {
-  const references = await readAll();
-  const existing = references.find(
-    (item) =>
-      item.ownerUserId === input.ownerUserId &&
-      item.courseId === input.courseId &&
-      item.jobType === input.jobType &&
-      item.lastKnownStatus === "creating" &&
-      Date.now() - Date.parse(item.createdAt) < PENDING_INTENT_REUSE_MS,
-  );
-  if (existing) return existing;
+  return serialized(async () => {
+    const references = await readAll();
+    const existing = references.find(
+      (item) =>
+        item.ownerUserId === input.ownerUserId &&
+        item.courseId === input.courseId &&
+        item.jobType === input.jobType &&
+        item.lastKnownStatus === "creating" &&
+        Date.now() - Date.parse(item.createdAt) < PENDING_INTENT_REUSE_MS,
+    );
+    if (existing) return existing;
 
-  const now = new Date().toISOString();
-  const reference: ActiveCanvasSyncJobReference = {
-    ...input,
-    idempotencyKey: createCanvasSyncIdempotencyKey(input.jobType),
-    jobId: null,
-    createdAt: now,
-    lastKnownStatus: "creating",
-    lastStatusCheckAt: now,
-    updatedAt: now,
-    progressMessage: "Submitting Canvas synchronization",
-    retryable: true,
-    safeErrorMessage: null,
-  };
-  await write([
-    reference,
-    ...references.filter((item) => !sameIntent(item, reference)),
-  ]);
-  return reference;
+    const now = new Date().toISOString();
+    const reference: ActiveCanvasSyncJobReference = {
+      ...input,
+      idempotencyKey: createCanvasSyncIdempotencyKey(input.jobType),
+      jobId: null,
+      createdAt: now,
+      lastKnownStatus: "creating",
+      lastStatusCheckAt: now,
+      updatedAt: now,
+      progressMessage: "Submitting Canvas synchronization",
+      retryable: true,
+      safeErrorMessage: null,
+    };
+    await write([
+      reference,
+      ...references.filter((item) => !sameIntent(item, reference)),
+    ]);
+    return reference;
+  });
 }
 
-export async function upsertActiveCanvasSyncJob(
+export function upsertActiveCanvasSyncJob(
   ownerUserId: string,
   job: CanvasSyncJobStatusView,
 ): Promise<void> {
-  const references = await readAll();
-  const previous = references.find(
-    (item) =>
-      item.ownerUserId === ownerUserId &&
-      (item.jobId === job.id ||
-        (item.courseId === job.course.id && item.jobType === job.jobType)),
-  );
-  const now = new Date().toISOString();
-  const reference: ActiveCanvasSyncJobReference = {
-    ownerUserId,
-    courseId: job.course.id,
-    courseDisplayName: job.course.displayName,
-    jobType: job.jobType,
-    idempotencyKey:
-      previous?.idempotencyKey ?? createCanvasSyncIdempotencyKey(job.jobType),
-    jobId: job.id,
-    createdAt: job.createdAt,
-    lastKnownStatus: job.status,
-    lastStatusCheckAt: now,
-    updatedAt: job.updatedAt,
-    progressMessage: job.progress.message,
-    retryable: job.retryable,
-    safeErrorMessage: job.safeErrorMessage,
-  };
-  await write([
-    reference,
-    ...references.filter(
+  return serialized(async () => {
+    const references = await readAll();
+    const previous = references.find(
       (item) =>
-        item.jobId !== job.id &&
-        !(
-          item.ownerUserId === ownerUserId &&
-          item.courseId === job.course.id &&
-          item.jobType === job.jobType
-        ),
-    ),
-  ]);
+        item.ownerUserId === ownerUserId &&
+        (item.jobId === job.id ||
+          (item.courseId === job.course.id && item.jobType === job.jobType)),
+    );
+    const now = new Date().toISOString();
+    const reference: ActiveCanvasSyncJobReference = {
+      ownerUserId,
+      courseId: job.course.id,
+      courseDisplayName: job.course.displayName,
+      jobType: job.jobType,
+      idempotencyKey:
+        previous?.idempotencyKey ?? createCanvasSyncIdempotencyKey(job.jobType),
+      jobId: job.id,
+      createdAt: job.createdAt,
+      lastKnownStatus: job.status,
+      lastStatusCheckAt: now,
+      updatedAt: job.updatedAt,
+      progressMessage: job.progress.message,
+      retryable: job.retryable,
+      safeErrorMessage: job.safeErrorMessage,
+    };
+    await write([
+      reference,
+      ...references.filter(
+        (item) =>
+          item.jobId !== job.id &&
+          !(
+            item.ownerUserId === ownerUserId &&
+            item.courseId === job.course.id &&
+            item.jobType === job.jobType
+          ),
+      ),
+    ]);
+  });
 }
 
 export async function readActiveCanvasSyncJobs(
@@ -119,8 +135,10 @@ export async function readActiveCanvasSyncJobs(
   return (await readAll()).filter((item) => item.ownerUserId === ownerUserId);
 }
 
-export async function removeActiveCanvasSyncJob(jobId: string): Promise<void> {
-  await write((await readAll()).filter((item) => item.jobId !== jobId));
+export function removeActiveCanvasSyncJob(jobId: string): Promise<void> {
+  return serialized(async () => {
+    await write((await readAll()).filter((item) => item.jobId !== jobId));
+  });
 }
 
 export function isActiveCanvasSyncStatus(
