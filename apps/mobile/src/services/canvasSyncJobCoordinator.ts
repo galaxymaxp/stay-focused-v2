@@ -12,6 +12,7 @@ import {
 import {
   isActiveCanvasSyncStatus,
   readActiveCanvasSyncJobs,
+  removeActiveCanvasSyncJob,
   reserveCanvasSyncIntent,
   upsertActiveCanvasSyncJob,
   type ActiveCanvasSyncJobReference,
@@ -25,12 +26,46 @@ export async function startDurableCanvasSync(
     readonly jobType: CanvasSyncJobType;
   },
 ): Promise<CanvasApiResult<CanvasSyncJobStatusView>> {
+  const requestedAt = Date.now();
+  const previous = (await readActiveCanvasSyncJobs(input.ownerUserId)).find(
+    (item) =>
+      item.courseId === input.courseId &&
+      item.jobType === input.jobType &&
+      item.jobId !== null &&
+      isActiveCanvasSyncStatus(item.lastKnownStatus),
+  );
   const intent = await reserveCanvasSyncIntent(input);
-  const result = await submitIntent(input, intent);
+  let result = await submitIntent(input, intent);
+
+  // A key the server already knows replays its original job. A finished job
+  // created before this request is that replay, not a new sync: record it and
+  // submit once more under a fresh key.
+  if (result.ok && isReplayedFinishedJob(result.data, requestedAt)) {
+    await upsertActiveCanvasSyncJob(input.ownerUserId, result.data);
+    result = await submitIntent(input, await reserveCanvasSyncIntent(input));
+  }
+
+  // The course already has a running job. Report that job rather than a failure.
+  if (!result.ok && result.error.code === "sync_in_progress" && previous?.jobId) {
+    const running = await getCanvasSyncJob({ ...input, jobId: previous.jobId });
+    if (running.ok) result = running;
+  }
+
   if (result.ok) {
     await upsertActiveCanvasSyncJob(input.ownerUserId, result.data);
   }
   return result;
+}
+
+const REPLAY_TOLERANCE_MS = 60_000;
+
+export function isReplayedFinishedJob(
+  job: CanvasSyncJobStatusView,
+  requestedAt: number,
+): boolean {
+  if (isActiveCanvasSyncStatus(job.status)) return false;
+  const createdAt = Date.parse(job.createdAt);
+  return Number.isFinite(createdAt) && createdAt < requestedAt - REPLAY_TOLERANCE_MS;
 }
 
 export async function reconcileCanvasSyncJobs(
@@ -48,7 +83,14 @@ export async function reconcileCanvasSyncJobs(
     const result = reference.jobId
       ? await getCanvasSyncJob({ ...input, jobId: reference.jobId })
       : await submitIntent(input, reference);
-    if (!result.ok) continue;
+    if (!result.ok) {
+      // A job the server no longer knows can never finish; stop tracking it so
+      // it cannot hold the course in a permanent "syncing" state.
+      if (reference.jobId && result.error.status === 404) {
+        await removeActiveCanvasSyncJob(reference.jobId);
+      }
+      continue;
+    }
 
     jobs.push(result.data);
     if (

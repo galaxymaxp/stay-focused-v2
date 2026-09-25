@@ -5,6 +5,7 @@ import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { useTheme } from "../../design/theme";
 import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
+import { useCanvasSync } from "../sync/CanvasSyncProvider";
 
 export function useExperienceClient() {
   const { session } = useAuth();
@@ -26,6 +27,9 @@ export function useExperience<T>(
   pollCondition.current = pollWhile;
   const focused = useIsFocused();
   const { active } = useTheme();
+  // A finished Canvas sync bumps this so every mounted screen reloads its data
+  // in place, without clearing what is already shown.
+  const { dataVersion } = useCanvasSync();
   const [version, setVersion] = useState(0);
   const [state, setState] = useState<{
     data: T | null;
@@ -67,6 +71,6 @@ export function useExperience<T>(
       controller.abort();
       clearTimeout(timer);
     };
-  }, [client, path, focused, active, version, pollMs]);
+  }, [client, path, focused, active, version, dataVersion, pollMs]);
   return { ...state, refresh };
 }

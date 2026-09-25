@@ -2031,6 +2031,7 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
     case "canvas_connection_corrupt":
       return "corrupted_credentials";
     case "canvas_sync_in_progress":
+    case "canvas_sync_job_in_progress":
       return "sync_in_progress";
     case "canvas_course_not_found":
       return "course_not_found";

@@ -8,6 +8,15 @@ import type {
 const STORAGE_KEY = "stay-focused-v2.canvas-sync-jobs.v1";
 const MAX_REFERENCES = 40;
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
+/**
+ * An unacknowledged submission may be resent with its key so a lost response
+ * cannot create a duplicate job. Anything older, or any intent the server has
+ * already accepted, gets a fresh key: the server keeps keys for 30 days and
+ * replays the original job, so reusing one would return an old, finished sync
+ * instead of starting a new one. One active job per course is enforced
+ * server-side, so a fresh key can never run two syncs at once.
+ */
+const PENDING_INTENT_REUSE_MS = 10 * 60 * 1_000;
 
 export interface ActiveCanvasSyncJobReference {
   readonly ownerUserId: string;
@@ -37,7 +46,8 @@ export async function reserveCanvasSyncIntent(input: {
       item.ownerUserId === input.ownerUserId &&
       item.courseId === input.courseId &&
       item.jobType === input.jobType &&
-      isActiveStatus(item.lastKnownStatus),
+      item.lastKnownStatus === "creating" &&
+      Date.now() - Date.parse(item.createdAt) < PENDING_INTENT_REUSE_MS,
   );
   if (existing) return existing;
 
