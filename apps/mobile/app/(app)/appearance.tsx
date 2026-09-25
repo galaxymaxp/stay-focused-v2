@@ -40,6 +40,7 @@ export default function Appearance() {
         <Copy muted size="caption">Reduced motion follows your device setting: {reducedMotion ? "on" : "off"}.</Copy>
       </Surface>
       {error ? <Notice>{error}</Notice> : null}
+      {__DEV__ ? <Action secondary onPress={() => router.push("/generation-core-lab" as never)}>Knowledge Core Lab</Action> : null}
       <Action secondary onPress={() => router.push("/canvas-settings")}>Canvas connection & courses</Action>
       <Action secondary onPress={() => router.push("/settings")}>Account & sign out</Action>
     </Page>
