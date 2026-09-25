@@ -1,21 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { CORE_MOTION_PROFILES, CORE_STATES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, coreShimmerTarget, coreSpinTarget, REDUCED_MOTION_RATE } from "./coreModel";
+import { CORE_MOTION_PROFILES, CORE_STATES, coreAccessibilityLabel, coreMotionRate, coreShimmerTarget, coreSpinTarget, REDUCED_MOTION_RATE } from "./coreModel";
 
 describe("Knowledge Core state model", () => {
-  it("uses an achromatic palette with equal RGB channels in every mode", () => {
-    for (const mode of ["light", "dark"] as const) {
-      const palette = coreRibbonPalette(mode);
-      expect(palette).toHaveLength(3);
-      palette.forEach((color) => {
-        expect(color).toMatch(/^#[0-9A-F]{6}$/);
-        expect(color.slice(1, 3)).toBe(color.slice(3, 5));
-        expect(color.slice(3, 5)).toBe(color.slice(5, 7));
-      });
-    }
-    expect(coreRibbonPalette("light")).not.toEqual(coreRibbonPalette("dark"));
-  });
-
   it("keeps every successful state moving, including slow settled completion", () => {
     for (const state of CORE_STATES.filter((value) => value !== "error")) {
       expect(coreMotionRate(state, false, CORE_MOTION_PROFILES[state].completion)).toBeGreaterThan(0);

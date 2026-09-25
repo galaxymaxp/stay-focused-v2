@@ -11,6 +11,7 @@ export const CORE_STATES = [
 
 export type CoreState = (typeof CORE_STATES)[number];
 
+
 /** Share of the normal clock kept under Reduced Motion: a slow drift, never a freeze. */
 export const REDUCED_MOTION_RATE = 0.1;
 
@@ -66,13 +67,6 @@ export const CORE_STATE_COPY: Record<CoreState, { readonly title: string; readon
 };
 
 export type CoreLabTheme = "light" | "dark" | "uc_light" | "uc_dark";
-
-/** Achromatic pearl/silver in every theme; only tonal depth changes. */
-export function coreRibbonPalette(mode: "light" | "dark"): readonly [string, string, string] {
-  return mode === "dark"
-    ? ["#C8C8C8", "#969696", "#ECECEC"]
-    : ["#989898", "#707070", "#C8C8C8"];
-}
 
 export function coreLabTheme(
   key: CoreLabTheme,

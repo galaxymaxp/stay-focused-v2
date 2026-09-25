@@ -5,64 +5,25 @@ import { AppState, Pressable, StyleSheet, View } from "react-native";
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
-import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, coreShimmerTarget, coreSpinTarget, type CoreState } from "./coreModel";
-import { createLivingRibbon } from "./livingRibbon";
-import { createCoreOrb } from "./coreOrb";
+import {
+  CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreShimmerTarget, coreSpinTarget, type CoreState,
+} from "./coreModel";
+import { createOrbAura } from "./orbAura";
+import { createOrbBody } from "./orbBody";
 
 const DEFAULT_SIZE = 320;
-
-const SHELL_VERTEX = `
-uniform float uTime;
-uniform float uActivity;
-uniform float uOrder;
-uniform float uTouch;
-varying vec3 vNormal;
-varying vec3 vWorldPosition;
-varying float vWave;
-void main() {
-  vec3 p = position;
-  float waveA = sin(p.y * 4.2 + uTime * 0.72) * cos(p.z * 3.4 - uTime * 0.46);
-  float waveB = sin(p.x * 5.1 - uTime * 0.58 + p.y * 2.3);
-  float movement = (0.018 + uActivity * 0.028) * (1.0 - uOrder * 0.62);
-  p += normal * ((waveA * 0.68 + waveB * 0.32) * movement + uTouch * 0.018);
-  p.x += p.y * p.y * 0.055 - 0.025;
-  p.y *= 1.08;
-  p.z *= 0.9;
-  vWave = waveA * 0.5 + 0.5;
-  vNormal = normalize(mat3(modelMatrix) * normal);
-  vec4 worldPosition = modelMatrix * vec4(p, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}`;
-
-const SHELL_FRAGMENT = `
-uniform vec3 uAccent;
-uniform vec3 uSecondary;
-uniform float uCompletion;
-uniform float uError;
-uniform vec3 uGlowColor;
-uniform float uShimmerLevel;
-varying vec3 vNormal;
-varying vec3 vWorldPosition;
-varying float vWave;
-void main() {
-  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-  float facing = max(dot(normalize(vNormal), viewDirection), 0.0);
-  float fresnel = pow(1.0 - facing, 2.35);
-  float edge = pow(1.0 - facing, 5.0);
-  float highlight = pow(max(dot(normalize(vNormal), normalize(vec3(-0.45, 0.72, 0.8))), 0.0), 26.0);
-  vec3 color = mix(vec3(0.42), uSecondary, 0.12 + vWave * 0.08);
-  color += uAccent * fresnel * 0.22 + vec3(1.0) * highlight * 0.82;
-  color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))), uError * 0.74);
-  color += vec3(0.96) * uCompletion * edge * 0.22;
-  // The shell's rim catches the orb's light and wavers with it.
-  float caught = fresnel * (0.12 + uShimmerLevel * 0.08);
-  color += uGlowColor * caught;
-  gl_FragColor = vec4(color, min(fresnel * 0.12 + edge * 0.08 + highlight * 0.08, 0.2) + caught * 0.3);
-}`;
+/** Radians per second at full spin (generating): about one turn every seven seconds. */
+const ORB_MAX_SPIN = 0.9;
+const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
+const CAMERA_DISTANCE = 4.55;
+const CAMERA_FOV = 36;
 
 interface SceneController { renderForChange: () => void; dispose: () => void }
-interface RuntimeProps { state: CoreState; colors: ThemeColors; mode: "light" | "dark"; reducedMotion: boolean; active: boolean; focused: boolean }
+interface RuntimeProps {
+  state: CoreState; colors: ThemeColors; mode: "light" | "dark";
+  reducedMotion: boolean; active: boolean; focused: boolean;
+}
+interface TouchState { strength: number; x: number; y: number; age: number }
 
 export interface KnowledgeCoreProps {
   readonly state: CoreState;
@@ -78,7 +39,7 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const runtime = useRef<RuntimeProps>({ state, colors, mode, reducedMotion, active: active && foreground, focused });
   const controller = useRef<SceneController | null>(null);
-  const touch = useRef({ strength: 0, x: 0, y: 0 });
+  const touch = useRef<TouchState>({ strength: 0, x: 0, y: 0, age: 10 });
   runtime.current = { state, colors, mode, reducedMotion, active: active && foreground, focused };
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => setForeground(next === "active"));
@@ -112,11 +73,10 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
         accessibilityState={{ busy: ["reading", "generating", "finalizing"].includes(state) }}
         hitSlop={8}
         onPressIn={(event) => {
-          touch.current = { strength: reducedMotion ? 0.25 : 1, x: event.nativeEvent.locationX / size - 0.5, y: event.nativeEvent.locationY / size - 0.5 };
-          controller.current?.renderForChange();
-        }}
-        onPressOut={() => {
-          touch.current.strength = reducedMotion ? 0 : 0.72;
+          touch.current = {
+            strength: reducedMotion ? 0.25 : 1, age: 0,
+            x: event.nativeEvent.locationX / size - 0.5, y: event.nativeEvent.locationY / size - 0.5,
+          };
           controller.current?.renderForChange();
         }}
         style={styles.touchTarget}
@@ -129,7 +89,7 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
 function buildScene(
   gl: ExpoWebGLRenderingContext,
   runtime: React.MutableRefObject<RuntimeProps>,
-  touch: React.MutableRefObject<{ strength: number; x: number; y: number }>,
+  touch: React.MutableRefObject<TouchState>,
 ): SceneController {
   const canvas = {
     width: gl.drawingBufferWidth,
@@ -152,52 +112,18 @@ function buildScene(
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.02;
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-  camera.position.set(0, 0.02, 4.55);
+  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.position.set(0, 0.02, CAMERA_DISTANCE);
   const root = new THREE.Group();
-  root.rotation.set(-0.13, -0.26, -0.12);
   scene.add(root);
 
-  const shellUniforms = {
-    uTime: { value: 0 }, uActivity: { value: 0 }, uOrder: { value: 0 }, uTouch: { value: 0 },
-    uAccent: { value: new THREE.Color() }, uSecondary: { value: new THREE.Color() },
-    uCompletion: { value: 0 }, uError: { value: 0 },
-    uGlowColor: { value: new THREE.Color() }, uShimmerLevel: { value: 0 },
-  };
-  const shellMaterial = new THREE.ShaderMaterial({ vertexShader: SHELL_VERTEX, fragmentShader: SHELL_FRAGMENT, uniforms: shellUniforms, transparent: true, depthWrite: false, side: THREE.FrontSide });
-  const shellGeometry = new THREE.IcosahedronGeometry(1.03, 5);
-  const shell = new THREE.Mesh(shellGeometry, shellMaterial);
-  shell.renderOrder = 4;
-  root.add(shell);
-
-  const coreOrb = createCoreOrb();
-  root.add(coreOrb.orb);
-  scene.add(...coreOrb.glows);
-
-  const inner = new THREE.Group();
-  root.add(inner);
-  const ribbons = [0, 1, 2].map(createLivingRibbon);
-  ribbons.forEach((ribbon) => inner.add(ribbon.mesh));
-
-  const particlePositions = new Float32Array(270);
-  let seed = 19;
-  const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-  for (let index = 0; index < particlePositions.length; index += 3) {
-    const radius = 0.15 + random() * 0.77;
-    const theta = random() * Math.PI * 2;
-    const phi = Math.acos(2 * random() - 1);
-    particlePositions[index] = radius * Math.sin(phi) * Math.cos(theta);
-    particlePositions[index + 1] = radius * Math.cos(phi) * 0.92;
-    particlePositions[index + 2] = radius * Math.sin(phi) * Math.sin(theta) * 0.75;
-  }
-  const particleGeometry = new THREE.BufferGeometry();
-  particleGeometry.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-  const particleMaterial = new THREE.PointsMaterial({ color: 0x9fbaff, size: 0.025, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending });
-  const particles = new THREE.Points(particleGeometry, particleMaterial);
-  inner.add(particles);
+  const body = createOrbBody();
+  root.add(body.mesh);
+  const aura = createOrbAura();
+  scene.add(aura.mesh);
 
   const shardGeometry = new THREE.TetrahedronGeometry(0.105, 0);
-  const shardStarts = [new THREE.Vector3(-1.42, 0.62, 0.18), new THREE.Vector3(1.37, 0.22, -0.12), new THREE.Vector3(-1.18, -0.7, 0.38)];
+  const shardStarts = [new THREE.Vector3(-1.52, 0.66, 0.18), new THREE.Vector3(1.47, 0.24, -0.12), new THREE.Vector3(-1.28, -0.74, 0.38)];
   const shards = shardStarts.map((position, index) => {
     const material = new THREE.MeshPhysicalMaterial({ color: 0xaaaaaa, emissive: 0x555555, emissiveIntensity: 0.8, transparent: true, opacity: 0, roughness: 0.22, metalness: 0.22 });
     const shard = new THREE.Mesh(shardGeometry, material);
@@ -207,32 +133,19 @@ function buildScene(
     root.add(shard);
     return shard;
   });
-
   scene.add(new THREE.HemisphereLight(0xcccccc, 0x101010, 1.25));
   const key = new THREE.DirectionalLight(0xffffff, 4.2);
   key.position.set(-3.2, 4.1, 4.8);
   scene.add(key);
-  const accentLight = new THREE.PointLight(0xffffff, 4.5, 7);
-  accentLight.position.set(2.2, -0.4, 2.1);
-  scene.add(accentLight);
 
   let requestId: number | null = null;
   let disposed = false;
   let lastFrame = Date.now();
   let animatedTime = 8.4;
-  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, spin = 0, shimmer = 0, life = 0, settleUntil = 0;
-  const coreView = new THREE.Vector3();
-  const coreLightColor = new THREE.Color();
-  const white = new THREE.Color(0xffffff);
-  const accent = new THREE.Color();
-  const secondary = new THREE.Color();
-  let paletteMode = runtime.current.mode;
-  const palette = coreRibbonPalette(paletteMode).map((color) => new THREE.Color(color));
-  ribbons.forEach(({ uniforms }) => {
-    uniforms.uColorA.value.copy(palette[0]!);
-    uniforms.uColorB.value.copy(palette[1]!);
-    uniforms.uColorC.value.copy(palette[2]!);
-  });
+  let spinAngle = 0;
+  let activity = 0, intake = 0, completion = 0, error = 0, spin = 0, shimmer = 0, life = 0, settleUntil = 0;
+  const spinMatrix = new THREE.Matrix3();
+  const spinRotation = new THREE.Matrix4();
 
   const draw = () => {
     if (disposed) return;
@@ -248,63 +161,26 @@ function buildScene(
     const ease = 1 - Math.pow(0.002, delta);
     activity += (profile.activity - activity) * ease;
     intake += (profile.intake - intake) * ease;
-    order += (profile.order - order) * ease;
     completion += (profile.completion - completion) * ease;
     error += (profile.error - error) * ease;
-    // Spin and shimmer carry momentum between states; failure winds them down rather than cutting them.
+    // Spin, shimmer and liveliness carry momentum between states; failure winds them down rather than cutting them.
     const momentum = 1 - Math.pow(0.12, delta);
     const spinTarget = coreSpinTarget(current.state, current.reducedMotion);
     const shimmerTarget = coreShimmerTarget(current.state, current.reducedMotion);
+    const lifeTarget = current.reducedMotion ? 0.15 : 0.35 + activity * 0.65;
     spin += (spinTarget - spin) * momentum;
     shimmer += (shimmerTarget - shimmer) * momentum;
-    // How much the ribbons swim, curl and ruffle; eased so the shape never snaps between states.
-    const lifeTarget = current.reducedMotion ? 0.15 : 0.35 + activity * 0.65;
     life += (lifeTarget - life) * momentum;
     const motionRate = coreMotionRate(current.state, current.reducedMotion, completion);
-    const moving = motionRate > 0;
     // Completion settles into a slow living state without resetting phase or pose.
     const motionDelta = delta * motionRate;
-    const rotationDelta = motionDelta * 0.22;
     animatedTime += motionDelta;
-    touch.current.strength *= Math.pow(0.08, delta);
+    spinAngle = (spinAngle + spin * ORB_MAX_SPIN * delta) % (Math.PI * 2);
+    spinMatrix.setFromMatrix4(spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle));
+    touch.current.strength *= Math.pow(0.2, delta);
+    touch.current.age += delta;
 
-    accent.set("#C8C8C8");
-    secondary.set("#ACACAC");
-    if (paletteMode !== current.mode) {
-      paletteMode = current.mode;
-      coreRibbonPalette(paletteMode).forEach((color, index) => palette[index]!.set(color));
-    }
-    shellUniforms.uTime.value = animatedTime;
-    shellUniforms.uActivity.value = activity;
-    shellUniforms.uOrder.value = order;
-    shellUniforms.uTouch.value = touch.current.strength;
-    shellUniforms.uAccent.value.copy(accent);
-    shellUniforms.uSecondary.value.copy(secondary);
-    shellUniforms.uCompletion.value = completion;
-    shellUniforms.uError.value = error;
-
-    const breathe = Math.sin(animatedTime * (0.68 + activity * 0.24));
-    root.position.y = breathe * (0.025 + activity * 0.018);
-    root.rotation.y += rotationDelta * (0.06 + activity * 0.14);
-    root.rotation.x = -0.13 + Math.sin(animatedTime * 0.31) * 0.045;
-    root.scale.setScalar(1 + completion * 0.025);
-    inner.rotation.y -= rotationDelta * (0.24 + activity * 0.72);
-    inner.rotation.z += rotationDelta * (0.1 + activity * 0.28);
-    ribbons.forEach(({ mesh: ribbon, uniforms }, index) => {
-      const direction = index % 2 === 0 ? 1 : -1;
-      ribbon.rotation.x += rotationDelta * (0.08 + activity * 0.35) * direction;
-      ribbon.rotation.z += rotationDelta * (0.06 + activity * 0.22) * -direction;
-      uniforms.uTime.value = animatedTime * 2.8;
-      uniforms.uLife.value = life;
-      uniforms.uGlow.value = (current.mode === "dark" ? 0.9 : 0.55) + activity * 0.38 + completion * 0.10;
-      uniforms.uError.value = error;
-      uniforms.uColorA.value.lerp(palette[0]!, ease);
-      uniforms.uColorB.value.lerp(palette[1]!, ease);
-      uniforms.uColorC.value.lerp(palette[2]!, ease);
-    });
-    particles.rotation.y += rotationDelta * (0.18 + activity * 0.65);
-    particleMaterial.color.copy(accent).lerp(white, 0.42);
-    particleMaterial.opacity = (0.22 + activity * 0.62) * (1 - error * 0.8);
+    root.position.y = Math.sin(animatedTime * 0.5) * 0.02;
     shards.forEach((shard, index) => {
       const phase = (animatedTime * (0.34 + index * 0.035) + index * 0.27) % 1;
       shard.position.copy(shardStarts[index]!).multiplyScalar(1 - phase * 0.7);
@@ -313,37 +189,30 @@ function buildScene(
       shard.rotation.y += motionDelta * 1.2;
       (shard.material as THREE.MeshPhysicalMaterial).opacity = intake * (1 - phase) * (current.reducedMotion ? 0.28 : 1);
     });
-    camera.position.x += (touch.current.x * 0.24 * touch.current.strength - camera.position.x) * Math.min(1, delta * 5);
-    camera.position.y += (-touch.current.y * 0.18 * touch.current.strength + 0.02 - camera.position.y) * Math.min(1, delta * 5);
+    const parallax = touch.current.strength * Math.min(1, touch.current.age * 3);
+    camera.position.x += (touch.current.x * 0.12 * parallax - camera.position.x) * Math.min(1, delta * 5);
+    camera.position.y += (-touch.current.y * 0.09 * parallax + 0.02 - camera.position.y) * Math.min(1, delta * 5);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
-    const heat = 0.35 + activity * 0.75 + completion * 0.2 + touch.current.strength * 0.18;
-    coreOrb.update({
-      delta, spin, shimmer, heat, error, mode: current.mode, camera,
+
+    const glow = 0.55 + activity * 0.5 + completion * 0.15;
+    aura.update({
+      delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
       // Reduced Motion keeps a steady glow.
       shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
-      glow: 0.55 + activity * 0.5 + completion * 0.15,
     });
-    const light = coreOrb.shimmer;
-    coreView.copy(coreOrb.center).applyMatrix4(camera.matrixWorldInverse);
-    coreLightColor.set(current.mode === "dark" ? "#D6E2FF" : "#B9CCF5");
-    const coreLight = (current.mode === "dark" ? 1.5 : 0.9) * (0.45 + activity * 0.55) * (1 - error);
-    ribbons.forEach(({ uniforms }) => {
-      uniforms.uCoreView.value.copy(coreView);
-      uniforms.uCoreColor.value.copy(coreLightColor);
-      uniforms.uCoreLight.value = coreLight;
-      uniforms.uShimmerTime.value = light.time;
-      uniforms.uShimmer.value = light.amount;
-      uniforms.uShimmerLevel.value = light.level;
+    body.update({
+      time: animatedTime, life, glow, error, spin: spinMatrix, mode: current.mode,
+      level: aura.shimmer.level,
+      // A touch stirs the liquid briefly.
+      stir: touch.current.strength,
     });
-    shellUniforms.uGlowColor.value.copy(coreLightColor).multiplyScalar(1 - error);
-    shellUniforms.uShimmerLevel.value = light.level * (1 - error);
     renderer.render(scene, camera);
     gl.endFrameEXP();
     const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
       || Math.abs(spin - spinTarget) > 0.004 || Math.abs(shimmer - shimmerTarget) > 0.004 || Math.abs(life - lifeTarget) > 0.004
       || touch.current.strength > 0.01;
-    requestId = moving || settling ? requestAnimationFrame(draw) : null;
+    requestId = motionRate > 0 || settling ? requestAnimationFrame(draw) : null;
   };
 
   return {
@@ -354,10 +223,9 @@ function buildScene(
     dispose: () => {
       disposed = true;
       if (requestId !== null) cancelAnimationFrame(requestId);
-      shellGeometry.dispose(); shellMaterial.dispose();
-      coreOrb.dispose();
-      ribbons.forEach((ribbon) => ribbon.dispose());
-      particleGeometry.dispose(); particleMaterial.dispose(); shardGeometry.dispose();
+      body.dispose();
+      aura.dispose();
+      shardGeometry.dispose();
       shards.forEach((shard) => (shard.material as THREE.Material).dispose());
       renderer.dispose();
     },
