@@ -5,8 +5,9 @@ import { AppState, Pressable, StyleSheet, View } from "react-native";
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
-import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, type CoreState } from "./coreModel";
+import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, coreSpinTarget, type CoreState } from "./coreModel";
 import { createLivingRibbon } from "./livingRibbon";
+import { createNeutronStar } from "./neutronStar";
 
 const DEFAULT_SIZE = 320;
 
@@ -48,47 +49,11 @@ void main() {
   float fresnel = pow(1.0 - facing, 2.35);
   float edge = pow(1.0 - facing, 5.0);
   float highlight = pow(max(dot(normalize(vNormal), normalize(vec3(-0.45, 0.72, 0.8))), 0.0), 26.0);
-  vec3 color = mix(vec3(0.34, 0.46, 0.68), uSecondary, 0.12 + vWave * 0.08);
-  color += uAccent * fresnel * 0.22 + vec3(1.0, 0.96, 0.9) * highlight * 0.82;
+  vec3 color = mix(vec3(0.42), uSecondary, 0.12 + vWave * 0.08);
+  color += uAccent * fresnel * 0.22 + vec3(1.0) * highlight * 0.82;
   color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))), uError * 0.74);
-  color += vec3(0.92, 0.94, 1.0) * uCompletion * edge * 0.22;
+  color += vec3(0.96) * uCompletion * edge * 0.22;
   gl_FragColor = vec4(color, min(fresnel * 0.12 + edge * 0.08 + highlight * 0.08, 0.2));
-}`;
-
-const CORE_VERTEX = `
-uniform float uTime;
-uniform float uActivity;
-varying vec3 vNormal;
-varying vec3 vWorldPosition;
-varying float vPulse;
-void main() {
-  vec3 p = position;
-  float pulse = sin(uTime * (1.15 + uActivity * 0.8) + p.y * 4.0) * 0.5 + 0.5;
-  p += normal * pulse * (0.018 + uActivity * 0.026);
-  p.x *= 0.94;
-  p.y *= 1.08;
-  vPulse = pulse;
-  vNormal = normalize(mat3(modelMatrix) * normal);
-  vec4 worldPosition = modelMatrix * vec4(p, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}`;
-
-const CORE_FRAGMENT = `
-uniform vec3 uAccent;
-uniform vec3 uSecondary;
-uniform float uActivity;
-uniform float uError;
-varying vec3 vNormal;
-varying vec3 vWorldPosition;
-varying float vPulse;
-void main() {
-  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-  float fresnel = pow(1.0 - max(dot(normalize(vNormal), viewDirection), 0.0), 2.0);
-  vec3 color = mix(vec3(0.018, 0.028, 0.08), uSecondary, 0.22 + vPulse * 0.17);
-  color += uAccent * (fresnel * 0.42 + vPulse * uActivity * 0.16);
-  color = mix(color, vec3(0.12, 0.13, 0.15), uError * 0.82);
-  gl_FragColor = vec4(color, 0.18 + fresnel * 0.1);
 }`;
 
 interface SceneController { renderForChange: () => void; dispose: () => void }
@@ -115,8 +80,20 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
     return () => subscription.remove();
   }, []);
   useEffect(() => controller.current?.renderForChange(), [active, colors, focused, foreground, mode, reducedMotion, state]);
-  useEffect(() => () => controller.current?.dispose(), []);
+  const context = useRef<ExpoWebGLRenderingContext | null>(null);
+  // Effects can re-run on a live GL context (Fast Refresh, StrictMode), so rebuild rather than stay disposed.
+  useEffect(() => {
+    if (context.current && !controller.current) {
+      controller.current = buildScene(context.current, runtime, touch);
+      controller.current.renderForChange();
+    }
+    return () => {
+      controller.current?.dispose();
+      controller.current = null;
+    };
+  }, []);
   const createScene = useCallback((gl: ExpoWebGLRenderingContext) => {
+    context.current = gl;
     controller.current?.dispose();
     controller.current = buildScene(gl, runtime, touch);
     controller.current.renderForChange();
@@ -187,14 +164,9 @@ function buildScene(
   shell.renderOrder = 4;
   root.add(shell);
 
-  const coreUniforms = {
-    uTime: { value: 0 }, uActivity: { value: 0 }, uAccent: { value: new THREE.Color() },
-    uSecondary: { value: new THREE.Color() }, uError: { value: 0 },
-  };
-  const coreMaterial = new THREE.ShaderMaterial({ vertexShader: CORE_VERTEX, fragmentShader: CORE_FRAGMENT, uniforms: coreUniforms, transparent: true, depthWrite: false });
-  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.58, 4), coreMaterial);
-  core.renderOrder = 1;
-  root.add(core);
+  const neutronStar = createNeutronStar();
+  root.add(neutronStar.star);
+  scene.add(...neutronStar.glows);
 
   const inner = new THREE.Group();
   root.add(inner);
@@ -221,7 +193,7 @@ function buildScene(
   const shardGeometry = new THREE.TetrahedronGeometry(0.105, 0);
   const shardStarts = [new THREE.Vector3(-1.42, 0.62, 0.18), new THREE.Vector3(1.37, 0.22, -0.12), new THREE.Vector3(-1.18, -0.7, 0.38)];
   const shards = shardStarts.map((position, index) => {
-    const material = new THREE.MeshPhysicalMaterial({ color: 0x8ba7ff, emissive: 0x2b377d, emissiveIntensity: 0.8, transparent: true, opacity: 0, roughness: 0.22, metalness: 0.22 });
+    const material = new THREE.MeshPhysicalMaterial({ color: 0xaaaaaa, emissive: 0x555555, emissiveIntensity: 0.8, transparent: true, opacity: 0, roughness: 0.22, metalness: 0.22 });
     const shard = new THREE.Mesh(shardGeometry, material);
     shard.position.copy(position);
     shard.scale.set(1.25, 0.55, 0.44);
@@ -230,11 +202,11 @@ function buildScene(
     return shard;
   });
 
-  scene.add(new THREE.HemisphereLight(0xb9ccff, 0x090b18, 1.25));
-  const key = new THREE.DirectionalLight(0xfff1df, 4.2);
+  scene.add(new THREE.HemisphereLight(0xcccccc, 0x101010, 1.25));
+  const key = new THREE.DirectionalLight(0xffffff, 4.2);
   key.position.set(-3.2, 4.1, 4.8);
   scene.add(key);
-  const accentLight = new THREE.PointLight(0x6d7dff, 4.5, 7);
+  const accentLight = new THREE.PointLight(0xffffff, 4.5, 7);
   accentLight.position.set(2.2, -0.4, 2.1);
   scene.add(accentLight);
 
@@ -242,13 +214,14 @@ function buildScene(
   let disposed = false;
   let lastFrame = Date.now();
   let animatedTime = 8.4;
-  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, settleUntil = 0;
+  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, spin = 0, settleUntil = 0;
+  const coreView = new THREE.Vector3();
+  const coreLightColor = new THREE.Color();
   const white = new THREE.Color(0xffffff);
   const accent = new THREE.Color();
   const secondary = new THREE.Color();
-  let paletteAccent = runtime.current.colors.accent;
   let paletteMode = runtime.current.mode;
-  const palette = coreRibbonPalette(paletteAccent, paletteMode).map((color) => new THREE.Color(color));
+  const palette = coreRibbonPalette(paletteMode).map((color) => new THREE.Color(color));
   ribbons.forEach(({ uniforms }) => {
     uniforms.uColorA.value.copy(palette[0]!);
     uniforms.uColorB.value.copy(palette[1]!);
@@ -272,19 +245,22 @@ function buildScene(
     order += (profile.order - order) * ease;
     completion += (profile.completion - completion) * ease;
     error += (profile.error - error) * ease;
+    // Spin carries momentum between states; failure winds it down rather than cutting it.
+    const spinTarget = coreSpinTarget(current.state, current.reducedMotion);
+    spin = current.reducedMotion ? 0 : spin + (spinTarget - spin) * (1 - Math.pow(0.12, delta));
     const motionRate = coreMotionRate(current.state, current.reducedMotion, completion);
     const moving = motionRate > 0;
     // Completion settles into a slow living state without resetting phase or pose.
     const motionDelta = delta * motionRate;
+    const rotationDelta = motionDelta * 0.22;
     animatedTime += motionDelta;
     touch.current.strength *= Math.pow(0.08, delta);
 
-    accent.set(current.colors.accent);
-    secondary.set(current.colors.violet);
-    if (paletteAccent !== current.colors.accent || paletteMode !== current.mode) {
-      paletteAccent = current.colors.accent;
+    accent.set("#C8C8C8");
+    secondary.set("#ACACAC");
+    if (paletteMode !== current.mode) {
       paletteMode = current.mode;
-      coreRibbonPalette(paletteAccent, paletteMode).forEach((color, index) => palette[index]!.set(color));
+      coreRibbonPalette(paletteMode).forEach((color, index) => palette[index]!.set(color));
     }
     shellUniforms.uTime.value = animatedTime;
     shellUniforms.uActivity.value = activity;
@@ -294,31 +270,26 @@ function buildScene(
     shellUniforms.uSecondary.value.copy(secondary);
     shellUniforms.uCompletion.value = completion;
     shellUniforms.uError.value = error;
-    coreUniforms.uTime.value = animatedTime;
-    coreUniforms.uActivity.value = activity;
-    coreUniforms.uAccent.value.copy(accent);
-    coreUniforms.uSecondary.value.copy(secondary);
-    coreUniforms.uError.value = error;
 
     const breathe = Math.sin(animatedTime * (0.68 + activity * 0.24));
     root.position.y = breathe * (0.025 + activity * 0.018);
-    root.rotation.y += motionDelta * (0.06 + activity * 0.14);
+    root.rotation.y += rotationDelta * (0.06 + activity * 0.14);
     root.rotation.x = -0.13 + Math.sin(animatedTime * 0.31) * 0.045;
     root.scale.setScalar(1 + completion * 0.025);
-    inner.rotation.y -= motionDelta * (0.24 + activity * 0.72);
-    inner.rotation.z += motionDelta * (0.1 + activity * 0.28);
+    inner.rotation.y -= rotationDelta * (0.24 + activity * 0.72);
+    inner.rotation.z += rotationDelta * (0.1 + activity * 0.28);
     ribbons.forEach(({ mesh: ribbon, uniforms }, index) => {
       const direction = index % 2 === 0 ? 1 : -1;
-      ribbon.rotation.x += motionDelta * (0.08 + activity * 0.35) * direction;
-      ribbon.rotation.z += motionDelta * (0.06 + activity * 0.22) * -direction;
-      uniforms.uTime.value = animatedTime;
+      ribbon.rotation.x += rotationDelta * (0.08 + activity * 0.35) * direction;
+      ribbon.rotation.z += rotationDelta * (0.06 + activity * 0.22) * -direction;
+      uniforms.uTime.value = animatedTime * 2.8;
       uniforms.uGlow.value = (current.mode === "dark" ? 0.9 : 0.55) + activity * 0.38 + completion * 0.10;
       uniforms.uError.value = error;
       uniforms.uColorA.value.lerp(palette[0]!, ease);
       uniforms.uColorB.value.lerp(palette[1]!, ease);
       uniforms.uColorC.value.lerp(palette[2]!, ease);
     });
-    particles.rotation.y += motionDelta * (0.18 + activity * 0.65);
+    particles.rotation.y += rotationDelta * (0.18 + activity * 0.65);
     particleMaterial.color.copy(accent).lerp(white, 0.42);
     particleMaterial.opacity = (0.22 + activity * 0.62) * (1 - error * 0.8);
     shards.forEach((shard, index) => {
@@ -332,9 +303,25 @@ function buildScene(
     camera.position.x += (touch.current.x * 0.24 * touch.current.strength - camera.position.x) * Math.min(1, delta * 5);
     camera.position.y += (-touch.current.y * 0.18 * touch.current.strength + 0.02 - camera.position.y) * Math.min(1, delta * 5);
     camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const heat = 0.35 + activity * 0.75 + completion * 0.2 + touch.current.strength * 0.18;
+    neutronStar.update({
+      delta, spin, heat, error, mode: current.mode, camera,
+      beam: 0.3 + activity * 0.7,
+      glow: 0.55 + activity * 0.5 + completion * 0.15,
+    });
+    coreView.copy(neutronStar.center).applyMatrix4(camera.matrixWorldInverse);
+    coreLightColor.set(current.mode === "dark" ? "#D6E2FF" : "#B9CCF5");
+    const coreLight = (current.mode === "dark" ? 1.5 : 0.9) * (0.45 + activity * 0.55) * (1 - error);
+    ribbons.forEach(({ uniforms }) => {
+      uniforms.uCoreView.value.copy(coreView);
+      uniforms.uCoreColor.value.copy(coreLightColor);
+      uniforms.uCoreLight.value = coreLight;
+    });
     renderer.render(scene, camera);
     gl.endFrameEXP();
-    const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006 || touch.current.strength > 0.01;
+    const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
+      || Math.abs(spin - spinTarget) > 0.004 || touch.current.strength > 0.01;
     requestId = moving || settling ? requestAnimationFrame(draw) : null;
   };
 
@@ -346,7 +333,8 @@ function buildScene(
     dispose: () => {
       disposed = true;
       if (requestId !== null) cancelAnimationFrame(requestId);
-      shellGeometry.dispose(); shellMaterial.dispose(); core.geometry.dispose(); coreMaterial.dispose();
+      shellGeometry.dispose(); shellMaterial.dispose();
+      neutronStar.dispose();
       ribbons.forEach((ribbon) => ribbon.dispose());
       particleGeometry.dispose(); particleMaterial.dispose(); shardGeometry.dispose();
       shards.forEach((shard) => (shard.material as THREE.Material).dispose());

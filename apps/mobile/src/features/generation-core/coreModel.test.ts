@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { CORE_MOTION_PROFILES, CORE_STATES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette } from "./coreModel";
+import { CORE_MOTION_PROFILES, CORE_STATES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, coreSpinTarget } from "./coreModel";
 
 describe("Knowledge Core state model", () => {
-  it("uses three bounded theme-specific colors instead of a rainbow cycle", () => {
-    for (const accent of ["#245DC8", "#AACBFF", "#9E1B32", "#F08C99"]) {
-      for (const mode of ["light", "dark"] as const) {
-        const palette = coreRibbonPalette(accent, mode);
-        expect(palette).toHaveLength(3);
-        palette.forEach((color) => expect(color).toMatch(/^#[0-9A-F]{6}$/));
-      }
+  it("uses an achromatic palette with equal RGB channels in every mode", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const palette = coreRibbonPalette(mode);
+      expect(palette).toHaveLength(3);
+      palette.forEach((color) => {
+        expect(color).toMatch(/^#[0-9A-F]{6}$/);
+        expect(color.slice(1, 3)).toBe(color.slice(3, 5));
+        expect(color.slice(3, 5)).toBe(color.slice(5, 7));
+      });
     }
-    expect(coreRibbonPalette("#9E1B32", "dark")).toEqual(coreRibbonPalette("#f08c99", "dark"));
-    expect(coreRibbonPalette("#9E1B32", "dark")).not.toEqual(coreRibbonPalette("#AACBFF", "dark"));
-    expect(coreRibbonPalette("#AACBFF", "light")).not.toEqual(coreRibbonPalette("#AACBFF", "dark"));
+    expect(coreRibbonPalette("light")).not.toEqual(coreRibbonPalette("dark"));
   });
 
   it("keeps every successful state moving, including slow settled completion", () => {
@@ -27,6 +27,20 @@ describe("Knowledge Core state model", () => {
   it("stops on failure and respects Reduced Motion in every state", () => {
     expect(coreMotionRate("error", false, 0)).toBe(0);
     for (const state of CORE_STATES) expect(coreMotionRate(state, true, 0)).toBe(0);
+  });
+
+  it("spins the central star with the work and stops it only on failure", () => {
+    const spin = (state: (typeof CORE_STATES)[number]) => coreSpinTarget(state, false);
+    expect(spin("generating")).toBe(1);
+    for (const state of CORE_STATES.filter((value) => value !== "generating")) {
+      expect(spin(state)).toBeLessThan(spin("generating"));
+    }
+    expect(spin("reading")).toBeGreaterThan(spin("idle"));
+    expect(spin("finalizing")).toBeLessThan(spin("generating"));
+    expect(spin("complete")).toBeGreaterThan(0);
+    expect(spin("complete")).toBeLessThan(spin("idle"));
+    expect(spin("error")).toBe(0);
+    for (const state of CORE_STATES) expect(coreSpinTarget(state, true)).toBe(0);
   });
 
   it("defines a complete bounded profile for every lab state", () => {

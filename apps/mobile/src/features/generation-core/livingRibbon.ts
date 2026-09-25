@@ -54,6 +54,9 @@ uniform float uError;
 uniform vec3 uColorA;
 uniform vec3 uColorB;
 uniform vec3 uColorC;
+uniform vec3 uCoreView;
+uniform vec3 uCoreColor;
+uniform float uCoreLight;
 varying vec2 vRibbonUv;
 varying vec3 vNormal;
 varying vec3 vViewPosition;
@@ -68,18 +71,25 @@ void main() {
   float diffuse = max(dot(n, lightDir), 0.0);
   float fresnel = pow(1.0 - abs(dot(n, viewDir)), 2.0);
   float specular = pow(max(dot(n, normalize(lightDir + viewDir)), 0.0), 38.0);
-  float edge = smoothstep(0.72, 0.98, abs(vRibbonUv.y));
-  float flow = 0.7 + 0.3 * sin(vRibbonUv.x * 2.0 - uTime * 0.32 + uIndex);
-  vec3 color = palette * (0.20 + diffuse * 0.52);
-  color += vec3(0.80, 0.88, 1.0) * specular * 0.62;
-  color += palette * (edge * 0.65 + fresnel * 0.28 + flow * 0.09) * uGlow;
+  // The body reflects light but does not emit a bright stripe from inside.
+  vec3 color = palette * (0.17 + diffuse * 0.48 + fresnel * 0.09);
+  color += vec3(1.0) * specular * 0.32;
+  // The central star lights the ribbons from inside, strongest on its nearest faces.
+  vec3 toCore = uCoreView + vViewPosition;
+  float coreDistance = length(toCore);
+  // Only faces turned toward the star catch it; outer faces keep their silver shading.
+  float coreFacing = max(dot(n, toCore / coreDistance), 0.0) * 0.9 + 0.06;
+  color += uCoreColor * coreFacing * uCoreLight / (1.0 + coreDistance * coreDistance * 14.0);
   color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))) * 0.26, uError);
   float alpha = 1.0;
   if (uHalo > 0.5) {
-    float spread = exp(-pow((abs(vRibbonUv.y) - 0.76) * 5.0, 2.0));
-    float fade = 1.0 - smoothstep(0.78, 1.0, abs(vRibbonUv.y));
-    color = palette;
-    alpha = spread * fade * uGlow * 0.20 * (1.0 - uError);
+    // Expanded width is 1.32x: the real edge lies at 1/1.32 ~= .758.
+    // Discard the interior so this pass cannot paint a stripe over the body.
+    float outside = abs(vRibbonUv.y);
+    if (outside < 0.758) discard;
+    float fade = 1.0 - smoothstep(0.758, 1.0, outside);
+    color = vec3(1.0);
+    alpha = fade * fade * uGlow * 0.36 * (1.0 - uError);
   }
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
@@ -92,6 +102,8 @@ export function createLivingRibbon(index: number) {
     uGlow: { value: 0 }, uError: { value: 0 },
     uColorA: { value: new THREE.Color() }, uColorB: { value: new THREE.Color() },
     uColorC: { value: new THREE.Color() },
+    uCoreView: { value: new THREE.Vector3() }, uCoreColor: { value: new THREE.Color() },
+    uCoreLight: { value: 0 },
   };
   const geometry = new THREE.PlaneGeometry(1, 1, 128, 10);
   const material = new THREE.ShaderMaterial({
