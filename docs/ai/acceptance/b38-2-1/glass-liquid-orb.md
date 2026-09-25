@@ -8,6 +8,7 @@
 2. "Don't like the ribbons as much anymore … either an orb with liquid inside or the orb's surface is waving or distorting." Both were prototyped as switchable lab styles.
 3. "Neither style looks right, but … the liquid inside while having it inside a glass ball." The Wave style and the style switch were removed.
 4. After the glass rebuild: "looks better, just remove the spotlight reflection." The softbox highlight was removed.
+5. "Remove the particles and it's good." The Reading-state fragments (the last particles in the scene) were removed. So were the scene lights that only lit them, and the now-unused `intake` and `order` profile values. Reading is now distinguished by its spin, flow and shimmer. Rechecked on the device: Reading and Generating animate (218k–274k changed pixels between frames), Error holds at 0, and no GL errors.
 
 ## What it is now
 
@@ -21,7 +22,6 @@
   - Spin (now at most 0.9 rad/s, about one turn every 7 s) turns the liquid field.
   - State liveliness sets the liquid's turbulence.
   - A touch briefly stirs the liquid.
-  - Reading-state fragments are kept.
 - Deleted: `livingRibbon.ts`, `coreOrb.ts` and their tests. New tests: `orbBody.test.ts`, `orbAura.test.ts`.
 
 State behaviour is unchanged. Complete keeps moving slowly. Error is the only stop. Reduced Motion drifts at 10% of the clock with a steady glow.
