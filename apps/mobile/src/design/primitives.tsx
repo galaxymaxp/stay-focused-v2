@@ -25,16 +25,19 @@ export function Copy({
   muted = false,
   color,
   style,
+  numberOfLines,
 }: {
   children: ReactNode;
   size?: "display" | "h1" | "h2" | "h3" | "body" | "bodySmall" | "caption";
   muted?: boolean;
   color?: string;
   style?: StyleProp<import("react-native").TextStyle>;
+  numberOfLines?: number;
 }) {
   const { colors } = useTheme();
   return (
     <Text
+      numberOfLines={numberOfLines}
       style={[
         {
           color: color ?? (muted ? colors.textSecondary : colors.textPrimary),

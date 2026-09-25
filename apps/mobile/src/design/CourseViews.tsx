@@ -50,9 +50,8 @@ export function CourseCard({
   children?: ReactNode;
   testID?: string;
 }) {
-  const { colors, mode } = useTheme();
+  const { colors } = useTheme();
   const press = usePressScale();
-  const accent = courseAccent(identity, mode);
   return (
     <Animated.View style={{ transform: [{ scale: press.scale }] }}>
       <Pressable
@@ -74,10 +73,8 @@ export function CourseCard({
           backgroundColor: pressed ? colors.surfaceSecondary : colors.surfacePrimary,
           borderWidth: 1,
           borderColor: colors.separator,
-          overflow: "hidden",
         })}
       >
-        <View style={{ position: "absolute", left: 0, top: 14, bottom: 14, width: 3, borderRadius: 2, backgroundColor: accent.fg, opacity: 0.85 }} />
         <CourseMark identity={identity} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Copy size="h3" style={{ fontSize: 16, lineHeight: 21 }}>{identity.title}</Copy>
@@ -90,7 +87,10 @@ export function CourseCard({
   );
 }
 
-/** Compact, roughly square tile for grids (Library). */
+/**
+ * Compact tile for grids (Library). Every tile has the same size whatever the
+ * title length, so rows stay aligned; text is clamped instead of growing it.
+ */
 export function CourseTile({
   identity,
   width,
@@ -106,8 +106,9 @@ export function CourseTile({
 }) {
   const { colors } = useTheme();
   const press = usePressScale();
+  const height = courseTileHeight(width);
   return (
-    <Animated.View style={{ width, transform: [{ scale: press.scale }] }}>
+    <Animated.View style={{ width, height, transform: [{ scale: press.scale }] }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? identity.title}
@@ -116,24 +117,27 @@ export function CourseTile({
         onPressOut={press.onPressOut}
         style={({ pressed }) => ({
           width,
-          minHeight: Math.max(width * 0.92, 132),
+          height,
           padding: density.cardPadding + 2,
           borderRadius: radius.card,
           backgroundColor: pressed ? colors.surfaceSecondary : colors.surfacePrimary,
           borderWidth: 1,
           borderColor: colors.separator,
-          justifyContent: "space-between",
-          gap: spacing[3],
+          gap: spacing[2],
         })}
       >
-        <CourseMark identity={identity} size={36} />
-        <View style={{ gap: 3 }}>
-          <Copy size="h3" style={{ fontSize: 15, lineHeight: 20 }}>{identity.title}</Copy>
-          {identity.code ? <Copy muted size="caption" style={{ fontSize: 11, lineHeight: 14 }}>{identity.code}</Copy> : null}
-          {identity.section ? <Copy muted size="caption" style={{ fontSize: 11, lineHeight: 14 }}>{identity.section}</Copy> : null}
-          {footnote ? <Copy size="caption" color={colors.textSecondary} style={{ fontSize: 11, lineHeight: 15, marginTop: 4 }}>{footnote}</Copy> : null}
+        <CourseMark identity={identity} size={34} />
+        <View style={{ flex: 1, minHeight: 0, gap: 2 }}>
+          <Copy size="h3" numberOfLines={3} style={{ fontSize: 15, lineHeight: 20 }}>{identity.title}</Copy>
+          {identity.subtitle ? <Copy muted size="caption" numberOfLines={1} style={{ fontSize: 11, lineHeight: 15 }}>{identity.subtitle}</Copy> : null}
         </View>
+        {footnote ? <Copy size="caption" numberOfLines={1} color={colors.textSecondary} style={{ fontSize: 11, lineHeight: 15 }}>{footnote}</Copy> : null}
       </Pressable>
     </Animated.View>
   );
+}
+
+/** One height for every tile in a grid: square, but never too short for its content. */
+export function courseTileHeight(width: number): number {
+  return Math.max(Math.round(width), 176);
 }
