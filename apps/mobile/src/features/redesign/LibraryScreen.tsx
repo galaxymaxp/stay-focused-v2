@@ -141,7 +141,6 @@ function LibraryCard({ item }: { item: LibraryArtifactSummary }) {
       <RowLink inset icon={<ContentIcon kind={item.type} />} label={`${typeLabel}: ${item.title}`} onPress={() => router.push({ pathname: "/artifact", params: { id: item.id } })}>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing[2] }}>
           <View style={{ backgroundColor: soft, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}><Copy size="caption" color={tone} style={{ fontWeight: "700" }}>{typeLabel}</Copy></View>
-          <Copy muted size="caption">{item.course?.code ?? item.course?.name ?? "Personal"}</Copy>
         </View>
         <Copy size="h3" style={{ lineHeight: 23 }}>{item.title}</Copy>
         <Copy muted size="caption">

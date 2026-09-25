@@ -11,7 +11,6 @@ import {
 } from "react";
 import {
   Animated,
-  PanResponder,
   Pressable,
   Text,
   TextInput,
@@ -22,6 +21,7 @@ import {
   type ScrollView,
 } from "react-native";
 
+import { courseIdentity } from "../../design/courseIdentity";
 import { Copy, IconAction, Notice, Page } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
@@ -159,9 +159,10 @@ export function ReviewerReaderScreen({
   };
 
   const currentTitle = current >= 0 ? anchors[current]?.title : null;
+  const courseTitle = artifact.course ? courseIdentity(artifact.course).title : null;
   const subtitle = currentTitle
     ? `${current + 1} of ${anchors.length} · ${currentTitle}`
-    : artifact.course?.name ?? "Reviewer";
+    : courseTitle ?? "Reviewer";
 
   return (
     <Page
@@ -209,7 +210,7 @@ export function ReviewerReaderScreen({
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
       <View style={{ gap: spacing[1], paddingRight: spacing[2] }}>
         <Copy muted size="caption">
-          {artifact.course?.name ?? "Your study tools"}
+          {courseTitle ?? "Your study tools"}
           {artifact.sourceTitle ? ` · ${artifact.sourceTitle}` : ""}
         </Copy>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
@@ -393,10 +394,10 @@ function SearchStep({ label, disabled, onPress, children }: { label: string; dis
  * briefly after scrolling and fades away. Touching and holding the right edge
  * (or the thumb) activates the scrubber: scrolling locks, a preview names the
  * destination topic, and the page follows the finger topic by topic. A quick
- * swipe near the edge never activates it; the native scroll view takes it.
+ * swipe on the edge never activates it and still scrolls the page natively.
  * Without at least two topics it scrubs by proportional position instead.
  */
-function SectionScrubber({
+export function SectionScrubber({
   handle,
   anchors,
   anchorOffset,
@@ -422,7 +423,7 @@ function SectionScrubber({
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const state = useRef({ active: false, startY: 0, lastIndex: -1, lastOffset: 0 });
+  const state = useRef({ active: false, startY: 0, startPageY: 0, lastIndex: -1, lastOffset: 0 });
   const latest = useRef({ anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion });
   latest.current = { anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion };
   const THUMB = 40;
@@ -449,7 +450,7 @@ function SectionScrubber({
     };
   }, [handle, height, thumbOpacity, thumbTop]);
 
-  const responder = useMemo(() => {
+  const touch = useMemo(() => {
     const targetFor = (locationY: number) => {
       const { anchors: list, anchorOffset: offsetOf, height: trackHeight } = latest.current;
       const fraction = trackHeight > 0 ? locationY / trackHeight : 0;
@@ -495,27 +496,29 @@ function SectionScrubber({
         Animated.timing(overlayOpacity, { toValue: 0, duration: 220, delay: 250, useNativeDriver: true }).start(done);
       }
     };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => state.current.active,
-      // Let the native scroll view claim quick swipes that start at the edge.
-      onShouldBlockNativeResponder: () => false,
-      onPanResponderTerminationRequest: () => !state.current.active,
-      onPanResponderGrant: (event) => {
+    // Raw touch handlers observe without claiming the gesture, so a normal
+    // swipe that starts on the edge still scrolls natively. Only a still hold
+    // activates the scrubber, which then locks scrolling and follows the finger.
+    type Touch = { nativeEvent: { locationY: number; pageY: number } };
+    return {
+      onTouchStart: (event: Touch) => {
         state.current.startY = event.nativeEvent.locationY;
+        state.current.startPageY = event.nativeEvent.pageY;
         clearTimeout(holdTimer.current);
         holdTimer.current = setTimeout(activate, SCRUB_HOLD_MS);
       },
-      onPanResponderMove: (event, gesture) => {
+      onTouchMove: (event: Touch) => {
+        const dy = event.nativeEvent.pageY - state.current.startPageY;
         if (!state.current.active) {
-          if (Math.abs(gesture.dy) > SCRUB_SLOP) clearTimeout(holdTimer.current);
+          if (Math.abs(dy) > SCRUB_SLOP) clearTimeout(holdTimer.current);
           return;
         }
-        update(state.current.startY + gesture.dy);
+        update(state.current.startY + dy);
       },
-      onPanResponderRelease: () => deactivate(true),
-      onPanResponderTerminate: () => deactivate(false),
-    });
+      onTouchEnd: () => deactivate(true),
+      // The native scroll view took the gesture (a swipe): never activate.
+      onTouchCancel: () => deactivate(false),
+    };
   }, [metrics, overlayOpacity, thumbOpacity]);
 
   const hasAnchors = anchors.length >= 2;
@@ -523,7 +526,10 @@ function SectionScrubber({
   return (
     <View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}>
       <View
-        {...responder.panHandlers}
+        onTouchStart={touch.onTouchStart}
+        onTouchMove={touch.onTouchMove}
+        onTouchEnd={touch.onTouchEnd}
+        onTouchCancel={touch.onTouchCancel}
         testID="reviewer-scrubber"
         accessible
         accessibilityRole="adjustable"
