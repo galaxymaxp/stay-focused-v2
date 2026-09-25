@@ -24,8 +24,6 @@ export function coreMotionRate(state: CoreState, reducedMotion: boolean, complet
 
 export interface CoreMotionProfile {
   readonly activity: number;
-  readonly intake: number;
-  readonly order: number;
   readonly completion: number;
   readonly error: number;
   /** Share of the orb's maximum angular velocity. */
@@ -35,12 +33,12 @@ export interface CoreMotionProfile {
 }
 
 export const CORE_MOTION_PROFILES: Record<CoreState, CoreMotionProfile> = {
-  idle: { activity: 0.12, intake: 0, order: 0.28, completion: 0, error: 0, spin: 0.22, shimmer: 0.3 },
-  reading: { activity: 0.42, intake: 1, order: 0.18, completion: 0, error: 0, spin: 0.5, shimmer: 0.55 },
-  generating: { activity: 0.86, intake: 0.22, order: 0.08, completion: 0, error: 0, spin: 1, shimmer: 1 },
-  finalizing: { activity: 0.3, intake: 0, order: 1, completion: 0, error: 0, spin: 0.55, shimmer: 0.5 },
-  complete: { activity: 0.04, intake: 0, order: 1, completion: 1, error: 0, spin: 0.12, shimmer: 0.2 },
-  error: { activity: 0, intake: 0, order: 0.35, completion: 0, error: 1, spin: 0, shimmer: 0 },
+  idle: { activity: 0.12, completion: 0, error: 0, spin: 0.22, shimmer: 0.3 },
+  reading: { activity: 0.42, completion: 0, error: 0, spin: 0.5, shimmer: 0.55 },
+  generating: { activity: 0.86, completion: 0, error: 0, spin: 1, shimmer: 1 },
+  finalizing: { activity: 0.3, completion: 0, error: 0, spin: 0.55, shimmer: 0.5 },
+  complete: { activity: 0.04, completion: 1, error: 0, spin: 0.12, shimmer: 0.2 },
+  error: { activity: 0, completion: 0, error: 1, spin: 0, shimmer: 0 },
 };
 
 /** Under Reduced Motion the orb still turns, at most once every ~40 seconds. */

@@ -60,13 +60,6 @@ describe("Knowledge Core state model", () => {
     }
   });
 
-  it("uses purposeful fragments only while material is being ingested", () => {
-    expect(CORE_MOTION_PROFILES.reading.intake).toBe(1);
-    expect(CORE_MOTION_PROFILES.generating.intake).toBeLessThan(0.3);
-    expect(CORE_MOTION_PROFILES.idle.intake).toBe(0);
-    expect(CORE_MOTION_PROFILES.finalizing.intake).toBe(0);
-  });
-
   it("announces each state without presenting invented progress", () => {
     for (const state of CORE_STATES) {
       expect(coreAccessibilityLabel(state)).not.toMatch(/\d+%/);

@@ -122,28 +122,12 @@ function buildScene(
   const aura = createOrbAura();
   scene.add(aura.mesh);
 
-  const shardGeometry = new THREE.TetrahedronGeometry(0.105, 0);
-  const shardStarts = [new THREE.Vector3(-1.52, 0.66, 0.18), new THREE.Vector3(1.47, 0.24, -0.12), new THREE.Vector3(-1.28, -0.74, 0.38)];
-  const shards = shardStarts.map((position, index) => {
-    const material = new THREE.MeshPhysicalMaterial({ color: 0xaaaaaa, emissive: 0x555555, emissiveIntensity: 0.8, transparent: true, opacity: 0, roughness: 0.22, metalness: 0.22 });
-    const shard = new THREE.Mesh(shardGeometry, material);
-    shard.position.copy(position);
-    shard.scale.set(1.25, 0.55, 0.44);
-    shard.rotation.set(index * 0.8, index * 1.4, index * 0.47);
-    root.add(shard);
-    return shard;
-  });
-  scene.add(new THREE.HemisphereLight(0xcccccc, 0x101010, 1.25));
-  const key = new THREE.DirectionalLight(0xffffff, 4.2);
-  key.position.set(-3.2, 4.1, 4.8);
-  scene.add(key);
-
   let requestId: number | null = null;
   let disposed = false;
   let lastFrame = Date.now();
   let animatedTime = 8.4;
   let spinAngle = 0;
-  let activity = 0, intake = 0, completion = 0, error = 0, spin = 0, shimmer = 0, life = 0, settleUntil = 0;
+  let activity = 0, completion = 0, error = 0, spin = 0, shimmer = 0, life = 0, settleUntil = 0;
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
@@ -160,7 +144,6 @@ function buildScene(
     const profile = CORE_MOTION_PROFILES[current.state];
     const ease = 1 - Math.pow(0.002, delta);
     activity += (profile.activity - activity) * ease;
-    intake += (profile.intake - intake) * ease;
     completion += (profile.completion - completion) * ease;
     error += (profile.error - error) * ease;
     // Spin, shimmer and liveliness carry momentum between states; failure winds them down rather than cutting them.
@@ -181,14 +164,6 @@ function buildScene(
     touch.current.age += delta;
 
     root.position.y = Math.sin(animatedTime * 0.5) * 0.02;
-    shards.forEach((shard, index) => {
-      const phase = (animatedTime * (0.34 + index * 0.035) + index * 0.27) % 1;
-      shard.position.copy(shardStarts[index]!).multiplyScalar(1 - phase * 0.7);
-      shard.position.y += Math.sin(phase * Math.PI) * 0.18;
-      shard.rotation.x += motionDelta * 0.8;
-      shard.rotation.y += motionDelta * 1.2;
-      (shard.material as THREE.MeshPhysicalMaterial).opacity = intake * (1 - phase) * (current.reducedMotion ? 0.28 : 1);
-    });
     const parallax = touch.current.strength * Math.min(1, touch.current.age * 3);
     camera.position.x += (touch.current.x * 0.12 * parallax - camera.position.x) * Math.min(1, delta * 5);
     camera.position.y += (-touch.current.y * 0.09 * parallax + 0.02 - camera.position.y) * Math.min(1, delta * 5);
@@ -225,8 +200,6 @@ function buildScene(
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
       aura.dispose();
-      shardGeometry.dispose();
-      shards.forEach((shard) => (shard.material as THREE.Material).dispose());
       renderer.dispose();
     },
   };
