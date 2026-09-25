@@ -25,6 +25,8 @@ export const palettes = {
     violetSoft: "#EEE8FA",
     red: "#B13C36",
     redSoft: "#FCE9E5",
+    findMatch: "#FBE9A6",
+    findActive: "#F4C542",
   },
   dark: {
     backgroundPrimary: "#000000",
@@ -51,11 +53,65 @@ export const palettes = {
     violetSoft: "#352A49",
     red: "#FFABA3",
     redSoft: "#4B2928",
+    findMatch: "#5A4B1B",
+    findActive: "#A98423",
   },
 } as const;
 export type ThemeColors = {
   readonly [K in keyof typeof palettes.light]: string;
 };
+
+/**
+ * UC-inspired palette family, for evaluation with the University of the
+ * Cordilleras. NOT official UC branding: no verified UC brand source or token
+ * exists in this repository, so the crimson accent is an approximation chosen
+ * for contrast, not a sanctioned institutional value. Red is reserved for
+ * selection, primary actions, active controls and progress; surfaces stay
+ * neutral, and "danger" moves to burnt orange so overdue work never reads as
+ * the brand color.
+ */
+export const ucInspiredPalettes: { readonly light: ThemeColors; readonly dark: ThemeColors } = {
+  light: {
+    ...palettes.light,
+    backgroundPrimary: "#F6F6F4",
+    surfacePrimary: "rgba(255,255,255,0.92)",
+    surfaceElevated: "#FFFFFF",
+    surfaceSecondary: "#EFEFED",
+    textPrimary: "#161616",
+    textSecondary: "#58585B",
+    textMuted: "#6C6C70",
+    separator: "rgba(0,0,0,0.08)",
+    accent: "#9E1B32",
+    onAccent: "#FFFFFF",
+    danger: "#B4470F",
+    warning: "#8A5A10",
+    shadow: "#2B2B2B",
+    red: "#9E1B32",
+    redSoft: "#F7E4E7",
+  },
+  dark: {
+    ...palettes.dark,
+    backgroundPrimary: "#0B0B0C",
+    surfacePrimary: "#19191B",
+    surfaceElevated: "#252527",
+    surfaceSecondary: "#323235",
+    textPrimary: "#F4F4F4",
+    textSecondary: "#B3B3B7",
+    textMuted: "#9D9DA2",
+    separator: "rgba(255,255,255,0.09)",
+    accent: "#F08C99",
+    onAccent: "#3B0B14",
+    danger: "#FFB27D",
+    red: "#F08C99",
+    redSoft: "#46222A",
+  },
+};
+
+export type PaletteFamily = "standard" | "uc_inspired";
+
+export function paletteFor(family: PaletteFamily, mode: "light" | "dark"): ThemeColors {
+  return family === "uc_inspired" ? ucInspiredPalettes[mode] : palettes[mode];
+}
 export const motion = {
   press: 140,
   small: 180,

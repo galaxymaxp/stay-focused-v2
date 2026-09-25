@@ -1,10 +1,12 @@
 import { router } from "expo-router";
 import { ArrowLeft, ChevronRight, Layers, MoreHorizontal, FileText, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
+import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
   Animated,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   Text,
@@ -12,7 +14,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing, typography } from "./tokens";
@@ -180,6 +182,12 @@ export function Page({
   onRefresh,
   actions = [],
   headerAction,
+  headerLeading,
+  scrollRef,
+  onScroll,
+  overlay,
+  headerBelow,
+  scrollEnabled = true,
 }: {
   children: ReactNode;
   title: string;
@@ -190,9 +198,28 @@ export function Page({
   onRefresh?: () => void;
   actions?: readonly { label: string; onPress: () => void }[];
   headerAction?: ReactNode;
+  /** Small identity mark shown before the title (e.g. a course monogram). */
+  headerLeading?: ReactNode;
+  scrollRef?: Ref<ScrollView>;
+  onScroll?: React.ComponentProps<typeof ScrollView>["onScroll"];
+  /** Absolutely positioned layer above the scroll content (e.g. a scrubber). */
+  overlay?: ReactNode;
+  /** Pinned content between the header and the scroll area (e.g. find-in-page). */
+  headerBelow?: ReactNode;
+  scrollEnabled?: boolean;
 }) {
   const { colors, mode } = useTheme();
   const [menu, setMenu] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  // Screens nested inside a tab already sit above the tab bar.
+  const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
+  const pullToRefresh = onRefresh
+    ? () => {
+        setPulling(true);
+        onRefresh();
+        setTimeout(() => setPulling(false), 700);
+      }
+    : undefined;
   const menuActions = [
     ...actions,
     ...(onRefresh ? [{ label: "Refresh", onPress: onRefresh }] : []),
@@ -201,7 +228,7 @@ export function Page({
   return (
     <SafeAreaView
       edges={
-        back ? ["top", "left", "right", "bottom"] : ["top", "left", "right"]
+        back && !insideTabs ? ["top", "left", "right", "bottom"] : ["top", "left", "right"]
       }
       style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}
     >
@@ -229,8 +256,9 @@ export function Page({
             <ArrowLeft size={density.utilityIcon} color={colors.textPrimary} />
           </IconAction>
         )}
+        {headerLeading ? <View style={{ marginRight: spacing[3] }}>{headerLeading}</View> : null}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Copy size="h1">{title}</Copy>
+          <Copy size={back ? "h2" : "h1"} style={back ? { fontSize: 20, lineHeight: 26 } : undefined}>{title}</Copy>
           {subtitle && (
             <Copy muted size="caption">
               {subtitle}
@@ -248,9 +276,16 @@ export function Page({
         )}
         {menuActions.length > 0 && <IconAction label="More options" onPress={() => setMenu(true)}><MoreHorizontal color={colors.textSecondary} size={density.utilityIcon} /></IconAction>}
       </View>
+      {headerBelow}
+      <View style={{ flex: 1 }}>
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEnabled={scrollEnabled}
+          scrollEventThrottle={onScroll ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
+          refreshControl={pullToRefresh ? <RefreshControl refreshing={pulling} onRefresh={pullToRefresh} tintColor={colors.textSecondary} colors={[colors.accent]} progressBackgroundColor={colors.surfaceElevated} /> : undefined}
           contentContainerStyle={{
             paddingHorizontal: spacing[5],
             paddingBottom: 32,
@@ -262,6 +297,8 @@ export function Page({
       ) : (
         <View style={{ flex: 1, paddingHorizontal: 20 }}>{children}</View>
       )}
+      {overlay}
+      </View>
       {footer && (
         <View
           style={{
@@ -275,7 +312,7 @@ export function Page({
           {footer}
         </View>
       )}
-      {menu && <Sheet onClose={() => setMenu(false)}><Copy size="h2">{title || "Options"}</Copy>{menuActions.map(action => <RowLink key={action.label} label={action.label} onPress={() => { setMenu(false); action.onPress(); }}><Copy>{action.label}</Copy></RowLink>)}</Sheet>}
+      {menu && <Sheet title={title || "Options"} onClose={() => setMenu(false)}>{menuActions.map(action => <RowLink key={action.label} label={action.label} onPress={() => { setMenu(false); action.onPress(); }}><Copy>{action.label}</Copy></RowLink>)}</Sheet>}
     </SafeAreaView>
   );
 }
@@ -365,52 +402,163 @@ export function FilterChip({ label, selected, onPress }: { label: string; select
   return <Animated.View style={{ transform: [{ scale: press.scale }] }}><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable></Animated.View>;
 }
 
+/**
+ * Bottom sheet for lightweight choices. Dismissal never depends on scrolling:
+ * the header keeps a visible Done control, the backdrop dismisses, and Android
+ * back closes it. Insets come from the app's provider because a native Modal
+ * is its own window, where a nested SafeAreaView can report zero insets under
+ * edge-to-edge and hide controls behind the navigation bar.
+ */
 export function Sheet({
   children,
   onClose,
+  title,
+  footer,
 }: {
   children: ReactNode;
   onClose: () => void;
+  title?: string;
+  /** Pinned below the scroll area, always visible (e.g. a secondary action). */
+  footer?: ReactNode;
 }) {
   const { colors, reducedMotion } = useTheme();
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       transparent
       visible
+      statusBarTranslucent
+      navigationBarTranslucent
       animationType={reducedMotion ? "fade" : "slide"}
       onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "flex-end",
-          backgroundColor: "rgba(0,0,0,0.4)",
-        }}
-      >
-        <SafeAreaView
-          edges={["bottom", "left", "right"]}
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          onPress={onClose}
+          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.4)" }}
+        />
+        <View
+          accessibilityViewIsModal
           style={{
-            maxHeight: "85%",
+            maxHeight: "88%",
+            flexShrink: 1,
             backgroundColor: colors.surfaceElevated,
-            borderTopLeftRadius: radius.card,
-            borderTopRightRadius: radius.card,
-            padding: spacing[5],
+            borderTopLeftRadius: radius.page,
+            borderTopRightRadius: radius.page,
+            paddingBottom: Math.max(insets.bottom, spacing[4]),
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
           }}
         >
+          <View style={{ alignItems: "center", paddingTop: spacing[2] }}>
+            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} />
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
+            </View>
+            <DoneButton onPress={onClose} />
+          </View>
           <ScrollView
+            style={{ flexShrink: 1 }}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              gap: spacing[3],
-              paddingBottom: spacing[4],
-            }}
+            contentContainerStyle={{ gap: spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[4] }}
           >
             {children}
           </ScrollView>
-          <Action secondary onPress={onClose}>
-            Close
-          </Action>
-        </SafeAreaView>
+          {footer ? <View style={{ paddingHorizontal: spacing[5], paddingTop: spacing[2], gap: spacing[2] }}>{footer}</View> : null}
+        </View>
       </View>
     </Modal>
+  );
+}
+
+/** The single, always-visible local dismissal control for sheets and modals. */
+export function DoneButton({ onPress, label = "Done" }: { onPress: () => void; label?: string }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID="sheet-done"
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => ({ minHeight: hitTarget.min, minWidth: hitTarget.min + 16, paddingHorizontal: spacing[3], alignItems: "center", justifyContent: "center", opacity: pressed ? 0.55 : 1 })}
+    >
+      <Copy size="body" color={colors.accent} style={{ fontWeight: "600" }}>{label}</Copy>
+    </Pressable>
+  );
+}
+
+/**
+ * iOS-style segmented control. The selection pill springs between segments on
+ * the native driver; with Reduced Motion it moves without travel.
+ */
+export function SegmentedControl<T extends string>({
+  segments,
+  value,
+  onChange,
+}: {
+  segments: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const { colors, mode, reducedMotion } = useTheme();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, segments.findIndex((segment) => segment.value === value));
+  const segmentWidth = width > 0 ? (width - 4) / segments.length : 0;
+  const offset = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const toValue = index * segmentWidth;
+    if (reducedMotion || segmentWidth === 0) offset.setValue(toValue);
+    else Animated.spring(offset, { toValue, ...motion.spring, useNativeDriver: true }).start();
+  }, [index, offset, reducedMotion, segmentWidth]);
+  return (
+    <View
+      accessibilityRole="tablist"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", padding: 2, minHeight: 36, borderRadius: 10, backgroundColor: colors.surfaceSecondary }}
+    >
+      {segmentWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 2,
+            bottom: 2,
+            left: 2,
+            width: segmentWidth,
+            borderRadius: 8,
+            backgroundColor: mode === "dark" ? colors.surfaceElevated : "#FFFFFF",
+            shadowColor: "#000",
+            shadowOpacity: mode === "dark" ? 0 : 0.08,
+            shadowRadius: 3,
+            shadowOffset: { width: 0, height: 1 },
+            elevation: mode === "dark" ? 0 : 1,
+            transform: [{ translateX: offset }],
+          }}
+        />
+      ) : null}
+      {segments.map((segment) => {
+        const selected = segment.value === value;
+        return (
+          <Pressable
+            key={segment.value}
+            accessibilityRole="tab"
+            accessibilityLabel={segment.label}
+            accessibilityState={{ selected }}
+            onPress={() => onChange(segment.value)}
+            hitSlop={{ top: 6, bottom: 6 }}
+            style={{ flex: 1, minHeight: 32, alignItems: "center", justifyContent: "center" }}
+          >
+            <Copy size="caption" color={selected ? colors.textPrimary : colors.textSecondary} style={{ fontWeight: selected ? "600" : "500", fontSize: 13 }}>
+              {segment.label}
+            </Copy>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }

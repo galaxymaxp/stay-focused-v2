@@ -31,6 +31,9 @@ import {
   announcementCourseLabel,
   formatAnnouncementDate,
 } from "../announcements/announcementPresentation";
+import { openAnnouncement } from "../announcements/AnnouncementsScreen";
+import { SyncStatus } from "../sync/SyncStatus";
+import { useCanvasSync } from "../sync/CanvasSyncProvider";
 
 export function TodayScreen() {
   const date = localDate();
@@ -46,6 +49,7 @@ export function TodayScreen() {
     60000,
   );
   const client = useExperienceClient();
+  const { sync } = useCanvasSync();
   const requestBusy = useRef(false);
   const [start, setStart] = useState(() =>
     Math.min(
@@ -134,9 +138,11 @@ export function TodayScreen() {
       onRefresh={() => {
         today.refresh();
         announcements.refresh();
+        void sync();
       }}
       actions={[{ label: "Schedule & availability", onPress: () => setExpanded(!expanded) }]}
     >
+      <SyncStatus />
       <DayRingClock
         date={date}
         timeline={today.data?.timeline ?? []}
@@ -197,7 +203,7 @@ export function TodayScreen() {
               <RowLink
                 key={item.id}
                 label={`Read announcement: ${item.title}`}
-                onPress={() => router.push({ pathname: "/announcements", params: { announcementId: item.id } })}
+                onPress={() => openAnnouncement(item.id)}
               >
                 <Copy muted size="caption">{announcementCourseLabel(item)} · {formatAnnouncementDate(item.postedAt)}</Copy>
                 <Copy size="h3">{item.title}</Copy>

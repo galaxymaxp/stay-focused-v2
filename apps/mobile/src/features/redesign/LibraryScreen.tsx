@@ -3,12 +3,11 @@ import type {
   ActivityDraftContent,
   LibraryArtifactDetail,
   LibraryArtifactSummary,
-  ReviewerReaderModel,
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Platform, Pressable, ScrollView, TextInput, View, useWindowDimensions } from "react-native";
+import { useMemo, useState } from "react";
+import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
 
 import {
   Action,
@@ -16,133 +15,119 @@ import {
   Notice,
   Page,
   RowLink,
+  SegmentedControl,
   Surface,
   ContentIcon,
 } from "../../design/primitives";
+import { courseIdentity } from "../../design/courseIdentity";
+import { CourseMark, CourseTile } from "../../design/CourseViews";
 import { radius, spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
 import { available } from "./presentation";
 import { useExperienceClient } from "./useExperience";
+import {
+  PERSONAL_LIBRARY_KEY,
+  describeLibraryCounts,
+  filterCourseLibrary,
+  groupLibraryByCourse,
+  librarySegments,
+  type LibraryFilter,
+} from "./libraryPresentation";
 import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
+import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
 
 const LOCAL_PAGE_SIZE = 50;
-const filters = [
-  { value: "all", label: "All" },
-  { value: "reviewer", label: "Reviewers" },
-  { value: "quiz", label: "Quizzes" },
-  { value: "activity_output", label: "Activity Outputs" },
-] as const;
+const GRID_GAP = 12;
+
+function libraryIdentity(key: string, course: LibraryArtifactSummary["course"]) {
+  return course
+    ? courseIdentity(course)
+    : courseIdentity({ id: PERSONAL_LIBRARY_KEY, name: "Personal & other", code: null });
+}
+
+/** Level 1: a compact grid of courses that have saved study work. */
 export function LibraryScreen() {
-  const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
-  const pageWidth = Math.max(280, windowWidth - 40);
-  const [filter, setFilter] = useState<(typeof filters)[number]["value"]>("all");
   const library = useLocalLibrary();
-  const pager = useRef<ScrollView>(null);
-  const tabs = useRef<ScrollView>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
-
-  useEffect(() => {
-    const index = filters.findIndex((item) => item.value === filter);
-    tabs.current?.scrollTo({ x: Math.max(0, index * 78 - 50), animated: true });
-  }, [filter]);
-
+  const groups = useMemo(() => groupLibraryByCourse(library.items), [library.items]);
+  const contentWidth = Math.max(280, windowWidth - spacing[5] * 2);
+  const columns = contentWidth >= 560 ? 3 : 2;
+  const tileWidth = Math.floor((contentWidth - GRID_GAP * (columns - 1)) / columns);
   // Saved work renders from the device; the skeleton appears only when nothing
   // is stored yet and the cloud is still answering.
   const hasLocal = library.items.length > 0;
   const loading = !library.localReady || (!hasLocal && library.refreshing);
-  const itemsFor = (value: (typeof filters)[number]["value"]) =>
-    value === "all" ? library.items : library.items.filter((entry) => entry.type === value);
-  const selectPage = (index: number) => {
-    pager.current?.scrollTo({ x: index * pageWidth, animated: true });
-    setFilter(filters[index]!.value);
-  };
   return (
-    <Page title="Library" subtitle="Your saved study tools, in one place." scroll={false} onRefresh={library.refresh} actions={[{ label: "Manage saved Reviewers", onPress: () => router.push("/saved-reviewers") }]}>
-      <View style={{ flex: 1 }}>
-        <ScrollView ref={tabs} horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ padding: 4 }}>
-          <View style={{ width: 298, height: 44, flexDirection: "row", alignItems: "center" }}>
-            <Animated.View style={{ position: "absolute", left: 0, height: 34, borderRadius: radius.pill, backgroundColor: colors.blueSoft, transform: [{ translateX: scrollX.interpolate({ inputRange: filters.map((_, index) => index * pageWidth), outputRange: [2, 48, 124, 188], extrapolate: "clamp" }) }], width: scrollX.interpolate({ inputRange: filters.map((_, index) => index * pageWidth), outputRange: [42, 72, 60, 108], extrapolate: "clamp" }) }} />
-            {filters.map((item, index) => {
-              const widths = [46, 76, 64, 112];
-              return (
-                <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: filter === item.value }} onPress={() => selectPage(index)} style={({ pressed }) => ({ width: widths[index], height: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.65 : 1 })}>
-                  <Copy size="caption" color={filter === item.value ? colors.blue : colors.textSecondary} style={{ fontWeight: filter === item.value ? "700" : "500" }}>{item.label}</Copy>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-        <Animated.ScrollView
-          ref={pager}
-          horizontal
-          pagingEnabled
-          directionalLockEnabled
-          nestedScrollEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
-            setFilter(filters[index]?.value ?? "all");
-          }}
-        >
-          {filters.map((item) => (
-            <LibraryPage
-              key={item.value}
-              width={pageWidth}
-              filter={item.value}
-              items={itemsFor(item.value).slice(0, visible)}
-              total={itemsFor(item.value).length}
-              loading={loading}
-              error={hasLocal ? null : library.error}
-              deviceCopy={hasLocal && !!library.error}
-              refreshing={hasLocal && library.refreshing}
-              unavailable={item.value !== "all" && library.categories ? !available(library.categories[item.value]) : false}
-              onLoadMore={() => setVisible((count) => count + LOCAL_PAGE_SIZE)}
-              onRetry={library.refresh}
+    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh} actions={[{ label: "Manage saved Reviewers", onPress: () => router.push("/saved-reviewers") }]}>
+      {loading ? <LibrarySkeleton /> : null}
+      {!hasLocal && library.error ? <Surface><Copy size="h3">Library could not be loaded</Copy><Copy muted>{library.error}</Copy><Action secondary onPress={library.refresh}>Try again</Action></Surface> : null}
+      {hasLocal && library.error ? <Notice>Showing work saved on this device. Refresh when you are back online.</Notice> : null}
+      {hasLocal && library.refreshing ? <Copy muted size="caption">Checking for updates…</Copy> : null}
+      {!loading && !library.error && groups.length === 0 ? (
+        <Surface>
+          <Copy size="h2">No generated study materials yet</Copy>
+          <Copy muted>Reviewers, quizzes and activity drafts you generate will be kept here, grouped by course.</Copy>
+          <Action onPress={() => router.navigate("/courses")}>Browse synced courses</Action>
+        </Surface>
+      ) : null}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
+        {groups.map((group) => {
+          const identity = libraryIdentity(group.key, group.course);
+          const footnote = describeLibraryCounts(group.counts);
+          return (
+            <CourseTile
+              key={group.key}
+              identity={identity}
+              width={tileWidth}
+              footnote={footnote}
+              accessibilityLabel={`${identity.title}, ${footnote}`}
+              onPress={() => router.push({ pathname: "/library/[courseKey]", params: { courseKey: group.key } })}
             />
-          ))}
-        </Animated.ScrollView>
+          );
+        })}
       </View>
     </Page>
   );
 }
 
-function LibraryPage({ width, filter, items, total, loading, error, deviceCopy, refreshing, unavailable, onLoadMore, onRetry }: {
-  width: number;
-  filter: (typeof filters)[number]["value"];
-  items: readonly LibraryArtifactSummary[];
-  total: number;
-  loading: boolean;
-  error: string | null;
-  deviceCopy: boolean;
-  refreshing: boolean;
-  unavailable: boolean;
-  onLoadMore: () => void;
-  onRetry: () => void;
-}) {
-  const label = filter === "all" ? "study tools" : filters.find((item) => item.value === filter)!.label.toLowerCase();
+/** Level 2: one course's saved work, filtered by kind. */
+export function LibraryCourseScreen() {
+  const { courseKey: rawKey } = useLocalSearchParams<{ courseKey?: string }>();
+  const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? PERSONAL_LIBRARY_KEY;
+  const library = useLocalLibrary();
+  const [filter, setFilter] = useState<LibraryFilter>("all");
+  const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
+  const courseItems = useMemo(() => filterCourseLibrary(library.items, courseKey, "all"), [courseKey, library.items]);
+  const items = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
+  const identity = libraryIdentity(courseKey, courseItems[0]?.course ?? null);
+  const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
+  const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
   return (
-    <ScrollView nestedScrollEnabled style={{ width }} contentContainerStyle={{ gap: spacing[3], paddingTop: spacing[3], paddingBottom: 36 }}>
-      {loading ? <LibrarySkeleton /> : null}
-      {error ? <Surface><Copy size="h3">Library could not be loaded</Copy><Copy muted>{error}</Copy><Action secondary onPress={onRetry}>Try again</Action></Surface> : null}
-      {deviceCopy ? <Notice>Showing work saved on this device. Refresh when you are back online.</Notice> : null}
-      {refreshing ? <Copy muted size="caption">Checking for updates…</Copy> : null}
+    <Page
+      back
+      title={identity.title}
+      subtitle={identity.subtitle ?? undefined}
+      onRefresh={library.refresh}
+      headerLeading={<CourseMark identity={identity} size={34} />}
+      headerBelow={
+        <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
+          <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />
+        </View>
+      }
+    >
+      {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
-      {!loading && !error && items.length === 0 ? (
+      {library.localReady && items.length === 0 ? (
         <Surface>
-          <Copy size="h2">Nothing saved here yet</Copy>
-          <Copy muted>No {label} yet. Generate from a synchronized course when you are ready.</Copy>
-          <Action onPress={() => router.navigate("/courses")}>Browse synced courses</Action>
+          <Copy size="h3">{filter === "all" ? "Nothing saved for this course" : `No ${label} yet`}</Copy>
+          <Copy muted>Generate from this course&apos;s materials when you are ready.</Copy>
         </Surface>
       ) : null}
-      {items.map((item) => <LibraryCard key={item.id} item={item} />)}
-      {items.length < total ? <Action secondary onPress={onLoadMore}>More saved work</Action> : null}
-      {total > 0 ? <Copy muted size="caption" style={{ textAlign: "center" }}>{total} {total === 1 ? "item" : "items"}</Copy> : null}
-    </ScrollView>
+      {items.slice(0, visible).map((item) => <LibraryCard key={item.id} item={item} />)}
+      {items.length > visible ? <Action secondary onPress={() => setVisible((count) => count + LOCAL_PAGE_SIZE)}>More saved work</Action> : null}
+      {items.length > 0 ? <Copy muted size="caption" style={{ textAlign: "center" }}>{items.length} {items.length === 1 ? "item" : "items"}</Copy> : null}
+    </Page>
   );
 }
 
@@ -177,6 +162,9 @@ export function ArtifactScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const result = useLocalArtifact(id ?? null);
   const detail = result.data;
+  if (detail && "reviewer" in detail) {
+    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} />;
+  }
   return (
     <Page title="Library" back>
       {result.deviceCopy && (
@@ -201,9 +189,6 @@ export function ArtifactScreen() {
           <Copy muted size="caption">
             Generated {new Date(detail.artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
           </Copy>
-          {"reviewer" in detail && (
-            <ReviewerContent reviewer={detail.reviewer} />
-          )}
           {"quiz" in detail && (
             <Surface>
               <Copy>
@@ -238,57 +223,6 @@ export function ArtifactScreen() {
       )}
     </Page>
   );
-}
-function ReviewerContent({ reviewer }: { reviewer: ReviewerReaderModel }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ gap: spacing[8], paddingTop: spacing[3] }}>
-      {reviewer.freshness === "changed" ? <Notice>The source has changed since this Reviewer was created.</Notice> : null}
-      {reviewer.sections.map((section, sectionIndex) => (
-        <View key={section.id} style={{ gap: spacing[4] }}>
-          <View style={{ gap: spacing[1], borderBottomWidth: 1, borderColor: colors.separator, paddingBottom: spacing[3] }}>
-            <Copy size="caption" color={colors.accent} style={{ fontWeight: "800", letterSpacing: 1.1 }}>TOPIC {sectionIndex + 1}</Copy>
-            <Copy size="h2" style={{ fontSize: 22, lineHeight: 29 }}>{section.title}</Copy>
-          </View>
-          {section.blocks.map((block, blockIndex) => {
-            const duplicateTitle = normalizedHeading(block.title) === normalizedHeading(section.title);
-            return (
-              <View key={block.id} style={{ gap: spacing[3], paddingBottom: spacing[5], borderBottomWidth: blockIndex === section.blocks.length - 1 ? 0 : 1, borderColor: colors.separator }}>
-                {!duplicateTitle ? <Copy size="h3" style={{ fontSize: 18, lineHeight: 25 }}>{block.title}</Copy> : null}
-                <Copy style={{ fontSize: 16, lineHeight: 26 }}>{block.explanation}</Copy>
-                {block.keyPoints.length > 0 ? (
-                  <View style={{ backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4], gap: spacing[2] }}>
-                    <Copy size="caption" color={colors.accent} style={{ fontWeight: "800", letterSpacing: 0.9 }}>KEY POINTS</Copy>
-                    {block.keyPoints.map((point, index) => (
-                      <View key={`${block.id}-point-${index}`} style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing[2] }}>
-                        <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 8, backgroundColor: colors.accent }} />
-                        <Copy style={{ flex: 1, lineHeight: 24 }}>{point}</Copy>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {block.evidence.length > 0 ? (
-                  <View style={{ borderLeftWidth: 2, borderColor: colors.separator, paddingLeft: spacing[3], gap: spacing[3] }}>
-                    <Copy size="caption" muted style={{ fontWeight: "700", letterSpacing: 0.7 }}>DETAILS & EXAMPLES</Copy>
-                    {block.evidence.map((evidence, index) => (
-                      <View key={`${block.id}-evidence-${index}`} style={{ gap: spacing[1] }}>
-                        <Copy size="caption" color={colors.textMuted} style={{ textTransform: "uppercase", fontWeight: "700" }}>{evidence.kind}</Copy>
-                        <Copy muted style={{ lineHeight: 24 }}>{evidence.text}</Copy>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function normalizedHeading(value: string): string {
-  return value.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft: ActivityDraft) => void }) {
   const navigation = useNavigation();

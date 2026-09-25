@@ -1,8 +1,8 @@
 import type { ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Plus, Circle } from "lucide-react-native";
-import { useRef, useState } from "react";
-import { Linking, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Linking, Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import {
@@ -10,86 +10,173 @@ import {
   Copy,
   Notice,
   Page,
-  RowLink,
   Surface,
-  ContentIcon,
   IconAction,
 } from "../../design/primitives";
+import { courseIdentity } from "../../design/courseIdentity";
+import { CourseCard, CourseMark } from "../../design/CourseViews";
 import { useTheme } from "../../design/theme";
+import { spacing } from "../../design/tokens";
 import { createGenerationIntent } from "../../services/generationRecovery";
+import { SyncStatus } from "../sync/SyncStatus";
+import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { available, capabilityNote, deadline } from "./presentation";
+import {
+  PERSONAL_COURSE_KEY,
+  courseKeyOf,
+  groupCourseTasks,
+  relativeDue,
+  summarizeTaskCourses,
+  type TaskCourseSummary,
+  type TaskGroupKey,
+} from "./tasksPresentation";
 import { useExperience } from "./useExperience";
 
+function activitiesPath() {
+  return `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`;
+}
+
+function identityFor(summary: Pick<TaskCourseSummary, "key" | "course">) {
+  return summary.course
+    ? courseIdentity(summary.course)
+    : courseIdentity({ id: PERSONAL_COURSE_KEY, name: "Personal tasks", code: null });
+}
+
+/** Level 1: one card per course, with real due/missing/completed counts. */
 export function TasksScreen() {
   const { colors } = useTheme();
-  const tasks = useExperience<{ items: ActivitySummary[] }>(
-    `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
-  );
+  const { sync } = useCanvasSync();
+  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const courses = useMemo(() => summarizeTaskCourses(tasks.data?.items ?? []), [tasks.data]);
   return (
     <Page
       title="Tasks"
-      onRefresh={tasks.refresh}
+      onRefresh={() => {
+        tasks.refresh();
+        void sync();
+      }}
       headerAction={<IconAction label="Add a task" onPress={() => router.push("/task")}><Plus size={18} color={colors.accent} /></IconAction>}
       actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >
-      {tasks.loading && <Notice>Loading your activities…</Notice>}
-      {tasks.error && <Notice>{tasks.error}</Notice>}
-      {(["now", "next", "later"] as const).map((group) => {
-        const items =
-          tasks.data?.items.filter(
-            (item) =>
-              item.urgency === group &&
-              item.status !== "completed" &&
-              item.status !== "submitted",
-          ) ?? [];
+      <SyncStatus />
+      {tasks.loading && !tasks.data ? <Notice>Loading your activities…</Notice> : null}
+      {tasks.error && !tasks.data ? (
+        <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
+      ) : null}
+      {tasks.data && courses.length === 0 ? (
+        <Surface><Copy size="h3">No tasks yet</Copy><Copy muted>Canvas assignments with deadlines appear here after a sync. You can also add your own.</Copy></Surface>
+      ) : null}
+      {courses.map((summary) => {
+        const identity = identityFor(summary);
         return (
-          <View key={group} style={{ gap: 8 }}>
-            <Copy size="h2">
-              {group === "now" ? "Now" : group === "next" ? "Next" : "Later"}
-            </Copy>
-            {items.length ? (
-              items.map((item) => <ActivityCard key={item.id} item={item} />)
+          <CourseCard
+            key={summary.key}
+            identity={identity}
+            testID={`task-course-${summary.key}`}
+            accessibilityLabel={`${identity.title}: ${summary.due} due, ${summary.missing} missing, ${summary.completed} completed`}
+            onPress={() => router.push({ pathname: "/work/[courseKey]", params: { courseKey: summary.key } })}
+          >
+            <TaskCounts summary={summary} />
+          </CourseCard>
+        );
+      })}
+    </Page>
+  );
+}
+
+function TaskCounts({ summary }: { summary: TaskCourseSummary }) {
+  const { colors } = useTheme();
+  const parts: { label: string; color: string; strong?: boolean }[] = [];
+  if (summary.missing > 0) parts.push({ label: `${summary.missing} missing`, color: colors.danger, strong: true });
+  parts.push({ label: `${summary.due} due`, color: summary.due > 0 ? colors.textPrimary : colors.textMuted });
+  parts.push({ label: `${summary.completed} completed`, color: colors.textMuted });
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: spacing[3] }}>
+      {parts.map((part) => (
+        <Copy key={part.label} size="caption" color={part.color} style={{ fontWeight: part.strong ? "600" : "400" }}>{part.label}</Copy>
+      ))}
+    </View>
+  );
+}
+
+/** Level 2: one course's tasks, ordered by what needs attention now. */
+export function TasksCourseScreen() {
+  const { colors } = useTheme();
+  const { courseKey: rawKey } = useLocalSearchParams<{ courseKey?: string }>();
+  const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? PERSONAL_COURSE_KEY;
+  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const [showCompleted, setShowCompleted] = useState(false);
+  const now = Date.now();
+  const items = useMemo(() => (tasks.data?.items ?? []).filter((item) => courseKeyOf(item) === courseKey), [courseKey, tasks.data]);
+  const summary = summarizeTaskCourses(items)[0];
+  const identity = identityFor({ key: courseKey, course: summary?.course ?? null });
+  const groups = groupCourseTasks(items, now);
+  return (
+    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
+      {tasks.loading && !tasks.data ? <Notice>Loading tasks…</Notice> : null}
+      {tasks.error && !tasks.data ? (
+        <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
+      ) : null}
+      {tasks.data && items.length === 0 ? (
+        <Surface><Copy size="h3">No tasks in this course</Copy><Copy muted>Assignments with deadlines or submissions will appear after your next Canvas sync.</Copy></Surface>
+      ) : null}
+      {summary ? <TaskCounts summary={summary} /> : null}
+      {groups.map((group) => {
+        if (group.items.length === 0) return null;
+        const completed = group.key === "completed";
+        const heading = { fontWeight: "600" as const, letterSpacing: 0.4, textTransform: "uppercase" as const };
+        return (
+          <View key={group.key} style={{ gap: spacing[2] }}>
+            {completed ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${showCompleted ? "Hide" : "Show"} ${group.items.length} completed tasks`}
+                accessibilityState={{ expanded: showCompleted }}
+                onPress={() => setShowCompleted((value) => !value)}
+                style={({ pressed }) => ({ minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing[2], opacity: pressed ? 0.6 : 1 })}
+              >
+                <Copy muted size="caption" style={[heading, { flex: 1 }]}>{group.title} · {group.items.length}</Copy>
+                <Copy size="caption" color={colors.accent}>{showCompleted ? "Hide" : "Show"}</Copy>
+              </Pressable>
             ) : (
-              <Copy muted size="bodySmall">Nothing here right now.</Copy>
+              <Copy size="caption" color={group.key === "missing" ? colors.danger : colors.textSecondary} style={heading}>{group.title}</Copy>
             )}
+            {!completed || showCompleted ? (
+              <Surface style={{ padding: 0, overflow: "hidden", gap: 0 }}>
+                {group.items.map((item, index) => <TaskLine key={item.id} item={item} group={group.key} first={index === 0} now={now} />)}
+              </Surface>
+            ) : null}
           </View>
         );
       })}
     </Page>
   );
 }
-function ActivityCard({ item }: { item: ActivitySummary }) {
+
+function TaskLine({ item, group, first, now }: { item: ActivitySummary; group: TaskGroupKey; first: boolean; now: number }) {
   const { colors } = useTheme();
+  const done = group === "completed";
   return (
-    <Surface>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-      <View style={{ flex: 1 }}>
-      <RowLink
-        inset
-        icon={<ContentIcon kind="task" small />}
-        label={`Open activity: ${item.title}`}
-        onPress={() =>
-          router.push({ pathname: "/activity", params: { id: item.id } })
-        }
+    <View style={{ flexDirection: "row", alignItems: "center", borderTopWidth: first ? 0 : 1, borderColor: colors.separator }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open task: ${item.title}`}
+        onPress={() => router.push({ pathname: "/activity", params: { id: item.id } })}
+        style={({ pressed }) => ({ flex: 1, minHeight: 60, paddingVertical: spacing[3], paddingLeft: spacing[4], paddingRight: spacing[2], gap: 2, backgroundColor: pressed ? colors.surfaceSecondary : undefined })}
       >
-        <Copy
-          color={item.isOverdue ? colors.danger : colors.accent}
-          size="caption"
-        >
-          {item.course?.code ?? item.course?.name ?? "Personal"}
-          {item.isOverdue ? " · Overdue" : ""}
+        <Copy size="bodySmall" color={done ? colors.textSecondary : colors.textPrimary} style={{ fontWeight: "600", fontSize: 15, lineHeight: 20 }}>{item.title}</Copy>
+        <Copy size="caption" color={group === "missing" ? colors.danger : colors.textSecondary}>
+          {group === "missing" ? "Missing · " : ""}
+          {done ? (item.status === "submitted" ? "Submitted" : "Completed") : relativeDue(item.dueAt, now)}
+          {item.hasGeneratedDraft ? " · Draft ready" : ""}
         </Copy>
-        <Copy size="h3">{item.title}</Copy>
-        <Copy muted size="caption">
-          {deadline(item.dueAt)}
-          {item.estimatedMinutes ? ` · ${item.estimatedMinutes} min` : ""}
-        </Copy>
-        {item.hasGeneratedDraft && <Copy size="caption">Draft ready</Copy>}
-      </RowLink>
-      </View>
-      {item.taskId && <IconAction label={`Edit completion: ${item.title}`} onPress={() => router.push({ pathname: "/task", params: { taskId: item.taskId! } })}><Circle size={18} color={colors.textMuted} /></IconAction>}
-      </View>
-    </Surface>
+      </Pressable>
+      {item.taskId ? (
+        <IconAction label={`Edit completion: ${item.title}`} onPress={() => router.push({ pathname: "/task", params: { taskId: item.taskId! } })}>
+          <Circle size={18} color={colors.textMuted} />
+        </IconAction>
+      ) : null}
+    </View>
   );
 }
 export function ActivityScreen() {
