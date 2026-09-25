@@ -220,7 +220,7 @@ function buildScene(
   let disposed = false;
   let lastFrame = Date.now();
   let animatedTime = 8.4;
-  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, spin = 0, shimmer = 0, settleUntil = 0;
+  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, spin = 0, shimmer = 0, life = 0, settleUntil = 0;
   const coreView = new THREE.Vector3();
   const coreLightColor = new THREE.Color();
   const white = new THREE.Color(0xffffff);
@@ -257,6 +257,9 @@ function buildScene(
     const shimmerTarget = coreShimmerTarget(current.state, current.reducedMotion);
     spin += (spinTarget - spin) * momentum;
     shimmer += (shimmerTarget - shimmer) * momentum;
+    // How much the ribbons swim, curl and ruffle; eased so the shape never snaps between states.
+    const lifeTarget = current.reducedMotion ? 0.15 : 0.35 + activity * 0.65;
+    life += (lifeTarget - life) * momentum;
     const motionRate = coreMotionRate(current.state, current.reducedMotion, completion);
     const moving = motionRate > 0;
     // Completion settles into a slow living state without resetting phase or pose.
@@ -292,6 +295,7 @@ function buildScene(
       ribbon.rotation.x += rotationDelta * (0.08 + activity * 0.35) * direction;
       ribbon.rotation.z += rotationDelta * (0.06 + activity * 0.22) * -direction;
       uniforms.uTime.value = animatedTime * 2.8;
+      uniforms.uLife.value = life;
       uniforms.uGlow.value = (current.mode === "dark" ? 0.9 : 0.55) + activity * 0.38 + completion * 0.10;
       uniforms.uError.value = error;
       uniforms.uColorA.value.lerp(palette[0]!, ease);
@@ -337,7 +341,7 @@ function buildScene(
     renderer.render(scene, camera);
     gl.endFrameEXP();
     const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
-      || Math.abs(spin - spinTarget) > 0.004 || Math.abs(shimmer - shimmerTarget) > 0.004
+      || Math.abs(spin - spinTarget) > 0.004 || Math.abs(shimmer - shimmerTarget) > 0.004 || Math.abs(life - lifeTarget) > 0.004
       || touch.current.strength > 0.01;
     requestId = moving || settling ? requestAnimationFrame(draw) : null;
   };

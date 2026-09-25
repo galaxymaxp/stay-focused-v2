@@ -10,6 +10,7 @@ describe("living ribbon resources", () => {
     const bodyMaterial = body!.material as ShaderMaterial;
     const glowMaterial = glow!.material as ShaderMaterial;
     expect(bodyMaterial.uniforms.uTime).toBe(glowMaterial.uniforms.uTime);
+    expect(bodyMaterial.uniforms.uLife).toBe(glowMaterial.uniforms.uLife);
     expect(bodyMaterial.uniforms.uHalo!.value).toBe(0);
     expect(glowMaterial.uniforms.uHalo!.value).toBe(1);
     expect(bodyMaterial.transparent).toBe(false);
