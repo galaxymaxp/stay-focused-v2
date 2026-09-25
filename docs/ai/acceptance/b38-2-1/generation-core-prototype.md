@@ -1,6 +1,6 @@
 # B38.2.1 — Knowledge Core visual prototype
 
-Latest revision: [neutron-star centre](neutron-star-core.md) adds a shining centre star whose spin follows the generation state (fast while generating, slow but never still once complete, winding down and stopping only on failure). Earlier: [luminous, morphing ribbons](ribbon-glow-refinement.md) adds glow, flowing three-color palettes and changing width/twist/curvature, with 576 passing tests. The original measurements, transparent-ribbon implementation and screenshots below are the historical baseline, not the latest renderer. Production approval remains PARTIAL.
+Latest revision: [wavering orb light](orb-light-waver.md). The orb's light wavers irregularly instead of pulsing, spin follows the generation state, and Reduced Motion drifts slowly instead of freezing. Error is the only stopped state. Earlier: [neutron-star centre](neutron-star-core.md), [luminous, morphing ribbons](ribbon-glow-refinement.md) adds glow, flowing three-color palettes and changing width/twist/curvature, with 576 passing tests. The original measurements, transparent-ribbon implementation and screenshots below are the historical baseline, not the latest renderer. Production approval remains PARTIAL.
 
 Date: 2026-09-26. **PARTIAL — prototype works but visual/performance quality is not yet sufficient.**
 
