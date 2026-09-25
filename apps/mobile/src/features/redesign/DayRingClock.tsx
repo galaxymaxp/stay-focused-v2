@@ -1,12 +1,12 @@
 import type { TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "@react-navigation/native";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sun, Moon } from "lucide-react-native";
 import { Animated, PanResponder, Vibration, View } from "react-native";
-import Svg, { Circle, Path, Line, Defs, LinearGradient, RadialGradient, Stop, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Path, Line, Text as SvgText } from "react-native-svg";
 
 import { Copy } from "../../design/primitives";
-import { contentColors, motion, useTheme } from "../../design/theme";
+import { motion, useTheme } from "../../design/theme";
 import {
   clockMinutes,
   ringDragMinutes,
@@ -17,8 +17,9 @@ import {
 const SIZE = 320,
   CENTER = SIZE / 2,
   RADIUS = 126,
+  TRACK = 22,
   HANDLE_TOUCH_SIZE = 56,
-  HANDLE_VISIBLE_SIZE = 34;
+  HANDLE_VISIBLE_SIZE = 28;
 function point(minutes: number, radius = RADIUS) {
   const angle = (minutes / 1440) * Math.PI * 2 + Math.PI / 2;
   return {
@@ -31,6 +32,25 @@ function arc(from: number, to: number) {
     b = point(Math.min(to, from + 1439.9));
   return `M ${a.x} ${a.y} A ${RADIUS} ${RADIUS} 0 ${to - from > 720 ? 1 : 0} 1 ${b.x} ${b.y}`;
 }
+/** "2 h 15 min", "45 min", "3 h". */
+export function formatFreeTime(minutes: number) {
+  const hours = Math.floor(minutes / 60),
+    rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+function clockLabel(minutes: number) {
+  const date = new Date(2000, 0, 1, 0, 0);
+  date.setMinutes(minutes);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * The day as a 24-hour ring. Free time is the one filled arc, in the theme
+ * accent, so it reads as "yours" without competing colors. Scheduled items sit
+ * as a thin inner line; "now" is a small dot on the track. Holding a handle
+ * lifts it, shows its time in the center, and releasing commits.
+ */
 export function DayRingClock({
   date,
   timeline,
@@ -49,9 +69,9 @@ export function DayRingClock({
   disabled?: boolean;
 }) {
   const { colors, active, mode } = useTheme();
-  const gradientId = useId().replace(/:/g, "");
   const focused = useIsFocused();
   const [now, setNow] = useState(new Date());
+  const [adjusting, setAdjusting] = useState<"start" | "end" | null>(null);
   useEffect(() => {
     if (!active || !focused) return;
     setNow(new Date());
@@ -62,11 +82,14 @@ export function DayRingClock({
     () => timelineSegments(timeline, date),
     [timeline, date],
   );
-  const marker = point(now.getHours() * 60 + now.getMinutes());
-  const markerInner = point(now.getHours() * 60 + now.getMinutes(), 103);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const marker = point(nowMinutes);
   const daytime = now.getHours() >= 6 && now.getHours() < 18;
+  const track = mode === "dark" ? colors.surfaceSecondary : "#E8E7E3";
+  const segmentColor = (kind: TodayItem["kind"]) =>
+    kind === "study_session" ? colors.blue : kind === "calendar_block" ? colors.orange : colors.violet;
   return (
-    <View style={{ alignItems: "center", gap: 0 }}>
+    <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: SIZE, height: SIZE }} testID="day-ring">
         <Svg
           width={SIZE}
@@ -74,83 +97,51 @@ export function DayRingClock({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
-          <Defs>
-            <LinearGradient id={`${gradientId}-rim`} x1="0%" y1="0%" x2="90%" y2="100%">
-              <Stop offset="0" stopColor={mode === "dark" ? "#505355" : "#DFE3E1"} />
-              <Stop offset="0.45" stopColor={mode === "dark" ? "#25282A" : "#F1F0EC"} />
-              <Stop offset="1" stopColor={mode === "dark" ? "#444548" : "#CFD6D3"} />
-            </LinearGradient>
-            <RadialGradient id={`${gradientId}-face`} cx="40%" cy="30%" r="75%">
-              <Stop offset="0" stopColor={mode === "dark" ? "#1A1D1E" : "#FFFFFF"} />
-              <Stop offset="1" stopColor={colors.backgroundPrimary} />
-            </RadialGradient>
-            <LinearGradient id={`${gradientId}-free`} x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0" stopColor="#B4E6D2" /><Stop offset="1" stopColor="#5FAF91" />
-            </LinearGradient>
-          </Defs>
-          <Circle cx={CENTER} cy={CENTER} r={116} fill={`url(#${gradientId}-face)`} />
-          <Circle
-            cx={CENTER}
-            cy={CENTER}
-            r={RADIUS}
-            stroke={`url(#${gradientId}-rim)`}
-            strokeWidth={22}
-            fill="none"
-          />
+          <Circle cx={CENTER} cy={CENTER} r={RADIUS - TRACK / 2 - 1} fill={mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated} />
+          <Circle cx={CENTER} cy={CENTER} r={RADIUS} stroke={track} strokeWidth={TRACK} fill="none" />
           <Path
             d={arc(start, end)}
-            stroke={`url(#${gradientId}-free)`}
-            strokeWidth={22}
+            stroke={colors.accent}
+            strokeOpacity={adjusting ? 1 : 0.88}
+            strokeWidth={TRACK}
             fill="none"
             strokeLinecap="butt"
+            testID="free-time-arc"
           />
           {segments.map((segment) => (
             <Path
               key={segment.id}
               d={arc(segment.from, segment.to)}
-              stroke={
-                segment.kind === "study_session"
-                  ? contentColors.study
-                  : segment.kind === "calendar_block"
-                    ? contentColors.classes
-                    : contentColors.other
-              }
-              strokeWidth={22}
+              stroke={segmentColor(segment.kind)}
+              strokeWidth={6}
               fill="none"
-              strokeLinecap="butt"
+              strokeLinecap="round"
+              opacity={0.9}
             />
           ))}
-          {Array.from({ length: 96 }, (_, index) => {
-            const angle = (index * Math.PI) / 48;
-            const major = index % 4 === 0;
+          {Array.from({ length: 24 }, (_, hour) => {
+            const angle = (hour * Math.PI) / 12;
+            const major = hour % 6 === 0;
+            const inner = RADIUS - TRACK / 2 - (major ? 9 : 5);
+            const outer = RADIUS - TRACK / 2 - 2;
             return (
               <Line
-                key={index}
-                x1={CENTER + Math.sin(angle) * (major ? 98 : 108)}
-                y1={CENTER - Math.cos(angle) * (major ? 98 : 108)}
-                x2={CENTER + Math.sin(angle) * 112}
-                y2={CENTER - Math.cos(angle) * 112}
+                key={hour}
+                x1={CENTER + Math.sin(angle) * inner}
+                y1={CENTER - Math.cos(angle) * inner}
+                x2={CENTER + Math.sin(angle) * outer}
+                y2={CENTER - Math.cos(angle) * outer}
                 stroke={colors.textMuted}
-                strokeWidth={major ? 1 : 0.6}
-                opacity={major ? 0.8 : 0.35}
+                strokeWidth={major ? 1.2 : 0.8}
+                opacity={major ? 0.7 : 0.35}
               />
             );
           })}
-          <Circle cx={CENTER} cy={CENTER} r={137} fill="none" stroke={colors.textMuted} strokeWidth={0.5} opacity={0.25} />
           {[{ label: "12 AM", minutes: 0 }, { label: "6 AM", minutes: 360 }, { label: "12 PM", minutes: 720 }, { label: "6 PM", minutes: 1080 }].map(hour => {
-            const p = point(hour.minutes, 146);
-            return <SvgText key={hour.label} x={p.x} y={p.y + 4} fontFamily="sans-serif" fontSize={9} fill={colors.textSecondary} textAnchor="middle">{hour.label}</SvgText>;
+            const p = point(hour.minutes, RADIUS + 22);
+            return <SvgText key={hour.label} x={p.x} y={p.y + 4} fontFamily="sans-serif" fontSize={10} fill={colors.textMuted} textAnchor="middle">{hour.label}</SvgText>;
           })}
-          <Line x1={markerInner.x} y1={markerInner.y} x2={marker.x} y2={marker.y} stroke={contentColors.classes} strokeWidth={2} />
-          <Circle cx={markerInner.x} cy={markerInner.y} r={3} fill={contentColors.classes} />
-          <Circle
-            cx={marker.x}
-            cy={marker.y}
-            r={4}
-            fill={contentColors.classes}
-            stroke={colors.backgroundPrimary}
-            strokeWidth={2}
-          />
+          <Circle cx={marker.x} cy={marker.y} r={5} fill={colors.textPrimary} stroke={mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated} strokeWidth={2} testID="now-marker" />
         </Svg>
         <View
           pointerEvents="none"
@@ -159,24 +150,36 @@ export function DayRingClock({
             inset: 75,
             justifyContent: "center",
             alignItems: "center",
+            gap: 2,
           }}
         >
-          {daytime ? <Sun size={23} color={colors.warning} strokeWidth={1.5} /> : <Moon size={23} color={colors.accent} strokeWidth={1.5} />}
-          <Copy size="display" style={{ fontSize: 29, lineHeight: 36 }}>
-            {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-          </Copy>
-          <Copy color={colors.accent} size="caption">
-            {now.toLocaleDateString([], {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            })}
-          </Copy>
+          {adjusting ? (
+            <>
+              <Copy muted size="caption" style={{ letterSpacing: 0.6, textTransform: "uppercase", fontWeight: "600" }}>{adjusting === "start" ? "Free from" : "Free until"}</Copy>
+              <Copy size="display" style={{ fontSize: 30, lineHeight: 37, fontVariant: ["tabular-nums"] }}>{clockLabel(adjusting === "start" ? start : end)}</Copy>
+              <Copy color={colors.textSecondary} size="caption" style={{ fontVariant: ["tabular-nums"] }}>{formatFreeTime(end - start)}</Copy>
+            </>
+          ) : (
+            <>
+              {daytime ? <Sun size={20} color={colors.textMuted} strokeWidth={1.5} /> : <Moon size={20} color={colors.textMuted} strokeWidth={1.5} />}
+              <Copy size="display" style={{ fontSize: 30, lineHeight: 37, fontVariant: ["tabular-nums"] }}>
+                {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </Copy>
+              <Copy color={colors.textSecondary} size="caption">
+                {now.toLocaleDateString([], {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </Copy>
+            </>
+          )}
         </View>
         <RingHandle
           label="Availability start"
           value={start}
           disabled={disabled}
+          onHoldChange={(held) => setAdjusting(held ? "start" : null)}
           onChange={(value) => onChange(Math.min(value, end - 15), end)}
           onCommit={(value) => onCommit(Math.min(value, end - 15), end)}
         />
@@ -184,24 +187,30 @@ export function DayRingClock({
           label="Availability end"
           value={end}
           disabled={disabled}
+          onHoldChange={(held) => setAdjusting(held ? "end" : null)}
           onChange={(value) => onChange(start, Math.max(value, start + 15))}
           onCommit={(value) => onCommit(start, Math.max(value, start + 15))}
         />
       </View>
-      <Copy size="caption" color={colors.success}>{end - start} min free time · Hold a handle to adjust</Copy>
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: 12,
-          justifyContent: "center",
-        }}
-      >
-        {segments.some((s) => s.kind === "study_session") && <Copy size="caption" color={colors.accent}>Study</Copy>}
-        {segments.some((s) => s.kind === "calendar_block") && (
-          <Copy size="caption" color={colors.warning}>Classes</Copy>
-        )}
-      </View>
+      <Copy size="h3" style={{ fontVariant: ["tabular-nums"] }}>{formatFreeTime(end - start)} free</Copy>
+      <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>
+        {clockLabel(start)} – {clockLabel(end)} · Hold a handle to adjust
+      </Copy>
+      {segments.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 2 }}>
+          {segments.some((s) => s.kind === "study_session") && <Legend color={colors.blue} label="Study" />}
+          {segments.some((s) => s.kind === "calendar_block") && <Legend color={colors.orange} label="Classes" />}
+          {segments.some((s) => s.kind !== "study_session" && s.kind !== "calendar_block") && <Legend color={colors.violet} label="Other" />}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <View style={{ width: 12, height: 4, borderRadius: 2, backgroundColor: color }} />
+      <Copy muted size="caption">{label}</Copy>
     </View>
   );
 }
@@ -209,25 +218,29 @@ function RingHandle({
   label,
   value,
   disabled,
+  onHoldChange,
   onChange,
   onCommit,
 }: {
   label: string;
   value: number;
   disabled: boolean;
+  onHoldChange?: (held: boolean) => void;
   onChange: (value: number) => void;
   onCommit: (value: number) => void;
 }) {
-  const { colors, reducedMotion } = useTheme();
+  const { colors, mode, reducedMotion } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
+  const halo = useRef(new Animated.Value(0)).current;
   const current = useRef({
     value,
     onChange,
     onCommit,
+    onHoldChange,
     disabled,
     reducedMotion,
   });
-  current.current = { value, onChange, onCommit, disabled, reducedMotion };
+  current.current = { value, onChange, onCommit, onHoldChange, disabled, reducedMotion };
   const held = useRef(false),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     origin = useRef(point(value)),
@@ -236,18 +249,30 @@ function RingHandle({
     () => () => {
       clearTimeout(timer.current);
       scale.stopAnimation();
+      halo.stopAnimation();
     },
-    [scale],
+    [halo, scale],
   );
   const responder = useMemo(() => {
-    const animate = (toValue: number) => {
-      if (current.current.reducedMotion) scale.setValue(1);
-      else
-        Animated.spring(scale, {
-          toValue,
-          ...motion.spring,
-          useNativeDriver: true,
-        }).start();
+    const animate = (lifted: boolean) => {
+      if (current.current.reducedMotion) {
+        scale.setValue(1);
+        halo.setValue(lifted ? 1 : 0);
+        return;
+      }
+      Animated.parallel([
+        Animated.spring(scale, { toValue: lifted ? 1.14 : 1, ...motion.spring, useNativeDriver: true }),
+        Animated.timing(halo, { toValue: lifted ? 1 : 0, duration: lifted ? motion.small : motion.normal, useNativeDriver: true }),
+      ]).start();
+    };
+    const release = (commit: boolean) => {
+      clearTimeout(timer.current);
+      animate(false);
+      if (held.current) {
+        if (commit) current.current.onCommit(latest.current);
+        current.current.onHoldChange?.(false);
+      }
+      held.current = false;
     };
     return PanResponder.create({
       onStartShouldSetPanResponder: () => !current.current.disabled,
@@ -258,7 +283,8 @@ function RingHandle({
         timer.current = setTimeout(() => {
           held.current = true;
           Vibration.vibrate(10);
-          animate(1.16);
+          animate(true);
+          current.current.onHoldChange?.(true);
         }, 300);
       },
       onPanResponderMove: (_, gesture) => {
@@ -273,20 +299,12 @@ function RingHandle({
         latest.current = next;
         current.current.onChange(next);
       },
-      onPanResponderRelease: () => {
-        clearTimeout(timer.current);
-        animate(1);
-        if (held.current) current.current.onCommit(latest.current);
-        held.current = false;
-      },
-      onPanResponderTerminate: () => {
-        clearTimeout(timer.current);
-        animate(1);
-        held.current = false;
-      },
+      onPanResponderRelease: () => release(true),
+      onPanResponderTerminate: () => release(false),
     });
-  }, [scale]);
+  }, [halo, scale]);
   const p = point(value);
+  const surface = mode === "dark" ? colors.surfaceElevated : "#FFFFFF";
   return (
     <Animated.View
       {...responder.panHandlers}
@@ -326,19 +344,30 @@ function RingHandle({
         transform: [{ scale }],
       }}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          width: HANDLE_VISIBLE_SIZE + 18,
+          height: HANDLE_VISIBLE_SIZE + 18,
+          borderRadius: (HANDLE_VISIBLE_SIZE + 18) / 2,
+          backgroundColor: colors.accent,
+          opacity: Animated.multiply(halo, 0.16),
+        }}
+      />
       <View
         style={{
           width: HANDLE_VISIBLE_SIZE,
           height: HANDLE_VISIBLE_SIZE,
           borderRadius: HANDLE_VISIBLE_SIZE / 2,
-          backgroundColor: colors.violet,
-          borderColor: colors.backgroundPrimary,
-          borderWidth: 3,
-          shadowColor: colors.shadow,
-          shadowOpacity: 0.18,
-          shadowRadius: 5,
+          backgroundColor: surface,
+          borderColor: colors.accent,
+          borderWidth: 2.5,
+          shadowColor: "#000",
+          shadowOpacity: mode === "dark" ? 0.4 : 0.16,
+          shadowRadius: 4,
           shadowOffset: { width: 0, height: 2 },
-          elevation: 4,
+          elevation: 3,
         }}
       />
     </Animated.View>
