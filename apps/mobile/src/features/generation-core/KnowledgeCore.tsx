@@ -5,9 +5,9 @@ import { AppState, Pressable, StyleSheet, View } from "react-native";
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
-import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, coreSpinTarget, type CoreState } from "./coreModel";
+import { CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreRibbonPalette, coreShimmerTarget, coreSpinTarget, type CoreState } from "./coreModel";
 import { createLivingRibbon } from "./livingRibbon";
-import { createNeutronStar } from "./neutronStar";
+import { createCoreOrb } from "./coreOrb";
 
 const DEFAULT_SIZE = 320;
 
@@ -40,6 +40,8 @@ uniform vec3 uAccent;
 uniform vec3 uSecondary;
 uniform float uCompletion;
 uniform float uError;
+uniform vec3 uGlowColor;
+uniform float uShimmerLevel;
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
 varying float vWave;
@@ -53,7 +55,10 @@ void main() {
   color += uAccent * fresnel * 0.22 + vec3(1.0) * highlight * 0.82;
   color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))), uError * 0.74);
   color += vec3(0.96) * uCompletion * edge * 0.22;
-  gl_FragColor = vec4(color, min(fresnel * 0.12 + edge * 0.08 + highlight * 0.08, 0.2));
+  // The shell's rim catches the orb's light and wavers with it.
+  float caught = fresnel * (0.12 + uShimmerLevel * 0.08);
+  color += uGlowColor * caught;
+  gl_FragColor = vec4(color, min(fresnel * 0.12 + edge * 0.08 + highlight * 0.08, 0.2) + caught * 0.3);
 }`;
 
 interface SceneController { renderForChange: () => void; dispose: () => void }
@@ -157,6 +162,7 @@ function buildScene(
     uTime: { value: 0 }, uActivity: { value: 0 }, uOrder: { value: 0 }, uTouch: { value: 0 },
     uAccent: { value: new THREE.Color() }, uSecondary: { value: new THREE.Color() },
     uCompletion: { value: 0 }, uError: { value: 0 },
+    uGlowColor: { value: new THREE.Color() }, uShimmerLevel: { value: 0 },
   };
   const shellMaterial = new THREE.ShaderMaterial({ vertexShader: SHELL_VERTEX, fragmentShader: SHELL_FRAGMENT, uniforms: shellUniforms, transparent: true, depthWrite: false, side: THREE.FrontSide });
   const shellGeometry = new THREE.IcosahedronGeometry(1.03, 5);
@@ -164,9 +170,9 @@ function buildScene(
   shell.renderOrder = 4;
   root.add(shell);
 
-  const neutronStar = createNeutronStar();
-  root.add(neutronStar.star);
-  scene.add(...neutronStar.glows);
+  const coreOrb = createCoreOrb();
+  root.add(coreOrb.orb);
+  scene.add(...coreOrb.glows);
 
   const inner = new THREE.Group();
   root.add(inner);
@@ -214,7 +220,7 @@ function buildScene(
   let disposed = false;
   let lastFrame = Date.now();
   let animatedTime = 8.4;
-  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, spin = 0, settleUntil = 0;
+  let activity = 0, intake = 0, order = 0, completion = 0, error = 0, spin = 0, shimmer = 0, settleUntil = 0;
   const coreView = new THREE.Vector3();
   const coreLightColor = new THREE.Color();
   const white = new THREE.Color(0xffffff);
@@ -245,9 +251,12 @@ function buildScene(
     order += (profile.order - order) * ease;
     completion += (profile.completion - completion) * ease;
     error += (profile.error - error) * ease;
-    // Spin carries momentum between states; failure winds it down rather than cutting it.
+    // Spin and shimmer carry momentum between states; failure winds them down rather than cutting them.
+    const momentum = 1 - Math.pow(0.12, delta);
     const spinTarget = coreSpinTarget(current.state, current.reducedMotion);
-    spin = current.reducedMotion ? 0 : spin + (spinTarget - spin) * (1 - Math.pow(0.12, delta));
+    const shimmerTarget = coreShimmerTarget(current.state, current.reducedMotion);
+    spin += (spinTarget - spin) * momentum;
+    shimmer += (shimmerTarget - shimmer) * momentum;
     const motionRate = coreMotionRate(current.state, current.reducedMotion, completion);
     const moving = motionRate > 0;
     // Completion settles into a slow living state without resetting phase or pose.
@@ -305,23 +314,31 @@ function buildScene(
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
     const heat = 0.35 + activity * 0.75 + completion * 0.2 + touch.current.strength * 0.18;
-    neutronStar.update({
-      delta, spin, heat, error, mode: current.mode, camera,
-      beam: 0.3 + activity * 0.7,
+    coreOrb.update({
+      delta, spin, shimmer, heat, error, mode: current.mode, camera,
+      // Reduced Motion keeps a steady glow.
+      shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
       glow: 0.55 + activity * 0.5 + completion * 0.15,
     });
-    coreView.copy(neutronStar.center).applyMatrix4(camera.matrixWorldInverse);
+    const light = coreOrb.shimmer;
+    coreView.copy(coreOrb.center).applyMatrix4(camera.matrixWorldInverse);
     coreLightColor.set(current.mode === "dark" ? "#D6E2FF" : "#B9CCF5");
     const coreLight = (current.mode === "dark" ? 1.5 : 0.9) * (0.45 + activity * 0.55) * (1 - error);
     ribbons.forEach(({ uniforms }) => {
       uniforms.uCoreView.value.copy(coreView);
       uniforms.uCoreColor.value.copy(coreLightColor);
       uniforms.uCoreLight.value = coreLight;
+      uniforms.uShimmerTime.value = light.time;
+      uniforms.uShimmer.value = light.amount;
+      uniforms.uShimmerLevel.value = light.level;
     });
+    shellUniforms.uGlowColor.value.copy(coreLightColor).multiplyScalar(1 - error);
+    shellUniforms.uShimmerLevel.value = light.level * (1 - error);
     renderer.render(scene, camera);
     gl.endFrameEXP();
     const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
-      || Math.abs(spin - spinTarget) > 0.004 || touch.current.strength > 0.01;
+      || Math.abs(spin - spinTarget) > 0.004 || Math.abs(shimmer - shimmerTarget) > 0.004
+      || touch.current.strength > 0.01;
     requestId = moving || settling ? requestAnimationFrame(draw) : null;
   };
 
@@ -334,7 +351,7 @@ function buildScene(
       disposed = true;
       if (requestId !== null) cancelAnimationFrame(requestId);
       shellGeometry.dispose(); shellMaterial.dispose();
-      neutronStar.dispose();
+      coreOrb.dispose();
       ribbons.forEach((ribbon) => ribbon.dispose());
       particleGeometry.dispose(); particleMaterial.dispose(); shardGeometry.dispose();
       shards.forEach((shard) => (shard.material as THREE.Material).dispose());

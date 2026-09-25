@@ -57,6 +57,9 @@ uniform vec3 uColorC;
 uniform vec3 uCoreView;
 uniform vec3 uCoreColor;
 uniform float uCoreLight;
+uniform float uShimmerTime;
+uniform float uShimmer;
+uniform float uShimmerLevel;
 varying vec2 vRibbonUv;
 varying vec3 vNormal;
 varying vec3 vViewPosition;
@@ -79,7 +82,12 @@ void main() {
   float coreDistance = length(toCore);
   // Only faces turned toward the star catch it; outer faces keep their silver shading.
   float coreFacing = max(dot(n, toCore / coreDistance), 0.0) * 0.9 + 0.06;
-  color += uCoreColor * coreFacing * uCoreLight / (1.0 + coreDistance * coreDistance * 14.0);
+  // The orb's light wavers: patches of it drift across the ribbons in different directions.
+  vec3 outward = -toCore / coreDistance;
+  float waver = sin(outward.x * 3.1 + outward.y * 1.7 + uShimmerTime * 1.9)
+    * sin(outward.y * 2.6 - outward.z * 2.2 - uShimmerTime * 1.3);
+  float shimmerLight = 1.0 + (waver * 0.7 + uShimmerLevel * 0.45) * uShimmer;
+  color += uCoreColor * coreFacing * uCoreLight * shimmerLight / (1.0 + coreDistance * coreDistance * 14.0);
   color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))) * 0.26, uError);
   float alpha = 1.0;
   if (uHalo > 0.5) {
@@ -89,7 +97,7 @@ void main() {
     if (outside < 0.758) discard;
     float fade = 1.0 - smoothstep(0.758, 1.0, outside);
     color = vec3(1.0);
-    alpha = fade * fade * uGlow * 0.36 * (1.0 - uError);
+    alpha = fade * fade * uGlow * 0.36 * (1.0 - uError) * (1.0 + waver * 0.45 * uShimmer);
   }
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
@@ -103,7 +111,7 @@ export function createLivingRibbon(index: number) {
     uColorA: { value: new THREE.Color() }, uColorB: { value: new THREE.Color() },
     uColorC: { value: new THREE.Color() },
     uCoreView: { value: new THREE.Vector3() }, uCoreColor: { value: new THREE.Color() },
-    uCoreLight: { value: 0 },
+    uCoreLight: { value: 0 }, uShimmerTime: { value: 0 }, uShimmer: { value: 0 }, uShimmerLevel: { value: 0 },
   };
   const geometry = new THREE.PlaneGeometry(1, 1, 128, 10);
   const material = new THREE.ShaderMaterial({

@@ -11,10 +11,14 @@ export const CORE_STATES = [
 
 export type CoreState = (typeof CORE_STATES)[number];
 
-/** Completion slows the same animation clock; only failure/accessibility pauses it. */
+/** Share of the normal clock kept under Reduced Motion: a slow drift, never a freeze. */
+export const REDUCED_MOTION_RATE = 0.1;
+
+/** Completion slows the same animation clock; only failure stops it. */
 export function coreMotionRate(state: CoreState, reducedMotion: boolean, completion: number): number {
-  if (reducedMotion || state === "error") return 0;
-  return 1 - Math.max(0, Math.min(1, completion)) * 0.72;
+  if (state === "error") return 0;
+  const rate = 1 - Math.max(0, Math.min(1, completion)) * 0.72;
+  return reducedMotion ? Math.min(rate, REDUCED_MOTION_RATE) : rate;
 }
 
 export interface CoreMotionProfile {
@@ -23,22 +27,33 @@ export interface CoreMotionProfile {
   readonly order: number;
   readonly completion: number;
   readonly error: number;
-  /** Share of the central star's maximum angular velocity. */
+  /** Share of the orb's maximum angular velocity. */
   readonly spin: number;
+  /** Speed of the orb's wavering light, as a share of its fastest. */
+  readonly shimmer: number;
 }
 
 export const CORE_MOTION_PROFILES: Record<CoreState, CoreMotionProfile> = {
-  idle: { activity: 0.12, intake: 0, order: 0.28, completion: 0, error: 0, spin: 0.22 },
-  reading: { activity: 0.42, intake: 1, order: 0.18, completion: 0, error: 0, spin: 0.5 },
-  generating: { activity: 0.86, intake: 0.22, order: 0.08, completion: 0, error: 0, spin: 1 },
-  finalizing: { activity: 0.3, intake: 0, order: 1, completion: 0, error: 0, spin: 0.55 },
-  complete: { activity: 0.04, intake: 0, order: 1, completion: 1, error: 0, spin: 0.12 },
-  error: { activity: 0, intake: 0, order: 0.35, completion: 0, error: 1, spin: 0 },
+  idle: { activity: 0.12, intake: 0, order: 0.28, completion: 0, error: 0, spin: 0.22, shimmer: 0.3 },
+  reading: { activity: 0.42, intake: 1, order: 0.18, completion: 0, error: 0, spin: 0.5, shimmer: 0.55 },
+  generating: { activity: 0.86, intake: 0.22, order: 0.08, completion: 0, error: 0, spin: 1, shimmer: 1 },
+  finalizing: { activity: 0.3, intake: 0, order: 1, completion: 0, error: 0, spin: 0.55, shimmer: 0.5 },
+  complete: { activity: 0.04, intake: 0, order: 1, completion: 1, error: 0, spin: 0.12, shimmer: 0.2 },
+  error: { activity: 0, intake: 0, order: 0.35, completion: 0, error: 1, spin: 0, shimmer: 0 },
 };
 
-/** The star spins with the work: fastest while generating, slow once complete, still only on failure. */
+/** Under Reduced Motion the orb still turns, at most once every ~40 seconds. */
+const REDUCED_MOTION_SPIN = 0.06;
+
+/** The orb spins with the work: fastest while generating, slow once complete, still only on failure. */
 export function coreSpinTarget(state: CoreState, reducedMotion: boolean): number {
-  return reducedMotion ? 0 : CORE_MOTION_PROFILES[state].spin;
+  const spin = CORE_MOTION_PROFILES[state].spin;
+  return reducedMotion ? Math.min(spin, REDUCED_MOTION_SPIN) : spin;
+}
+
+/** The orb's light wavers with the work. Reduced Motion keeps the glow steady instead. */
+export function coreShimmerTarget(state: CoreState, reducedMotion: boolean): number {
+  return reducedMotion ? 0 : CORE_MOTION_PROFILES[state].shimmer;
 }
 
 export const CORE_STATE_COPY: Record<CoreState, { readonly title: string; readonly detail: string }> = {
