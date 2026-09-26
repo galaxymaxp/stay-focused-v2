@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { countActiveJobs } from "../../design/appActivity";
 import { EMPTY_LIST_PREFERENCES, arrangeList, parseListPreferences, setHidden, setPinned } from "./listPreferences";
-import { queueSections, todayItemDetail } from "./presentation";
+import { generationCoreState, queueSections, todayItemDetail } from "./presentation";
 
 describe("pin and hide preferences", () => {
   it("surfaces the newest pin first and keeps hidden items recoverable, never deleted", () => {
@@ -59,5 +59,15 @@ describe("Today item detail", () => {
     expect(old).toContain("Oct");
     expect(old).toContain("2023");
     expect(todayItemDetail({ startAt: null, dueAt: "2026-09-29T23:59:00", estimatedMinutes: null, status: "pending" }, now)).toMatch(/^Due Sep 29/);
+  });
+});
+
+describe("Knowledge Core state", () => {
+  it("follows the real generation job and stops only when it cannot finish", () => {
+    expect(generationCoreState(null, false)).toBe("idle");
+    expect(generationCoreState(null, true)).toBe("reading");
+    expect(["queued", "preparing", "generating", "finalizing", "cancelling", "completed", "failed", "cancelled"].map((state) =>
+      generationCoreState(state as Parameters<typeof generationCoreState>[0], true),
+    )).toEqual(["reading", "reading", "generating", "finalizing", "finalizing", "complete", "error", "error"]);
   });
 });

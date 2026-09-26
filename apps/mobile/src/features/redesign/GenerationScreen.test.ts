@@ -21,7 +21,7 @@ vi.mock("../../services/generationRecovery", () => ({
 }));
 vi.mock("../../services/localLibrary/deviceLibrary", () => ({ storeCompletedGeneration: vi.fn() }));
 vi.mock("../../services/localLibrary/librarySync", () => ({ persistedArtifactId: () => null }));
-vi.mock("./GenerationVisual", () => ({ GenerationVisual: "GenerationVisual" }));
+vi.mock("./GenerationCore", () => ({ GenerationCore: "GenerationCore" }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({ baseUrl: "https://api.example", accessToken: "token" }),
   useExperience: () => ({ data: null, error: null, refresh: vi.fn() }),
@@ -64,8 +64,11 @@ describe("Queue generation confirmation safety", () => {
   it("does not accept on mount and accepts exactly once after explicit confirmation", async () => {
     const root = await render(createElement(GenerationScreen));
     expect(mocks.accept).not.toHaveBeenCalled();
+    // Nothing runs before confirmation, so the Knowledge Core waits quietly.
+    expect(root.findAll(node => String(node.type) === "GenerationCore")[0]!.props.state).toBe("idle");
     const confirm = root.findAll(node => String(node.type) === "Action").find(node => node.props.children === "Confirm generation")!;
     await act(async () => { await confirm.props.onPress(); });
+    expect(root.findAll(node => String(node.type) === "GenerationCore")[0]!.props.state).toBe("reading");
     expect(mocks.accept).toHaveBeenCalledTimes(1);
     expect(mocks.accept).toHaveBeenCalledWith("owner", expect.anything(), pending);
   });

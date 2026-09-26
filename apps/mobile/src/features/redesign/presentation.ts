@@ -8,6 +8,8 @@ import type {
 } from "@stay-focused/shared";
 import type { StudyPlanningRequest } from "@stay-focused/shared/task-planning";
 
+import type { CoreState } from "../generation-core/coreModel";
+
 export const primaryTabs = [
   { route: "today", title: "Today" },
   { route: "courses", title: "Generate" },
@@ -196,4 +198,29 @@ export function timelineSegments(items: readonly TodayItem[], date: string) {
       ? [{ id: item.id, from, to, kind: item.kind, title: item.title }]
       : [];
   });
+}
+
+/**
+ * The Knowledge Core follows the real job: it reads while the source is
+ * prepared, spins fastest while generating, settles while saving, keeps
+ * slowly moving once complete, and stops only when the job cannot finish.
+ */
+export function generationCoreState(state: GenerationState | null, connecting: boolean): CoreState {
+  switch (state) {
+    case null:
+      return connecting ? "reading" : "idle";
+    case "queued":
+    case "preparing":
+      return "reading";
+    case "generating":
+      return "generating";
+    case "finalizing":
+    case "cancelling":
+      return "finalizing";
+    case "completed":
+      return "complete";
+    case "failed":
+    case "cancelled":
+      return "error";
+  }
 }

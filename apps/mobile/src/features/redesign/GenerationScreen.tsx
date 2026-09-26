@@ -20,8 +20,8 @@ import {
 } from "../../services/generationRecovery";
 import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibrary";
 import { persistedArtifactId } from "../../services/localLibrary/librarySync";
-import { GenerationVisual } from "./GenerationVisual";
-import { generationMessages, queueSections } from "./presentation";
+import { GenerationCore } from "./GenerationCore";
+import { generationCoreState, generationMessages, queueSections } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 
 export function GenerationScreen() {
@@ -127,7 +127,7 @@ export function GenerationScreen() {
           style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
           <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent ? "Ready for confirmation" : "Preparing your request…"} />
-          <GenerationVisual running={running && !!id} completed={data?.state === "completed"} />
+          <GenerationCore state={generationCoreState(data?.state ?? null, !!id)} />
           <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
               ? running
