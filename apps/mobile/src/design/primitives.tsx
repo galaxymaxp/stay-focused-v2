@@ -287,6 +287,11 @@ export function Page({
           ref={scrollRef}
           onScroll={onScroll}
           scrollEnabled={scrollEnabled}
+          // Android's pull-to-refresh wrapper ignores a child's "don't steal
+          // this touch" request unless the scroll view nests. Without this a
+          // quick drag on a control (a clock handle, a scrubber) at the top of
+          // the page is taken as a pull-to-refresh.
+          nestedScrollEnabled
           {...scrollTouch}
           scrollEventThrottle={onScroll ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
