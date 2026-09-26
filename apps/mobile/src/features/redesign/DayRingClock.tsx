@@ -372,7 +372,8 @@ export function DayRingClock({
             const hour = index * 2;
             const major = hour % 6 === 0;
             const label = hour === 0 ? "12AM" : hour === 12 ? "12PM" : hour === 6 ? "6AM" : hour === 18 ? "6PM" : String(hour % 12);
-            const p = ringPoint(hour * 60, CLOCK.ring + CLOCK.track / 2 + 10);
+            // Far enough out that a handle parked on an hour never covers its label.
+            const p = ringPoint(hour * 60, CLOCK.ring + CLOCK.track / 2 + 15);
             return (
               <SvgText key={hour} x={p.x} y={p.y + 3.5} fontFamily="sans-serif" fontSize={major ? 9.5 : 9} fontWeight={major ? "600" : "400"} fill={major ? colors.textSecondary : colors.textMuted} textAnchor="middle">
                 {label}
@@ -391,7 +392,7 @@ export function DayRingClock({
             const p = ringPoint(handle.at, CLOCK.ring);
             const held = adjusting === handle.key || adjusting === "move";
             return (
-              <Circle key={handle.key} cx={p.x} cy={p.y} r={held ? 13.5 : 12} fill={handleFill} stroke={colors.accent} strokeWidth={2.5} />
+              <Circle key={handle.key} cx={p.x} cy={p.y} r={held ? 12.5 : 11} fill={handleFill} stroke={colors.accent} strokeWidth={2.5} />
             );
           })}
         </Svg>
