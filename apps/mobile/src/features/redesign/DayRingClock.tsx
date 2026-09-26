@@ -173,12 +173,7 @@ export function DayRingClock({
   const range = draft ?? { start, end };
   const lift = useRef(new Animated.Value(0)).current;
 
-  const scheduled = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
-  // Blocks live inside the free time: anything outside the window is not
-  // shown, and a block that crosses an edge is clipped to it.
-  const segments = scheduled
-    .map((segment) => ({ ...segment, from: Math.max(segment.from, range.start), to: Math.min(segment.to, range.end) }))
-    .filter((segment) => segment.to - segment.from > 0.5);
+  const segments = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
 
   const latest = useRef({ start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange, segments, onSegmentPress, locked });
   latest.current = { start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange, segments, onSegmentPress, locked };
@@ -410,7 +405,7 @@ export function DayRingClock({
           })}
           <Path d={arc(range.start, range.end, CLOCK.ring)} stroke={colors.accent} strokeOpacity={adjusting ? 1 : locked ? 0.55 : 0.9} strokeWidth={CLOCK.track} fill="none" strokeLinecap="butt" testID="free-time-arc" />
           {segments.map((segment) => (
-            <Path key={segment.id} d={arc(segment.from, Math.max(segment.to, segment.from + 0.5), CLOCK.lane)} stroke={segmentColor(segment.kind)} strokeWidth={6} fill="none" strokeLinecap="round" opacity={0.92} />
+            <Path key={segment.id} d={arc(segment.from, Math.max(segment.to, segment.from + 0.5), CLOCK.lane)} stroke={segmentColor(segment.kind)} strokeWidth={6} fill="none" strokeLinecap="round" opacity={proposed.length ? 0.28 : 0.92} />
           ))}
           {proposed.map((session) => (
             <Path key={session.id} d={arc(session.from, Math.max(session.to, session.from + 0.5), CLOCK.lane)} stroke={session.color} strokeWidth={6} strokeDasharray="5 4" fill="none" strokeLinecap="round" testID="proposed-arc" />

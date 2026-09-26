@@ -77,14 +77,13 @@ describe("day-ring input and planner boundary", () => {
     expect(snapMinutes(-10)).toBe(0);
     expect(snapMinutes(1500)).toBe(1440);
   });
-  it("sends availability to the authoritative planner without client sessions", () => {
+  it("offers only the free time, but replans the whole day so every block fits inside it", () => {
     const request = planningRequest("2026-09-13", 600, 720);
-    expect(request.availability).toEqual([request.planningRange]);
     expect(Object.keys(request)).toEqual(["planningRange", "availability"]);
-    expect(
-      Date.parse(request.planningRange.endsAt) -
-        Date.parse(request.planningRange.startsAt),
-    ).toBe(120 * 60000);
+    const [window] = request.availability;
+    expect(Date.parse(window!.endsAt) - Date.parse(window!.startsAt)).toBe(120 * 60000);
+    expect(request.planningRange.startsAt).toBe(new Date("2026-09-13T00:00:00").toISOString());
+    expect(Date.parse(request.planningRange.endsAt) - Date.parse(request.planningRange.startsAt)).toBe(1440 * 60000);
     expect(() => planningRequest("2026-09-13", 720, 600)).toThrow();
   });
   it("draws only real timed blocks and excludes skipped sessions", () => {

@@ -260,3 +260,11 @@ describe("announcement read state", () => {
     expect(setRead(prefs, "a1", false).read.announcements).toEqual([]);
   });
 });
+
+describe("free time holds the day's blocks", () => {
+  it("wraps a missing free time around the planned blocks, on the quarter hour", async () => {
+    const { freeTimeAround } = await import("./presentation");
+    expect(freeTimeAround([{ from: 722, to: 780 }, { from: 780, to: 845 }])).toEqual({ start: 720, end: 855 });
+    expect(freeTimeAround([])).toBeNull();
+  });
+});

@@ -170,7 +170,13 @@ export function deadline(value: string | null) {
       })
     : "No deadline";
 }
-/** Only describes availability. The existing server planner owns allocation/order. */
+/**
+ * Only describes availability. The existing server planner owns allocation
+ * and order. The free time is the only availability, and the planning range
+ * is the whole day: applying replaces every planned block today, so all of
+ * the day's work is refit inside the free time instead of old blocks being
+ * left outside it.
+ */
 export function planningRequest(
   date: string,
   start: number,
@@ -181,9 +187,21 @@ export function planningRequest(
   const at = (minutes: number) =>
     new Date(midnight.getTime() + minutes * 60000).toISOString();
   return {
-    planningRange: { startsAt: at(start), endsAt: at(end) },
+    planningRange: { startsAt: at(0), endsAt: at(1440) },
     availability: [{ startsAt: at(start), endsAt: at(end) }],
   };
+}
+
+/**
+ * The free time that holds a day's planned blocks, for when none was saved:
+ * from the first planned block's start to the last one's end, on the
+ * fifteen-minute grid.
+ */
+export function freeTimeAround(segments: readonly { readonly from: number; readonly to: number }[]): { start: number; end: number } | null {
+  if (segments.length === 0) return null;
+  const start = Math.max(0, Math.floor(Math.min(...segments.map((s) => s.from)) / 15) * 15);
+  const end = Math.min(1440, Math.ceil(Math.max(...segments.map((s) => s.to)) / 15) * 15);
+  return end > start ? { start, end } : null;
 }
 export function timelineSegments(items: readonly TodayItem[], date: string) {
   const start = new Date(`${date}T00:00:00`).getTime();

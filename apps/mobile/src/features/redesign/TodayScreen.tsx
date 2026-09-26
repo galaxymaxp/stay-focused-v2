@@ -26,9 +26,11 @@ import {
   arrangeToday,
   available,
   deadline,
+  freeTimeAround,
   greetingFor,
   localDate,
   planningRequest,
+  timelineSegments,
   todayItemDetail,
   urgencyOf,
   type Urgency,
@@ -194,11 +196,49 @@ export function TodayScreen() {
   const [previewRequest, setPreviewRequest] = useState<ReturnType<
     typeof planningRequest
   > | null>(null);
+  // The free time is remembered per day, so the planned blocks it holds and
+  // the window you set stay together across launches.
+  const windowKey = `sf.today.free-time.${date}`;
+  const [windowKnown, setWindowKnown] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void Promise.resolve(sessionStore.getItem(windowKey)).then((raw) => {
+      if (!live) return;
+      try {
+        const saved = raw ? (JSON.parse(raw) as { start?: unknown; end?: unknown }) : null;
+        if (saved && typeof saved.start === "number" && typeof saved.end === "number" && saved.end > saved.start) {
+          setStart(saved.start);
+          setEnd(saved.end);
+          setWindowKnown(true);
+          return;
+        }
+      } catch {
+        // Unreadable: fall back to the day's planned blocks below.
+      }
+      setWindowKnown(false);
+    }).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [windowKey]);
+  // Nothing saved yet: wrap the free time around today's planned blocks.
+  const planned = today.data?.timeline;
+  useEffect(() => {
+    if (windowKnown || !planned) return;
+    const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date));
+    if (around) {
+      setStart(around.start);
+      setEnd(around.end);
+      setWindowKnown(true);
+    }
+  }, [date, planned, windowKnown]);
   const change = (from: number, to: number) => {
     setStart(from);
     setEnd(to);
     setPreview(null);
     setPreviewRequest(null);
+    setWindowKnown(true);
+    void Promise.resolve(sessionStore.setItem(windowKey, JSON.stringify({ start: from, end: to }))).catch(() => {});
   };
   async function plan(from: number, to: number) {
     if (requestBusy.current || !available(capabilities.data?.planner)) return;
