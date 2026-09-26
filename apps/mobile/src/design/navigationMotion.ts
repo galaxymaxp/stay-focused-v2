@@ -13,10 +13,14 @@ import type { NativeStackNavigationOptions } from "@react-navigation/native-stac
  * All of these are native transitions driven by react-native-screens, so the
  * JS thread never blocks a tap and back gestures stay interruptible. Reduced
  * Motion keeps navigation legible with a short fade and no travel.
+ *
+ * Every scene is painted with the app background, so nothing lighter than the
+ * page can show through while a screen is moving.
  */
-export function hierarchyMotion(reducedMotion: boolean): NativeStackNavigationOptions {
+export function hierarchyMotion(reducedMotion: boolean, background: string): NativeStackNavigationOptions {
   return {
     headerShown: false,
+    contentStyle: { backgroundColor: background },
     animation: reducedMotion ? "fade" : "slide_from_right",
     animationDuration: reducedMotion ? 150 : 300,
     gestureEnabled: true,
@@ -33,6 +37,26 @@ export function modalMotion(reducedMotion: boolean): NativeStackNavigationOption
   };
 }
 
-export function tabMotion(reducedMotion: boolean): Pick<BottomTabNavigationOptions, "animation"> {
-  return { animation: reducedMotion ? "none" : "fade" };
+/**
+ * A dismissible sheet over the current screen: the screen underneath stays
+ * visible behind a dimmed backdrop, so tapping outside, Android back and the
+ * close control all lead straight back to it.
+ */
+export function sheetMotion(): NativeStackNavigationOptions {
+  return {
+    presentation: "transparentModal",
+    animation: "fade",
+    animationDuration: 180,
+    gestureEnabled: true,
+    contentStyle: { backgroundColor: "transparent" },
+  };
+}
+
+export function tabMotion(reducedMotion: boolean, background: string): Pick<BottomTabNavigationOptions, "animation" | "sceneStyle" | "transitionSpec"> {
+  return {
+    animation: reducedMotion ? "none" : "fade",
+    // Short and eased: siblings swap quickly without a visible dip.
+    transitionSpec: { animation: "timing", config: { duration: 140 } },
+    sceneStyle: { backgroundColor: background },
+  };
 }

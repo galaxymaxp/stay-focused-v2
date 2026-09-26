@@ -57,15 +57,20 @@ function actions() {
   };
 }
 
-async function renderRow(spy: ReturnType<typeof actions>) {
+async function renderRow(spy: ReturnType<typeof actions>, fullSwipe = false) {
   await act(async () => {
     rendered = create(createElement(Row, {
-      leading: [
+      leading: [{ key: "pin", label: "Pin", icon: "Pin" as never, tone: "accent", onPress: spy.pin }],
+      trailing: [
         { key: "hide", label: "Hide", icon: "EyeOff" as never, tone: "neutral", onPress: spy.hide },
         { key: "unsync", label: "Unsync", icon: "CloudOff" as never, tone: "warning", onPress: spy.unsync },
       ],
-      trailing: [{ key: "pin", label: "Pin", icon: "Pin" as never, tone: "accent", onPress: spy.pin }],
+      fullSwipe,
     }, createElement("Card")));
+  });
+  // A laid-out row, so a full swipe has a width to measure against.
+  await act(async () => {
+    rendered!.root.findAll((node) => typeof node.props.onLayout === "function")[0]!.props.onLayout({ nativeEvent: { layout: { width: 360, height: 72 } } });
   });
   const root = rendered!.root;
   const surface = () => root.findAll((node) => String(node.type) === "AnimatedView" && typeof node.props.onPanResponderMove === "function")[0]!;
@@ -92,18 +97,37 @@ describe("SwipeRow", () => {
     expect(claim({}, { dx: -24, dy: 3 })).toBe(true);
   });
 
-  it("swipe right reveals Hide and Unsync; swipe left reveals Pin", async () => {
+  it("swipe right reveals Pin; swipe left reveals Hide and Unsync", async () => {
     const row = await renderRow(actions());
-    await row.drag(90);
-    expect(row.openSide()).toEqual([["swipe-action-hide", "swipe-action-unsync"]]);
-    await row.drag(-400);
+    await row.drag(60);
     expect(row.openSide()).toEqual([["swipe-action-pin"]]);
+    await row.drag(-400);
+    expect(row.openSide()).toEqual([["swipe-action-hide", "swipe-action-unsync"]]);
+  });
+
+  it("runs the first action directly on a full swipe, only when enabled", async () => {
+    const spy = actions();
+    const row = await renderRow(spy, true);
+    await row.drag(260);
+    expect(spy.pin).toHaveBeenCalledOnce();
+    await row.drag(-260);
+    expect(spy.hide).toHaveBeenCalledOnce();
+    expect(spy.unsync).not.toHaveBeenCalled();
+    expect(row.openSide()).toEqual([]);
+  });
+
+  it("never runs an action from a drag when full swipe is off", async () => {
+    const spy = actions();
+    const row = await renderRow(spy);
+    await row.drag(-300);
+    expect(spy.hide).not.toHaveBeenCalled();
+    expect(row.openSide()).toEqual([["swipe-action-hide", "swipe-action-unsync"]]);
   });
 
   it("runs an action with one tap and closes, and a short drag springs back closed", async () => {
     const spy = actions();
     const row = await renderRow(spy);
-    await row.drag(-80);
+    await row.drag(60);
     await act(async () => row.layer("pin").props.onPress());
     expect(spy.pin).toHaveBeenCalledOnce();
     expect(row.openSide()).toEqual([]);

@@ -7,6 +7,8 @@ vi.mock("react-native", () => ({
   Text: "Text",
   TextInput: "TextInput",
   Pressable: "Pressable",
+  ScrollView: "ScrollView",
+  Vibration: { vibrate: vi.fn() },
   useWindowDimensions: () => ({ width: 360, height: 800, scale: 3, fontScale: 1 }),
   Animated: {
     View: "AnimatedView",
@@ -19,8 +21,13 @@ vi.mock("react-native", () => ({
     multiply: (a: unknown, b: unknown) => ({ a, b }),
   },
 }));
-vi.mock("lucide-react-native", () => ({ ChevronDown: "ChevronDown", ChevronUp: "ChevronUp", Search: "Search", X: "X" }));
-vi.mock("../../design/primitives", () => ({ Copy: "Copy", IconAction: "IconAction", Notice: "Notice", Page: "Page" }));
+vi.mock("lucide-react-native", () => ({ ChevronDown: "ChevronDown", ChevronUp: "ChevronUp", FileQuestion: "FileQuestion" }));
+vi.mock("../../design/primitives", () => ({
+  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", SearchField: "SearchField", SegmentedControl: "SegmentedControl", Sheet: "Sheet", Surface: "Surface",
+}));
+vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
+vi.mock("../../auth", () => ({ useAuth: () => ({ session: null }) }));
+vi.mock("../../services/generationRecovery", () => ({ createGenerationIntent: vi.fn() }));
 vi.mock("../../design/theme", async () => {
   const tokens = await import("../../design/themeTokens");
   return { ...tokens, useTheme: () => ({ colors: tokens.palettes.light, mode: "light", reducedMotion: true }) };
@@ -110,6 +117,29 @@ describe("Reviewer section scrubber", () => {
     await act(async () => { vi.advanceTimersByTime(500); });
     await act(async () => strip.onTouchEnd());
     expect(props.onActiveChange).not.toHaveBeenCalled();
+  });
+
+  it("lets the visible thumb be dragged at once, with a floating topic label", async () => {
+    await mount();
+    const thumb = () => rendered!.root.find((node) => node.props.testID === "reviewer-scrubber-thumb");
+    // Hidden thumb: touches pass straight through to the reader.
+    expect(thumb().props.pointerEvents).toBe("none");
+    await act(async () => handle.current.reveal(0, 4000, 800));
+    expect(thumb().props.pointerEvents).toBe("auto");
+    await act(async () => thumb().props.onResponderGrant(at(20)));
+    // No hold: the drag owns the touch immediately.
+    expect(props.onActiveChange).toHaveBeenLastCalledWith(true);
+    await act(async () => thumb().props.onResponderMove(at(450)));
+    expect(props.onScrub).toHaveBeenLastCalledWith(2000);
+    expect(bubbleText()).toContain("Normalization");
+    await act(async () => thumb().props.onResponderMove(at(700)));
+    expect(bubbleText()).toContain("Transactions");
+    await act(async () => thumb().props.onResponderRelease());
+    expect(props.onSettle).toHaveBeenLastCalledWith(3000);
+    expect(props.onActiveChange).toHaveBeenLastCalledWith(false);
+    // The label disappears once the interaction ends and the thumb fades.
+    await act(async () => { vi.advanceTimersByTime(1600); });
+    expect(thumb().props.pointerEvents).toBe("none");
   });
 
   it("is purely visual, so it can never block the scroll view underneath", async () => {

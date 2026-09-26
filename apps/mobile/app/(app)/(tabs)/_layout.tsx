@@ -15,7 +15,7 @@ export default function TabsLayout() {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
   return (
-    <Tabs screenOptions={{ ...coreTabOptions(colors, insets.bottom), ...tabMotion(reducedMotion) }}>
+    <Tabs screenOptions={{ ...coreTabOptions(colors, insets.bottom), ...tabMotion(reducedMotion, colors.backgroundPrimary) }}>
       {primaryTabs.map((tab) => (
         <Tabs.Screen
           key={tab.route}

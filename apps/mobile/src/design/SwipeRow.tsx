@@ -16,10 +16,13 @@ import { motion, useTheme } from "./theme";
 import { radius } from "./tokens";
 
 /**
- * One gesture language for every browsable list (Generate and Library):
+ * One gesture language across the app (Today, Announcements, Generate, Library):
  *
- * - Swipe right reveals `leading` actions on the left edge (Hide, Unsync).
- * - Swipe left reveals `trailing` actions on the right edge (Pin).
+ * - Swipe right reveals `leading` actions on the left edge: Pin, a positive
+ *   shortcut.
+ * - Swipe left reveals `trailing` actions on the right edge: Hide / dismiss.
+ * - With `fullSwipe`, dragging most of the way across runs the first action
+ *   on that side directly, like Mail.
  *
  * A tap still opens the item. The gesture is claimed only for a clearly
  * horizontal drag, so vertical scrolling is untouched. Everything moves on the
@@ -69,6 +72,8 @@ export function SwipeRow({
   trailing = [],
   style,
   compact = false,
+  fullSwipe = false,
+  background,
 }: {
   children: ReactNode;
   leading?: readonly SwipeAction[];
@@ -76,6 +81,10 @@ export function SwipeRow({
   style?: StyleProp<ViewStyle>;
   /** Narrow grid tiles: actions share the tile instead of a fixed width. */
   compact?: boolean;
+  /** A long drag runs the first action on that side without a second tap. */
+  fullSwipe?: boolean;
+  /** Opaque fill for rows that have no card of their own, so actions never show through. */
+  background?: string;
 }) {
   const { colors, reducedMotion } = useTheme();
   const [width, setWidth] = useState(0);
@@ -85,9 +94,14 @@ export function SwipeRow({
   const offset = useRef(0);
   const actionWidth = compact && width > 0 ? Math.min(ACTION_WIDTH, Math.floor(width / 2.2)) : ACTION_WIDTH;
   const leadingWidth = leading.length * actionWidth;
+  const leadingRef = useRef(leading);
+  leadingRef.current = leading;
+  const trailingRef = useRef(trailing);
+  trailingRef.current = trailing;
   const trailingWidth = trailing.length * actionWidth;
-  const limits = useRef({ leadingWidth, trailingWidth });
-  limits.current = { leadingWidth, trailingWidth };
+  const limits = useRef({ leadingWidth, trailingWidth, width, fullSwipe });
+  limits.current = { leadingWidth, trailingWidth, width, fullSwipe };
+  const runRef = useRef<(action: SwipeAction, direction: 1 | -1) => void>(() => {});
 
   const settle = (to: number, done?: () => void) => {
     offset.current = to;
@@ -125,17 +139,22 @@ export function SwipeRow({
           translate.stopAnimation();
         },
         onPanResponderMove: (_event, gesture) => {
-          const { leadingWidth: left, trailingWidth: right } = limits.current;
+          const { leadingWidth: left, trailingWidth: right, fullSwipe: full } = limits.current;
           const raw = offset.current + gesture.dx;
-          // Past the actions the row resists instead of sliding freely.
-          const value = raw > left ? left + (raw - left) * 0.2 : raw < -right ? -right + (raw + right) * 0.2 : raw;
+          // Past the actions the row resists instead of sliding freely, unless
+          // a full swipe can carry it across.
+          const give = full ? 0.75 : 0.2;
+          const value = raw > left ? left + (raw - left) * give : raw < -right ? -right + (raw + right) * give : raw;
           translate.setValue(value);
         },
         onPanResponderTerminationRequest: () => false,
         onPanResponderRelease: (_event, gesture) => {
-          const { leadingWidth: left, trailingWidth: right } = limits.current;
+          const { leadingWidth: left, trailingWidth: right, width: rowWidth, fullSwipe: full } = limits.current;
           const value = offset.current + gesture.dx;
-          if (left > 0 && (value > left * OPEN_FRACTION || (gesture.vx > FLICK_VELOCITY && value > CLAIM_DISTANCE))) settle(left);
+          const across = full && rowWidth > 0 ? rowWidth * 0.55 : Infinity;
+          if (left > 0 && value > Math.max(across, left + 40)) runRef.current(leadingRef.current[0]!, 1);
+          else if (right > 0 && -value > Math.max(across, right + 40)) runRef.current(trailingRef.current[0]!, -1);
+          else if (left > 0 && (value > left * OPEN_FRACTION || (gesture.vx > FLICK_VELOCITY && value > CLAIM_DISTANCE))) settle(left);
           else if (right > 0 && (value < -right * OPEN_FRACTION || (gesture.vx < -FLICK_VELOCITY && value < -CLAIM_DISTANCE))) settle(-right);
           else settle(0);
         },
@@ -146,7 +165,7 @@ export function SwipeRow({
     [reducedMotion],
   );
 
-  const run = (action: SwipeAction) => {
+  const run = (action: SwipeAction, swiped?: 1 | -1) => {
     if (closeOpenRow === closeRef.current) closeOpenRow = null;
     if (!action.exits || reducedMotion) {
       settle(0);
@@ -155,7 +174,7 @@ export function SwipeRow({
     }
     // Slide the item away in the direction it was swiped, then let the list
     // close the gap. The row resets in case the item stays (e.g. offline).
-    const direction = offset.current >= 0 ? 1 : -1;
+    const direction = swiped ?? (offset.current >= 0 ? 1 : -1);
     Animated.parallel([
       Animated.timing(translate, { toValue: direction * Math.max(width, 320), duration: motion.normal, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       Animated.timing(exit, { toValue: 0, duration: motion.normal, useNativeDriver: true }),
@@ -167,6 +186,8 @@ export function SwipeRow({
       exit.setValue(1);
     });
   };
+
+  runRef.current = run;
 
   const tone = (value: SwipeAction["tone"]) =>
     value === "accent" ? colors.accent : value === "warning" ? colors.warning : colors.textSecondary;
@@ -222,7 +243,7 @@ export function SwipeRow({
     <View style={[{ overflow: "hidden", borderRadius: radius.card }, style]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       {leading.length > 0 ? renderActions(leading, "leading") : null}
       {trailing.length > 0 ? renderActions(trailing, "trailing") : null}
-      <Animated.View {...responder.panHandlers} style={{ opacity: exit, transform: [{ translateX: translate }] }}>
+      <Animated.View {...responder.panHandlers} style={{ opacity: exit, backgroundColor: background, transform: [{ translateX: translate }] }}>
         {children}
         {open ? (
           // While actions show, a tap on the item closes them instead of opening it.

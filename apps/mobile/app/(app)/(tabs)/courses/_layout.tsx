@@ -9,6 +9,6 @@ import { useTheme } from "../../../../src/design/theme";
  * one level instead of leaving the tab.
  */
 export default function CoursesLayout() {
-  const { reducedMotion } = useTheme();
-  return <Stack screenOptions={hierarchyMotion(reducedMotion)} />;
+  const { colors, reducedMotion } = useTheme();
+  return <Stack screenOptions={hierarchyMotion(reducedMotion, colors.backgroundPrimary)} />;
 }

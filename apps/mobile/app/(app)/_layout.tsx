@@ -4,7 +4,7 @@ import { AppActivityProvider } from "../../src/app-shell/AppActivityProvider";
 import { RestoringState } from "../../src/app-shell/RestoringState";
 import { useAuth } from "../../src/auth";
 import { APP_ROUTES } from "../../src/navigation/appRoutes";
-import { hierarchyMotion, modalMotion } from "../../src/design/navigationMotion";
+import { hierarchyMotion, modalMotion, sheetMotion } from "../../src/design/navigationMotion";
 import { useTheme } from "../../src/design/theme";
 import { CanvasSyncProvider } from "../../src/features/sync/CanvasSyncProvider";
 
@@ -17,7 +17,7 @@ import { CanvasSyncProvider } from "../../src/features/sync/CanvasSyncProvider";
  */
 export default function AppLayout() {
   const { isRestoring, session } = useAuth();
-  const { reducedMotion } = useTheme();
+  const { colors, reducedMotion } = useTheme();
 
   if (isRestoring) return <RestoringState />;
   if (!session) return <Redirect href={APP_ROUTES.signIn} />;
@@ -25,10 +25,10 @@ export default function AppLayout() {
   return (
     <CanvasSyncProvider>
       <AppActivityProvider>
-      <Stack key={session.user.id} screenOptions={hierarchyMotion(reducedMotion)}>
+      <Stack key={session.user.id} screenOptions={hierarchyMotion(reducedMotion, colors.backgroundPrimary)}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="generate" options={modalMotion(reducedMotion)} />
-        <Stack.Screen name="announcement" options={modalMotion(reducedMotion)} />
+        <Stack.Screen name="announcement" options={sheetMotion()} />
         <Stack.Screen name="processing" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="task" options={modalMotion(reducedMotion)} />

@@ -13,7 +13,7 @@ import { Pressable, View } from "react-native";
 import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseCard, CourseMark } from "../../design/CourseViews";
-import { Action, Copy, Notice, Page, Surface, ContentIcon, RowLink } from "../../design/primitives";
+import { Action, Copy, Notice, Page, SearchField, Surface, ContentIcon, RowLink } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
@@ -22,7 +22,8 @@ import { experienceRequest } from "../../services/experienceApi";
 import { createGenerationIntent } from "../../services/generationRecovery";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
-import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, materialTypes, moduleGroups } from "./presentation";
+import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, matchesCourseQuery, materialTypes, moduleGroups } from "./presentation";
+import { quizIntentInput } from "./quizRequest";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { arrangeList } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
@@ -38,6 +39,11 @@ function firstParam(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
 }
 
+function courseMatches(course: GenerateCourseSummary, query: string) {
+  const identity = courseIdentity(course);
+  return matchesCourseQuery([course.code, course.name, identity.title, identity.subtitle, identity.monogram], query);
+}
+
 /** Level 1: synced courses grouped by term period, pinned courses first. */
 export function GenerateScreen() {
   const courses = useExperience<GenerateCourseList>("/api/experience/courses");
@@ -46,7 +52,11 @@ export function GenerateScreen() {
   const { reducedMotion } = useTheme();
   const [showHidden, setShowHidden] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const arranged = arrangeList(courses.data?.items ?? [], (course) => course.id, prefs.pinned.course, prefs.hidden.generate);
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
+  const allCourses = courses.data?.items ?? [];
+  const matching = searching ? allCourses.filter((course) => courseMatches(course, query)) : allCourses;
+  const arranged = arrangeList(matching, (course) => course.id, prefs.pinned.course, prefs.hidden.generate);
   const courseGroups = [
     ...(arranged.pinned.length ? [{ key: "pinned", title: "Pinned", items: arranged.pinned }] : []),
     ...generateCourseGroups(arranged.rest),
@@ -73,8 +83,14 @@ export function GenerateScreen() {
     else setNote(`Couldn’t stop syncing ${courseIdentity(course).title}. Check your connection and try again.`);
   }
 
+  // Swipe right pins; swipe left hides (or stops syncing) — the same
+  // directions as Today and Announcements.
   function actions(course: GenerateCourseSummary, hidden: boolean) {
-    const leading: SwipeAction[] = hidden
+    const pinned = prefs.pinned.course.includes(course.id);
+    const leading: SwipeAction[] = hidden ? [] : [
+      { key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => change(() => pin("course", course.id, !pinned)) },
+    ];
+    const trailing: SwipeAction[] = hidden
       ? [{ key: "show", label: "Show", icon: Eye, tone: "neutral", onPress: () => change(() => hide("generate", course.id, false)) }]
       : [
           { key: "hide", label: "Hide", icon: EyeOff, tone: "neutral", exits: true, onPress: () => change(() => hide("generate", course.id, true)) },
@@ -82,10 +98,6 @@ export function GenerateScreen() {
             ? [{ key: "unsync", label: "Unsync", icon: CloudOff, tone: "warning", onPress: () => void unsync(course) } satisfies SwipeAction]
             : []),
         ];
-    const pinned = prefs.pinned.course.includes(course.id);
-    const trailing: SwipeAction[] = hidden ? [] : [
-      { key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => change(() => pin("course", course.id, !pinned)) },
-    ];
     return { leading, trailing, pinned };
   }
 
@@ -97,10 +109,14 @@ export function GenerateScreen() {
         courses.refresh();
         void sync();
       }}
-      actions={[
-        { label: "Canvas connection & courses", onPress: () => router.push("/canvas-settings") },
-        { label: "Use text, camera or a local file", onPress: () => router.push("/generate") },
-      ]}
+      actions={[{ label: "Use text, camera or a local file", onPress: () => router.push("/generate") }]}
+      headerBelow={
+        allCourses.length > 0 ? (
+          <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
+            <SearchField value={query} onChangeText={setQuery} placeholder="Search courses" label="Search courses" />
+          </View>
+        ) : null
+      }
     >
       <SyncStatus />
       {courses.loading && !courses.data ? <GenerateSkeleton rows={3} /> : null}
@@ -115,6 +131,12 @@ export function GenerateScreen() {
         </Surface>
       ) : null}
       {note ? <Notice>{note}</Notice> : null}
+      {searching && matching.length === 0 ? (
+        <View accessibilityLiveRegion="polite" style={{ alignItems: "center", paddingVertical: spacing[8], gap: spacing[1] }}>
+          <Copy size="h3">No matching courses</Copy>
+          <Copy muted size="bodySmall" style={{ textAlign: "center" }}>Nothing matches “{query.trim()}”. Try a course code like CIT17 or part of the name.</Copy>
+        </View>
+      ) : null}
       {courseGroups.map((group) => (
         <View key={group.key} style={{ gap: spacing[2] }}>
           <Copy muted size="caption" style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>{group.title}</Copy>
@@ -136,8 +158,8 @@ export function GenerateScreen() {
           {showHidden ? arranged.hidden.map((course) => {
             const swipe = actions(course, true);
             return (
-              <SwipeRow key={course.id} leading={swipe.leading} style={{ opacity: 0.6 }}>
-                <GenerateCourseCard course={course} swipeActions={swipe.leading} onPress={() => openCourse(course)} />
+              <SwipeRow key={course.id} trailing={swipe.trailing} style={{ opacity: 0.6 }}>
+                <GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} />
               </SwipeRow>
             );
           }) : null}
@@ -296,21 +318,12 @@ export function GenerateMaterialScreen() {
     setBusy(true);
     setError(null);
     try {
-      const intent = await createGenerationIntent(session.user.id, {
-        title: material.title,
-        type,
-        path: type === "reviewer" ? "/api/experience/generations" : "/api/experience/quizzes",
-        body: type === "reviewer"
-          ? { courseId: material.courseId, materialId: material.id }
-          : {
-              sourceType: "reviewer",
-              sourceIds: [material.reviewerArtifactId],
-              reviewerArtifactId: material.reviewerArtifactId,
-              questionCount: 5,
-              difficulty: "mixed",
-              questionTypes: ["single_select", "true_false"],
-            },
-      });
+      const intent = await createGenerationIntent(
+        session.user.id,
+        type === "reviewer"
+          ? { title: material.title, type, path: "/api/experience/generations", body: { courseId: material.courseId, materialId: material.id } }
+          : quizIntentInput({ title: material.title, reviewerArtifactId: material.reviewerArtifactId! }),
+      );
       router.push({ pathname: "/generation", params: { intent: intent.key } });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your generation request.");

@@ -5,9 +5,16 @@
  * - A pinned course is pinned everywhere it appears (Generate and Library).
  * - Hiding is per surface: hiding a course in Generate leaves its saved work
  *   in Library, and hidden items stay one tap away ("Show hidden").
+ * - Today hides are scoped to one day (see `todayHideKey`), so a dismissed
+ *   item only leaves that day's plan; Canvas and task data are untouched.
  */
-export type HideSurface = "generate" | "library" | "libraryItems";
-export type PinKind = "course" | "artifact";
+export type HideSurface = "generate" | "library" | "libraryItems" | "today" | "announcements";
+export type PinKind = "course" | "artifact" | "today" | "announcement";
+
+/** A Today dismissal lasts for the day it was made on. */
+export function todayHideKey(date: string, itemId: string) {
+  return `${date}|${itemId}`;
+}
 
 export interface ListPreferences {
   readonly pinned: Readonly<Record<PinKind, readonly string[]>>;
@@ -15,8 +22,8 @@ export interface ListPreferences {
 }
 
 export const EMPTY_LIST_PREFERENCES: ListPreferences = {
-  pinned: { course: [], artifact: [] },
-  hidden: { generate: [], library: [], libraryItems: [] },
+  pinned: { course: [], artifact: [], today: [], announcement: [] },
+  hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [] },
 };
 
 const MAX_ENTRIES = 300;
@@ -69,8 +76,14 @@ export function parseListPreferences(raw: string | null): ListPreferences {
     const ids = (list: unknown) =>
       Array.isArray(list) ? list.filter((id): id is string => typeof id === "string").slice(0, MAX_ENTRIES) : [];
     return {
-      pinned: { course: ids(value.pinned?.course), artifact: ids(value.pinned?.artifact) },
-      hidden: { generate: ids(value.hidden?.generate), library: ids(value.hidden?.library), libraryItems: ids(value.hidden?.libraryItems) },
+      pinned: { course: ids(value.pinned?.course), artifact: ids(value.pinned?.artifact), today: ids(value.pinned?.today), announcement: ids(value.pinned?.announcement) },
+      hidden: {
+        generate: ids(value.hidden?.generate),
+        library: ids(value.hidden?.library),
+        libraryItems: ids(value.hidden?.libraryItems),
+        today: ids(value.hidden?.today),
+        announcements: ids(value.hidden?.announcements),
+      },
     };
   } catch {
     return EMPTY_LIST_PREFERENCES;

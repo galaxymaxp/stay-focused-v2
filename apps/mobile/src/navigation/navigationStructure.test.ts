@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { hierarchyMotion, modalMotion, tabMotion } from "../design/navigationMotion";
+import { hierarchyMotion, modalMotion, sheetMotion, tabMotion } from "../design/navigationMotion";
 
 const app = join(__dirname, "..", "..", "app", "(app)");
 const read = (path: string) => readFileSync(join(app, path), "utf8");
@@ -30,7 +30,7 @@ describe("navigation hierarchy", () => {
       expect(existsSync(join(app, path)), path).toBe(true);
     }
     for (const layout of ["(tabs)/courses/_layout.tsx", "(tabs)/work/_layout.tsx", "(tabs)/library/_layout.tsx"]) {
-      expect(read(layout)).toContain("<Stack screenOptions={hierarchyMotion(reducedMotion)} />");
+      expect(read(layout)).toContain("<Stack screenOptions={hierarchyMotion(reducedMotion, colors.backgroundPrimary)} />");
     }
   });
 
@@ -41,23 +41,32 @@ describe("navigation hierarchy", () => {
     expect(generate).toContain('pathname: "/courses/[courseId]/material"');
   });
 
-  it("presents announcement detail as a dismissible modal route", () => {
+  it("presents announcement detail as a dismissible sheet over the current screen", () => {
     expect(existsSync(join(app, "announcement.tsx"))).toBe(true);
-    expect(read("_layout.tsx")).toContain('<Stack.Screen name="announcement" options={modalMotion(reducedMotion)} />');
+    expect(read("_layout.tsx")).toContain('<Stack.Screen name="announcement" options={sheetMotion()} />');
+    expect(sheetMotion()).toMatchObject({ presentation: "transparentModal", gestureEnabled: true });
   });
 });
 
 describe("navigation motion", () => {
   it("slides hierarchy horizontally, raises modals, and cross-fades sibling tabs", () => {
-    expect(hierarchyMotion(false)).toMatchObject({ animation: "slide_from_right", gestureEnabled: true });
+    expect(hierarchyMotion(false, "#000")).toMatchObject({ animation: "slide_from_right", gestureEnabled: true });
     expect(modalMotion(false)).toMatchObject({ presentation: "modal", animation: "slide_from_bottom", gestureEnabled: true });
-    expect(tabMotion(false)).toEqual({ animation: "fade" });
+    expect(tabMotion(false, "#000")).toMatchObject({ animation: "fade" });
+  });
+
+  it("paints every moving scene with the app background so transitions never flash", () => {
+    expect(hierarchyMotion(false, "#000000").contentStyle).toEqual({ backgroundColor: "#000000" });
+    expect(tabMotion(false, "#000000").sceneStyle).toEqual({ backgroundColor: "#000000" });
+    const root = readFileSync(join(__dirname, "..", "..", "app", "_layout.tsx"), "utf8");
+    expect(root).toContain("NavigationThemeProvider");
+    expect(root).toContain("background: colors.backgroundPrimary");
   });
 
   it("removes travel under Reduced Motion but keeps navigation legible", () => {
-    expect(hierarchyMotion(true).animation).toBe("fade");
+    expect(hierarchyMotion(true, "#000").animation).toBe("fade");
     expect(modalMotion(true)).toMatchObject({ presentation: "modal", animation: "fade" });
-    expect(tabMotion(true)).toEqual({ animation: "none" });
-    expect(hierarchyMotion(true).gestureEnabled).toBe(true);
+    expect(tabMotion(true, "#000")).toMatchObject({ animation: "none" });
+    expect(hierarchyMotion(true, "#000").gestureEnabled).toBe(true);
   });
 });

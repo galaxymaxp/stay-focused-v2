@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ArrowLeft, ChevronRight, MoreHorizontal, FileText, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, FileText, RefreshCw, Search, Settings, X, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
 import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
@@ -10,6 +10,7 @@ import {
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   View,
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
@@ -18,6 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuth } from "../auth";
 import { QueueButton } from "./QueueButton";
 import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing, typography } from "./tokens";
@@ -224,7 +226,6 @@ export function Page({
   scrollTouch?: Pick<React.ComponentProps<typeof ScrollView>, "onTouchStart" | "onTouchMove" | "onTouchEnd" | "onTouchCancel">;
 }) {
   const { colors, mode } = useTheme();
-  const [menu, setMenu] = useState(false);
   const [pulling, setPulling] = useState(false);
   // Screens nested inside a tab already sit above the tab bar.
   const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
@@ -235,11 +236,6 @@ export function Page({
         setTimeout(() => setPulling(false), 700);
       }
     : undefined;
-  const menuActions = [
-    ...actions,
-    ...(onRefresh ? [{ label: "Refresh", onPress: onRefresh }] : []),
-    ...(!back ? [{ label: "Settings and appearance", onPress: () => router.push("/appearance") }] : []),
-  ];
   return (
     <SafeAreaView
       edges={
@@ -282,7 +278,7 @@ export function Page({
         </View>
         {headerAction}
         {!back && <QueueButton />}
-        {menuActions.length > 0 && <IconAction label="More options" onPress={() => setMenu(true)}><MoreHorizontal color={colors.textSecondary} size={density.utilityIcon} /></IconAction>}
+        {!back && <ProfileButton />}
       </View>
       {headerBelow}
       <View style={{ flex: 1 }}>
@@ -301,7 +297,8 @@ export function Page({
             gap: density.screenGap,
           }}
         >
-          <Flow>{children}</Flow>
+          {children}
+          {actions.length > 0 ? <PageLinks actions={actions} /> : null}
         </ScrollView>
       ) : (
         <View style={{ flex: 1, paddingHorizontal: 20 }}>{children}</View>
@@ -321,23 +318,24 @@ export function Page({
           {footer}
         </View>
       )}
-      {menu && <Sheet title={title || "Options"} onClose={() => setMenu(false)}>{menuActions.map(action => <RowLink key={action.label} label={action.label} onPress={() => { setMenu(false); action.onPress(); }}><Copy>{action.label}</Copy></RowLink>)}</Sheet>}
     </SafeAreaView>
   );
 }
-export function Flow({ children }: { children: ReactNode }) {
-  const { reducedMotion } = useTheme();
-  const opacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const animation = Animated.timing(opacity, {
-      toValue: 1,
-      duration: reducedMotion ? motion.small : motion.normal,
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [opacity, reducedMotion]);
-  return <Animated.View style={{ opacity, gap: density.screenGap }}>{children}</Animated.View>;
+/**
+ * Page-specific management links (e.g. "Manage saved Reviewers") sit quietly
+ * at the end of the page instead of behind an overflow menu.
+ */
+function PageLinks({ actions }: { actions: readonly { label: string; onPress: () => void }[] }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ marginTop: spacing[2], borderTopWidth: 1, borderColor: colors.separator, paddingTop: spacing[1] }}>
+      {actions.map((action) => (
+        <RowLink key={action.label} label={action.label} onPress={action.onPress}>
+          <Copy size="bodySmall" color={colors.accent}>{action.label}</Copy>
+        </RowLink>
+      ))}
+    </View>
+  );
 }
 export function Notice({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
@@ -360,6 +358,7 @@ export function RowLink({
   disabled = false,
   accessibilityActions,
   onAccessibilityAction,
+  onLongPress,
 }: {
   children: ReactNode;
   label: string;
@@ -370,6 +369,8 @@ export function RowLink({
   disabled?: boolean;
   accessibilityActions?: readonly AccessibilityActionInfo[];
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+  /** Additional options, e.g. a quick-actions sheet. */
+  onLongPress?: () => void;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
@@ -381,6 +382,8 @@ export function RowLink({
       accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
       onAccessibilityAction={onAccessibilityAction}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={onLongPress ? 380 : undefined}
       disabled={disabled}
       accessibilityState={{ disabled }}
       onPressIn={press.onPressIn}
@@ -574,6 +577,124 @@ export function SegmentedControl<T extends string>({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/**
+ * Inline filter field. Results update while typing; clearing restores the
+ * full list. Styled like the system search bar.
+ */
+export function SearchField({
+  value,
+  onChangeText,
+  placeholder,
+  label,
+  autoFocus = false,
+  onSubmitEditing,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  label: string;
+  autoFocus?: boolean;
+  onSubmitEditing?: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2], minHeight: 40, borderRadius: 10, paddingHorizontal: spacing[3], backgroundColor: colors.surfaceSecondary }}>
+      <Search size={16} color={colors.textMuted} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        accessibilityLabel={label}
+        autoFocus={autoFocus}
+        autoCorrect={false}
+        autoCapitalize="none"
+        returnKeyType="search"
+        onSubmitEditing={onSubmitEditing}
+        submitBehavior={onSubmitEditing ? "submit" : "blurAndSubmit"}
+        style={{ flex: 1, minHeight: 40, color: colors.textPrimary, fontSize: 15, paddingVertical: 0 }}
+      />
+      {value ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => onChangeText("")} hitSlop={12}>
+          <X size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function initialOf(email: string | null | undefined) {
+  const letter = email?.trim()[0];
+  return letter ? letter.toLocaleUpperCase() : "·";
+}
+
+/**
+ * The account entry point on primary screens. It replaces the old overflow
+ * menu: the only things that belong here are the account itself, Canvas sync
+ * and Settings. Refreshing is pull-to-refresh on each screen.
+ */
+export function ProfileButton() {
+  const { colors } = useTheme();
+  const { session } = useAuth();
+  const [open, setOpen] = useState(false);
+  const email = session?.user.email ?? null;
+  const go = (path: "/canvas-settings" | "/appearance") => {
+    setOpen(false);
+    router.push(path);
+  };
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Profile and settings"
+        testID="profile-button"
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => ({ minWidth: hitTarget.min, minHeight: hitTarget.min, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+      >
+        <Avatar initial={initialOf(email)} size={density.utilitySize} />
+      </Pressable>
+      {open ? (
+        <Sheet onClose={() => setOpen(false)}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], paddingBottom: spacing[2] }}>
+            <Avatar initial={initialOf(email)} size={44} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Copy size="h3" numberOfLines={1}>{email ?? "Your account"}</Copy>
+              <Copy muted size="caption">Signed in to Stay Focused</Copy>
+            </View>
+          </View>
+          <View style={{ height: 1, backgroundColor: colors.separator }} />
+          <RowLink label="Sync" icon={<RowIcon><RefreshCw size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/canvas-settings")}>
+            <Copy>Sync</Copy>
+            <Copy muted size="caption">Canvas connection and synced courses</Copy>
+          </RowLink>
+          <RowLink label="Settings" icon={<RowIcon><Settings size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/appearance")}>
+            <Copy>Settings</Copy>
+            <Copy muted size="caption">Appearance, account and sign out</Copy>
+          </RowLink>
+        </Sheet>
+      ) : null}
+    </>
+  );
+}
+
+function RowIcon({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return <View style={{ width: 32, height: 32, borderRadius: radius.control - 4, backgroundColor: colors.blueSoft, alignItems: "center", justifyContent: "center" }}>{children}</View>;
+}
+
+function Avatar({ initial, size }: { initial: string; size: number }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: colors.separator, alignItems: "center", justifyContent: "center" }}
+    >
+      <Copy color={colors.blue} style={{ fontSize: size * 0.44, lineHeight: size * 0.56, fontWeight: "600" }}>{initial}</Copy>
     </View>
   );
 }

@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   createIntent: vi.fn(),
   vibration: vi.fn(),
-  prefs: { pinned: { course: [] as string[], artifact: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[] } },
+  prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[] } },
   pin: vi.fn(),
   hide: vi.fn(),
   unsync: vi.fn(async () => true),
@@ -80,6 +80,7 @@ vi.mock("../../design/primitives", () => ({
   FilterChip: "FilterChip",
   SegmentedControl: "SegmentedControl",
   DoneButton: "DoneButton",
+  SearchField: "SearchField",
 }));
 vi.mock("../../design/CourseViews", () => ({
   CourseCard: "CourseCard",
@@ -99,7 +100,8 @@ vi.mock("../../design/SwipeRow", () => ({
 }));
 vi.mock("../sync/SyncStatus", () => ({ SyncStatus: "SyncStatus" }));
 vi.mock("../reviewer/ReviewerReader", () => ({ ReviewerReaderScreen: "ReviewerReaderScreen" }));
-vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
+vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
+vi.mock("./GlassDayClock", () => ({ GlassDayClock: "GlassDayClock" }));
 vi.mock("react-native", () => ({
   View: "View",
   ScrollView: "ScrollView",
@@ -107,6 +109,7 @@ vi.mock("react-native", () => ({
   TextInput: "TextInput",
   StatusBar: "StatusBar",
   Linking: { openURL: mocks.openURL },
+  Easing: { out: () => 0, in: () => 0, inOut: () => 0, cubic: 0, quad: 0, sin: 0 },
   Vibration: { vibrate: mocks.vibration },
   useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
   PanResponder: { create: (handlers: unknown) => ({ panHandlers: handlers }) },
@@ -117,6 +120,12 @@ vi.mock("react-native", () => ({
       setValue() {}
       stopAnimation() {}
       interpolate(config: unknown) { return config; }
+    },
+    ValueXY: class {
+      x = 0;
+      y = 0;
+      setValue() {}
+      stopAnimation() {}
     },
     spring: () => ({ start() {} }),
     timing: () => ({ start() {} }),
@@ -152,6 +161,7 @@ vi.mock("lucide-react-native", () => ({
   Pin: "Pin",
   PinOff: "PinOff",
   CloudOff: "CloudOff",
+  X: "X",
 }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({
@@ -188,7 +198,7 @@ beforeEach(() => {
   mocks.paths = [];
   mocks.params = {};
   mocks.library = { items: [], categories: null, localReady: true, refreshing: false, error: null };
-  mocks.prefs = { pinned: { course: [], artifact: [] }, hidden: { generate: [], library: [], libraryItems: [] } };
+  mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [] } };
   mocks.selectedCourseIds = new Set();
   vi.clearAllMocks();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -266,6 +276,14 @@ const workspace: CourseLearningWorkspace = {
     calendar: unavailable,
   },
 };
+const ringTouch = (root: ReactTestRenderer["root"]) => root.findAll((node) => node.props.testID === "day-ring-touch")[0]!;
+/** A touch at a design point on the 340-point clock (scale 1 at this window width). */
+const touchAt = (x: number, y: number) => ({ nativeEvent: { locationX: x, locationY: y } });
+/** Where the ring passes a minute of the day, optionally off the visible track. */
+const ringAt = (minutes: number, offset = 0) => {
+  const angle = (minutes / 1440) * Math.PI * 2 + Math.PI / 2;
+  return { x: 170 + (136 + offset) * Math.cos(angle), y: 170 + (136 + offset) * Math.sin(angle) };
+};
 describe("B25 screen interactions", () => {
   it("shows an intentional announcement empty state", async () => {
     mocks.data["/api/experience/announcements?limit=100"] = { items: [], nextOffset: null };
@@ -326,18 +344,85 @@ describe("B25 screen interactions", () => {
     await act(async () => done[0]!.props.onPress());
     expect(mocks.back).toHaveBeenCalledTimes(1);
     expect(mocks.openURL).not.toHaveBeenCalled();
-    const canvas = root.findAll(node => String(node.type) === "Pressable").find(node => node.props.accessibilityLabel === "Open in Canvas")!;
-    await act(async () => canvas.props.onPress());
+    // A visible close control and the dimmed backdrop are exits too.
+    for (const testID of ["announcement-close", "announcement-backdrop"]) {
+      await act(async () => rendered!.unmount());
+      mocks.back.mockClear();
+      const again = await render(createElement(AnnouncementDetailScreen));
+      await act(async () => again.findAll(node => node.props.testID === testID)[0]!.props.onPress());
+      expect(mocks.back, testID).toHaveBeenCalledTimes(1);
+    }
+    expect(mocks.openURL).not.toHaveBeenCalled();
+    await act(async () => rendered!.unmount());
+    const withCanvas = await render(createElement(AnnouncementDetailScreen));
+    const canvasLink = withCanvas.findAll(node => String(node.type) === "Pressable").find(node => node.props.accessibilityLabel === "Open in Canvas")!;
+    await act(async () => canvasLink.props.onPress());
     expect(mocks.openURL).toHaveBeenCalledWith("https://canvas.example/courses/1/discussion_topics/2");
   });
 
-  it("keeps Canvas and local intake actions reachable from Generate options", async () => {
+  it("offers announcement pin, hide and Canvas as gestures, long press and accessible actions", async () => {
+    mocks.data["/api/experience/announcements?limit=100"] = {
+      items: [
+        { id: "a1", course: { id: "c", code: "CIT17", name: "CIT17" }, title: "First", body: null, preview: null, postedAt: null, authorName: null, htmlUrl: "https://canvas.example/a1", attachments: [], links: [] },
+        { id: "a2", course: { id: "c", code: "CIT17", name: "CIT17" }, title: "Second", body: null, preview: null, postedAt: null, authorName: null, htmlUrl: null, attachments: [], links: [] },
+      ],
+      nextOffset: null,
+    };
+    mocks.prefs.pinned.announcement = ["a2"];
+    mocks.prefs.hidden.announcements = [];
+    const root = await render(createElement(AnnouncementsScreen));
+    const titles = root.findAll(node => String(node.type) === "RowLink").map(node => node.props.label);
+    // Pinned first.
+    expect(titles[0]).toBe("Read announcement: Second, pinned");
+    type Action = { key: string; onPress: () => void };
+    const rows = root.findAll(node => String(node.type) === "SwipeRow");
+    const first = rows.find(row => row.findAll(node => String(node.type) === "RowLink")[0]!.props.label === "Read announcement: First")!;
+    // Swipe right pins, swipe left hides.
+    expect((first.props.leading as Action[]).map(a => a.key)).toEqual(["pin"]);
+    expect((first.props.trailing as Action[]).map(a => a.key)).toEqual(["hide"]);
+    await act(async () => (first.props.leading as Action[])[0]!.onPress());
+    expect(mocks.pin).toHaveBeenCalledWith("announcement", "a1", true);
+    await act(async () => (first.props.trailing as Action[])[0]!.onPress());
+    expect(mocks.hide).toHaveBeenCalledWith("announcements", "a1", true);
+    // Long press opens every option, including Open in Canvas.
+    const firstRow = root.findAll(node => String(node.type) === "RowLink").find(node => node.props.label === "Read announcement: First")!;
+    expect(firstRow.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(["pin", "hide", "canvas"]);
+    await act(async () => firstRow.props.onLongPress());
+    expect(mocks.vibration).toHaveBeenCalled();
+    const sheet = root.findAll(node => String(node.type) === "Sheet")[0]!;
+    const options = sheet.findAll(node => String(node.type) === "RowLink").map(node => node.props.label);
+    expect(options).toEqual(["Read announcement", "Open in Canvas", "Pin to top", "Hide"]);
+    await act(async () => sheet.findAll(node => node.props.label === "Open in Canvas")[0]!.props.onPress());
+    expect(mocks.openURL).toHaveBeenCalledWith("https://canvas.example/a1");
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it("keeps local intake on the Generate page; Canvas sync lives in the profile", async () => {
     const root = await render(createElement(GenerateScreen));
     const page = root.findAll(node => String(node.type) === "Page")[0]!;
-    await act(async () => page.props.actions.find((item: { label: string }) => item.label === "Canvas connection & courses").onPress());
-    expect(mocks.push).toHaveBeenLastCalledWith("/canvas-settings");
-    await act(async () => page.props.actions.find((item: { label: string }) => item.label === "Use text, camera or a local file").onPress());
+    expect(page.props.actions.map((item: { label: string }) => item.label)).toEqual(["Use text, camera or a local file"]);
+    await act(async () => page.props.actions[0].onPress());
     expect(mocks.push).toHaveBeenLastCalledWith("/generate");
+  });
+
+  it("filters Generate courses while typing by code or name, and clearing restores the list", async () => {
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
+      generateCourse({ id: "cit17", name: "CIT17 | Web Information Systems", code: "CIT17" }),
+      generateCourse({ id: "cc11", name: "Communication in the Workplace", code: "CC11" }),
+    ] };
+    const root = await render(createElement(GenerateScreen));
+    const titles = () => root.findAll((node) => String(node.type) === "CourseCard").map((node) => node.props.identity.title);
+    const search = () => root.findAll((node) => String(node.type) === "Page")[0]!.props.headerBelow.props.children;
+    expect(titles()).toHaveLength(2);
+    await act(async () => search().props.onChangeText("cit 17"));
+    expect(titles()).toEqual(["Web Information Systems"]);
+    await act(async () => search().props.onChangeText("workplace"));
+    expect(titles()).toEqual(["Communication in the Workplace"]);
+    await act(async () => search().props.onChangeText("zz999"));
+    expect(titles()).toEqual([]);
+    expect(copyText(root)).toContain("No matching courses");
+    await act(async () => search().props.onChangeText(""));
+    expect(titles()).toHaveLength(2);
   });
   it("opens the existing completion editor only for a linked task", async () => {
     mocks.data[`/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = { items: [
@@ -356,13 +441,14 @@ describe("B25 screen interactions", () => {
     vi.useFakeTimers();
     const onCommit = vi.fn();
     const root = await render(createElement(DayRingClock, { date: "2026-09-14", timeline: [], start: 360, end: 720, onChange: vi.fn(), onCommit }));
-    const handle = root.findAll(node => String(node.type) === "AnimatedView").find(node => node.props.accessibilityLabel === "Availability end")!;
+    const overlay = ringTouch(root);
+    const noon = ringAt(720);
     await act(async () => {
-      handle.props.onPanResponderGrant();
-      vi.advanceTimersByTime(300);
+      overlay.props.onPanResponderGrant(touchAt(noon.x, noon.y));
+      vi.advanceTimersByTime(150);
       // Noon is at the top; a quarter-circle clockwise is 6 PM at the right.
-      handle.props.onPanResponderMove(null, { dx: 126, dy: 126 });
-      handle.props.onPanResponderRelease();
+      overlay.props.onPanResponderMove(null, { dx: 136, dy: 136 });
+      overlay.props.onPanResponderRelease();
     });
     expect(onCommit).toHaveBeenLastCalledWith(360, 1080);
   });
@@ -575,20 +661,24 @@ describe("B25 screen interactions", () => {
     await act(async () => open.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith({ pathname: "/activity", params: { id: "missed" } });
   });
-  it("pauses pull-to-refresh while a ring handle is held", async () => {
+  it("pauses scrolling and pull-to-refresh while the ring is held", async () => {
     vi.useFakeTimers();
     mocks.data["/api/experience/capabilities"] = workspace.capabilities;
     const root = await render(createElement(TodayScreen));
     const page = () => root.findAll((node) => String(node.type) === "Page")[0]!;
     expect(page().props.refreshEnabled).toBe(true);
-    const handle = root.findAll((node) => String(node.type) === "AnimatedView").find((node) => node.props.accessibilityLabel === "Availability end")!;
+    const overlay = ringTouch(root);
+    const clock = root.findByType(DayRingClock).props;
+    const end = ringAt(clock.end as number);
     await act(async () => {
-      handle.props.onPanResponderGrant();
-      vi.advanceTimersByTime(300);
+      overlay.props.onPanResponderGrant(touchAt(end.x, end.y));
+      vi.advanceTimersByTime(200);
     });
     expect(page().props.refreshEnabled).toBe(false);
-    await act(async () => handle.props.onPanResponderRelease());
+    expect(page().props.scrollEnabled).toBe(false);
+    await act(async () => overlay.props.onPanResponderRelease());
     expect(page().props.refreshEnabled).toBe(true);
+    expect(page().props.scrollEnabled).toBe(true);
   });
   it("sends a planner preview when the ring is committed, never applying silently", async () => {
     mocks.data["/api/experience/capabilities"] = workspace.capabilities;
@@ -615,44 +705,75 @@ describe("B25 screen interactions", () => {
     );
     expect(mocks.request).toHaveBeenCalledTimes(1);
   });
-  it("requires hold before dragging, haptics on hold, and exposes accessible adjustments", async () => {
+  it("follows the finger continuously while held and snaps only on release", async () => {
     vi.useFakeTimers();
     const onChange = vi.fn(),
       onCommit = vi.fn();
-    const root = await render(
-      createElement(DayRingClock, {
-        date: "2026-09-13",
-        timeline: [],
-        start: 600,
-        end: 720,
-        onChange,
-        onCommit,
-      }),
-    );
-    const handle = root
-      .findAll((node) => String(node.type) === "AnimatedView")
-      .find((node) => node.props.accessibilityLabel === "Availability end")!;
+    const root = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: [], start: 600, end: 720, onChange, onCommit }));
+    const overlay = ringTouch(root);
+    const end = ringAt(720);
+    // Grab well outside the thin visible ring: the touch area is generous.
+    const loose = ringAt(724, 24);
+    expect(overlay.props.onStartShouldSetPanResponder(touchAt(loose.x, loose.y))).toBe(true);
+    // Away from the free-time block the page keeps the touch.
+    const away = ringAt(200);
+    expect(overlay.props.onStartShouldSetPanResponder(touchAt(away.x, away.y))).toBe(false);
+    // Before the hold, a vertical move is a page scroll: nothing changes.
     await act(async () => {
-      handle.props.onPanResponderGrant();
-      handle.props.onPanResponderMove(null, { dx: 20, dy: 0 });
-    });
-    expect(onChange).not.toHaveBeenCalled();
-    await act(async () => {
+      overlay.props.onPanResponderGrant(touchAt(end.x, end.y));
+      overlay.props.onPanResponderMove(null, { dx: 0, dy: 20 });
       vi.advanceTimersByTime(300);
-      handle.props.onPanResponderMove(null, { dx: 20, dy: 0 });
-      handle.props.onPanResponderRelease();
+      overlay.props.onPanResponderRelease();
+    });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(mocks.vibration).not.toHaveBeenCalled();
+    // Hold, then drag a few minutes: the readout follows unsnapped.
+    await act(async () => {
+      overlay.props.onPanResponderGrant(touchAt(end.x, end.y));
+      vi.advanceTimersByTime(150);
+      overlay.props.onPanResponderMove(null, { dx: 16, dy: 0.6 });
+      vi.advanceTimersByTime(20);
     });
     expect(mocks.vibration).toHaveBeenCalledWith(10);
-    expect(onCommit).toHaveBeenCalled();
-    await act(async () =>
-      handle.props.onAccessibilityAction({
-        nativeEvent: { actionName: "increment" },
-      }),
-    );
-    expect(onCommit).toHaveBeenLastCalledWith(600, 735);
+    const live = copyText(root).join(" ");
+    expect(live).toMatch(/Free until/);
+    expect(onCommit).not.toHaveBeenCalled();
+    await act(async () => overlay.props.onPanResponderRelease());
+    const [from, to] = onCommit.mock.calls.at(-1)!;
+    expect(from).toBe(600);
+    expect(to % 15).toBe(0);
+    expect(to).toBeGreaterThan(720);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("uses one swipe language: right for Hide/Unsync, left for Pin, in Generate and Library alike", async () => {
+  it("drags the whole block from its middle, keeping its length", async () => {
+    vi.useFakeTimers();
+    const onCommit = vi.fn();
+    const root = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: [], start: 540, end: 720, onChange: vi.fn(), onCommit }));
+    const overlay = ringTouch(root);
+    const middle = ringAt(630);
+    const later = ringAt(690);
+    await act(async () => {
+      overlay.props.onPanResponderGrant(touchAt(middle.x, middle.y));
+      vi.advanceTimersByTime(220);
+      overlay.props.onPanResponderMove(null, { dx: later.x - middle.x, dy: later.y - middle.y });
+      overlay.props.onPanResponderRelease();
+    });
+    expect(onCommit).toHaveBeenLastCalledWith(600, 780);
+  });
+
+  it("exposes accessible step adjustments for both edges and the whole block", async () => {
+    const onChange = vi.fn(),
+      onCommit = vi.fn();
+    const root = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: [], start: 600, end: 720, onChange, onCommit }));
+    const control = (label: string) => root.findAll((node) => node.props.accessibilityLabel === label && node.props.accessibilityRole === "adjustable")[0]!;
+    await act(async () => control("Availability end").props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } }));
+    expect(onCommit).toHaveBeenLastCalledWith(600, 735);
+    await act(async () => control("Free time block").props.onAccessibilityAction({ nativeEvent: { actionName: "decrement" } }));
+    expect(onCommit).toHaveBeenLastCalledWith(585, 705);
+  });
+
+  it("uses one swipe language: right to pin, left to hide; Library offers only Pin", async () => {
     type Action = { key: string; onPress: () => void };
     const keys = (row: { props: { leading?: Action[]; trailing?: Action[] } }) => [
       (row.props.leading ?? []).map((action) => action.key),
@@ -664,7 +785,7 @@ describe("B25 screen interactions", () => {
     ] };
     const generate = await render(createElement(GenerateScreen));
     const generateRows = generate.findAll((node) => String(node.type) === "SwipeRow");
-    expect(generateRows.map(keys)).toEqual([[["hide", "unsync"], ["pin"]], [["hide"], ["pin"]]]);
+    expect(generateRows.map(keys)).toEqual([[["pin"], ["hide", "unsync"]], [["pin"], ["hide"]]]);
     // A normal tap still opens the course.
     await act(async () => generate.findAll((node) => String(node.type) === "CourseCard")[0]!.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/courses/[courseId]" }));
@@ -673,15 +794,19 @@ describe("B25 screen interactions", () => {
     const courseItem = { ...savedQuiz, id: "reviewer:cit17", type: "reviewer" as const, course: { id: "synced", code: "CIT17", name: "Web Information Systems" } };
     mocks.library.items = [courseItem, savedQuiz];
     mocks.selectedCourseIds = new Set(["synced"]);
+    // Previously hidden Library entries come back: generated work is stable.
+    mocks.prefs.hidden.library = ["synced"];
     const library = await render(createElement(LibraryScreen));
     const tiles = library.findAll((node) => String(node.type) === "SwipeRow");
-    // Unsync only where a synced Canvas course exists; personal work can only be hidden.
-    expect(tiles.map(keys)).toEqual([[["hide", "unsync"], ["pin"]], [["hide"], ["pin"]]]);
+    expect(tiles.map(keys)).toEqual([[["pin"], []], [["pin"], []]]);
+    expect(copyText(library).join(" ")).not.toMatch(/hidden/);
     await act(async () => rendered!.unmount());
 
     mocks.params = { courseKey: "synced" };
+    mocks.prefs.hidden.libraryItems = ["reviewer:cit17"];
     const course = await render(createElement(LibraryCourseScreen));
-    expect(course.findAll((node) => String(node.type) === "SwipeRow").map(keys)).toEqual([[["hide"], ["pin"]]]);
+    expect(course.findAll((node) => String(node.type) === "SwipeRow").map(keys)).toEqual([[["pin"], []]]);
+    expect(mocks.unsync).not.toHaveBeenCalled();
   });
 
   it("pins without a modal, surfaces pinned courses first, and keeps hidden ones recoverable", async () => {
@@ -703,14 +828,42 @@ describe("B25 screen interactions", () => {
     expect(show).toBeTruthy();
 
     const firstRow = root.findAll((node) => String(node.type) === "SwipeRow")[1]!;
-    await act(async () => (firstRow.props.trailing as Action[])[0]!.onPress());
+    await act(async () => (firstRow.props.leading as Action[])[0]!.onPress());
     expect(mocks.pin).toHaveBeenCalledWith("course", "first", true);
-    await act(async () => (firstRow.props.leading as Action[]).find((action) => action.key === "hide")!.onPress());
+    await act(async () => (firstRow.props.trailing as Action[]).find((action) => action.key === "hide")!.onPress());
     expect(mocks.hide).toHaveBeenCalledWith("generate", "first", true);
-    await act(async () => (firstRow.props.leading as Action[]).find((action) => action.key === "unsync")!.onPress());
+    await act(async () => (firstRow.props.trailing as Action[]).find((action) => action.key === "unsync")!.onPress());
     expect(mocks.unsync).toHaveBeenCalledWith("first");
     // Hide and Unsync never touch saved work or generation.
     expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it("pins Today items with a swipe right, keeps the real next item, and hides with a swipe left for the day", async () => {
+    type Action = { key: string; onPress: () => void };
+    const make = (id: string, title: string) => ({ id, kind: "canvas_activity", title, course: { id: "c", code: "CIT17", name: "CIT17" }, startAt: null, endAt: null, dueAt: null, estimatedMinutes: null, priority: "medium", status: "unknown", source: "canvas", deepLinkTarget: { surface: "activity", id } });
+    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = {
+      timeline: [], next: make("next", "Next actual item"), later: [make("later", "IT Security reviewer")], upcomingDeadlines: [], plannerState: { needsTaskImport: false },
+    } as unknown as TodayOverview;
+    mocks.prefs.pinned.today = ["later"];
+    const root = await render(createElement(TodayScreen));
+    const labels = root.findAll((node) => String(node.type) === "RowLink").map((node) => node.props.label);
+    // The pinned item leads Up Next, and the planner's next item still follows.
+    expect(labels.indexOf("Pinned: IT Security reviewer")).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf("Pinned: IT Security reviewer")).toBeLessThan(labels.indexOf("Open next item: Next actual item"));
+    expect(labels.filter((label) => label.includes("IT Security reviewer"))).toHaveLength(1);
+    const rows = root.findAll((node) => String(node.type) === "SwipeRow" && node.props.fullSwipe === true);
+    const nextRow = rows.find((row) => row.findAll((node) => String(node.type) === "RowLink")[0]!.props.label === "Open next item: Next actual item")!;
+    expect((nextRow.props.leading as Action[]).map((a) => a.key)).toEqual(["pin"]);
+    expect((nextRow.props.trailing as Action[]).map((a) => a.key)).toEqual(["hide"]);
+    await act(async () => (nextRow.props.leading as Action[])[0]!.onPress());
+    expect(mocks.pin).toHaveBeenCalledWith("today", "next", true);
+    expect(mocks.vibration).toHaveBeenCalledWith(8);
+    await act(async () => (nextRow.props.trailing as Action[])[0]!.onPress());
+    expect(mocks.hide).toHaveBeenCalledWith("today", `${localDate()}|next`, true);
+    // Hiding is local: no Canvas or task request is made.
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(copyText(root).join(" ")).toContain("is hidden for today");
   });
 
   it("never asks the student to add Canvas work to Tasks, and shows plain deadlines", async () => {

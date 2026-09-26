@@ -224,3 +224,63 @@ export function generationCoreState(state: GenerationState | null, connecting: b
       return "error";
   }
 }
+
+/** Lowercase letters and digits only, so "cit 17", "CIT-17" and "cit17" agree. */
+function compactSearchText(value: string) {
+  return value.toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/**
+ * Course filter for Generate: matches the course code, the full Canvas name or
+ * the shortened display title, by partial text, ignoring case, spacing and
+ * punctuation. A blank query matches everything.
+ */
+export function matchesCourseQuery(fields: readonly (string | null | undefined)[], query: string): boolean {
+  const needle = compactSearchText(query);
+  if (!needle) return true;
+  return fields.some((field) => !!field && compactSearchText(field).includes(needle));
+}
+
+export interface TodayArrangement {
+  /** Pinned by the student, newest pin first. Always shown in Up Next. */
+  readonly pinned: readonly TodayItem[];
+  /** The recommended next item that is neither pinned nor hidden. */
+  readonly next: TodayItem | null;
+  readonly later: readonly TodayItem[];
+  readonly dueSoon: readonly TodayItem[];
+  /** Items dismissed from today's plan, still recoverable. */
+  readonly hidden: readonly TodayItem[];
+}
+
+/**
+ * Applies the student's Today pins and hides without changing the planner's
+ * own order. A pinned item stays in Up Next and never displaces the real
+ * recommendation: when the pinned or hidden item was the recommendation, the
+ * next one in line takes its place underneath. Hides are keyed per day.
+ */
+export function arrangeToday(
+  sections: { readonly next: TodayItem | null; readonly later: readonly TodayItem[]; readonly dueSoon: readonly TodayItem[]; readonly others?: readonly TodayItem[] },
+  pinnedIds: readonly string[],
+  hiddenKeys: readonly string[],
+  date: string,
+): TodayArrangement {
+  const hiddenSet = new Set(hiddenKeys);
+  const isHidden = (item: TodayItem) => hiddenSet.has(`${date}|${item.id}`);
+  const pinOrder = new Map(pinnedIds.map((id, index) => [id, index]));
+  const pool = new Map<string, TodayItem>();
+  for (const item of [...(sections.next ? [sections.next] : []), ...sections.later, ...sections.dueSoon, ...(sections.others ?? [])]) {
+    if (!pool.has(item.id)) pool.set(item.id, item);
+  }
+  const pinned = [...pool.values()]
+    .filter((item) => pinOrder.has(item.id) && !isHidden(item))
+    .sort((a, b) => pinOrder.get(a.id)! - pinOrder.get(b.id)!);
+  const shown = new Set(pinned.map((item) => item.id));
+  const eligible = (item: TodayItem) => !shown.has(item.id) && !isHidden(item);
+  const next = [...(sections.next ? [sections.next] : []), ...sections.later].find(eligible) ?? null;
+  if (next) shown.add(next.id);
+  const later = sections.later.filter(eligible);
+  later.forEach((item) => shown.add(item.id));
+  const dueSoon = sections.dueSoon.filter(eligible);
+  const hidden = [...pool.values()].filter(isHidden);
+  return { pinned, next, later, dueSoon, hidden };
+}

@@ -1,5 +1,6 @@
-import type { LibraryArtifactSummary, ReviewerReaderModel } from "@stay-focused/shared";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react-native";
+import type { LibraryArtifactSummary, QuizDifficulty, ReviewerReaderModel } from "@stay-focused/shared";
+import { router } from "expo-router";
+import { ChevronDown, ChevronUp, FileQuestion } from "lucide-react-native";
 import {
   useCallback,
   useDeferredValue,
@@ -12,8 +13,9 @@ import {
 import {
   Animated,
   Pressable,
+  ScrollView as NativeScrollView,
   Text,
-  TextInput,
+  Vibration,
   View,
   useWindowDimensions,
   type GestureResponderEvent,
@@ -23,8 +25,9 @@ import {
   type ScrollView,
 } from "react-native";
 
+import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
-import { Copy, IconAction, Notice, Page } from "../../design/primitives";
+import { Action, Copy, Notice, Page, SearchField, SegmentedControl, Sheet, Surface } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
 import {
@@ -40,19 +43,25 @@ import {
   segmentIds,
   type ReviewerMatch,
 } from "./reviewerNavigation";
+import { createGenerationIntent } from "../../services/generationRecovery";
+import { QUIZ_DIFFICULTIES, QUIZ_QUESTION_COUNTS, quizIntentInput, reviewerArtifactIdFromLibraryId } from "../redesign/quizRequest";
 
 type Measurable = View | Text;
 /** Keeps a found line below the header/search bar with readable context above it. */
 const JUMP_CONTEXT = 72;
-const SCRUB_STRIP_WIDTH = 30;
+const SCRUB_STRIP_WIDTH = 32;
+/** Invisible grab area around the fast-scroll thumb. */
+const THUMB_TOUCH_WIDTH = 44;
+const THUMB_TOUCH_HEIGHT = 76;
 const SCRUB_HOLD_MS = 160;
 const SCRUB_SLOP = 8;
 
 /**
- * The Reviewer reader. The page stays calm: content first, with controls
- * revealed only when asked for. Search (header icon) finds any rendered text;
- * the right-edge scrubber (touch and hold) moves between the Reviewer's own
- * topics. Both only read the persisted Reviewer on the device.
+ * The Reviewer reader. Search sits at the top and finds any rendered text,
+ * listing the topics that match so a tap jumps straight there. A fast-scroll
+ * thumb appears on the right while scrolling: drag it (or touch and hold the
+ * right edge) to move through topics with a floating label. Both only read the
+ * persisted Reviewer on the device. A saved Reviewer can lead into a Quiz.
  */
 export function ReviewerReaderScreen({
   artifact,
@@ -78,10 +87,10 @@ export function ReviewerReaderScreen({
   const segments = useMemo(() => reviewerSegments(reviewer), [reviewer]);
   const anchors = useMemo(() => reviewerAnchors(reviewer), [reviewer]);
 
-  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [quizOpen, setQuizOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
-  const matches = useMemo(() => (searchOpen ? findReviewerMatches(segments, deferredQuery) : []), [deferredQuery, searchOpen, segments]);
+  const matches = useMemo(() => findReviewerMatches(segments, deferredQuery), [deferredQuery, segments]);
   const [activeMatch, setActiveMatch] = useState(0);
   const bySegment = useMemo(() => {
     const map = new Map<string, { first: number; items: ReviewerMatch[] }>();
@@ -180,28 +189,17 @@ export function ReviewerReaderScreen({
         onTouchEnd: () => scrubber.current.touch?.onTouchEnd(),
         onTouchCancel: () => scrubber.current.touch?.onTouchCancel(),
       }}
-      headerAction={
-        searchOpen ? null : (
-          <IconAction label="Search this Reviewer" onPress={() => setSearchOpen(true)}>
-            <Search size={18} color={colors.textSecondary} />
-          </IconAction>
-        )
-      }
       headerBelow={
-        searchOpen ? (
-          <ReviewerSearchBar
-            query={query}
-            onChangeQuery={setQuery}
-            count={matches.length}
-            active={activeMatch}
-            onPrevious={() => setActiveMatch((index) => (matches.length ? (index - 1 + matches.length) % matches.length : 0))}
-            onNext={() => setActiveMatch((index) => (matches.length ? (index + 1) % matches.length : 0))}
-            onClose={() => {
-              setSearchOpen(false);
-              setQuery("");
-            }}
-          />
-        ) : null
+        <ReviewerSearchBar
+          query={query}
+          onChangeQuery={setQuery}
+          matches={matches}
+          topicTitle={(index) => reviewer.sections[index]?.title ?? `Topic ${index + 1}`}
+          active={activeMatch}
+          onSelect={setActiveMatch}
+          onPrevious={() => setActiveMatch((index) => (matches.length ? (index - 1 + matches.length) % matches.length : 0))}
+          onNext={() => setActiveMatch((index) => (matches.length ? (index + 1) % matches.length : 0))}
+        />
       }
       overlay={
         <SectionScrubber
@@ -226,6 +224,9 @@ export function ReviewerReaderScreen({
           Generated {new Date(artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
           {anchors.length > 1 ? ` · ${anchors.length} topics` : ""}
         </Copy>
+        <View style={{ flexDirection: "row", paddingTop: spacing[2] }}>
+          <QuizPill onPress={() => setQuizOpen(true)} />
+        </View>
       </View>
       <View
         ref={rootRef}
@@ -299,86 +300,167 @@ export function ReviewerReaderScreen({
           </View>
         ))}
       </View>
+      <Surface style={{ gap: spacing[2], marginTop: spacing[4] }}>
+        <Copy size="h3">Test yourself on this Reviewer</Copy>
+        <Copy muted size="bodySmall">Build a quiz from these topics. You choose the settings and confirm before anything is generated.</Copy>
+        <Action onPress={() => setQuizOpen(true)}>Generate Quiz</Action>
+      </Surface>
+      {quizOpen ? <QuizFromReviewerSheet artifact={artifact} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
     </Page>
+  );
+}
+
+function QuizPill({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Generate Quiz from this Reviewer"
+      onPress={onPress}
+      style={({ pressed }) => ({ minHeight: hitTarget.min, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.violetSoft }}>
+        <FileQuestion size={15} color={colors.violet} strokeWidth={1.8} />
+        <Copy size="caption" color={colors.violet} style={{ fontWeight: "600" }}>Generate Quiz</Copy>
+      </View>
+    </Pressable>
+  );
+}
+
+const QUESTION_SEGMENTS = QUIZ_QUESTION_COUNTS.map((count) => ({ value: String(count), label: String(count) }));
+
+/**
+ * Quiz settings for a saved Reviewer. The Reviewer is the source, so nothing
+ * has to be selected again; the request goes to the same confirmation screen
+ * as every other generation, and nothing starts until the student confirms.
+ */
+function QuizFromReviewerSheet({ artifact, deviceCopy, onClose }: { artifact: LibraryArtifactSummary; deviceCopy: boolean; onClose: () => void }) {
+  const { session } = useAuth();
+  const reviewerArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
+  const [count, setCount] = useState<string>("5");
+  const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function next() {
+    if (!session || !reviewerArtifactId || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const intent = await createGenerationIntent(
+        session.user.id,
+        quizIntentInput({ title: artifact.title, reviewerArtifactId, questionCount: Number(count), difficulty }),
+      );
+      onClose();
+      router.push({ pathname: "/generation", params: { intent: intent.key } });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not prepare this Quiz request.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Sheet
+      title="New Quiz"
+      onClose={onClose}
+      footer={<Action disabled={busy || !reviewerArtifactId || !session} onPress={() => void next()}>{busy ? "Preparing…" : "Continue"}</Action>}
+    >
+      <View style={{ gap: spacing[1] }}>
+        <Copy muted size="caption">Source</Copy>
+        <Copy size="h3" numberOfLines={2}>{artifact.title}</Copy>
+        {artifact.course ? <Copy muted size="caption">{courseIdentity(artifact.course).title}</Copy> : null}
+      </View>
+      <View style={{ gap: spacing[2] }}>
+        <Copy muted size="caption">Questions</Copy>
+        <SegmentedControl segments={QUESTION_SEGMENTS} value={count} onChange={setCount} />
+      </View>
+      <View style={{ gap: spacing[2] }}>
+        <Copy muted size="caption">Difficulty</Copy>
+        <SegmentedControl segments={QUIZ_DIFFICULTIES} value={difficulty} onChange={setDifficulty} />
+      </View>
+      {!reviewerArtifactId ? <Notice>This Reviewer isn&apos;t saved to your account yet, so it can&apos;t be used for a Quiz.</Notice> : null}
+      {deviceCopy ? <Notice>Quiz generation needs a connection.</Notice> : null}
+      <Copy muted size="caption">Next you&apos;ll review the request. Nothing is generated until you confirm.</Copy>
+      {error ? <Notice>{error}</Notice> : null}
+    </Sheet>
   );
 }
 
 function ReviewerSearchBar({
   query,
   onChangeQuery,
-  count,
+  matches,
+  topicTitle,
   active,
+  onSelect,
   onPrevious,
   onNext,
-  onClose,
 }: {
   query: string;
   onChangeQuery: (value: string) => void;
-  count: number;
+  matches: readonly ReviewerMatch[];
+  topicTitle: (sectionIndex: number) => string;
   active: number;
+  onSelect: (matchIndex: number) => void;
   onPrevious: () => void;
   onNext: () => void;
-  onClose: () => void;
 }) {
-  const { colors, reducedMotion } = useTheme();
-  const reveal = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
-  useEffect(() => {
-    if (reducedMotion) return;
-    Animated.timing(reveal, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-  }, [reducedMotion, reveal]);
+  const { colors } = useTheme();
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
+  const count = matches.length;
+  // One result per matching topic, in reading order, jumping to its first match.
+  const topics = useMemo(() => {
+    const seen = new Map<number, { first: number; count: number }>();
+    matches.forEach((match, index) => {
+      const entry = seen.get(match.sectionIndex);
+      if (entry) entry.count += 1;
+      else seen.set(match.sectionIndex, { first: index, count: 1 });
+    });
+    return [...seen.entries()].map(([sectionIndex, entry]) => ({ sectionIndex, ...entry }));
+  }, [matches]);
+  const activeSection = matches[active]?.sectionIndex;
   return (
-    <Animated.View
-      testID="reviewer-search"
-      style={{
-        paddingHorizontal: spacing[5],
-        paddingBottom: spacing[2],
-        gap: spacing[1],
-        opacity: reveal,
-        transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}>
-        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: spacing[2], minHeight: 40, borderRadius: 10, paddingHorizontal: spacing[3], backgroundColor: colors.surfaceSecondary }}>
-          <Search size={16} color={colors.textMuted} />
-          <TextInput
-            autoFocus
-            value={query}
-            onChangeText={onChangeQuery}
-            placeholder="Find in Reviewer"
-            placeholderTextColor={colors.textMuted}
-            returnKeyType="search"
-            submitBehavior="submit"
-            onSubmitEditing={onNext}
-            accessibilityLabel="Find in Reviewer"
-            autoCorrect={false}
-            autoCapitalize="none"
-            style={{ flex: 1, minHeight: 40, color: colors.textPrimary, fontSize: 15, paddingVertical: 0 }}
-          />
-          {query ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => onChangeQuery("")} hitSlop={10}>
-              <X size={16} color={colors.textMuted} />
-            </Pressable>
-          ) : null}
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close search" onPress={onClose} style={({ pressed }) => ({ minHeight: hitTarget.min, justifyContent: "center", paddingHorizontal: spacing[1], opacity: pressed ? 0.55 : 1 })}>
-          <Copy color={colors.accent} style={{ fontWeight: "600" }}>Done</Copy>
-        </Pressable>
-      </View>
+    <View testID="reviewer-search" style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[2], gap: spacing[1] }}>
+      <SearchField value={query} onChangeText={onChangeQuery} placeholder="Search topics, terms, definitions" label="Search this Reviewer" onSubmitEditing={onNext} />
       {searching ? (
-        <View style={{ flexDirection: "row", alignItems: "center", minHeight: 36 }}>
-          <Copy muted size="caption" style={{ flex: 1 }} >
-            {count === 0 ? `No matches for “${query.trim()}”` : `${active + 1} of ${count}`}
-          </Copy>
-          <SearchStep label="Previous match" disabled={count === 0} onPress={onPrevious}>
-            <ChevronUp size={20} color={count === 0 ? colors.textMuted : colors.accent} />
-          </SearchStep>
-          <SearchStep label="Next match" disabled={count === 0} onPress={onNext}>
-            <ChevronDown size={20} color={count === 0 ? colors.textMuted : colors.accent} />
-          </SearchStep>
-        </View>
+        <>
+          <View style={{ flexDirection: "row", alignItems: "center", minHeight: 36 }}>
+            <Copy muted size="caption" style={{ flex: 1 }}>
+              {count === 0 ? `No matches for \u201C${query.trim()}\u201D` : `${active + 1} of ${count}${activeSection !== undefined ? ` \u00B7 Topic ${activeSection + 1}` : ""}`}
+            </Copy>
+            <SearchStep label="Previous match" disabled={count === 0} onPress={onPrevious}>
+              <ChevronUp size={20} color={count === 0 ? colors.textMuted : colors.accent} />
+            </SearchStep>
+            <SearchStep label="Next match" disabled={count === 0} onPress={onNext}>
+              <ChevronDown size={20} color={count === 0 ? colors.textMuted : colors.accent} />
+            </SearchStep>
+          </View>
+          {topics.length > 0 ? (
+            <NativeScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing[2], paddingBottom: spacing[1] }}>
+              {topics.map((topic) => {
+                const selected = topic.sectionIndex === activeSection;
+                return (
+                  <Pressable
+                    key={topic.sectionIndex}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Jump to topic ${topic.sectionIndex + 1}, ${topicTitle(topic.sectionIndex)}, ${topic.count} ${topic.count === 1 ? "match" : "matches"}`}
+                    accessibilityState={{ selected }}
+                    onPress={() => onSelect(topic.first)}
+                    style={({ pressed }) => ({ minHeight: 36, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <View style={{ maxWidth: 240, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: selected ? colors.blueSoft : colors.surfaceSecondary }}>
+                      <Copy size="caption" numberOfLines={1} color={selected ? colors.blue : colors.textPrimary} style={{ flexShrink: 1, fontWeight: selected ? "600" : "500" }}>
+                        {topicTitle(topic.sectionIndex)}
+                      </Copy>
+                      <Copy size="caption" color={selected ? colors.blue : colors.textMuted} style={{ fontVariant: ["tabular-nums"] }}>{topic.count}</Copy>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </NativeScrollView>
+          ) : null}
+        </>
       ) : null}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -409,12 +491,14 @@ export type ScrubberHandle = {
 };
 
 /**
- * Right-edge fast navigation. While reading, a slim position thumb appears
- * briefly after scrolling and fades away. Touching and holding the right edge
- * (or the thumb) activates the scrubber: scrolling locks, a preview names the
- * destination topic, and the page follows the finger topic by topic. A quick
- * swipe on the edge never activates it and still scrolls the page natively.
- * Without at least two topics it scrubs by proportional position instead.
+ * Right-edge fast navigation. While reading, a position thumb appears after
+ * scrolling and fades away. Dragging the thumb (a generous invisible grab
+ * area) starts scrubbing at once; touching and holding anywhere on the right
+ * edge does too. While scrubbing, a floating label names the current topic,
+ * updates continuously, and the page follows the finger topic by topic; it
+ * hides when the finger lifts. A quick swipe on the edge while the thumb is
+ * hidden still scrolls natively. Without at least two topics it scrubs by
+ * proportional position instead.
  */
 export function SectionScrubber({
   handle,
@@ -439,13 +523,14 @@ export function SectionScrubber({
   const stripTop = useRef(0);
   const [height, setHeight] = useState(0);
   const [active, setActive] = useState(false);
+  const [grabbable, setGrabbable] = useState(false);
   const [preview, setPreview] = useState<{ index: number; fraction: number }>({ index: -1, fraction: 0 });
   const thumbOpacity = useRef(new Animated.Value(0)).current;
   const thumbTop = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const state = useRef({ tracking: false, active: false, startY: 0, startPageY: 0, lastIndex: -1, lastOffset: 0 });
+  const state = useRef({ tracking: false, active: false, grabbable: false, startY: 0, startPageY: 0, lastIndex: -1, lastOffset: 0 });
   const latest = useRef({ anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion, windowWidth });
   latest.current = { anchors, anchorOffset, onScrub, onSettle, onActiveChange, height, reducedMotion, windowWidth };
   const THUMB = 40;
@@ -464,11 +549,17 @@ export function SectionScrubber({
       if (scrollable <= viewport * 0.5) return;
       thumbTop.setValue((height - THUMB) * Math.min(Math.max(y / scrollable, 0), 1));
       thumbOpacity.setValue(1);
+      if (!state.current.grabbable) {
+        state.current.grabbable = true;
+        setGrabbable(true);
+      }
       clearTimeout(hideTimer.current);
       hideTimer.current = setTimeout(() => {
+        state.current.grabbable = false;
+        setGrabbable(false);
         if (latest.current.reducedMotion) thumbOpacity.setValue(0);
         else Animated.timing(thumbOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start();
-      }, 900);
+      }, 1600);
     };
   }, [handle, height, thumbOpacity, thumbTop]);
 
@@ -485,7 +576,9 @@ export function SectionScrubber({
     };
     const update = (locationY: number) => {
       const target = targetFor(locationY);
-      setPreview({ index: target.index, fraction: Math.min(Math.max(target.fraction, 0), 1) });
+      const fraction = Math.min(Math.max(target.fraction, 0), 1);
+      setPreview({ index: target.index, fraction });
+      thumbTop.setValue(Math.max(0, latest.current.height - THUMB) * fraction);
       const moved = target.index >= 0 ? target.index !== state.current.lastIndex : Math.abs(target.offset - state.current.lastOffset) > 4;
       if (moved) {
         state.current.lastIndex = target.index;
@@ -499,7 +592,8 @@ export function SectionScrubber({
       setActive(true);
       latest.current.onActiveChange(true);
       clearTimeout(hideTimer.current);
-      thumbOpacity.setValue(0);
+      Vibration.vibrate(8);
+      thumbOpacity.setValue(1);
       if (latest.current.reducedMotion) overlayOpacity.setValue(1);
       else Animated.timing(overlayOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
       update(state.current.startY);
@@ -511,6 +605,13 @@ export function SectionScrubber({
       latest.current.onActiveChange(false);
       if (settle) latest.current.onSettle(state.current.lastOffset);
       const done = () => setActive(false);
+      clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => {
+        state.current.grabbable = false;
+        setGrabbable(false);
+        if (latest.current.reducedMotion) thumbOpacity.setValue(0);
+        else Animated.timing(thumbOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+      }, 1200);
       if (latest.current.reducedMotion) {
         overlayOpacity.setValue(0);
         done();
@@ -522,8 +623,32 @@ export function SectionScrubber({
     // so a swipe anywhere, including on the edge, scrolls natively. A touch
     // that starts at the right edge and holds still activates the scrubber,
     // which then disables scrolling and follows the finger.
+    // Dragging the visible thumb claims the touch immediately: no hold.
+    const thumb = {
+      onGrab: (event: GestureResponderEvent) => {
+        clearTimeout(holdTimer.current);
+        const { pageY } = event.nativeEvent;
+        stripRef.current?.measureInWindow((_x, y) => {
+          stripTop.current = y;
+        });
+        state.current.tracking = true;
+        state.current.startPageY = pageY;
+        state.current.startY = pageY - stripTop.current;
+        activate();
+      },
+      onDrag: (event: GestureResponderEvent) => {
+        if (!state.current.active) return;
+        update(state.current.startY + (event.nativeEvent.pageY - state.current.startPageY));
+      },
+      onRelease: () => {
+        state.current.tracking = false;
+        deactivate(true);
+      },
+    };
     return {
+      thumb,
       onTouchStart: (event: GestureResponderEvent) => {
+        if (state.current.active) return;
         clearTimeout(holdTimer.current);
         const { pageX, pageY } = event.nativeEvent;
         state.current.tracking = pageX >= latest.current.windowWidth - SCRUB_STRIP_WIDTH;
@@ -560,7 +685,7 @@ export function SectionScrubber({
         deactivate(false);
       },
     };
-  }, [metrics, overlayOpacity, thumbOpacity]);
+  }, [metrics, overlayOpacity, thumbOpacity, thumbTop]);
 
   useEffect(() => {
     const current = handle.current;
@@ -602,7 +727,7 @@ export function SectionScrubber({
       >
         <Animated.View
           pointerEvents="none"
-          style={{ position: "absolute", right: 4, width: 4, height: THUMB, borderRadius: 2, backgroundColor: colors.textMuted, opacity: Animated.multiply(thumbOpacity, 0.55), transform: [{ translateY: thumbTop }] }}
+          style={{ position: "absolute", right: 4, width: active ? 6 : 5, height: THUMB, borderRadius: 3, backgroundColor: active ? colors.accent : colors.textMuted, opacity: Animated.multiply(thumbOpacity, active ? 0.9 : 0.6), transform: [{ translateY: thumbTop }] }}
         />
         {active ? (
           <Animated.View
@@ -620,6 +745,27 @@ export function SectionScrubber({
           </Animated.View>
         ) : null}
       </View>
+      <Animated.View
+        pointerEvents={grabbable || active ? "auto" : "none"}
+        testID="reviewer-scrubber-thumb"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => false}
+        onResponderGrant={touch.thumb.onGrab}
+        onResponderMove={touch.thumb.onDrag}
+        onResponderRelease={touch.thumb.onRelease}
+        onResponderTerminate={touch.thumb.onRelease}
+        style={{
+          position: "absolute",
+          right: 0,
+          top: -(THUMB_TOUCH_HEIGHT - THUMB) / 2,
+          width: THUMB_TOUCH_WIDTH,
+          height: THUMB_TOUCH_HEIGHT,
+          transform: [{ translateY: thumbTop }],
+        }}
+      />
       {active ? (
         <Animated.View
           pointerEvents="none"

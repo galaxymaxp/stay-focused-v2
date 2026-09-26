@@ -6,8 +6,9 @@ import type {
 } from "@stay-focused/shared";
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
-import { View } from "react-native";
+import { EyeOff, Pin, PinOff } from "lucide-react-native";
+import { useRef, useState, type ReactNode } from "react";
+import { Vibration, View } from "react-native";
 
 import {
   Action,
@@ -18,9 +19,12 @@ import {
   Surface,
   ContentIcon,
 } from "../../design/primitives";
+import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
+import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
 import { DayRingClock } from "./DayRingClock";
 import {
+  arrangeToday,
   available,
   deadline,
   localDate,
@@ -29,11 +33,9 @@ import {
   todayItemDetail,
 } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
-import {
-  announcementCourseLabel,
-  formatAnnouncementDate,
-} from "../announcements/announcementPresentation";
-import { openAnnouncement } from "../announcements/AnnouncementsScreen";
+import { AnnouncementItem, useArrangedAnnouncements } from "../announcements/AnnouncementsScreen";
+import { todayHideKey } from "./listPreferences";
+import { useListPreferences } from "./useListPreferences";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
 
@@ -52,10 +54,70 @@ export function TodayScreen() {
   );
   const client = useExperienceClient();
   const { sync } = useCanvasSync();
+  const { colors, mode, reducedMotion } = useTheme();
+  const { prefs, pin, hide } = useListPreferences();
   // Canvas deadlines in the coming week that are not already scheduled today.
-  const dueSoon = (today.data?.upcomingDeadlines ?? [])
-    .filter((item) => item.dueAt && Date.parse(item.dueAt) - Date.now() < 7 * 86_400_000)
-    .slice(0, 3);
+  const upcoming = (today.data?.upcomingDeadlines ?? [])
+    .filter((item) => item.dueAt && Date.parse(item.dueAt) - Date.now() < 7 * 86_400_000);
+  const arranged = arrangeToday(
+    {
+      next: today.data?.next ?? null,
+      later: today.data?.later ?? [],
+      dueSoon: upcoming.slice(0, 3),
+      others: [...(today.data?.timeline ?? []), ...upcoming],
+    },
+    prefs.pinned.today,
+    prefs.hidden.today,
+    date,
+  );
+  const announcementList = useArrangedAnnouncements(announcements.data?.items ?? []);
+  const shownAnnouncements = [...announcementList.pinned, ...announcementList.rest].slice(0, 3);
+  const [showHidden, setShowHidden] = useState(false);
+  const [lastHidden, setLastHidden] = useState<TodayItem | null>(null);
+  const cardFill = mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated;
+  const glide = (update: () => void) => {
+    animateNextLayout(reducedMotion);
+    update();
+  };
+  // Swipe right pins to Up Next; swipe left hides from today's plan only.
+  const rowActions = (item: TodayItem) => {
+    const pinned = prefs.pinned.today.includes(item.id);
+    const leading: SwipeAction[] = [{
+      key: "pin",
+      label: pinned ? "Unpin" : "Pin",
+      icon: pinned ? PinOff : Pin,
+      tone: "accent",
+      onPress: () => {
+        if (!pinned) Vibration.vibrate(8);
+        glide(() => pin("today", item.id, !pinned));
+      },
+    }];
+    const trailing: SwipeAction[] = [{
+      key: "hide",
+      label: "Hide",
+      icon: EyeOff,
+      tone: "neutral",
+      exits: true,
+      onPress: () => {
+        glide(() => hide("today", todayHideKey(date, item.id), true));
+        if (pinned) pin("today", item.id, false);
+        setLastHidden(item);
+      },
+    }];
+    return { leading, trailing, pinned };
+  };
+  const unhide = (item: TodayItem) => {
+    glide(() => hide("today", todayHideKey(date, item.id), false));
+    if (lastHidden?.id === item.id) setLastHidden(null);
+  };
+  const swipeItem = (item: TodayItem, options: { dominant?: boolean; withDay?: boolean; fill: string }) => {
+    const swipe = rowActions(item);
+    return (
+      <SwipeRow key={item.id} fullSwipe leading={swipe.leading} trailing={swipe.trailing} background={options.fill}>
+        <TodayRow item={item} dominant={options.dominant} withDay={options.withDay} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} />
+      </SwipeRow>
+    );
+  };
   // Dragging a ring handle downward must never start pull-to-refresh.
   const [ringActive, setRingActive] = useState(false);
   const requestBusy = useRef(false);
@@ -148,8 +210,8 @@ export function TodayScreen() {
         announcements.refresh();
         void sync();
       }}
-      actions={[{ label: "Schedule & availability", onPress: () => setExpanded(!expanded) }]}
       refreshEnabled={!ringActive}
+      scrollEnabled={!ringActive}
     >
       <SyncStatus />
       <DayRingClock
@@ -201,42 +263,64 @@ export function TodayScreen() {
         <>
           <View style={{ gap: 8 }}>
           <Copy size="h2">Up Next</Copy>
-          {today.data?.next ? (
-            <Surface>
-              <TodayRow item={today.data.next} dominant />
-            </Surface>
-          ) : (
+          {arranged.pinned.map((item) => (
+            <SwipeCard key={item.id} fill={colors.backgroundPrimary}>
+              {swipeItem(item, { dominant: true, fill: colors.backgroundPrimary })}
+            </SwipeCard>
+          ))}
+          {arranged.next ? (
+            <SwipeCard fill={colors.backgroundPrimary}>
+              {swipeItem(arranged.next, { dominant: true, fill: colors.backgroundPrimary })}
+            </SwipeCard>
+          ) : arranged.pinned.length === 0 ? (
             <Surface>
               <RowLink inset icon={<ContentIcon kind="task" />} label="Open Tasks" onPress={() => router.navigate("/work")}>
                 <Copy size="h3">Room to focus</Copy>
                 <Copy muted size="bodySmall">Nothing scheduled next. Plan your time or open Tasks.</Copy>
               </RowLink>
             </Surface>
-          )}
+          ) : null}
           </View>
+          {lastHidden ? (
+            <View accessibilityLiveRegion="polite" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Copy muted size="caption" style={{ flex: 1 }} numberOfLines={1}>{`“${lastHidden.title}” is hidden for today.`}</Copy>
+              <Action secondary label={`Undo hiding ${lastHidden.title}`} onPress={() => unhide(lastHidden)}>Undo</Action>
+            </View>
+          ) : null}
           <View style={{ gap: 8 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Copy size="h2">Later Today</Copy>
           <Action secondary onPress={() => setExpanded(!expanded)}>{expanded ? "Close schedule" : "See schedule"}</Action>
           </View>
-          {today.data?.later.length ? (
-            today.data.later.map((item) => (
-              <TodayRow key={item.id} item={item} />
-            ))
+          {arranged.later.length ? (
+            arranged.later.map((item) => swipeItem(item, { fill: colors.backgroundPrimary }))
           ) : (
             <Copy muted size="bodySmall">Your day is clear. Make room for what matters.</Copy>
           )}
           </View>
-          {dueSoon.length > 0 && (
+          {arranged.dueSoon.length > 0 && (
             <View style={{ gap: 8 }}>
               <Copy size="h2">Due soon</Copy>
               <Surface>
-                {dueSoon.map((item) => (
-                  <TodayRow key={item.id} item={item} withDay />
-                ))}
+                {arranged.dueSoon.map((item) => swipeItem(item, { withDay: true, fill: cardFill }))}
               </Surface>
             </View>
           )}
+          {arranged.hidden.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              <Action secondary onPress={() => glide(() => setShowHidden((value) => !value))}>
+                {showHidden ? "Done" : `Show ${arranged.hidden.length} hidden today`}
+              </Action>
+              {showHidden
+                ? arranged.hidden.map((item) => (
+                    <View key={item.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, opacity: 0.75 }}>
+                      <View style={{ flex: 1 }}><TodayRow item={item} /></View>
+                      <Action secondary label={`Show ${item.title} again`} onPress={() => unhide(item)}>Show</Action>
+                    </View>
+                  ))
+                : null}
+            </View>
+          ) : null}
         </>
       )}
       <View style={{ gap: 8 }}>
@@ -253,17 +337,17 @@ export function TodayScreen() {
               <Copy muted size="bodySmall">Announcements are unavailable right now.</Copy>
             </RowLink>
           </Surface>
-        ) : announcements.data?.items.length ? (
+        ) : shownAnnouncements.length ? (
           <Surface>
-            {announcements.data.items.map(item => (
-              <RowLink
+            {shownAnnouncements.map(item => (
+              <AnnouncementItem
                 key={item.id}
-                label={`Read announcement: ${item.title}`}
-                onPress={() => openAnnouncement(item.id)}
-              >
-                <Copy muted size="caption">{announcementCourseLabel(item)} · {formatAnnouncementDate(item.postedAt)}</Copy>
-                <Copy size="h3">{item.title}</Copy>
-              </RowLink>
+                item={item}
+                background={cardFill}
+                pinned={announcementList.isPinned(item.id)}
+                onPin={(pinned) => announcementList.setPinned(item.id, pinned)}
+                onHide={(hidden) => announcementList.setHidden(item.id, hidden)}
+              />
             ))}
           </Surface>
         ) : (
@@ -330,22 +414,34 @@ export function TodayScreen() {
     </Page>
   );
 }
+/** A card that slides as one piece; the page color sits under it while it moves. */
+function SwipeCard({ children, fill }: { children: ReactNode; fill: string }) {
+  return <View style={{ borderRadius: 16, backgroundColor: fill }}>{children}</View>;
+}
+
 function TodayRow({
   item,
   dominant = false,
   withDay = false,
+  pinned = false,
+  swipeActions = [],
 }: {
   item: TodayItem;
   dominant?: boolean;
   /** Deadlines beyond today name their day. */
   withDay?: boolean;
+  pinned?: boolean;
+  swipeActions?: readonly SwipeAction[];
 }) {
+  const { colors } = useTheme();
   const detail = withDay && item.dueAt ? deadline(item.dueAt) : todayItemDetail(item);
-  return (
+  const course = item.course?.code ?? item.course?.name ?? (item.kind === "study_session" ? "Study" : "Personal");
+  const row = (
     <RowLink
       inset={dominant}
       icon={<ContentIcon kind={item.kind === "study_session" ? "reviewer" : "task"} small={!dominant} />}
-      label={`${dominant ? "Open next item" : "Open"}: ${item.title}`}
+      label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.title}`}
+      {...(swipeActions.length ? swipeAccessibility(swipeActions) : {})}
       onPress={() =>
         router.push(
           item.deepLinkTarget.surface === "activity"
@@ -357,13 +453,20 @@ function TodayRow({
         )
       }
     >
-      <Copy muted size="caption">
-        {item.course?.code ??
-          item.course?.name ??
-          (item.kind === "study_session" ? "Study" : "Personal")}
-      </Copy>
+      {pinned ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Pin size={11} color={colors.accent} strokeWidth={2} style={{ transform: [{ rotate: "35deg" }] }} />
+          <Copy size="caption" color={colors.accent} style={{ fontWeight: "600" }}>Pinned</Copy>
+          <Copy muted size="caption">{`· ${course}`}</Copy>
+        </View>
+      ) : (
+        <Copy muted size="caption">{course}</Copy>
+      )}
       <Copy size="h3">{item.title}</Copy>
       {detail ? <Copy muted size="caption">{withDay ? `Due ${detail}` : detail}</Copy> : null}
     </RowLink>
   );
+  // Up Next items are cards; the card moves with the swipe.
+  if (!dominant) return row;
+  return <Surface>{row}</Surface>;
 }
