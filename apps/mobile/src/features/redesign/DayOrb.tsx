@@ -1,6 +1,6 @@
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { AppState, StyleSheet, View } from "react-native";
+import { AppState, View } from "react-native";
 import * as THREE from "three";
 
 import { createOrbAura } from "../generation-core/orbAura";
@@ -12,8 +12,12 @@ const CAMERA_FOV = 36;
 /** Share of the canvas the ball's diameter fills at this camera. */
 export const DAY_ORB_FILL = (0.95 * 2) / (2 * CAMERA_DISTANCE * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)));
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
-/** The Today orb moves slowly; a third of the display rate is plenty. */
-const FRAME_MS = 50;
+/**
+ * The Today orb moves slowly, so ~12 fps reads as smooth. Every frame costs
+ * JS-thread time, and touches on the ring are claimed from the JS thread, so
+ * fewer frames means handles grab faster.
+ */
+const FRAME_MS = 80;
 /**
  * The glass is soft, so it renders at a reduced resolution and is scaled up.
  * The shader's cost grows with pixels, and on modest GPUs a full-resolution
