@@ -4,6 +4,7 @@ import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
   Animated,
+  Easing,
   Modal,
   Pressable,
   RefreshControl,
@@ -12,6 +13,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
   type StyleProp,
@@ -425,12 +427,19 @@ export function FilterChip({ label, selected, onPress }: { label: string; select
   return <Animated.View style={{ transform: [{ scale: press.scale }] }}><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable></Animated.View>;
 }
 
+/** Extra sheet surface below the screen edge, so a spring overshoot never shows a gap. */
+const SHEET_OVERSHOOT = 48;
+
 /**
  * Bottom sheet for lightweight choices. Dismissal never depends on scrolling:
  * the header keeps a visible Done control, the backdrop dismisses, and Android
  * back closes it. Insets come from the app's provider because a native Modal
  * is its own window, where a nested SafeAreaView can report zero insets under
  * edge-to-edge and hide controls behind the navigation bar.
+ *
+ * Motion: the whole screen fades to a dark tint on its own, while the panel
+ * springs up with momentum and settles. Dismissing slides the panel back down
+ * as the tint fades out, then closes. Reduced Motion fades both.
  */
 export function Sheet({
   children,
@@ -446,33 +455,55 @@ export function Sheet({
 }) {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const tint = useRef(new Animated.Value(0)).current;
+  const rise = useRef(new Animated.Value(reducedMotion ? 0 : windowHeight)).current;
+  const panelHeight = useRef(windowHeight);
+  const closing = useRef(false);
+
+  useEffect(() => {
+    Animated.timing(tint, { toValue: 1, duration: reducedMotion ? 160 : 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    if (!reducedMotion) Animated.spring(rise, { toValue: 0, ...motion.sheet, useNativeDriver: true }).start();
+    return () => {
+      tint.stopAnimation();
+      rise.stopAnimation();
+    };
+  }, [reducedMotion, rise, tint]);
+
+  const dismiss = () => {
+    if (closing.current) return;
+    closing.current = true;
+    Animated.parallel([
+      Animated.timing(tint, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      reducedMotion
+        ? Animated.timing(rise, { toValue: 0, duration: 0, useNativeDriver: true })
+        : Animated.timing(rise, { toValue: panelHeight.current, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => onClose());
+  };
+
   return (
-    <Modal
-      transparent
-      visible
-      statusBarTranslucent
-      navigationBarTranslucent
-      animationType={reducedMotion ? "fade" : "slide"}
-      onRequestClose={onClose}
-    >
+    <Modal transparent visible statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={dismiss}>
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss"
-          onPress={onClose}
-          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.4)" }}
-        />
-        <View
+        <Animated.View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: tint }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={dismiss} style={{ flex: 1 }} />
+        </Animated.View>
+        <Animated.View
           accessibilityViewIsModal
+          onLayout={(event) => {
+            panelHeight.current = event.nativeEvent.layout.height;
+          }}
           style={{
             maxHeight: "88%",
             flexShrink: 1,
+            marginBottom: -SHEET_OVERSHOOT,
             backgroundColor: colors.surfaceElevated,
             borderTopLeftRadius: radius.page,
             borderTopRightRadius: radius.page,
-            paddingBottom: Math.max(insets.bottom, spacing[4]),
+            paddingBottom: Math.max(insets.bottom, spacing[4]) + SHEET_OVERSHOOT,
             paddingLeft: insets.left,
             paddingRight: insets.right,
+            opacity: reducedMotion ? tint : 1,
+            transform: [{ translateY: rise }],
           }}
         >
           <View style={{ alignItems: "center", paddingTop: spacing[2] }}>
@@ -482,7 +513,7 @@ export function Sheet({
             <View style={{ flex: 1, minWidth: 0 }}>
               {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
             </View>
-            <DoneButton onPress={onClose} />
+            <DoneButton onPress={dismiss} />
           </View>
           <ScrollView
             style={{ flexShrink: 1 }}
@@ -492,7 +523,7 @@ export function Sheet({
             {children}
           </ScrollView>
           {footer ? <View style={{ paddingHorizontal: spacing[5], paddingTop: spacing[2], gap: spacing[2] }}>{footer}</View> : null}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

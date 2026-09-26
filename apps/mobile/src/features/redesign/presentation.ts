@@ -271,16 +271,29 @@ export function arrangeToday(
   for (const item of [...(sections.next ? [sections.next] : []), ...sections.later, ...sections.dueSoon, ...(sections.others ?? [])]) {
     if (!pool.has(item.id)) pool.set(item.id, item);
   }
+  // One activity appears once: a planned work session for it and the activity
+  // itself are the same thing to the student.
+  const shownWork = new Set<string>();
+  const firstOfWork = (item: TodayItem) => {
+    const key = workKey(item);
+    if (shownWork.has(key)) return false;
+    shownWork.add(key);
+    return true;
+  };
   const pinned = [...pool.values()]
     .filter((item) => pinOrder.has(item.id) && !isHidden(item))
     .sort((a, b) => pinOrder.get(a.id)! - pinOrder.get(b.id)!);
   const shown = new Set(pinned.map((item) => item.id));
-  const eligible = (item: TodayItem) => !shown.has(item.id) && !isHidden(item);
+  pinned.forEach((item) => shownWork.add(workKey(item)));
+  const eligible = (item: TodayItem) => !shown.has(item.id) && !isHidden(item) && !shownWork.has(workKey(item));
   const next = [...(sections.next ? [sections.next] : []), ...sections.later].find(eligible) ?? null;
-  if (next) shown.add(next.id);
-  const later = sections.later.filter(eligible);
+  if (next) {
+    shown.add(next.id);
+    shownWork.add(workKey(next));
+  }
+  const later = sections.later.filter((item) => eligible(item) && firstOfWork(item));
   later.forEach((item) => shown.add(item.id));
-  const dueSoon = sections.dueSoon.filter(eligible);
+  const dueSoon = sections.dueSoon.filter((item) => eligible(item) && firstOfWork(item));
   const hidden = [...pool.values()].filter(isHidden);
   return { pinned, next, later, dueSoon, hidden };
 }
@@ -290,4 +303,38 @@ export function greetingFor(hour: number): string {
   if (hour >= 5 && hour < 12) return "Good morning";
   if (hour >= 12 && hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+/** The activity an item is about, so a work session and its activity dedupe. */
+export function workKey(item: { readonly title: string; readonly course: { readonly id: string } | null }): string {
+  return `${item.course?.id ?? ""}|${item.title.trim().toLocaleLowerCase()}`;
+}
+
+export type Urgency = "overdue" | "today" | "tomorrow" | "week" | null;
+
+/**
+ * How soon something is due, by local calendar day: past due and today are
+ * urgent (red), tomorrow is next (orange), this week is soon (amber). Done
+ * work has no urgency.
+ */
+export function urgencyOf(item: Pick<TodayItem, "dueAt" | "status">, now = Date.now()): Urgency {
+  if (!item.dueAt || ["completed", "submitted", "skipped"].includes(item.status)) return null;
+  const due = new Date(item.dueAt);
+  if (due.getTime() < now) return "overdue";
+  const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+  const days = Math.round((startOfDay(due) - startOfDay(new Date(now))) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
+  if (days <= 7) return "week";
+  return null;
+}
+
+/** Finds the activity behind a Today item (a planned work session carries only its title and course). */
+export function activityFor<T extends { readonly id: string; readonly title: string; readonly course: { readonly id: string } | null }>(
+  item: Pick<TodayItem, "title" | "course" | "deepLinkTarget">,
+  activities: readonly T[],
+): T | null {
+  if (item.deepLinkTarget.surface === "activity") return activities.find((activity) => activity.id === item.deepLinkTarget.id) ?? null;
+  const key = workKey(item);
+  return activities.find((activity) => workKey(activity) === key) ?? null;
 }

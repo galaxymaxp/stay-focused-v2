@@ -324,7 +324,7 @@ export function GenerateMaterialScreen() {
           ? { title: material.title, type, path: "/api/experience/generations", body: { courseId: material.courseId, materialId: material.id } }
           : quizIntentInput({ title: material.title, reviewerArtifactId: material.reviewerArtifactId! }),
       );
-      router.push({ pathname: "/generation", params: { intent: intent.key } });
+      router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your generation request.");
     } finally {

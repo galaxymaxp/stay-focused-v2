@@ -351,7 +351,7 @@ function QuizFromReviewerSheet({ artifact, deviceCopy, onClose }: { artifact: Li
         quizIntentInput({ title: artifact.title, reviewerArtifactId, questionCount: Number(count), difficulty }),
       );
       onClose();
-      router.push({ pathname: "/generation", params: { intent: intent.key } });
+      router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not prepare this Quiz request.");
     } finally {

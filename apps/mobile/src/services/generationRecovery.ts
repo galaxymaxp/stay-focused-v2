@@ -72,6 +72,19 @@ async function save(owner: string, intent: GenerationIntent) {
   writes.set(owner, operation);
   await operation;
 }
+/** Drops saved requests that were never accepted (Queue > Clear). */
+export async function discardGenerationIntents(owner: string, keys: readonly string[]) {
+  const drop = new Set(keys);
+  const operation = (writes.get(owner) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      const items = await readGenerationIntents(owner);
+      await sessionStore.setItem(storageKey(owner), JSON.stringify(items.filter((item) => !drop.has(item.key) || !!item.generationId)));
+    });
+  writes.set(owner, operation);
+  await operation;
+}
+
 export async function createGenerationIntent(
   owner: string,
   input: Omit<GenerationIntent, "key">,

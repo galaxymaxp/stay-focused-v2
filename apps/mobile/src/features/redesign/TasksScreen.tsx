@@ -1,13 +1,14 @@
 import type { ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { Plus, Circle } from "lucide-react-native";
+import { Plus, Circle, Pin, PinOff } from "lucide-react-native";
 import { useMemo, useRef, useState } from "react";
-import { Linking, Pressable, View } from "react-native";
+import { Linking, Pressable, Vibration, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { Action, Copy, Notice, Page, Surface, IconAction, SkeletonCards } from "../../design/primitives";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseCard, CourseMark } from "../../design/CourseViews";
+import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
 import { spacing } from "../../design/tokens";
 import { createGenerationIntent } from "../../services/generationRecovery";
@@ -18,12 +19,14 @@ import {
   PERSONAL_COURSE_KEY,
   courseKeyOf,
   groupCourseTasks,
+  isDone,
   relativeDue,
   summarizeTaskCourses,
   type TaskCourseSummary,
   type TaskGroupKey,
 } from "./tasksPresentation";
 import { useExperience } from "./useExperience";
+import { useListPreferences } from "./useListPreferences";
 
 function activitiesPath() {
   return `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`;
@@ -103,7 +106,19 @@ export function TasksCourseScreen() {
   const items = useMemo(() => (tasks.data?.items ?? []).filter((item) => courseKeyOf(item) === courseKey), [courseKey, tasks.data]);
   const summary = summarizeTaskCourses(items)[0];
   const identity = identityFor({ key: courseKey, course: summary?.course ?? null });
-  const groups = groupCourseTasks(items, now);
+  // Pins are shared with Today: a task pinned here is pinned there too.
+  const { prefs, pin } = useListPreferences();
+  const { reducedMotion, mode } = useTheme();
+  const pinnedIds = prefs.pinned.today;
+  const pinned = items.filter((item) => pinnedIds.includes(item.id) && !isDone(item)).sort((a, b) => pinnedIds.indexOf(a.id) - pinnedIds.indexOf(b.id));
+  const groups = groupCourseTasks(items.filter((item) => !pinned.includes(item)), now);
+  const card = mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated;
+  const togglePin = (item: ActivitySummary) => {
+    const on = !pinnedIds.includes(item.id);
+    if (on) Vibration.vibrate(8);
+    animateNextLayout(reducedMotion);
+    pin("today", item.id, on);
+  };
   return (
     <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
       {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading tasks" /> : null}
@@ -114,6 +129,14 @@ export function TasksCourseScreen() {
         <Surface><Copy size="h3">No tasks in this course</Copy><Copy muted>Assignments with deadlines or submissions will appear after your next Canvas sync.</Copy></Surface>
       ) : null}
       {summary ? <TaskCounts summary={summary} /> : null}
+      {pinned.length ? (
+        <View style={{ gap: spacing[2] }}>
+          <Copy size="caption" color={colors.accent} style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>Pinned</Copy>
+          <Surface style={{ padding: 0, overflow: "hidden", gap: 0 }}>
+            {pinned.map((item, index) => <TaskLine key={item.id} item={item} group={groupCourseTasks([item], now).find((g) => g.items.length)!.key} first={index === 0} now={now} pinned background={card} onTogglePin={() => togglePin(item)} />)}
+          </Surface>
+        </View>
+      ) : null}
       {groups.map((group) => {
         if (group.items.length === 0) return null;
         const completed = group.key === "completed";
@@ -136,7 +159,7 @@ export function TasksCourseScreen() {
             )}
             {!completed || showCompleted ? (
               <Surface style={{ padding: 0, overflow: "hidden", gap: 0 }}>
-                {group.items.map((item, index) => <TaskLine key={item.id} item={item} group={group.key} first={index === 0} now={now} />)}
+                {group.items.map((item, index) => <TaskLine key={item.id} item={item} group={group.key} first={index === 0} now={now} background={card} onTogglePin={completed ? undefined : () => togglePin(item)} />)}
               </Surface>
             ) : null}
           </View>
@@ -146,14 +169,26 @@ export function TasksCourseScreen() {
   );
 }
 
-function TaskLine({ item, group, first, now }: { item: ActivitySummary; group: TaskGroupKey; first: boolean; now: number }) {
+function TaskLine({ item, group, first, now, pinned = false, background, onTogglePin }: {
+  item: ActivitySummary;
+  group: TaskGroupKey;
+  first: boolean;
+  now: number;
+  pinned?: boolean;
+  background: string;
+  /** Swipe right to pin or unpin (not offered for completed work). */
+  onTogglePin?: () => void;
+}) {
   const { colors } = useTheme();
   const done = group === "completed";
+  const leading: SwipeAction[] = onTogglePin ? [{ key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: onTogglePin }] : [];
   return (
+    <SwipeRow fullSwipe leading={leading} background={background} style={{ borderRadius: 0 }}>
     <View style={{ flexDirection: "row", alignItems: "center", borderTopWidth: first ? 0 : 1, borderColor: colors.separator }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open task: ${item.title}`}
+        {...swipeAccessibility(leading)}
+        accessibilityLabel={`Open task: ${item.title}${pinned ? ", pinned" : ""}`}
         onPress={() => router.push({ pathname: "/activity", params: { id: item.id } })}
         style={({ pressed }) => ({ flex: 1, minHeight: 60, paddingVertical: spacing[3], paddingLeft: spacing[4], paddingRight: spacing[2], gap: 2, backgroundColor: pressed ? colors.surfaceSecondary : undefined })}
       >
@@ -164,12 +199,14 @@ function TaskLine({ item, group, first, now }: { item: ActivitySummary; group: T
           {item.hasGeneratedDraft ? " · Draft ready" : ""}
         </Copy>
       </Pressable>
+      {pinned ? <Pin size={14} color={colors.accent} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }], marginRight: item.taskId ? 0 : spacing[4] }} /> : null}
       {item.taskId ? (
         <IconAction label={`Edit completion: ${item.title}`} onPress={() => router.push({ pathname: "/task", params: { taskId: item.taskId! } })}>
           <Circle size={18} color={colors.textMuted} />
         </IconAction>
       ) : null}
     </View>
+    </SwipeRow>
   );
 }
 export function ActivityScreen() {
@@ -199,7 +236,7 @@ export function ActivityScreen() {
         path: `/api/experience/activities/${encodeURIComponent(activity.data.id)}/generate`,
         body: { mode: "draft" },
       });
-      router.push({ pathname: "/generation", params: { intent: intent.key } });
+      router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Could not start your draft.",

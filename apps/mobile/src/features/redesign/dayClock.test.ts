@@ -209,3 +209,54 @@ describe("Generate course search", () => {
     expect(matchesCourseQuery(cit17, "   ")).toBe(true);
   });
 });
+
+describe("Today urgency and de-duplication", () => {
+  const now = new Date(2026, 8, 27, 10, 0).getTime();
+  const due = (days: number, hour = 23) => new Date(2026, 8, 27 + days, hour, 0).toISOString();
+  it("colors by calendar day: past due and today urgent, tomorrow next, this week soon", async () => {
+    const { urgencyOf } = await import("./presentation");
+    expect(urgencyOf({ dueAt: due(0, 8), status: "unknown" } as never, now)).toBe("overdue");
+    expect(urgencyOf({ dueAt: due(0), status: "unknown" } as never, now)).toBe("today");
+    expect(urgencyOf({ dueAt: due(1), status: "unknown" } as never, now)).toBe("tomorrow");
+    expect(urgencyOf({ dueAt: due(4), status: "unknown" } as never, now)).toBe("week");
+    expect(urgencyOf({ dueAt: due(12), status: "unknown" } as never, now)).toBeNull();
+    expect(urgencyOf({ dueAt: due(0), status: "completed" } as never, now)).toBeNull();
+  });
+
+  it("shows an activity once: a work session for it never repeats in Later Today or Due soon", () => {
+    const course = { id: "cc17", code: "CC17", name: "CC17" };
+    const activity = { ...item("canvas:dice"), title: "Lab Activity 2: Dice Roller", course } as TodayItem;
+    const session = { ...item("session:1"), kind: "study_session", title: "Lab Activity 2: Dice Roller", course } as TodayItem;
+    const other = { ...item("canvas:other"), title: "Other", course } as TodayItem;
+    const result = arrangeToday({ next: activity, later: [session, other], dueSoon: [activity] }, [], [], "2026-09-27");
+    expect(result.next?.id).toBe("canvas:dice");
+    expect(result.later.map((i) => i.id)).toEqual(["canvas:other"]);
+    expect(result.dueSoon).toEqual([]);
+    // Two sessions for the same activity in Later Today show once.
+    const twice = arrangeToday({ next: other, later: [session, { ...session, id: "session:2" }], dueSoon: [] }, [], [], "2026-09-27");
+    expect(twice.later.map((i) => i.id)).toEqual(["session:1"]);
+  });
+});
+
+describe("clock blocks", () => {
+  it("finds the scheduled block under a touch on the inner lane, but leaves handles to the handles", async () => {
+    const { segmentAt } = await import("./dayClock");
+    const blocks = [{ id: "b1", from: 900, to: 960 }];
+    const onLane = ringPoint(930, CLOCK.lane);
+    expect(segmentAt(onLane.x, onLane.y, blocks, [600, 720])?.id).toBe("b1");
+    const outside = ringPoint(930, CLOCK.ring + 20);
+    expect(segmentAt(outside.x, outside.y, blocks, [600, 720])).toBeNull();
+    const nearHandle = ringPoint(930, CLOCK.lane);
+    expect(segmentAt(nearHandle.x, nearHandle.y, blocks, [930])).toBeNull();
+  });
+});
+
+describe("announcement read state", () => {
+  it("records reads and survives storage", async () => {
+    const { EMPTY_LIST_PREFERENCES, setRead, parseListPreferences } = await import("./listPreferences");
+    const prefs = setRead(EMPTY_LIST_PREFERENCES, "a1", true);
+    expect(prefs.read.announcements).toEqual(["a1"]);
+    expect(parseListPreferences(JSON.stringify(prefs)).read.announcements).toEqual(["a1"]);
+    expect(setRead(prefs, "a1", false).read.announcements).toEqual([]);
+  });
+});

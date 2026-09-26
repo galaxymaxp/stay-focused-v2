@@ -27,6 +27,8 @@ export const palettes = {
     redSoft: "#FCE9E5",
     findMatch: "#FBE9A6",
     findActive: "#F4C542",
+    /** Due this week: a readable amber between orange and neutral. */
+    amber: "#846400",
   },
   dark: {
     backgroundPrimary: "#000000",
@@ -55,6 +57,7 @@ export const palettes = {
     redSoft: "#4B2928",
     findMatch: "#5A4B1B",
     findActive: "#A98423",
+    amber: "#EBC55E",
   },
 } as const;
 export type ThemeColors = {
@@ -119,6 +122,8 @@ export const motion = {
   spatial: 320,
   ambient: 3200,
   spring: { damping: 22, stiffness: 260, mass: 0.8 },
+  /** Sheets rise with momentum and settle with a slight overshoot. */
+  sheet: { damping: 19, stiffness: 180, mass: 0.9 },
 } as const;
 export const iconSize = { small: 18, normal: 22, tab: 23, hero: 32 } as const;
 export const contentColors = {

@@ -8,11 +8,12 @@ const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
   read: vi.fn(),
   push: vi.fn(),
+  params: { intent: "pending-key" } as Record<string, string>,
 }));
 
 vi.mock("expo-router", () => ({
   router: { push: mocks.push, replace: vi.fn() },
-  useLocalSearchParams: () => ({ intent: "pending-key" }),
+  useLocalSearchParams: () => mocks.params,
 }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" } } }) }));
 vi.mock("../../services/generationRecovery", () => ({
@@ -22,6 +23,8 @@ vi.mock("../../services/generationRecovery", () => ({
 vi.mock("../../services/localLibrary/deviceLibrary", () => ({ storeCompletedGeneration: vi.fn() }));
 vi.mock("../../services/localLibrary/librarySync", () => ({ persistedArtifactId: () => null }));
 vi.mock("./GenerationCore", () => ({ GenerationCore: "GenerationCore" }));
+vi.mock("./useListPreferences", () => ({ useListPreferences: () => ({ prefs: { hidden: { queue: [] } }, hide: vi.fn() }) }));
+vi.mock("../../design/appActivity", () => ({ useAppActivity: () => ({ refresh: vi.fn() }) }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({ baseUrl: "https://api.example", accessToken: "token" }),
   useExperience: () => ({ data: null, error: null, refresh: vi.fn() }),
@@ -47,6 +50,7 @@ const pending: GenerationIntent = { key: "pending-key", title: "Reviewer request
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.params = { intent: "pending-key" };
   mocks.read.mockResolvedValue([pending]);
   mocks.accept.mockResolvedValue({ ...pending, generationId: "job-id" });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -61,12 +65,22 @@ async function render(element: ReactElement) {
 }
 
 describe("Queue generation confirmation safety", () => {
-  it("does not accept on mount and accepts exactly once after explicit confirmation", async () => {
+  it("starts a request made from a Generate action at once, exactly once", async () => {
+    mocks.params = { intent: "pending-key", start: "1" };
+    const root = await render(createElement(GenerationScreen));
+    await act(async () => { await Promise.resolve(); });
+    expect(mocks.accept).toHaveBeenCalledTimes(1);
+    expect(root.findAll(node => String(node.type) === "Action" && node.props.children === "Start generation")).toHaveLength(0);
+    const copy = root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ");
+    expect(copy).not.toContain("Ready for confirmation");
+  });
+
+  it("an old saved request reopened from Queue waits for Start, then accepts exactly once", async () => {
     const root = await render(createElement(GenerationScreen));
     expect(mocks.accept).not.toHaveBeenCalled();
     // Nothing runs before confirmation, so the Knowledge Core waits quietly.
     expect(root.findAll(node => String(node.type) === "GenerationCore")[0]!.props.state).toBe("idle");
-    const confirm = root.findAll(node => String(node.type) === "Action").find(node => node.props.children === "Confirm generation")!;
+    const confirm = root.findAll(node => String(node.type) === "Action").find(node => node.props.children === "Start generation")!;
     await act(async () => { await confirm.props.onPress(); });
     expect(root.findAll(node => String(node.type) === "GenerationCore")[0]!.props.state).toBe("reading");
     expect(mocks.accept).toHaveBeenCalledTimes(1);
@@ -77,7 +91,7 @@ describe("Queue generation confirmation safety", () => {
     let release: ((value: GenerationIntent) => void) | undefined;
     mocks.accept.mockImplementation(() => new Promise<GenerationIntent>(resolve => { release = resolve; }));
     const root = await render(createElement(GenerationScreen));
-    const confirm = root.findAll(node => String(node.type) === "Action").find(node => node.props.children === "Confirm generation")!;
+    const confirm = root.findAll(node => String(node.type) === "Action").find(node => node.props.children === "Start generation")!;
     let first: Promise<void> | undefined;
     await act(async () => {
       first = confirm.props.onPress();
@@ -95,6 +109,6 @@ describe("Queue generation confirmation safety", () => {
     mocks.read.mockResolvedValue([{ ...pending, generationId: "job-id" }]);
     const root = await render(createElement(GenerationScreen));
     expect(mocks.accept).not.toHaveBeenCalled();
-    expect(root.findAll(node => String(node.type) === "Action" && node.props.children === "Confirm generation")).toHaveLength(0);
+    expect(root.findAll(node => String(node.type) === "Action" && node.props.children === "Start generation")).toHaveLength(0);
   });
 });

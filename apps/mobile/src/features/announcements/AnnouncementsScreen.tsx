@@ -1,13 +1,13 @@
 import type { StudentAnnouncement, StudentAnnouncementList } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { BookOpen, ExternalLink, Eye, EyeOff, Pin, PinOff, X } from "lucide-react-native";
+import { BookOpen, ExternalLink, Mail, MailOpen, Pin, PinOff, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Linking, Pressable, ScrollView, StatusBar, Vibration, View, useWindowDimensions } from "react-native";
+import { Animated, BackHandler, Easing, Linking, Pressable, ScrollView, StatusBar, Vibration, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Action, Copy, DoneButton, Notice, Page, RowLink, Sheet, Surface, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
-import { useTheme } from "../../design/theme";
+import { motion, useTheme } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
 import { arrangeList } from "../redesign/listPreferences";
 import { useExperience } from "../redesign/useExperience";
@@ -21,83 +21,99 @@ export function openAnnouncement(id: string) {
 }
 
 /**
- * Pinned announcements first, hidden ones set aside (recoverable). Hiding is a
- * local reading preference; Canvas is never changed.
+ * Announcements are read or unread, like mail; nothing is hidden. Read state
+ * is a local reading preference (Canvas is never changed), pinned ones come
+ * first, and ones hidden in an earlier version simply count as read.
  */
 export function useArrangedAnnouncements(items: readonly StudentAnnouncement[]) {
-  const { prefs, pin, hide } = useListPreferences();
+  const { prefs, pin, markRead } = useListPreferences();
   const { reducedMotion } = useTheme();
-  const arranged = arrangeList(items, (item) => item.id, prefs.pinned.announcement, prefs.hidden.announcements);
+  const read = new Set([...prefs.read.announcements, ...prefs.hidden.announcements]);
+  const arranged = arrangeList(items, (item) => item.id, prefs.pinned.announcement, []);
+  const ordered = [...arranged.pinned, ...arranged.rest];
   const change = (update: () => void) => {
     animateNextLayout(reducedMotion);
     update();
   };
   return {
-    ...arranged,
+    unread: ordered.filter((item) => !read.has(item.id)),
+    read: ordered.filter((item) => read.has(item.id)),
+    isRead: (id: string) => read.has(id),
     isPinned: (id: string) => prefs.pinned.announcement.includes(id),
     setPinned: (id: string, pinned: boolean) => {
       if (pinned) Vibration.vibrate(8);
       change(() => pin("announcement", id, pinned));
     },
-    setHidden: (id: string, hidden: boolean) => change(() => hide("announcements", id, hidden)),
+    setRead: (id: string, value: boolean) => change(() => markRead(id, value)),
   };
 }
 
 /**
  * One announcement row with the app's gesture language: swipe right to pin,
- * swipe left to hide, long press for every option (including Open in Canvas).
- * Screen readers get the same options as custom actions.
+ * swipe left to mark read (or unread), long press for every option including
+ * Open in Canvas. Opening it marks it read. Screen readers get the same
+ * options as custom actions.
  */
 export function AnnouncementItem({
   item,
   pinned,
-  hidden = false,
+  read,
   onPin,
-  onHide,
+  onRead,
   preview = false,
   background,
+  leaveWhenRead = false,
 }: {
   item: StudentAnnouncement;
   pinned: boolean;
-  hidden?: boolean;
+  read: boolean;
   onPin: (pinned: boolean) => void;
-  onHide: (hidden: boolean) => void;
+  onRead: (read: boolean) => void;
   preview?: boolean;
   background?: string;
+  /** On lists that only show unread items, marking read slides the row away. */
+  leaveWhenRead?: boolean;
 }) {
   const { colors } = useTheme();
   const [options, setOptions] = useState(false);
-  const leading: SwipeAction[] = hidden ? [] : [{ key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => onPin(!pinned) }];
-  const trailing: SwipeAction[] = hidden
-    ? [{ key: "show", label: "Show", icon: Eye, tone: "neutral", onPress: () => onHide(false) }]
-    : [{ key: "hide", label: "Hide", icon: EyeOff, tone: "neutral", exits: true, onPress: () => onHide(true) }];
+  const leading: SwipeAction[] = [{ key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => onPin(!pinned) }];
+  const trailing: SwipeAction[] = [
+    read
+      ? { key: "unread", label: "Unread", icon: Mail, tone: "neutral", onPress: () => onRead(false) }
+      : { key: "read", label: "Read", icon: MailOpen, tone: "neutral", exits: leaveWhenRead, onPress: () => onRead(true) },
+  ];
   const canvas = item.htmlUrl
     ? [{ key: "canvas", label: "Open in Canvas", icon: ExternalLink, tone: "neutral" as const, onPress: () => void Linking.openURL(item.htmlUrl!) }]
     : [];
+  const open = () => {
+    if (!read) onRead(true);
+    openAnnouncement(item.id);
+  };
   return (
     <>
       <SwipeRow fullSwipe leading={leading} trailing={trailing} background={background}>
         <RowLink
-          label={`Read announcement: ${item.title}${pinned ? ", pinned" : ""}`}
-          onPress={() => openAnnouncement(item.id)}
+          label={`${read ? "" : "Unread: "}${item.title}${pinned ? ", pinned" : ""}`}
+          onPress={open}
           onLongPress={() => {
             Vibration.vibrate(10);
             setOptions(true);
           }}
           {...swipeAccessibility([...leading, ...trailing, ...canvas])}
+          icon={<View testID={read ? "announcement-read" : "announcement-unread"} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: read ? "transparent" : colors.accent }} />}
           trailing={pinned ? <Pin size={14} color={colors.textMuted} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }] }} /> : undefined}
         >
           <Copy muted size="caption">{announcementCourseLabel(item)} · {formatAnnouncementDate(item.postedAt)}</Copy>
-          <Copy size="h3">{item.title}</Copy>
+          <Copy size="h3" color={read ? colors.textSecondary : colors.textPrimary} style={{ fontWeight: read ? "400" : "600" }}>{item.title}</Copy>
           {preview && item.preview ? <Copy muted size="bodySmall" numberOfLines={3}>{item.preview}</Copy> : null}
         </RowLink>
       </SwipeRow>
       {options ? (
         <Sheet title={item.title} onClose={() => setOptions(false)}>
-          <OptionRow icon={BookOpen} label="Read announcement" onPress={() => { setOptions(false); openAnnouncement(item.id); }} />
+          <OptionRow icon={BookOpen} label="Read announcement" onPress={() => { setOptions(false); open(); }} />
           {item.htmlUrl ? <OptionRow icon={ExternalLink} label="Open in Canvas" onPress={() => { setOptions(false); void Linking.openURL(item.htmlUrl!); }} /> : null}
-          {!hidden ? <OptionRow icon={pinned ? PinOff : Pin} label={pinned ? "Unpin" : "Pin to top"} onPress={() => { setOptions(false); onPin(!pinned); }} /> : null}
-          <OptionRow icon={hidden ? Eye : EyeOff} label={hidden ? "Show again" : "Hide"} onPress={() => { setOptions(false); onHide(!hidden); }} />
+          <OptionRow icon={pinned ? PinOff : Pin} label={pinned ? "Unpin" : "Pin to top"} onPress={() => { setOptions(false); onPin(!pinned); }} />
+          <OptionRow icon={read ? Mail : MailOpen} label={read ? "Mark as unread" : "Mark as read"} onPress={() => { setOptions(false); onRead(!read); }} />
         </Sheet>
       ) : null}
     </>
@@ -116,16 +132,35 @@ function OptionRow({ icon: Icon, label, onPress }: { icon: typeof Pin; label: st
 export function AnnouncementsScreen() {
   const announcements = useExperience<StudentAnnouncementList>(ANNOUNCEMENT_LIST_PATH);
   const arranged = useArrangedAnnouncements(announcements.data?.items ?? []);
-  const [showHidden, setShowHidden] = useState(false);
   const { colors, mode } = useTheme();
   const card = mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated;
-  const visible = [...arranged.pinned, ...arranged.rest];
+  const section = (title: string, items: readonly StudentAnnouncement[]) =>
+    items.length ? (
+      <View style={{ gap: 12 }}>
+        <Copy muted size="caption" style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>{title}</Copy>
+        {items.map((item) => (
+          <Surface key={item.id} style={{ padding: 0, overflow: "hidden" }}>
+            <View style={{ padding: 12 }}>
+              <AnnouncementItem
+                item={item}
+                preview
+                background={card}
+                read={arranged.isRead(item.id)}
+                pinned={arranged.isPinned(item.id)}
+                onPin={(pinned) => arranged.setPinned(item.id, pinned)}
+                onRead={(read) => arranged.setRead(item.id, read)}
+              />
+            </View>
+          </Surface>
+        ))}
+      </View>
+    ) : null;
 
   return (
     <Page
       back
       title="Announcements"
-      subtitle="Updates from your Canvas courses"
+      subtitle={arranged.unread.length ? `${arranged.unread.length} unread` : "Updates from your Canvas courses"}
       onRefresh={announcements.refresh}
     >
       {announcements.loading && !announcements.data ? (
@@ -137,35 +172,9 @@ export function AnnouncementsScreen() {
           <Action secondary onPress={announcements.refresh}>Try again</Action>
         </Surface>
       ) : announcements.data?.items.length ? (
-        <View style={{ gap: 12 }}>
-          {visible.map(item => (
-            <Surface key={item.id} style={{ padding: 0, overflow: "hidden" }}>
-              <View style={{ padding: 12 }}>
-                <AnnouncementItem
-                  item={item}
-                  preview
-                  background={card}
-                  pinned={arranged.isPinned(item.id)}
-                  onPin={(pinned) => arranged.setPinned(item.id, pinned)}
-                  onHide={(hidden) => arranged.setHidden(item.id, hidden)}
-                />
-              </View>
-            </Surface>
-          ))}
-          {visible.length === 0 ? <Copy muted size="bodySmall">All announcements are hidden.</Copy> : null}
-          {arranged.hidden.length > 0 ? (
-            <Action secondary onPress={() => setShowHidden((value) => !value)}>
-              {showHidden ? "Done" : `Show ${arranged.hidden.length} hidden`}
-            </Action>
-          ) : null}
-          {showHidden
-            ? arranged.hidden.map((item) => (
-                <Surface key={item.id} style={{ opacity: 0.65 }}>
-                  <AnnouncementItem item={item} hidden pinned={false} background={card} onPin={() => {}} onHide={(hidden) => arranged.setHidden(item.id, hidden)} />
-                </Surface>
-              ))
-            : null}
-          <Copy muted size="caption" style={{ textAlign: "center" }}>Swipe right to pin, left to hide. Touch and hold for more.</Copy>
+        <View style={{ gap: 20 }}>
+          {section("Unread", arranged.unread)}
+          {section("Read", arranged.read)}
         </View>
       ) : (
         <Surface>
@@ -189,31 +198,45 @@ export function AnnouncementDetailScreen() {
   const announcements = useExperience<StudentAnnouncementList>(ANNOUNCEMENT_LIST_PATH);
   const announcement = announcements.data?.items.find(item => item.id === id) ?? null;
   const { colors, reducedMotion } = useTheme();
+  const { markRead } = useListPreferences();
+  // Opening an announcement, from anywhere, reads it.
+  useEffect(() => {
+    if (id) markRead(id, true);
+  }, [id, markRead]);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const rise = useRef(new Animated.Value(reducedMotion ? 0 : 1)).current;
   const closing = useRef(false);
+  const tint = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    Animated.timing(tint, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
     if (reducedMotion) return;
-    Animated.timing(rise, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [reducedMotion, rise]);
+    Animated.spring(rise, { toValue: 0, ...motion.sheet, useNativeDriver: true }).start();
+  }, [reducedMotion, rise, tint]);
   const close = () => {
     if (closing.current) return;
     closing.current = true;
-    if (router.canGoBack()) router.back();
-    else router.replace("/today");
+    const leave = () => (router.canGoBack() ? router.back() : router.replace("/today"));
+    Animated.parallel([
+      Animated.timing(tint, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(rise, { toValue: reducedMotion ? 0 : 1, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(leave);
   };
 
+  // Android back plays the same exit as the close button.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      close();
+      return true;
+    });
+    return () => subscription.remove();
+  });
   return (
     <View style={{ flex: 1, justifyContent: "flex-end" }}>
       <StatusBar barStyle="light-content" />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close announcement"
-        testID="announcement-backdrop"
-        onPress={close}
-        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)" }}
-      />
+      <Animated.View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: tint }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close announcement" testID="announcement-backdrop" onPress={close} style={{ flex: 1 }} />
+      </Animated.View>
       <Animated.View
         accessibilityViewIsModal
         style={{

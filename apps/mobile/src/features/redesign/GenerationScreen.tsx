@@ -15,6 +15,7 @@ import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
   acceptGeneration,
+  discardGenerationIntents,
   readGenerationIntents,
   type GenerationIntent,
 } from "../../services/generationRecovery";
@@ -23,9 +24,14 @@ import { persistedArtifactId } from "../../services/localLibrary/librarySync";
 import { GenerationCore } from "./GenerationCore";
 import { generationCoreState, generationMessages, queueSections } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
+import { useListPreferences } from "./useListPreferences";
 
 export function GenerationScreen() {
-  const params = useLocalSearchParams<{ id?: string; intent?: string }>();
+  const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string }>();
+  // Requests made from a Generate action start at once; only an old saved
+  // request reopened from Queue still asks before it starts.
+  const autoStart = params.start === "1";
+  const autoStarted = useRef(false);
   const { session } = useAuth(),
     client = useExperienceClient();
   const [id, setId] = useState(params.id ?? null),
@@ -81,6 +87,11 @@ export function GenerationScreen() {
       setConfirming(false);
     }
   }
+  useEffect(() => {
+    if (!autoStart || !intent || id || autoStarted.current) return;
+    autoStarted.current = true;
+    void confirmGeneration();
+  });
   const generation = useExperience<GenerationView>(
     id ? `/api/experience/generations/${encodeURIComponent(id)}` : null,
     3000,
@@ -126,18 +137,20 @@ export function GenerationScreen() {
           accessibilityLiveRegion="polite"
           style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
-          <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent ? "Ready for confirmation" : "Preparing your request…"} />
+          <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
           <GenerationCore state={generationCoreState(data?.state ?? null, !!id)} />
           <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
               ? running
                 ? "You can leave this screen. We’ll keep working."
                 : "View your saved work or return to Queue."
-              : "Review this request, then confirm when you are ready. No generation starts until you confirm."}
+              : autoStart
+                ? "You can leave this screen. We’ll keep working."
+                : "This saved request hasn’t started yet."}
           </Copy>
-          {intent && !id && (
-            <View style={{ width: 240 }}><Action disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Confirming…" : "Confirm generation"}</Action></View>
-          )}
+          {intent && !id && (!autoStart || error) ? (
+            <View style={{ width: 240 }}><Action disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Starting…" : autoStart ? "Try again" : "Start generation"}</Action></View>
+          ) : null}
           <View style={{ width: 240 }}><Action secondary pill onPress={() => router.push("/generation-queue")}>View Queue</Action></View>
         </View>
         {(error || generation.error) && (
@@ -262,12 +275,28 @@ export function QueueScreen() {
       setBusy(false);
     }
   }
+  const { prefs, hide } = useListPreferences();
+  const cleared = new Set(prefs.hidden.queue);
   const jobs = [
     ...(queue.data?.jobs ?? []),
     ...more.filter(
       (job) => !queue.data?.jobs.some((current) => current.id === job.id),
     ),
-  ];
+  ].filter((job) => !cleared.has(job.id));
+  const sections = queueSections(jobs);
+  const attention = sections.find((section) => section.key === "attention")?.jobs ?? [];
+  const needsAttention = attention.length > 0 || pending.length > 0;
+  async function clearAttention() {
+    for (const job of attention) hide("queue", job.id, true);
+    if (session && pending.length) {
+      try {
+        await discardGenerationIntents(session.user.id, pending.map((item) => item.key));
+        setPending([]);
+      } catch {
+        setError("Could not clear saved requests on this device.");
+      }
+    }
+  }
   return (
     <Page
       title="Queue"
@@ -278,6 +307,12 @@ export function QueueScreen() {
       {queue.error && <Notice>{queue.error}</Notice>}
       {error && <Notice>{error}</Notice>}
       {queue.loading && <SkeletonCards rows={2} label="Loading your generations" />}
+      {needsAttention ? (
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Copy size="h2">Needs attention</Copy>
+          <Action secondary label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action>
+        </View>
+      ) : null}
       {pending.map((item) => (
         <Surface key={item.key}>
           <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}
@@ -289,11 +324,14 @@ export function QueueScreen() {
             }
           >
             <Copy size="h3">{item.title}</Copy>
-            <Copy muted size="caption">Request needs confirmation</Copy>
+            <Copy muted size="caption">Not started</Copy>
           </RowLink>
         </Surface>
       ))}
-      {queueSections(jobs).map((section) => (
+      {attention.map((job) => (
+        <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
+      ))}
+      {sections.filter((section) => section.key !== "attention").map((section) => (
         <View key={section.key} style={{ gap: 8 }}>
           <Copy size="h2">{section.title}</Copy>
           {section.jobs.map((job) => (

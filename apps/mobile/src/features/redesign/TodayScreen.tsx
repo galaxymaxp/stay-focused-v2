@@ -1,4 +1,5 @@
 import type {
+  ActivitySummary,
   ExperienceCapabilities,
   TodayItem,
   TodayOverview,
@@ -7,18 +8,21 @@ import type {
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { router } from "expo-router";
 import { EyeOff, Pin, PinOff } from "lucide-react-native";
-import { useRef, useState, type ReactNode } from "react";
+import { useIsFocused } from "@react-navigation/native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Vibration, View } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
+import { sessionStore } from "../../auth/sessionStore";
 import { experienceRequest } from "../../services/experienceApi";
 import { dayOrbTouch } from "./DayOrb";
 import { DayRingClock } from "./DayRingClock";
 
 import { PlanPreview, planTaskIds, planToneFor } from "./PlanPreview";
 import {
+  activityFor,
   arrangeToday,
   available,
   deadline,
@@ -26,13 +30,23 @@ import {
   localDate,
   planningRequest,
   todayItemDetail,
+  urgencyOf,
+  type Urgency,
 } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { AnnouncementItem, useArrangedAnnouncements } from "../announcements/AnnouncementsScreen";
 import { todayHideKey } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
-import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
+
+/** Opening Today resyncs Canvas and refreshes the day, at most every three minutes. */
+const RESYNC_MS = 3 * 60_000;
+let lastResync = 0;
+const CLOCK_LOCK_KEY = "sf.today.clock-locked";
+
+function activitiesPath() {
+  return `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`;
+}
 
 /** Any finger on Today pauses the orb, so touches are handled without waiting on a frame. */
 const orbTouchPause = {
@@ -51,11 +65,52 @@ export function TodayScreen() {
     "/api/experience/capabilities",
   );
   const announcements = useExperience<StudentAnnouncementList>(
-    "/api/experience/announcements?limit=3",
+    "/api/experience/announcements?limit=20",
     60000,
   );
+  const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const focused = useIsFocused();
   const client = useExperienceClient();
   const { sync } = useCanvasSync();
+  // No pull-to-refresh on Today: coming back to it is the refresh.
+  const refreshers = useRef({ today, announcements, activities, sync });
+  refreshers.current = { today, announcements, activities, sync };
+  useEffect(() => {
+    if (!focused) return;
+    const now = Date.now();
+    if (now - lastResync < RESYNC_MS) return;
+    const first = lastResync === 0;
+    lastResync = now;
+    const current = refreshers.current;
+    void current.sync();
+    // The first visit already loads fresh data on mount.
+    if (!first) {
+      current.today.refresh();
+      current.announcements.refresh();
+      current.activities.refresh();
+    }
+  }, [focused]);
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void Promise.resolve(sessionStore.getItem(CLOCK_LOCK_KEY)).then((value) => {
+      if (live && value === "1") setLocked(true);
+    }).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  const toggleLock = () => {
+    const next = !locked;
+    setLocked(next);
+    void Promise.resolve(sessionStore.setItem(CLOCK_LOCK_KEY, next ? "1" : "0")).catch(() => {});
+  };
+  const openItem = (item: TodayItem) => {
+    const activity = activityFor(item, activities.data?.items ?? []);
+    if (activity) router.push({ pathname: "/activity", params: { id: activity.id } });
+    else if (item.deepLinkTarget.surface === "activity") router.push({ pathname: "/activity", params: { id: item.deepLinkTarget.id } });
+    else router.push({ pathname: "/study-session", params: { id: item.deepLinkTarget.id, date: localDate() } });
+  };
   const { colors, mode, reducedMotion } = useTheme();
   const { prefs, pin, hide } = useListPreferences();
   // Canvas deadlines in the coming week that are not already scheduled today.
@@ -73,7 +128,8 @@ export function TodayScreen() {
     date,
   );
   const announcementList = useArrangedAnnouncements(announcements.data?.items ?? []);
-  const shownAnnouncements = [...announcementList.pinned, ...announcementList.rest].slice(0, 3);
+  // Today shows only what hasn't been read yet.
+  const shownAnnouncements = announcementList.unread.slice(0, 3);
   const [showHidden, setShowHidden] = useState(false);
   const [lastHidden, setLastHidden] = useState<TodayItem | null>(null);
   const cardFill = mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated;
@@ -116,11 +172,11 @@ export function TodayScreen() {
     const swipe = rowActions(item);
     return (
       <SwipeRow key={item.id} fullSwipe leading={swipe.leading} trailing={swipe.trailing} background={options.fill}>
-        <TodayRow item={item} dominant={options.dominant} withDay={options.withDay} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} />
+        <TodayRow item={item} dominant={options.dominant} withDay={options.withDay} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} onOpen={() => openItem(item)} />
       </SwipeRow>
     );
   };
-  // Dragging a ring handle downward must never start pull-to-refresh.
+  // Holding the ring must never scroll the page.
   const [ringActive, setRingActive] = useState(false);
   const requestBusy = useRef(false);
   const [start, setStart] = useState(() =>
@@ -180,7 +236,7 @@ export function TodayScreen() {
       });
       setPreview(null);
       setPreviewRequest(null);
-      setNote("Your schedule has been updated.");
+      Vibration.vibrate(8);
       today.refresh();
     } catch (error) {
       setNote(
@@ -201,17 +257,16 @@ export function TodayScreen() {
         month: "long",
         day: "numeric",
       })}
-      onRefresh={() => {
-        today.refresh();
-        announcements.refresh();
-        void sync();
-      }}
-      refreshEnabled={!ringActive}
       scrollEnabled={!ringActive}
       scrollTouch={orbTouchPause}
     >
-      <SyncStatus />
       <DayRingClock
+        locked={locked}
+        onToggleLock={toggleLock}
+        onSegmentPress={(id) => {
+          const item = today.data?.timeline.find((entry) => entry.id === id);
+          if (item) openItem(item);
+        }}
         onAdjustingChange={setRingActive}
         date={date}
         timeline={today.data?.timeline ?? []}
@@ -307,7 +362,7 @@ export function TodayScreen() {
               {showHidden
                 ? arranged.hidden.map((item) => (
                     <View key={item.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, opacity: 0.75 }}>
-                      <View style={{ flex: 1 }}><TodayRow item={item} /></View>
+                      <View style={{ flex: 1 }}><TodayRow item={item} onOpen={() => openItem(item)} /></View>
                       <Action secondary label={`Show ${item.title} again`} onPress={() => unhide(item)}>Show</Action>
                     </View>
                   ))
@@ -337,14 +392,16 @@ export function TodayScreen() {
                 key={item.id}
                 item={item}
                 background={cardFill}
+                read={false}
+                leaveWhenRead
                 pinned={announcementList.isPinned(item.id)}
                 onPin={(pinned) => announcementList.setPinned(item.id, pinned)}
-                onHide={(hidden) => announcementList.setHidden(item.id, hidden)}
+                onRead={(read) => announcementList.setRead(item.id, read)}
               />
             ))}
           </Surface>
         ) : (
-          <Copy muted size="bodySmall">No recent Canvas announcements.</Copy>
+          <Copy muted size="bodySmall">{announcements.data?.items.length ? "You're all caught up." : "No recent Canvas announcements."}</Copy>
         )}
       </View>
       {expanded && (
@@ -400,7 +457,7 @@ export function TodayScreen() {
             <Notice>Planning is not available right now.</Notice>
           )}
           {today.data?.timeline.map((item) => (
-            <TodayRow key={item.id} item={item} />
+            <TodayRow key={item.id} item={item} onOpen={() => openItem(item)} />
           ))}
         </Surface>
       )}
@@ -418,7 +475,9 @@ function TodayRow({
   withDay = false,
   pinned = false,
   swipeActions = [],
+  onOpen,
 }: {
+  onOpen: () => void;
   item: TodayItem;
   dominant?: boolean;
   /** Deadlines beyond today name their day. */
@@ -428,6 +487,7 @@ function TodayRow({
 }) {
   const { colors } = useTheme();
   const detail = withDay && item.dueAt ? deadline(item.dueAt) : todayItemDetail(item);
+  const urgency = urgencyOf(item);
   // A planner session is time set aside for an activity: show it as that
   // activity's work, never as a separate "study" item.
   const session = item.kind === "study_session";
@@ -439,16 +499,7 @@ function TodayRow({
       icon={<ContentIcon kind="task" small={!dominant} />}
       label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.title}`}
       {...(swipeActions.length ? swipeAccessibility(swipeActions) : {})}
-      onPress={() =>
-        router.push(
-          item.deepLinkTarget.surface === "activity"
-            ? { pathname: "/activity", params: { id: item.deepLinkTarget.id } }
-            : {
-                pathname: "/study-session",
-                params: { id: item.deepLinkTarget.id, date: localDate() },
-              },
-        )
-      }
+      onPress={onOpen}
     >
       {pinned ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -460,7 +511,11 @@ function TodayRow({
         <Copy muted size="caption">{course}</Copy>
       )}
       <Copy size="h3">{item.title}</Copy>
-      {detail ? <Copy muted size="caption">{withDay ? `Due ${detail}` : detail}</Copy> : null}
+      {detail ? (
+        <Copy size="caption" color={urgencyColor(colors, urgency)} style={urgency === "overdue" || urgency === "today" ? { fontWeight: "600" } : undefined}>
+          {withDay ? `Due ${detail}` : detail}
+        </Copy>
+      ) : null}
     </RowLink>
   );
   // Up Next items are cards; the card moves with the swipe.
@@ -476,4 +531,19 @@ function PlanPreviewLoading() {
       <SkeletonBlock width="100%" height={58} radius={12} />
     </Surface>
   );
+}
+
+/** Only the date/time line carries urgency, so the list stays calm. */
+function urgencyColor(colors: ReturnType<typeof useTheme>["colors"], urgency: Urgency) {
+  switch (urgency) {
+    case "overdue":
+    case "today":
+      return colors.danger;
+    case "tomorrow":
+      return colors.orange;
+    case "week":
+      return colors.amber;
+    default:
+      return colors.textSecondary;
+  }
 }

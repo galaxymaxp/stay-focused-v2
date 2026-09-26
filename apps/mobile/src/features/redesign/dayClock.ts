@@ -128,6 +128,29 @@ export function hitTest(x: number, y: number, start: number, end: number): "star
   return Math.min(startGap, endGap) <= reach ? nearest : null;
 }
 
+/**
+ * The scheduled block on the inner lane under a touch, if any. Touches within
+ * reach of a handle stay with the handle.
+ */
+export function segmentAt<T extends { readonly id: string; readonly from: number; readonly to: number }>(
+  x: number,
+  y: number,
+  segments: readonly T[],
+  handles: readonly number[],
+): T | null {
+  const dx = x - CLOCK.center;
+  const dy = y - CLOCK.center;
+  const distance = Math.hypot(dx, dy);
+  if (distance < CLOCK.lane - 20 || distance > CLOCK.ring - CLOCK.track / 2 + 2) return null;
+  for (const handle of handles) {
+    const p = ringPoint(handle);
+    if (Math.hypot(x - p.x, y - p.y) < 30) return null;
+  }
+  const minutes = angleMinutes(dx, dy);
+  const slack = 10;
+  return segments.find((segment) => minutes >= segment.from - slack && minutes <= segment.to + slack) ?? null;
+}
+
 /* ------------------------------------------------------------------------ */
 /* Day state inside the glass                                               */
 /* ------------------------------------------------------------------------ */

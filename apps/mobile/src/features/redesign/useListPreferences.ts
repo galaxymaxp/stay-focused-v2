@@ -7,6 +7,7 @@ import {
   parseListPreferences,
   setHidden,
   setPinned,
+  setRead,
   type HideSurface,
   type ListPreferences,
   type PinKind,
@@ -78,5 +79,8 @@ export function useListPreferences() {
   const hide = useCallback((surface: HideSurface, id: string, hidden: boolean) => {
     if (owner) update(owner, (current) => setHidden(current, surface, id, hidden));
   }, [owner]);
-  return useMemo(() => ({ prefs, pin, hide }), [prefs, pin, hide]);
+  const markRead = useCallback((id: string, read: boolean) => {
+    if (owner) update(owner, (current) => setRead(current, id, read));
+  }, [owner]);
+  return useMemo(() => ({ prefs, pin, hide, markRead }), [prefs, pin, hide, markRead]);
 }

@@ -45,8 +45,8 @@ export function modalMotion(reducedMotion: boolean): NativeStackNavigationOption
 export function sheetMotion(): NativeStackNavigationOptions {
   return {
     presentation: "transparentModal",
-    animation: "fade",
-    animationDuration: 180,
+    // The screen animates its own tint and sheet; the route itself just appears.
+    animation: "none",
     gestureEnabled: true,
     contentStyle: { backgroundColor: "transparent" },
   };

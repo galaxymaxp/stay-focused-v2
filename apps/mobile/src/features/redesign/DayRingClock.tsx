@@ -1,7 +1,8 @@
 import type { TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, PanResponder, Vibration, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+import { Lock, LockOpen } from "lucide-react-native";
+import { Animated, PanResponder, Pressable, Vibration, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { Copy } from "../../design/primitives";
@@ -17,6 +18,7 @@ import {
   hitTest,
   moveRange,
   ringPoint,
+  segmentAt,
   snapRange,
   snapTo,
 } from "./dayClock";
@@ -129,7 +131,15 @@ export function DayRingClock({
   onAdjustingChange,
   disabled = false,
   proposed = [],
+  onSegmentPress,
+  locked = false,
+  onToggleLock,
 }: {
+  /** A scheduled block on the inner lane was tapped. */
+  onSegmentPress?: (id: string) => void;
+  /** Locked, the free time cannot be dragged (blocks can still be tapped). */
+  locked?: boolean;
+  onToggleLock?: () => void;
   /** A plan preview drawn as dashed arcs on the schedule lane until applied. */
   proposed?: readonly { readonly id: string; readonly from: number; readonly to: number; readonly color: string }[];
   date: string;
@@ -165,8 +175,8 @@ export function DayRingClock({
 
   const segments = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
 
-  const latest = useRef({ start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange });
-  latest.current = { start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange };
+  const latest = useRef({ start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange, segments, onSegmentPress, locked });
+  latest.current = { start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange, segments, onSegmentPress, locked };
   const gesture = useRef({
     mode: null as Mode | null,
     held: false,
@@ -177,6 +187,7 @@ export function DayRingClock({
     value: { start: 0, end: 0 },
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
     pending: null as Range | null,
+    tap: null as string | null,
     scheduled: false,
     stopSnap: null as null | (() => void),
   });
@@ -253,20 +264,23 @@ export function DayRingClock({
     };
     return PanResponder.create({
       onStartShouldSetPanResponder: (event) => {
-        const { disabled: off, start: from, end: to } = latest.current;
-        if (off) return false;
+        const { disabled: off, start: from, end: to, segments: blocks, onSegmentPress: pressBlock, locked: fixed } = latest.current;
         const point = local(event);
+        if (pressBlock && segmentAt(point.x, point.y, blocks, [from, to])) return true;
+        if (off || fixed) return false;
         return hitTest(point.x, point.y, from, to) !== null;
       },
-      // An end owns its touch immediately; the middle lets the page scroll until held.
-      onShouldBlockNativeResponder: () => gesture.current.mode !== "move",
+      // An end owns its touch immediately; the middle and block taps let the page scroll.
+      onShouldBlockNativeResponder: () => gesture.current.mode === "start" || gesture.current.mode === "end",
       onPanResponderGrant: (event) => {
         const state = gesture.current;
         state.stopSnap?.();
         state.stopSnap = null;
         const point = local(event);
-        const { start: from, end: to } = latest.current;
-        state.mode = hitTest(point.x, point.y, from, to);
+        const { start: from, end: to, segments: blocks, onSegmentPress: pressBlock, locked: fixed, disabled: off } = latest.current;
+        const block = pressBlock ? segmentAt(point.x, point.y, blocks, [from, to]) : null;
+        state.tap = block?.id ?? null;
+        state.mode = block || fixed || off ? null : hitTest(point.x, point.y, from, to);
         state.held = false;
         state.origin = point;
         state.angle = angleMinutes(point.x - CLOCK.center, point.y - CLOCK.center);
@@ -279,6 +293,7 @@ export function DayRingClock({
       },
       onPanResponderMove: (_event, move) => {
         const state = gesture.current;
+        if (state.tap && Math.hypot(move.dx, move.dy) > MOVE_SLOP) state.tap = null;
         if (!state.mode) return;
         const k = latest.current.scale;
         if (!state.held) {
@@ -306,8 +321,16 @@ export function DayRingClock({
         publish(next);
       },
       onPanResponderTerminationRequest: () => !gesture.current.held,
-      onPanResponderRelease: () => finish(true),
-      onPanResponderTerminate: () => finish(false),
+      onPanResponderRelease: () => {
+        const tapped = gesture.current.tap;
+        gesture.current.tap = null;
+        if (tapped) latest.current.onSegmentPress?.(tapped);
+        finish(true);
+      },
+      onPanResponderTerminate: () => {
+        gesture.current.tap = null;
+        finish(false);
+      },
     });
   }, [lift, publish]);
 
@@ -380,7 +403,7 @@ export function DayRingClock({
               </SvgText>
             );
           })}
-          <Path d={arc(range.start, range.end, CLOCK.ring)} stroke={colors.accent} strokeOpacity={adjusting ? 1 : 0.9} strokeWidth={CLOCK.track} fill="none" strokeLinecap="butt" testID="free-time-arc" />
+          <Path d={arc(range.start, range.end, CLOCK.ring)} stroke={colors.accent} strokeOpacity={adjusting ? 1 : locked ? 0.55 : 0.9} strokeWidth={CLOCK.track} fill="none" strokeLinecap="butt" testID="free-time-arc" />
           {segments.map((segment) => (
             <Path key={segment.id} d={arc(segment.from, Math.max(segment.to, segment.from + 0.5), CLOCK.lane)} stroke={segmentColor(segment.kind)} strokeWidth={6} fill="none" strokeLinecap="round" opacity={0.92} />
           ))}
@@ -392,7 +415,7 @@ export function DayRingClock({
             const p = ringPoint(handle.at, CLOCK.ring);
             const held = adjusting === handle.key || adjusting === "move";
             return (
-              <Circle key={handle.key} cx={p.x} cy={p.y} r={held ? 12.5 : 11} fill={handleFill} stroke={colors.accent} strokeWidth={2.5} />
+              <Circle key={handle.key} cx={p.x} cy={p.y} r={held ? 12.5 : locked ? 6 : 11} fill={locked ? colors.accent : handleFill} stroke={colors.accent} strokeWidth={locked ? 0 : 2.5} />
             );
           })}
         </Svg>
@@ -431,18 +454,24 @@ export function DayRingClock({
           importantForAccessibility="no"
           style={{ position: "absolute", top: 0, left: 0, width: size, height: size }}
         />
+        {onToggleLock ? (
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel="Lock clock"
+            accessibilityHint="When locked, your free time can't be changed by accident."
+            accessibilityState={{ checked: locked }}
+            testID="clock-lock"
+            onPress={() => {
+              Vibration.vibrate(6);
+              onToggleLock();
+            }}
+            hitSlop={6}
+            style={({ pressed }) => ({ position: "absolute", top: 0, right: 0, width: 44, height: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.55 : 1 })}
+          >
+            {locked ? <Lock size={17} color={colors.accent} strokeWidth={2} /> : <LockOpen size={17} color={colors.textMuted} strokeWidth={1.8} />}
+          </Pressable>
+        ) : null}
       </View>
-      <Copy size="h3" style={{ fontVariant: ["tabular-nums"] }}>{formatFreeTime(range.end - range.start)} free</Copy>
-      <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>
-        {clockLabel(range.start)} – {clockLabel(range.end)} · Drag an end, or hold the middle to move
-      </Copy>
-      {segments.length > 0 ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 2 }}>
-          {segments.some((s) => s.kind === "study_session") && <Legend color={colors.blue} label="Planned work" />}
-          {segments.some((s) => s.kind === "calendar_block") && <Legend color={colors.orange} label="Classes" />}
-          {segments.some((s) => s.kind !== "study_session" && s.kind !== "calendar_block") && <Legend color={colors.violet} label="Tasks" />}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -492,14 +521,5 @@ function CenterReadout({ mode, range, now }: { mode: Mode | null; range: Range; 
         {now.toLocaleDateString([], { weekday: "long" })}
       </Copy>
     </>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-      <View style={{ width: 12, height: 4, borderRadius: 2, backgroundColor: color }} />
-      <Copy muted size="caption">{label}</Copy>
-    </View>
   );
 }

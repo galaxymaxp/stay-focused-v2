@@ -8,7 +8,7 @@
  * - Today hides are scoped to one day (see `todayHideKey`), so a dismissed
  *   item only leaves that day's plan; Canvas and task data are untouched.
  */
-export type HideSurface = "generate" | "library" | "libraryItems" | "today" | "announcements";
+export type HideSurface = "generate" | "library" | "libraryItems" | "today" | "announcements" | "queue";
 export type PinKind = "course" | "artifact" | "today" | "announcement";
 
 /** A Today dismissal lasts for the day it was made on. */
@@ -19,11 +19,14 @@ export function todayHideKey(date: string, itemId: string) {
 export interface ListPreferences {
   readonly pinned: Readonly<Record<PinKind, readonly string[]>>;
   readonly hidden: Readonly<Record<HideSurface, readonly string[]>>;
+  /** Announcements the student has read on this device. */
+  readonly read: { readonly announcements: readonly string[] };
 }
 
 export const EMPTY_LIST_PREFERENCES: ListPreferences = {
   pinned: { course: [], artifact: [], today: [], announcement: [] },
-  hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [] },
+  hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] },
+  read: { announcements: [] },
 };
 
 const MAX_ENTRIES = 300;
@@ -36,6 +39,10 @@ function toggled(list: readonly string[], id: string, on: boolean): readonly str
 
 export function setPinned(prefs: ListPreferences, kind: PinKind, id: string, pinned: boolean): ListPreferences {
   return { ...prefs, pinned: { ...prefs.pinned, [kind]: toggled(prefs.pinned[kind], id, pinned) } };
+}
+
+export function setRead(prefs: ListPreferences, id: string, read: boolean): ListPreferences {
+  return { ...prefs, read: { announcements: toggled(prefs.read.announcements, id, read) } };
 }
 
 export function setHidden(prefs: ListPreferences, surface: HideSurface, id: string, hidden: boolean): ListPreferences {
@@ -83,7 +90,9 @@ export function parseListPreferences(raw: string | null): ListPreferences {
         libraryItems: ids(value.hidden?.libraryItems),
         today: ids(value.hidden?.today),
         announcements: ids(value.hidden?.announcements),
+        queue: ids(value.hidden?.queue),
       },
+      read: { announcements: ids((value as { read?: Record<string, unknown> }).read?.announcements) },
     };
   } catch {
     return EMPTY_LIST_PREFERENCES;
