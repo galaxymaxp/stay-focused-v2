@@ -6,7 +6,7 @@ import type {
   LearningMaterial,
 } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { BookOpen, ChevronDown, ChevronRight, ClipboardList } from "lucide-react-native";
+import { BookOpen, ChevronDown, ChevronRight, ClipboardList, CloudOff, Eye, EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 
@@ -14,6 +14,7 @@ import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseCard, CourseMark } from "../../design/CourseViews";
 import { Action, Copy, Notice, Page, Surface, ContentIcon, RowLink } from "../../design/primitives";
+import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { readCourseIdParam } from "../../navigation/appRoutes";
@@ -23,6 +24,8 @@ import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, materialTypes, moduleGroups } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
+import { arrangeList } from "./listPreferences";
+import { useListPreferences } from "./useListPreferences";
 
 /**
  * The material row that was tapped, handed to the material screen so it can
@@ -35,11 +38,19 @@ function firstParam(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
 }
 
-/** Level 1: synced courses grouped by term period. */
+/** Level 1: synced courses grouped by term period, pinned courses first. */
 export function GenerateScreen() {
   const courses = useExperience<GenerateCourseList>("/api/experience/courses");
-  const { sync } = useCanvasSync();
-  const courseGroups = generateCourseGroups(courses.data?.items ?? []);
+  const { sync, unsyncCourse } = useCanvasSync();
+  const { prefs, pin, hide } = useListPreferences();
+  const { reducedMotion } = useTheme();
+  const [showHidden, setShowHidden] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const arranged = arrangeList(courses.data?.items ?? [], (course) => course.id, prefs.pinned.course, prefs.hidden.generate);
+  const courseGroups = [
+    ...(arranged.pinned.length ? [{ key: "pinned", title: "Pinned", items: arranged.pinned }] : []),
+    ...generateCourseGroups(arranged.rest),
+  ];
 
   function openCourse(course: GenerateCourseSummary) {
     // Unsynced courses never request materials; the Sync flow opens with that course in focus.
@@ -48,6 +59,34 @@ export function GenerateScreen() {
       return;
     }
     router.push({ pathname: "/courses/[courseId]", params: { courseId: course.id, courseName: course.name, courseCode: course.code ?? "" } });
+  }
+
+  function change(update: () => void) {
+    animateNextLayout(reducedMotion);
+    update();
+  }
+
+  async function unsync(course: GenerateCourseSummary) {
+    setNote(null);
+    const done = await unsyncCourse(course.id);
+    if (done) courses.refresh();
+    else setNote(`Couldn’t stop syncing ${courseIdentity(course).title}. Check your connection and try again.`);
+  }
+
+  function actions(course: GenerateCourseSummary, hidden: boolean) {
+    const leading: SwipeAction[] = hidden
+      ? [{ key: "show", label: "Show", icon: Eye, tone: "neutral", onPress: () => change(() => hide("generate", course.id, false)) }]
+      : [
+          { key: "hide", label: "Hide", icon: EyeOff, tone: "neutral", exits: true, onPress: () => change(() => hide("generate", course.id, true)) },
+          ...(course.syncState !== "not_synced"
+            ? [{ key: "unsync", label: "Unsync", icon: CloudOff, tone: "warning", onPress: () => void unsync(course) } satisfies SwipeAction]
+            : []),
+        ];
+    const pinned = prefs.pinned.course.includes(course.id);
+    const trailing: SwipeAction[] = hidden ? [] : [
+      { key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => change(() => pin("course", course.id, !pinned)) },
+    ];
+    return { leading, trailing, pinned };
   }
 
   return (
@@ -75,25 +114,46 @@ export function GenerateScreen() {
           <Action onPress={() => router.push("/canvas-settings")}>Open Canvas sync</Action>
         </Surface>
       ) : null}
+      {note ? <Notice>{note}</Notice> : null}
       {courseGroups.map((group) => (
         <View key={group.key} style={{ gap: spacing[2] }}>
           <Copy muted size="caption" style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>{group.title}</Copy>
-          {group.items.map((course) => (
-            <GenerateCourseCard key={course.id} course={course} onPress={() => openCourse(course)} />
-          ))}
+          {group.items.map((course) => {
+            const swipe = actions(course, false);
+            return (
+              <SwipeRow key={course.id} leading={swipe.leading} trailing={swipe.trailing}>
+                <GenerateCourseCard course={course} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} onPress={() => openCourse(course)} />
+              </SwipeRow>
+            );
+          })}
         </View>
       ))}
+      {arranged.hidden.length > 0 ? (
+        <View style={{ gap: spacing[2] }}>
+          <Action secondary onPress={() => change(() => setShowHidden((value) => !value))}>
+            {showHidden ? "Done" : `Show ${arranged.hidden.length} hidden`}
+          </Action>
+          {showHidden ? arranged.hidden.map((course) => {
+            const swipe = actions(course, true);
+            return (
+              <SwipeRow key={course.id} leading={swipe.leading} style={{ opacity: 0.6 }}>
+                <GenerateCourseCard course={course} swipeActions={swipe.leading} onPress={() => openCourse(course)} />
+              </SwipeRow>
+            );
+          }) : null}
+        </View>
+      ) : null}
     </Page>
   );
 }
 
-function GenerateCourseCard({ course, onPress }: { course: GenerateCourseSummary; onPress: () => void }) {
+function GenerateCourseCard({ course, onPress, pinned = false, swipeActions }: { course: GenerateCourseSummary; onPress: () => void; pinned?: boolean; swipeActions: readonly SwipeAction[] }) {
   const { colors } = useTheme();
   const identity = useMemo(() => courseIdentity(course), [course]);
   const status = generateCourseStatus(course);
   const synced = course.syncState === "synced";
   return (
-    <CourseCard identity={identity} onPress={onPress} accessibilityLabel={`${synced ? "Open" : "Sync"} ${identity.title}, ${status}`}>
+    <CourseCard identity={identity} onPress={onPress} pinned={pinned} {...swipeAccessibility(swipeActions)} accessibilityLabel={`${synced ? "Open" : "Sync"} ${identity.title}, ${status}`}>
       <Copy size="caption" color={synced ? colors.textMuted : colors.accent}>{status}</Copy>
     </CourseCard>
   );

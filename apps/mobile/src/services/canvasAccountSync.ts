@@ -230,3 +230,80 @@ export async function startAccountCanvasSync(
       : summarizeSyncJobs(jobs, rejected).phase;
   return { phase, lastSyncedAt, jobs, rejected };
 }
+
+/** What one course's sync looks like to the student: never raw job stages. */
+export type CourseSyncState = "syncing" | "synced" | "failed";
+
+/** Per-course state from the jobs this session started or resumed. */
+export function courseSyncStates(
+  jobs: readonly CanvasSyncJobStatusView[],
+  rejected: readonly SyncRejection[],
+): Readonly<Record<string, CourseSyncState>> {
+  const states: Record<string, CourseSyncState> = {};
+  const rank: Record<CourseSyncState, number> = { synced: 0, syncing: 1, failed: 2 };
+  const mark = (courseId: string, state: CourseSyncState) => {
+    const current = states[courseId];
+    if (!current || rank[state] > rank[current]) states[courseId] = state;
+  };
+  for (const job of jobs) {
+    mark(job.course.id, !isFinishedSyncJob(job) ? "syncing" : job.status === "succeeded" ? "synced" : "failed");
+  }
+  for (const item of rejected) mark(item.courseId, "failed");
+  return states;
+}
+
+export interface CourseSelectionDependencies {
+  readonly readSelection: (
+    input: CanvasApiBaseInput,
+  ) => Promise<CanvasApiResult<{ readonly selectedCourseIds: readonly string[] }>>;
+  readonly saveSelection: (
+    input: CanvasApiBaseInput & { readonly selectedCourseIds: readonly string[] },
+  ) => Promise<CanvasApiResult<{ readonly selectedCourseIds: readonly string[] }>>;
+}
+
+export type CourseSelectionChange =
+  | { readonly ok: true; readonly selectedCourseIds: readonly string[] }
+  | { readonly ok: false; readonly phase: AccountSyncPhase };
+
+/**
+ * Adds or removes one course from the saved selection. It re-reads the saved
+ * selection first, so a change made elsewhere is never overwritten, and it
+ * saves nothing when the course is already in the requested state.
+ */
+export async function changeCourseSelection(
+  input: CanvasApiBaseInput,
+  courseId: string,
+  selected: boolean,
+  dependencies: CourseSelectionDependencies,
+): Promise<CourseSelectionChange> {
+  const current = await dependencies.readSelection(input);
+  if (!current.ok) return { ok: false, phase: phaseForSyncError(current.error) };
+  const ids = current.data.selectedCourseIds;
+  if (ids.includes(courseId) === selected) return { ok: true, selectedCourseIds: ids };
+  const next = selected ? [...ids, courseId] : ids.filter((id) => id !== courseId);
+  const saved = await dependencies.saveSelection({ ...input, selectedCourseIds: next });
+  return saved.ok
+    ? { ok: true, selectedCourseIds: saved.data.selectedCourseIds }
+    : { ok: false, phase: phaseForSyncError(saved.error) };
+}
+
+/**
+ * The whole "Sync" tap for one course: select it, then start the same durable
+ * content and grade jobs as the account refresh. No separate Save step.
+ */
+export async function selectAndSyncCourse(
+  input: CanvasApiBaseInput,
+  course: AccountSyncCourse,
+  dependencies: CourseSelectionDependencies & Pick<AccountSyncDependencies, "startCourse">,
+): Promise<AccountSyncStart & { readonly selectedCourseIds: readonly string[] | null }> {
+  const selection = await changeCourseSelection(input, course.id, true, dependencies);
+  if (!selection.ok) {
+    return { phase: selection.phase, lastSyncedAt: null, jobs: [], rejected: [{ courseId: course.id, code: selection.phase }], selectedCourseIds: null };
+  }
+  const results = await Promise.all(
+    ACCOUNT_SYNC_JOB_TYPES.map((jobType) => dependencies.startCourse(course, jobType)),
+  );
+  const jobs = results.flatMap((result) => (result.ok ? [result.data] : []));
+  const rejected = results.flatMap((result) => (result.ok ? [] : [{ courseId: course.id, code: result.error.code }]));
+  return { phase: summarizeSyncJobs(jobs, rejected).phase, lastSyncedAt: null, jobs, rejected, selectedCourseIds: selection.selectedCourseIds };
+}

@@ -1,3 +1,9 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { CoursesScreen } from "../../src/features/courses/CoursesScreen";
-export default function CanvasSettings() { const { courseId } = useLocalSearchParams<{ courseId?: string }>(); return <CoursesScreen focusCourseId={typeof courseId === "string" ? courseId : null} onCreateReviewer={() => router.push("/generate")} onCreateReviewerFromCanvas={(courseId, courseName) => router.push({ pathname: "/courses/[courseId]/reviewer", params: { courseId, courseName } })} onOpenGrades={(courseId, courseName) => router.push({ pathname: "/courses/[courseId]/grades", params: { courseId, courseName } })} onOpenLibrary={() => router.navigate("/library")} />; }
+import { useLocalSearchParams } from "expo-router";
+
+import { CanvasSyncScreen } from "../../src/features/sync/CanvasSyncScreen";
+
+/** Canvas course sync: search, tap, sync, done. Generate opens it with a course in focus. */
+export default function CanvasSettings() {
+  const { courseId } = useLocalSearchParams<{ courseId?: string }>();
+  return <CanvasSyncScreen focusCourseId={typeof courseId === "string" ? courseId : null} />;
+}

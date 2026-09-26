@@ -10,6 +10,7 @@ import { CheckCircle2, CircleDashed, Clock3, AlertCircle } from "lucide-react-na
 
 import { useAuth } from "../../auth";
 import { Action, Copy, Notice, Page, Surface, RowLink, ContentIcon } from "../../design/primitives";
+import { useAppActivity } from "../../design/appActivity";
 import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
@@ -20,7 +21,7 @@ import {
 import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibrary";
 import { persistedArtifactId } from "../../services/localLibrary/librarySync";
 import { GenerationVisual } from "./GenerationVisual";
-import { generationMessages } from "./presentation";
+import { generationMessages, queueSections } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 
 export function GenerationScreen() {
@@ -33,6 +34,7 @@ export function GenerationScreen() {
     [attempt, setAttempt] = useState(0),
     [confirming, setConfirming] = useState(false);
   const confirmationInFlight = useRef(false);
+  const activity = useAppActivity();
   useEffect(() => {
     if (!params.intent || !session) return;
     let live = true;
@@ -70,6 +72,8 @@ export function GenerationScreen() {
       const accepted = await acceptGeneration(session.user.id, client, intent);
       setId(accepted.generationId!);
       setIntent(accepted);
+      // The header orb should appear now, not on the next idle check.
+      activity.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not confirm this request.");
     } finally {
@@ -289,33 +293,19 @@ export function QueueScreen() {
           </RowLink>
         </Surface>
       ))}
-      {(["Generating", "Queued", "Completed", "Needs attention"] as const).map(
-        (group) => {
-          const selected = jobs.filter((job) =>
-            group === "Generating"
-              ? ["running", "cancellation_requested"].includes(job.status)
-              : group === "Queued"
-                ? job.status === "queued"
-                : group === "Completed"
-                  ? job.status === "succeeded"
-                  : ![
-                      "running",
-                      "cancellation_requested",
-                      "queued",
-                      "succeeded",
-                    ].includes(job.status),
-          );
-          return (
-            <View key={group} style={{ gap: 8 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}><Copy size={selected.length ? "h2" : "bodySmall"} muted={!selected.length}>{group}</Copy><Copy muted size="caption">{selected.length ? selected.length : "None"}</Copy></View>
-              {selected.length ? (
-                selected.map((job) => (
-                  <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
-                ))
-              ) : null}
-            </View>
-          );
-        },
+      {queueSections(jobs).map((section) => (
+        <View key={section.key} style={{ gap: 8 }}>
+          <Copy size="h2">{section.title}</Copy>
+          {section.jobs.map((job) => (
+            <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
+          ))}
+        </View>
+      ))}
+      {queue.data && jobs.length === 0 && pending.length === 0 && (
+        <Surface>
+          <Copy size="h3">Nothing in your Queue</Copy>
+          <Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they’re made, then stay in Library.</Copy>
+        </Surface>
       )}
       {cursor && (
         <Action secondary disabled={busy} onPress={() => void loadMore()}>
@@ -334,6 +324,7 @@ function QueueCard({
 }) {
   const client = useExperienceClient();
   const { colors } = useTheme();
+  const activity = useAppActivity();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [retryKey] = useState(newRequestKey);
@@ -387,6 +378,7 @@ function QueueCard({
         { method: "POST", key: retryKey },
       );
       onRefresh();
+      activity.refresh();
       router.push({ pathname: "/generation", params: { id: result.id } });
     } catch (cause) {
       setError(

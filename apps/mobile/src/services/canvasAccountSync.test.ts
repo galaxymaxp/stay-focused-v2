@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  changeCourseSelection,
+  courseSyncStates,
   describeSyncAge,
   describeSyncState,
   latestSuccessfulSync,
   phaseForSyncError,
+  selectAndSyncCourse,
   selectedSyncCourses,
   shouldAutoSync,
   startAccountCanvasSync,
@@ -135,5 +138,55 @@ describe("account Canvas sync", () => {
     expect(describeSyncAge("2026-09-25T00:59:40.000Z", now)).toBe("Synced just now");
     expect(describeSyncAge("2026-09-25T00:46:00.000Z", now)).toBe("Synced 14 minutes ago");
     expect(describeSyncAge("2026-09-19T00:00:00.000Z", now)).toBe("Synced 6 days ago");
+  });
+});
+
+describe("one-tap course sync", () => {
+  function selection(initial: string[]) {
+    let saved = [...initial];
+    return {
+      get saved() { return saved; },
+      readSelection: vi.fn(async () => ({ ok: true as const, data: { selectedCourseIds: saved } })),
+      saveSelection: vi.fn(async (request: { selectedCourseIds: readonly string[] }) => {
+        saved = [...request.selectedCourseIds];
+        return { ok: true as const, data: { selectedCourseIds: saved } };
+      }),
+    };
+  }
+
+  it("selects the course and starts content and grade jobs with no separate save step", async () => {
+    const store = selection(["other"]);
+    const startCourse = vi.fn(async (item: { id: string }, jobType: CanvasSyncJobStatusView["jobType"]) => ({ ok: true as const, data: job(`${item.id}-${jobType}`, "queued", null, item.id, jobType) }));
+    const started = await selectAndSyncCourse(input, { id: "cit17", displayName: "CIT17" }, { ...store, startCourse });
+    // The existing selection is preserved; the course is added, not substituted.
+    expect(store.saved).toEqual(["other", "cit17"]);
+    expect(startCourse.mock.calls.map(([, jobType]) => jobType)).toEqual(["course_content", "course_grades"]);
+    expect(started).toMatchObject({ phase: "syncing", rejected: [], selectedCourseIds: ["other", "cit17"] });
+  });
+
+  it("never starts jobs when the selection could not be saved", async () => {
+    const startCourse = vi.fn();
+    const started = await selectAndSyncCourse(input, { id: "cit17", displayName: "CIT17" }, {
+      readSelection: async () => ({ ok: false as const, error: { code: "network_error", message: "offline" } }),
+      saveSelection: vi.fn(),
+      startCourse,
+    });
+    expect(startCourse).not.toHaveBeenCalled();
+    expect(started).toMatchObject({ phase: "offline", jobs: [], rejected: [{ courseId: "cit17", code: "offline" }] });
+  });
+
+  it("unsyncs by removing only that course and saves nothing when it is already unsynced", async () => {
+    const store = selection(["a", "b"]);
+    expect(await changeCourseSelection(input, "a", false, store)).toEqual({ ok: true, selectedCourseIds: ["b"] });
+    expect(await changeCourseSelection(input, "a", false, store)).toEqual({ ok: true, selectedCourseIds: ["b"] });
+    expect(store.saveSelection).toHaveBeenCalledOnce();
+  });
+
+  it("states each course simply: syncing until every job finishes, failed if any failed", () => {
+    expect(courseSyncStates([
+      job("a1", "succeeded", "success", "a"), job("a2", "running", null, "a", "course_grades"),
+      job("b1", "succeeded", "unchanged", "b"), job("b2", "succeeded", "success", "b", "course_grades"),
+      job("c1", "succeeded", "success", "c"),
+    ], [{ courseId: "c", code: "rate_limited" }])).toEqual({ a: "syncing", b: "synced", c: "failed" });
   });
 });

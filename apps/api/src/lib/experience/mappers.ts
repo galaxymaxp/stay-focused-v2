@@ -1,4 +1,4 @@
-import type { CanvasAssignmentRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
+import type { CanvasAssignmentRow, CanvasAssignmentSubmissionRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
 import type { ActivitySummary, CourseSummary, ExperienceCapabilities, GenerateCoursePeriod, GenerateCourseSummary, GenerateCourseSyncState, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceDescriptor } from '@/lib/canvas-reviewer-sources';
 import type { CanvasCourseClassification, CanvasCourseInventoryItem } from '@/lib/canvas-course-selection';
@@ -95,7 +95,11 @@ export function composeActivities(input: {
   return result.sort(compareActivities);
 }
 
-function isActionableCanvasAssignment(assignment: CanvasAssignmentRow): boolean {
+/** Canvas already counts this submission as handed in (or excused), so no work remains. */
+export function isSubmittedCanvasSubmission(submission: Pick<CanvasAssignmentSubmissionRow, 'submitted_at' | 'excused' | 'workflow_state' | 'missing'>): boolean {
+  return Boolean(submission.submitted_at || submission.excused || submission.workflow_state === 'submitted' || submission.workflow_state === 'pending_review' || (submission.workflow_state === 'graded' && !submission.missing));
+}
+export function isActionableCanvasAssignment(assignment: Pick<CanvasAssignmentRow, 'due_at' | 'submission_types'>): boolean {
   if (assignment.due_at !== null) return true;
   return assignment.submission_types.some(type => {
     const normalized = type.trim().toLowerCase();

@@ -121,6 +121,33 @@ export function timeLabel(value: string | null) {
       })
     : "";
 }
+/**
+ * The line under a Today item: when it happens and whether it is finished.
+ * Internal states such as "pending" or "unknown" are never shown.
+ */
+export function todayItemDetail(item: Pick<TodayItem, "startAt" | "dueAt" | "estimatedMinutes" | "status">): string {
+  const when = item.startAt
+    ? [timeLabel(item.startAt), item.estimatedMinutes ? `${item.estimatedMinutes} min` : ""]
+    : [item.dueAt ? `Due ${timeLabel(item.dueAt)}` : ""];
+  const state = item.status === "submitted" ? "Submitted" : item.status === "completed" ? "Done" : item.status === "skipped" ? "Skipped" : "";
+  return [...when, state].filter(Boolean).join(" · ");
+}
+/**
+ * Queue sections exist only while they hold something. The generating group
+ * is named by what it is doing; the queued group by how many are waiting.
+ */
+export function queueSections<T extends { readonly status: string }>(jobs: readonly T[]) {
+  const generating = jobs.filter((job) => job.status === "running" || job.status === "cancellation_requested");
+  const queued = jobs.filter((job) => job.status === "queued");
+  const completed = jobs.filter((job) => job.status === "succeeded");
+  const attention = jobs.filter((job) => !["running", "cancellation_requested", "queued", "succeeded"].includes(job.status));
+  return [
+    { key: "generating", title: "Generating", jobs: generating },
+    { key: "queued", title: `${queued.length} queued`, jobs: queued },
+    { key: "attention", title: "Needs attention", jobs: attention },
+    { key: "completed", title: "Completed", jobs: completed },
+  ].filter((section) => section.jobs.length > 0);
+}
 export function deadline(value: string | null) {
   return value
     ? new Date(value).toLocaleString([], {

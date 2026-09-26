@@ -1,5 +1,6 @@
 import { Redirect, Stack } from "expo-router";
 
+import { AppActivityProvider } from "../../src/app-shell/AppActivityProvider";
 import { RestoringState } from "../../src/app-shell/RestoringState";
 import { useAuth } from "../../src/auth";
 import { APP_ROUTES } from "../../src/navigation/appRoutes";
@@ -23,6 +24,7 @@ export default function AppLayout() {
 
   return (
     <CanvasSyncProvider>
+      <AppActivityProvider>
       <Stack key={session.user.id} screenOptions={hierarchyMotion(reducedMotion)}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="generate" options={modalMotion(reducedMotion)} />
@@ -31,6 +33,7 @@ export default function AppLayout() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="task" options={modalMotion(reducedMotion)} />
       </Stack>
+      </AppActivityProvider>
     </CanvasSyncProvider>
   );
 }

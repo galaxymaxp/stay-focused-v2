@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ArrowLeft, ChevronRight, Layers, MoreHorizontal, FileText, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, MoreHorizontal, FileText, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
 import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
@@ -11,11 +11,14 @@ import {
   StatusBar,
   Text,
   View,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { QueueButton } from "./QueueButton";
 import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing, typography } from "./tokens";
 
@@ -278,14 +281,7 @@ export function Page({
           )}
         </View>
         {headerAction}
-        {!back && (
-            <IconAction
-              label="Open Queue"
-              onPress={() => router.push("/generation-queue")}
-            >
-              <Layers color={colors.textSecondary} size={density.utilityIcon} />
-            </IconAction>
-        )}
+        {!back && <QueueButton />}
         {menuActions.length > 0 && <IconAction label="More options" onPress={() => setMenu(true)}><MoreHorizontal color={colors.textSecondary} size={density.utilityIcon} /></IconAction>}
       </View>
       {headerBelow}
@@ -362,6 +358,8 @@ export function RowLink({
   trailing,
   inset = false,
   disabled = false,
+  accessibilityActions,
+  onAccessibilityAction,
 }: {
   children: ReactNode;
   label: string;
@@ -370,6 +368,8 @@ export function RowLink({
   trailing?: ReactNode;
   inset?: boolean;
   disabled?: boolean;
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
@@ -378,6 +378,8 @@ export function RowLink({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
+      onAccessibilityAction={onAccessibilityAction}
       onPress={onPress}
       disabled={disabled}
       accessibilityState={{ disabled }}

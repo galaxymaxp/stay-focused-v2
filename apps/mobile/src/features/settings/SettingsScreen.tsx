@@ -18,8 +18,8 @@ interface SettingsScreenProps {
  *
  * Only account and sign out are implemented; sign out is real and already
  * worked, it was simply buried inside Courses and Library. The remaining groups
- * are named rather than mocked, because Canvas connection and course selection
- * still live in `CoursesScreen` and moving them is its own milestone.
+ * are named rather than mocked. Canvas connection and course sync live in
+ * `CanvasSyncScreen` (Settings and appearance → Canvas connection & courses).
  */
 export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const colors = useLegacyTheme();

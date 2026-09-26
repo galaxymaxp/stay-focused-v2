@@ -10,12 +10,19 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   reconcile: vi.fn(),
   upsert: vi.fn(async () => undefined),
+  readSelection: vi.fn(),
+  saveSelection: vi.fn(),
 }));
 
 vi.mock("react-native", () => ({ AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) } }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" }, accessToken: "token" } }) }));
 vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => "https://api.example" }));
-vi.mock("../../services/canvasApi", () => ({ listCanvasCourses: mocks.listCourses, getCanvasSyncJob: mocks.getJob }));
+vi.mock("../../services/canvasApi", () => ({
+  listCanvasCourses: mocks.listCourses,
+  getCanvasSyncJob: mocks.getJob,
+  getCanvasCoursePreferences: mocks.readSelection,
+  saveCanvasCoursePreferences: mocks.saveSelection,
+}));
 vi.mock("../../services/canvasSyncJobCoordinator", () => ({ startDurableCanvasSync: mocks.start, reconcileCanvasSyncJobs: mocks.reconcile }));
 vi.mock("../../services/activeCanvasSyncJobStore", () => ({ upsertActiveCanvasSyncJob: mocks.upsert }));
 
@@ -96,5 +103,41 @@ describe("CanvasSyncProvider", () => {
     mocks.listCourses.mockResolvedValueOnce({ ok: false, error: { code: "canvas_unavailable", message: "Bad gateway" } });
     await act(async () => { await latest!.sync(); });
     expect(latest!.snapshot).toMatchObject({ phase: "failed", lastSyncedAt: fresh });
+  });
+
+  it("syncs one tapped course in a single step and reports it synced when its jobs finish", async () => {
+    const fresh = new Date().toISOString();
+    mocks.listCourses.mockResolvedValue(inventory(fresh));
+    mocks.readSelection.mockResolvedValue({ ok: true, data: { selectedCourseIds: ["a"] } });
+    mocks.saveSelection.mockImplementation(async ({ selectedCourseIds }: { selectedCourseIds: string[] }) => ({ ok: true, data: { selectedCourseIds } }));
+    mocks.start.mockImplementation(async ({ courseId, jobType }: { courseId: string; jobType: string }) => ({ ok: true, data: { ...job(`job-${courseId}-${jobType}`, "running"), course: { id: courseId, displayName: courseId, courseCode: null } } }));
+    mocks.getJob.mockImplementation(async ({ jobId }: { jobId: string }) => ({ ok: true, data: { ...job(jobId, "succeeded", "success"), course: { id: "cit17", displayName: "CIT17", courseCode: null } } }));
+    await mount();
+
+    let started = false;
+    await act(async () => { started = await latest!.syncCourse({ id: "cit17", displayName: "CIT17" }); });
+    expect(started).toBe(true);
+    expect(mocks.saveSelection).toHaveBeenCalledWith(expect.objectContaining({ selectedCourseIds: ["a", "cit17"] }));
+    expect(latest!.courseStates.cit17).toBe("syncing");
+    expect(latest!.selectedCourseIds?.has("cit17")).toBe(true);
+    // The header orb reads this phase while the course syncs.
+    expect(latest!.snapshot.phase).toBe("syncing");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
+    expect(latest!.courseStates.cit17).toBe("synced");
+    expect(latest!.snapshot.phase).toBe("succeeded");
+  });
+
+  it("unsyncs by deselecting only that course and refreshes screens", async () => {
+    mocks.listCourses.mockResolvedValue(inventory(new Date().toISOString()));
+    mocks.readSelection.mockResolvedValue({ ok: true, data: { selectedCourseIds: ["a", "b"] } });
+    mocks.saveSelection.mockImplementation(async ({ selectedCourseIds }: { selectedCourseIds: string[] }) => ({ ok: true, data: { selectedCourseIds } }));
+    await mount();
+    const before = latest!.dataVersion;
+    await act(async () => { await latest!.unsyncCourse("a"); });
+    expect(mocks.saveSelection).toHaveBeenCalledWith(expect.objectContaining({ selectedCourseIds: ["b"] }));
+    expect([...latest!.selectedCourseIds!]).toEqual(["b"]);
+    expect(latest!.dataVersion).toBe(before + 1);
+    expect(mocks.start).not.toHaveBeenCalled();
   });
 });

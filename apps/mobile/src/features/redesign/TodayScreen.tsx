@@ -22,9 +22,11 @@ import { experienceRequest } from "../../services/experienceApi";
 import { DayRingClock } from "./DayRingClock";
 import {
   available,
+  deadline,
   localDate,
   planningRequest,
   timeLabel,
+  todayItemDetail,
 } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 import {
@@ -50,6 +52,10 @@ export function TodayScreen() {
   );
   const client = useExperienceClient();
   const { sync } = useCanvasSync();
+  // Canvas deadlines in the coming week that are not already scheduled today.
+  const dueSoon = (today.data?.upcomingDeadlines ?? [])
+    .filter((item) => item.dueAt && Date.parse(item.dueAt) - Date.now() < 7 * 86_400_000)
+    .slice(0, 3);
   // Dragging a ring handle downward must never start pull-to-refresh.
   const [ringActive, setRingActive] = useState(false);
   const requestBusy = useRef(false);
@@ -187,37 +193,6 @@ export function TodayScreen() {
           </Action>
         </Surface>
       )}
-      <View style={{ gap: 8 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Copy size="h2">Announcements</Copy>
-          <Action secondary onPress={() => router.push("/announcements")}>View all</Action>
-        </View>
-        {announcements.loading ? (
-          <Notice>Checking Canvas updates...</Notice>
-        ) : announcements.error ? (
-          <Surface>
-            <RowLink inset label="Open announcements" onPress={() => router.push("/announcements")}>
-              <Copy size="h3">Canvas updates</Copy>
-              <Copy muted size="bodySmall">Announcements are unavailable right now.</Copy>
-            </RowLink>
-          </Surface>
-        ) : announcements.data?.items.length ? (
-          <Surface>
-            {announcements.data.items.map(item => (
-              <RowLink
-                key={item.id}
-                label={`Read announcement: ${item.title}`}
-                onPress={() => openAnnouncement(item.id)}
-              >
-                <Copy muted size="caption">{announcementCourseLabel(item)} · {formatAnnouncementDate(item.postedAt)}</Copy>
-                <Copy size="h3">{item.title}</Copy>
-              </RowLink>
-            ))}
-          </Surface>
-        ) : (
-          <Copy muted size="bodySmall">No recent Canvas announcements.</Copy>
-        )}
-      </View>
       {today.error ? (
         <Notice>{today.error}</Notice>
       ) : today.loading ? (
@@ -252,14 +227,49 @@ export function TodayScreen() {
             <Copy muted size="bodySmall">Your day is clear. Make room for what matters.</Copy>
           )}
           </View>
-          {today.data?.plannerState.needsTaskImport && (
-            <Notice>
-              Some Canvas activities need to be added to your tasks before they
-              can be scheduled.
-            </Notice>
+          {dueSoon.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <Copy size="h2">Due soon</Copy>
+              <Surface>
+                {dueSoon.map((item) => (
+                  <TodayRow key={item.id} item={item} withDay />
+                ))}
+              </Surface>
+            </View>
           )}
         </>
       )}
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Copy size="h2">Announcements</Copy>
+          <Action secondary onPress={() => router.push("/announcements")}>View all</Action>
+        </View>
+        {announcements.loading ? (
+          <Notice>Checking Canvas updates...</Notice>
+        ) : announcements.error ? (
+          <Surface>
+            <RowLink inset label="Open announcements" onPress={() => router.push("/announcements")}>
+              <Copy size="h3">Canvas updates</Copy>
+              <Copy muted size="bodySmall">Announcements are unavailable right now.</Copy>
+            </RowLink>
+          </Surface>
+        ) : announcements.data?.items.length ? (
+          <Surface>
+            {announcements.data.items.map(item => (
+              <RowLink
+                key={item.id}
+                label={`Read announcement: ${item.title}`}
+                onPress={() => openAnnouncement(item.id)}
+              >
+                <Copy muted size="caption">{announcementCourseLabel(item)} · {formatAnnouncementDate(item.postedAt)}</Copy>
+                <Copy size="h3">{item.title}</Copy>
+              </RowLink>
+            ))}
+          </Surface>
+        ) : (
+          <Copy muted size="bodySmall">No recent Canvas announcements.</Copy>
+        )}
+      </View>
       {expanded && (
         <Surface>
           <Copy size="h2">Your available time</Copy>
@@ -323,10 +333,14 @@ export function TodayScreen() {
 function TodayRow({
   item,
   dominant = false,
+  withDay = false,
 }: {
   item: TodayItem;
   dominant?: boolean;
+  /** Deadlines beyond today name their day. */
+  withDay?: boolean;
 }) {
+  const detail = withDay && item.dueAt ? deadline(item.dueAt) : todayItemDetail(item);
   return (
     <RowLink
       inset={dominant}
@@ -349,11 +363,7 @@ function TodayRow({
           (item.kind === "study_session" ? "Study" : "Personal")}
       </Copy>
       <Copy size="h3">{item.title}</Copy>
-      <Copy muted size="caption">
-        {timeLabel(item.startAt ?? item.dueAt)}
-        {item.estimatedMinutes ? ` � ${item.estimatedMinutes} min` : ""} �{" "}
-        {item.status}
-      </Copy>
+      {detail ? <Copy muted size="caption">{withDay ? `Due ${detail}` : detail}</Copy> : null}
     </RowLink>
   );
 }

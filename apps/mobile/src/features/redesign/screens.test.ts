@@ -38,6 +38,11 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   createIntent: vi.fn(),
   vibration: vi.fn(),
+  prefs: { pinned: { course: [] as string[], artifact: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[] } },
+  pin: vi.fn(),
+  hide: vi.fn(),
+  unsync: vi.fn(async () => true),
+  selectedCourseIds: new Set<string>(),
 }));
 vi.mock("expo-router", () => ({
   router: { push: mocks.push, navigate: mocks.navigate, back: mocks.back, replace: mocks.replace, canGoBack: () => true },
@@ -82,7 +87,15 @@ vi.mock("../../design/CourseViews", () => ({
   CourseTile: "CourseTile",
 }));
 vi.mock("../sync/CanvasSyncProvider", () => ({
-  useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync }),
+  useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync, unsyncCourse: mocks.unsync, selectedCourseIds: mocks.selectedCourseIds, courseStates: {} }),
+}));
+vi.mock("./useListPreferences", () => ({
+  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide }),
+}));
+vi.mock("../../design/SwipeRow", () => ({
+  SwipeRow: "SwipeRow",
+  animateNextLayout: vi.fn(),
+  swipeAccessibility: (actions: { key: string; label: string }[]) => ({ accessibilityActions: actions.map((action) => ({ name: action.key, label: action.label })) }),
 }));
 vi.mock("../sync/SyncStatus", () => ({ SyncStatus: "SyncStatus" }));
 vi.mock("../reviewer/ReviewerReader", () => ({ ReviewerReaderScreen: "ReviewerReaderScreen" }));
@@ -134,6 +147,11 @@ vi.mock("lucide-react-native", () => ({
   BookOpen: "BookOpen",
   ClipboardList: "ClipboardList",
   ExternalLink: "ExternalLink",
+  Eye: "Eye",
+  EyeOff: "EyeOff",
+  Pin: "Pin",
+  PinOff: "PinOff",
+  CloudOff: "CloudOff",
 }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({
@@ -170,6 +188,8 @@ beforeEach(() => {
   mocks.paths = [];
   mocks.params = {};
   mocks.library = { items: [], categories: null, localReady: true, refreshing: false, error: null };
+  mocks.prefs = { pinned: { course: [], artifact: [] }, hidden: { generate: [], library: [], libraryItems: [] } };
+  mocks.selectedCourseIds = new Set();
   vi.clearAllMocks();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
@@ -630,5 +650,84 @@ describe("B25 screen interactions", () => {
       }),
     );
     expect(onCommit).toHaveBeenLastCalledWith(600, 735);
+  });
+
+  it("uses one swipe language: right for Hide/Unsync, left for Pin, in Generate and Library alike", async () => {
+    type Action = { key: string; onPress: () => void };
+    const keys = (row: { props: { leading?: Action[]; trailing?: Action[] } }) => [
+      (row.props.leading ?? []).map((action) => action.key),
+      (row.props.trailing ?? []).map((action) => action.key),
+    ];
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
+      generateCourse({ id: "synced", name: "Synced course" }),
+      generateCourse({ id: "unsynced", name: "Unsynced course", syncState: "not_synced" }),
+    ] };
+    const generate = await render(createElement(GenerateScreen));
+    const generateRows = generate.findAll((node) => String(node.type) === "SwipeRow");
+    expect(generateRows.map(keys)).toEqual([[["hide", "unsync"], ["pin"]], [["hide"], ["pin"]]]);
+    // A normal tap still opens the course.
+    await act(async () => generate.findAll((node) => String(node.type) === "CourseCard")[0]!.props.onPress());
+    expect(mocks.push).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/courses/[courseId]" }));
+    await act(async () => rendered!.unmount());
+
+    const courseItem = { ...savedQuiz, id: "reviewer:cit17", type: "reviewer" as const, course: { id: "synced", code: "CIT17", name: "Web Information Systems" } };
+    mocks.library.items = [courseItem, savedQuiz];
+    mocks.selectedCourseIds = new Set(["synced"]);
+    const library = await render(createElement(LibraryScreen));
+    const tiles = library.findAll((node) => String(node.type) === "SwipeRow");
+    // Unsync only where a synced Canvas course exists; personal work can only be hidden.
+    expect(tiles.map(keys)).toEqual([[["hide", "unsync"], ["pin"]], [["hide"], ["pin"]]]);
+    await act(async () => rendered!.unmount());
+
+    mocks.params = { courseKey: "synced" };
+    const course = await render(createElement(LibraryCourseScreen));
+    expect(course.findAll((node) => String(node.type) === "SwipeRow").map(keys)).toEqual([[["hide"], ["pin"]]]);
+  });
+
+  it("pins without a modal, surfaces pinned courses first, and keeps hidden ones recoverable", async () => {
+    type Action = { key: string; onPress: () => void };
+    mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
+      generateCourse({ id: "first", name: "First" }),
+      generateCourse({ id: "pinned", name: "Pinned one", period: "previous" }),
+      generateCourse({ id: "hidden", name: "Hidden one" }),
+    ] };
+    mocks.prefs.pinned.course = ["pinned"];
+    mocks.prefs.hidden.generate = ["hidden"];
+    const root = await render(createElement(GenerateScreen));
+    const text = copyText(root);
+    expect(text.indexOf("Pinned")).toBeLessThan(text.indexOf("Current courses"));
+    const cards = root.findAll((node) => String(node.type) === "CourseCard");
+    expect(cards.map((node) => node.props.identity.title)).toEqual(["Pinned one", "First"]);
+    expect(cards[0]!.props.pinned).toBe(true);
+    const show = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Show 1 hidden")!;
+    expect(show).toBeTruthy();
+
+    const firstRow = root.findAll((node) => String(node.type) === "SwipeRow")[1]!;
+    await act(async () => (firstRow.props.trailing as Action[])[0]!.onPress());
+    expect(mocks.pin).toHaveBeenCalledWith("course", "first", true);
+    await act(async () => (firstRow.props.leading as Action[]).find((action) => action.key === "hide")!.onPress());
+    expect(mocks.hide).toHaveBeenCalledWith("generate", "first", true);
+    await act(async () => (firstRow.props.leading as Action[]).find((action) => action.key === "unsync")!.onPress());
+    expect(mocks.unsync).toHaveBeenCalledWith("first");
+    // Hide and Unsync never touch saved work or generation.
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it("never asks the student to add Canvas work to Tasks, and shows plain deadlines", async () => {
+    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = {
+      timeline: [],
+      next: { id: "canvas:a", kind: "canvas_activity", title: "Midterm Seminar", course: { id: "c", code: "CIT5", name: "CIT5" }, startAt: null, endAt: null, dueAt: "2026-09-26T15:59:00.000Z", estimatedMinutes: null, priority: "medium", status: "unknown", source: "canvas", deepLinkTarget: { surface: "activity", id: "canvas:a" } },
+      later: [],
+      upcomingDeadlines: [],
+      plannerState: { needsTaskImport: true },
+    } as unknown as TodayOverview;
+    const root = await render(createElement(TodayScreen));
+    const text = copyText(root).join(" ");
+    expect(text).not.toContain("added to your tasks");
+    expect(text).not.toContain("unknown");
+    expect(text).not.toContain("\uFFFD");
+    expect(text).toMatch(/Due \d/);
+    expect(root.findAll((node) => node.props.label === "Add a task" || node.props.children === "New Task")).toHaveLength(0);
   });
 });

@@ -1,6 +1,6 @@
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight, Pin } from "lucide-react-native";
 import { useEffect, useRef, type ReactNode } from "react";
-import { Animated, Pressable, View } from "react-native";
+import { Animated, Pressable, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from "react-native";
 
 import { courseAccent, type CourseIdentity } from "./courseIdentity";
 import { Copy } from "./primitives";
@@ -16,6 +16,18 @@ function usePressScale() {
     Animated.spring(scale, { toValue: value, ...motion.spring, useNativeDriver: true }).start();
   };
   return { scale, onPressIn: () => to(0.975), onPressOut: () => to(1) };
+}
+
+/** Pin and Hide stay reachable to screen readers as named actions. */
+interface ItemAccessibilityActions {
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+}
+
+/** A quiet mark, not a badge: pinned items are also grouped first. */
+function PinnedMark() {
+  const { colors } = useTheme();
+  return <Pin accessibilityElementsHidden importantForAccessibility="no" size={13} color={colors.textMuted} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }] }} />;
 }
 
 /** Small tinted monogram: identity without decoration competing with content. */
@@ -43,20 +55,26 @@ export function CourseCard({
   accessibilityLabel,
   children,
   testID,
+  pinned = false,
+  accessibilityActions,
+  onAccessibilityAction,
 }: {
   identity: CourseIdentity;
   onPress: () => void;
   accessibilityLabel?: string;
   children?: ReactNode;
   testID?: string;
-}) {
+  pinned?: boolean;
+} & ItemAccessibilityActions) {
   const { colors } = useTheme();
   const press = usePressScale();
   return (
     <Animated.View style={{ transform: [{ scale: press.scale }] }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? identity.title}
+        accessibilityLabel={`${accessibilityLabel ?? identity.title}${pinned ? ", pinned" : ""}`}
+        accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
+        onAccessibilityAction={onAccessibilityAction}
         testID={testID}
         onPress={onPress}
         onPressIn={press.onPressIn}
@@ -81,6 +99,7 @@ export function CourseCard({
           {identity.subtitle ? <Copy muted size="caption">{identity.subtitle}</Copy> : null}
           {children ? <View style={{ marginTop: 4 }}>{children}</View> : null}
         </View>
+        {pinned ? <PinnedMark /> : null}
         <ChevronRight size={16} color={colors.textMuted} />
       </Pressable>
     </Animated.View>
@@ -97,13 +116,17 @@ export function CourseTile({
   onPress,
   footnote,
   accessibilityLabel,
+  pinned = false,
+  accessibilityActions,
+  onAccessibilityAction,
 }: {
   identity: CourseIdentity;
   width: number;
   onPress: () => void;
   footnote?: string | null;
   accessibilityLabel?: string;
-}) {
+  pinned?: boolean;
+} & ItemAccessibilityActions) {
   const { colors } = useTheme();
   const press = usePressScale();
   const height = courseTileHeight(width);
@@ -111,7 +134,9 @@ export function CourseTile({
     <Animated.View style={{ width, height, transform: [{ scale: press.scale }] }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? identity.title}
+        accessibilityLabel={`${accessibilityLabel ?? identity.title}${pinned ? ", pinned" : ""}`}
+        accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
+        onAccessibilityAction={onAccessibilityAction}
         onPress={onPress}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
@@ -126,7 +151,10 @@ export function CourseTile({
           gap: spacing[2],
         })}
       >
-        <CourseMark identity={identity} size={34} />
+        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <CourseMark identity={identity} size={34} />
+          {pinned ? <PinnedMark /> : null}
+        </View>
         <View style={{ flex: 1, minHeight: 0, gap: 2 }}>
           <Copy size="h3" numberOfLines={3} style={{ fontSize: 15, lineHeight: 20 }}>{identity.title}</Copy>
           {identity.subtitle ? <Copy muted size="caption" numberOfLines={1} style={{ fontSize: 11, lineHeight: 15 }}>{identity.subtitle}</Copy> : null}

@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 
 import {
+  importSchedulableCanvasAssignments,
   loadOwnedPlannerTasks,
   persistOwnedStudyPlan,
   toStudySessionView,
@@ -27,7 +28,11 @@ export async function previewOwnedStudyPlan(
   client: SupabaseClient<Database>,
   userId: string,
   request: StudyPlanningRequest,
+  now = Date.now(),
 ): Promise<DeterministicStudyPlan> {
+  // Planning the student's whole day includes their synced Canvas work
+  // automatically. An explicit task selection plans exactly those tasks.
+  if (!request.taskIds) await importSchedulableCanvasAssignments(client, userId, now);
   const tasks = await loadOwnedPlannerTasks(client, userId, request.taskIds);
   if (request.taskIds && tasks.length !== request.taskIds.length) {
     throw new OwnedPlanningError(

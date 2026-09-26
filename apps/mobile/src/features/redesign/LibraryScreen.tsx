@@ -6,6 +6,7 @@ import type {
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
+import { CloudOff, Eye, EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
 
@@ -21,6 +22,7 @@ import {
 } from "../../design/primitives";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseMark, CourseTile } from "../../design/CourseViews";
+import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { radius, spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
@@ -32,9 +34,13 @@ import {
   filterCourseLibrary,
   groupLibraryByCourse,
   librarySegments,
+  type LibraryCourseGroup,
   type LibraryFilter,
 } from "./libraryPresentation";
 import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
+import { arrangeList } from "./listPreferences";
+import { useListPreferences } from "./useListPreferences";
+import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
 
 const LOCAL_PAGE_SIZE = 50;
@@ -51,9 +57,66 @@ export function LibraryScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const library = useLocalLibrary();
   const groups = useMemo(() => groupLibraryByCourse(library.items), [library.items]);
+  const { prefs, pin, hide } = useListPreferences();
+  const { selectedCourseIds, unsyncCourse } = useCanvasSync();
+  const { reducedMotion } = useTheme();
+  const [showHidden, setShowHidden] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const arranged = arrangeList(groups, (group) => group.key, prefs.pinned.course, prefs.hidden.library);
   const contentWidth = Math.max(280, windowWidth - spacing[5] * 2);
   const columns = contentWidth >= 560 ? 3 : 2;
   const tileWidth = Math.floor((contentWidth - GRID_GAP * (columns - 1)) / columns);
+  const change = (update: () => void) => {
+    animateNextLayout(reducedMotion);
+    update();
+  };
+  function tileActions(group: LibraryCourseGroup, hidden: boolean, title: string) {
+    const pinned = prefs.pinned.course.includes(group.key);
+    // Unsync applies only to a Canvas course that is synced now; its saved work stays.
+    const canUnsync = group.key !== PERSONAL_LIBRARY_KEY && selectedCourseIds?.has(group.key) === true;
+    const unsync: SwipeAction = {
+      key: "unsync",
+      label: "Unsync",
+      icon: CloudOff,
+      tone: "warning",
+      onPress: () => {
+        setNote(null);
+        void unsyncCourse(group.key).then((done) =>
+          setNote(done
+            ? `${title} is no longer synced. Its saved study work stays here.`
+            : `Couldn’t stop syncing ${title}. Check your connection and try again.`),
+        );
+      },
+    };
+    const leading: SwipeAction[] = hidden
+      ? [{ key: "show", label: "Show", icon: Eye, tone: "neutral", onPress: () => change(() => hide("library", group.key, false)) }]
+      : [
+          { key: "hide", label: "Hide", icon: EyeOff, tone: "neutral", exits: true, onPress: () => change(() => hide("library", group.key, true)) },
+          ...(canUnsync ? [unsync] : []),
+        ];
+    const trailing: SwipeAction[] = hidden ? [] : [
+      { key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => change(() => pin("course", group.key, !pinned)) },
+    ];
+    return { leading, trailing, pinned };
+  }
+  function renderTile(group: LibraryCourseGroup, hidden: boolean) {
+    const identity = libraryIdentity(group.key, group.course);
+    const footnote = describeLibraryCounts(group.counts);
+    const swipe = tileActions(group, hidden, identity.title);
+    return (
+      <SwipeRow key={group.key} compact leading={swipe.leading} trailing={swipe.trailing} style={{ width: tileWidth, opacity: hidden ? 0.6 : 1 }}>
+        <CourseTile
+          identity={identity}
+          width={tileWidth}
+          footnote={footnote}
+          pinned={swipe.pinned}
+          {...swipeAccessibility([...swipe.leading, ...swipe.trailing])}
+          accessibilityLabel={`${identity.title}, ${footnote}`}
+          onPress={() => router.push({ pathname: "/library/[courseKey]", params: { courseKey: group.key } })}
+        />
+      </SwipeRow>
+    );
+  }
   // Saved work renders from the device; the skeleton appears only when nothing
   // is stored yet and the cloud is still answering.
   const hasLocal = library.items.length > 0;
@@ -71,22 +134,20 @@ export function LibraryScreen() {
           <Action onPress={() => router.navigate("/courses")}>Browse synced courses</Action>
         </Surface>
       ) : null}
+      {note ? <Notice>{note}</Notice> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
-        {groups.map((group) => {
-          const identity = libraryIdentity(group.key, group.course);
-          const footnote = describeLibraryCounts(group.counts);
-          return (
-            <CourseTile
-              key={group.key}
-              identity={identity}
-              width={tileWidth}
-              footnote={footnote}
-              accessibilityLabel={`${identity.title}, ${footnote}`}
-              onPress={() => router.push({ pathname: "/library/[courseKey]", params: { courseKey: group.key } })}
-            />
-          );
-        })}
+        {[...arranged.pinned, ...arranged.rest].map((group) => renderTile(group, false))}
       </View>
+      {arranged.hidden.length > 0 ? (
+        <Action secondary onPress={() => change(() => setShowHidden((value) => !value))}>
+          {showHidden ? "Done" : `Show ${arranged.hidden.length} hidden`}
+        </Action>
+      ) : null}
+      {showHidden && arranged.hidden.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
+          {arranged.hidden.map((group) => renderTile(group, true))}
+        </View>
+      ) : null}
     </Page>
   );
 }
@@ -99,7 +160,28 @@ export function LibraryCourseScreen() {
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
   const courseItems = useMemo(() => filterCourseLibrary(library.items, courseKey, "all"), [courseKey, library.items]);
-  const items = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
+  const filtered = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
+  const { prefs, pin, hide } = useListPreferences();
+  const { reducedMotion } = useTheme();
+  const [showHidden, setShowHidden] = useState(false);
+  const arranged = arrangeList(filtered, (item) => item.id, prefs.pinned.artifact, prefs.hidden.libraryItems);
+  const items = [...arranged.pinned, ...arranged.rest];
+  const change = (update: () => void) => {
+    animateNextLayout(reducedMotion);
+    update();
+  };
+  // Same directions as everywhere else. Saved work has no Canvas sync of its
+  // own, so swipe right offers Hide only.
+  function itemActions(item: LibraryArtifactSummary, hidden: boolean) {
+    const pinned = prefs.pinned.artifact.includes(item.id);
+    const leading: SwipeAction[] = hidden
+      ? [{ key: "show", label: "Show", icon: Eye, tone: "neutral", onPress: () => change(() => hide("libraryItems", item.id, false)) }]
+      : [{ key: "hide", label: "Hide", icon: EyeOff, tone: "neutral", exits: true, onPress: () => change(() => hide("libraryItems", item.id, true)) }];
+    const trailing: SwipeAction[] = hidden ? [] : [
+      { key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => change(() => pin("artifact", item.id, !pinned)) },
+    ];
+    return { leading, trailing, pinned };
+  }
   const identity = libraryIdentity(courseKey, courseItems[0]?.course ?? null);
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
   const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
@@ -118,27 +200,53 @@ export function LibraryCourseScreen() {
     >
       {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
-      {library.localReady && items.length === 0 ? (
+      {library.localReady && items.length === 0 && arranged.hidden.length === 0 ? (
         <Surface>
           <Copy size="h3">{filter === "all" ? "Nothing saved for this course" : `No ${label} yet`}</Copy>
           <Copy muted>Generate from this course&apos;s materials when you are ready.</Copy>
         </Surface>
       ) : null}
-      {items.slice(0, visible).map((item) => <LibraryCard key={item.id} item={item} />)}
+      {items.slice(0, visible).map((item) => {
+        const swipe = itemActions(item, false);
+        return (
+          <SwipeRow key={item.id} leading={swipe.leading} trailing={swipe.trailing}>
+            <LibraryCard item={item} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} />
+          </SwipeRow>
+        );
+      })}
       {items.length > visible ? <Action secondary onPress={() => setVisible((count) => count + LOCAL_PAGE_SIZE)}>More saved work</Action> : null}
+      {arranged.hidden.length > 0 ? (
+        <Action secondary onPress={() => change(() => setShowHidden((value) => !value))}>
+          {showHidden ? "Done" : `Show ${arranged.hidden.length} hidden`}
+        </Action>
+      ) : null}
+      {showHidden ? arranged.hidden.map((item) => {
+        const swipe = itemActions(item, true);
+        return (
+          <SwipeRow key={item.id} leading={swipe.leading} style={{ opacity: 0.6 }}>
+            <LibraryCard item={item} swipeActions={swipe.leading} />
+          </SwipeRow>
+        );
+      }) : null}
       {items.length > 0 ? <Copy muted size="caption" style={{ textAlign: "center" }}>{items.length} {items.length === 1 ? "item" : "items"}</Copy> : null}
     </Page>
   );
 }
 
-function LibraryCard({ item }: { item: LibraryArtifactSummary }) {
+function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArtifactSummary; pinned?: boolean; swipeActions: readonly SwipeAction[] }) {
   const { colors } = useTheme();
   const typeLabel = item.type === "activity_output" ? "Activity output" : item.type === "quiz" ? "Quiz" : "Reviewer";
   const tone = item.type === "quiz" ? colors.violet : item.type === "activity_output" ? colors.green : colors.blue;
   const soft = item.type === "quiz" ? colors.violetSoft : item.type === "activity_output" ? colors.greenSoft : colors.blueSoft;
   return (
     <Surface style={{ overflow: "hidden" }}>
-      <RowLink inset icon={<ContentIcon kind={item.type} />} label={`${typeLabel}: ${item.title}`} onPress={() => router.push({ pathname: "/artifact", params: { id: item.id } })}>
+      <RowLink
+        inset
+        icon={<ContentIcon kind={item.type} />}
+        label={`${typeLabel}: ${item.title}${pinned ? ", pinned" : ""}`}
+        {...swipeAccessibility(swipeActions)}
+        trailing={pinned ? <Pin size={14} color={colors.textMuted} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }] }} /> : undefined}
+        onPress={() => router.push({ pathname: "/artifact", params: { id: item.id } })}>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing[2] }}>
           <View style={{ backgroundColor: soft, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}><Copy size="caption" color={tone} style={{ fontWeight: "700" }}>{typeLabel}</Copy></View>
         </View>

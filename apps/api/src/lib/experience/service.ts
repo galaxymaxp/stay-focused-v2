@@ -7,7 +7,7 @@ import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
 import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
-import { composeActivities, composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
+import { composeActivities, composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, isSubmittedCanvasSubmission, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
 import { activityGenerationState, draftView } from '../activity-maker/service';
 import type { ActivityDraft } from '@stay-focused/shared';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
@@ -92,7 +92,7 @@ export class ExperienceService {
     const [assignments, tasks, courses, submissions] = await Promise.all([
       this.rows('canvas_assignments', userId), this.rows('tasks', userId), this.rows('canvas_courses', userId), this.rows('canvas_assignment_submissions', userId),
     ]);
-    const submittedAssignmentIds = new Set(submissions.filter(s => s.submitted_at || s.excused || s.workflow_state === 'submitted' || s.workflow_state === 'pending_review' || (s.workflow_state === 'graded' && !s.missing)).map(s => s.assignment_id));
+    const submittedAssignmentIds = new Set(submissions.filter(isSubmittedCanvasSubmission).map(s => s.assignment_id));
     return { activities: composeActivities({ userId, assignments, tasks, courses, submittedAssignmentIds, now, dayEnd: end }), assignments, tasks, now, date: requestedDate };
   }
   async getActivityList(userId: string, filters: { courseId?: string; status?: ActivitySummary['status']; offsetMinutes?: number } = {}): Promise<readonly ActivitySummary[]> {
