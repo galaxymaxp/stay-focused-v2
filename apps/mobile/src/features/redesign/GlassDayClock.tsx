@@ -30,6 +30,7 @@ export const GlassDayClock = memo(function GlassDayClock({
   minutes,
   scale,
   parallax,
+  live = true,
 }: {
   /** Minute of the day, already rounded by the caller. */
   minutes: number;
@@ -37,6 +38,8 @@ export const GlassDayClock = memo(function GlassDayClock({
   scale: number;
   /** Small offset applied to the sheen while the ring is being dragged. */
   parallax: Animated.ValueXY;
+  /** False while Today is not on screen: ambient motion stops entirely. */
+  live?: boolean;
 }) {
   const { mode, reducedMotion, active } = useTheme();
   const state = useMemo(() => dayStateAt(minutes), [minutes]);
@@ -48,7 +51,7 @@ export const GlassDayClock = memo(function GlassDayClock({
   const glow = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (reducedMotion || !active) {
+    if (reducedMotion || !active || !live) {
       drift.setValue(0);
       sheen.setValue(0);
       glow.setValue(1);
@@ -76,7 +79,7 @@ export const GlassDayClock = memo(function GlassDayClock({
     ];
     loops.forEach((loop) => loop.start());
     return () => loops.forEach((loop) => loop.stop());
-  }, [active, drift, glow, reducedMotion, sheen]);
+  }, [active, drift, glow, live, reducedMotion, sheen]);
 
   return (
     <>

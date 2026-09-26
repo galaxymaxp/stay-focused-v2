@@ -341,7 +341,7 @@ export function DayRingClock({
   return (
     <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: size, height: size }} testID="day-ring">
-        <GlassDayClock minutes={nowMinutes} scale={scale} parallax={parallax} />
+        <GlassDayClock minutes={nowMinutes} scale={scale} parallax={parallax} live={focused} />
         <View
           pointerEvents="none"
           style={{
