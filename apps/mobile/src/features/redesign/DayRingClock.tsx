@@ -173,7 +173,12 @@ export function DayRingClock({
   const range = draft ?? { start, end };
   const lift = useRef(new Animated.Value(0)).current;
 
-  const segments = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
+  const scheduled = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
+  // Blocks live inside the free time: anything outside the window is not
+  // shown, and a block that crosses an edge is clipped to it.
+  const segments = scheduled
+    .map((segment) => ({ ...segment, from: Math.max(segment.from, range.start), to: Math.min(segment.to, range.end) }))
+    .filter((segment) => segment.to - segment.from > 0.5);
 
   const latest = useRef({ start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange, segments, onSegmentPress, locked });
   latest.current = { start, end, disabled, reducedMotion, scale, onCommit, onAdjustingChange, segments, onSegmentPress, locked };

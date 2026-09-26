@@ -723,7 +723,13 @@ describe("B25 screen interactions", () => {
     const onSegmentPress = vi.fn();
     const at = (h: number) => new Date(`2026-09-13T${String(h).padStart(2, "0")}:00:00`).toISOString();
     const timeline = [{ id: "session:1", kind: "study_session", title: "Dice Roller", course: null, startAt: at(15), endAt: at(16), dueAt: null, estimatedMinutes: 60, priority: "medium", status: "planned", source: "local", deepLinkTarget: { surface: "study_session", id: "1" } }];
-    const root = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: timeline as never, start: 600, end: 720, onChange: vi.fn(), onCommit: vi.fn(), onSegmentPress }));
+    // Outside the free time the block is not drawn and cannot be tapped.
+    const outside = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: timeline as never, start: 600, end: 720, onChange: vi.fn(), onCommit: vi.fn(), onSegmentPress }));
+    const lanePaths = (tree: ReactTestRenderer["root"]) => tree.findAll((node) => String(node.type) === "Path" && node.props.strokeWidth === 6 && !node.props.strokeDasharray);
+    expect(lanePaths(outside)).toHaveLength(0);
+    await act(async () => rendered!.unmount());
+    const root = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: timeline as never, start: 840, end: 1020, onChange: vi.fn(), onCommit: vi.fn(), onSegmentPress }));
+    expect(lanePaths(root)).toHaveLength(1);
     // On the inner lane at 3:30 PM.
     const angle = (930 / 1440) * Math.PI * 2 - Math.PI / 2;
     const point = { x: 170 + 116 * Math.cos(angle), y: 170 + 116 * Math.sin(angle) };
