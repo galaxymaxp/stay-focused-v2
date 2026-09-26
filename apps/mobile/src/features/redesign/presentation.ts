@@ -284,3 +284,10 @@ export function arrangeToday(
   const hidden = [...pool.values()].filter(isHidden);
   return { pinned, next, later, dueSoon, hidden };
 }
+
+/** Morning is 5–11, afternoon 12–16; late night and evening both read as evening. */
+export function greetingFor(hour: number): string {
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
+}

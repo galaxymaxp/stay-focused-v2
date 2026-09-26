@@ -10,26 +10,19 @@ import { EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useRef, useState, type ReactNode } from "react";
 import { Vibration, View } from "react-native";
 
-import {
-  Action,
-  Copy,
-  Notice,
-  Page,
-  RowLink,
-  Surface,
-  ContentIcon,
-} from "../../design/primitives";
+import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
 import { DayRingClock } from "./DayRingClock";
+import { PlanPreview, planTaskIds, planToneFor } from "./PlanPreview";
 import {
   arrangeToday,
   available,
   deadline,
+  greetingFor,
   localDate,
   planningRequest,
-  timeLabel,
   todayItemDetail,
 } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
@@ -193,13 +186,7 @@ export function TodayScreen() {
   }
   return (
     <Page
-      title={
-        new Date().getHours() < 12
-          ? "Good morning"
-          : new Date().getHours() < 18
-            ? "Good afternoon"
-            : "Good evening"
-      }
+      title={greetingFor(new Date().getHours())}
       subtitle={new Date().toLocaleDateString([], {
         weekday: "long",
         month: "long",
@@ -226,39 +213,35 @@ export function TodayScreen() {
           void plan(from, to);
         }}
         disabled={busy || !available(capabilities.data?.planner)}
+        proposed={
+          preview
+            ? preview.sessions.map((session) => {
+                const at = new Date(session.startsAt);
+                const from = at.getHours() * 60 + at.getMinutes();
+                return { id: session.proposalId, from, to: from + session.durationMinutes, color: colors[planToneFor(planTaskIds(preview), session.taskId)] };
+              })
+            : []
+        }
       />
-      {busy && <Notice>Updating your plan…</Notice>}
+      {busy && !preview ? <PlanPreviewLoading /> : null}
       {note && <Notice>{note}</Notice>}
       {preview && (
-        <Surface>
-          <Copy size="h2">Your plan preview</Copy>
-          {preview.sessions.length === 0 && (
-            <Copy muted>No study sessions fit this window.</Copy>
-          )}
-          {preview.sessions.map((session) => (
-            <Copy key={session.proposalId}>
-              {timeLabel(session.startsAt)} · {session.taskTitle} ·{" "}
-              {session.durationMinutes} min
-            </Copy>
-          ))}
-          {preview.unscheduledWork.map((item) => (
-            <Copy key={item.taskId} muted>
-              {item.taskTitle}: {item.unscheduledMinutes} min still to schedule
-            </Copy>
-          ))}
-          <Copy muted size="caption">
-            Applying replaces planned sessions in this window and preserves
-            completed work.
-          </Copy>
-          <Action disabled={busy} onPress={() => void apply()}>
-            Apply this schedule
-          </Action>
-        </Surface>
+        <PlanPreview
+          plan={preview}
+          from={start}
+          to={end}
+          busy={busy}
+          onApply={() => void apply()}
+          onDiscard={() => {
+            setPreview(null);
+            setPreviewRequest(null);
+          }}
+        />
       )}
       {today.error ? (
         <Notice>{today.error}</Notice>
       ) : today.loading ? (
-        <Notice>Loading your day…</Notice>
+        <SkeletonCards rows={3} label="Loading your day" />
       ) : (
         <>
           <View style={{ gap: 8 }}>
@@ -329,7 +312,7 @@ export function TodayScreen() {
           <Action secondary onPress={() => router.push("/announcements")}>View all</Action>
         </View>
         {announcements.loading ? (
-          <Notice>Checking Canvas updates...</Notice>
+          <SkeletonCards rows={2} label="Checking Canvas updates" />
         ) : announcements.error ? (
           <Surface>
             <RowLink inset label="Open announcements" onPress={() => router.push("/announcements")}>
@@ -435,11 +418,15 @@ function TodayRow({
 }) {
   const { colors } = useTheme();
   const detail = withDay && item.dueAt ? deadline(item.dueAt) : todayItemDetail(item);
-  const course = item.course?.code ?? item.course?.name ?? (item.kind === "study_session" ? "Study" : "Personal");
+  // A planner session is time set aside for an activity: show it as that
+  // activity's work, never as a separate "study" item.
+  const session = item.kind === "study_session";
+  const courseName = item.course?.code ?? item.course?.name ?? (session ? null : "Personal");
+  const course = session ? [courseName, "Work session"].filter(Boolean).join(" · ") : courseName!;
   const row = (
     <RowLink
       inset={dominant}
-      icon={<ContentIcon kind={item.kind === "study_session" ? "reviewer" : "task"} small={!dominant} />}
+      icon={<ContentIcon kind="task" small={!dominant} />}
       label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.title}`}
       {...(swipeActions.length ? swipeAccessibility(swipeActions) : {})}
       onPress={() =>
@@ -469,4 +456,14 @@ function TodayRow({
   // Up Next items are cards; the card moves with the swipe.
   if (!dominant) return row;
   return <Surface>{row}</Surface>;
+}
+
+/** Placeholder while the planner answers: the preview's shape, shimmering. */
+function PlanPreviewLoading() {
+  return (
+    <Surface style={{ gap: 12 }}>
+      <SkeletonBlock width="36%" height={14} />
+      <SkeletonBlock width="100%" height={58} radius={12} />
+    </Surface>
+  );
 }

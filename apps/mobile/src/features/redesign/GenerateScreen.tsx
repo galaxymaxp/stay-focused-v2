@@ -13,7 +13,7 @@ import { Pressable, View } from "react-native";
 import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseCard, CourseMark } from "../../design/CourseViews";
-import { Action, Copy, Notice, Page, SearchField, Surface, ContentIcon, RowLink } from "../../design/primitives";
+import { Action, Copy, Notice, Page, SearchField, Surface, ContentIcon, RowLink, SkeletonBlock } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
@@ -381,13 +381,12 @@ export function GenerateMaterialScreen() {
 }
 
 function GenerateSkeleton({ rows }: { rows: number }) {
-  const { colors } = useTheme();
   return (
     <View accessibilityLabel="Loading synced course content" style={{ gap: spacing[3] }}>
       {Array.from({ length: rows }, (_, index) => (
         <Surface key={index} style={{ minHeight: 78, justifyContent: "center", gap: spacing[2] }}>
-          <View style={{ width: "34%", height: 10, borderRadius: 6, backgroundColor: colors.surfaceSecondary }} />
-          <View style={{ width: index % 2 ? "76%" : "62%", height: 16, borderRadius: 8, backgroundColor: colors.surfaceSecondary }} />
+          <SkeletonBlock width={"34%"} height={10} radius={6} />
+          <SkeletonBlock width={index % 2 ? "76%" : "62%"} height={16} radius={8} />
         </Surface>
       ))}
     </View>

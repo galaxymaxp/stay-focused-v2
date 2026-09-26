@@ -9,7 +9,7 @@ import { Animated, Easing, View } from "react-native";
 import { CheckCircle2, CircleDashed, Clock3, AlertCircle } from "lucide-react-native";
 
 import { useAuth } from "../../auth";
-import { Action, Copy, Notice, Page, Surface, RowLink, ContentIcon } from "../../design/primitives";
+import { Action, Copy, Notice, Page, Surface, RowLink, ContentIcon, SkeletonCards } from "../../design/primitives";
 import { useAppActivity } from "../../design/appActivity";
 import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
@@ -277,7 +277,7 @@ export function QueueScreen() {
     >
       {queue.error && <Notice>{queue.error}</Notice>}
       {error && <Notice>{error}</Notice>}
-      {queue.loading && <Notice>Loading your generations…</Notice>}
+      {queue.loading && <SkeletonCards rows={2} label="Loading your generations" />}
       {pending.map((item) => (
         <Surface key={item.key}>
           <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}

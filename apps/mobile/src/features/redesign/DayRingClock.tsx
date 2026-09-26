@@ -20,7 +20,7 @@ import {
   snapRange,
   snapTo,
 } from "./dayClock";
-import { GlassDayClock } from "./GlassDayClock";
+import { DAY_ORB_FILL, DayOrb, type OrbTilt } from "./DayOrb";
 import { timelineSegments } from "./presentation";
 
 /** "2 h 15 min", "45 min", "3 h". */
@@ -45,8 +45,12 @@ function arc(from: number, to: number, radius: number) {
 type Mode = "start" | "end" | "move";
 type Range = { start: number; end: number };
 
-/** Press still this long before a drag takes over from page scrolling. */
-const HOLD_MS = { start: 150, end: 150, move: 220 } as const;
+/**
+ * The ends grab at once, so a drag starting on either end always adjusts it.
+ * The middle of the block moves both ends together after a short still hold,
+ * so a scroll that happens to start on the arc still scrolls the page.
+ */
+const MOVE_HOLD_MS = 240;
 const MOVE_SLOP = 8;
 const SNAP_MS = 180;
 const TWEEN_MS = 260;
@@ -124,7 +128,10 @@ export function DayRingClock({
   onCommit,
   onAdjustingChange,
   disabled = false,
+  proposed = [],
 }: {
+  /** A plan preview drawn as dashed arcs on the schedule lane until applied. */
+  proposed?: readonly { readonly id: string; readonly from: number; readonly to: number; readonly color: string }[];
   date: string;
   timeline: readonly TodayItem[];
   start: number;
@@ -154,7 +161,7 @@ export function DayRingClock({
   const [draft, setDraft] = useState<Range | null>(null);
   const [adjusting, setAdjusting] = useState<Mode | null>(null);
   const range = draft ?? { start, end };
-  const parallax = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const tilt = useRef<OrbTilt>({ x: 0, y: 0 });
   const lift = useRef(new Animated.Value(0)).current;
 
   const segments = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
@@ -207,7 +214,7 @@ export function DayRingClock({
       const state = gesture.current;
       if (state.held || !state.mode) return;
       state.held = true;
-      Vibration.vibrate(10);
+      Vibration.vibrate(state.mode === "move" ? 12 : 6);
       setAdjusting(state.mode);
       latest.current.onAdjustingChange?.(true);
       if (!latest.current.reducedMotion) {
@@ -224,11 +231,8 @@ export function DayRingClock({
       state.mode = null;
       if (!latest.current.reducedMotion) {
         Animated.spring(lift, { toValue: 0, ...motion.spring, useNativeDriver: true }).start();
-        Animated.spring(parallax, { toValue: { x: 0, y: 0 }, ...motion.spring, useNativeDriver: true }).start();
-      } else {
-        lift.setValue(0);
-        parallax.setValue({ x: 0, y: 0 });
-      }
+      } else lift.setValue(0);
+      tilt.current = { x: 0, y: 0 };
       if (!wasHeld || !mode) return;
       latest.current.onAdjustingChange?.(false);
       state.pending = null;
@@ -256,8 +260,8 @@ export function DayRingClock({
         const point = local(event);
         return hitTest(point.x, point.y, from, to) !== null;
       },
-      // Until the hold completes, the page may still take the touch as a scroll.
-      onShouldBlockNativeResponder: () => false,
+      // An end owns its touch immediately; the middle lets the page scroll until held.
+      onShouldBlockNativeResponder: () => gesture.current.mode !== "move",
       onPanResponderGrant: (event) => {
         const state = gesture.current;
         state.stopSnap?.();
@@ -272,7 +276,8 @@ export function DayRingClock({
         state.base = { start: from, end: to };
         state.value = { start: from, end: to };
         clearTimeout(state.timer);
-        if (state.mode) state.timer = setTimeout(activate, HOLD_MS[state.mode]);
+        if (state.mode === "move") state.timer = setTimeout(activate, MOVE_HOLD_MS);
+        else if (state.mode) activate();
       },
       onPanResponderMove: (_event, move) => {
         const state = gesture.current;
@@ -281,14 +286,10 @@ export function DayRingClock({
         if (!state.held) {
           const distance = Math.hypot(move.dx, move.dy);
           if (distance <= MOVE_SLOP) return;
-          // A clearly sideways drag on a handle starts at once (the page only
-          // scrolls vertically); anything else before the hold is a scroll.
-          if (state.mode !== "move" && Math.abs(move.dx) > Math.abs(move.dy) * 1.5) activate();
-          else {
-            clearTimeout(state.timer);
-            state.mode = null;
-            return;
-          }
+          // Moving before the hold completes is a page scroll, not a block move.
+          clearTimeout(state.timer);
+          state.mode = null;
+          return;
         }
         const x = state.origin.x + move.dx / k;
         const y = state.origin.y + move.dy / k;
@@ -306,15 +307,15 @@ export function DayRingClock({
         state.value = next;
         publish(next);
         if (!latest.current.reducedMotion) {
-          // The sheen leans a few points away from the finger.
-          parallax.setValue({ x: ((CLOCK.center - x) / CLOCK.center) * 3 * k, y: ((CLOCK.center - y) / CLOCK.center) * 3 * k });
+          // The orb leans slightly toward the finger.
+          tilt.current = { x: (x - CLOCK.center) / CLOCK.center, y: (y - CLOCK.center) / CLOCK.center };
         }
       },
       onPanResponderTerminationRequest: () => !gesture.current.held,
       onPanResponderRelease: () => finish(true),
       onPanResponderTerminate: () => finish(false),
     });
-  }, [lift, parallax, publish]);
+  }, [lift, publish]);
 
   const step = (edge: Mode, direction: 1 | -1) => {
     if (disabled) return;
@@ -333,6 +334,7 @@ export function DayRingClock({
     kind === "study_session" ? colors.blue : kind === "calendar_block" ? colors.orange : colors.violet;
   const marker = ringPoint(nowMinutes);
   const middle = (range.start + range.end) / 2;
+  const orbCanvas = (CLOCK.glass * 2) / DAY_ORB_FILL;
   const handles: { key: Mode; at: number }[] = [
     { key: "start", at: range.start },
     { key: "end", at: range.end },
@@ -341,7 +343,9 @@ export function DayRingClock({
   return (
     <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: size, height: size }} testID="day-ring">
-        <GlassDayClock minutes={nowMinutes} scale={scale} parallax={parallax} live={focused} />
+        <View pointerEvents="none" style={{ position: "absolute", left: (CLOCK.center - orbCanvas / 2) * scale, top: (CLOCK.center - orbCanvas / 2) * scale }}>
+          <DayOrb minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} tilt={tilt} />
+        </View>
         <View
           pointerEvents="none"
           style={{
@@ -352,7 +356,6 @@ export function DayRingClock({
             height: CLOCK.glass * 2 * scale,
             justifyContent: "center",
             alignItems: "center",
-            paddingBottom: 22 * scale,
           }}
         >
           <CenterReadout mode={adjusting} range={range} now={now} />
@@ -367,20 +370,27 @@ export function DayRingClock({
         >
           <Circle cx={CLOCK.center} cy={CLOCK.center} r={CLOCK.ring} stroke={track} strokeWidth={CLOCK.track} fill="none" />
           {Array.from({ length: 24 }, (_, hour) => {
-            // 6 AM and 6 PM carry labels at the side; a tick there would strike through them.
-            if (hour === 6 || hour === 18) return null;
-            const major = hour % 6 === 0;
-            const inner = ringPoint(hour * 60, CLOCK.ring + CLOCK.track / 2 + 2);
-            const outer = ringPoint(hour * 60, CLOCK.ring + CLOCK.track / 2 + (major ? 8 : 5));
-            return <Line key={hour} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke={colors.textMuted} strokeWidth={major ? 1.2 : 0.8} opacity={major ? 0.7 : 0.35} />;
+            const inner = ringPoint(hour * 60, CLOCK.ring - CLOCK.track / 2 + 3);
+            const outer = ringPoint(hour * 60, CLOCK.ring + CLOCK.track / 2 - 3);
+            return <Line key={hour} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke={colors.textMuted} strokeWidth={hour % 6 === 0 ? 1.4 : 0.9} opacity={hour % 6 === 0 ? 0.55 : 0.28} />;
           })}
-          {[{ label: "12 AM", minutes: 0 }, { label: "6 AM", minutes: 360 }, { label: "12 PM", minutes: 720 }, { label: "6 PM", minutes: 1080 }].map((hour) => {
-            const p = ringPoint(hour.minutes, CLOCK.ring + 21);
-            return <SvgText key={hour.label} x={p.x} y={p.y + 3.5} fontFamily="sans-serif" fontSize={9.5} fill={colors.textMuted} textAnchor="middle">{hour.label}</SvgText>;
+          {Array.from({ length: 12 }, (_, index) => {
+            const hour = index * 2;
+            const major = hour % 6 === 0;
+            const label = hour === 0 ? "12AM" : hour === 12 ? "12PM" : hour === 6 ? "6AM" : hour === 18 ? "6PM" : String(hour % 12);
+            const p = ringPoint(hour * 60, CLOCK.ring + CLOCK.track / 2 + 10);
+            return (
+              <SvgText key={hour} x={p.x} y={p.y + 3.5} fontFamily="sans-serif" fontSize={major ? 9.5 : 9} fontWeight={major ? "600" : "400"} fill={major ? colors.textSecondary : colors.textMuted} textAnchor="middle">
+                {label}
+              </SvgText>
+            );
           })}
           <Path d={arc(range.start, range.end, CLOCK.ring)} stroke={colors.accent} strokeOpacity={adjusting ? 1 : 0.9} strokeWidth={CLOCK.track} fill="none" strokeLinecap="butt" testID="free-time-arc" />
           {segments.map((segment) => (
             <Path key={segment.id} d={arc(segment.from, Math.max(segment.to, segment.from + 0.5), CLOCK.lane)} stroke={segmentColor(segment.kind)} strokeWidth={6} fill="none" strokeLinecap="round" opacity={0.92} />
+          ))}
+          {proposed.map((session) => (
+            <Path key={session.id} d={arc(session.from, Math.max(session.to, session.from + 0.5), CLOCK.lane)} stroke={session.color} strokeWidth={6} strokeDasharray="5 4" fill="none" strokeLinecap="round" testID="proposed-arc" />
           ))}
           <Circle cx={marker.x} cy={marker.y} r={4.5} fill={colors.textPrimary} stroke={handleFill} strokeWidth={2} testID="now-marker" />
           {handles.map((handle) => {
@@ -429,11 +439,11 @@ export function DayRingClock({
       </View>
       <Copy size="h3" style={{ fontVariant: ["tabular-nums"] }}>{formatFreeTime(range.end - range.start)} free</Copy>
       <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>
-        {clockLabel(range.start)} – {clockLabel(range.end)} · Hold the ring to adjust
+        {clockLabel(range.start)} – {clockLabel(range.end)} · Drag an end, or hold the middle to move
       </Copy>
       {segments.length > 0 ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 2 }}>
-          {segments.some((s) => s.kind === "study_session") && <Legend color={colors.blue} label="Study" />}
+          {segments.some((s) => s.kind === "study_session") && <Legend color={colors.blue} label="Planned work" />}
           {segments.some((s) => s.kind === "calendar_block") && <Legend color={colors.orange} label="Classes" />}
           {segments.some((s) => s.kind !== "study_session" && s.kind !== "calendar_block") && <Legend color={colors.violet} label="Tasks" />}
         </View>

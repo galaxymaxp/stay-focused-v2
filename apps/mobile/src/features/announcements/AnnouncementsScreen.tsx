@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Linking, Pressable, ScrollView, StatusBar, Vibration, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Action, Copy, DoneButton, Notice, Page, RowLink, Sheet, Surface } from "../../design/primitives";
+import { Action, Copy, DoneButton, Notice, Page, RowLink, Sheet, Surface, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
@@ -129,7 +129,7 @@ export function AnnouncementsScreen() {
       onRefresh={announcements.refresh}
     >
       {announcements.loading && !announcements.data ? (
-        <Notice>Loading announcements...</Notice>
+        <SkeletonCards rows={4} label="Loading announcements" />
       ) : announcements.error && !announcements.data ? (
         <Surface>
           <Copy size="h2">Announcements unavailable</Copy>
@@ -249,7 +249,7 @@ export function AnnouncementDetailScreen() {
           {announcement ? (
             <AnnouncementBody announcement={announcement} />
           ) : announcements.loading ? (
-            <Notice>Loading announcement…</Notice>
+            <SkeletonCards rows={1} label="Loading announcement" />
           ) : (
             <Surface>
               <Copy size="h3">This announcement is unavailable</Copy>

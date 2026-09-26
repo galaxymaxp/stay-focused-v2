@@ -10,16 +10,7 @@ import { Pin, PinOff } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
 
-import {
-  Action,
-  Copy,
-  Notice,
-  Page,
-  RowLink,
-  SegmentedControl,
-  Surface,
-  ContentIcon,
-} from "../../design/primitives";
+import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseMark, CourseTile } from "../../design/CourseViews";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
@@ -202,8 +193,7 @@ function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArti
 }
 
 function LibrarySkeleton() {
-  const { colors } = useTheme();
-  return <View accessibilityLabel="Loading Library" style={{ gap: spacing[3] }}>{[0, 1, 2].map((index) => <Surface key={index} style={{ minHeight: 104, justifyContent: "center", gap: spacing[2] }}><View style={{ width: "28%", height: 10, borderRadius: 5, backgroundColor: colors.surfaceSecondary }} /><View style={{ width: index === 1 ? "88%" : "68%", height: 18, borderRadius: 8, backgroundColor: colors.surfaceSecondary }} /><View style={{ width: "44%", height: 10, borderRadius: 5, backgroundColor: colors.surfaceSecondary }} /></Surface>)}</View>;
+  return <View accessibilityLabel="Loading Library" style={{ gap: spacing[3] }}>{[0, 1, 2].map((index) => <Surface key={index} style={{ minHeight: 104, justifyContent: "center", gap: spacing[2] }}><SkeletonBlock width={"28%"} height={10} radius={5} /><SkeletonBlock width={index === 1 ? "88%" : "68%"} height={18} radius={8} /><SkeletonBlock width={"44%"} height={10} radius={5} /></Surface>)}</View>;
 }
 
 export function ArtifactScreen() {
@@ -226,7 +216,7 @@ export function ArtifactScreen() {
           </Action>
         </>
       )}
-      {result.loading && !detail && <Notice>Opening saved work…</Notice>}
+      {result.loading && !detail && <SkeletonCards rows={2} label="Opening saved work" />}
       {detail && (
         <>
           <Copy muted size="caption">

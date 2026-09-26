@@ -3,7 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 
-import { Action, Copy, Notice, Page, Surface } from "../../design/primitives";
+import { Action, Copy, Notice, Page, Surface, SkeletonCards } from "../../design/primitives";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { useLocalArtifact } from "./useLocalLibrary";
@@ -90,7 +90,7 @@ export function QuizScreen() {
   return (
     <Page title="Quiz" back>
       {quiz.error && !savedQuiz && <Notice>{quiz.error}</Notice>}
-      {quiz.loading && !quizData && <Notice>Loading your quiz…</Notice>}
+      {quiz.loading && !quizData && <SkeletonCards rows={2} label="Loading your quiz" />}
       {quizData && <Copy size="h2">{quizData.title}</Copy>}
       {!quiz.data && savedQuiz && !quiz.loading && (
         <>

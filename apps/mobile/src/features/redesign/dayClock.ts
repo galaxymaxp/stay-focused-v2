@@ -3,8 +3,8 @@
  * continuous drag math with snap-on-release, and the day state painted inside
  * the glass. Kept free of React so it can be tested and reused.
  *
- * Orientation matches the ring: midnight at the bottom, 6 AM on the left,
- * noon at the top, 6 PM on the right (clockwise).
+ * Orientation reads like a wall clock (and iOS Bedtime): midnight at the top,
+ * 6 AM on the right, noon at the bottom, 6 PM on the left, running clockwise.
  */
 
 export const DAY_MINUTES = 1440;
@@ -32,13 +32,13 @@ export function clamp(value: number, min: number, max: number) {
 
 /** Minutes → point on a circle of the given radius around the clock center. */
 export function ringPoint(minutes: number, radius: number = CLOCK.ring, center: number = CLOCK.center) {
-  const angle = (minutes / DAY_MINUTES) * Math.PI * 2 + Math.PI / 2;
+  const angle = (minutes / DAY_MINUTES) * Math.PI * 2 - Math.PI / 2;
   return { x: center + radius * Math.cos(angle), y: center + radius * Math.sin(angle) };
 }
 
 /** Offset from the center → minutes of the day (0 ≤ m < 1440). */
 export function angleMinutes(dx: number, dy: number) {
-  const degrees = (Math.atan2(dy, dx) * 180) / Math.PI - 90;
+  const degrees = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
   return (((degrees % 360) + 360) % 360) * 4;
 }
 
@@ -118,9 +118,14 @@ export function hitTest(x: number, y: number, start: number, end: number): "star
   const reach = (CLOCK.handleReach / (2 * Math.PI * CLOCK.ring)) * DAY_MINUTES;
   const startGap = Math.abs(angularDelta(minutes, start));
   const endGap = Math.abs(angularDelta(minutes, end));
-  if (Math.min(startGap, endGap) <= reach) return startGap <= endGap ? "start" : "end";
-  if (withinRange(minutes, start, end)) return "move";
-  return null;
+  const nearest = startGap <= endGap ? "start" : "end";
+  if (withinRange(minutes, start, end)) {
+    // Inside the block the ends share it with the middle: a short block keeps
+    // its central third for moving the whole thing.
+    const inside = Math.min(reach, (end - start) / 3);
+    return Math.min(startGap, endGap) <= inside ? nearest : "move";
+  }
+  return Math.min(startGap, endGap) <= reach ? nearest : null;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -251,5 +256,50 @@ export function dayStateAt(minutes: number): DayState {
     warmth,
     body,
     scrim: clamp((midLight - 0.1) * 1.6, 0, 0.34),
+  };
+}
+
+const hexOf = (value: Rgb) => `#${value.map((c) => Math.round(clamp(c, 0, 255)).toString(16).padStart(2, "0")).join("")}`;
+const parseRgb = (value: string): Rgb => {
+  const [r, g, b] = value.match(/\d+(\.\d+)?/g)!.map(Number);
+  return [r!, g!, b!];
+};
+
+export interface DayOrbTones {
+  /** Lit liquid. */
+  readonly base: string;
+  /** Liquid in shadow. */
+  readonly deep: string;
+  /** The inner light: warm sun by day, cool moon by night. */
+  readonly light: string;
+  /** Light spilled around the ball. */
+  readonly aura: string;
+  /** Inner light position in ball radii (y up, z toward the viewer). */
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  /** Inner light strength, 0–1. */
+  readonly strength: number;
+}
+
+/**
+ * The Today orb's liquid carries the sky of the moment, and its inner light
+ * is the sun or moon on the same path as the flat sky model: rising on the
+ * left, highest at noon (or midnight for the moon), setting on the right.
+ */
+export function dayOrbTones(minutes: number): DayOrbTones {
+  const state = dayStateAt(minutes);
+  const top = parseRgb(state.top);
+  const mid = parseRgb(state.mid);
+  const horizon = parseRgb(state.horizon);
+  const { body } = state;
+  const low = 1 - body.altitude;
+  const sunLight = mix(hex("#FFF1D2"), hex("#FFB46E"), clamp((low - 0.35) / 0.65, 0, 1));
+  const light = body.kind === "sun" ? sunLight : hex("#C8D6FF");
+  return {
+    base: hexOf(mix(mix(mid, horizon, 0.45), [255, 255, 255], 0.28)),
+    deep: hexOf(mix(top, [0, 0, 0], 0.25)),
+    light: hexOf(light),
+    aura: hexOf(parseRgb(state.glow)),
+    position: { x: body.x * 0.6, y: -body.y * 0.55, z: 0.28 },
+    strength: body.kind === "sun" ? 0.45 + 0.4 * body.altitude : 0.32 + 0.1 * body.altitude,
   };
 }

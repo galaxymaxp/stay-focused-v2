@@ -698,3 +698,64 @@ function Avatar({ initial, size }: { initial: string; size: number }) {
     </View>
   );
 }
+
+/**
+ * One shimmer shared by every placeholder on screen, on the native driver, so
+ * all skeletons breathe together and cost nothing on the JS thread. It runs
+ * only while at least one skeleton is mounted.
+ */
+const shimmer = new Animated.Value(0);
+let shimmerUsers = 0;
+let shimmerLoop: Animated.CompositeAnimation | null = null;
+function useSharedShimmer(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    shimmerUsers += 1;
+    if (!shimmerLoop) {
+      shimmerLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmer, { toValue: 1, duration: 650, useNativeDriver: true, isInteraction: false }),
+          Animated.timing(shimmer, { toValue: 0, duration: 650, useNativeDriver: true, isInteraction: false }),
+        ]),
+      );
+      shimmerLoop.start();
+    }
+    return () => {
+      shimmerUsers -= 1;
+      if (shimmerUsers === 0) {
+        shimmerLoop?.stop();
+        shimmerLoop = null;
+      }
+    };
+  }, [enabled]);
+}
+
+/** A loading placeholder block. Under Reduced Motion it holds still. */
+export function SkeletonBlock({ width, height, radius: corner = 8, style }: { width: number | `${number}%`; height: number; radius?: number; style?: StyleProp<ViewStyle> }) {
+  const { colors, reducedMotion } = useTheme();
+  useSharedShimmer(!reducedMotion);
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[{ width, height, borderRadius: corner, backgroundColor: colors.surfaceSecondary, opacity: reducedMotion ? 0.8 : shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }, style]}
+    />
+  );
+}
+
+/** A card-shaped placeholder list for screens whose content is still loading. */
+export function SkeletonCards({ rows = 3, label = "Loading" }: { rows?: number; label?: string }) {
+  return (
+    <View accessible accessibilityLabel={label} accessibilityState={{ busy: true }} style={{ gap: spacing[3] }}>
+      {Array.from({ length: rows }, (_, index) => (
+        <Surface key={index} style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], minHeight: 76 }}>
+          <SkeletonBlock width={40} height={48} radius={10} />
+          <View style={{ flex: 1, gap: spacing[2] }}>
+            <SkeletonBlock width="34%" height={10} />
+            <SkeletonBlock width={index % 2 ? "82%" : "64%"} height={16} />
+          </View>
+        </Surface>
+      ))}
+    </View>
+  );
+}

@@ -60,6 +60,8 @@ export interface OrbAuraFrame {
   readonly mode: "light" | "dark";
   readonly center: THREE.Vector3;
   readonly camera: THREE.Camera;
+  /** Optional light color (the Today day orb); defaults follow the theme. */
+  readonly color?: string;
 }
 
 /** Overlapping rhythms that never line up, so the light wavers without a regular beat. Range ±1. */
@@ -90,7 +92,8 @@ export function createOrbAura() {
       shimmer.time = (shimmer.time + frame.shimmer * SHIMMER_SPEED * frame.delta) % 10000;
       shimmer.amount = frame.shimmerAmount * (1 - frame.error);
       shimmer.level = orbShimmerLevel(shimmer.time) * shimmer.amount;
-      if (mode !== frame.mode) {
+      if (frame.color) uniforms.uColor.value.set(frame.color);
+      else if (mode !== frame.mode) {
         mode = frame.mode;
         uniforms.uColor.value.set(AURA_COLOR[mode]);
       }

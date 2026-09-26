@@ -27,6 +27,8 @@ uniform vec3 uDeep;
 uniform vec3 uGlowColor;
 uniform vec3 uEnvFloor;
 uniform vec3 uEnvSky;
+// Where the inner light sits, in ball radii from the centre (zero: the centre).
+uniform vec3 uLight;
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
 
@@ -68,13 +70,15 @@ void main() {
     float held = 1.0 - smoothstep(0.5, 0.7, r2);
     float sheet = smoothstep(0.3, 0.9, liquid(uSpin * x)) * held;
     float density = sheet * 0.38;
-    float centre = exp(-r2 * 3.2);
+    vec3 toLight = x - uLight;
+    float centre = exp(-dot(toLight, toLight) * 3.2);
     vec3 emit = mix(uDeep, uBase, sheet) * (0.06 + centre * light * 2.1);
     glow += (1.0 - cover) * emit * density;
     cover += (1.0 - cover) * density;
   }
   // The light at the centre, seen through whatever liquid lies in front of it.
-  float closest = length(oc - rd * b) / uRadius;
+  vec3 ol = oc - uLight * uRadius;
+  float closest = length(ol - rd * dot(ol, rd)) / uRadius;
   glow += (1.0 - cover * 0.55) * uGlowColor * exp(-closest * closest * 22.0) * light * 0.8;
   // Glass focuses the key light into a soft caustic on the far lower side.
   float caustic = smoothstep(0.55, 0.95, dot(n, normalize(vec3(0.42, -0.6, 0.68)))) * (1.0 - fresnel);
@@ -104,6 +108,10 @@ export interface OrbBodyFrame {
   readonly error: number;
   readonly spin: THREE.Matrix3;
   readonly mode: "light" | "dark";
+  /** Optional per-frame liquid and light colors (the Today day orb); defaults follow the theme. */
+  readonly tones?: { readonly base: string; readonly deep: string; readonly glow: string };
+  /** Optional inner light position in ball radii; defaults to the centre. */
+  readonly light?: { readonly x: number; readonly y: number; readonly z: number };
 }
 
 /** A clear glass ball holding luminous liquid, lit from its centre. */
@@ -114,6 +122,7 @@ export function createOrbBody() {
     uGlow: { value: 0 }, uLevel: { value: 0 }, uError: { value: 0 },
     uBase: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uGlowColor: { value: new THREE.Color() },
     uEnvFloor: { value: new THREE.Color() }, uEnvSky: { value: new THREE.Color() },
+    uLight: { value: new THREE.Vector3() },
   };
   const geometry = new THREE.SphereGeometry(ORB_RADIUS, 96, 64);
   const material = new THREE.ShaderMaterial({
@@ -137,6 +146,12 @@ export function createOrbBody() {
         uniforms.uEnvFloor.value.set(tones.envFloor);
         uniforms.uEnvSky.value.set(tones.envSky);
       }
+      if (frame.tones) {
+        uniforms.uBase.value.set(frame.tones.base);
+        uniforms.uDeep.value.set(frame.tones.deep);
+        uniforms.uGlowColor.value.set(frame.tones.glow);
+      }
+      if (frame.light) uniforms.uLight.value.set(frame.light.x, frame.light.y, frame.light.z);
       uniforms.uTime.value = frame.time;
       uniforms.uLife.value = frame.life;
       uniforms.uStir.value = frame.stir;

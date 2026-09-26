@@ -52,7 +52,7 @@ const JUMP_CONTEXT = 72;
 const SCRUB_STRIP_WIDTH = 32;
 /** Invisible grab area around the fast-scroll thumb. */
 const THUMB_TOUCH_WIDTH = 44;
-const THUMB_TOUCH_HEIGHT = 76;
+const THUMB_TOUCH_HEIGHT = 96;
 const SCRUB_HOLD_MS = 160;
 const SCRUB_SLOP = 8;
 
@@ -725,25 +725,8 @@ export function SectionScrubber({
         }}
         style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: SCRUB_STRIP_WIDTH }}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={{ position: "absolute", right: 4, width: active ? 6 : 5, height: THUMB, borderRadius: 3, backgroundColor: active ? colors.accent : colors.textMuted, opacity: Animated.multiply(thumbOpacity, active ? 0.9 : 0.6), transform: [{ translateY: thumbTop }] }}
-        />
-        {active ? (
-          <Animated.View
-            pointerEvents="none"
-            style={{ position: "absolute", top: 6, bottom: 6, right: 6, width: 6, borderRadius: 3, backgroundColor: colors.separator, opacity: overlayOpacity }}
-          >
-            {hasAnchors && anchors.length <= 60
-              ? anchors.map((_, index) => (
-                  <View
-                    key={index}
-                    style={{ position: "absolute", left: 1, width: 4, height: 2, borderRadius: 1, top: `${((index + 0.5) / anchors.length) * 100}%`, backgroundColor: index === preview.index ? colors.accent : colors.textMuted, opacity: index === preview.index ? 1 : 0.5 }}
-                  />
-                ))
-              : null}
-          </Animated.View>
-        ) : null}
+        {/* No drawn thumb: Android already shows its own scroll indicator here. The
+            grab area below sits on it, so dragging the system indicator scrubs. */}
       </View>
       <Animated.View
         pointerEvents={grabbable || active ? "auto" : "none"}

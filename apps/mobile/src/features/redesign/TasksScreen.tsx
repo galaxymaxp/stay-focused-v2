@@ -5,14 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
-import {
-  Action,
-  Copy,
-  Notice,
-  Page,
-  Surface,
-  IconAction,
-} from "../../design/primitives";
+import { Action, Copy, Notice, Page, Surface, IconAction, SkeletonCards } from "../../design/primitives";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseCard, CourseMark } from "../../design/CourseViews";
 import { useTheme } from "../../design/theme";
@@ -59,7 +52,7 @@ export function TasksScreen() {
       actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >
       <SyncStatus />
-      {tasks.loading && !tasks.data ? <Notice>Loading your activities…</Notice> : null}
+      {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading your activities" /> : null}
       {tasks.error && !tasks.data ? (
         <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
       ) : null}
@@ -113,7 +106,7 @@ export function TasksCourseScreen() {
   const groups = groupCourseTasks(items, now);
   return (
     <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
-      {tasks.loading && !tasks.data ? <Notice>Loading tasks…</Notice> : null}
+      {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading tasks" /> : null}
       {tasks.error && !tasks.data ? (
         <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
       ) : null}
@@ -219,7 +212,7 @@ export function ActivityScreen() {
   return (
     <Page title="Activity" back onRefresh={activity.refresh}>
       {activity.error && <Notice>{activity.error}</Notice>}
-      {activity.loading && <Notice>Loading activity…</Notice>}
+      {activity.loading && <SkeletonCards rows={2} label="Loading activity" />}
       {activity.data && (
         <>
           <Copy muted>{activity.data.course?.name ?? "Personal task"}</Copy>

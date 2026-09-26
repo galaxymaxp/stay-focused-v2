@@ -81,6 +81,8 @@ vi.mock("../../design/primitives", () => ({
   SegmentedControl: "SegmentedControl",
   DoneButton: "DoneButton",
   SearchField: "SearchField",
+  SkeletonBlock: "SkeletonBlock",
+  SkeletonCards: "SkeletonCards",
 }));
 vi.mock("../../design/CourseViews", () => ({
   CourseCard: "CourseCard",
@@ -101,7 +103,7 @@ vi.mock("../../design/SwipeRow", () => ({
 vi.mock("../sync/SyncStatus", () => ({ SyncStatus: "SyncStatus" }));
 vi.mock("../reviewer/ReviewerReader", () => ({ ReviewerReaderScreen: "ReviewerReaderScreen" }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
-vi.mock("./GlassDayClock", () => ({ GlassDayClock: "GlassDayClock" }));
+vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642 }));
 vi.mock("react-native", () => ({
   View: "View",
   ScrollView: "ScrollView",
@@ -281,7 +283,7 @@ const ringTouch = (root: ReactTestRenderer["root"]) => root.findAll((node) => no
 const touchAt = (x: number, y: number) => ({ nativeEvent: { locationX: x, locationY: y } });
 /** Where the ring passes a minute of the day, optionally off the visible track. */
 const ringAt = (minutes: number, offset = 0) => {
-  const angle = (minutes / 1440) * Math.PI * 2 + Math.PI / 2;
+  const angle = (minutes / 1440) * Math.PI * 2 - Math.PI / 2;
   return { x: 170 + (136 + offset) * Math.cos(angle), y: 170 + (136 + offset) * Math.sin(angle) };
 };
 describe("B25 screen interactions", () => {
@@ -445,9 +447,8 @@ describe("B25 screen interactions", () => {
     const noon = ringAt(720);
     await act(async () => {
       overlay.props.onPanResponderGrant(touchAt(noon.x, noon.y));
-      vi.advanceTimersByTime(150);
-      // Noon is at the top; a quarter-circle clockwise is 6 PM at the right.
-      overlay.props.onPanResponderMove(null, { dx: 136, dy: 136 });
+      // Noon is at the bottom; a quarter-circle clockwise is 6 PM on the left.
+      overlay.props.onPanResponderMove(null, { dx: -136, dy: -136 });
       overlay.props.onPanResponderRelease();
     });
     expect(onCommit).toHaveBeenLastCalledWith(360, 1080);
@@ -610,6 +611,7 @@ describe("B25 screen interactions", () => {
     mocks.library.refreshing = true;
     const root = await render(createElement(LibraryScreen));
     expect(root.findAll((node) => node.props.accessibilityLabel === "Loading Library" && String(node.type) === "View")).toHaveLength(1);
+    expect(root.findAll((node) => String(node.type) === "SkeletonBlock").length).toBeGreaterThan(0);
   });
   it("keeps the B34 error surface when there is no saved work and the cloud fails", async () => {
     mocks.library.error = "Could not connect.";
@@ -705,7 +707,7 @@ describe("B25 screen interactions", () => {
     );
     expect(mocks.request).toHaveBeenCalledTimes(1);
   });
-  it("follows the finger continuously while held and snaps only on release", async () => {
+  it("grabs an end at once, follows the finger continuously, and snaps only on release", async () => {
     vi.useFakeTimers();
     const onChange = vi.fn(),
       onCommit = vi.fn();
@@ -718,23 +720,15 @@ describe("B25 screen interactions", () => {
     // Away from the free-time block the page keeps the touch.
     const away = ringAt(200);
     expect(overlay.props.onStartShouldSetPanResponder(touchAt(away.x, away.y))).toBe(false);
-    // Before the hold, a vertical move is a page scroll: nothing changes.
+    // An end owns its touch immediately (the page cannot steal it) with no hold.
+    await act(async () => overlay.props.onPanResponderGrant(touchAt(end.x, end.y)));
+    expect(overlay.props.onShouldBlockNativeResponder()).toBe(true);
+    expect(mocks.vibration).toHaveBeenCalledWith(6);
+    // Drag a few minutes at once: the readout follows unsnapped.
     await act(async () => {
-      overlay.props.onPanResponderGrant(touchAt(end.x, end.y));
-      overlay.props.onPanResponderMove(null, { dx: 0, dy: 20 });
-      vi.advanceTimersByTime(300);
-      overlay.props.onPanResponderRelease();
-    });
-    expect(onCommit).not.toHaveBeenCalled();
-    expect(mocks.vibration).not.toHaveBeenCalled();
-    // Hold, then drag a few minutes: the readout follows unsnapped.
-    await act(async () => {
-      overlay.props.onPanResponderGrant(touchAt(end.x, end.y));
-      vi.advanceTimersByTime(150);
-      overlay.props.onPanResponderMove(null, { dx: 16, dy: 0.6 });
+      overlay.props.onPanResponderMove(null, { dx: -16, dy: 0.6 });
       vi.advanceTimersByTime(20);
     });
-    expect(mocks.vibration).toHaveBeenCalledWith(10);
     const live = copyText(root).join(" ");
     expect(live).toMatch(/Free until/);
     expect(onCommit).not.toHaveBeenCalled();
@@ -753,9 +747,18 @@ describe("B25 screen interactions", () => {
     const overlay = ringTouch(root);
     const middle = ringAt(630);
     const later = ringAt(690);
+    // Moving before the hold completes is a scroll: the page keeps it.
     await act(async () => {
       overlay.props.onPanResponderGrant(touchAt(middle.x, middle.y));
-      vi.advanceTimersByTime(220);
+      overlay.props.onPanResponderMove(null, { dx: 0, dy: 30 });
+      vi.advanceTimersByTime(400);
+      overlay.props.onPanResponderRelease();
+    });
+    expect(onCommit).not.toHaveBeenCalled();
+    await act(async () => {
+      overlay.props.onPanResponderGrant(touchAt(middle.x, middle.y));
+      expect(overlay.props.onShouldBlockNativeResponder()).toBe(false);
+      vi.advanceTimersByTime(240);
       overlay.props.onPanResponderMove(null, { dx: later.x - middle.x, dy: later.y - middle.y });
       overlay.props.onPanResponderRelease();
     });
@@ -870,7 +873,7 @@ describe("B25 screen interactions", () => {
     mocks.data["/api/experience/capabilities"] = workspace.capabilities;
     mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = {
       timeline: [],
-      next: { id: "canvas:a", kind: "canvas_activity", title: "Midterm Seminar", course: { id: "c", code: "CIT5", name: "CIT5" }, startAt: null, endAt: null, dueAt: "2026-09-26T15:59:00.000Z", estimatedMinutes: null, priority: "medium", status: "unknown", source: "canvas", deepLinkTarget: { surface: "activity", id: "canvas:a" } },
+      next: { id: "canvas:a", kind: "canvas_activity", title: "Midterm Seminar", course: { id: "c", code: "CIT5", name: "CIT5" }, startAt: null, endAt: null, dueAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), estimatedMinutes: null, priority: "medium", status: "unknown", source: "canvas", deepLinkTarget: { surface: "activity", id: "canvas:a" } },
       later: [],
       upcomingDeadlines: [],
       plannerState: { needsTaskImport: true },
@@ -880,7 +883,8 @@ describe("B25 screen interactions", () => {
     expect(text).not.toContain("added to your tasks");
     expect(text).not.toContain("unknown");
     expect(text).not.toContain("\uFFFD");
-    expect(text).toMatch(/Due \d/);
+    // A plain deadline: a time today, or a short date further out.
+    expect(text).toMatch(/Due (\d|[A-Z][a-z]{2} \d)/);
     expect(root.findAll((node) => node.props.label === "Add a task" || node.props.children === "New Task")).toHaveLength(0);
   });
 });

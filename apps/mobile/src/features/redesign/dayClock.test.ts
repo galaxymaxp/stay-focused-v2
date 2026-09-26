@@ -6,6 +6,7 @@ import {
   angleMinutes,
   celestialBody,
   dayStateAt,
+  dayOrbTones,
   dragEdge,
   followMinutes,
   hitTest,
@@ -16,16 +17,27 @@ import {
   snapRange,
 } from "./dayClock";
 import { todayHideKey } from "./listPreferences";
-import { arrangeToday, matchesCourseQuery } from "./presentation";
+import { arrangeToday, greetingFor, matchesCourseQuery } from "./presentation";
 
 const at = (minutes: number, radius: number = CLOCK.ring) => ringPoint(minutes, radius);
 
 describe("glass clock ring input", () => {
-  it("reads the ring with midnight at the bottom, 6 AM left, noon top and 6 PM right", () => {
+  it("reads like a wall clock: midnight at the top, 6 AM right, noon bottom, 6 PM left", () => {
     for (const minutes of [0, 360, 720, 1080]) {
       const p = at(minutes);
       expect(angleMinutes(p.x - CLOCK.center, p.y - CLOCK.center)).toBeCloseTo(minutes % 1440, 5);
     }
+    expect(at(0).y).toBeLessThan(CLOCK.center - 100);
+    expect(at(360).x).toBeGreaterThan(CLOCK.center + 100);
+    expect(at(720).y).toBeGreaterThan(CLOCK.center + 100);
+    expect(at(1080).x).toBeLessThan(CLOCK.center - 100);
+  });
+
+  it("keeps a middle to hold on even a short block", () => {
+    const middle = at(615);
+    expect(hitTest(middle.x, middle.y, 600, 630)).toBe("move");
+    const nearStart = at(603);
+    expect(hitTest(nearStart.x, nearStart.y, 600, 630)).toBe("start");
   });
 
   it("follows the finger continuously, with no snapping while held", () => {
@@ -156,6 +168,30 @@ describe("Today pins and hides", () => {
     const tomorrow = arrangeToday(sections, [], hidden, "2026-09-27");
     expect(tomorrow.next?.id).toBe("a");
     expect(tomorrow.hidden).toEqual([]);
+  });
+});
+
+describe("Today greeting", () => {
+  it("never says good morning at night", () => {
+    expect(greetingFor(1)).toBe("Good evening");
+    expect(greetingFor(4)).toBe("Good evening");
+    expect(greetingFor(6)).toBe("Good morning");
+    expect(greetingFor(13)).toBe("Good afternoon");
+    expect(greetingFor(19)).toBe("Good evening");
+  });
+});
+
+describe("day orb", () => {
+  it("lights the orb with the sun by day and a cool moon by night, inside the ball", () => {
+    const noon = dayOrbTones(720);
+    const night = dayOrbTones(60);
+    expect(noon.position.y).toBeGreaterThan(0.3);
+    expect(night.light.toLowerCase()).toBe("#c8d6ff");
+    expect(noon.strength).toBeGreaterThan(night.strength);
+    for (let minutes = 0; minutes < 1440; minutes += 30) {
+      const { position } = dayOrbTones(minutes);
+      expect(Math.hypot(position.x, position.y, position.z)).toBeLessThan(0.7);
+    }
   });
 });
 
