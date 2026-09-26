@@ -44,10 +44,20 @@ describe("Queue status", () => {
 
 describe("Today item detail", () => {
   it("never shows internal states and always uses a clean separator", () => {
-    const due = todayItemDetail({ startAt: null, dueAt: "2026-09-26T15:59:00.000Z", estimatedMinutes: null, status: "unknown" });
+    const now = Date.parse("2026-09-26T08:00:00");
+    const due = todayItemDetail({ startAt: null, dueAt: "2026-09-26T23:59:00", estimatedMinutes: null, status: "unknown" }, now);
     expect(due).toMatch(/^Due \d/);
     expect(due).not.toContain("unknown");
-    expect(todayItemDetail({ startAt: "2026-09-26T01:00:00.000Z", dueAt: null, estimatedMinutes: 45, status: "planned" })).toMatch(/ · 45 min$/);
-    expect(todayItemDetail({ startAt: null, dueAt: "2026-09-26T15:59:00.000Z", estimatedMinutes: null, status: "submitted" })).toMatch(/ · Submitted$/);
+    expect(todayItemDetail({ startAt: "2026-09-26T09:00:00", dueAt: null, estimatedMinutes: 45, status: "planned" }, now)).toMatch(/ · 45 min$/);
+    expect(todayItemDetail({ startAt: null, dueAt: "2026-09-26T23:59:00", estimatedMinutes: null, status: "submitted" }, now)).toMatch(/ · Submitted$/);
+  });
+
+  it("never lets an old deadline read as tonight", () => {
+    const now = Date.parse("2026-09-26T08:00:00");
+    const old = todayItemDetail({ startAt: null, dueAt: "2023-10-12T23:59:00", estimatedMinutes: null, status: "unknown" }, now);
+    expect(old).toMatch(/^Past due · /);
+    expect(old).toContain("Oct");
+    expect(old).toContain("2023");
+    expect(todayItemDetail({ startAt: null, dueAt: "2026-09-29T23:59:00", estimatedMinutes: null, status: "pending" }, now)).toMatch(/^Due Sep 29/);
   });
 });

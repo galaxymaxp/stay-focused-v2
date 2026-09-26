@@ -58,6 +58,8 @@ describe("Canvas sync presentation", () => {
     // Selected but never completed a sync: one tap finishes it.
     expect(syncRowState(course("a", { selected: true }), undefined)).toBe("not_synced");
     expect(syncRowState(course("a", { selectable: false }), undefined)).toBe("unavailable");
+    // Jobs finished before the course list refreshed: stay "Synced", never flash back to "Sync".
+    expect(syncRowState(course("a", { selected: false }), "synced")).toBe("synced");
     // A first tap that failed before selection still offers Retry, not a silent reset.
     expect(syncRowState(course("a"), "failed")).toBe("failed");
   });

@@ -13,10 +13,12 @@ export function syncRowState(
 ): SyncRowState {
   if (live === "syncing") return "syncing";
   if (!course.selectable) return course.selected && hasSynced(course) ? "synced" : "unavailable";
+  // Live job results win over the course list, which may predate this sync:
+  // a finished sync never flickers back to "Sync" while the list refreshes.
+  if (live === "synced") return "synced";
   // A tap that could not finish (even before the course was selected) offers Retry.
   if (live === "failed") return "failed";
   if (!course.selected) return "not_synced";
-  if (live === "synced") return "synced";
   if (course.lastSync?.status === "running") return "syncing";
   if (course.lastSync?.status === "failed" && !course.lastSync.lastSuccessfulSyncAt) return "failed";
   // Selected but never finished a sync: tapping Sync completes it.

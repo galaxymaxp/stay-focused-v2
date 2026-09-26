@@ -125,12 +125,22 @@ export function timeLabel(value: string | null) {
  * The line under a Today item: when it happens and whether it is finished.
  * Internal states such as "pending" or "unknown" are never shown.
  */
-export function todayItemDetail(item: Pick<TodayItem, "startAt" | "dueAt" | "estimatedMinutes" | "status">): string {
+export function todayItemDetail(item: Pick<TodayItem, "startAt" | "dueAt" | "estimatedMinutes" | "status">, now = Date.now()): string {
   const when = item.startAt
     ? [timeLabel(item.startAt), item.estimatedMinutes ? `${item.estimatedMinutes} min` : ""]
-    : [item.dueAt ? `Due ${timeLabel(item.dueAt)}` : ""];
+    : [item.dueAt ? dueLabel(item.dueAt, now) : ""];
   const state = item.status === "submitted" ? "Submitted" : item.status === "completed" ? "Done" : item.status === "skipped" ? "Skipped" : "";
   return [...when, state].filter(Boolean).join(" · ");
+}
+
+/** A time alone means today; any other day names its date, and the past says so. */
+function dueLabel(dueAt: string, now: number): string {
+  const due = new Date(dueAt);
+  if (due.getTime() < now) {
+    const otherYear = due.getFullYear() !== new Date(now).getFullYear();
+    return `Past due · ${due.toLocaleDateString([], { month: "short", day: "numeric", ...(otherYear ? { year: "numeric" } : {}) })}`;
+  }
+  return due.toDateString() === new Date(now).toDateString() ? `Due ${timeLabel(dueAt)}` : `Due ${deadline(dueAt)}`;
 }
 /**
  * Queue sections exist only while they hold something. The generating group

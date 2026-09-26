@@ -113,8 +113,15 @@ export function ActivityOrb({ size = 20, running }: { size?: number; running: bo
           </Svg>
         </Animated.View>
         <Animated.View style={[{ position: "absolute", width: size, height: size }, style.counter]}>
+          {/* A feathered glint, not a hard spot, so the bead never reads as an eye. */}
           <Svg width={size} height={size}>
-            <Circle cx={size * 0.68} cy={size * 0.7} r={size * 0.2} fill={mode === "dark" ? "#FFFFFF" : colors.blueSoft} fillOpacity={0.55} />
+            <Defs>
+              <RadialGradient id={`${id}-glint`}>
+                <Stop offset="0" stopColor={mode === "dark" ? "#FFFFFF" : colors.blueSoft} stopOpacity={0.5} />
+                <Stop offset="1" stopColor={mode === "dark" ? "#FFFFFF" : colors.blueSoft} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Circle cx={size * 0.66} cy={size * 0.68} r={size * 0.34} fill={`url(#${id}-glint)`} />
           </Svg>
         </Animated.View>
         {/* The clear glass rim, so it reads as a bead rather than a flat dot. */}
