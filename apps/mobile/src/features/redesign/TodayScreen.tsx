@@ -225,7 +225,8 @@ export function TodayScreen() {
   const planned = today.data?.timeline;
   useEffect(() => {
     if (windowKnown || !planned) return;
-    const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date));
+    const now = new Date();
+    const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date), now.getHours() * 60 + now.getMinutes());
     if (around) {
       setStart(around.start);
       setEnd(around.end);

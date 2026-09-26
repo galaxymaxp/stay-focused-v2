@@ -264,7 +264,9 @@ describe("announcement read state", () => {
 describe("free time holds the day's blocks", () => {
   it("wraps a missing free time around the planned blocks, on the quarter hour", async () => {
     const { freeTimeAround } = await import("./presentation");
-    expect(freeTimeAround([{ from: 722, to: 780 }, { from: 780, to: 845 }])).toEqual({ start: 720, end: 855 });
-    expect(freeTimeAround([])).toBeNull();
+    expect(freeTimeAround([{ from: 722, to: 780 }, { from: 780, to: 845 }], 460)).toEqual({ start: 720, end: 855 });
+    // A past block and a stray evening one don't stretch it over the day.
+    expect(freeTimeAround([{ from: 60, to: 120 }, { from: 720, to: 780 }, { from: 780, to: 840 }, { from: 1170, to: 1230 }], 460)).toEqual({ start: 720, end: 840 });
+    expect(freeTimeAround([], 460)).toBeNull();
   });
 });

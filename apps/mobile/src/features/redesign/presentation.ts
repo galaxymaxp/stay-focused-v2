@@ -193,14 +193,24 @@ export function planningRequest(
 }
 
 /**
- * The free time that holds a day's planned blocks, for when none was saved:
- * from the first planned block's start to the last one's end, on the
- * fifteen-minute grid.
+ * The free time that holds the day's planned blocks, for when none was saved:
+ * the run of upcoming blocks starting with the next one (blocks less than an
+ * hour apart belong together), on the fifteen-minute grid. Past blocks and
+ * stray later ones don't stretch it across the whole day.
  */
-export function freeTimeAround(segments: readonly { readonly from: number; readonly to: number }[]): { start: number; end: number } | null {
-  if (segments.length === 0) return null;
-  const start = Math.max(0, Math.floor(Math.min(...segments.map((s) => s.from)) / 15) * 15);
-  const end = Math.min(1440, Math.ceil(Math.max(...segments.map((s) => s.to)) / 15) * 15);
+export function freeTimeAround(
+  segments: readonly { readonly from: number; readonly to: number }[],
+  nowMinutes: number,
+): { start: number; end: number } | null {
+  const upcoming = segments.filter((s) => s.to > nowMinutes).sort((a, b) => a.from - b.from);
+  if (upcoming.length === 0) return null;
+  let last = upcoming[0]!.to;
+  for (const segment of upcoming.slice(1)) {
+    if (segment.from - last > 60) break;
+    last = Math.max(last, segment.to);
+  }
+  const start = Math.max(0, Math.floor(upcoming[0]!.from / 15) * 15);
+  const end = Math.min(1440, Math.ceil(last / 15) * 15);
   return end > start ? { start, end } : null;
 }
 export function timelineSegments(items: readonly TodayItem[], date: string) {
