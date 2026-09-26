@@ -12,8 +12,20 @@ const CAMERA_FOV = 36;
 /** Share of the canvas the ball's diameter fills at this camera. */
 export const DAY_ORB_FILL = (0.95 * 2) / (2 * CAMERA_DISTANCE * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)));
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
-/** The Today orb moves slowly; half the display rate is plenty and saves battery. */
-const FRAME_MS = 33;
+/** The Today orb moves slowly; a third of the display rate is plenty. */
+const FRAME_MS = 50;
+/**
+ * The glass is soft, so it renders at a reduced resolution and is scaled up.
+ * The shader's cost grows with pixels, and on modest GPUs a full-resolution
+ * frame kept the JS thread waiting long enough for the page to steal touches.
+ */
+const RENDER_SCALE = 0.6;
+
+/**
+ * Set while a finger is on Today. Rendering pauses entirely so touch handling
+ * (ring handles, scrolling, pull-to-refresh) always gets the JS thread first.
+ */
+export const dayOrbTouch = { active: false };
 
 interface Runtime {
   tones: DayOrbTones;
@@ -22,8 +34,6 @@ interface Runtime {
   running: boolean;
 }
 
-/** Offset (−1…1) the clock writes while the ring is dragged; the camera leans with it. */
-export type OrbTilt = { x: number; y: number };
 
 /**
  * The Today clock's body: the same glass ball and luminous liquid as the
@@ -38,7 +48,6 @@ export const DayOrb = memo(function DayOrb({
   mode,
   reducedMotion,
   live,
-  tilt,
 }: {
   minutes: number;
   /** Canvas size in points; the ball fills DAY_ORB_FILL of it. */
@@ -46,7 +55,6 @@ export const DayOrb = memo(function DayOrb({
   mode: "light" | "dark";
   reducedMotion: boolean;
   live: boolean;
-  tilt: { current: OrbTilt };
 }) {
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const runtime = useRef<Runtime>({ tones: dayOrbTones(minutes), mode, reducedMotion, running: live && foreground });
@@ -59,25 +67,26 @@ export const DayOrb = memo(function DayOrb({
   }, []);
   useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground]);
   useEffect(() => {
-    if (context.current && !controller.current) controller.current = buildScene(context.current, runtime, tilt);
+    if (context.current && !controller.current) controller.current = buildScene(context.current, runtime);
     return () => {
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [tilt]);
+  }, []);
   const create = useCallback((gl: ExpoWebGLRenderingContext) => {
     context.current = gl;
     controller.current?.dispose();
-    controller.current = buildScene(gl, runtime, tilt);
-  }, [tilt]);
+    controller.current = buildScene(gl, runtime);
+  }, []);
+  const inner = size * RENDER_SCALE;
   return (
-    <View pointerEvents="none" style={{ width: size, height: size }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <GLView onContextCreate={create} style={StyleSheet.absoluteFill} />
+    <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />
     </View>
   );
 });
 
-function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }, tilt: { current: OrbTilt }) {
+function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }) {
   const canvas = {
     width: gl.drawingBufferWidth,
     height: gl.drawingBufferHeight,
@@ -121,6 +130,12 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     const now = Date.now();
     const current = runtime.current;
     const moving = current.running && !current.reducedMotion;
+    // While a finger is down, skip frames entirely (the clock keeps its pose).
+    if (dayOrbTouch.active && moving) {
+      lastFrame = now;
+      requestId = requestAnimationFrame(draw);
+      return;
+    }
     if (now - lastRender >= FRAME_MS || !moving) {
       const delta = Math.min((now - lastFrame) / 1000, 0.08);
       lastFrame = now;
@@ -131,9 +146,6 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         spinAngle = (spinAngle + delta * (current.reducedMotion ? 0.03 : 0.12)) % (Math.PI * 2);
       }
       spinMatrix.setFromMatrix4(spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle));
-      const lean = tilt.current;
-      camera.position.x += (lean.x * 0.14 - camera.position.x) * Math.min(1, delta * 6);
-      camera.position.y += (0.02 - lean.y * 0.1 - camera.position.y) * Math.min(1, delta * 6);
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld();
       const tones = current.tones;
@@ -163,8 +175,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       renderer.render(scene, camera);
       gl.endFrameEXP();
     }
-    const leaning = Math.abs(camera.position.x - tilt.current.x * 0.14) > 0.002 || Math.abs(tilt.current.x) + Math.abs(tilt.current.y) > 0;
-    if (!disposed && (moving || now < settleUntil || leaning)) requestId = requestAnimationFrame(draw);
+    if (!disposed && (moving || now < settleUntil)) requestId = requestAnimationFrame(draw);
   };
 
   const wake = () => {

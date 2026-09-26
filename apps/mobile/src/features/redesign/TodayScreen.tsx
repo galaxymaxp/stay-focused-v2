@@ -14,7 +14,15 @@ import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBloc
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
+import { dayOrbTouch } from "./DayOrb";
 import { DayRingClock } from "./DayRingClock";
+
+/** Any finger on Today pauses the orb, so touches are handled without waiting on a frame. */
+const orbTouchPause = {
+  onTouchStart: () => { dayOrbTouch.active = true; },
+  onTouchEnd: () => { dayOrbTouch.active = false; },
+  onTouchCancel: () => { dayOrbTouch.active = false; },
+};
 import { PlanPreview, planTaskIds, planToneFor } from "./PlanPreview";
 import {
   arrangeToday,
@@ -199,6 +207,7 @@ export function TodayScreen() {
       }}
       refreshEnabled={!ringActive}
       scrollEnabled={!ringActive}
+      scrollTouch={orbTouchPause}
     >
       <SyncStatus />
       <DayRingClock

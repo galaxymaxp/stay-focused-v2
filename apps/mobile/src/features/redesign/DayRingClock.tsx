@@ -20,7 +20,7 @@ import {
   snapRange,
   snapTo,
 } from "./dayClock";
-import { DAY_ORB_FILL, DayOrb, type OrbTilt } from "./DayOrb";
+import { DAY_ORB_FILL, DayOrb } from "./DayOrb";
 import { timelineSegments } from "./presentation";
 
 /** "2 h 15 min", "45 min", "3 h". */
@@ -161,7 +161,6 @@ export function DayRingClock({
   const [draft, setDraft] = useState<Range | null>(null);
   const [adjusting, setAdjusting] = useState<Mode | null>(null);
   const range = draft ?? { start, end };
-  const tilt = useRef<OrbTilt>({ x: 0, y: 0 });
   const lift = useRef(new Animated.Value(0)).current;
 
   const segments = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
@@ -232,7 +231,6 @@ export function DayRingClock({
       if (!latest.current.reducedMotion) {
         Animated.spring(lift, { toValue: 0, ...motion.spring, useNativeDriver: true }).start();
       } else lift.setValue(0);
-      tilt.current = { x: 0, y: 0 };
       if (!wasHeld || !mode) return;
       latest.current.onAdjustingChange?.(false);
       state.pending = null;
@@ -306,10 +304,6 @@ export function DayRingClock({
         }
         state.value = next;
         publish(next);
-        if (!latest.current.reducedMotion) {
-          // The orb leans slightly toward the finger.
-          tilt.current = { x: (x - CLOCK.center) / CLOCK.center, y: (y - CLOCK.center) / CLOCK.center };
-        }
       },
       onPanResponderTerminationRequest: () => !gesture.current.held,
       onPanResponderRelease: () => finish(true),
@@ -344,7 +338,7 @@ export function DayRingClock({
     <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: size, height: size }} testID="day-ring">
         <View pointerEvents="none" style={{ position: "absolute", left: (CLOCK.center - orbCanvas / 2) * scale, top: (CLOCK.center - orbCanvas / 2) * scale }}>
-          <DayOrb minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} tilt={tilt} />
+          <DayOrb minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} />
         </View>
         <View
           pointerEvents="none"
