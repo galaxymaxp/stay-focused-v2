@@ -1,5 +1,9 @@
 # Roadmap
 
+## B37 study experience overhaul (2026-09-27)
+
+**PARTIAL.** Quiz formats/100-item batching/topic scope, Reviewer selection and keyword emphasis, practice feedback, Queue cleanup, Library actions, Today timeline, monochrome chrome and dynamic orb spill have been implemented. The never-started Vercel Workflow-bound Quiz was cancelled after owner authorization. The forward Quiz migration, matching Vercel API and B37 Google Cloud worker are live. Next: decide the per-job Quiz call budget and retry cache keys for batched generation, fix the continuation prompt, redeploy the worker, then finish live generation and device acceptance. Spend the single EAS preview build only after every prebuild gate passes. [Implementation and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).
+
 ## B38 Google generation cutover readiness (2026-09-27)
 
 **PASS — production generation cutover complete.** The B37 Quiz failure was a multi-select prompt/type mismatch; the prompt was repaired without relaxing validation. Fresh Google-backed Quiz, terminal duplicate replay, scoped Vercel OIDC federation and authenticated dispatch pass. After the user confirmed deployment capacity, one READY production deployment `dpl_Cgp6geT9JJrE2epyR9zQDmmYxvbL` switched routing to Google Cloud. Health and one owner-authenticated real instructional Quiz passed through the production API, queue, worker, persistence and Library reopen. Vercel Workflow remains the rollback path; no Android/EAS build was used. See [acceptance](ai/acceptance/b38/google-generation-cutover-readiness.md).

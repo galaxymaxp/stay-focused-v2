@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B37 study experience overhaul (2026-09-27)
+
+**PARTIAL - active acceptance.** Quiz, Reviewer, Practice, Queue, Library, Today, feedback, monochrome UI and branding are implemented. API/mobile tests, builds, local Android debug installation and several authenticated realme flows pass. The Quiz migration and Vercel API are now live after owner authorization. After owner authorization the B37 worker is live (`generation-worker-00006-75b`, private) and accepts topic-filtered 30-question requests, which now reach generation. Two validator defects found in the smoke were fixed and redeployed, but no multi-batch Quiz completes: each job may make only two `quiz_set` provider calls, and the continuation prompt overrides single-format requests. An owner decision on that call budget is needed. No EAS cloud build has been triggered (0 of 1 allowed). The old Vercel-bound queued Quiz was cancelled after explicit owner authorization. [B37 report](acceptance/b37/study-experience-overhaul.md).
+
 ## B38 Google generation cutover readiness (2026-09-27)
 
 **PASS — production generation runs on Google Cloud.** The fresh VPN instructional Quiz, terminal duplicate replay, production-scoped Vercel OIDC federation and rebuilt private worker passed. After the user confirmed deployment capacity, one READY Vercel production version `dpl_Cgp6geT9JJrE2epyR9zQDmmYxvbL` enabled Google routing. `/api/health` returned 200; one authenticated production API Quiz from the existing VPN Reviewer completed through Cloud Tasks, Cloud Run, OpenAI and Supabase, then listed and reopened from Library. Vercel Workflow remains for rollback, and no EAS build was consumed. [B38 evidence and rollback](acceptance/b38/google-generation-cutover-readiness.md).
