@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B37 Google Cloud heavy-generation foundation (2026-09-27)
+
+**PARTIAL — Google execution proven, B38 cutover gated.** Cloud Tasks delivered fresh jobs to a private Cloud Run worker using the existing engine, Supabase persistence and Google Vision OCR. Text/scanned PDF, DOCX, PPTX and Canvas Page Reviewers plus Activity succeeded and reopened; the fresh Quiz failed existing validation. Lease retry, cancellation and safe failure passed, but terminal replay was blocked by an automatic approval-review usage limit. Vercel-to-Google dispatcher identity is not configured, and Vercel storage pressure still affects redeployment. No production routing change or EAS build. [Evidence and exact B38 actions](acceptance/b37/google-cloud-generation-foundation.md).
+
 ## B37 Reviewer Study Assist (2026-09-27)
 
 **PASS - production and realme acceptance complete.** On-demand Summarize, Explain simply, Analogy and Example use existing canonical Reviewer blocks and the contextual sheet, with a separate owner-scoped SQLite cache, content/prompt invalidation and concurrent-request deduplication. Reviewer and Quiz prompts/schemas are unchanged; cache isolation is regression-tested. Fresh mobile 677/677, API 947 passed / 3 existing opt-in skips, shared 44/44, provider contracts 19/19, forced typecheck/lint 7/7, API build and mobile export pass. Production deployment dpl_F87NsbQVEkbisWzJ1VZqiXtt5RKD is READY. EAS preview group c52531f9-a177-4b82-b73b-533f7ef0b93c reached the realme. All four live assists, cached sheet/Reviewer reopen, offline cached reuse after force-stop/relaunch, uncached-offline guidance, canonical integrity and Quiz UI pass. Logs show exactly four successful generation requests and zero additional calls for cached reuse; no deployment error entries. See [acceptance](acceptance/b37/reviewer-study-assist-acceptance.md). Reviewer generation-quality review remains a separate user-guided milestone.

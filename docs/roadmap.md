@@ -1,5 +1,9 @@
 # Roadmap
 
+## B37 Google Cloud generation foundation (2026-09-27)
+
+**PARTIAL.** A private Cloud Run worker and OIDC Cloud Tasks queue in the existing Stay Focus project executed the shared Reviewer/Quiz/Activity pipeline without a Vercel deployment. Five fresh Reviewer source formats and Activity succeeded, including existing scanned-PDF Google OCR and Library reopen. Quiz failed existing source validation; terminal replay was not executed after automatic approval review hit its usage limit. Vercel dispatcher workload identity and deployment capacity remain B38 prerequisites. Production still uses Vercel Workflow. See [acceptance](ai/acceptance/b37/google-cloud-generation-foundation.md).
+
 ## B37 Reviewer Study Assist (2026-09-27)
 
 **PASS - production and realme acceptance complete.** On-demand Summarize, Explain simply, Analogy and Example use existing canonical Reviewer blocks and the contextual sheet, with a separate owner-scoped SQLite cache, content/prompt invalidation and concurrent-request deduplication. Reviewer and Quiz prompts/schemas are unchanged; cache isolation is regression-tested. Fresh mobile 677/677, API 947 passed / 3 existing opt-in skips, shared 44/44, provider contracts 19/19, forced typecheck/lint 7/7, API build and mobile export pass. Production deployment dpl_F87NsbQVEkbisWzJ1VZqiXtt5RKD is READY. EAS preview group c52531f9-a177-4b82-b73b-533f7ef0b93c reached the realme. All four live assists, cached sheet/Reviewer reopen, offline cached reuse after force-stop/relaunch, uncached-offline guidance, canonical integrity and Quiz UI pass. Logs show exactly four successful generation requests and zero additional calls for cached reuse; no deployment error entries. See [acceptance](ai/acceptance/b37/reviewer-study-assist-acceptance.md). Reviewer generation-quality review remains a separate user-guided milestone.
