@@ -6,3 +6,6 @@
 .turbo
 coverage
 tmp
+.npm-cache
+apps/mobile/android
+apps/mobile/ios
