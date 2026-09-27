@@ -222,7 +222,7 @@ export function LibraryScreen() {
 /** Level 2: one course's saved work, filtered by kind. */
 export function LibraryCourseScreen() {
   const { courseKey: rawKey } = useLocalSearchParams<{ courseKey?: string }>();
-  const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? PERSONAL_LIBRARY_KEY;
+  const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? "";
   const library = useLocalLibrary();
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
@@ -245,16 +245,16 @@ export function LibraryCourseScreen() {
   });
   const arranged = arrangeList(filtered.filter((item) => !deletion.removed.has(item.id) && !quizRemoval.removed.has(item.id)), (item) => item.id, prefs.pinned.artifact, []);
   const items = [...arranged.pinned, ...arranged.rest];
-  const identity = libraryIdentity(courseKey, courseItems[0]?.course ?? null);
+  const identity = courseKey ? libraryIdentity(courseKey, courseItems[0]?.course ?? null) : null;
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
   const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
   return (
     <Page
       back
-      title={identity.title}
-      subtitle={identity.subtitle ?? undefined}
+      title={identity?.title ?? "Library"}
+      subtitle={identity?.subtitle ?? undefined}
       onRefresh={library.refresh}
-      headerLeading={<CourseMark identity={identity} size={34} />}
+      headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
           <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />
@@ -266,7 +266,7 @@ export function LibraryCourseScreen() {
       {deletion.note ? <Notice>{deletion.note}</Notice> : null}
       {remake.note ? <Notice>{remake.note}</Notice> : null}
       {quizRemoval.note ? <Notice>{quizRemoval.note}</Notice> : null}
-      {library.localReady && items.length === 0 ? (
+      {library.localReady && courseKey && items.length === 0 ? (
         <Surface>
           <Copy size="h3">{filter === "all" ? "Nothing saved for this course" : `No ${label} yet`}</Copy>
           <Copy muted>Generate from this course&apos;s materials when you are ready.</Copy>
