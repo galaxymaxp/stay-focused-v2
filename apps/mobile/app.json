@@ -3,16 +3,21 @@
     "name": "Stay Focused V2",
     "slug": "stay-focused-v2",
     "version": "2.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "icon": "./assets/branding/app-icon.png",
+    "runtimeVersion": "2.0.0",
     "orientation": "portrait",
     "scheme": "stayfocused",
     "ios": {
-      "bundleIdentifier": "com.galaxymaxp.stayfocusedv2"
+      "bundleIdentifier": "com.galaxymaxp.stayfocusedv2",
+      "icon": "./assets/branding/app-icon.png"
     },
     "android": {
       "package": "com.galaxymaxp.stayfocusedv2",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/branding/orb-adaptive-foreground.png",
+        "monochromeImage": "./assets/branding/orb-monochrome.png",
+        "backgroundColor": "#050506"
+      },
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]

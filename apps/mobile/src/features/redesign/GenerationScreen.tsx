@@ -335,10 +335,6 @@ export function QueueScreen() {
           <Action secondary label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action>
         </View>
       ) : null}
-      {completed.length ? <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Copy size="h2">Completed</Copy>
-        <Action secondary label={`Clear ${completed.length} completed Queue entries`} onPress={() => completed.forEach(job => hide("queue", job.id, true))}>Clear Completed</Action>
-      </View> : null}
       {pending.map((item) => (
         <Surface key={item.key}>
           <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}
@@ -357,6 +353,10 @@ export function QueueScreen() {
       {attention.map((job) => (
         <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
       ))}
+      {completed.length ? <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Copy size="h2">Completed</Copy>
+        <Action secondary label={`Clear ${completed.length} completed Queue entries`} onPress={() => completed.forEach(job => hide("queue", job.id, true))}>Clear Completed</Action>
+      </View> : null}
       {sections.filter((section) => section.key !== "attention").map((section) => (
         <View key={section.key} style={{ gap: 8 }}>
           {section.key !== "completed" ? <Copy size="h2">{section.title}</Copy> : null}

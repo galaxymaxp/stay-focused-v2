@@ -94,6 +94,14 @@ describe('Quiz source selection', () => {
         expect(value.reviewerArtifactId).toBe(id);
         expect(mocks.structure).not.toHaveBeenCalled();
     });
+    it('limits Quiz context to selected owned Reviewer topics', async () => {
+        const data = canonical();
+        data.generated_artifact_versions[0]!.payload.reviewer.sections.push({ id: 'section-2', title: 'Other topic', items: [{ id: 'item-2', title: 'Other fact', sourceCore: { explanation: 'A different grounded fact.', keyPoints: ['Other point'], evidence: [] } }] });
+        const selected = await assembleQuizSources(client(data), A, { ...input, selectedTopicIds: ['section-1'] });
+        expect(selected.regions).toHaveLength(1);
+        expect(selected.regions[0]!.text).not.toContain('different grounded fact');
+        await expect(assembleQuizSources(client(data), A, { ...input, selectedTopicIds: ['section-outside'] })).rejects.toThrow('invalid_request');
+    });
     it('Study Assist is invisible to Quiz context, even if unrelated cache data is present', async () => {
         const data = canonical();
         const version = data.generated_artifact_versions[0]!;

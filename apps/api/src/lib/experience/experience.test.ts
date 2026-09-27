@@ -255,6 +255,7 @@ describe('Library ownership and persisted output', () => {
       generated_artifact_versions: [...libraryData.generated_artifact_versions!, { ...libraryData.generated_artifact_versions![0]!, id: 'new-version', artifact_id: 'new-artifact' }],
     });
     expect((await api.getLibrary('owner')).items.map(item => item.id)).toEqual(['artifact:new-artifact']);
+    expect((await api.getLibrary('owner')).supersededReviewerIds).toEqual(['artifact:artifact']);
     expect((await api.getLibrary('owner')).items[0]?.sourceMaterialId).toBe('file:source');
     expect((await api.getLibraryArtifact('owner', 'artifact:artifact')).artifact.id).toBe('artifact:artifact');
   });
