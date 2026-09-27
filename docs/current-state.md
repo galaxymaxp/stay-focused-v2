@@ -1,5 +1,9 @@
 # Current State
 
+## B37 Reviewer Study Assist (2026-09-27)
+
+**PASS - production and realme acceptance complete.** On-demand Summarize, Explain simply, Analogy and Example use existing canonical Reviewer blocks and the contextual sheet, with a separate owner-scoped SQLite cache, content/prompt invalidation and concurrent-request deduplication. Reviewer and Quiz prompts/schemas are unchanged; cache isolation is regression-tested. Fresh mobile 677/677, API 947 passed / 3 existing opt-in skips, shared 44/44, provider contracts 19/19, forced typecheck/lint 7/7, API build and mobile export pass. Production deployment dpl_F87NsbQVEkbisWzJ1VZqiXtt5RKD is READY. EAS preview group c52531f9-a177-4b82-b73b-533f7ef0b93c reached the realme. All four live assists, cached sheet/Reviewer reopen, offline cached reuse after force-stop/relaunch, uncached-offline guidance, canonical integrity and Quiz UI pass. Logs show exactly four successful generation requests and zero additional calls for cached reuse; no deployment error entries. See [acceptance](ai/acceptance/b37/reviewer-study-assist-acceptance.md). Reviewer generation-quality review remains a separate user-guided milestone.
+
 ### B38.2.1 ribbon refinement (2026-09-26)
 
 Latest dev-lab revision adds ribbon-edge glow, flowing theme palettes and independent width/twist/curvature changes, replacing transparent faceting with depth-tested bodies. Complete remains slowly alive; Error and Reduced Motion freeze. Fresh mobile 576/576, typecheck and lint pass (four existing warnings). Realme checks are recorded in [ribbon refinement](ai/acceptance/b38-2-1/ribbon-glow-refinement.md). Still PARTIAL for the original glass-material bar; production remains unchanged.
