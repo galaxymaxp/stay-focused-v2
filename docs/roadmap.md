@@ -2,7 +2,7 @@
 
 ## B38 Google generation cutover readiness (2026-09-27)
 
-**READY FOR CUTOVER — WAITING FOR VERCEL DEPLOYMENT CAPACITY.** The B37 Quiz failure was a multi-select prompt/type mismatch; the prompt was repaired without relaxing validation. Fresh Google-backed Quiz, terminal duplicate replay, scoped Vercel OIDC federation and authenticated dispatch all pass. The worker was rebuilt; production Vercel routing and Workflow rollback stay intact. Capacity has no reliable current reading through the available Hobby CLI/API, so no Vercel deployment was attempted. See [acceptance](ai/acceptance/b38/google-generation-cutover-readiness.md). Next: confirm deployable storage, then one controlled production cutover and smoke test.
+**PASS — production generation cutover complete.** The B37 Quiz failure was a multi-select prompt/type mismatch; the prompt was repaired without relaxing validation. Fresh Google-backed Quiz, terminal duplicate replay, scoped Vercel OIDC federation and authenticated dispatch pass. After the user confirmed deployment capacity, one READY production deployment `dpl_Cgp6geT9JJrE2epyR9zQDmmYxvbL` switched routing to Google Cloud. Health and one owner-authenticated real instructional Quiz passed through the production API, queue, worker, persistence and Library reopen. Vercel Workflow remains the rollback path; no Android/EAS build was used. See [acceptance](ai/acceptance/b38/google-generation-cutover-readiness.md).
 
 ## B37 Google Cloud generation foundation (2026-09-27)
 

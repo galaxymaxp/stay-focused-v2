@@ -2,7 +2,7 @@
 
 ## B38 Google generation cutover readiness (2026-09-27)
 
-**READY FOR CUTOVER — WAITING FOR VERCEL DEPLOYMENT CAPACITY.** A fresh VPN instructional Quiz completed through the real Google queue, passed existing validation, persisted once and reopened in Library. Terminal Quiz and text-PDF redelivery changed no provider count, artifact or job state. Production-scoped Vercel OIDC federation dispatched the successful run through a controlled development-token harness, and the temporary development grant was removed. The worker was rebuilt and private access rechecked. No production backend switch or Vercel/EAS deployment occurred: current Vercel storage capacity could not be verified. [B38 evidence and rollback](acceptance/b38/google-generation-cutover-readiness.md). Next: confirm deployment headroom, then one production cutover deployment and smoke test.
+**PASS — production generation runs on Google Cloud.** The fresh VPN instructional Quiz, terminal duplicate replay, production-scoped Vercel OIDC federation and rebuilt private worker passed. After the user confirmed deployment capacity, one READY Vercel production version `dpl_Cgp6geT9JJrE2epyR9zQDmmYxvbL` enabled Google routing. `/api/health` returned 200; one authenticated production API Quiz from the existing VPN Reviewer completed through Cloud Tasks, Cloud Run, OpenAI and Supabase, then listed and reopened from Library. Vercel Workflow remains for rollback, and no EAS build was consumed. [B38 evidence and rollback](acceptance/b38/google-generation-cutover-readiness.md).
 
 ## B37 Google Cloud heavy-generation foundation (2026-09-27)
 
