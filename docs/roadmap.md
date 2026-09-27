@@ -2,7 +2,7 @@
 
 ## B37 study experience overhaul (2026-09-27)
 
-**PARTIAL.** Quiz formats/100-item batching/topic scope, Reviewer selection and keyword emphasis, practice feedback, Queue cleanup, Library actions, Today timeline, monochrome chrome and dynamic orb spill have been implemented. The never-started Vercel Workflow-bound Quiz was cancelled after owner authorization. The forward Quiz migration, matching Vercel API and B37 Google Cloud worker are live. Next: decide the per-job Quiz call budget and retry cache keys for batched generation, fix the continuation prompt, redeploy the worker, then finish live generation and device acceptance. Spend the single EAS preview build only after every prebuild gate passes. [Implementation and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).
+**PARTIAL.** Batched Quiz generation, retry, exact-wording contract, key-point result reopening and Android sheet swipe-to-close are live and verified; 30-item production Quizzes pass. Next: decide how 100-item Quizzes stay unique (concept planning before batches or a source-size guard), make Study Assist reads scoped or co-locate the API with Supabase, then finish device acceptance and spend the single EAS build only after every gate passes. [Implementation and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).
 
 ## B38 Google generation cutover readiness (2026-09-27)
 

@@ -1,6 +1,6 @@
 # B37 study experience overhaul - 2026-09-27
 
-Status: **PARTIAL - BLOCKED on Quiz generation design**. Production database, API and the B37 Google Cloud worker are live. The worker now accepts topic-filtered and 30-question requests and reaches generation, but no multi-batch Quiz has completed: the durable provider budget allows only two `quiz_set` calls per job (see "Worker rollout and production smoke"). No EAS cloud build has been triggered.
+Status: **PARTIAL - 100-item production Quiz stopped at batch 3**. The owner-approved per-batch budget, repair identity, format and exact-wording changes are live; 30-item Mixed (via Retry) and 30-item Multiple Choice production Quizzes pass. The 100-item Mixed smoke failed on duplicate questions in batch 3 and was stopped for owner review as instructed. No EAS cloud build has been triggered.
 
 ## Implemented locally
 
@@ -49,24 +49,46 @@ Open design blockers (not changed in production):
 
 Other findings: the Quiz sheet says "Next you'll review the request. Nothing is generated until you confirm." but Continue submits immediately. Failed Quiz jobs offer no Retry in the app. After a warm resume the debug app's surface stopped repainting (clock frozen, taps unreflected); a force-stop and relaunch cleared it. `database.test.ts` still referenced the pre-rename migration file and failed at HEAD; fixed in `552540d`. Library reviewer counts collapsed from 10 to 5 once reconciliation finished, and the Today timeline rendered, on the realme.
 
+## Approved batching rework and production smoke (2026-09-27, 16:40-17:25 UTC)
+
+Owner approved a bounded per-batch budget. Commits `faf5a80`, `3886a2d`, `29e9d1f` (API/worker), `c387d7a`, `8b78451` (mobile).
+
+- Budget: `min(10, ceil(n/20) * 2)` `quiz_set` calls per job. Each 20-item batch makes one call; only if items fail does one repair run, and it asks only for replacements of the rejected or missing slots. No retry loops remain.
+- Saved-response identity: each call carries `quiz:batch:<offset>:initial|repair`, so a repair cannot resolve to the failed call's saved output; redelivery of the same call still reuses it (`ai_generation.saved_response_reused` is logged).
+- Single-format requests state one allowed type in every batch; only Mixed rebalances (surplus items of a dominating format are repaired). Earlier stems, used matching terms and repair notes travel in the prompt so instructions stay under 8 KB.
+- Contract now requires identification answers and modified true/false corrections copied exactly from the cited source. Validation was not relaxed.
+- Failed `quiz_generation_failed` jobs are user-retryable; the retry route returns a live or succeeded retry instead of creating another job; the generation view and failed screen offer Retry.
+- Tests: batching (30/50/100, first-attempt, one-repair, failure after repair, hard cap, fresh repair identity, all five single formats, off-format repair, Mixed rebalance, reused matching term), exact modified true/false and identification wording, retry route guard, retryable generation view. API 99 files, 1026 tests (3 opt-in skipped); provider contract 20/20; mobile 65 files, 653 tests.
+
+| Production smoke | Job | Result |
+| --- | --- | --- |
+| 30 Mixed, topics 6-10 (first try, worker `00007-xzx`) | `c5c83f17` | Failed: batch 2 initial and repair both reused matching term "IPSec" (3 calls). Prompt fix `3886a2d`, worker `00008-8q5`. |
+| 30 Mixed, same request via app Retry | `4cdd8af2` (`retry_of` `c5c83f17`) | **PASS**: 2 batches, 2 calls (budget 4), 30 unique items, 8 MC / 6 identification / 6 T/F / 4 modified T/F / 6 matching, one Quiz, reopened in Library. A second Retry on the original returned this job; no duplicate. |
+| 30 Multiple Choice, topics 6-10 | `76bd34cf` | **PASS**: batch 2 repaired one duplicate with a fresh response; 3 calls, 3 distinct saved responses, 30/30 `single_select`, 30 unique. |
+| 100 Mixed, topics 2-10 | `c1f1e32c` | **FAILED, stopped for review**. See below. |
+
+100-item stop report: batch **3 of 5** (offset 40); provider calls **5 of 10** (batch 1: 1, batch 2: 2, batch 3: 2); validation category **`duplicate_question`**; first call rejected q1, q6, q11, q19 (matching terms already used: Site-to-Site VPN, IPSec, Cisco AnyConnect, OpenVPN) and q5 (modified T/F repeating an earlier question); **repair ran** and fixed four, but r2 reproduced the rejected q5 verbatim. All five responses were **fresh** (distinct call identities, no saved-response reuse). Batches 1-2 remain checkpointed; the job is failed and retryable. No further architectural change was made.
+
+Reviewer fixes verified on the realme: a key point with a saved explanation shows a muted marker and a tap opens its result. Sheets now close by dragging down (handle, header or content that fits) and by swiping up when content fits; small or horizontal drags and taps are unchanged. Study Assist uses low reasoning effort but still took about 20 s on device: each request loads every Reviewer version (about 1.5 MB for this owner) twice from Supabase `ap-northeast-1` to Vercel `iad1` before the model call.
+
 ## Verification ledger
 
 | Gate | Result |
 | --- | --- |
 | API typecheck | FRESH PASS |
 | Mobile typecheck | FRESH PASS |
-| API tests | FRESH PASS after `5a857ad`: 1000 passed, 3 opt-in skipped (97 files); Quiz suites 126 passed incl. database tests |
-| Mobile tests | FRESH PASS: 652 passed; focused post-change Library reconciliation 21 passed |
+| API tests | FRESH PASS after `29e9d1f`: 99 files, 1026 tests (3 opt-in skipped); provider contract 20/20 |
+| Mobile tests | FRESH PASS after `8b78451`: 65 files, 653 tests |
 | API lint | FRESH PASS, 0 errors |
 | Mobile lint | FRESH PASS: 0 errors, four existing test-import warnings |
 | API build | FRESH PASS outside sandbox after alias read denial inside sandbox |
 | Mobile export | FRESH PASS (web, Android and iOS JS bundles) |
 | Android native debug build | FRESH PASS after local Windows NDK C++ runtime diagnostic; installed alongside the release app |
 | Supabase migration | FRESH PASS, version `20260927140343`, constraints verified |
-| Vercel API | FRESH PASS, deployment `dpl_47RqgoYLpra5v5cefPmAzy8xD3tW` READY, health 200 |
-| Google Cloud worker | FRESH PASS rollout: `generation-worker-00006-75b` serving 100%, private, config unchanged |
-| Production Quiz smoke | PARTIAL: topic IDs and 30 questions accepted, no `invalid_request`, generation reached and batch 1 persisted; no Quiz completed (budget/prompt blockers above) |
+| Vercel API | FRESH PASS, `dpl_4m9zHz7epmr7qHtG427gJgZgBMQi` READY and aliased, health 200 |
+| Google Cloud worker | FRESH PASS rollout: `generation-worker-00008-8q5` (`3886a2d`) serving 100%, private, config unchanged |
+| Production Quiz smoke | PARTIAL: 30 Mixed (Retry) and 30 Multiple Choice pass; 100 Mixed failed at batch 3 on duplicates and was stopped |
 | Authenticated realme flows | PARTIAL: Reviewer, Practice, Queue, Library, Today, themes pass observed checks; new-format Quiz practice blocked on generation |
 | EAS cloud build | NOT RUN (0 of 1 allowed) |
 
-Next: owner decision on the per-job Quiz call budget (for example two calls per batch, keyed per batch) and retry cache keys; fix the single-format continuation prompt and verbatim-correction wording; redeploy the worker; rerun the 30- and 100-item smoke; then finish the five-format practice, Queue, Library, theme and orb matrix. Use the single EAS preview build only after every prebuild gate passes.
+Next: owner decision on 100-item uniqueness (for example concept planning before batches, repair that rejects verbatim repeats of rejected items, or a source-size guard for large counts); scoped Study Assist reads or a Vercel function region near Supabase; then finish the five-format practice, Queue, Library, theme and orb matrix. Use the single EAS preview build only after every prebuild gate passes.

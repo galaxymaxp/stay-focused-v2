@@ -2,7 +2,7 @@
 
 ## B37 study experience overhaul (2026-09-27)
 
-**PARTIAL - active acceptance.** Quiz, Reviewer, Practice, Queue, Library, Today, feedback, monochrome UI and branding are implemented. API/mobile tests, builds, local Android debug installation and several authenticated realme flows pass. The Quiz migration and Vercel API are now live after owner authorization. After owner authorization the B37 worker is live (`generation-worker-00006-75b`, private) and accepts topic-filtered 30-question requests, which now reach generation. Two validator defects found in the smoke were fixed and redeployed, but no multi-batch Quiz completes: each job may make only two `quiz_set` provider calls, and the continuation prompt overrides single-format requests. An owner decision on that call budget is needed. No EAS cloud build has been triggered (0 of 1 allowed). The old Vercel-bound queued Quiz was cancelled after explicit owner authorization. [B37 report](acceptance/b37/study-experience-overhaul.md).
+**PARTIAL - 100-item Quiz stopped for review.** Owner-approved Quiz batching is live: two provider calls per 20-item batch (cap 10), repair of only rejected items with a distinct call identity, single formats kept across batches, exact source wording for recall answers, and retryable failed Quizzes without duplicate retries. Production 30-item Mixed (via Retry) and 30-item Multiple Choice Quizzes pass; the 100-item Mixed smoke failed at batch 3 of 5 on duplicate questions after one fresh repair (5 of 10 calls) and was stopped as instructed. Reviewer key-point results open on tap and sheets close by swiping on Android. No EAS build used (0 of 1). [B37 report](acceptance/b37/study-experience-overhaul.md).
 
 ## B38 Google generation cutover readiness (2026-09-27)
 
