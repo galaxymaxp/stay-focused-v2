@@ -424,9 +424,8 @@ describe("B25 screen interactions", () => {
 
   it("keeps local intake on the Generate page; Canvas sync lives in the profile", async () => {
     const root = await render(createElement(GenerateScreen));
-    const page = root.findAll(node => String(node.type) === "Page")[0]!;
-    expect(page.props.actions.map((item: { label: string }) => item.label)).toEqual(["Use text, camera or a local file"]);
-    await act(async () => page.props.actions[0].onPress());
+    const source = root.findAll(node => String(node.type) === "RowLink" && node.props.label === "Other source")[0]!;
+    await act(async () => source.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith("/generate");
   });
 

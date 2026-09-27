@@ -104,12 +104,11 @@ export function GenerateScreen() {
   return (
     <Page
       title="Generate"
-      subtitle="Study tools from your synced courses."
+      subtitle="Canvas material or your own notes."
       onRefresh={() => {
         courses.refresh();
         void sync();
       }}
-      actions={[{ label: "Use text, camera or a local file", onPress: () => router.push("/generate") }]}
       headerBelow={
         allCourses.length > 0 ? (
           <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
@@ -118,7 +117,12 @@ export function GenerateScreen() {
         ) : null
       }
     >
+      <Copy muted size="caption" style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>Canvas</Copy>
       <SyncStatus />
+      <RowLink label="Other source" onPress={() => router.push("/generate")}>
+        <Copy>Other source</Copy>
+        <Copy muted size="caption">Text, Camera or Local File</Copy>
+      </RowLink>
       {courses.loading && !courses.data ? <GenerateSkeleton rows={3} /> : null}
       {courses.error && !courses.data ? (
         <Surface><Copy size="h3">Courses could not be loaded</Copy><Copy muted>{courses.error}</Copy><Action secondary onPress={courses.refresh}>Try again</Action></Surface>

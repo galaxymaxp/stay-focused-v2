@@ -27,7 +27,7 @@ export default function AppLayout() {
       <AppActivityProvider>
       <Stack key={session.user.id} screenOptions={hierarchyMotion(reducedMotion, colors.backgroundPrimary)}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="generate" options={modalMotion(reducedMotion)} />
+        <Stack.Screen name="generate" options={sheetMotion()} />
         <Stack.Screen name="announcement" options={sheetMotion()} />
         <Stack.Screen name="processing" />
         <Stack.Screen name="settings" />

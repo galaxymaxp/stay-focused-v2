@@ -20,7 +20,7 @@ import {
 import { useAuth } from "../../auth";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { Screen } from "../../components/Screen";
+import { SegmentedControl, Sheet } from "../../design/primitives";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { spacing, typography } from "../../design/tokens";
@@ -86,9 +86,7 @@ const DEFAULT_SOURCE_TEXT_HEIGHT = 180;
 const OCR_SMOKE_FIXTURE_ENABLED = isOcrSmokeFixtureEnabled();
 
 interface ReviewerGenerateScreenProps {
-  readonly onOpenCourses?: () => void;
   readonly onOpenLibrary?: () => void;
-  readonly onOpenProcessing?: () => void;
 }
 
 interface GenerationDisplayError {
@@ -98,14 +96,12 @@ interface GenerationDisplayError {
 }
 
 export function ReviewerGenerateScreen({
-  onOpenCourses,
   onOpenLibrary,
-  onOpenProcessing,
 }: ReviewerGenerateScreenProps) {
   const colors = useLegacyTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { isSigningOut, session, signOut } = useAuth();
+  const { session } = useAuth();
   const [sourceTitle, setSourceTitle] = useState("");
   const [imageSourceMode, setImageSourceMode] =
     useState<Extract<SavedReviewerSourceMode, "gallery" | "camera">>("gallery");
@@ -140,7 +136,6 @@ export function ReviewerGenerateScreen({
   const extractionSubmissionInFlightRef = useRef(false);
   const reviewerSubmissionInFlightRef = useRef(false);
 
-  const email = session?.user.email ?? "No email on this account";
   const visibleSourceText = getCurrentSourceText(sourceState);
   const sourceCharacterCount = getSourceCharacterCount(sourceState);
   const reviewerJobIsActive = Boolean(
@@ -837,8 +832,9 @@ export function ReviewerGenerateScreen({
   };
 
   return (
-    <Screen
-      contentContainerStyle={styles.content}
+    <Sheet
+      title="Other source"
+      onClose={() => router.back()}
       footer={
         reviewer ? (
           <>
@@ -878,13 +874,7 @@ export function ReviewerGenerateScreen({
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.stack}
       >
-        <View style={styles.header} testID="reviewer-generate-screen">
-          <Text style={styles.kicker}>Reviewer generator</Text>
-          <Text style={styles.title}>Stay Focused</Text>
-          <Text style={styles.subtitle}>{email}</Text>
-        </View>
-
-        <Card elevated style={styles.formCard}>
+        <View style={styles.formCard} testID="reviewer-generate-screen">
           <TextField
             label="Source title"
             onChangeText={(value) => {
@@ -898,33 +888,8 @@ export function ReviewerGenerateScreen({
           />
 
           <View style={styles.sourceModeGroup}>
-            <Text style={styles.fieldLabel}>Source mode</Text>
-            <View style={styles.sourceModeButtons}>
-              <Button
-                onPress={() => handleSourceModeChange("paste")}
-                style={styles.sourceModeButton}
-                testID="reviewer-source-mode-paste"
-                variant={sourceState.mode === "paste" ? "primary" : "secondary"}
-              >
-                Paste text
-              </Button>
-              <Button
-                onPress={() => handleSourceModeChange("image")}
-                style={styles.sourceModeButton}
-                testID="reviewer-source-mode-image"
-                variant={sourceState.mode === "image" ? "primary" : "secondary"}
-              >
-                Import image
-              </Button>
-              <Button
-                onPress={() => handleSourceModeChange("pdf")}
-                style={styles.sourceModeButton}
-                testID="reviewer-source-mode-pdf"
-                variant={sourceState.mode === "pdf" ? "primary" : "secondary"}
-              >
-                Import PDF
-              </Button>
-            </View>
+            <Text style={styles.fieldLabel}>Source</Text>
+            <SegmentedControl segments={[{ value: "paste", label: "Text" }, { value: "image", label: "Camera" }, { value: "pdf", label: "Local File" }]} value={sourceState.mode} onChange={handleSourceModeChange} />
           </View>
 
           {sourceState.mode === "image" ? (
@@ -1002,48 +967,7 @@ export function ReviewerGenerateScreen({
             </View>
           ) : null}
 
-          <Button
-            fullWidth
-            loading={isSigningOut}
-            onPress={signOut}
-            variant="secondary"
-          >
-            Log out
-          </Button>
-
-          {onOpenLibrary ? (
-            <Button
-              fullWidth
-              onPress={onOpenLibrary}
-              testID="study-library-open-button"
-              variant="secondary"
-            >
-              Study Library
-            </Button>
-          ) : null}
-
-          {onOpenProcessing ? (
-            <Button
-              fullWidth
-              onPress={onOpenProcessing}
-              testID="processing-open-button"
-              variant="secondary"
-            >
-              Processing
-            </Button>
-          ) : null}
-
-          {onOpenCourses ? (
-            <Button
-              fullWidth
-              onPress={onOpenCourses}
-              testID="courses-open-button"
-              variant="secondary"
-            >
-              Courses
-            </Button>
-          ) : null}
-        </Card>
+        </View>
 
         {activeExtractionJob ? (
           <ProcessingJobCard
@@ -1110,7 +1034,7 @@ export function ReviewerGenerateScreen({
           />
         ) : null}
       </KeyboardAvoidingView>
-    </Screen>
+    </Sheet>
   );
 }
 
