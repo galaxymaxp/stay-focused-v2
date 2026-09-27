@@ -13,7 +13,7 @@ import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispa
 import { readProcessingJobCheckpoint,writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
 import { AI_FIRST_QUIZ_MODEL,generateQuizSet } from './ai-first';
 import type { QuizRegion,StoredQuestion } from './generation';
-import { normalized } from './generation';
+import { normalized,quizQuestionKey } from './generation';
 import { assembleQuizSources,readQuizRequest,resolveQuizSources } from './sources';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
@@ -103,10 +103,11 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
             provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
 }
 /** Exact stems and highly overlapping long stems are duplicate study items. */
-export function hasRepeatedQuizQuestions(questions: readonly Pick<StoredQuestion, 'prompt'>[]): boolean {
-    const stems = questions.map(question => normalized(question.prompt));
+export function hasRepeatedQuizQuestions(questions: readonly (Pick<StoredQuestion, 'prompt'> & Partial<Pick<StoredQuestion, 'type' | 'leftItem'>>)[]): boolean {
+    const stems = questions.map(quizQuestionKey);
     for (let i = 0; i < stems.length; i++) for (let j = 0; j < i; j++) {
         if (stems[i] === stems[j]) return true;
+        if (questions[i]!.type === 'matching' || questions[j]!.type === 'matching') continue;
         const a = new Set(stems[i]!.split(' ').filter(Boolean)), b = new Set(stems[j]!.split(' ').filter(Boolean));
         if (a.size < 8 || b.size < 8) continue;
         const intersection = [...a].filter(word => b.has(word)).length;

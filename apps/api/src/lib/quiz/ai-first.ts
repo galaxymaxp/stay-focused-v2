@@ -1,6 +1,7 @@
 import { buildGenerationContext, prepareGenerationContext, generateContract, GenerationContractError, generationObject as obj, generationList as list, generationString as str, generationRecord as record, generationText as text, requireSourceRefs, type GenerationProvider, type StructuredOutputSchema } from '@stay-focused/engine';
 import type { QuizGenerationRequest } from '@stay-focused/shared';
 import type { QuizRegion, StoredQuestion } from './generation';
+import { quizQuestionKey } from './generation';
 
 export const AI_FIRST_QUIZ_MODEL = 'gpt-5.4-2026-03-05';
 export const quizSetSchema: StructuredOutputSchema = { name: 'quiz_set', description: 'Complete source-grounded quiz with private answer keys', schema: obj({ questions: list(obj({
@@ -37,7 +38,7 @@ export function validateQuizSet(raw: unknown, request: QuizGenerationRequest, re
     const falseId = options.find(option => normalized(option.text) === 'false')?.id;
     const freeText = q.type === 'identification' || q.type === 'modified_true_false' && correct[0] === falseId;
     if (q.type === 'identification' ? correct.length !== 1 : q.type === 'modified_true_false' ? correct.length !== (freeText ? 2 : 1) || !options.some(option => option.id === correct[0]) : correct.some(key => !options.some(option => option.id === key)) || (q.type === 'multi_select' ? correct.length < 2 || correct.length >= options.length : correct.length !== 1)) return fail(`${id}:answer_key`);
-    const fingerprint = normalized(q.prompt);
+    const fingerprint = quizQuestionKey({ prompt: q.prompt as string, type: String(q.type), leftItem: typeof q.leftItem === 'string' ? q.leftItem : undefined });
     if (!fingerprint || seen.has(fingerprint)) return fail(`${id}:duplicate_question`);
     seen.add(fingerprint);
     const refs = requireSourceRefs(q.sourceRefs, regions.map(r => r.id));

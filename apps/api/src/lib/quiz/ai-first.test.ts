@@ -16,6 +16,9 @@ describe('AI-first context and product contracts', () => {
   it('detects repeated and near-repeated long stems across batches', () => {
     expect(hasRepeatedQuizQuestions([{ prompt: 'What is phishing?' }, { prompt: 'WHAT IS PHISHING!' }])).toBe(true);
     expect(hasRepeatedQuizQuestions([{ prompt: 'Which protocol uses certificates to verify the identity of a remote web server?' }, { prompt: 'Which protocol uses certificates to verify the identity of the remote web server?' }])).toBe(true);
+    const stem = 'Match the VPN technology to its commonly described access method or deployment style.';
+    expect(hasRepeatedQuizQuestions([{ prompt: stem, type: 'matching', leftItem: 'IPSec VPN' }, { prompt: stem, type: 'matching', leftItem: 'SSL/TLS VPN' }])).toBe(false);
+    expect(hasRepeatedQuizQuestions([{ prompt: stem, type: 'matching', leftItem: 'IPSec VPN' }, { prompt: 'Match the term to its description.', type: 'matching', leftItem: 'ipsec vpn' }])).toBe(true);
     const mixed = ['single_select', 'single_select', 'single_select', 'single_select', 'single_select', 'single_select', 'identification', 'identification', 'true_false', 'matching'] as const;
     expect(hasUnbalancedQuizMix(mixed.map(type => ({ type })), ['single_select', 'identification', 'true_false', 'modified_true_false', 'matching'])).toBe(false);
     expect(hasUnbalancedQuizMix(mixed.map(type => ({ type: type === 'matching' ? 'single_select' : type })), ['single_select', 'identification', 'true_false', 'modified_true_false', 'matching'])).toBe(true);
@@ -93,6 +96,16 @@ describe('AI-first context and product contracts', () => {
     expect(learnerQuestion(validated[2]!)).toHaveProperty('leftItem', 'Confidentiality');
     expect(learnerQuestion(validated[1]!)).not.toHaveProperty('acceptedAnswers');
     (raw.questions[0] as typeof raw.questions[0] & { acceptedAnswers: string[] }).acceptedAnswers = ['Invented alias'];
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+  });
+  it('treats matching items with a shared stem as distinct by their left-side term', () => {
+    const raw = quiz();
+    const source = [{ ...regions[0]!, text: 'OpenVPN and Cisco AnyConnect are VPN applications. OpenVPN is open source.' }];
+    const matching = (leftItem: string) => ({ type: 'matching', prompt: 'Match the VPN application to its description.', leftItem, options: [{ id: 'a', text: 'Open source client' }, { id: 'b', text: 'Vendor client' }, { id: 'c', text: 'Browser plugin' }, { id: 'd', text: 'Firewall' }], correctOptionIds: ['a'], acceptedAnswers: [], incorrectTerm: '' });
+    Object.assign(raw.questions[0]!, matching('OpenVPN'));
+    Object.assign(raw.questions[1]!, matching('Cisco AnyConnect'));
+    expect(validateQuizSet(raw, request, source).map(question => question.leftItem).slice(0, 2)).toEqual(['OpenVPN', 'Cisco AnyConnect']);
+    Object.assign(raw.questions[1]!, matching('OpenVPN'));
     expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
   });
   it('drops ungrounded recall aliases but keeps a grounded canonical answer', () => {

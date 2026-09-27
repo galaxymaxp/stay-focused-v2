@@ -23,3 +23,5 @@ export interface StoredQuestion extends QuizQuestion {
     incorrectTerm?: string;
 }
 export const normalized = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+/** Matching items share an instruction stem, so their left-side term identifies them. */
+export const quizQuestionKey = (q: { readonly prompt: string; readonly type?: string; readonly leftItem?: string }) => q.type === 'matching' && q.leftItem ? `matching ${normalized(q.leftItem)}` : normalized(q.prompt);
