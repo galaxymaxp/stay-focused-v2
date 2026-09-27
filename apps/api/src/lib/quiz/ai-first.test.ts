@@ -43,6 +43,7 @@ describe('AI-first context and product contracts', () => {
     expect(result).toHaveLength(5); expect(calls).toHaveLength(1);
     expect(JSON.parse(calls[0]!.prompt.split('\n').slice(1).join('\n'))[0].text).toBe(regions[0]!.text);
     expect(calls[0]!.instructions).toContain('exactly 5');
+    expect(calls[0]!.instructions).toContain('If exactly one option is supported, use single_select');
   });
   it.each(['count', 'key', 'refs', 'duplicate', 'options', 'empty', 'unexpected'])('rejects objectively invalid %s', problem => {
     const raw = quiz();
@@ -53,6 +54,18 @@ describe('AI-first context and product contracts', () => {
     if (problem === 'options') raw.questions[0]!.options[1]!.id = 'a';
     if (problem === 'empty') raw.questions[0]!.explanation = ' ';
     if (problem === 'unexpected') Object.assign(raw.questions[0]!, { secret: 'extra' });
+    expect(() => validateQuizSet(raw, request, regions)).toThrow(GenerationContractError);
+  });
+  it('rejects a combination-choice question mislabeled as multi select', () => {
+    const raw = quiz();
+    raw.questions[4]!.type = 'multi_select';
+    raw.questions[4]!.options = [
+      { id: 'a', text: 'Statements 1, 2, and 3' },
+      { id: 'b', text: 'Statements 1 and 4' },
+      { id: 'c', text: 'Statements 2 and 3' },
+      { id: 'd', text: 'All four statements' },
+    ];
+    raw.questions[4]!.correctOptionIds = ['a'];
     expect(() => validateQuizSet(raw, request, regions)).toThrow(GenerationContractError);
   });
   it('repairs the complete output once', async () => {
