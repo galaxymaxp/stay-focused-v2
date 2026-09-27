@@ -24,6 +24,7 @@ const messages: Record<string, string> = {
   activity_draft_conflict:
     "Your draft changed elsewhere. Reload it before saving.",
   quiz_source_unavailable: "This source is not available for a quiz yet.",
+  quiz_source_capacity_exceeded: "Choose fewer questions for this material.",
   quiz_generation_failed:
     "Your quiz could not be completed. Choose another material.",
   activity_generation_failed:
@@ -76,7 +77,9 @@ export async function experienceRequest<T>(
           : "unavailable";
       throw new ExperienceApiError(
         code,
-        messages[code] ?? "This request could not be completed. Try again.",
+        code === "quiz_source_capacity_exceeded" && value?.ok === false && Number.isInteger(value.error?.supportedMaximum)
+          ? `This material supports up to ${value.error.supportedMaximum} questions. Choose a shorter Quiz.`
+          : messages[code] ?? "This request could not be completed. Try again.",
         value?.ok === false && value.error?.retryable === true,
       );
     }

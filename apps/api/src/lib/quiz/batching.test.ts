@@ -82,7 +82,7 @@ beforeEach(() => {
     vi.resetAllMocks();
     checkpoints.clear(); serial = 0; matchingIndex = 0;
     mocks.resolve.mockResolvedValue(resolved);
-    mocks.assemble.mockResolvedValue({ ...resolved, regions });
+    mocks.assemble.mockResolvedValue({ ...resolved, regions, capacity: { maximum: 100 } });
     mocks.read.mockImplementation(async (_client, _job, key: string) => checkpoints.has(key) ? { payload: checkpoints.get(key) } : null);
     mocks.write.mockImplementation(async (_client, value: { checkpointKey: string; payload: Json }) => { checkpoints.set(value.checkpointKey, value.payload); });
 });
@@ -155,6 +155,27 @@ describe('Quiz batching, budget and repair', () => {
         expect(checkpoints.has('quiz:batch:ai-first:000')).toBe(true);
         expect(checkpoints.has('quiz:batch:ai-first:020')).toBe(false);
         log.mockRestore();
+    });
+    it('rejects a repair that repeats its rejected original and makes no third call', async () => {
+        useRequest({ questionCount: 30, questionTypes: ALL });
+        let rejected: Record<string, unknown> | null = null;
+        const calls = scriptedModel({
+            'quiz:batch:20:initial#0': produced => { rejected = { ...produced, prompt: 'Item 1 prompt.' }; return rejected; },
+            'quiz:batch:20:repair#0': produced => ({ ...produced, prompt: rejected?.prompt }),
+        });
+        const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+        await expect(run()).rejects.toThrow('quiz_generation_failed');
+        expect(quizCalls(calls)).toHaveLength(3);
+        expect(checkpoints.has('quiz:batch:ai-first:020')).toBe(false);
+        expect(log.mock.calls.find(([event]) => event === 'quiz_batch.failed')?.[1]).toMatchObject({ repairRan: true, findings: expect.arrayContaining(['batch_20:repair:r1:duplicate_question']) });
+        log.mockRestore();
+    });
+    it.each([...ALL, 'mixed'] as const)('blocks an oversized persisted %s request before any provider call', async type => {
+        useRequest({ questionCount: 30, ...(type === 'mixed' ? {} : { questionTypes: [type] }) });
+        mocks.assemble.mockResolvedValue({ ...resolved, regions, capacity: { maximum: 20 } });
+        const calls = scriptedModel();
+        await expect(run()).rejects.toThrow('quiz_source_capacity_exceeded');
+        expect(quizCalls(calls)).toHaveLength(0);
     });
     it.each(ALL)('keeps every batch of a single-format %s quiz in that format', async (type) => {
         useRequest({ questionCount: 22, questionTypes: [type] });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { validateIdempotencyKey } from "@/lib/processing-jobs/creation";
+import { quizRetryCapacity } from "@/lib/quiz/service";
 import {
   createProcessingJobServiceClient,
   findLiveProcessingJobRetry,
@@ -46,6 +47,10 @@ export async function POST(
         { ok: true, data: toProcessingJobStatusView(live) },
         { status: 202, headers: corsHeaders() },
       );
+    }
+    const supportedMaximum = await quizRetryCapacity(client, user.id, jobId);
+    if (supportedMaximum !== null) {
+      return NextResponse.json({ ok: false, error: { code: "quiz_source_capacity_exceeded", message: `This material supports up to ${supportedMaximum} questions. Choose a shorter Quiz.`, supportedMaximum, retryable: false } }, { status: 422, headers: corsHeaders() });
     }
     const job = await retryProcessingJob(
       client,

@@ -46,6 +46,12 @@ describe("experience client", () => {
       ),
     ).rejects.toThrow("The server could not load this content.");
   });
+  it("shows the supported Quiz maximum from a typed capacity rejection", async () => {
+    await expect(experienceRequest({
+      baseUrl: "https://api.example", accessToken: "token",
+      fetchImpl: async () => Response.json({ ok: false, error: { code: "quiz_source_capacity_exceeded", supportedMaximum: 43, message: "private detail", retryable: false } }, { status: 422 }),
+    }, "/api/experience/quizzes", { method: "POST" })).rejects.toThrow("supports up to 43 questions");
+  });
   it("handles invalid JSON as a safe connection failure", async () => {
     await expect(
       experienceRequest(

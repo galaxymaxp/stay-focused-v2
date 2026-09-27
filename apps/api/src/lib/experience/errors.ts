@@ -1,7 +1,7 @@
 import type { ExperienceError } from '@stay-focused/shared';
 
 export class ExperienceFailure extends Error {
-  constructor(readonly status: number, readonly code: ExperienceError['code']) {
+  constructor(readonly status: number, readonly code: ExperienceError['code'], readonly supportedMaximum?: number) {
     super(code);
   }
 }
@@ -10,6 +10,7 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
   const copy: Record<ExperienceError['code'], Omit<ExperienceError, 'code'>> = {
     quiz_generation_unavailable: { title: 'Quiz', message: 'Quiz generation is temporarily unavailable.', retryable: false, action: 'none' },
     quiz_source_unavailable: { title: 'Quiz', message: 'Prepare the selected course material or choose another source.', retryable: false, action: 'none' },
+    quiz_source_capacity_exceeded: { title: 'Quiz', message: 'Choose fewer questions for this material.', retryable: false, action: 'none' },
     quiz_not_found: { title: 'Quiz', message: 'Quiz could not be found.', retryable: false, action: 'none' },
     quiz_generation_failed: { title: 'Quiz', message: 'The questions did not pass source and correctness validation.', retryable: false, action: 'none' },
     quiz_attempt_not_found: { title: 'Quiz', message: 'Quiz attempt could not be found.', retryable: false, action: 'none' },
@@ -36,7 +37,7 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
     rate_limited: { title: 'Please wait', message: 'Try again after the current work has finished.', retryable: true, action: 'retry' },
     conflict: { title: 'Request has changed', message: 'Start a new request for the changed material.', retryable: false, action: 'none' },
   };
-  return { status: failure.status, error: { code: failure.code, ...copy[failure.code] } };
+  return { status: failure.status, error: { code: failure.code, ...copy[failure.code], ...(failure.code === 'quiz_source_capacity_exceeded' && Number.isInteger(failure.supportedMaximum) ? { supportedMaximum: failure.supportedMaximum } : {}) } };
 }
 export function requireFound<T>(value: T | null | undefined): T {
   if (value == null) throw new ExperienceFailure(404, 'not_found');

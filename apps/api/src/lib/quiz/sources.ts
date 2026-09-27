@@ -1,5 +1,5 @@
 import type { Database } from '@stay-focused/db';
-import type { QuizGenerationRequest,QuizSourceReference } from '@stay-focused/shared';
+import { quizSourceCapacity,type QuizCapacitySection,type QuizGenerationRequest,type QuizSourceReference } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sanitizeCanvasTitleText } from '../canvas-source-safety';
 import { ExperienceFailure } from '../experience/errors';
@@ -120,6 +120,14 @@ export async function assembleQuizSources(client: Client, userId: string, reques
     const sections = Array.isArray(reviewer.sections) ? reviewer.sections.map(record) : [];
     if (request.selectedTopicIds && request.selectedTopicIds.some(id => !sections.some(section => section.id === id)))
         throw new ExperienceFailure(400, 'invalid_request');
+    const capacitySections: QuizCapacitySection[] = sections.filter(section => !request.selectedTopicIds || request.selectedTopicIds.includes(section.id as string)).map(section => ({
+        title: typeof section.title === 'string' ? section.title : '',
+        blocks: (Array.isArray(section.items) ? section.items : []).map(record).map(item => ({
+            title: typeof item.title === 'string' ? item.title : '',
+            keyPoints: Array.isArray(record(item.sourceCore).keyPoints) ? (record(item.sourceCore).keyPoints as unknown[]).filter((point): point is string => typeof point === 'string') : [],
+        })),
+    }));
+    const capacity = quizSourceCapacity(capacitySections);
     const regions: QuizRegion[] = sections.filter(section => !request.selectedTopicIds || request.selectedTopicIds.includes(section.id as string)).flatMap(section => {
         if (typeof section.id !== 'string' || typeof section.title !== 'string' || !Array.isArray(section.items)) return [];
         return section.items.map(record).flatMap(item => {
@@ -138,5 +146,5 @@ export async function assembleQuizSources(client: Client, userId: string, reques
     });
     if (!regions.length || regions.reduce((n, r) => n + r.text.length, 0) > 120000)
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
-    return { ...resolved, regions };
+    return { ...resolved, regions, capacity };
 }

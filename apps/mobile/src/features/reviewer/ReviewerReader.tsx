@@ -1,5 +1,5 @@
 import type { AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
-import { selectAssistBlock } from "@stay-focused/shared";
+import { quizCountOptions, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
 import { CheckCircle2, ChevronDown, ChevronUp, Circle, Sparkles } from "lucide-react-native";
@@ -52,7 +52,7 @@ import {
 } from "./reviewerNavigation";
 import { createGenerationIntent } from "../../services/generationRecovery";
 import { memoryKeywordRanges } from "./memoryKeywords";
-import { QUIZ_DIFFICULTIES, QUIZ_QUESTION_COUNTS, quizIntentInput, reviewerArtifactIdFromLibraryId } from "../redesign/quizRequest";
+import { QUIZ_DIFFICULTIES, quizIntentInput, reviewerArtifactIdFromLibraryId } from "../redesign/quizRequest";
 
 type Measurable = View | Text;
 /** Keeps a found line below the header/search bar with readable context above it. */
@@ -463,7 +463,6 @@ function KeyPointsBox({ picking, onHold, children }: { picking: readonly number[
   );
 }
 
-const QUESTION_SEGMENTS = [...QUIZ_QUESTION_COUNTS.map((count) => ({ value: String(count), label: String(count) })), { value: "custom", label: "Custom" }];
 const QUIZ_FORMATS: readonly { value: QuizQuestionType | "mixed"; label: string }[] = [
   { value: "mixed", label: "Mixed" }, { value: "single_select", label: "Multiple Choice" },
   { value: "identification", label: "Identification" }, { value: "true_false", label: "True or False" },
@@ -483,8 +482,14 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
   const [customCount, setCustomCount] = useState("25");
   const [topicsOpen, setTopicsOpen] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState(() => reviewer.sections.map(section => section.id));
+  const capacity = useMemo(() => quizSourceCapacity(reviewer.sections.filter(section => selectedTopics.includes(section.id))), [reviewer, selectedTopics]);
+  const countOptions = useMemo(() => quizCountOptions(capacity.maximum), [capacity.maximum]);
+  const questionSegments = countOptions.length ? [...countOptions.map(value => ({ value: String(value), label: value === capacity.maximum && value !== 100 ? `${value} max` : String(value) })), { value: "custom", label: "Custom" }] : [];
   const questionCount = Number(count === "custom" ? customCount : count);
-  const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= 100;
+  const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= capacity.maximum;
+  useEffect(() => {
+    if (count !== "custom" && Number(count) > capacity.maximum && countOptions.length) setCount(String(countOptions.at(-1)));
+  }, [capacity.maximum, count, countOptions]);
   const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
   const [format, setFormat] = useState<QuizQuestionType | "mixed">("mixed");
   const [busy, setBusy] = useState(false);
@@ -519,9 +524,10 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
       </View>
       <View style={{ gap: spacing[2] }}>
         <Copy muted size="caption">Questions</Copy>
-        <SegmentedControl segments={QUESTION_SEGMENTS} value={count} onChange={setCount} />
-        {count === "custom" ? <TextInput accessibilityLabel="Custom question count, 5 to 100" keyboardType="number-pad" value={customCount} onChangeText={setCustomCount} maxLength={3} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} /> : null}
-        {!validCount ? <Copy size="caption" color={colors.danger}>Choose 5 to 100 questions.</Copy> : null}
+        {questionSegments.length ? <SegmentedControl segments={questionSegments} value={count} onChange={setCount} /> : null}
+        {capacity.maximum >= 5 ? <Copy muted size="caption">{capacity.maximum}-question maximum. Based on the topics and key points in this material.</Copy> : null}
+        {count === "custom" ? <TextInput accessibilityLabel={`Custom question count, 5 to ${capacity.maximum}`} keyboardType="number-pad" value={customCount} onChangeText={setCustomCount} maxLength={3} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} /> : null}
+        {!validCount ? <Copy size="caption" color={colors.danger}>{capacity.maximum < 5 ? "This material needs more distinct study points for a Quiz." : `Choose 5 to ${capacity.maximum} questions.`}</Copy> : null}
       </View>
       <View style={{ gap: spacing[2] }}>
         <Action secondary onPress={() => setTopicsOpen(value => !value)}>{`Select Topics · ${selectedTopics.length} of ${reviewer.sections.length}`}</Action>

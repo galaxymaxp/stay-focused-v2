@@ -2,9 +2,7 @@ import type { QuizDifficulty, QuizQuestionType } from "@stay-focused/shared";
 
 import type { GenerationIntent } from "../../services/generationRecovery";
 
-/** The Quiz settings the server accepts (5–20 questions). */
-export const QUIZ_QUESTION_COUNTS = [10, 20, 30, 50, 100] as const;
-export type QuizQuestionCount = (typeof QUIZ_QUESTION_COUNTS)[number];
+/** Quiz settings accepted after source-capacity validation. */
 export const QUIZ_DIFFICULTIES: readonly { value: QuizDifficulty | "mixed"; label: string }[] = [
   { value: "mixed", label: "Mixed" },
   { value: "easy", label: "Easy" },

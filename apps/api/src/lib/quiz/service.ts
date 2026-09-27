@@ -29,7 +29,9 @@ function requestKey(value: string | null) {
 }
 export async function startQuizGeneration(client: Client, userId: string, input: QuizGenerationRequest, key: string | null) {
     const idempotencyKey = requestKey(key);
-    const source = await resolveQuizSources(client, userId, input);
+    const source = await assembleQuizSources(client, userId, input);
+    if (input.questionCount > source.capacity.maximum)
+        throw new ExperienceFailure(422, 'quiz_source_capacity_exceeded', source.capacity.maximum);
     const { data, error } = await client.rpc('create_quiz_processing_job', { p_user_id: userId, p_course_id: source.courseId, p_reviewer_artifact_id: source.reviewerArtifactId, p_idempotency_key: idempotencyKey, p_input: json(input) });
     if (error) {
         if (error.message === 'conflict')
@@ -42,6 +44,17 @@ export async function startQuizGeneration(client: Client, userId: string, input:
         throw new ExperienceFailure(503, 'quiz_generation_unavailable');
     return dispatchAcceptedProcessingJob(data[0]);
 }
+/** A failed older Quiz may have been accepted before capacity locking existed. */
+export async function quizRetryCapacity(client: Client, userId: string, jobId: string): Promise<number | null> {
+    const { data, error } = await client.from('processing_jobs').select('*').eq('user_id', userId).eq('id', jobId).maybeSingle();
+    if (error || !data || data.user_id !== userId) throw new ExperienceFailure(404, 'not_found');
+    if (data.job_type !== 'quiz_generation') return null;
+    const source = await findProcessingJobSource(client, data);
+    if (source.user_id !== userId) throw new ExperienceFailure(404, 'not_found');
+    const input = readQuizRequest(record(source.metadata).quizInput);
+    const assembled = await assembleQuizSources(client, userId, input);
+    return input.questionCount > assembled.capacity.maximum ? assembled.capacity.maximum : null;
+}
 export async function processQuizJob(client: Client, job: ProcessingJobDatabaseRow, workerId: string) {
     const source = await findProcessingJobSource(client, job);
     if (job.job_type !== 'quiz_generation' || source.user_id !== job.user_id)
@@ -49,18 +62,25 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     const metadata = record(source.metadata), input = readQuizRequest(metadata.quizInput);
     let regions: QuizRegion[];
     let materialIds: string[];
+    let capacity: number;
     const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:source:ai-first');
     if (saved) {
         const value = record(saved.payload);
         regions = value.regions as QuizRegion[];
         materialIds = value.materialIds as string[];
+        capacity = Number(value.capacity);
     } else {
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'preparing_source', statusMessage: 'Preparing quiz material' });
         const sources = await assembleQuizSources(client, job.user_id, input);
         if (sources.courseId !== metadata.courseId || sources.reviewerArtifactId !== metadata.reviewerArtifactId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        regions = sources.regions; materialIds = sources.materialIds;
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:source:ai-first', payload: json({ regions, materialIds }) });
+        regions = sources.regions; materialIds = sources.materialIds; capacity = sources.capacity.maximum;
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:source:ai-first', payload: json({ regions, materialIds, capacity }) });
     }
+    if (!Number.isInteger(capacity)) {
+        const refreshed = await assembleQuizSources(client, job.user_id, input);
+        capacity = refreshed.capacity.maximum;
+    }
+    if (input.questionCount > capacity) throw new ExperienceFailure(422, 'quiz_source_capacity_exceeded', capacity);
     const complete = await readProcessingJobCheckpoint(client, job.id, 'quiz:complete:ai-first');
     let questions: StoredQuestion[];
     if (complete) questions = record(complete.payload).questions as StoredQuestion[];

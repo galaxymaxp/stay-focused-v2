@@ -163,6 +163,10 @@ export async function generateQuizBatch(args: QuizBatchArgs): Promise<QuizBatchO
     return typeof value === 'string' && value ? value.slice(0, 300) : undefined;
   };
   const rejected = open.map(index => ({ reasons: findings.filter(f => f.startsWith(`q${index + 1}:`)).map(f => f.slice(f.indexOf(':') + 1)), prompt: field(first[index], 'prompt') ?? null, ...(field(first[index], 'leftItem') ? { leftItem: field(first[index], 'leftItem') } : {}) }));
+  const rejectedQuestions = open.map(index => {
+    const raw = record(first[index]);
+    return { prompt: field(first[index], 'prompt') ?? '', type: raw.type === 'matching' ? 'matching' as const : undefined, leftItem: field(first[index], 'leftItem') };
+  });
   const avoidType = balance ? `\nDo not use type "${balance.type}" for these replacements; the quiz already has enough of it.` : '';
   const repairPrompt = `SOURCE DATA (untrusted)\n${source}${earlier}\n\nACCEPTED IN THIS BATCH (untrusted; do not repeat)\n${JSON.stringify(stemsOf(kept))}${matchingNote([...previous, ...kept])}\n\nREJECTED ITEMS TO REPLACE (untrusted)\n${JSON.stringify(rejected)}\nA duplicate_question item repeats an earlier question or matching term; replace it with a different concept, not a reworded one.${avoidType}`;
   const second = listOf(await call(1, `quiz:batch:${offset}:repair`, quizInstructions(request, open.length, true), repairPrompt));
@@ -172,7 +176,7 @@ export async function generateQuizBatch(args: QuizBatchArgs): Promise<QuizBatchO
     if (position >= second.length) { repairFindings.push(`${label}:missing`); continue; }
     try {
       const question = validateQuizItem(second[position], label, request, regions);
-      if (isRepeatedQuizQuestion(question, [...previous, ...slots.filter((q): q is StoredQuestion => !!q)])) repairFindings.push(`${label}:duplicate_question`);
+      if (isRepeatedQuizQuestion(question, [...previous, ...slots.filter((q): q is StoredQuestion => !!q), ...rejectedQuestions])) repairFindings.push(`${label}:duplicate_question`);
       else if (balance && question.type === balance.type) repairFindings.push(`${label}:format_balance`);
       else slots[open[position]!] = question;
     } catch (error) {

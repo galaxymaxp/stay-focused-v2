@@ -91,6 +91,8 @@ describe('Quiz source selection', () => {
         expect(value.materialIds).toEqual([`page:${id}`]);
         expect(value.regions).toHaveLength(1);
         expect(value.regions[0]!.text).toContain('Persisted Reviewer');
+        expect(value.capacity.maximum).toBe(0);
+        expect(value.capacity.topicCount).toBe(0);
         expect(value.reviewerArtifactId).toBe(id);
         expect(mocks.structure).not.toHaveBeenCalled();
     });

@@ -18,7 +18,7 @@ beforeEach(() => {
     vi.resetAllMocks();
     checkpoints.clear();
     mocks.resolve.mockResolvedValue(resolved);
-    mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions() });
+    mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions(), capacity: { maximum: 100 } });
     mocks.source.mockResolvedValue({ user_id: 'owner', metadata: { courseId: 'course', reviewerArtifactId: request.reviewerArtifactId, quizInput: request } });
     mocks.read.mockImplementation(async (_client, _job, key: string) => checkpoints.has(key) ? { payload: checkpoints.get(key) } : null);
     mocks.write.mockImplementation(async (_client, value: {
@@ -40,6 +40,13 @@ describe('Quiz existing durable job integration', () => {
         const client = { rpc: vi.fn().mockResolvedValue({ data: [{ ...job, user_id: 'foreign' }], error: null }) } as unknown as SupabaseClient<Database>;
         await expect(startQuizGeneration(client, 'owner', request, 'request-key')).rejects.toThrow('quiz_generation_unavailable');
         expect(mocks.dispatch).not.toHaveBeenCalled();
+    });
+    it('rejects an oversized direct request before creating a job or calling a provider', async () => {
+        const rpc = vi.fn(), client = { rpc } as unknown as SupabaseClient<Database>;
+        mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions(), capacity: { maximum: 12 } });
+        await expect(startQuizGeneration(client, 'owner', { ...request, questionCount: 30 }, 'request-key')).rejects.toThrow('quiz_source_capacity_exceeded');
+        expect(rpc).not.toHaveBeenCalled();
+        expect(mocks.provider).not.toHaveBeenCalled();
     });
     it('checkpoints source plan and verified questions, and resumes without provider calls', async () => {
         const client = {} as SupabaseClient<Database>, provider = acceptingProvider(fixturePlan());
