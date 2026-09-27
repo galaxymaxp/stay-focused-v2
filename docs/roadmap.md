@@ -1,5 +1,9 @@
 # Roadmap
 
+## B38 Google generation cutover readiness (2026-09-27)
+
+**READY FOR CUTOVER — WAITING FOR VERCEL DEPLOYMENT CAPACITY.** The B37 Quiz failure was a multi-select prompt/type mismatch; the prompt was repaired without relaxing validation. Fresh Google-backed Quiz, terminal duplicate replay, scoped Vercel OIDC federation and authenticated dispatch all pass. The worker was rebuilt; production Vercel routing and Workflow rollback stay intact. Capacity has no reliable current reading through the available Hobby CLI/API, so no Vercel deployment was attempted. See [acceptance](ai/acceptance/b38/google-generation-cutover-readiness.md). Next: confirm deployable storage, then one controlled production cutover and smoke test.
+
 ## B37 Google Cloud generation foundation (2026-09-27)
 
 **PARTIAL.** A private Cloud Run worker and OIDC Cloud Tasks queue in the existing Stay Focus project executed the shared Reviewer/Quiz/Activity pipeline without a Vercel deployment. Five fresh Reviewer source formats and Activity succeeded, including existing scanned-PDF Google OCR and Library reopen. Quiz failed existing source validation; terminal replay was not executed after automatic approval review hit its usage limit. Vercel dispatcher workload identity and deployment capacity remain B38 prerequisites. Production still uses Vercel Workflow. See [acceptance](ai/acceptance/b37/google-cloud-generation-foundation.md).
