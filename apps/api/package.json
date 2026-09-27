@@ -27,6 +27,7 @@
     "@stay-focused/ocr": "*",
     "@stay-focused/shared": "*",
     "@supabase/supabase-js": "^2.49.4",
+    "@vercel/oidc": "^3.8.9",
     "expo-server-sdk": "^6.1.0",
     "fast-xml-parser": "^5.11.1",
     "fflate": "^0.8.3",

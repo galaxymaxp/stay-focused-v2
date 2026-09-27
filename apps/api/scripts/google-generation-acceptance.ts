@@ -30,6 +30,12 @@ function refreshOperatorToken() {
   auth.setCredentials({ access_token: token });
 }
 async function enqueue(reference: GoogleJobReference) {
+  if (process.env.B38_USE_FEDERATED_DISPATCH === "1") {
+    // Exercise the exact Vercel dispatcher implementation with a short-lived
+    // Vercel OIDC token supplied to this controlled server-side harness.
+    await enqueueGoogleJob(reference);
+    return;
+  }
   refreshOperatorToken();
   await enqueueGoogleJob(reference, { client: auth });
 }
@@ -57,21 +63,24 @@ async function main() {
     job = await startReviewerGeneration(client, owner, { courseId: required("B37_COURSE_ID"), materialId: required("B37_MATERIAL_ID") }, idempotencyKey, { schedule: () => undefined });
   }
   if (job.user_id !== owner) throw new Error("acceptance_owner_mismatch");
-  const prepared = await dispatchGoogleJob(job, { client, enqueue: async () => undefined });
+  const evidenceOnly = process.env.B38_EVIDENCE_ONLY === "1";
+  const prepared = evidenceOnly ? job : await dispatchGoogleJob(job, { client, enqueue: async () => undefined });
   if (!prepared.google_dispatch_id || prepared.execution_backend !== "google_cloud") throw new Error("acceptance_backend_mismatch");
   const reference = { jobId: prepared.id, dispatchId: prepared.google_dispatch_id };
   // Save identity before enqueue so an operator can reconcile an interrupted harness.
   const evidence: Record<string, unknown> = { label, jobId: job.id, idempotencyKey, startedAt: new Date(started).toISOString(), ...previous };
   writeFileSync(evidencePath, JSON.stringify(evidence, null, 2));
-  if (label === "cancel") await requestProcessingJobCancellation(client, owner, job.id);
+  if (label === "cancel" && !evidenceOnly) await requestProcessingJobCancellation(client, owner, job.id);
   let holder: string | undefined;
   if (process.env.B37_CONTROLLED_RETRY === "1" && !resumeId) {
     holder = `google-cloud:${randomUUID()}`;
     const claim = await client.rpc("claim_google_processing_job_v1", { p_job_id: job.id, p_dispatch_id: reference.dispatchId, p_worker_id: holder });
     if (claim.error || claim.data?.[0]?.lease_owner !== holder) throw new Error("acceptance_hold_failed");
   }
-  await enqueue(reference);
-  console.info("b37.accepted", { label, jobId: job.id });
+  if (!evidenceOnly) {
+    await enqueue(reference);
+    console.info("b37.accepted", { label, jobId: job.id });
+  }
   if (label === "cancel-running" && !resumeId) {
     let observedRunning = false;
     for (let attempt = 0; attempt < 120; attempt++) {
@@ -125,6 +134,19 @@ async function main() {
     if (!artifactId) throw new Error("acceptance_artifact_missing");
     const reopened = await service.getLibraryArtifact(owner, artifactId);
     Object.assign(evidence, { artifactId, reopenType: reopened.artifact.type, libraryVisible: library.items.some(item => item.id === artifactId), generationState: generation.state });
+    if (label === "quiz") {
+      const quizzes = await client.from("quizzes").select("id,user_id").eq("generation_id", job.id).eq("user_id", owner);
+      const versions = await client.from("generated_artifact_versions").select("id,user_id").eq("generation_job_id", job.id).eq("user_id", owner);
+      if (quizzes.error || versions.error) throw new Error("acceptance_quiz_evidence_unavailable");
+      Object.assign(evidence, { quizRows: quizzes.data.length, artifactVersions: versions.data.length,
+        ownershipValid: quizzes.data.every(row => row.user_id === owner) && versions.data.every(row => row.user_id === owner) });
+      // Quiz Library records use quizzes + quiz_keys; they do not create a
+      // generated_artifact_versions row (that table stores Reviewers here).
+      if (quizzes.data.length !== 1 || versions.data.length !== 0 || !evidence.ownershipValid ||
+          evidence.resultCount !== 1 || !evidence.libraryVisible || evidence.reopenType !== "quiz") {
+        throw new Error("acceptance_quiz_integrity_failed");
+      }
+    }
   }
   writeFileSync(evidencePath, JSON.stringify(evidence, null, 2));
   console.info("b37.result", { label, jobId: job.id, status: job.status, durationMs: evidence.durationMs, artifactId: evidence.artifactId ?? null });

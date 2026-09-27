@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { GoogleAuth, type AuthClient } from "google-auth-library";
+import { ExternalAccountClient, GoogleAuth, type AuthClient } from "google-auth-library";
+import { getVercelOidcToken } from "@vercel/oidc";
 import type { ProcessingJobDatabaseRow } from "@stay-focused/db";
 import { createProcessingJobServiceClient, type ProcessingJobServiceClient } from "./repository";
 import { failProcessingJob, readProcessingJobState } from "./worker-repository";
@@ -38,14 +39,48 @@ export function googleTaskConfig(environment: Readonly<Record<string, string | u
   return { parent: `projects/${project}/locations/${location}/queues/${queue}`, workerUrl: url.origin, serviceAccountEmail };
 }
 
+export function googleFederationConfig(environment: Readonly<Record<string, string | undefined>> = process.env) {
+  const project = environment.GOOGLE_CLOUD_PROJECT_ID?.trim();
+  const number = environment.GOOGLE_WIF_PROJECT_NUMBER?.trim();
+  const pool = environment.GOOGLE_WIF_POOL_ID?.trim();
+  const provider = environment.GOOGLE_WIF_PROVIDER_ID?.trim();
+  const email = environment.GOOGLE_GENERATION_DISPATCHER_EMAIL?.trim();
+  if (!project || !number || !pool || !provider || !email ||
+      !/^\d+$/.test(number) || !/^[a-z][a-z0-9-]+$/.test(pool) ||
+      !/^[a-z][a-z0-9-]+$/.test(provider) ||
+      email !== `generation-dispatcher@${project}.iam.gserviceaccount.com`) {
+    throw new Error("google_generation_federation_not_configured");
+  }
+  return {
+    audience: `//iam.googleapis.com/projects/${number}/locations/global/workloadIdentityPools/${pool}/providers/${provider}`,
+    email,
+  };
+}
+
+export async function googleDispatcherClient(): Promise<AuthClient> {
+  if (process.env.VERCEL === "1" || process.env.GOOGLE_GENERATION_USE_VERCEL_OIDC === "1") {
+    const { audience, email } = googleFederationConfig();
+    const client = ExternalAccountClient.fromJSON({
+      type: "external_account",
+      audience,
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+      token_url: "https://sts.googleapis.com/v1/token",
+      service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${email}:generateAccessToken`,
+      subject_token_supplier: { getSubjectToken: () => getVercelOidcToken() },
+    });
+    if (!client) throw new Error("google_generation_federation_not_configured");
+    return client;
+  }
+  return new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] }).getClient();
+}
+
 export async function enqueueGoogleJob(reference: GoogleJobReference, dependencies: {
   readonly client?: Pick<AuthClient, "request">;
 } = {}): Promise<void> {
   const config = googleTaskConfig();
-  // ADC supports an attached identity or a workload-identity federation config.
+  // Vercel uses its request-scoped OIDC token; other server runtimes use ADC.
   // The OCR static JSON credential is deliberately not used for dispatch.
-  const auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
-  const client = dependencies.client ?? await auth.getClient();
+  const client = dependencies.client ?? await googleDispatcherClient();
   try {
     await client.request({
       url: `https://cloudtasks.googleapis.com/v2/${config.parent}/tasks`,
@@ -67,6 +102,14 @@ export async function enqueueGoogleJob(reference: GoogleJobReference, dependenci
     // Deterministic task names make acceptance replay safe, including a lost response.
     if (typeof error === "object" && error !== null && "response" in error &&
         (error.response as { status?: number } | undefined)?.status === 409) return;
+    const response = typeof error === "object" && error !== null && "response" in error
+      ? error.response as { status?: number; data?: { error?: { status?: string; errors?: { reason?: string }[] } } }
+      : undefined;
+    console.info("google_generation.enqueue_failed", {
+      httpStatus: response?.status ?? null,
+      category: response?.data?.error?.status ?? null,
+      reason: response?.data?.error?.errors?.[0]?.reason ?? null,
+    });
     throw new Error("google_generation_enqueue_failed");
   }
 }

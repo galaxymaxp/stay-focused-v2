@@ -19,11 +19,15 @@ async function main() {
   async function snapshot() {
     const state = await readProcessingJobState(client, job!.id);
     const results = await client.from("processing_job_results").select("id").eq("job_id", job!.id).eq("user_id", owner!);
-    const checkpoints = await client.from("processing_job_checkpoints").select("checkpoint_key,updated_at").eq("job_id", job!.id).order("checkpoint_key");
+    const checkpoints = await client.from("processing_job_checkpoints").select("checkpoint_key,updated_at,payload").eq("job_id", job!.id).order("checkpoint_key");
     const versions = await client.from("generated_artifact_versions").select("id").eq("generation_job_id", job!.id).eq("user_id", owner!);
-    if (results.error || checkpoints.error || versions.error) throw new Error("replay_snapshot_unavailable");
+    const quizzes = await client.from("quizzes").select("id").eq("generation_id", job!.id).eq("user_id", owner!);
+    if (results.error || checkpoints.error || versions.error || quizzes.error) throw new Error("replay_snapshot_unavailable");
     return { status: state.status, attemptCount: state.attempt_count, sourceId: state.source_snapshot_id,
-      resultIds: results.data.map(row => row.id), versionIds: versions.data.map(row => row.id), checkpoints: checkpoints.data };
+      resultIds: results.data.map(row => row.id), versionIds: versions.data.map(row => row.id), quizIds: quizzes.data.map(row => row.id),
+      checkpoints: checkpoints.data.map(row => ({ key: row.checkpoint_key, updatedAt: row.updated_at,
+        ...(row.checkpoint_key.startsWith("ai-first:calls:") ? { providerCalls: (row.payload as { count?: number })?.count ?? null } : {}),
+      })) };
   }
   const before = await snapshot();
   const auth = new OAuth2Client();

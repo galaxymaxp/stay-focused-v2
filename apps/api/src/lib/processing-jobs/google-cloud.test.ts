@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { ProcessingJobDatabaseRow } from "@stay-focused/db";
-import { dispatchGoogleJob, executeGoogleJob, googleTaskConfig, parseGoogleJobReference } from "./google-cloud";
+import { dispatchGoogleJob, executeGoogleJob, googleFederationConfig, googleTaskConfig, parseGoogleJobReference } from "./google-cloud";
 import { getProcessingExecutionBackend } from "./workflow-dispatch";
 
 const id = "11111111-1111-4111-8111-111111111111";
@@ -27,6 +27,17 @@ describe("Google generation delivery", () => {
     expect(googleTaskConfig(config).parent).toContain("projects/project-one/");
     expect(() => googleTaskConfig({ ...config, GOOGLE_GENERATION_WORKER_URL: "http://localhost" })).toThrow();
     expect(() => googleTaskConfig({ ...config, GOOGLE_TASKS_INVOKER_EMAIL: "invoker@other.iam.gserviceaccount.com" })).toThrow();
+  });
+  it("pins federation to the dedicated dispatcher identity and provider", () => {
+    const config = { GOOGLE_CLOUD_PROJECT_ID: "project-one", GOOGLE_WIF_PROJECT_NUMBER: "123456789012",
+      GOOGLE_WIF_POOL_ID: "vercel", GOOGLE_WIF_PROVIDER_ID: "production",
+      GOOGLE_GENERATION_DISPATCHER_EMAIL: "generation-dispatcher@project-one.iam.gserviceaccount.com" };
+    expect(googleFederationConfig(config)).toEqual({
+      audience: "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/vercel/providers/production",
+      email: config.GOOGLE_GENERATION_DISPATCHER_EMAIL,
+    });
+    expect(() => googleFederationConfig({ ...config, GOOGLE_GENERATION_DISPATCHER_EMAIL: "owner@project-one.iam.gserviceaccount.com" })).toThrow();
+    expect(() => googleFederationConfig({ ...config, GOOGLE_WIF_POOL_ID: "../other" })).toThrow();
   });
   it.each(["succeeded", "cancelled", "failed", "expired"])("acknowledges %s without extraction or OpenAI", async (status) => {
     const run = vi.fn();
