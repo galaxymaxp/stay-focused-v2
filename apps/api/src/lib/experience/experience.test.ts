@@ -264,6 +264,10 @@ describe('Library ownership and persisted output', () => {
     expect((await api.getLibrary('owner')).items).toEqual([]);
     await expect(api.getLibraryArtifact('owner', 'generation:job')).rejects.toMatchObject({ status: 404 });
   });
+  it.each([true, false])('reports a failed Quiz generation as retryable=%s from the job', async retryable => {
+    const { api } = service({ ...libraryData, processing_jobs: [{ ...libraryData.processing_jobs![0], job_type: 'quiz_generation', status: 'failed', retryable }], generated_artifacts: [] });
+    expect((await api.getGeneration('owner', 'job')).error).toMatchObject({ code: 'quiz_generation_failed', retryable, action: retryable ? 'retry' : 'none' });
+  });
   it.each(['cancelled', 'cancellation_requested', 'failed', 'running'] as const)('never publishes persisted result for %s job', async status => {
     const { api } = service({ ...libraryData, processing_jobs: [{ ...libraryData.processing_jobs![0], status }], generated_artifacts: [] });
     expect((await api.getLibrary('owner')).items).toEqual([]);

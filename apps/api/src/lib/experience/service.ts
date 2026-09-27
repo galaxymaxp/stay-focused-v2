@@ -236,7 +236,7 @@ export class ExperienceService {
     const job = requireFound((await this.rows('processing_jobs', userId)).find(j => j.id === generationId && (j.job_type === 'reviewer_generation' || j.job_type === 'activity_generation' || j.job_type === 'quiz_generation')));
     if (job.job_type === 'quiz_generation') {
       const quiz=job.status==='succeeded'?(await this.quizRecords(userId)).find(r=>r.generationId===job.id):null;
-      return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:quiz?.summary.id??null,error:['failed','expired'].includes(job.status)?{code:'quiz_generation_failed',title:'Quiz',message:'Quiz generation did not finish.',retryable:false,action:'none'}:null};
+      return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:quiz?.summary.id??null,error:['failed','expired'].includes(job.status)?{code:'quiz_generation_failed',title:'Quiz',message:'Quiz generation did not finish.',retryable:job.retryable===true,action:job.retryable===true?'retry':'none'}:null};
     }
     if (job.job_type === 'activity_generation') {
       const draft=job.status==='succeeded'?(await this.activityDraftRecords(userId)).find(r=>r.draft.generationId===job.id):null;
