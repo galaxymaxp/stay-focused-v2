@@ -27,7 +27,10 @@ export interface AssistRequest {
   readonly contentHash: string;
   readonly assistType: AssistType;
   readonly promptVersion: string;
+  /** One key point of the block to focus on; absent means the whole block. */
+  readonly pointIndex?: number;
 }
+export const MAX_ASSIST_POINT_INDEX = 49;
 export interface AssistResult extends AssistRequest {
   readonly text: string;
   readonly createdAt: string;
@@ -54,12 +57,19 @@ export function selectAssistBlock(reviewer: ReviewerReaderModel, sectionId: stri
       explanation: block.explanation, keyPoints: block.keyPoints, evidence: block.evidence } });
   return { reviewerId: reviewer.id, sectionId, blockId, block, canonicalContent, contentHash: assistContentHash(canonicalContent) };
 }
-export function assistRequest(selection: AssistSelection, assistType: AssistType, promptVersion = ASSIST_PROMPT_VERSION): AssistRequest {
+export function assistRequest(selection: AssistSelection, assistType: AssistType, promptVersion = ASSIST_PROMPT_VERSION, pointIndex?: number): AssistRequest {
   return { reviewerId: selection.reviewerId, sectionId: selection.sectionId, blockId: selection.blockId,
-    contentHash: selection.contentHash, assistType, promptVersion };
+    contentHash: selection.contentHash, assistType, promptVersion, ...(pointIndex === undefined ? {} : { pointIndex }) };
 }
 export function assistCacheKey(request: AssistRequest): string {
-  return JSON.stringify([request.reviewerId, request.sectionId, request.blockId, request.assistType, request.contentHash, request.promptVersion]);
+  const key: unknown[] = [request.reviewerId, request.sectionId, request.blockId, request.assistType, request.contentHash, request.promptVersion];
+  // Whole-block keys keep their original shape, so entries saved before point focus stay valid.
+  if (request.pointIndex !== undefined) key.push(request.pointIndex);
+  return JSON.stringify(key);
+}
+export function validAssistPointIndex(value: unknown, block?: AssistBlock): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_ASSIST_POINT_INDEX
+    && (!block || (value < block.keyPoints.length && block.keyPoints[value]!.trim().length > 0));
 }
 export function validAssistText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 2400 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value);
@@ -68,5 +78,6 @@ export function isAssistResult(value: unknown, request: AssistRequest): value is
   if (!value || typeof value !== 'object') return false;
   const row = value as Record<string, unknown>;
   return Object.entries(request).every(([key, expected]) => row[key] === expected)
+    && (request.pointIndex !== undefined || row.pointIndex === undefined)
     && validAssistText(row.text) && typeof row.createdAt === 'string' && Number.isFinite(Date.parse(row.createdAt));
 }

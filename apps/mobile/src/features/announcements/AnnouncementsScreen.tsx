@@ -2,11 +2,12 @@ import type { StudentAnnouncement, StudentAnnouncementList } from "@stay-focused
 import { router, useLocalSearchParams } from "expo-router";
 import { BookOpen, ExternalLink, Mail, MailOpen, Pin, PinOff, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { Animated, BackHandler, Easing, Linking, Pressable, ScrollView, StatusBar, Vibration, View, useWindowDimensions } from "react-native";
+import { Animated, BackHandler, Easing, Linking, Pressable, ScrollView, StatusBar, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Action, Copy, DoneButton, Notice, Page, RowLink, Sheet, Surface, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
+import { useSheetDrag } from "../../design/sheetDrag";
 import { motion, useTheme } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
 import { arrangeList } from "../redesign/listPreferences";
@@ -41,7 +42,6 @@ export function useArrangedAnnouncements(items: readonly StudentAnnouncement[]) 
     isRead: (id: string) => read.has(id),
     isPinned: (id: string) => prefs.pinned.announcement.includes(id),
     setPinned: (id: string, pinned: boolean) => {
-      if (pinned) Vibration.vibrate(8);
       change(() => pin("announcement", id, pinned));
     },
     setRead: (id: string, value: boolean) => change(() => markRead(id, value)),
@@ -96,7 +96,6 @@ export function AnnouncementItem({
           label={`${read ? "" : "Unread: "}${item.title}${pinned ? ", pinned" : ""}`}
           onPress={open}
           onLongPress={() => {
-            Vibration.vibrate(10);
             setOptions(true);
           }}
           {...swipeAccessibility([...leading, ...trailing, ...canvas])}
@@ -213,15 +212,17 @@ export function AnnouncementDetailScreen() {
     if (reducedMotion) return;
     Animated.spring(rise, { toValue: 0, ...motion.sheet, useNativeDriver: true }).start();
   }, [reducedMotion, rise, tint]);
-  const close = () => {
+  const close = (from = 0) => {
     if (closing.current) return;
     closing.current = true;
+    if (from > 0) rise.setValue(Math.min(1, from / (height * 0.6)));
     const leave = () => (router.canGoBack() ? router.back() : router.replace("/today"));
     Animated.parallel([
       Animated.timing(tint, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       Animated.timing(rise, { toValue: reducedMotion ? 0 : 1, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
     ]).start(leave);
   };
+  const pull = useSheetDrag(close);
 
   // Android back plays the same exit as the close button.
   useEffect(() => {
@@ -235,10 +236,11 @@ export function AnnouncementDetailScreen() {
     <View style={{ flex: 1, justifyContent: "flex-end" }}>
       <StatusBar barStyle="light-content" />
       <Animated.View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: tint }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close announcement" testID="announcement-backdrop" onPress={close} style={{ flex: 1 }} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Close announcement" testID="announcement-backdrop" onPress={() => close()} style={{ flex: 1 }} />
       </Animated.View>
       <Animated.View
         accessibilityViewIsModal
+        {...pull.panHandlers}
         style={{
           maxHeight: height - insets.top - spacing[6],
           minHeight: Math.min(360, height * 0.5),
@@ -246,7 +248,7 @@ export function AnnouncementDetailScreen() {
           borderTopLeftRadius: radius.page,
           borderTopRightRadius: radius.page,
           paddingBottom: insets.bottom,
-          transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [0, height * 0.6] }) }],
+          transform: [{ translateY: Animated.add(rise.interpolate({ inputRange: [0, 1], outputRange: [0, height * 0.6] }), pull.drag) }],
         }}
       >
         <View style={{ alignItems: "center", paddingTop: spacing[2] }}>
@@ -257,7 +259,7 @@ export function AnnouncementDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Close"
             testID="announcement-close"
-            onPress={close}
+            onPress={() => close()}
             hitSlop={6}
             style={({ pressed }) => ({ width: hitTarget.min, height: hitTarget.min, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.55 : 1 })}
           >
@@ -266,9 +268,9 @@ export function AnnouncementDetailScreen() {
             </View>
           </Pressable>
           <Copy muted size="caption" numberOfLines={1} style={{ flex: 1, textAlign: "center" }}>{announcement ? announcementCourseLabel(announcement) : "Announcement"}</Copy>
-          <DoneButton onPress={close} />
+          <DoneButton onPress={() => close()} />
         </View>
-        <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ padding: spacing[5], gap: spacing[3], paddingBottom: spacing[6] }}>
+        <ScrollView style={{ flexShrink: 1 }} onScroll={pull.onScroll} scrollEventThrottle={16} alwaysBounceVertical={false} contentContainerStyle={{ padding: spacing[5], gap: spacing[3], paddingBottom: spacing[6] }}>
           {announcement ? (
             <AnnouncementBody announcement={announcement} />
           ) : announcements.loading ? (

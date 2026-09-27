@@ -22,7 +22,7 @@ import {
 import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibrary";
 import { persistedArtifactId } from "../../services/localLibrary/librarySync";
 import { GenerationCore } from "./GenerationCore";
-import { generationCoreState, generationMessages, queueSections } from "./presentation";
+import { generationCoreState, generationMessages, queueSections, stalledInQueue } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { useListPreferences } from "./useListPreferences";
 
@@ -115,6 +115,22 @@ export function GenerationScreen() {
   const running =
     !data ||
     ["queued", "preparing", "generating", "finalizing"].includes(data.state);
+  const stalled = !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
+  const [cancelling, setCancelling] = useState(false);
+  async function cancelStalled() {
+    if (!id || cancelling) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      await experienceRequest(client, `/api/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+      generation.refresh();
+      activity.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not cancel this generation.");
+    } finally {
+      setCancelling(false);
+    }
+  }
   return (
     <Page
       title=""
@@ -137,11 +153,13 @@ export function GenerationScreen() {
           accessibilityLiveRegion="polite"
           style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
-          <GenerationStatus message={data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
+          <GenerationStatus message={stalled ? "Still waiting to start" : data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
           <GenerationCore state={generationCoreState(data?.state ?? null, !!id)} />
           <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
-              ? running
+              ? stalled
+                ? "The generation service hasn’t picked this up. It may be busy or at its usage limit. Cancel and try again later."
+                : running
                 ? "You can leave this screen. We’ll keep working."
                 : "View your saved work or return to Queue."
               : autoStart
@@ -150,6 +168,9 @@ export function GenerationScreen() {
           </Copy>
           {intent && !id && (!autoStart || error) ? (
             <View style={{ width: 240 }}><Action disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Starting…" : autoStart ? "Try again" : "Start generation"}</Action></View>
+          ) : null}
+          {stalled ? (
+            <View style={{ width: 240 }}><Action disabled={cancelling} pill onPress={() => void cancelStalled()}>{cancelling ? "Cancelling…" : "Cancel generation"}</Action></View>
           ) : null}
           <View style={{ width: 240 }}><Action secondary pill onPress={() => router.push("/generation-queue")}>View Queue</Action></View>
         </View>
@@ -405,6 +426,21 @@ function QueueCard({
       setBusy(false);
     }
   }
+  const stalled = stalledInQueue({ status: job.status, since: job.updatedAt ?? job.createdAt });
+  async function cancel() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await experienceRequest(client, `/api/jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
+      onRefresh();
+      activity.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not cancel this generation.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function retry() {
     if (busy) return;
     setBusy(true);
@@ -443,10 +479,15 @@ function QueueCard({
               : job.status === "cancellation_requested"
                 ? "Stopping"
                 : job.status === "queued"
-                  ? "Queued"
+                  ? stalled ? "Hasn’t started · the generation service may be at its limit" : "Queued"
                   : "Cancelled"}
       </Copy>
       </RowLink>
+      {stalled && (
+        <Action secondary disabled={busy} onPress={() => void cancel()}>
+          Cancel
+        </Action>
+      )}
       {job.retryable && ["failed", "expired"].includes(job.status) && (
         <Action secondary disabled={busy} onPress={() => void retry()}>
           Retry

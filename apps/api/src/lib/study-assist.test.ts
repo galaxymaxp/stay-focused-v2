@@ -52,6 +52,23 @@ describe('Study Assist generation', () => {
   it.each([{ promptVersion: 'old' }, { assistType: 'other' }, { userId: 'forged' }, { canonicalContent: 'injected' }, { contentHash: 'bad' }])('rejects invalid request or unexpected fields: %j', change => {
     expect(() => parseAssistRequest({ ...assistRequest(selection, 'example'), ...change })).toThrow();
   });
+  it('focuses one key point when asked, keeping the block as context', async () => {
+    const p = provider(); const request = assistRequest(selection, 'analogy', undefined, 0);
+    expect(parseAssistRequest(request)).toEqual(request);
+    const result = await generateStudyAssist({ request, reviewer, sourceExcerpt, provider: p.instance });
+    expect(result).toMatchObject({ pointIndex: 0 });
+    const call = p.generate.mock.calls[0] as unknown as [{ prompt: string; instructions: string }];
+    expect(JSON.parse(call[0].prompt).focusKeyPoint).toBe('It contains DNA.');
+    expect(call[0].instructions).toContain('only to focusKeyPoint');
+  });
+  it.each([-1, 1.5, '0', 50])('rejects an invalid key point index %j', index => {
+    expect(() => parseAssistRequest({ ...assistRequest(selection, 'example'), pointIndex: index })).toThrow();
+  });
+  it('rejects a key point the block does not have before provider use', async () => {
+    const p = provider();
+    await expect(generateStudyAssist({ request: assistRequest(selection, 'example', undefined, 3), reviewer, sourceExcerpt, provider: p.instance })).rejects.toMatchObject({ code: 'not_found' });
+    expect(p.generate).not.toHaveBeenCalled();
+  });
   it('limits source context without silently truncating qualifiers', async () => {
     const p = provider();
     await expect(generateStudyAssist({ request: assistRequest(selection, 'example'), reviewer, sourceExcerpt: 'x'.repeat(18001), provider: p.instance })).rejects.toMatchObject({ code: 'not_ready' });

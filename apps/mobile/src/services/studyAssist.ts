@@ -13,8 +13,18 @@ export function createStudyAssistService(dependencies: {
 }) {
   const pending = new Map<string, Promise<AssistResult>>();
   return {
-    request(owner: string, client: ExperienceClient, selection: AssistSelection, type: AssistType, promptVersion?: string): Promise<AssistResult> {
-      const request = assistRequest(selection, type, promptVersion);
+    /** A saved result only; never reaches the network. */
+    async peek(owner: string, selection: AssistSelection, type: AssistType, pointIndex?: number): Promise<AssistResult | null> {
+      if (!owner) return null;
+      try {
+        const cache = await dependencies.cache();
+        return cache ? await cache.readAssist(owner, assistRequest(selection, type, undefined, pointIndex), selection.canonicalContent) : null;
+      } catch {
+        return null;
+      }
+    },
+    request(owner: string, client: ExperienceClient, selection: AssistSelection, type: AssistType, promptVersion?: string, pointIndex?: number): Promise<AssistResult> {
+      const request = assistRequest(selection, type, promptVersion, pointIndex);
       const key = JSON.stringify([owner, assistCacheKey(request), selection.canonicalContent]);
       const existing = pending.get(key);
       if (existing) return existing;

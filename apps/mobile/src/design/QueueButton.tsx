@@ -6,6 +6,7 @@ import { Animated, Easing, Pressable, Text, View } from "react-native";
 import orbDark from "../../assets/queue/orb-dark.png";
 import orbLight from "../../assets/queue/orb-light.png";
 import { useAppActivity } from "./appActivity";
+import { haptic } from "./haptics";
 import { motion, shouldAnimate, useTheme } from "./theme";
 import { hitTarget } from "./tokens";
 
@@ -64,7 +65,10 @@ export const QueueButton = memo(function QueueButton() {
       accessibilityRole="button"
       accessibilityLabel={status ? `Open Queue, ${status}` : "Open Queue"}
       testID="queue-button"
-      onPress={() => router.push("/generation-queue")}
+      onPress={() => {
+        haptic.tap();
+        router.push("/generation-queue");
+      }}
       style={({ pressed }) => ({ minHeight: hitTarget.min, minWidth: hitTarget.min, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, opacity: pressed ? 0.6 : 1 })}
     >
       {count > 0 ? (

@@ -21,10 +21,12 @@ vi.mock("react-native", () => ({
     multiply: (a: unknown, b: unknown) => ({ a, b }),
   },
 }));
-vi.mock("lucide-react-native", () => ({ ChevronDown: "ChevronDown", ChevronUp: "ChevronUp", FileQuestion: "FileQuestion" }));
+vi.mock("lucide-react-native", () => Object.fromEntries(["ChevronDown", "ChevronUp", "FileQuestion", "CheckCircle2", "Circle", "Sparkles", "X", "AlertCircle",
+  "AlignLeft", "ArrowLeftRight", "Check", "FlaskConical", "Lightbulb", "RotateCcw"].map((name) => [name, name])));
 vi.mock("../../design/primitives", () => ({
-  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", SearchField: "SearchField", SegmentedControl: "SegmentedControl", Sheet: "Sheet", Surface: "Surface",
+  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", SearchField: "SearchField", SegmentedControl: "SegmentedControl", Sheet: "Sheet", Surface: "Surface", SkeletonBlock: "SkeletonBlock",
 }));
+vi.mock("../../design/haptics", () => ({ haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: null }) }));
 vi.mock("../../services/generationRecovery", () => ({ createGenerationIntent: vi.fn() }));

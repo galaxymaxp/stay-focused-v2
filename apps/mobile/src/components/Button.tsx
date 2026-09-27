@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { hitTarget, radius, spacing, typography } from "../design/tokens";
+import { haptic } from "../design/haptics";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -34,6 +35,7 @@ export function Button({
   accessibilityState,
   style,
   textStyle,
+  onPress,
   ...props
 }: ButtonProps) {
   const colors = useLegacyTheme();
@@ -60,6 +62,10 @@ export function Button({
         style,
       ]}
       {...props}
+      onPress={onPress ? (event) => {
+        haptic.tap();
+        onPress(event);
+      } : undefined}
     >
       {loading ? (
         <ActivityIndicator color={palette.indicatorColor} size="small" />

@@ -145,6 +145,18 @@ function dueLabel(dueAt: string, now: number): string {
   return due.toDateString() === new Date(now).toDateString() ? `Due ${timeLabel(dueAt)}` : `Due ${deadline(dueAt)}`;
 }
 /**
+ * A queued job is normally claimed within seconds. After this long without
+ * starting, the generation service is not picking it up (e.g. its usage limit
+ * was reached), so the job is shown as stalled and can be cancelled instead
+ * of "waiting" forever.
+ */
+export const STALLED_QUEUE_MS = 2 * 60_000;
+export function stalledInQueue(job: { readonly status: string; readonly since: string | null }, now = Date.now()) {
+  if (job.status !== "queued" || !job.since) return false;
+  const since = Date.parse(job.since);
+  return Number.isFinite(since) && now - since > STALLED_QUEUE_MS;
+}
+/**
  * Queue sections exist only while they hold something. The generating group
  * is named by what it is doing; the queued group by how many are waiting.
  */

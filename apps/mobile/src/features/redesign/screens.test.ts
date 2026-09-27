@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   createIntent: vi.fn(),
   vibration: vi.fn(),
+  haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
   prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] } },
   markRead: vi.fn(),
   pin: vi.fn(),
@@ -137,6 +138,7 @@ vi.mock("react-native", () => ({
     // Exit animations finish at once, so their completion (e.g. closing) runs.
     parallel: () => ({ start(done?: (result: { finished: boolean }) => void) { done?.({ finished: true }); } }),
     multiply: (a: unknown, b: unknown) => ({ a, b }),
+    add: (a: unknown, b: unknown) => ({ a, b }),
     event: () => vi.fn(),
   },
 }));
@@ -172,7 +174,13 @@ vi.mock("lucide-react-native", () => ({
   MailOpen: "MailOpen",
   Lock: "Lock",
   LockOpen: "LockOpen",
+  Trash2: "Trash2",
+  ChevronLeft: "ChevronLeft",
+  CalendarDays: "CalendarDays",
 }));
+vi.mock("../../design/haptics", () => ({ haptic: mocks.haptic }));
+vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => "https://example.test" }));
+vi.mock("../../services/reviewerLibraryApi", () => ({ deleteReviewer: vi.fn(async () => ({ ok: true, value: undefined })) }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({
     baseUrl: "https://api.example",
@@ -784,7 +792,7 @@ describe("B25 screen interactions", () => {
     // An end owns its touch immediately (the page cannot steal it) with no hold.
     await act(async () => overlay.props.onPanResponderGrant(touchAt(end.x, end.y)));
     expect(overlay.props.onShouldBlockNativeResponder()).toBe(true);
-    expect(mocks.vibration).toHaveBeenCalledWith(6);
+    expect(mocks.haptic.select).toHaveBeenCalled();
     // Drag a few minutes at once: the readout follows unsnapped.
     await act(async () => {
       overlay.props.onPanResponderMove(null, { dx: -16, dy: 0.6 });
@@ -922,7 +930,6 @@ describe("B25 screen interactions", () => {
     expect((nextRow.props.trailing as Action[]).map((a) => a.key)).toEqual(["hide"]);
     await act(async () => (nextRow.props.leading as Action[])[0]!.onPress());
     expect(mocks.pin).toHaveBeenCalledWith("today", "next", true);
-    expect(mocks.vibration).toHaveBeenCalledWith(8);
     await act(async () => (nextRow.props.trailing as Action[])[0]!.onPress());
     expect(mocks.hide).toHaveBeenCalledWith("today", `${localDate()}|next`, true);
     // Hiding is local: no Canvas or task request is made.

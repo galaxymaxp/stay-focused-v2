@@ -2,7 +2,7 @@ import type { ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Plus, Circle, Pin, PinOff } from "lucide-react-native";
 import { useMemo, useRef, useState } from "react";
-import { Linking, Pressable, Vibration, View } from "react-native";
+import { Linking, Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { Action, Copy, Notice, Page, Surface, IconAction, SkeletonCards } from "../../design/primitives";
@@ -115,7 +115,6 @@ export function TasksCourseScreen() {
   const card = mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated;
   const togglePin = (item: ActivitySummary) => {
     const on = !pinnedIds.includes(item.id);
-    if (on) Vibration.vibrate(8);
     animateNextLayout(reducedMotion);
     pin("today", item.id, on);
   };

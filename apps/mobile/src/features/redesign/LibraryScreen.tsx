@@ -6,17 +6,23 @@ import type {
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import { Pin, PinOff } from "lucide-react-native";
+import { Pin, PinOff, Trash2 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
+import { useAuth } from "../../auth";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { courseIdentity } from "../../design/courseIdentity";
+import { haptic } from "../../design/haptics";
 import { CourseMark, CourseTile } from "../../design/CourseViews";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { radius, spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
+import { removeLocalArtifact } from "../../services/localLibrary/deviceLibrary";
+import { deleteReviewer } from "../../services/reviewerLibraryApi";
+import { reviewerArtifactIdFromLibraryId } from "./quizRequest";
 import { available } from "./presentation";
 import { useExperienceClient } from "./useExperience";
 import {
@@ -49,6 +55,50 @@ function libraryIdentity(key: string, course: LibraryArtifactSummary["course"]) 
  */
 function pinAction(pinned: boolean, onPress: () => void): SwipeAction[] {
   return [{ key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress }];
+}
+
+/**
+ * Deletes a saved Reviewer from the account and this device, after a
+ * confirmation. Quizzes and activity outputs have no delete on the server yet,
+ * so only Reviewers offer it.
+ */
+function useDeleteReviewer(onDeleted: (item: LibraryArtifactSummary) => void) {
+  const { session } = useAuth();
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
+  const [note, setNote] = useState<string | null>(null);
+  async function remove(item: LibraryArtifactSummary) {
+    const id = reviewerArtifactIdFromLibraryId(item.id);
+    const apiBaseUrl = getApiBaseUrl();
+    const accessToken = session?.accessToken?.trim();
+    if (!id || !apiBaseUrl || !accessToken || !session) {
+      setNote("Sign in again to delete this Reviewer.");
+      return;
+    }
+    setNote(null);
+    setRemoved((value) => new Set(value).add(item.id));
+    const result = await deleteReviewer({ apiBaseUrl, accessToken, reviewerArtifactId: id });
+    if (result.ok || result.error.code === "reviewer_not_found") {
+      await removeLocalArtifact(session.user.id, item.id);
+      haptic.success();
+      onDeleted(item);
+      return;
+    }
+    setRemoved((value) => {
+      const next = new Set(value);
+      next.delete(item.id);
+      return next;
+    });
+    haptic.error();
+    setNote(result.error.code === "unauthorized" ? "Your session expired. Sign in again to delete this Reviewer." : `“${item.title}” couldn’t be deleted. Check your connection and try again.`);
+  }
+  const confirm = (item: LibraryArtifactSummary) => {
+    haptic.warning();
+    Alert.alert("Delete Reviewer?", `“${item.title}” will be removed from your Library on every device. This can’t be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => void remove(item) },
+    ]);
+  };
+  return { removed, note, confirm };
 }
 
 /** Level 1: a compact grid of courses that have saved study work. */
@@ -90,7 +140,7 @@ export function LibraryScreen() {
   const hasLocal = library.items.length > 0;
   const loading = !library.localReady || (!hasLocal && library.refreshing);
   return (
-    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh} actions={[{ label: "Manage saved Reviewers", onPress: () => router.push("/saved-reviewers") }]}>
+    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh}>
       {loading ? <LibrarySkeleton /> : null}
       {!hasLocal && library.error ? <Surface><Copy size="h3">Library could not be loaded</Copy><Copy muted>{library.error}</Copy><Action secondary onPress={library.refresh}>Try again</Action></Surface> : null}
       {hasLocal && library.error ? <Notice>Showing work saved on this device. Refresh when you are back online.</Notice> : null}
@@ -120,12 +170,16 @@ export function LibraryCourseScreen() {
   const filtered = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
   const { prefs, pin } = useListPreferences();
   const { reducedMotion } = useTheme();
-  const arranged = arrangeList(filtered, (item) => item.id, prefs.pinned.artifact, []);
-  const items = [...arranged.pinned, ...arranged.rest];
   const change = (update: () => void) => {
     animateNextLayout(reducedMotion);
     update();
   };
+  const deletion = useDeleteReviewer((item) => {
+    if (prefs.pinned.artifact.includes(item.id)) pin("artifact", item.id, false);
+    library.refresh();
+  });
+  const arranged = arrangeList(filtered.filter((item) => !deletion.removed.has(item.id)), (item) => item.id, prefs.pinned.artifact, []);
+  const items = [...arranged.pinned, ...arranged.rest];
   const identity = libraryIdentity(courseKey, courseItems[0]?.course ?? null);
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
   const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
@@ -144,6 +198,7 @@ export function LibraryCourseScreen() {
     >
       {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
+      {deletion.note ? <Notice>{deletion.note}</Notice> : null}
       {library.localReady && items.length === 0 ? (
         <Surface>
           <Copy size="h3">{filter === "all" ? "Nothing saved for this course" : `No ${label} yet`}</Copy>
@@ -153,9 +208,13 @@ export function LibraryCourseScreen() {
       {items.slice(0, visible).map((item) => {
         const pinned = prefs.pinned.artifact.includes(item.id);
         const leading = pinAction(pinned, () => change(() => pin("artifact", item.id, !pinned)));
+        // Swipe left to delete a Reviewer (confirmed first).
+        const trailing: SwipeAction[] = item.type === "reviewer" && reviewerArtifactIdFromLibraryId(item.id)
+          ? [{ key: "delete", label: "Delete", icon: Trash2, tone: "danger", onPress: () => deletion.confirm(item) }]
+          : [];
         return (
-          <SwipeRow key={item.id} leading={leading}>
-            <LibraryCard item={item} pinned={pinned} swipeActions={leading} />
+          <SwipeRow key={item.id} leading={leading} trailing={trailing}>
+            <LibraryCard item={item} pinned={pinned} swipeActions={[...leading, ...trailing]} />
           </SwipeRow>
         );
       })}

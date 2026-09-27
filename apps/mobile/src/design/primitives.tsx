@@ -22,7 +22,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../auth";
+import { haptic } from "./haptics";
 import { QueueButton } from "./QueueButton";
+import { useSheetDrag } from "./sheetDrag";
 import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing, typography } from "./tokens";
 
@@ -136,7 +138,10 @@ export function Action({
         accessibilityState={{ disabled }}
         disabled={disabled}
         testID={testID}
-        onPress={onPress}
+        onPress={() => {
+          haptic.tap();
+          onPress();
+        }}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         style={({ pressed }) => ({
@@ -169,7 +174,10 @@ export function IconAction({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
       style={({ pressed }) => ({
         minWidth: hitTarget.min,
         minHeight: hitTarget.min,
@@ -389,7 +397,10 @@ export function RowLink({
       accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
       onAccessibilityAction={onAccessibilityAction}
       onPress={onPress}
-      onLongPress={onLongPress}
+      onLongPress={onLongPress ? () => {
+        haptic.press();
+        onLongPress();
+      } : undefined}
       delayLongPress={onLongPress ? 380 : undefined}
       disabled={disabled}
       accessibilityState={{ disabled }}
@@ -424,7 +435,7 @@ export function ContentIcon({ kind, small = false }: { kind: string; small?: boo
 export function FilterChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { colors } = useTheme();
   const press = usePressMotion();
-  return <Animated.View style={{ transform: [{ scale: press.scale }] }}><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable></Animated.View>;
+  return <Animated.View style={{ transform: [{ scale: press.scale }] }}><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={() => { haptic.select(); onPress(); }} onPressIn={press.onPressIn} onPressOut={press.onPressOut} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable></Animated.View>;
 }
 
 /** Extra sheet surface below the screen edge, so a spring overshoot never shows a gap. */
@@ -432,8 +443,9 @@ const SHEET_OVERSHOOT = 48;
 
 /**
  * Bottom sheet for lightweight choices. Dismissal never depends on scrolling:
- * the header keeps a visible Done control, the backdrop dismisses, and Android
- * back closes it. Insets come from the app's provider because a native Modal
+ * the header keeps a visible Done control, the backdrop dismisses, Android
+ * back closes it, and the panel can be pulled down (from the top of its
+ * content) to close. Insets come from the app's provider because a native Modal
  * is its own window, where a nested SafeAreaView can report zero insets under
  * edge-to-edge and hide controls behind the navigation bar.
  *
@@ -470,9 +482,10 @@ export function Sheet({
     };
   }, [reducedMotion, rise, tint]);
 
-  const dismiss = () => {
+  const dismiss = (from = 0) => {
     if (closing.current) return;
     closing.current = true;
+    rise.setValue(from);
     Animated.parallel([
       Animated.timing(tint, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       reducedMotion
@@ -480,15 +493,19 @@ export function Sheet({
         : Animated.timing(rise, { toValue: panelHeight.current, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
     ]).start(() => onClose());
   };
+  const pull = useSheetDrag(dismiss);
+  // The backdrop lightens as the panel is pulled down.
+  const shade = Animated.multiply(tint, pull.drag.interpolate({ inputRange: [0, 420], outputRange: [1, 0.35], extrapolate: "clamp" }));
 
   return (
-    <Modal transparent visible statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={dismiss}>
+    <Modal transparent visible statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={() => dismiss()}>
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <Animated.View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: tint }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={dismiss} style={{ flex: 1 }} />
+        <Animated.View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: shade }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={() => dismiss()} style={{ flex: 1 }} />
         </Animated.View>
         <Animated.View
           accessibilityViewIsModal
+          {...pull.panHandlers}
           onLayout={(event) => {
             panelHeight.current = event.nativeEvent.layout.height;
           }}
@@ -503,20 +520,23 @@ export function Sheet({
             paddingLeft: insets.left,
             paddingRight: insets.right,
             opacity: reducedMotion ? tint : 1,
-            transform: [{ translateY: rise }],
+            transform: [{ translateY: Animated.add(rise, pull.drag) }],
           }}
         >
-          <View style={{ alignItems: "center", paddingTop: spacing[2] }}>
+          <View style={{ alignItems: "center", paddingTop: spacing[2], paddingBottom: spacing[1] }}>
             <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} />
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
             <View style={{ flex: 1, minWidth: 0 }}>
               {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
             </View>
-            <DoneButton onPress={dismiss} />
+            <DoneButton onPress={() => dismiss()} />
           </View>
           <ScrollView
             style={{ flexShrink: 1 }}
+            onScroll={pull.onScroll}
+            scrollEventThrottle={16}
+            alwaysBounceVertical={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ gap: spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[4] }}
           >
@@ -537,7 +557,10 @@ export function DoneButton({ onPress, label = "Done" }: { onPress: () => void; l
       accessibilityRole="button"
       accessibilityLabel={label}
       testID="sheet-done"
-      onPress={onPress}
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
       hitSlop={6}
       style={({ pressed }) => ({ minHeight: hitTarget.min, minWidth: hitTarget.min + 16, paddingHorizontal: spacing[3], alignItems: "center", justifyContent: "center", opacity: pressed ? 0.55 : 1 })}
     >
@@ -603,7 +626,10 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="tab"
             accessibilityLabel={segment.label}
             accessibilityState={{ selected }}
-            onPress={() => onChange(segment.value)}
+            onPress={() => {
+              if (!selected) haptic.select();
+              onChange(segment.value);
+            }}
             hitSlop={{ top: 6, bottom: 6 }}
             style={{ flex: 1, minHeight: 32, alignItems: "center", justifyContent: "center" }}
           >
@@ -688,7 +714,10 @@ export function ProfileButton() {
         accessibilityRole="button"
         accessibilityLabel="Profile and settings"
         testID="profile-button"
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          haptic.tap();
+          setOpen(true);
+        }}
         style={({ pressed }) => ({ minWidth: hitTarget.min, minHeight: hitTarget.min, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
       >
         <Avatar initial={initialOf(email)} size={density.utilitySize} />

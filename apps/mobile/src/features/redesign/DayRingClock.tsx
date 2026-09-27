@@ -2,7 +2,9 @@ import type { TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, LockOpen } from "lucide-react-native";
-import { Animated, PanResponder, Pressable, Vibration, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+import { Animated, PanResponder, Pressable, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+
+import { haptic } from "../../design/haptics";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { Copy } from "../../design/primitives";
@@ -224,7 +226,8 @@ export function DayRingClock({
       const state = gesture.current;
       if (state.held || !state.mode) return;
       state.held = true;
-      Vibration.vibrate(state.mode === "move" ? 12 : 6);
+      if (state.mode === "move") haptic.press();
+      else haptic.select();
       setAdjusting(state.mode);
       latest.current.onAdjustingChange?.(true);
       if (!latest.current.reducedMotion) {
@@ -250,7 +253,7 @@ export function DayRingClock({
       const done = () => {
         state.stopSnap = null;
         if (commit) {
-          Vibration.vibrate(8);
+          haptic.tap();
           latest.current.onCommit(target.start, target.end);
         } else setDraft(null);
       };
@@ -462,7 +465,7 @@ export function DayRingClock({
             accessibilityState={{ checked: locked }}
             testID="clock-lock"
             onPress={() => {
-              Vibration.vibrate(6);
+              haptic.select();
               onToggleLock();
             }}
             hitSlop={6}

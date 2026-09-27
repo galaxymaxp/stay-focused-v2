@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { haptic } from "./haptics";
 import { Copy } from "./primitives";
 import { motion, useTheme } from "./theme";
 import { radius } from "./tokens";
@@ -32,7 +33,7 @@ export interface SwipeAction {
   readonly key: string;
   readonly label: string;
   readonly icon: ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
-  readonly tone: "accent" | "neutral" | "warning";
+  readonly tone: "accent" | "neutral" | "warning" | "danger";
   readonly onPress: () => void;
   /** The item leaves the list (Hide): it slides out before the action runs. */
   readonly exits?: boolean;
@@ -152,11 +153,20 @@ export function SwipeRow({
           const { leadingWidth: left, trailingWidth: right, width: rowWidth, fullSwipe: full } = limits.current;
           const value = offset.current + gesture.dx;
           const across = full && rowWidth > 0 ? rowWidth * 0.55 : Infinity;
-          if (left > 0 && value > Math.max(across, left + 40)) runRef.current(leadingRef.current[0]!, 1);
-          else if (right > 0 && -value > Math.max(across, right + 40)) runRef.current(trailingRef.current[0]!, -1);
-          else if (left > 0 && (value > left * OPEN_FRACTION || (gesture.vx > FLICK_VELOCITY && value > CLAIM_DISTANCE))) settle(left);
-          else if (right > 0 && (value < -right * OPEN_FRACTION || (gesture.vx < -FLICK_VELOCITY && value < -CLAIM_DISTANCE))) settle(-right);
-          else settle(0);
+          const wasOpen = offset.current !== 0;
+          if (left > 0 && value > Math.max(across, left + 40)) {
+            haptic.press();
+            runRef.current(leadingRef.current[0]!, 1);
+          } else if (right > 0 && -value > Math.max(across, right + 40)) {
+            haptic.press();
+            runRef.current(trailingRef.current[0]!, -1);
+          } else if (left > 0 && (value > left * OPEN_FRACTION || (gesture.vx > FLICK_VELOCITY && value > CLAIM_DISTANCE))) {
+            if (!wasOpen) haptic.select();
+            settle(left);
+          } else if (right > 0 && (value < -right * OPEN_FRACTION || (gesture.vx < -FLICK_VELOCITY && value < -CLAIM_DISTANCE))) {
+            if (!wasOpen) haptic.select();
+            settle(-right);
+          } else settle(0);
         },
         onPanResponderTerminate: () => settle(0),
       }),
@@ -190,7 +200,7 @@ export function SwipeRow({
   runRef.current = run;
 
   const tone = (value: SwipeAction["tone"]) =>
-    value === "accent" ? colors.accent : value === "warning" ? colors.warning : colors.textSecondary;
+    value === "accent" ? colors.accent : value === "warning" ? colors.warning : value === "danger" ? colors.danger : colors.textSecondary;
 
   const renderActions = (actions: readonly SwipeAction[], side: "leading" | "trailing") => (
     <Animated.View
@@ -219,7 +229,10 @@ export function SwipeRow({
             accessibilityRole="button"
             accessibilityLabel={action.label}
             testID={`swipe-action-${action.key}`}
-            onPress={() => run(action)}
+            onPress={() => {
+              haptic.tap();
+              run(action);
+            }}
             style={({ pressed }) => ({
               width: actionWidth,
               alignItems: "center",

@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { coreTabIcons, coreTabOptions } from "../../../src/design/coreNavigation";
+import { haptic } from "../../../src/design/haptics";
 import { tabMotion } from "../../../src/design/navigationMotion";
 import { density } from "../../../src/design/tokens";
 import { useTheme } from "../../../src/design/theme";
@@ -15,7 +16,7 @@ export default function TabsLayout() {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
   return (
-    <Tabs screenOptions={{ ...coreTabOptions(colors, insets.bottom), ...tabMotion(reducedMotion, colors.backgroundPrimary) }}>
+    <Tabs screenOptions={{ ...coreTabOptions(colors, insets.bottom), ...tabMotion(reducedMotion, colors.backgroundPrimary) }} screenListeners={{ tabPress: () => haptic.select() }}>
       {primaryTabs.map((tab) => (
         <Tabs.Screen
           key={tab.route}

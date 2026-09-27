@@ -10,7 +10,9 @@ import { router } from "expo-router";
 import { EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Vibration, View } from "react-native";
+import { View } from "react-native";
+
+import { haptic } from "../../design/haptics";
 
 import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
@@ -21,6 +23,7 @@ import { dayOrbTouch } from "./DayOrb";
 import { DayRingClock } from "./DayRingClock";
 
 import { PlanPreview, planTaskIds, planToneFor } from "./PlanPreview";
+import { TodayCalendar } from "./TodayCalendar";
 import {
   activityFor,
   arrangeToday,
@@ -147,10 +150,7 @@ export function TodayScreen() {
       label: pinned ? "Unpin" : "Pin",
       icon: pinned ? PinOff : Pin,
       tone: "accent",
-      onPress: () => {
-        if (!pinned) Vibration.vibrate(8);
-        glide(() => pin("today", item.id, !pinned));
-      },
+      onPress: () => glide(() => pin("today", item.id, !pinned)),
     }];
     const trailing: SwipeAction[] = [{
       key: "hide",
@@ -277,7 +277,7 @@ export function TodayScreen() {
       });
       setPreview(null);
       setPreviewRequest(null);
-      Vibration.vibrate(8);
+      haptic.success();
       today.refresh();
     } catch (error) {
       setNote(
@@ -395,6 +395,10 @@ export function TodayScreen() {
               </Surface>
             </View>
           )}
+          <TodayCalendar
+            items={activities.data?.items ?? []}
+            onOpen={(item) => router.push({ pathname: "/activity", params: { id: item.id } })}
+          />
           {arranged.hidden.length > 0 ? (
             <View style={{ gap: 8 }}>
               <Action secondary onPress={() => glide(() => setShowHidden((value) => !value))}>

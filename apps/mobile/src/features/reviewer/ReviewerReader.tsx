@@ -1,8 +1,8 @@
-import type { LibraryArtifactSummary, QuizDifficulty, ReviewerReaderModel } from "@stay-focused/shared";
+import type { AssistType, LibraryArtifactSummary, QuizDifficulty, ReviewerReaderModel } from "@stay-focused/shared";
 import { selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
-import { ChevronDown, ChevronUp, FileQuestion } from "lucide-react-native";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, FileQuestion, Sparkles } from "lucide-react-native";
 import {
   useCallback,
   useDeferredValue,
@@ -13,11 +13,11 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Pressable,
   ScrollView as NativeScrollView,
   Text,
-  Vibration,
   View,
   useWindowDimensions,
   type GestureResponderEvent,
@@ -28,6 +28,10 @@ import {
 } from "react-native";
 
 import { useAuth } from "../../auth";
+import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { haptic } from "../../design/haptics";
+import { assistMark, assistStore, assistTargetKey, keyOf, useAssistMarks, type AssistMark, type AssistReadyEvent, type AssistTarget } from "./assistStore";
+import { PassageMark, PickBar, ReadyBanner } from "./AssistMarks";
 import { courseIdentity } from "../../design/courseIdentity";
 import { Action, Copy, Notice, Page, SearchField, SegmentedControl, Sheet, Surface } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
@@ -91,8 +95,58 @@ export function ReviewerReaderScreen({
 
   const [query, setQuery] = useState("");
   const [quizOpen, setQuizOpen] = useState(false);
-  const [assistBlock, setAssistBlock] = useState<{ section: string; block: string } | null>(null);
-  const assistSelection = useMemo(() => assistBlock ? selectAssistBlock(reviewer, assistBlock.section, assistBlock.block) : null, [reviewer, assistBlock]);
+  const { session } = useAuth();
+  const [assistPassage, setAssistPassage] = useState<{ section: string; block: string; point?: number } | null>(null);
+  const assistTarget = useMemo<AssistTarget | null>(() => {
+    if (!assistPassage) return null;
+    const selection = selectAssistBlock(reviewer, assistPassage.section, assistPassage.block);
+    return selection ? { selection, ...(assistPassage.point === undefined ? {} : { pointIndex: assistPassage.point }) } : null;
+  }, [reviewer, assistPassage]);
+  const marks = useAssistMarks();
+  const markFor = (blockId: string, point?: number): AssistMark => assistMark(marks[assistTargetKey(reviewer.id, blockId, point)]);
+  // Holding the key points selects them all, ready to generate one result per point.
+  const [picking, setPicking] = useState<{ section: string; block: string; points: readonly number[] } | null>(null);
+  const pickingBlock = picking ? reviewer.sections.find((section) => section.id === picking.section)?.blocks.find((block) => block.id === picking.block) ?? null : null;
+  const openAssist = (section: string, block: string, point?: number) => {
+    if (picking) return;
+    haptic.tap();
+    setAssistPassage({ section, block, ...(point === undefined ? {} : { point }) });
+  };
+  const startPicking = (section: string, block: string, points: readonly string[]) => {
+    const all = points.map((_, index) => index).filter((index) => points[index]!.trim());
+    if (!all.length) return;
+    haptic.press();
+    setPicking({ section, block, points: all });
+  };
+  const togglePick = (index: number) => {
+    haptic.select();
+    setPicking((value) => value && {
+      ...value,
+      points: value.points.includes(index) ? value.points.filter((point) => point !== index) : [...value.points, index].sort((a, b) => a - b),
+    });
+  };
+  const generatePicked = (type: AssistType) => {
+    if (!picking || !picking.points.length || !session) return;
+    const selection = selectAssistBlock(reviewer, picking.section, picking.block);
+    if (!selection) return;
+    haptic.tap();
+    const client = { baseUrl: getApiBaseUrl() ?? "", accessToken: session.accessToken ?? "" };
+    for (const pointIndex of picking.points) assistStore.run(session.user.id, client, { selection, pointIndex }, type);
+    setPicking(null);
+  };
+  // A result that lands while its sheet is closed is announced here.
+  const [ready, setReady] = useState<AssistReadyEvent | null>(null);
+  const openKey = assistTarget ? keyOf(assistTarget) : null;
+  const openKeyRef = useRef(openKey);
+  openKeyRef.current = openKey;
+  useEffect(() => assistStore.onSettled((event) => {
+    if (event.target.selection.reviewerId === reviewer.id && event.key !== openKeyRef.current) setReady(event);
+  }), [reviewer.id]);
+  useEffect(() => {
+    if (!ready) return;
+    const timer = setTimeout(() => setReady(null), 6000);
+    return () => clearTimeout(timer);
+  }, [ready]);
   const deferredQuery = useDeferredValue(query);
   const matches = useMemo(() => findReviewerMatches(segments, deferredQuery), [deferredQuery, segments]);
   const [activeMatch, setActiveMatch] = useState(0);
@@ -206,6 +260,7 @@ export function ReviewerReaderScreen({
         />
       }
       overlay={
+        <>
         <SectionScrubber
           handle={scrubber}
           anchors={anchors.map((anchor) => anchor.title)}
@@ -215,6 +270,26 @@ export function ReviewerReaderScreen({
           onSettle={(y) => scrollTo(y, true)}
           onActiveChange={(active) => setScrollEnabled(!active)}
         />
+        {picking && pickingBlock ? (
+          <PickBar
+            count={picking.points.length}
+            onAll={() => startPicking(picking.section, picking.block, pickingBlock.keyPoints)}
+            onNone={() => setPicking({ ...picking, points: [] })}
+            onCancel={() => setPicking(null)}
+            onGenerate={generatePicked}
+          />
+        ) : ready ? (
+          <ReadyBanner
+            event={ready}
+            onView={() => {
+              setReady(null);
+              const { selection, pointIndex } = ready.target;
+              setAssistPassage({ section: selection.sectionId, block: selection.blockId, ...(pointIndex === undefined ? {} : { point: pointIndex }) });
+            }}
+            onDismiss={() => setReady(null)}
+          />
+        ) : null}
+        </>
       }
     >
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
@@ -224,14 +299,11 @@ export function ReviewerReaderScreen({
           {artifact.sourceTitle ? ` · ${artifact.sourceTitle}` : ""}
         </Copy>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
-        <Copy muted size="caption">
-          Generated {new Date(artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
-          {anchors.length > 1 ? ` · ${anchors.length} topics` : ""}
-        </Copy>
+        {anchors.length > 1 ? <Copy muted size="caption">{anchors.length} topics</Copy> : null}
         <View style={{ flexDirection: "row", paddingTop: spacing[2] }}>
           <QuizPill onPress={() => setQuizOpen(true)} />
         </View>
-        <Copy muted size="caption">Tap an explanation or key point for Study Assist.</Copy>
+        <Copy muted size="caption">Tap any passage for Study Assist. Hold key points to select them all.</Copy>
       </View>
       <View
         ref={rootRef}
@@ -271,21 +343,46 @@ export function ReviewerReaderScreen({
                     {render(segmentIds.blockTitle(block.id), block.title)}
                   </Text>
                 ) : null}
-                <Text ref={register(segmentIds.explanation(block.id))} accessibilityRole="button" accessibilityHint="Opens Study Assist for this concept" onPress={() => setAssistBlock({ section: section.id, block: block.id })} style={{ color: colors.textPrimary, fontSize: 16, lineHeight: 26 }}>
-                  {render(segmentIds.explanation(block.id), block.explanation)}
-                </Text>
+                <PassageMark mark={markFor(block.id)} onPress={() => openAssist(section.id, block.id)}>
+                  <Text ref={register(segmentIds.explanation(block.id))} accessibilityRole="button" accessibilityHint="Opens Study Assist for this concept" onPress={() => openAssist(section.id, block.id)} style={{ color: colors.textPrimary, fontSize: 16, lineHeight: 26 }}>
+                    {render(segmentIds.explanation(block.id), block.explanation)}
+                  </Text>
+                </PassageMark>
                 {block.keyPoints.length > 0 ? (
-                  <View style={{ backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4], gap: spacing[2] }}>
-                    <Copy size="caption" color={colors.accent} style={{ fontWeight: "800", letterSpacing: 0.9 }}>KEY POINTS</Copy>
-                    {block.keyPoints.map((point, index) => (
-                      <View key={`${block.id}-point-${index}`} style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing[2] }}>
-                        <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 9, backgroundColor: colors.accent }} />
-                        <Text ref={register(segmentIds.keyPoint(block.id, index))} accessibilityRole="button" accessibilityHint="Opens Study Assist for this concept" onPress={() => setAssistBlock({ section: section.id, block: block.id })} style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}>
-                          {render(segmentIds.keyPoint(block.id, index), point)}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  <KeyPointsBox
+                    picking={picking?.block === block.id ? picking.points : null}
+                    onHold={() => startPicking(section.id, block.id, block.keyPoints)}
+                  >
+                    {block.keyPoints.map((point, index) => {
+                      const pickingHere = picking?.block === block.id;
+                      const picked = pickingHere && picking.points.includes(index);
+                      const mark = pickingHere ? null : markFor(block.id, index);
+                      return (
+                        <PassageMark key={`${block.id}-point-${index}`} mark={mark} selected={picked} quiet>
+                          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing[2] }}>
+                            {pickingHere ? (
+                              picked ? <CheckCircle2 size={18} color={colors.accent} strokeWidth={2.2} style={{ marginTop: 3 }} /> : <Circle size={18} color={colors.textMuted} strokeWidth={1.8} style={{ marginTop: 3 }} />
+                            ) : (
+                              <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 9, backgroundColor: colors.accent }} />
+                            )}
+                            <Text
+                              ref={register(segmentIds.keyPoint(block.id, index))}
+                              accessibilityRole={pickingHere ? "checkbox" : "button"}
+                              accessibilityState={pickingHere ? { checked: picked } : undefined}
+                              accessibilityHint={pickingHere ? "Selects this key point" : "Opens Study Assist for this key point. Hold to select every key point."}
+                              onPress={() => (pickingHere ? togglePick(index) : openAssist(section.id, block.id, index))}
+                              onLongPress={() => startPicking(section.id, block.id, block.keyPoints)}
+                              style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}
+                            >
+                              {render(segmentIds.keyPoint(block.id, index), point)}
+                            </Text>
+                            {mark === "pending" ? <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 2 }} /> : null}
+                            {mark === "fresh" ? <Sparkles size={16} color={colors.green} strokeWidth={2} style={{ marginTop: 4 }} /> : null}
+                          </View>
+                        </PassageMark>
+                      );
+                    })}
+                  </KeyPointsBox>
                 ) : null}
                 {block.evidence.length > 0 ? (
                   <View style={{ borderLeftWidth: 2, borderColor: colors.separator, paddingLeft: spacing[3], gap: spacing[3] }}>
@@ -311,8 +408,27 @@ export function ReviewerReaderScreen({
         <Action onPress={() => setQuizOpen(true)}>Generate Quiz</Action>
       </Surface>
       {quizOpen ? <QuizFromReviewerSheet artifact={artifact} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
-      {assistBlock ? <StudyAssistSheet key={assistSelection?.contentHash ?? 'missing'} selection={assistSelection} onClose={() => setAssistBlock(null)} /> : null}
+      {assistPassage ? <StudyAssistSheet key={openKey ?? "missing"} target={assistTarget} onClose={() => setAssistPassage(null)} /> : null}
     </Page>
+  );
+}
+
+/** The key points card. Holding anywhere on it selects every point. */
+function KeyPointsBox({ picking, onHold, children }: { picking: readonly number[] | null; onHold: () => void; children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityHint="Hold to select every key point"
+      onLongPress={onHold}
+      delayLongPress={380}
+      style={{ backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4], gap: spacing[2], borderWidth: 1.5, borderColor: picking ? colors.accent : "transparent" }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Copy size="caption" color={colors.accent} style={{ fontWeight: "800", letterSpacing: 0.9 }}>KEY POINTS</Copy>
+        {picking ? <Copy size="caption" color={colors.accent} style={{ fontWeight: "600" }}>{picking.length} selected</Copy> : null}
+      </View>
+      {children}
+    </Pressable>
   );
 }
 
@@ -322,7 +438,10 @@ function QuizPill({ onPress }: { onPress: () => void }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Generate Quiz from this Reviewer"
-      onPress={onPress}
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
       style={({ pressed }) => ({ minHeight: hitTarget.min, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.violetSoft }}>
@@ -598,7 +717,7 @@ export function SectionScrubber({
       setActive(true);
       latest.current.onActiveChange(true);
       clearTimeout(hideTimer.current);
-      Vibration.vibrate(8);
+      haptic.select();
       thumbOpacity.setValue(1);
       if (latest.current.reducedMotion) overlayOpacity.setValue(1);
       else Animated.timing(overlayOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
