@@ -28,6 +28,7 @@ vi.mock("../../design/primitives", () => ({
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: null }) }));
 vi.mock("../../services/generationRecovery", () => ({ createGenerationIntent: vi.fn() }));
+vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => 'https://example.test' }));
 vi.mock("../../design/theme", async () => {
   const tokens = await import("../../design/themeTokens");
   return { ...tokens, useTheme: () => ({ colors: tokens.palettes.light, mode: "light", reducedMotion: true }) };

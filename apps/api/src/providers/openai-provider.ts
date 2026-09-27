@@ -66,6 +66,8 @@ export type OpenAIResponsesClientFactory = (
 ) => OpenAIResponsesClient;
 
 export interface CreateServerOpenAIProviderOptions {
+  readonly timeoutMs?: number;
+  readonly maxRetries?: number;
   readonly defaultModel?: string;
   readonly environment?: OpenAIProviderEnvironment;
   readonly clientFactory?: OpenAIResponsesClientFactory;
@@ -162,18 +164,18 @@ export function createServerOpenAIProvider(
     );
   }
 
-  const clientFactory = options.clientFactory ?? createOpenAIResponsesClient;
+  const clientFactory = options.clientFactory ?? ((key: string) => createOpenAIResponsesClient(key, options.timeoutMs, options.maxRetries));
   return new OpenAIProvider({
     client: clientFactory(apiKey),
     defaultModel: options.defaultModel,
   });
 }
 
-function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
+function createOpenAIResponsesClient(apiKey: string, timeoutMs = OPENAI_PROVIDER_REQUEST_TIMEOUT_MS, maxRetries = 1): OpenAIResponsesClient {
   const client = new OpenAI({
     apiKey,
-    timeout: OPENAI_PROVIDER_REQUEST_TIMEOUT_MS,
-    maxRetries: 1,
+    timeout: timeoutMs,
+    maxRetries,
   });
 
   return {

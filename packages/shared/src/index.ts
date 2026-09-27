@@ -223,3 +223,4 @@ export function isActiveProcessingJobStatus(
 export type * from './experience';
 
 export type * from './quiz';
+export * from './study-assist';

@@ -83,6 +83,18 @@ describe('Quiz source selection', () => {
         expect(value.reviewerArtifactId).toBe(id);
         expect(mocks.structure).not.toHaveBeenCalled();
     });
+    it('Study Assist is invisible to Quiz context, even if unrelated cache data is present', async () => {
+        const data = canonical();
+        const version = data.generated_artifact_versions[0]!;
+        const marker = 'AI_ASSIST_MUST_NEVER_GROUND_QUIZZES';
+        Object.assign(version.payload, { studyAssist: marker });
+        Object.assign(version.payload.reviewer, { studyAssist: marker });
+        Object.assign(version.payload.reviewer.sections[0]!.items[0]!, { studyAssist: marker, enrichment: { analogy: marker } });
+        const c = client({ ...data, study_assists: [{ text: marker, user_id: A }] });
+        const value = await assembleQuizSources(c, A, input);
+        expect(JSON.stringify(value.regions)).not.toContain(marker);
+        expect(vi.mocked(c.from).mock.calls.map(call => call[0])).not.toContain('study_assists');
+    });
     it('denies a foreign Reviewer artifact', async () => { await expect(assembleQuizSources(client(canonical(B)), A, input)).rejects.toThrow('quiz_source_unavailable'); expect(mocks.structure).not.toHaveBeenCalled(); });
     it('denies a non-Reviewer artifact', async () => { await expect(assembleQuizSources(client(canonical(A, 'summary')), A, input)).rejects.toThrow('quiz_source_unavailable'); });
     it('refuses Reviewer without its durable source relationship', async () => { await expect(assembleQuizSources(client(canonical(A, 'reviewer', '')), A, input)).rejects.toThrow('quiz_source_unavailable'); });

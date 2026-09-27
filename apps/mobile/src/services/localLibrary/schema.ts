@@ -34,10 +34,19 @@ const MIGRATIONS: readonly string[] = [
      artifact_id TEXT NOT NULL,
      PRIMARY KEY (owner_user_id, alias_id)
    );`,
+  `CREATE TABLE study_assists (
+     owner_user_id TEXT NOT NULL,
+     cache_key TEXT NOT NULL,
+     reviewer_id TEXT NOT NULL,
+     canonical_content TEXT NOT NULL,
+     result_json TEXT NOT NULL,
+     PRIMARY KEY (owner_user_id, cache_key)
+   );
+   CREATE INDEX study_assists_reviewer ON study_assists(owner_user_id, reviewer_id);`,
 ];
 
 export const LOCAL_LIBRARY_SCHEMA_VERSION = MIGRATIONS.length;
-const LOCAL_TABLES = ["library_artifact_aliases", "library_artifacts"] as const;
+const LOCAL_TABLES = ["study_assists", "library_artifact_aliases", "library_artifacts"] as const;
 
 export async function migrateLocalLibrary(db: LocalSqlDatabase): Promise<number> {
   let version = await userVersion(db);

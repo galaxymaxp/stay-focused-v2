@@ -5,6 +5,7 @@ import type {
 } from "@stay-focused/shared";
 
 import type { LocalSqlDatabase, LocalSqlExecutor } from "./sqlDatabase";
+import { createAssistCache, type AssistCache } from "./assistCache";
 
 /** Version of the stored detail payload shape (the Library detail DTO). */
 export const LOCAL_PAYLOAD_SCHEMA = 1;
@@ -17,7 +18,7 @@ export interface LocalArtifactDetail {
   readonly bodyBehindCloud: boolean;
 }
 
-export interface LocalArtifactStore {
+export interface LocalArtifactStore extends AssistCache {
   listSummaries(ownerUserId: string): Promise<LibraryArtifactSummary[]>;
   readDetail(ownerUserId: string, artifactId: string): Promise<LocalArtifactDetail | null>;
   upsertSummaries(
@@ -58,6 +59,7 @@ export function createLocalArtifactStore(
   now: () => string = () => new Date().toISOString(),
 ): LocalArtifactStore {
   return {
+    ...createAssistCache(db),
     async listSummaries(ownerUserId) {
       requireOwner(ownerUserId);
       // The list reads summaries only; bodies stay on disk until an artifact opens.
@@ -154,6 +156,7 @@ export function createLocalArtifactStore(
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
         const canonical = await resolveAlias(transaction, ownerUserId, artifactId);
+        await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ? AND reviewer_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
         await transaction.runAsync(
           "DELETE FROM library_artifacts WHERE owner_user_id = ? AND artifact_id IN (?, ?)",
           [ownerUserId, artifactId, canonical],
@@ -168,6 +171,7 @@ export function createLocalArtifactStore(
     async purgeOwner(ownerUserId) {
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
+        await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifacts WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifact_aliases WHERE owner_user_id = ?", [ownerUserId]);
       });

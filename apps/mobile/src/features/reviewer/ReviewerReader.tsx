@@ -1,4 +1,6 @@
 import type { LibraryArtifactSummary, QuizDifficulty, ReviewerReaderModel } from "@stay-focused/shared";
+import { selectAssistBlock } from "@stay-focused/shared";
+import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
 import { ChevronDown, ChevronUp, FileQuestion } from "lucide-react-native";
 import {
@@ -89,6 +91,8 @@ export function ReviewerReaderScreen({
 
   const [query, setQuery] = useState("");
   const [quizOpen, setQuizOpen] = useState(false);
+  const [assistBlock, setAssistBlock] = useState<{ section: string; block: string } | null>(null);
+  const assistSelection = useMemo(() => assistBlock ? selectAssistBlock(reviewer, assistBlock.section, assistBlock.block) : null, [reviewer, assistBlock]);
   const deferredQuery = useDeferredValue(query);
   const matches = useMemo(() => findReviewerMatches(segments, deferredQuery), [deferredQuery, segments]);
   const [activeMatch, setActiveMatch] = useState(0);
@@ -227,6 +231,7 @@ export function ReviewerReaderScreen({
         <View style={{ flexDirection: "row", paddingTop: spacing[2] }}>
           <QuizPill onPress={() => setQuizOpen(true)} />
         </View>
+        <Copy muted size="caption">Tap an explanation or key point for Study Assist.</Copy>
       </View>
       <View
         ref={rootRef}
@@ -266,7 +271,7 @@ export function ReviewerReaderScreen({
                     {render(segmentIds.blockTitle(block.id), block.title)}
                   </Text>
                 ) : null}
-                <Text ref={register(segmentIds.explanation(block.id))} style={{ color: colors.textPrimary, fontSize: 16, lineHeight: 26 }}>
+                <Text ref={register(segmentIds.explanation(block.id))} accessibilityRole="button" accessibilityHint="Opens Study Assist for this concept" onPress={() => setAssistBlock({ section: section.id, block: block.id })} style={{ color: colors.textPrimary, fontSize: 16, lineHeight: 26 }}>
                   {render(segmentIds.explanation(block.id), block.explanation)}
                 </Text>
                 {block.keyPoints.length > 0 ? (
@@ -275,7 +280,7 @@ export function ReviewerReaderScreen({
                     {block.keyPoints.map((point, index) => (
                       <View key={`${block.id}-point-${index}`} style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing[2] }}>
                         <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 9, backgroundColor: colors.accent }} />
-                        <Text ref={register(segmentIds.keyPoint(block.id, index))} style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}>
+                        <Text ref={register(segmentIds.keyPoint(block.id, index))} accessibilityRole="button" accessibilityHint="Opens Study Assist for this concept" onPress={() => setAssistBlock({ section: section.id, block: block.id })} style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}>
                           {render(segmentIds.keyPoint(block.id, index), point)}
                         </Text>
                       </View>
@@ -306,6 +311,7 @@ export function ReviewerReaderScreen({
         <Action onPress={() => setQuizOpen(true)}>Generate Quiz</Action>
       </Surface>
       {quizOpen ? <QuizFromReviewerSheet artifact={artifact} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
+      {assistBlock ? <StudyAssistSheet key={assistSelection?.contentHash ?? 'missing'} selection={assistSelection} onClose={() => setAssistBlock(null)} /> : null}
     </Page>
   );
 }
