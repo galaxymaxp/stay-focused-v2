@@ -1,6 +1,26 @@
 # Current State
 
-## B37.1a canonical source implementation (2026-09-28)
+## B37.2 opening production gate (2026-09-28)
+
+**PARTIAL — migration/deployment/small-source rejection verified; fresh 30 Mixed blocked at the existing daily quota (25/25), so B37.2 is NOT STARTED.**
+
+The approved B37.1a migration is recorded once in `xfdbwfqtorelmurncyql` as version `20260927230139`, name `20260928100000_canonical_non_canvas_sources`; reviewed local filename unchanged. Sources/courses/original Quiz row fingerprints match, all 15 historical Quizzes remain readable, and RLS/grants/owner-source constraints are preserved. No reset or deletion. Production API `dpl_FnAWyTzQmfNgsQLuo5rQyPKpdzbv` is READY for `0c354ac`, health 200 and signed-out Library 401. Private worker `generation-worker-00009-jzb` serves 100%; anonymous health 403. Build/digest and detailed verification are in the ledger.
+
+VPN sections 6–10 have 26 concepts, 5 duplicate exclusions and capacity 52. Direct 100-item admission returns typed 422 with maximum 52, no job and zero provider calls. The whole VPN Reviewer still calculates capacity 100; its whole-source capacity is not claimed to pass a below-100 check. Fresh 30 Mixed returns 429 `rate_limited`, no job/provider calls: 25/25 daily jobs, zero queued/running. The next window starts **2026-09-28 08:00 Manila**. An existing Canvas `2. Firewalls.pdf` Reviewer is a candidate with 138 concepts/capacity 100. No fresh 100-item, Queue/Library completion or non-Canvas physical flow was run after the required stop. Do not bypass the quota.
+
+Realme `PB6DWWEIHAUCMZOR` loaded current JS against production, retained the authorized owner's session, and loaded existing Library/Queue data. Tokens stayed in the app. The corrected config `stay-focused-v2/env.local` matches production; only variable names/presence are recorded. Initial inventory approval blocks were resolved for aggregate counts after explicit user approval; private content exports were not bypassed. Fresh Quiz tests: 157 passed, 2 existing skips; focused database tests: 30 passed, 2 skips (overlapping); production build and `git diff --check` pass. No EAS build, auth/Canvas credential/Resend implementation, live email or new lifecycle acceptance. Existing unrelated Supabase security-advisor warnings remain recorded for separate review.
+
+The authenticated Supabase user UUID is the canonical owner.
+
+Canvas credentials authorize synchronization.
+They do not own Stay Focused data.
+
+Resume the 30/100 and non-Canvas physical gate after daily admission resets, then B37.2. Study Assist latency remains approximately 20 seconds and optimization is deferred. `tmp/` untouched; no push.
+
+[Detailed B37 rollout and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).
+
+
+## B37.1a local checkpoint before rollout (2026-09-28)
 
 The local B37.1a implementation uses `source_versions` to anchor non-Canvas Text, Camera/OCR and Local PDF sources under the authenticated `user_id`. Existing Canvas File and Page Reviewers continue to use that table and retain snapshot/course/material provenance; new jobs label their source type. The non-Canvas sheet persists a source on Continue, then sends its source ID through the durable Reviewer path. Quiz resolves the same persisted Reviewer and source; the forward migration allows an owner-bound Quiz with a null Canvas course and a required source version. Library code retains source name/type and can reopen both artifacts. The old manual Save screen is removed from this route. No fake Canvas IDs are used for non-Canvas sources. Activity remains Canvas assignment based. The physical app reached Text entry, camera launch and PDF selection, but its API was unreachable, so persistence and Library reopening are unverified. Automatic approval review rejected the live Supabase migration; no production schema/data changed. Physical and production acceptance are tracked in the [B37 ledger](ai/acceptance/b37/study-experience-overhaul.md).
 
