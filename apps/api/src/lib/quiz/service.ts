@@ -13,6 +13,7 @@ import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispa
 import { readProcessingJobCheckpoint,writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
 import { AI_FIRST_QUIZ_MODEL,generateQuizSet } from './ai-first';
 import type { QuizRegion,StoredQuestion } from './generation';
+import { normalized } from './generation';
 import { assembleQuizSources,readQuizRequest,resolveQuizSources } from './sources';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
@@ -65,7 +66,28 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     if (complete) questions = record(complete.payload).questions as StoredQuestion[];
     else {
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Creating your quiz' });
-        try { questions = await generateQuizSet(durableGenerationProvider(client, job.id, workerId), input, regions); }
+        try {
+            questions = [];
+            for (const { offset, size } of quizBatches(input.questionCount)) {
+                const checkpointKey = `quiz:batch:ai-first:${String(offset).padStart(3, '0')}`;
+                const savedBatch = await readProcessingJobCheckpoint(client, job.id, checkpointKey);
+                let batch = savedBatch ? record(savedBatch.payload).questions as StoredQuestion[] : null;
+                if (batch && batch.length !== size) throw new GenerationContractError([`batch_${offset}:count`]);
+                if (!batch) {
+                    const provider = durableGenerationProvider(client, job.id, workerId);
+                    for (let retry = 0; retry < 3; retry++) {
+                        const candidate = await generateQuizSet(provider, { ...input, questionCount: size }, regions, undefined, questions);
+                        batch = candidate.map((question, index) => ({ ...question, id: `q${offset + index + 1}` }));
+                        if (!hasRepeatedQuizQuestions([...questions, ...batch]) && !hasUnbalancedQuizMix([...questions, ...batch], input.questionTypes)) break;
+                        batch = null;
+                    }
+                    if (!batch) throw new GenerationContractError([`batch_${offset}:duplicate_question`]);
+                    await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey, payload: json({ questions: batch }) });
+                }
+                questions.push(...batch);
+                if (hasRepeatedQuizQuestions(questions)) throw new GenerationContractError([`batch_${offset}:duplicate_question`]);
+            }
+        }
         catch (error) {
             console.info('quiz_generation.failed', { jobId: job.id, category: error instanceof GenerationContractError ? 'contract' : 'provider' });
             throw new ExperienceFailure(error instanceof GenerationContractError ? 422 : 503, 'quiz_generation_failed');
@@ -80,8 +102,31 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, materialIds, title: `${questions.length}-question quiz`, questions,
             provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
 }
+/** Exact stems and highly overlapping long stems are duplicate study items. */
+export function hasRepeatedQuizQuestions(questions: readonly Pick<StoredQuestion, 'prompt'>[]): boolean {
+    const stems = questions.map(question => normalized(question.prompt));
+    for (let i = 0; i < stems.length; i++) for (let j = 0; j < i; j++) {
+        if (stems[i] === stems[j]) return true;
+        const a = new Set(stems[i]!.split(' ').filter(Boolean)), b = new Set(stems[j]!.split(' ').filter(Boolean));
+        if (a.size < 8 || b.size < 8) continue;
+        const intersection = [...a].filter(word => b.has(word)).length;
+        if (intersection / new Set([...a, ...b]).size > 0.85) return true;
+    }
+    return false;
+}
+export function hasUnbalancedQuizMix(questions: readonly Pick<StoredQuestion, 'type'>[], requestedTypes: readonly StoredQuestion['type'][] | undefined): boolean {
+    const allowed = requestedTypes ?? ['single_select', 'identification', 'true_false', 'modified_true_false', 'matching'];
+    if (allowed.length < 3 || questions.length < 10) return false;
+    const counts = new Map<string, number>();
+    for (const question of questions) counts.set(question.type, (counts.get(question.type) ?? 0) + 1);
+    return Math.max(...counts.values()) > Math.ceil(questions.length * 0.6) || counts.size < Math.min(3, allowed.length);
+}
+export function quizBatches(count: number): { offset: number; size: number }[] {
+    if (!Number.isInteger(count) || count < 5 || count > 100) throw new Error('invalid_quiz_count');
+    return Array.from({ length: Math.ceil(count / 20) }, (_, index) => ({ offset: index * 20, size: Math.min(20, count - index * 20) }));
+}
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
-    return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : 'Choose one answer.' };
+    return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : q.type === 'identification' ? 'Type the term.' : q.type === 'modified_true_false' ? 'Mark true, or mark false and correct the wrong term.' : q.type === 'matching' ? 'Match the term to its meaning.' : 'Choose one answer.', ...(q.type === 'matching' && q.leftItem ? { leftItem: q.leftItem } : {}) };
 }
 export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Quiz {
     const attempts = history.filter(a => a.user_id === row.user_id && a.quiz_id === row.id).sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at) || b.id.localeCompare(a.id));
@@ -91,8 +136,17 @@ export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Qui
         attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null, questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {
-    const correct = [...answer.selectedOptionIds].sort().join('|') === [...question.correctOptionIds].sort().join('|');
+    const correct = [...normalizeSubmittedAnswer(question, answer.selectedOptionIds)].sort().join('|') === [...question.correctOptionIds].sort().join('|');
     return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct, explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
+}
+export function normalizeSubmittedAnswer(question: StoredQuestion, selected: readonly string[]): string[] {
+    if (question.type !== 'identification' && question.type !== 'modified_true_false') return [...selected];
+    const index = question.type === 'identification' ? 0 : selected.findIndex(value => !question.options.some(option => option.id === value));
+    if (index < 0 || selected.length <= index) return [...selected];
+    const answer = normalized(selected[index]!);
+    const accepted = question.acceptedAnswers ?? [];
+    const canonical = question.type === 'identification' ? question.correctOptionIds[0] : question.correctOptionIds.find(value => !question.options.some(option => option.id === value));
+    return selected.map((value, position) => position === index ? accepted.some(alias => normalized(alias) === answer) && canonical ? canonical : answer : value);
 }
 export function attemptView(row: AttemptRow, questions: readonly StoredQuestion[]): QuizAttempt {
     const answers = (row.answers as unknown as QuizAttemptAnswer[]).map(a => ({ questionId: a.questionId, selectedOptionIds: [...a.selectedOptionIds], finalizedAt: a.finalizedAt }));
@@ -136,6 +190,11 @@ export async function readQuiz(client: Client, userId: string, id: string): Prom
         throw new ExperienceFailure(404, 'quiz_not_found');
     return quizView(data, await attemptHistoryRows(client, userId, id));
 }
+export async function deleteQuiz(client: Client, userId: string, id: string): Promise<void> {
+    const { data, error } = await client.from('quizzes').delete().eq('user_id', userId).eq('id', id).select('id').maybeSingle();
+    if (error) throw new ExperienceFailure(503, 'unavailable');
+    if (!data) throw new ExperienceFailure(404, 'quiz_not_found');
+}
 export async function attemptHistoryRows(client: Client, userId: string, quizId: string): Promise<AttemptRow[]> {
     const all: AttemptRow[] = [];
     for (let offset = 0; offset < 10000; offset += 200) {
@@ -172,9 +231,14 @@ export async function startAttempt(client: Client, userId: string, quizId: strin
 }
 export async function saveAnswer(client: Client, userId: string, attemptId: string, questionId: string, value: unknown) {
     const input = record(value);
-    if (Object.keys(input).some(k => !['selectedOptionIds', 'finalize'].includes(k)) || typeof input.finalize !== 'boolean' || !Array.isArray(input.selectedOptionIds) || input.selectedOptionIds.length > 6 || !input.selectedOptionIds.every(v => typeof v === 'string' && v.length <= 30) || new Set(input.selectedOptionIds).size !== input.selectedOptionIds.length)
+    if (Object.keys(input).some(k => !['selectedOptionIds', 'finalize'].includes(k)) || typeof input.finalize !== 'boolean' || !Array.isArray(input.selectedOptionIds) || input.selectedOptionIds.length > 6 || !input.selectedOptionIds.every(v => typeof v === 'string' && v.length <= 200) || new Set(input.selectedOptionIds).size !== input.selectedOptionIds.length)
         throw new ExperienceFailure(400, 'quiz_answer_invalid');
-    const { data, error } = await client.rpc('save_quiz_answer', { p_user_id: userId, p_attempt_id: attemptId, p_question_id: questionId, p_selected: json(input.selectedOptionIds), p_finalize: input.finalize });
+    const { data: attemptRow, error: attemptError } = await client.from('quiz_attempts').select('quiz_id').eq('user_id', userId).eq('id', attemptId).maybeSingle();
+    if (attemptError || !attemptRow) throw new ExperienceFailure(404, 'quiz_attempt_not_found');
+    const question = (await keys(client, userId, attemptRow.quiz_id)).find(item => item.id === questionId);
+    if (!question) throw new ExperienceFailure(404, 'quiz_question_not_found');
+    const normalizedSelection = normalizeSubmittedAnswer(question, input.selectedOptionIds as string[]);
+    const { data, error } = await client.rpc('save_quiz_answer', { p_user_id: userId, p_attempt_id: attemptId, p_question_id: questionId, p_selected: json(normalizedSelection), p_finalize: input.finalize });
     rpcError(error);
     if (!data?.[0] || data[0].user_id !== userId)
         throw new ExperienceFailure(404, 'quiz_attempt_not_found');

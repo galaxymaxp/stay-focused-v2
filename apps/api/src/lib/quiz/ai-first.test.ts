@@ -2,13 +2,24 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildGenerationContext, prepareGenerationContext, generateContract, GenerationContractError, runAIReviewer, createReviewerDocumentSchema, validateReviewerDocument, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
 import { generateQuizSet, validateQuizSet, quizSetSchema } from './ai-first';
 import { validateActivityDocument, generateActivityDocument } from '../activity-maker/ai-first';
-import { learnerQuestion, evaluateAnswer } from './service';
+import { learnerQuestion, evaluateAnswer, hasRepeatedQuizQuestions, hasUnbalancedQuizMix, normalizeSubmittedAnswer, quizBatches } from './service';
 import type { QuizGenerationRequest, ActivitySource } from '@stay-focused/shared';
 const request: QuizGenerationRequest = { sourceType: 'material', sourceIds: ['material'], questionCount: 5, difficulty: 'mixed' };
 const regions = [{ id: 'page-1', label: 'Lecture', text: 'Complete lecture with relationships and examples.\n# Heading\nMore material.', sourceRefs: [{ materialId: 'material', regionId: 'page-1', page: 1, slide: null }], reviewerSectionIds: [] }];
 function quiz() { return { questions: Array.from({ length: 5 }, (_, i) => ({ id: `q${i + 1}`, type: 'single_select', prompt: `Question ${i + 1}?`, options: [{ id: 'a', text: 'First' }, { id: 'b', text: 'Second' }, { id: 'c', text: 'Third' }, { id: 'd', text: 'Fourth' }], correctOptionIds: ['a'], explanation: 'Explanation from the lecture.', difficulty: 'easy', concept: `Concept ${i + 1}`, sourceRefs: ['page-1'] })) }; }
 const provider = (response: unknown, capture?: GenerationRequest<unknown>[]): GenerationProvider => ({ generate: async <T>(r: GenerationRequest<T>) => { capture?.push(r); return response as T; } });
 describe('AI-first context and product contracts', () => {
+  it('plans 100 items in five bounded batches with stable global offsets', () => {
+    expect(quizBatches(100)).toEqual([{ offset: 0, size: 20 }, { offset: 20, size: 20 }, { offset: 40, size: 20 }, { offset: 60, size: 20 }, { offset: 80, size: 20 }]);
+    expect(quizBatches(45).at(-1)).toEqual({ offset: 40, size: 5 });
+  });
+  it('detects repeated and near-repeated long stems across batches', () => {
+    expect(hasRepeatedQuizQuestions([{ prompt: 'What is phishing?' }, { prompt: 'WHAT IS PHISHING!' }])).toBe(true);
+    expect(hasRepeatedQuizQuestions([{ prompt: 'Which protocol uses certificates to verify the identity of a remote web server?' }, { prompt: 'Which protocol uses certificates to verify the identity of the remote web server?' }])).toBe(true);
+    const mixed = ['single_select', 'single_select', 'single_select', 'single_select', 'single_select', 'single_select', 'identification', 'identification', 'true_false', 'matching'] as const;
+    expect(hasUnbalancedQuizMix(mixed.map(type => ({ type })), ['single_select', 'identification', 'true_false', 'modified_true_false', 'matching'])).toBe(false);
+    expect(hasUnbalancedQuizMix(mixed.map(type => ({ type: type === 'matching' ? 'single_select' : type })), ['single_select', 'identification', 'true_false', 'modified_true_false', 'matching'])).toBe(true);
+  });
   it('preserves all ordered headings/text and original IDs', () => {
     const sources = [{ id: 'p2', text: '# Heading\r\n  A | B', page: 2 }, { id: 'p3', text: 'Tail', page: 3 }];
     const c = buildGenerationContext(sources);
@@ -66,6 +77,27 @@ describe('AI-first context and product contracts', () => {
       { id: 'd', text: 'All four statements' },
     ];
     raw.questions[4]!.correctOptionIds = ['a'];
+    expect(() => validateQuizSet(raw, request, regions)).toThrow(GenerationContractError);
+  });
+  it('validates five grounded formats and normalizes source-supported recall aliases', () => {
+    const raw = quiz();
+    const source = [{ ...regions[0]!, text: 'The CIA triad consists of Confidentiality, Integrity, and Availability. Confidentiality prevents unauthorized disclosure.' }];
+    Object.assign(raw.questions[0]!, { type: 'identification', prompt: 'Name the CIA triad.', options: [], correctOptionIds: ['CIA triad'], acceptedAnswers: ['CIA triad'], leftItem: '', incorrectTerm: '' });
+    Object.assign(raw.questions[1]!, { type: 'modified_true_false', prompt: 'Availability prevents unauthorized disclosure.', options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['b', 'Confidentiality'], acceptedAnswers: ['Confidentiality'], incorrectTerm: 'Availability', leftItem: '' });
+    Object.assign(raw.questions[2]!, { type: 'matching', prompt: 'Match the term to its meaning.', leftItem: 'Confidentiality', options: [{ id: 'a', text: 'Uptime' }, { id: 'b', text: 'Accuracy' }, { id: 'c', text: 'Prevention of unauthorized disclosure' }, { id: 'd', text: 'Recovery' }], correctOptionIds: ['c'], acceptedAnswers: [], incorrectTerm: '' });
+    Object.assign(raw.questions[3]!, { type: 'true_false', prompt: 'The CIA triad includes Integrity.', options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['a'], acceptedAnswers: [], leftItem: '', incorrectTerm: '' });
+    const validated = validateQuizSet(raw, request, source);
+    expect(validated.map(question => question.type)).toEqual(['identification', 'modified_true_false', 'matching', 'true_false', 'single_select']);
+    expect(normalizeSubmittedAnswer(validated[0]!, ['  cia triad! '])).toEqual(['CIA triad']);
+    expect(normalizeSubmittedAnswer(validated[1]!, ['b', 'confidentiality.'])).toEqual(['b', 'Confidentiality']);
+    expect(learnerQuestion(validated[2]!)).toHaveProperty('leftItem', 'Confidentiality');
+    expect(learnerQuestion(validated[1]!)).not.toHaveProperty('acceptedAnswers');
+    (raw.questions[0] as typeof raw.questions[0] & { acceptedAnswers: string[] }).acceptedAnswers = ['Invented alias'];
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+  });
+  it('rejects recurring meta-question stems for repair', () => {
+    const raw = quiz();
+    raw.questions[0]!.prompt = 'According to the provided material, what is the term?';
     expect(() => validateQuizSet(raw, request, regions)).toThrow(GenerationContractError);
   });
   it('repairs the complete output once', async () => {

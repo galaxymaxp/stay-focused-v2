@@ -62,22 +62,23 @@ export class ExperienceService {
     const courseSnapshots = new Set(snapshots.filter(snapshot => snapshot.course_id === courseId).map(snapshot => snapshot.id));
     const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
     const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
-    const latestReviewerBySnapshot = new Map<string, string>();
+    const latestReviewerBySnapshot = new Map<string, { id: string; updatedAt: string }>();
     for (const artifact of [...artifacts].filter(row => row.artifact_type === 'reviewer' && !row.deleted_at).sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))) {
       const version = artifact.latest_version_id ? versionMap.get(artifact.latest_version_id) : null;
       const source = version ? sourceVersionMap.get(version.source_version_id) : null;
       const snapshotId = source ? text(record(source.metadata).reviewerSourceSnapshotId) : null;
       if (version?.artifact_id === artifact.id && snapshotId && courseSnapshots.has(snapshotId) && !latestReviewerBySnapshot.has(snapshotId)) {
-        latestReviewerBySnapshot.set(snapshotId, artifact.id);
+        latestReviewerBySnapshot.set(snapshotId, { id: artifact.id, updatedAt: artifact.updated_at });
       }
     }
-    const reviewerByMaterial = new Map<string, string>();
+    const reviewerByMaterial = new Map<string, { id: string; updatedAt: string }>();
     for (const item of snapshotItems) {
       if (item.course_id !== courseId || !item.source_row_id) continue;
-      const reviewerArtifactId = latestReviewerBySnapshot.get(item.source_snapshot_id);
-      if (reviewerArtifactId) reviewerByMaterial.set(`${item.source_type}:${item.source_row_id}`, reviewerArtifactId);
+      const reviewer = latestReviewerBySnapshot.get(item.source_snapshot_id);
+      const key = `${item.source_type}:${item.source_row_id}`;
+      if (reviewer && (!reviewerByMaterial.has(key) || Date.parse(reviewer.updatedAt) > Date.parse(reviewerByMaterial.get(key)!.updatedAt))) reviewerByMaterial.set(key, reviewer);
     }
-    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
+    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null)), totalKnown: result.value.pagination.totalKnown,
       nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
   }
   async getCourseLearningWorkspace(userId: string, courseId: string): Promise<CourseLearningWorkspace> {
@@ -178,16 +179,18 @@ export class ExperienceService {
     }).sort((a,b)=>Date.parse(b.draft.createdAt)-Date.parse(a.draft.createdAt)||a.draft.id.localeCompare(b.draft.id));
   }
   private async artifactRecords(userId: string): Promise<ArtifactRecord[]> {
-    const [artifacts, versions, sourceVersions, snapshots, courses] = await Promise.all([
+    const [artifacts, versions, sourceVersions, snapshots, courses, snapshotItems] = await Promise.all([
       this.rows('generated_artifacts', userId), this.rows('generated_artifact_versions', userId), this.rows('source_versions', userId),
-      this.rows('reviewer_source_snapshots', userId), this.rows('canvas_courses', userId),
+      this.rows('reviewer_source_snapshots', userId), this.rows('canvas_courses', userId), this.rows('reviewer_source_snapshot_items', userId),
     ]);
     const snapshotMap = new Map(snapshots.map(s => [s.id, s]));
     const courseMap = new Map(courses.map(c => [c.id, { id: c.id, code: c.course_code, name: c.name }]));
     function summary(id: string, title: string, createdAt: string, updatedAt: string, snapshotId: string | null, sourceId: string | null, sourceTitle: string | null): LibraryArtifactSummary {
       const snapshot = snapshotId ? snapshotMap.get(snapshotId) : null;
+      const originalItems = snapshotId ? snapshotItems.filter(item => item.source_snapshot_id === snapshotId) : [];
       return { id, type: 'reviewer', title, course: snapshot ? courseMap.get(snapshot.course_id) ?? null : null,
         sourceId: snapshot?.id ?? sourceId, sourceTitle: snapshot?.source_title ?? sourceTitle, activityId: null,
+        sourceMaterialId: originalItems.length === 1 && originalItems[0]!.source_row_id ? `${originalItems[0]!.source_type}:${originalItems[0]!.source_row_id}` : null,
         createdAt, updatedAt, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
     }
     const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
@@ -214,8 +217,13 @@ export class ExperienceService {
     const capabilities = experienceCapabilities();
     const categories = { reviewer: { status: 'available' as const }, quiz: capabilities.quizGeneration, activity_output: capabilities.activityMaker };
     const records = [...(await this.artifactRecords(userId)),...(await this.activityDraftRecords(userId)),...(await this.quizRecords(userId))].filter(r => (!filters.type || r.summary.type===filters.type) && (!filters.courseId || r.summary.course?.id === filters.courseId)).sort((a,b)=>Date.parse(b.summary.updatedAt)-Date.parse(a.summary.updatedAt)||a.summary.id.localeCompare(b.summary.id));
+    // A new generation from the same single Canvas material supersedes its
+    // prior Reviewer card. Older artifacts remain addressable by existing Quizzes.
+    const visible = records.filter((record, index) => record.summary.type !== 'reviewer' || !records.slice(0, index).some(earlier => earlier.summary.type === 'reviewer' && earlier.summary.course?.id === record.summary.course?.id && (earlier.summary.sourceMaterialId ?? earlier.summary.sourceId) && (earlier.summary.sourceMaterialId ?? earlier.summary.sourceId) === (record.summary.sourceMaterialId ?? record.summary.sourceId)));
     const offset = filters.offset ?? 0; const limit = filters.limit ?? 50;
-    return { items: records.slice(offset, offset + limit).map(r => r.summary), categories, nextOffset: offset + limit < records.length ? offset + limit : null };
+    const visibleIds = new Set(visible.map(record => record.summary.id));
+    return { items: visible.slice(offset, offset + limit).map(r => r.summary), categories, nextOffset: offset + limit < visible.length ? offset + limit : null,
+      supersededReviewerIds: records.filter(record => record.summary.type === 'reviewer' && !visibleIds.has(record.summary.id)).map(record => record.summary.id) };
   }
   async getLibraryArtifact(userId: string, artifactId: string): Promise<LibraryArtifactDetail> {
     if (artifactId.startsWith('quiz:')) { const entry=requireFound((await this.quizRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,quiz:entry.quiz}; }

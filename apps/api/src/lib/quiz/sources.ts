@@ -10,13 +10,15 @@ const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 const isId = (id: unknown): id is string => typeof id === 'string' && new RegExp(`^${uuid}$`, 'i').test(id);
 export function readQuizRequest(value: unknown): QuizGenerationRequest {
     const v = record(value);
-    if (Object.keys(v).some(k => !['sourceType', 'sourceIds', 'reviewerArtifactId', 'questionCount', 'difficulty', 'questionTypes'].includes(k)) || !['material', 'reviewer'].includes(String(v.sourceType)) || !Array.isArray(v.sourceIds) || v.sourceIds.length > 4 || new Set(v.sourceIds).size !== v.sourceIds.length || !Number.isInteger(v.questionCount) || Number(v.questionCount) < 5 || Number(v.questionCount) > 20 || !['easy', 'medium', 'hard', 'mixed'].includes(String(v.difficulty)) || (v.reviewerArtifactId !== undefined && !isId(v.reviewerArtifactId)))
+    if (Object.keys(v).some(k => !['sourceType', 'sourceIds', 'reviewerArtifactId', 'questionCount', 'difficulty', 'questionTypes', 'selectedTopicIds'].includes(k)) || !['material', 'reviewer'].includes(String(v.sourceType)) || !Array.isArray(v.sourceIds) || v.sourceIds.length > 4 || new Set(v.sourceIds).size !== v.sourceIds.length || !Number.isInteger(v.questionCount) || Number(v.questionCount) < 5 || Number(v.questionCount) > 100 || !['easy', 'medium', 'hard', 'mixed'].includes(String(v.difficulty)) || (v.reviewerArtifactId !== undefined && !isId(v.reviewerArtifactId)))
         throw new ExperienceFailure(400, 'invalid_request');
     if (v.sourceType === 'reviewer' ? v.sourceIds.length !== 1 || !isId(v.sourceIds[0]) || (v.reviewerArtifactId !== undefined && v.reviewerArtifactId !== v.sourceIds[0]) : v.sourceIds.length < 1 || !v.sourceIds.every(id => typeof id === 'string' && new RegExp(`^(file|page|assignment|announcement):${uuid}$`, 'i').test(id)))
         throw new ExperienceFailure(400, 'invalid_request');
-    if (v.questionTypes !== undefined && (!Array.isArray(v.questionTypes) || !v.questionTypes.length || new Set(v.questionTypes).size !== v.questionTypes.length || !v.questionTypes.every(t => ['single_select', 'multi_select', 'true_false'].includes(t))))
+    if (v.questionTypes !== undefined && (!Array.isArray(v.questionTypes) || !v.questionTypes.length || new Set(v.questionTypes).size !== v.questionTypes.length || !v.questionTypes.every(t => ['single_select', 'multi_select', 'true_false', 'identification', 'modified_true_false', 'matching'].includes(t))))
         throw new ExperienceFailure(400, 'invalid_request');
-    return { sourceType: v.sourceType as QuizGenerationRequest['sourceType'], sourceIds: (v.sourceIds as string[]).map(s => s.toLowerCase()).sort(), questionCount: Number(v.questionCount), difficulty: v.difficulty as QuizGenerationRequest['difficulty'], ...(v.reviewerArtifactId ? { reviewerArtifactId: String(v.reviewerArtifactId).toLowerCase() } : {}), ...(v.questionTypes ? { questionTypes: v.questionTypes as NonNullable<QuizGenerationRequest['questionTypes']> } : {}) };
+    if (v.selectedTopicIds !== undefined && (!Array.isArray(v.selectedTopicIds) || !v.selectedTopicIds.length || v.selectedTopicIds.length > 100 || !v.selectedTopicIds.every(id => typeof id === 'string' && id.length > 0 && id.length <= 100) || new Set(v.selectedTopicIds).size !== v.selectedTopicIds.length))
+        throw new ExperienceFailure(400, 'invalid_request');
+    return { sourceType: v.sourceType as QuizGenerationRequest['sourceType'], sourceIds: (v.sourceIds as string[]).map(s => s.toLowerCase()).sort(), questionCount: Number(v.questionCount), difficulty: v.difficulty as QuizGenerationRequest['difficulty'], ...(v.reviewerArtifactId ? { reviewerArtifactId: String(v.reviewerArtifactId).toLowerCase() } : {}), ...(v.questionTypes ? { questionTypes: v.questionTypes as NonNullable<QuizGenerationRequest['questionTypes']> } : {}), ...(v.selectedTopicIds ? { selectedTopicIds: v.selectedTopicIds as string[] } : {}) };
 }
 export async function resolveQuizSources(client: Client, userId: string, request: QuizGenerationRequest) {
     const reviewerArtifactId = request.sourceType === 'reviewer' ? request.sourceIds[0]! : request.reviewerArtifactId ?? null;
@@ -36,6 +38,10 @@ export async function resolveQuizSources(client: Client, userId: string, request
         const persisted = record(versionResult.data.payload);
         if (!record(persisted.reviewer).sections)
             throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        if (request.selectedTopicIds) {
+            const sectionIds = new Set((Array.isArray(record(persisted.reviewer).sections) ? record(persisted.reviewer).sections as unknown[] : []).map(section => record(section).id));
+            if (request.selectedTopicIds.some(id => !sectionIds.has(id))) throw new ExperienceFailure(400, 'invalid_request');
+        }
         const sourceResult = await client.from('source_versions').select('*').eq('user_id', userId).eq('id', versionResult.data.source_version_id).maybeSingle();
         const sourceSnapshotId = sourceResult.data ? record(sourceResult.data.metadata).reviewerSourceSnapshotId : null;
         if (sourceResult.error || !sourceResult.data || sourceResult.data.user_id !== userId || !isId(sourceSnapshotId))
@@ -112,7 +118,9 @@ export async function assembleQuizSources(client: Client, userId: string, reques
     const root = record(resolved.reviewerVersion.payload);
     const reviewer = record(root.reviewer);
     const sections = Array.isArray(reviewer.sections) ? reviewer.sections.map(record) : [];
-    const regions: QuizRegion[] = sections.flatMap(section => {
+    if (request.selectedTopicIds && request.selectedTopicIds.some(id => !sections.some(section => section.id === id)))
+        throw new ExperienceFailure(400, 'invalid_request');
+    const regions: QuizRegion[] = sections.filter(section => !request.selectedTopicIds || request.selectedTopicIds.includes(section.id as string)).flatMap(section => {
         if (typeof section.id !== 'string' || typeof section.title !== 'string' || !Array.isArray(section.items)) return [];
         return section.items.map(record).flatMap(item => {
             const core = record(item.sourceCore);

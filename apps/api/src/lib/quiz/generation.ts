@@ -18,5 +18,8 @@ export interface StoredQuestion extends QuizQuestion {
         quote: string;
     }[];
     concept: string;
+    /** Private source-supported aliases for direct recall and corrections. */
+    acceptedAnswers?: string[];
+    incorrectTerm?: string;
 }
 export const normalized = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();

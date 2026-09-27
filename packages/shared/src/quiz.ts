@@ -1,5 +1,5 @@
 import type { GenerationState } from './experience';
-export type QuizQuestionType = 'single_select' | 'multi_select' | 'true_false';
+export type QuizQuestionType = 'single_select' | 'multi_select' | 'true_false' | 'identification' | 'modified_true_false' | 'matching';
 export type QuizDifficulty = 'easy' | 'medium' | 'hard';
 export type QuizGenerationState = GenerationState;
 export interface QuizGenerationRequest {
@@ -9,6 +9,7 @@ export interface QuizGenerationRequest {
     readonly questionCount: number;
     readonly difficulty: QuizDifficulty | 'mixed';
     readonly questionTypes?: readonly QuizQuestionType[];
+    readonly selectedTopicIds?: readonly string[];
 }
 export interface QuizSourceReference {
     readonly materialId: string;
@@ -26,7 +27,9 @@ export interface QuizQuestion {
     readonly type: QuizQuestionType;
     readonly prompt: string;
     readonly options: readonly QuizQuestionOption[];
-    readonly selectionInstruction: 'Choose one answer.' | 'Select all correct answers.';
+    readonly selectionInstruction: string;
+    /** A matching item asks for one pair; this is its visible left side. */
+    readonly leftItem?: string;
     readonly difficulty: QuizDifficulty;
 }
 export interface QuizSummary {

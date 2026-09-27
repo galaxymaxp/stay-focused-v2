@@ -8,7 +8,7 @@ import type { ExperienceRepository,ExperienceRow,ExperienceTable } from '../expe
 import { ExperienceService } from '../experience/service';
 import { generateQuizSet } from './ai-first';
 import { candidate,fixturePlan,makeQuizPlan,request,validateCandidate } from './fixtures';
-import { attemptView,quizView,resultView,type AttemptRow,type QuizRow } from './service';
+import { attemptView,learnerQuestion,quizView,resultView,type AttemptRow,type QuizRow } from './service';
 import { regionsFromBlocks } from './sources';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -60,6 +60,7 @@ beforeAll(async () => {
     await db.exec(migration('20260912100000_activity_maker.sql'));
     await db.exec(migration('20260912110000_quiz_maker.sql'));
     await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
+    await db.exec(migration('20260927120000_quiz_100_items.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{
@@ -68,6 +69,51 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Quiz real Postgres transactions, RLS and history', () => {
+    it('removes only the owner Quiz and its keys while preserving the source Reviewer', async () => {
+        await db.exec('begin');
+        try {
+            expect((await db.query('delete from quizzes where id=$1 and user_id=$2 returning id', [quizId, B])).rows).toHaveLength(0);
+            expect((await db.query('delete from quizzes where id=$1 and user_id=$2 returning id', [quizId, A])).rows).toHaveLength(1);
+            expect((await db.query('select quiz_id from quiz_keys where quiz_id=$1', [quizId])).rows).toHaveLength(0);
+            expect((await db.query('select id from generated_artifacts where id=$1', [reviewer])).rows).toHaveLength(1);
+        } finally { await db.exec('rollback'); }
+    });
+    it('stores 100 questions without truncating the learner projection or private key', async () => {
+        await db.exec('begin');
+        try {
+            const hundred = Array.from({ length: 100 }, (_, index) => ({ ...questions[index % questions.length]!, id: `q${index + 1}` }));
+            await db.query('update quizzes set question_count=100,questions=$1 where id=$2', [JSON.stringify(hundred.map(learnerQuestion)), quizId]);
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(hundred), quizId]);
+            expect((await db.query<QuizRow>('select * from quizzes where id=$1', [quizId])).rows[0]!.question_count).toBe(100);
+            expect((await db.query<{ questions: unknown[] }>('select questions from quiz_keys where quiz_id=$1', [quizId])).rows[0]!.questions).toHaveLength(100);
+            const hundredAttempt = await start('hundred-question-attempt');
+            for (const question of hundred) await answer(hundredAttempt.id, question.id, question.correctOptionIds);
+            expect(Number((await complete(hundredAttempt.id)).percentage)).toBe(100);
+        } finally { await db.exec('rollback'); }
+    });
+    it('accepts and scores identification, modified true or false, and matching', async () => {
+        await db.exec('begin');
+        try {
+            const variants = questions.map((question, index) => {
+                if (index === 1) return { ...question, type: 'identification', prompt: 'Name the CIA triad.', options: [], correctOptionIds: ['CIA triad'], acceptedAnswers: ['CIA triad'], selectionInstruction: 'Type the term.' };
+                if (index === 3) return { ...question, type: 'modified_true_false', prompt: 'Availability prevents unauthorized disclosure.', options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['b', 'confidentiality'], acceptedAnswers: ['confidentiality'], incorrectTerm: 'Availability', selectionInstruction: 'Mark true, or mark false and correct the wrong term.' };
+                if (index === 4) return { ...question, type: 'matching', leftItem: 'Confidentiality', prompt: 'Match the term to its meaning.', options: [{ id: 'a', text: 'Accuracy' }, { id: 'b', text: 'Access' }, { id: 'c', text: 'Protection from unauthorized disclosure' }, { id: 'd', text: 'Uptime' }], correctOptionIds: ['c'], selectionInstruction: 'Match the term to its meaning.' };
+                return question;
+            });
+            const formatJob = await queue('five-format-generation');
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [formatJob]);
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [formatJob, 'worker', 'quiz_generation', JSON.stringify({ ...payload, questions: variants })]);
+            const formatQuizId = (await db.query<{ id: string }>('select id from quizzes where generation_id=$1', [formatJob])).rows[0]!.id;
+            const attempt = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, formatQuizId, 'five-format-attempt'])).rows[0]!;
+            for (const [index, question] of variants.entries()) await answer(attempt.id, question.id, index === 1 ? ['CIA triad'] : index === 3 ? ['b', 'confidentiality'] : question.correctOptionIds);
+            const done = await complete(attempt.id);
+            expect(Number(done.percentage)).toBe(100);
+            const publicQuestions = (await db.query<QuizRow>('select * from quizzes where id=$1', [formatQuizId])).rows[0]!.questions as unknown as Record<string, unknown>[];
+            expect(publicQuestions[1]).not.toHaveProperty('correctOptionIds');
+            expect(publicQuestions[3]).not.toHaveProperty('acceptedAnswers');
+            expect(publicQuestions[4]).toHaveProperty('leftItem', 'Confidentiality');
+        } finally { await db.exec('rollback'); }
+    });
     it.skipIf(process.env.B24_7_LIVE !== '1').each(['statistics', 'it-security'])('limited live %s: generation, SQL attempts and Library reopen', async (name) => {
         if (process.env.B24_7_ENV_FILE)
             process.loadEnvFile(process.env.B24_7_ENV_FILE);

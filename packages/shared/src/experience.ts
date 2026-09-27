@@ -159,6 +159,8 @@ export interface LibraryArtifactSummary {
   readonly title: string;
   readonly course: CourseReference | null;
   readonly sourceId: string | null;
+  /** Original Canvas material when a Reviewer was generated from one item. */
+  readonly sourceMaterialId?: string | null;
   readonly sourceTitle: string | null;
   readonly activityId: string | null;
   readonly createdAt: string;
@@ -171,6 +173,8 @@ export interface LibraryOverview {
   readonly items: readonly LibraryArtifactSummary[];
   readonly categories: Readonly<Record<LibraryArtifactType, FeatureCapability>>;
   readonly nextOffset: number | null;
+  /** Older Reviewer cards superseded by a generation from the same material. */
+  readonly supersededReviewerIds?: readonly string[];
 }
 /** Full owner-scoped artifact returned by `GET /api/experience/library/:id`. */
 export type LibraryArtifactDetail =

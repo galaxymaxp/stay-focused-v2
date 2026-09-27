@@ -1,5 +1,5 @@
 import { PATCH as answerPatch,POST as attemptComplete,GET as attemptGet } from '@/../app/api/experience/quiz-attempts/[...attemptPath]/route';
-import { POST as attemptStart,GET as quizGet } from '@/../app/api/experience/quizzes/[...quizPath]/route';
+import { POST as attemptStart,GET as quizGet,DELETE as quizDelete } from '@/../app/api/experience/quizzes/[...quizPath]/route';
 import { POST as generate } from '@/../app/api/experience/quizzes/route';
 import type { Database,Json } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -26,9 +26,10 @@ function client(data: Data = {}) {
                 string,
                 unknown
             ][] = [];
-            const query = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), order: vi.fn(), limit: vi.fn(), range: vi.fn(), maybeSingle: vi.fn(), then: vi.fn() };
+            const query = { select: vi.fn(), delete: vi.fn(), eq: vi.fn(), is: vi.fn(), order: vi.fn(), limit: vi.fn(), range: vi.fn(), maybeSingle: vi.fn(), then: vi.fn() };
             const rows = () => ({ data: (data[table] ?? []).filter(r => filters.every(([k, v]) => r[k] === v)), error: null });
             query.select.mockReturnValue(query);
+            query.delete.mockReturnValue(query);
             query.eq.mockImplementation((key: string, value: unknown) => { filters.push([key, value]); return query; });
             query.is.mockImplementation((key: string, value: unknown) => { filters.push([key, value]); return query; });
             query.order.mockReturnValue(query);
@@ -49,6 +50,7 @@ describe('Quiz authenticated HTTP surfaces', () => {
         () => attemptGet(request(), { params: Promise.resolve({ attemptPath: [id, 'result'] }) }),
         () => answerPatch(request('PATCH', { selectedOptionIds: ['a'], finalize: true }), { params: Promise.resolve({ attemptPath: [id, 'answers', 'q1'] }) }),
         () => attemptComplete(request('POST'), { params: Promise.resolve({ attemptPath: [id, 'complete'] }) }),
+        () => quizDelete(request('DELETE'), { params: Promise.resolve({ quizPath: [id] }) }),
     ];
     it.each(routes.map((run, i) => [i, run] as const))('requires verified JWT on route %i', async (_i, run) => { mocks.auth.mockResolvedValue(null); const response = await run(); expect(response.status).toBe(401); expect(mocks.client).not.toHaveBeenCalled(); });
     it('quiz and unanswered attempt serialization have no key/evidence/validation hints', async () => {
@@ -61,7 +63,16 @@ describe('Quiz authenticated HTTP surfaces', () => {
         }
     });
     it('incomplete result reveals nothing', async () => { const response = await routes[4]!(); expect(response.status).toBe(409); expect(await response.text()).not.toContain('correctOptionIds'); });
-    it.each([1, 2, 3, 4, 5, 6])('denies foreign user on route %i', async (i) => { mocks.auth.mockResolvedValue({ id: B }); const response = await routes[i]!(); expect(response.status).toBeGreaterThanOrEqual(400); expect(await response.text()).not.toContain('correctOptionIds'); });
+    it.each([1, 2, 3, 4, 5, 6, 7])('denies foreign user on route %i', async (i) => { mocks.auth.mockResolvedValue({ id: B }); const response = await routes[i]!(); expect(response.status).toBeGreaterThanOrEqual(400); expect(await response.text()).not.toContain('correctOptionIds'); });
+    it('removes an owned Quiz through the Quiz-only route', async () => {
+        expect((await routes[7]!()).status).toBe(200);
+        const db = mocks.client.mock.results[0]?.value;
+        expect(db.from).toHaveBeenCalledWith('quizzes');
+        const query = db.from.mock.results[0]?.value;
+        expect(query.delete).toHaveBeenCalled();
+        expect(query.eq).toHaveBeenCalledWith('user_id', A);
+        expect(query.eq).toHaveBeenCalledWith('id', id);
+    });
     it('rejects oversized generation input before source/provider work', async () => { const response = await generate(request('POST', { ...input, padding: 'x'.repeat(5000) })); expect(response.status).toBe(400); expect(mocks.prepare).not.toHaveBeenCalled(); });
     it('normalizes private storage errors', async () => { mocks.client.mockImplementation(() => { throw new Error('Canvas PAT sk-secret provider response'); }); const response = await routes[1]!(); expect(response.status).toBe(503); expect(await response.text()).not.toMatch(/PAT|sk-secret|provider response/); });
 });

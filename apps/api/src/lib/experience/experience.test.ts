@@ -28,6 +28,7 @@ const session = { id: 'session', user_id: 'owner', task_id: task.id, starts_at: 
 const plan = { id: 'plan', user_id: 'owner', planning_starts_at: '2026-09-12T00:00:00Z', planning_ends_at: '2026-09-13T00:00:00Z', created_at: '2026-09-11T00:00:00Z' } as StudyPlanRow;
 const libraryData: TestData = {
   canvas_courses: [course], reviewer_source_snapshots: [{ id: 'snapshot', user_id: 'owner', course_id: course.id, source_title: 'Cells.pdf' }],
+  reviewer_source_snapshot_items: [{ id: 'snapshot-item', user_id: 'owner', source_snapshot_id: 'snapshot', source_type: 'file', source_row_id: 'source', course_id: course.id }],
   source_versions: [{ id: 'source-version', user_id: 'owner', character_count: 100, metadata: { reviewerSourceSnapshotId: 'snapshot', sourceTitle: 'Cells.pdf' } }],
   processing_jobs: [{ id: 'job', user_id: 'owner', job_type: 'reviewer_generation', status: 'succeeded', stage: 'storing_reviewer', result_id: 'result', updated_at: date, source_metadata: { displayName: 'Cells.pdf' } }],
   processing_job_results: [{ id: 'result', user_id: 'owner', job_id: 'job', result_type: 'reviewer_generation', artifact_version_id: 'version', payload, created_at: date }],
@@ -246,6 +247,16 @@ describe('Library ownership and persisted output', () => {
     const { api } = service(libraryData);
     expect((await api.getLibrary('owner')).items.map(i => i.id)).toEqual(['artifact:artifact']);
     for (const id of ['artifact:artifact', 'generation:job']) { const opened=await api.getLibraryArtifact('owner', id); if (!('reviewer' in opened)) throw new Error('Expected reviewer'); expect(opened.reviewer.title).toBe('Cells'); }
+  });
+  it('shows one latest Reviewer card for repeated generations of the same material', async () => {
+    const newerDate = '2026-09-13T00:00:00Z';
+    const { api } = service({ ...libraryData,
+      generated_artifacts: [...libraryData.generated_artifacts!, { ...libraryData.generated_artifacts![0]!, id: 'new-artifact', latest_version_id: 'new-version', updated_at: newerDate }],
+      generated_artifact_versions: [...libraryData.generated_artifact_versions!, { ...libraryData.generated_artifact_versions![0]!, id: 'new-version', artifact_id: 'new-artifact' }],
+    });
+    expect((await api.getLibrary('owner')).items.map(item => item.id)).toEqual(['artifact:new-artifact']);
+    expect((await api.getLibrary('owner')).items[0]?.sourceMaterialId).toBe('file:source');
+    expect((await api.getLibraryArtifact('owner', 'artifact:artifact')).artifact.id).toBe('artifact:artifact');
   });
   it('does not expose deleted artifacts', async () => {
     const { api } = service({ ...libraryData, generated_artifacts: [{ ...libraryData.generated_artifacts![0], deleted_at: date }] });

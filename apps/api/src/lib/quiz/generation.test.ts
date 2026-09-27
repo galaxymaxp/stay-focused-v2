@@ -2,9 +2,14 @@ import { describe,expect,it } from 'vitest';
 import { request } from './fixtures';
 import { readQuizRequest,regionsFromBlocks } from './sources';
 describe('Quiz source contracts and coverage', () => {
-    it.each([5, 10, 15, 20])('accepts bounded count %i', questionCount => expect(readQuizRequest({ ...request, questionCount }).questionCount).toBe(questionCount));
-    it.each([0, 4, 21, 100000, 5.5, NaN])('rejects abusive count %i', questionCount => expect(() => readQuizRequest({ ...request, questionCount })).toThrow());
+    it.each([5, 10, 15, 20, 50, 100])('accepts bounded count %i', questionCount => expect(readQuizRequest({ ...request, questionCount }).questionCount).toBe(questionCount));
+    it.each([0, 4, 101, 100000, 5.5, NaN])('rejects abusive count %i', questionCount => expect(() => readQuizRequest({ ...request, questionCount })).toThrow());
     it.each([{ userId: 'foreign' }, { courseId: 'foreign' }, { provider: 'x' }, { model: 'x' }, { sourceIds: [] }, { sourceIds: ['https://evil.test'] }, { questionTypes: [] }, { questionTypes: ['free_response'] }, { difficulty: 'expert' }])('rejects unsafe input %j', change => expect(() => readQuizRequest({ ...request, ...change })).toThrow());
+    it('requires a nonempty unique topic selection when topics are specified', () => {
+      expect(readQuizRequest({ ...request, selectedTopicIds: ['topic-1'] }).selectedTopicIds).toEqual(['topic-1']);
+      expect(() => readQuizRequest({ ...request, selectedTopicIds: [] })).toThrow();
+      expect(() => readQuizRequest({ ...request, selectedTopicIds: ['topic-1', 'topic-1'] })).toThrow();
+    });
     it('accepts reviewer source and rejects mismatched reviewer association', () => {
         const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
         expect(readQuizRequest({ ...request, sourceType: 'reviewer', sourceIds: [id], reviewerArtifactId: id }).sourceType).toBe('reviewer');
