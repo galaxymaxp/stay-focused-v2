@@ -127,6 +127,21 @@ describe('Quiz batching, budget and repair', () => {
         expect(questions[22]!.prompt).not.toBe('Item 23 prompt.');
         expect(questions[26]!.prompt).not.toBe('Item 1 prompt.');
     });
+    it('names a reused matching term so the repair can replace it with a new concept', async () => {
+        useRequest({ questionCount: 30, questionTypes: ALL });
+        let firstTerm = '';
+        const reuse: Fault = produced => ({ ...produced, type: 'matching', prompt: 'Match the term to its description.', leftItem: firstTerm, sourceRefs: [words[0]!.region], options: [{ id: 'a', text: 'W1' }, { id: 'b', text: 'X1' }, { id: 'c', text: 'Y1' }, { id: 'd', text: 'Z1' }], correctOptionIds: ['a'], acceptedAnswers: [], incorrectTerm: '' });
+        firstTerm = words[0]!.word;
+        const calls = scriptedModel({ 'quiz:batch:20:initial#7': reuse });
+        const questions = await run();
+        const quiz = quizCalls(calls);
+        expect(quiz[1]!.request.prompt).toContain('MATCHING TERMS ALREADY USED');
+        expect(quiz[1]!.request.prompt).toContain(firstTerm);
+        const repair = quiz[2]!;
+        expect(repair.identity).toBe('quiz:batch:20:repair');
+        expect(repair.request.prompt).toContain(`"leftItem":"${firstTerm}"`);
+        expect(questions.filter(q => q.leftItem === firstTerm)).toHaveLength(1);
+    });
     it('fails a batch after its single repair and reports both calls without more attempts', async () => {
         useRequest({ questionCount: 30, questionTypes: ALL });
         const ungrounded: Fault = produced => ({ ...produced, type: 'identification', options: [], correctOptionIds: ['Invented'], acceptedAnswers: ['Invented'] });
