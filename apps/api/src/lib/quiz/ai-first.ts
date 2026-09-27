@@ -45,14 +45,16 @@ export function validateQuizSet(raw: unknown, request: QuizGenerationRequest, re
     const first = sources[0]!;
     const acceptedAnswers = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [];
     if (freeText && (!acceptedAnswers.length || acceptedAnswers.length > 8 || !acceptedAnswers.every(answer => typeof answer === 'string' && !!answer.trim() && answer.length <= 200) || !acceptedAnswers.some(answer => normalized(answer) === normalized(correct.at(-1)!)))) return fail(`${id}:accepted_answers`);
-    if (freeText && !acceptedAnswers.every(answer => sources.some(source => normalized(source.text).includes(normalized(answer))))) return fail(`${id}:ungrounded_answer`);
+    // The canonical answer must be in the cited source; other aliases are optional, so ungrounded ones are dropped rather than failing the set.
+    const groundedAnswers = (acceptedAnswers as string[]).filter(answer => sources.some(source => normalized(source.text).includes(normalized(answer))));
+    if (freeText && !groundedAnswers.some(answer => normalized(answer) === normalized(correct.at(-1)!))) return fail(`${id}:ungrounded_answer`);
     if (q.type === 'modified_true_false' && freeText && (!text(q.incorrectTerm, 200) || !normalized(q.prompt as string).includes(normalized(q.incorrectTerm as string)))) return fail(`${id}:incorrect_term`);
     if (q.type === 'matching' && (!text(q.leftItem, 200) || !sources.some(source => normalized(source.text).includes(normalized(q.leftItem as string))))) return fail(`${id}:matching_left_item`);
     return { id, type: q.type as StoredQuestion['type'], prompt: q.prompt, options,
       correctOptionIds: q.correctOptionIds as string[], explanation: q.explanation, difficulty: q.difficulty as StoredQuestion['difficulty'], concept: q.concept,
       selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : q.type === 'identification' ? 'Type the term.' : q.type === 'modified_true_false' ? 'Mark true, or mark false and correct the wrong term.' : q.type === 'matching' ? 'Match the term to its meaning.' : 'Choose one answer.',
       ...(q.type === 'matching' ? { leftItem: q.leftItem as string } : {}),
-      ...(freeText ? { acceptedAnswers: acceptedAnswers as string[] } : {}),
+      ...(freeText ? { acceptedAnswers: groundedAnswers } : {}),
       ...(q.type === 'modified_true_false' && freeText ? { incorrectTerm: q.incorrectTerm as string } : {}),
       topicId: first.id, topic: q.concept, sourceRefs: sources.flatMap(r => r.sourceRefs), reviewerSectionIds: [...new Set(sources.flatMap(r => r.reviewerSectionIds))],
       sourceEvidence: [] };

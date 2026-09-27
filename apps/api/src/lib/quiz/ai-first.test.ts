@@ -95,6 +95,16 @@ describe('AI-first context and product contracts', () => {
     (raw.questions[0] as typeof raw.questions[0] & { acceptedAnswers: string[] }).acceptedAnswers = ['Invented alias'];
     expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
   });
+  it('drops ungrounded recall aliases but keeps a grounded canonical answer', () => {
+    const raw = quiz();
+    const source = [{ ...regions[0]!, text: 'SSL/TLS VPNs are an important technology for secure personal device access.' }];
+    Object.assign(raw.questions[0]!, { type: 'identification', prompt: 'Name the VPN technology used for secure personal device access.', options: [], correctOptionIds: ['SSL/TLS VPN'], acceptedAnswers: ['SSL/TLS VPN', 'SSL VPN'], leftItem: '', incorrectTerm: '' });
+    const validated = validateQuizSet(raw, request, source);
+    expect(validated[0]!.acceptedAnswers).toEqual(['SSL/TLS VPN']);
+    expect(normalizeSubmittedAnswer(validated[0]!, ['ssl vpn'])).toEqual(['ssl vpn']);
+    Object.assign(raw.questions[0]!, { correctOptionIds: ['SSL VPN'], acceptedAnswers: ['SSL VPN', 'SSL/TLS VPN'] });
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+  });
   it('rejects recurring meta-question stems for repair', () => {
     const raw = quiz();
     raw.questions[0]!.prompt = 'According to the provided material, what is the term?';

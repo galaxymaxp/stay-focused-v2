@@ -60,7 +60,7 @@ beforeAll(async () => {
     await db.exec(migration('20260912100000_activity_maker.sql'));
     await db.exec(migration('20260912110000_quiz_maker.sql'));
     await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
-    await db.exec(migration('20260927120000_quiz_100_items.sql'));
+    await db.exec(migration('20260927140343_quiz_100_items.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{
