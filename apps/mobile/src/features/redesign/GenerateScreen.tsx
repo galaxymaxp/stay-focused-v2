@@ -364,7 +364,7 @@ export function GenerateMaterialScreen() {
           <Surface style={{ gap: spacing[3] }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}><BookOpen color={colors.violet} size={18} /><Copy size="h3">Quiz</Copy></View>
             <Copy muted size="bodySmall">
-              {material.reviewerArtifactId ? "Build a 5-question quiz from the saved Reviewer for this material." : "Generate and save a Reviewer first. Quizzes use that Reviewer as their study source."}
+              {material.reviewerArtifactId ? "Build a study quiz from the saved Reviewer for this material." : "Generate and save a Reviewer first. Quizzes use that Reviewer as their study source."}
             </Copy>
             <Action secondary disabled={busy || !material.reviewerArtifactId || !available(material.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")}>
               Generate Quiz

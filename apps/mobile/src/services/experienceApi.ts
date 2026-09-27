@@ -36,7 +36,7 @@ export async function experienceRequest<T>(
   client: ExperienceClient,
   path: string,
   options: {
-    method?: "GET" | "POST" | "PATCH";
+    method?: "GET" | "POST" | "PATCH" | "DELETE";
     body?: unknown;
     key?: string;
     signal?: AbortSignal;

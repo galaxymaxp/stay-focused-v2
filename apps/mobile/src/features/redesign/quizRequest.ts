@@ -1,9 +1,9 @@
-import type { QuizDifficulty } from "@stay-focused/shared";
+import type { QuizDifficulty, QuizQuestionType } from "@stay-focused/shared";
 
 import type { GenerationIntent } from "../../services/generationRecovery";
 
 /** The Quiz settings the server accepts (5–20 questions). */
-export const QUIZ_QUESTION_COUNTS = [5, 10, 15, 20] as const;
+export const QUIZ_QUESTION_COUNTS = [10, 20, 30, 50, 100] as const;
 export type QuizQuestionCount = (typeof QUIZ_QUESTION_COUNTS)[number];
 export const QUIZ_DIFFICULTIES: readonly { value: QuizDifficulty | "mixed"; label: string }[] = [
   { value: "mixed", label: "Mixed" },
@@ -32,13 +32,17 @@ export function reviewerArtifactIdFromLibraryId(libraryId: string): string | nul
 export function quizIntentInput({
   title,
   reviewerArtifactId,
-  questionCount = 5,
+  questionCount = 10,
   difficulty = "mixed",
+  selectedTopicIds,
+  questionTypes,
 }: {
   title: string;
   reviewerArtifactId: string;
   questionCount?: number;
   difficulty?: QuizDifficulty | "mixed";
+  selectedTopicIds?: readonly string[];
+  questionTypes?: readonly QuizQuestionType[];
 }): Omit<GenerationIntent, "key"> {
   return {
     title,
@@ -50,7 +54,8 @@ export function quizIntentInput({
       reviewerArtifactId,
       questionCount,
       difficulty,
-      questionTypes: ["single_select", "true_false"],
+      questionTypes: questionTypes ?? ["single_select", "identification", "true_false", "modified_true_false", "matching"],
+      ...(selectedTopicIds ? { selectedTopicIds } : {}),
     },
   };
 }

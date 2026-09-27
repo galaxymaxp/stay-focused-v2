@@ -344,6 +344,23 @@ export function greetingFor(hour: number): string {
   if (hour >= 12 && hour < 17) return "Good afternoon";
   return "Good evening";
 }
+export type ScheduleState = "overdue" | "current" | "upcoming" | "completed";
+export function scheduleState(item: Pick<TodayItem, "startAt" | "endAt" | "dueAt" | "status">, now = Date.now()): ScheduleState {
+  if (item.status === "completed" || item.status === "submitted") return "completed";
+  if (item.startAt && item.endAt && Date.parse(item.startAt) <= now && Date.parse(item.endAt) > now) return "current";
+  if (item.endAt && Date.parse(item.endAt) < now) return "overdue";
+  if (item.dueAt && Date.parse(item.dueAt) < now) return "overdue";
+  return "upcoming";
+}
+export function todaySchedule(items: readonly TodayItem[]): TodayItem[] {
+  return [...new Map(items.map(item => [item.id, item])).values()].sort((a, b) => {
+    const order = { overdue: 0, current: 1, upcoming: 2, completed: 3 } as const;
+    const state = order[scheduleState(a)] - order[scheduleState(b)];
+    const at = Date.parse(a.startAt ?? a.dueAt ?? "") || Number.MAX_SAFE_INTEGER;
+    const bt = Date.parse(b.startAt ?? b.dueAt ?? "") || Number.MAX_SAFE_INTEGER;
+    return state || at - bt || a.id.localeCompare(b.id);
+  });
+}
 
 /** The activity an item is about, so a work session and its activity dedupe. */
 export function workKey(item: { readonly title: string; readonly course: { readonly id: string } | null }): string {

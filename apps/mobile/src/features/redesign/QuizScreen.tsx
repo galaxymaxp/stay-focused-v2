@@ -1,9 +1,12 @@
 import type { Quiz, QuizAttempt, QuizResult } from "@stay-focused/shared";
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { TextInput, View } from "react-native";
 
 import { Action, Copy, Notice, Page, Surface, SkeletonCards } from "../../design/primitives";
+import { haptic } from "../../design/haptics";
+import { playFeedbackSound } from "../../design/feedback";
+import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { useLocalArtifact } from "./useLocalLibrary";
@@ -27,6 +30,7 @@ export function QuizScreen() {
   const savedQuiz = saved.data && "quiz" in saved.data ? saved.data.quiz : null;
   const quizData = quiz.data ?? savedQuiz;
   const client = useExperienceClient();
+  const { colors } = useTheme();
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null),
     [result, setResult] = useState<QuizResult | null>(null),
     [selected, setSelected] = useState<string[]>([]),
@@ -34,6 +38,8 @@ export function QuizScreen() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [key, setKey] = useState(newRequestKey);
+  const [matchingReady, setMatchingReady] = useState(false);
+  const initialized = useRef<string | null>(null);
   const question = quizData?.questions[index],
     feedback = attempt?.feedback.find(
       (item) => item.questionId === question?.id,
@@ -52,18 +58,27 @@ export function QuizScreen() {
       setBusy(false);
     }
   }
-  async function start() {
+  async function start(requestKey = key) {
     const value = await experienceRequest<QuizAttempt>(
       client,
       `/api/experience/quizzes/${encodeURIComponent(id)}/attempts`,
-      { method: "POST", key },
+      { method: "POST", key: requestKey },
     );
     setAttempt(value);
     setIndex(0);
     setSelected([]);
+    setMatchingReady(false);
     setResult(null);
     history.refresh();
   }
+  useEffect(() => {
+    if (!id || !quiz.data || history.loading || history.error || initialized.current === id || attempt || result) return;
+    initialized.current = id;
+    const unfinished = history.data?.find((item) => item.status === "in_progress");
+    void run(() => unfinished ? resume(unfinished.id, false) : start());
+    // The request key and the initialized guard prevent a second attempt on refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, quiz.data, history.loading, history.error, history.data]);
   async function resume(attemptId: string, completed: boolean) {
     if (completed) {
       setResult(
@@ -79,12 +94,15 @@ export function QuizScreen() {
       `/api/experience/quiz-attempts/${encodeURIComponent(attemptId)}`,
     );
     setAttempt(value);
-    setIndex(0);
+    const firstUnanswered = quizData?.questions.findIndex((question) => !value.feedback.some((item) => item.questionId === question.id)) ?? 0;
+    const next = firstUnanswered < 0 ? Math.max(0, (quizData?.questions.length ?? 1) - 1) : firstUnanswered;
+    setIndex(next);
     setSelected(
       value.answers
-        .find((answer) => answer.questionId === quizData?.questions[0]?.id)
+        .find((answer) => answer.questionId === quizData?.questions[next]?.id)
         ?.selectedOptionIds.slice() ?? [],
     );
+    setMatchingReady(false);
     setResult(null);
   }
   return (
@@ -95,22 +113,22 @@ export function QuizScreen() {
       {!quiz.data && savedQuiz && !quiz.loading && (
         <>
           <Notice>Practice and scoring need a connection. These are the questions saved on this device.</Notice>
-          {savedQuiz.questions.map((item, number) => (
-            <Surface key={item.id}>
-              <Copy muted size="caption">Question {number + 1} of {savedQuiz.questionCount}</Copy>
-              <Copy size="h3">{item.prompt}</Copy>
-              {item.options.map((option) => (
-                <Copy key={option.id} muted>• {option.text}</Copy>
-              ))}
-            </Surface>
-          ))}
+          {savedQuiz.questions[index] ? <Surface key={savedQuiz.questions[index]!.id}>
+            <Copy muted size="caption">Question {index + 1} of {savedQuiz.questionCount}</Copy>
+            <Copy size="h3">{savedQuiz.questions[index]!.prompt}</Copy>
+            {savedQuiz.questions[index]!.leftItem ? <Copy>{savedQuiz.questions[index]!.leftItem}</Copy> : null}
+            {savedQuiz.questions[index]!.options.map((option) => <Copy key={option.id} muted>• {option.text}</Copy>)}
+          </Surface> : null}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Action secondary disabled={index === 0} onPress={() => setIndex(value => value - 1)}>Previous</Action>
+            <Action secondary disabled={index + 1 >= savedQuiz.questionCount} onPress={() => setIndex(value => value + 1)}>Next</Action>
+          </View>
         </>
       )}
       {!attempt && !result && quiz.data && (
         <>
-          <Action disabled={busy} onPress={() => void run(start)}>
-            Start practice
-          </Action>
+          {busy || history.loading ? <SkeletonCards rows={1} label="Opening question 1" /> : null}
+          {history.error || error ? <Action disabled={busy} onPress={() => { initialized.current = null; history.refresh(); }}>Try opening practice again</Action> : null}
           {history.data
             ?.filter(
               (item) =>
@@ -138,14 +156,17 @@ export function QuizScreen() {
           <Copy muted>
             Question {index + 1} of {quizData?.questionCount}
           </Copy>
+          <View accessibilityLabel={`${index + 1} of ${quizData?.questionCount} questions`} style={{ height: 4, borderRadius: 2, backgroundColor: "#88888844", overflow: "hidden" }}><View style={{ width: `${((index + 1) / (quizData?.questionCount ?? 1)) * 100}%`, height: 4, backgroundColor: "#888888" }} /></View>
           <Surface>
             <Copy size="h2">{question.prompt}</Copy>
             <Copy muted>{question.selectionInstruction}</Copy>
+            {question.type === "matching" && question.leftItem ? <Action secondary={!matchingReady} disabled={busy || !!feedback} onPress={() => { haptic.select(); setMatchingReady(true); }}>{question.leftItem}</Action> : null}
+            {question.type === "identification" ? <TextInput accessibilityLabel="Type your answer" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected[0] ?? ""} onChangeText={value => setSelected(value ? [value] : [])} placeholder="Type the term" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
             {question.options.map((option) => (
               <Action
                 key={option.id}
                 secondary={!selected.includes(option.id)}
-                disabled={busy || !!feedback}
+                disabled={busy || !!feedback || question.type === "matching" && !matchingReady}
                 label={`${option.text}${selected.includes(option.id) ? ", selected" : ""}`}
                 onPress={() =>
                   setSelected((old) =>
@@ -160,6 +181,7 @@ export function QuizScreen() {
                 {option.text}
               </Action>
             ))}
+            {question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) ? <TextInput accessibilityLabel="Correct the wrong term or phrase" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected.find(id => !question.options.some(option => option.id === id)) ?? ""} onChangeText={value => { const falseId = question.options.find(option => option.text.toLowerCase() === "false")?.id; setSelected(falseId ? [falseId, value] : []); }} placeholder="Type the correction" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
           </Surface>
           {feedback ? (
             <Surface>
@@ -170,7 +192,7 @@ export function QuizScreen() {
             </Surface>
           ) : (
             <Action
-              disabled={busy || selected.length === 0}
+              disabled={busy || selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim())}
               onPress={() =>
                 void run(async () => {
                   const value = await experienceRequest<QuizAttempt>(
@@ -182,6 +204,12 @@ export function QuizScreen() {
                     },
                   );
                   setAttempt(value);
+                  const checked = value.feedback.find((item) => item.questionId === question.id);
+                  if (checked) {
+                    if (checked.correct) haptic.success();
+                    else haptic.error();
+                    void playFeedbackSound(checked.correct ? "correct" : "wrong");
+                  }
                 })
               }
             >
@@ -193,6 +221,7 @@ export function QuizScreen() {
               onPress={() => {
                 const next = index + 1;
                 setIndex(next);
+                setMatchingReady(false);
                 setSelected(
                   attempt.answers
                     .find(
@@ -218,6 +247,8 @@ export function QuizScreen() {
                       { method: "POST" },
                     ),
                   );
+                  haptic.success();
+                  void playFeedbackSound("complete");
                   history.refresh();
                 })
               }
@@ -248,9 +279,9 @@ export function QuizScreen() {
           )}
           <Action
             onPress={() => {
-              setAttempt(null);
-              setResult(null);
-              setKey(newRequestKey());
+              const nextKey = newRequestKey();
+              setKey(nextKey);
+              void run(() => start(nextKey));
             }}
           >
             Practice again

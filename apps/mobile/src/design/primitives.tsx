@@ -117,6 +117,7 @@ export function Action({
   disabled = false,
   secondary = false,
   pill = false,
+  hero = false,
   label,
   testID,
 }: {
@@ -125,6 +126,7 @@ export function Action({
   disabled?: boolean;
   secondary?: boolean;
   pill?: boolean;
+  hero?: boolean;
   label?: string;
   testID?: string;
 }) {
@@ -145,7 +147,7 @@ export function Action({
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         style={({ pressed }) => ({
-          minHeight: hitTarget.min,
+          minHeight: hero ? 56 : hitTarget.min,
           paddingHorizontal: secondary ? spacing[2] : spacing[4],
           paddingVertical: spacing[2],
           borderRadius: pill ? radius.pill : radius.control,

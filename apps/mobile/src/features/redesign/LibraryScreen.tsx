@@ -6,8 +6,8 @@ import type {
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import { Pin, PinOff, Trash2 } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
+import { useMemo, useRef, useState } from "react";
 import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
@@ -20,6 +20,7 @@ import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } fro
 import { radius, spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
+import { createGenerationIntent } from "../../services/generationRecovery";
 import { removeLocalArtifact } from "../../services/localLibrary/deviceLibrary";
 import { deleteReviewer } from "../../services/reviewerLibraryApi";
 import { reviewerArtifactIdFromLibraryId } from "./quizRequest";
@@ -58,9 +59,7 @@ function pinAction(pinned: boolean, onPress: () => void): SwipeAction[] {
 }
 
 /**
- * Deletes a saved Reviewer from the account and this device, after a
- * confirmation. Quizzes and activity outputs have no delete on the server yet,
- * so only Reviewers offer it.
+ * Deletes a saved Reviewer from the account and this device after confirmation.
  */
 function useDeleteReviewer(onDeleted: (item: LibraryArtifactSummary) => void) {
   const { session } = useAuth();
@@ -99,6 +98,67 @@ function useDeleteReviewer(onDeleted: (item: LibraryArtifactSummary) => void) {
     ]);
   };
   return { removed, note, confirm };
+}
+function useRemoveQuiz(onRemoved: (item: LibraryArtifactSummary) => void) {
+  const { session } = useAuth();
+  const client = useExperienceClient();
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
+  const [note, setNote] = useState<string | null>(null);
+  const remove = async (item: LibraryArtifactSummary) => {
+    if (!session || !item.quiz) return;
+    setNote(null);
+    try {
+      await experienceRequest(client, `/api/experience/quizzes/${encodeURIComponent(item.quiz.id)}`, { method: "DELETE" });
+      await removeLocalArtifact(session.user.id, item.id);
+      setRemoved(current => new Set(current).add(item.id));
+      haptic.success();
+      onRemoved(item);
+    } catch {
+      haptic.error();
+      setNote(`Could not remove “${item.title}”. Check your connection and try again.`);
+    }
+  };
+  const confirm = (item: LibraryArtifactSummary) => Alert.alert("Remove Quiz?", `“${item.title}” and its practice history will be removed from your Library.`, [
+    { text: "Cancel", style: "cancel" },
+    { text: "Remove", style: "destructive", onPress: () => void remove(item) },
+  ]);
+  return { removed, note, confirm };
+}
+function useRemakeReviewer() {
+  const { session } = useAuth();
+  const submitting = useRef(false);
+  const [note, setNote] = useState<string | null>(null);
+  const remake = async (item: LibraryArtifactSummary) => {
+    if (!session || !item.course || !item.sourceMaterialId || submitting.current) return;
+    submitting.current = true;
+    setNote(null);
+    try {
+      const intent = await createGenerationIntent(session.user.id, {
+        title: item.title,
+        type: "reviewer",
+        path: "/api/experience/generations",
+        body: { courseId: item.course.id, materialId: item.sourceMaterialId },
+      });
+      router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
+    } catch {
+      haptic.error();
+      setNote(`Could not remake “${item.title}”. Try again.`);
+    } finally {
+      submitting.current = false;
+    }
+  };
+  const confirm = (item: LibraryArtifactSummary) => {
+    if (!item.course || !item.sourceMaterialId) {
+      if (item.course) router.push({ pathname: "/courses/[courseId]/reviewer", params: { courseId: item.course.id, courseName: item.course.name } });
+      else setNote("This Reviewer has no original course material available to remake.");
+      return;
+    }
+    Alert.alert("Remake Reviewer?", `Create a fresh Reviewer from the original material for “${item.title}”? The latest version will appear in Library.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remake", onPress: () => void remake(item) },
+    ]);
+  };
+  return { note, confirm };
 }
 
 /** Level 1: a compact grid of courses that have saved study work. */
@@ -178,7 +238,12 @@ export function LibraryCourseScreen() {
     if (prefs.pinned.artifact.includes(item.id)) pin("artifact", item.id, false);
     library.refresh();
   });
-  const arranged = arrangeList(filtered.filter((item) => !deletion.removed.has(item.id)), (item) => item.id, prefs.pinned.artifact, []);
+  const remake = useRemakeReviewer();
+  const quizRemoval = useRemoveQuiz((item) => {
+    if (prefs.pinned.artifact.includes(item.id)) pin("artifact", item.id, false);
+    library.refresh();
+  });
+  const arranged = arrangeList(filtered.filter((item) => !deletion.removed.has(item.id) && !quizRemoval.removed.has(item.id)), (item) => item.id, prefs.pinned.artifact, []);
   const items = [...arranged.pinned, ...arranged.rest];
   const identity = libraryIdentity(courseKey, courseItems[0]?.course ?? null);
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
@@ -199,6 +264,8 @@ export function LibraryCourseScreen() {
       {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
       {deletion.note ? <Notice>{deletion.note}</Notice> : null}
+      {remake.note ? <Notice>{remake.note}</Notice> : null}
+      {quizRemoval.note ? <Notice>{quizRemoval.note}</Notice> : null}
       {library.localReady && items.length === 0 ? (
         <Surface>
           <Copy size="h3">{filter === "all" ? "Nothing saved for this course" : `No ${label} yet`}</Copy>
@@ -208,10 +275,15 @@ export function LibraryCourseScreen() {
       {items.slice(0, visible).map((item) => {
         const pinned = prefs.pinned.artifact.includes(item.id);
         const leading = pinAction(pinned, () => change(() => pin("artifact", item.id, !pinned)));
-        // Swipe left to delete a Reviewer (confirmed first).
+        // Remake uses the original source; completed replacements collapse to one Library card.
         const trailing: SwipeAction[] = item.type === "reviewer" && reviewerArtifactIdFromLibraryId(item.id)
-          ? [{ key: "delete", label: "Delete", icon: Trash2, tone: "danger", onPress: () => deletion.confirm(item) }]
-          : [];
+          ? [
+              { key: "remake", label: "Remake", icon: RotateCw, tone: "accent", onPress: () => remake.confirm(item) },
+              { key: "delete", label: "Delete", icon: Trash2, tone: "danger", onPress: () => deletion.confirm(item) },
+            ]
+          : item.type === "quiz" && item.quiz
+            ? [{ key: "remove", label: "Remove", icon: Trash2, tone: "danger", onPress: () => quizRemoval.confirm(item) }]
+            : [];
         return (
           <SwipeRow key={item.id} leading={leading} trailing={trailing}>
             <LibraryCard item={item} pinned={pinned} swipeActions={[...leading, ...trailing]} />

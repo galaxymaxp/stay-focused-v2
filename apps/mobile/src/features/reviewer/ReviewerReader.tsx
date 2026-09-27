@@ -1,8 +1,8 @@
-import type { AssistType, LibraryArtifactSummary, QuizDifficulty, ReviewerReaderModel } from "@stay-focused/shared";
+import type { AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
 import { selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, FileQuestion, Sparkles } from "lucide-react-native";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, Sparkles } from "lucide-react-native";
 import {
   useCallback,
   useDeferredValue,
@@ -18,6 +18,7 @@ import {
   Pressable,
   ScrollView as NativeScrollView,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
   type GestureResponderEvent,
@@ -33,7 +34,7 @@ import { haptic } from "../../design/haptics";
 import { assistMark, assistStore, assistTargetKey, keyOf, useAssistMarks, type AssistMark, type AssistReadyEvent, type AssistTarget } from "./assistStore";
 import { PassageMark, PickBar, ReadyBanner } from "./AssistMarks";
 import { courseIdentity } from "../../design/courseIdentity";
-import { Action, Copy, Notice, Page, SearchField, SegmentedControl, Sheet, Surface } from "../../design/primitives";
+import { Action, Copy, Notice, Page, SearchField, SegmentedControl, Sheet } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
 import {
@@ -50,6 +51,7 @@ import {
   type ReviewerMatch,
 } from "./reviewerNavigation";
 import { createGenerationIntent } from "../../services/generationRecovery";
+import { memoryKeywordRanges } from "./memoryKeywords";
 import { QUIZ_DIFFICULTIES, QUIZ_QUESTION_COUNTS, quizIntentInput, reviewerArtifactIdFromLibraryId } from "../redesign/quizRequest";
 
 type Measurable = View | Text;
@@ -104,7 +106,7 @@ export function ReviewerReaderScreen({
   }, [reviewer, assistPassage]);
   const marks = useAssistMarks();
   const markFor = (blockId: string, point?: number): AssistMark => assistMark(marks[assistTargetKey(reviewer.id, blockId, point)]);
-  // Holding the key points selects them all, ready to generate one result per point.
+  // A tap selects one point; holding the card selects its whole group.
   const [picking, setPicking] = useState<{ section: string; block: string; points: readonly number[] } | null>(null);
   const pickingBlock = picking ? reviewer.sections.find((section) => section.id === picking.section)?.blocks.find((block) => block.id === picking.block) ?? null : null;
   const openAssist = (section: string, block: string, point?: number) => {
@@ -116,14 +118,13 @@ export function ReviewerReaderScreen({
     const all = points.map((_, index) => index).filter((index) => points[index]!.trim());
     if (!all.length) return;
     haptic.press();
-    setPicking({ section, block, points: all });
+    setPicking((current) => current?.block === block && current.points.length === all.length ? { section, block, points: [] } : { section, block, points: all });
   };
-  const togglePick = (index: number) => {
+  const tapPoint = (section: string, block: string, index: number) => {
     haptic.select();
-    setPicking((value) => value && {
-      ...value,
-      points: value.points.includes(index) ? value.points.filter((point) => point !== index) : [...value.points, index].sort((a, b) => a - b),
-    });
+    setPicking((current) => current?.block === block
+      ? { ...current, points: current.points.includes(index) ? current.points.filter((point) => point !== index) : [...current.points, index].sort((a, b) => a - b) }
+      : { section, block, points: [index] });
   };
   const generatePicked = (type: AssistType) => {
     if (!picking || !picking.points.length || !session) return;
@@ -226,6 +227,20 @@ export function ReviewerReaderScreen({
       ),
     );
   };
+  const renderKeyPoint = (id: string, text: string, context: readonly string[]) => {
+    if (bySegment.has(id)) return render(id, text);
+    const ranges = memoryKeywordRanges(text, context);
+    if (!ranges.length) return text;
+    const runs: ReactNode[] = [];
+    let from = 0;
+    ranges.forEach((range, index) => {
+      if (range.start > from) runs.push(text.slice(from, range.start));
+      runs.push(<Text key={index} style={{ fontWeight: "700", textDecorationLine: "underline" }}>{text.slice(range.start, range.end)}</Text>);
+      from = range.end;
+    });
+    if (from < text.length) runs.push(text.slice(from));
+    return runs;
+  };
 
   const currentTitle = current >= 0 ? anchors[current]?.title : null;
   const courseTitle = artifact.course ? courseIdentity(artifact.course).title : null;
@@ -300,10 +315,8 @@ export function ReviewerReaderScreen({
         </Copy>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
         {anchors.length > 1 ? <Copy muted size="caption">{anchors.length} topics</Copy> : null}
-        <View style={{ flexDirection: "row", paddingTop: spacing[2] }}>
-          <QuizPill onPress={() => setQuizOpen(true)} />
-        </View>
-        <Copy muted size="caption">Tap any passage for Study Assist. Hold key points to select them all.</Copy>
+        <View style={{ paddingTop: spacing[2] }}><Action hero onPress={() => setQuizOpen(true)}>Generate Quiz</Action></View>
+        <Copy muted size="caption">Tap a key point to select it. Hold its group to select all.</Copy>
       </View>
       <View
         ref={rootRef}
@@ -367,14 +380,14 @@ export function ReviewerReaderScreen({
                             )}
                             <Text
                               ref={register(segmentIds.keyPoint(block.id, index))}
-                              accessibilityRole={pickingHere ? "checkbox" : "button"}
-                              accessibilityState={pickingHere ? { checked: picked } : undefined}
-                              accessibilityHint={pickingHere ? "Selects this key point" : "Opens Study Assist for this key point. Hold to select every key point."}
-                              onPress={() => (pickingHere ? togglePick(index) : openAssist(section.id, block.id, index))}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: !!picked }}
+                              accessibilityHint="Tap to select this key point. Hold to select the group."
+                              onPress={() => tapPoint(section.id, block.id, index)}
                               onLongPress={() => startPicking(section.id, block.id, block.keyPoints)}
                               style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}
                             >
-                              {render(segmentIds.keyPoint(block.id, index), point)}
+                              {renderKeyPoint(segmentIds.keyPoint(block.id, index), point, [block.title, section.title])}
                             </Text>
                             {mark === "pending" ? <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 2 }} /> : null}
                             {mark === "fresh" ? <Sparkles size={16} color={colors.green} strokeWidth={2} style={{ marginTop: 4 }} /> : null}
@@ -402,12 +415,7 @@ export function ReviewerReaderScreen({
           </View>
         ))}
       </View>
-      <Surface style={{ gap: spacing[2], marginTop: spacing[4] }}>
-        <Copy size="h3">Test yourself on this Reviewer</Copy>
-        <Copy muted size="bodySmall">Build a quiz from these topics. You choose the settings and confirm before anything is generated.</Copy>
-        <Action onPress={() => setQuizOpen(true)}>Generate Quiz</Action>
-      </Surface>
-      {quizOpen ? <QuizFromReviewerSheet artifact={artifact} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
+      {quizOpen ? <QuizFromReviewerSheet artifact={artifact} reviewer={reviewer} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
       {assistPassage ? <StudyAssistSheet key={openKey ?? "missing"} target={assistTarget} onClose={() => setAssistPassage(null)} /> : null}
     </Page>
   );
@@ -432,48 +440,40 @@ function KeyPointsBox({ picking, onHold, children }: { picking: readonly number[
   );
 }
 
-function QuizPill({ onPress }: { onPress: () => void }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Generate Quiz from this Reviewer"
-      onPress={() => {
-        haptic.tap();
-        onPress();
-      }}
-      style={({ pressed }) => ({ minHeight: hitTarget.min, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.violetSoft }}>
-        <FileQuestion size={15} color={colors.violet} strokeWidth={1.8} />
-        <Copy size="caption" color={colors.violet} style={{ fontWeight: "600" }}>Generate Quiz</Copy>
-      </View>
-    </Pressable>
-  );
-}
-
-const QUESTION_SEGMENTS = QUIZ_QUESTION_COUNTS.map((count) => ({ value: String(count), label: String(count) }));
+const QUESTION_SEGMENTS = [...QUIZ_QUESTION_COUNTS.map((count) => ({ value: String(count), label: String(count) })), { value: "custom", label: "Custom" }];
+const QUIZ_FORMATS: readonly { value: QuizQuestionType | "mixed"; label: string }[] = [
+  { value: "mixed", label: "Mixed" }, { value: "single_select", label: "Multiple Choice" },
+  { value: "identification", label: "Identification" }, { value: "true_false", label: "True or False" },
+  { value: "modified_true_false", label: "Modified True or False" }, { value: "matching", label: "Matching" },
+];
 
 /**
  * Quiz settings for a saved Reviewer. The Reviewer is the source, so nothing
  * has to be selected again; the request goes to the same confirmation screen
  * as every other generation, and nothing starts until the student confirms.
  */
-function QuizFromReviewerSheet({ artifact, deviceCopy, onClose }: { artifact: LibraryArtifactSummary; deviceCopy: boolean; onClose: () => void }) {
+function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel; deviceCopy: boolean; onClose: () => void }) {
   const { session } = useAuth();
+  const { colors } = useTheme();
   const reviewerArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
-  const [count, setCount] = useState<string>("5");
+  const [count, setCount] = useState<string>("10");
+  const [customCount, setCustomCount] = useState("25");
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [selectedTopics, setSelectedTopics] = useState(() => reviewer.sections.map(section => section.id));
+  const questionCount = Number(count === "custom" ? customCount : count);
+  const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= 100;
   const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
+  const [format, setFormat] = useState<QuizQuestionType | "mixed">("mixed");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function next() {
-    if (!session || !reviewerArtifactId || busy) return;
+    if (!session || !reviewerArtifactId || busy || !validCount || selectedTopics.length === 0) return;
     setBusy(true);
     setError(null);
     try {
       const intent = await createGenerationIntent(
         session.user.id,
-        quizIntentInput({ title: artifact.title, reviewerArtifactId, questionCount: Number(count), difficulty }),
+        quizIntentInput({ title: artifact.title, reviewerArtifactId, questionCount, difficulty, selectedTopicIds: selectedTopics, ...(format === "mixed" ? {} : { questionTypes: [format] }) }),
       );
       onClose();
       router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
@@ -487,7 +487,7 @@ function QuizFromReviewerSheet({ artifact, deviceCopy, onClose }: { artifact: Li
     <Sheet
       title="New Quiz"
       onClose={onClose}
-      footer={<Action disabled={busy || !reviewerArtifactId || !session} onPress={() => void next()}>{busy ? "Preparing…" : "Continue"}</Action>}
+      footer={<Action disabled={busy || !reviewerArtifactId || !session || !validCount || selectedTopics.length === 0} onPress={() => void next()}>{busy ? "Preparing…" : "Continue"}</Action>}
     >
       <View style={{ gap: spacing[1] }}>
         <Copy muted size="caption">Source</Copy>
@@ -497,10 +497,35 @@ function QuizFromReviewerSheet({ artifact, deviceCopy, onClose }: { artifact: Li
       <View style={{ gap: spacing[2] }}>
         <Copy muted size="caption">Questions</Copy>
         <SegmentedControl segments={QUESTION_SEGMENTS} value={count} onChange={setCount} />
+        {count === "custom" ? <TextInput accessibilityLabel="Custom question count, 5 to 100" keyboardType="number-pad" value={customCount} onChangeText={setCustomCount} maxLength={3} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} /> : null}
+        {!validCount ? <Copy size="caption" color={colors.danger}>Choose 5 to 100 questions.</Copy> : null}
+      </View>
+      <View style={{ gap: spacing[2] }}>
+        <Action secondary onPress={() => setTopicsOpen(value => !value)}>{`Select Topics · ${selectedTopics.length} of ${reviewer.sections.length}`}</Action>
+        {topicsOpen ? <>
+          <View style={{ flexDirection: "row", gap: spacing[2] }}>
+            <Action secondary onPress={() => setSelectedTopics(reviewer.sections.map(section => section.id))}>Select All</Action>
+            <Action secondary onPress={() => setSelectedTopics([])}>Clear All</Action>
+          </View>
+          {reviewer.sections.map(section => {
+            const selected = selectedTopics.includes(section.id);
+            return <Pressable key={section.id} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} accessibilityLabel={section.title} onPress={() => setSelectedTopics(current => selected ? current.filter(id => id !== section.id) : [...current, section.id])} style={{ minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, borderRadius: radius.control, backgroundColor: selected ? colors.blueSoft : colors.surfaceSecondary }}>
+              {selected ? <CheckCircle2 size={20} color={colors.accent} /> : <Circle size={20} color={colors.textMuted} />}
+              <Copy style={{ flex: 1 }}>{section.title}</Copy>
+            </Pressable>;
+          })}
+        </> : null}
+        {selectedTopics.length === 0 ? <Copy size="caption" color={colors.danger}>Select at least one topic.</Copy> : null}
       </View>
       <View style={{ gap: spacing[2] }}>
         <Copy muted size="caption">Difficulty</Copy>
         <SegmentedControl segments={QUIZ_DIFFICULTIES} value={difficulty} onChange={setDifficulty} />
+      </View>
+      <View style={{ gap: spacing[2] }}>
+        <Copy muted size="caption">Question format</Copy>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
+          {QUIZ_FORMATS.map(item => <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected: format === item.value }} onPress={() => setFormat(item.value)} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: "center", borderRadius: radius.pill, backgroundColor: format === item.value ? colors.accent : colors.surfaceSecondary }}><Copy size="caption" color={format === item.value ? colors.onAccent : colors.textPrimary}>{item.label}</Copy></Pressable>)}
+        </View>
       </View>
       {!reviewerArtifactId ? <Notice>This Reviewer isn&apos;t saved to your account yet, so it can&apos;t be used for a Quiz.</Notice> : null}
       {deviceCopy ? <Notice>Quiz generation needs a connection.</Notice> : null}

@@ -62,6 +62,8 @@ export interface OrbAuraFrame {
   readonly camera: THREE.Camera;
   /** Optional light color (the Today day orb); defaults follow the theme. */
   readonly color?: string;
+  /** Small light-source displacement, in scene units, for an environmental spill. */
+  readonly offset?: { readonly x: number; readonly y: number };
 }
 
 /** Overlapping rhythms that never line up, so the light wavers without a regular beat. Range ±1. */
@@ -102,6 +104,10 @@ export function createOrbAura() {
       uniforms.uShimmer.value = shimmer.amount;
       uniforms.uLevel.value = shimmer.level;
       mesh.position.copy(frame.center);
+      if (frame.offset) {
+        mesh.position.x += frame.offset.x;
+        mesh.position.y += frame.offset.y;
+      }
       mesh.quaternion.copy(frame.camera.quaternion);
     },
     dispose() {

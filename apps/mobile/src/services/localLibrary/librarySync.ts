@@ -16,6 +16,7 @@ export interface ReconcileResult {
   /** False when the page walk stopped early; nothing is deleted either way. */
   readonly listComplete: boolean;
   readonly hydrated: number;
+  readonly supersededReviewerIds: readonly string[];
 }
 
 const PAGE_SIZE = 100;
@@ -42,9 +43,11 @@ export async function reconcileLibrary(input: {
   let categories: LibraryOverview["categories"] | null = null;
   let offset = 0;
   let listComplete = false;
+  let supersededReviewerIds: readonly string[] = [];
   for (let page = 0; page < MAX_PAGES && !cancelled(); page += 1) {
     const overview = await remote.fetchPage(offset, PAGE_SIZE);
     categories ??= overview.categories;
+    supersededReviewerIds = overview.supersededReviewerIds ?? supersededReviewerIds;
     await store.upsertSummaries(ownerUserId, overview.items);
     if (overview.nextOffset === null || overview.nextOffset <= offset) {
       listComplete = true;
@@ -52,7 +55,7 @@ export async function reconcileLibrary(input: {
     }
     offset = overview.nextOffset;
   }
-  if (cancelled()) return { categories, listComplete, hydrated: 0 };
+  if (cancelled()) return { categories, listComplete, hydrated: 0, supersededReviewerIds };
   await input.onListReconciled?.();
 
   // Fetch missing or outdated bodies so saved work opens without a network.
@@ -69,7 +72,7 @@ export async function reconcileLibrary(input: {
       if (code === "connection" || code === "sign_in_required") break;
     }
   }
-  return { categories, listComplete, hydrated };
+  return { categories, listComplete, hydrated, supersededReviewerIds };
 }
 
 /** Fetches one artifact and stores it; removes it only on an explicit not_found. */

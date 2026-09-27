@@ -21,6 +21,7 @@ interface LibraryState {
   /** A cloud reconciliation is in flight. */
   readonly refreshing: boolean;
   readonly error: string | null;
+  readonly supersededReviewerIds: readonly string[];
 }
 const initialLibrary: LibraryState = {
   items: [],
@@ -28,6 +29,7 @@ const initialLibrary: LibraryState = {
   localReady: false,
   refreshing: false,
   error: null,
+  supersededReviewerIds: [],
 };
 
 /**
@@ -57,7 +59,7 @@ export function useLocalLibrary() {
         setState((old) => ({ ...old, localReady: true, refreshing: true, error: null }));
         try {
           const page = await remote.fetchPage(0, 100);
-          if (live) setState({ items: page.items, categories: page.categories, localReady: true, refreshing: false, error: null });
+          if (live) setState({ items: page.items, categories: page.categories, localReady: true, refreshing: false, error: null, supersededReviewerIds: page.supersededReviewerIds ?? [] });
         } catch (error) {
           if (live) setState((old) => ({ ...old, refreshing: false, error: message(error) }));
         }
@@ -65,7 +67,7 @@ export function useLocalLibrary() {
       }
       const readLocal = async () => {
         const items = await store.listSummaries(ownerUserId);
-        if (live) setState((old) => ({ ...old, items, localReady: true }));
+        if (live) setState((old) => ({ ...old, items: items.filter(item => !old.supersededReviewerIds.includes(item.id)), localReady: true }));
       };
       await readLocal().catch(() => {
         if (live) setState((old) => ({ ...old, localReady: true }));
@@ -80,7 +82,7 @@ export function useLocalLibrary() {
           onListReconciled: readLocal,
           isCancelled: () => !live,
         });
-        if (live) setState((old) => ({ ...old, categories: result.categories ?? old.categories, refreshing: false }));
+        if (live) setState((old) => ({ ...old, items: old.items.filter(item => !result.supersededReviewerIds.includes(item.id)), supersededReviewerIds: result.supersededReviewerIds, categories: result.categories ?? old.categories, refreshing: false }));
       } catch (error) {
         await readLocal().catch(() => undefined);
         if (live) setState((old) => ({ ...old, refreshing: false, error: message(error) }));

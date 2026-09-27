@@ -10,14 +10,16 @@ import { router } from "expo-router";
 import { EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { haptic } from "../../design/haptics";
+import { courseAccent, courseIdentity } from "../../design/courseIdentity";
 
 import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
 import { sessionStore } from "../../auth/sessionStore";
+import { useAuth } from "../../auth";
 import { experienceRequest } from "../../services/experienceApi";
 import { dayOrbTouch } from "./DayOrb";
 import { DayRingClock } from "./DayRingClock";
@@ -32,6 +34,9 @@ import {
   freeTimeAround,
   greetingFor,
   localDate,
+  scheduleState,
+  todaySchedule,
+  timeLabel,
   planningRequest,
   timelineSegments,
   todayItemDetail,
@@ -61,6 +66,9 @@ const orbTouchPause = {
 };
 
 export function TodayScreen() {
+  const { session } = useAuth();
+  const displayName = [session?.user.userMetadata?.full_name, session?.user.userMetadata?.name].find(value => typeof value === "string" && value.trim()) as string | undefined;
+  const firstName = displayName?.trim().split(/\s+/)[0];
   const date = localDate();
   const today = useExperience<TodayOverview>(
     `/api/today?date=${date}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
@@ -292,7 +300,7 @@ export function TodayScreen() {
   }
   return (
     <Page
-      title={greetingFor(new Date().getHours())}
+      title={`${greetingFor(new Date().getHours())}${firstName ? `, ${firstName}` : ""}`}
       subtitle={new Date().toLocaleDateString([], {
         weekday: "long",
         month: "long",
@@ -370,6 +378,7 @@ export function TodayScreen() {
             </Surface>
           ) : null}
           </View>
+          <TodayTimeline items={todaySchedule([...(today.data?.overdue ?? []), ...(today.data?.timeline ?? []), ...(today.data?.current ? [today.data.current] : []), ...upcoming.filter(item => item.dueAt && localDate(new Date(item.dueAt)) === date)])} onOpen={openItem} />
           {lastHidden ? (
             <View accessibilityLiveRegion="polite" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Copy muted size="caption" style={{ flex: 1 }} numberOfLines={1}>{`“${lastHidden.title}” is hidden for today.`}</Copy>
@@ -508,6 +517,34 @@ export function TodayScreen() {
       )}
     </Page>
   );
+}
+function TodayTimeline({ items, onOpen }: { items: readonly TodayItem[]; onOpen: (item: TodayItem) => void }) {
+  const { colors, mode } = useTheme();
+  if (!items.length) return null;
+  let nowShown = false;
+  return <View style={{ gap: 8 }}>
+    <Copy size="h2">Today&apos;s schedule</Copy>
+    <Surface style={{ gap: 0 }}>
+      {items.map((item, index) => {
+        const state = scheduleState(item);
+        const showNow = !nowShown && (state === "current" || state === "upcoming");
+        if (showNow) nowShown = true;
+        const tint = state === "overdue" ? colors.danger : state === "current" ? colors.success : state === "completed" ? colors.textMuted : item.course ? courseAccent(courseIdentity(item.course), mode).fg : colors.accent;
+        const label = state === "overdue" ? "Overdue" : state === "current" ? "Now" : state === "completed" ? "Done" : item.startAt ? timeLabel(item.startAt) : item.dueAt ? timeLabel(item.dueAt) : "Anytime";
+        return <View key={item.id}>
+          {showNow ? <Copy size="caption" color={colors.success} style={{ textAlign: "center", fontWeight: "700", paddingVertical: 8 }}>──── NOW ────</Copy> : null}
+          <Pressable accessibilityRole="button" accessibilityLabel={`${label}, ${item.course?.code ?? item.course?.name ?? "Personal"}, ${item.title}`} onPress={() => onOpen(item)} style={({ pressed }) => ({ flexDirection: "row", minHeight: 64, gap: 10, alignItems: "center", paddingVertical: 9, opacity: pressed ? 0.6 : state === "completed" ? 0.6 : 1, borderBottomWidth: index === items.length - 1 ? 0 : 1, borderColor: colors.separator })}>
+            <Copy size="caption" color={tint} style={{ width: 70, fontWeight: "700", fontVariant: ["tabular-nums"] }}>{label}</Copy>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tint }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Copy muted size="caption" numberOfLines={1}>{item.course?.code ?? item.course?.name ?? "Personal"}</Copy>
+              <Copy size="bodySmall" numberOfLines={2} style={{ fontWeight: state === "current" ? "700" : "500" }}>{item.title}</Copy>
+            </View>
+          </Pressable>
+        </View>;
+      })}
+    </Surface>
+  </View>;
 }
 /** A card that slides as one piece; the page color sits under it while it moves. */
 function SwipeCard({ children, fill }: { children: ReactNode; fill: string }) {

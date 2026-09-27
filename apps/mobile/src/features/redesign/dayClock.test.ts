@@ -17,7 +17,7 @@ import {
   snapRange,
 } from "./dayClock";
 import { todayHideKey } from "./listPreferences";
-import { arrangeToday, greetingFor, matchesCourseQuery } from "./presentation";
+import { arrangeToday, greetingFor, matchesCourseQuery, scheduleState, todaySchedule } from "./presentation";
 
 const at = (minutes: number, radius: number = CLOCK.ring) => ringPoint(minutes, radius);
 
@@ -178,6 +178,17 @@ describe("Today greeting", () => {
     expect(greetingFor(6)).toBe("Good morning");
     expect(greetingFor(13)).toBe("Good afternoon");
     expect(greetingFor(19)).toBe("Good evening");
+  });
+});
+describe("Today schedule", () => {
+  const now = Date.parse("2026-09-27T12:00:00Z");
+  const item = (id: string, startAt: string, endAt: string, status: TodayItem["status"] = "planned") => ({ id, startAt, endAt, dueAt: null, status, title: id, kind: "study_session", course: null, estimatedMinutes: 30, priority: "medium", source: "local", deepLinkTarget: { surface: "study_session", id } }) as TodayItem;
+  it("separates missed, current, upcoming, and done work", () => {
+    expect(scheduleState(item("missed", "2026-09-27T09:00:00Z", "2026-09-27T09:30:00Z"), now)).toBe("overdue");
+    expect(scheduleState(item("now", "2026-09-27T11:30:00Z", "2026-09-27T12:30:00Z"), now)).toBe("current");
+    expect(scheduleState(item("later", "2026-09-27T14:00:00Z", "2026-09-27T14:30:00Z"), now)).toBe("upcoming");
+    expect(scheduleState(item("done", "2026-09-27T09:00:00Z", "2026-09-27T09:30:00Z", "completed"), now)).toBe("completed");
+    expect(todaySchedule([item("later", "2026-09-27T14:00:00Z", "2026-09-27T14:30:00Z"), item("later", "2026-09-27T14:00:00Z", "2026-09-27T14:30:00Z")])).toHaveLength(1);
   });
 });
 

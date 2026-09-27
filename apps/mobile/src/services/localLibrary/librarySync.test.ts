@@ -58,7 +58,7 @@ describe("cloud reconciliation", () => {
     const store = await setup();
     const remote = remoteWith([reviewerDetail(), quizDetail(), draftDetail()]);
     const result = await reconcileLibrary({ store, ownerUserId: OWNER_A, remote });
-    expect(result).toEqual({ categories, listComplete: true, hydrated: 3 });
+    expect(result).toEqual({ categories, listComplete: true, hydrated: 3, supersededReviewerIds: [] });
 
     const offline = remoteWith([]);
     offline.fetchDetail.mockRejectedValue(new RemoteError("connection"));

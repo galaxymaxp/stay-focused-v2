@@ -163,6 +163,12 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         camera,
         center: root.position,
         color: tones.aura,
+        // The halo moves with the bright body and a slow independent current.
+        // This lights the surrounding canvas without another blur pass.
+        offset: current.reducedMotion ? { x: tones.position.x * 0.16, y: tones.position.y * 0.16 } : {
+          x: tones.position.x * 0.2 + Math.sin(time * 0.7) * 0.05,
+          y: tones.position.y * 0.2 + Math.cos(time * 0.5) * 0.04,
+        },
       });
       body.update({
         time,

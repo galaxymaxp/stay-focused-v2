@@ -306,6 +306,7 @@ export function QueueScreen() {
   ].filter((job) => !cleared.has(job.id));
   const sections = queueSections(jobs);
   const attention = sections.find((section) => section.key === "attention")?.jobs ?? [];
+  const completed = sections.find((section) => section.key === "completed")?.jobs ?? [];
   const needsAttention = attention.length > 0 || pending.length > 0;
   async function clearAttention() {
     for (const job of attention) hide("queue", job.id, true);
@@ -334,6 +335,10 @@ export function QueueScreen() {
           <Action secondary label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action>
         </View>
       ) : null}
+      {completed.length ? <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Copy size="h2">Completed</Copy>
+        <Action secondary label={`Clear ${completed.length} completed Queue entries`} onPress={() => completed.forEach(job => hide("queue", job.id, true))}>Clear Completed</Action>
+      </View> : null}
       {pending.map((item) => (
         <Surface key={item.key}>
           <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}
@@ -354,7 +359,7 @@ export function QueueScreen() {
       ))}
       {sections.filter((section) => section.key !== "attention").map((section) => (
         <View key={section.key} style={{ gap: 8 }}>
-          <Copy size="h2">{section.title}</Copy>
+          {section.key !== "completed" ? <Copy size="h2">{section.title}</Copy> : null}
           {section.jobs.map((job) => (
             <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
           ))}

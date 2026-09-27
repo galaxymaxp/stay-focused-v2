@@ -9,6 +9,7 @@ import {
 import { AccessibilityInfo, AppState, useColorScheme } from "react-native";
 
 import { sessionStore } from "../auth/sessionStore";
+import { loadFeedbackPreferences } from "./feedback";
 
 import {
   palettes,
@@ -37,6 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(AppState.currentState === "active");
   useEffect(() => {
     let live = true;
+    void loadFeedbackPreferences();
     void Promise.resolve(sessionStore.getItem("sf.appearance"))
       .then((value) => {
         if (
