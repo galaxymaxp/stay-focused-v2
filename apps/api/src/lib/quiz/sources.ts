@@ -44,24 +44,29 @@ export async function resolveQuizSources(client: Client, userId: string, request
         }
         const sourceResult = await client.from('source_versions').select('*').eq('user_id', userId).eq('id', versionResult.data.source_version_id).maybeSingle();
         const sourceSnapshotId = sourceResult.data ? record(sourceResult.data.metadata).reviewerSourceSnapshotId : null;
-        if (sourceResult.error || !sourceResult.data || sourceResult.data.user_id !== userId || !isId(sourceSnapshotId))
+        if (sourceResult.error || !sourceResult.data || sourceResult.data.user_id !== userId)
             throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        const s = await client.from('reviewer_source_snapshots').select('*').eq('user_id', userId).eq('id', sourceSnapshotId).maybeSingle();
-        if (s.error || !s.data || s.data.user_id !== userId || s.data.was_edited)
-            throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        snapshot = s.data;
-        const items = await client.from('reviewer_source_snapshot_items').select('*').eq('user_id', userId).eq('source_snapshot_id', snapshot.id).order('ordinal').limit(5);
-        if (items.error || !items.data?.length || items.data.length > 4 || items.data.some(i => i.user_id !== userId || !i.source_row_id))
-            throw new ExperienceFailure(409, 'quiz_source_unavailable');
-        const associated = items.data.map(i => `${i.source_type}:${i.source_row_id}`);
-        if (request.sourceType === 'reviewer')
-            materialIds = associated;
-        else if (materialIds.some(id => !associated.includes(id)))
-            throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        if (isId(sourceSnapshotId)) {
+            const s = await client.from('reviewer_source_snapshots').select('*').eq('user_id', userId).eq('id', sourceSnapshotId).maybeSingle();
+            if (s.error || !s.data || s.data.user_id !== userId || s.data.was_edited)
+                throw new ExperienceFailure(409, 'quiz_source_unavailable');
+            snapshot = s.data;
+            const items = await client.from('reviewer_source_snapshot_items').select('*').eq('user_id', userId).eq('source_snapshot_id', snapshot.id).order('ordinal').limit(5);
+            if (items.error || !items.data?.length || items.data.length > 4 || items.data.some(i => i.user_id !== userId || !i.source_row_id))
+                throw new ExperienceFailure(409, 'quiz_source_unavailable');
+            const associated = items.data.map(i => `${i.source_type}:${i.source_row_id}`);
+            if (request.sourceType === 'reviewer') materialIds = associated;
+            else if (materialIds.some(id => !associated.includes(id))) throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        } else {
+            const metadata = record(sourceResult.data.metadata);
+            if (request.sourceType !== 'reviewer' || !['text', 'camera', 'local_file'].includes(String(metadata.sourceType)) || !sourceResult.data.source_text.trim())
+                throw new ExperienceFailure(409, 'quiz_source_unavailable');
+            materialIds = [`source:${sourceResult.data.id}`];
+        }
     }
     let courseId: string | null = null, connectionId: string | null = null;
     const tableMap = { file: 'canvas_files', page: 'canvas_pages', assignment: 'canvas_assignments', announcement: 'canvas_announcements' } as const;
-    for (const id of materialIds) {
+    for (const id of materialIds.filter(id => !id.startsWith('source:'))) {
         const [kind, rowId] = id.split(':');
         const table = tableMap[kind as keyof typeof tableMap];
         if (!table)
@@ -72,11 +77,13 @@ export async function resolveQuizSources(client: Client, userId: string, request
         courseId = r.data.course_id;
         connectionId = r.data.canvas_connection_id;
     }
-    if (!courseId || !connectionId || (snapshot && snapshot.course_id !== courseId))
+    if (snapshot && (!courseId || !connectionId || snapshot.course_id !== courseId))
+        throw new ExperienceFailure(409, 'quiz_source_unavailable');
+    if (!snapshot && materialIds.length !== 1)
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     if (!reviewerArtifactId || !reviewerArtifact || !reviewerVersion)
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
-    return { courseId, connectionId, reviewerArtifactId, reviewerArtifact, reviewerVersion, snapshot, materialIds };
+    return { courseId, connectionId, reviewerArtifactId, reviewerArtifact, reviewerVersion, snapshot, materialIds, sourceVersionId: reviewerVersion.source_version_id };
 }
 export interface SourceBlock {
     id: string;

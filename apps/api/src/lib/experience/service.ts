@@ -12,6 +12,11 @@ import { activityGenerationState, draftView } from '../activity-maker/service';
 import type { ActivityDraft } from '@stay-focused/shared';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 
+function sourceType(metadata: unknown): LibraryArtifactSummary['sourceType'] {
+  const value = record(metadata).sourceType;
+  return value === 'canvas_file' || value === 'canvas_page' || value === 'canvas_mixed' || value === 'text' || value === 'camera' || value === 'local_file' ? value : null;
+}
+
 export interface ExperienceDependencies {
   readonly repository: ExperienceRepository;
   readonly materials: (userId: string, courseId: string, offset: number) => Promise<CanvasReviewerSourceResult<CanvasReviewerSourceList>>;
@@ -165,11 +170,12 @@ export class ExperienceService {
     };
   }
   private async quizRecords(userId: string): Promise<{summary:LibraryArtifactSummary;quiz:Quiz;generationId:string|null}[]> {
-    const [rows,attempts,courses] = await Promise.all([this.rows('quizzes',userId),this.rows('quiz_attempts',userId),this.getCourses(userId)]);
+    const [rows,attempts,courses,sources] = await Promise.all([this.rows('quizzes',userId),this.rows('quiz_attempts',userId),this.getCourses(userId),this.rows('source_versions',userId)]);
     return rows.map(row=>{
       const quiz=quizView(row,attempts), course=courses.find(c=>c.id===quiz.courseId);
       const summary = { ...quiz, questions: undefined };
-      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceTitle:null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary}};
+      const source = sources.find(value => value.id === row.source_version_id);
+      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceType:sourceType(source?.metadata),sourceTitle:source ? text(record(source.metadata).sourceTitle) : null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary}};
     });
   }
   private async activityDraftRecords(userId: string): Promise<{summary:LibraryArtifactSummary;draft:ActivityDraft}[]> {
@@ -185,11 +191,11 @@ export class ExperienceService {
     ]);
     const snapshotMap = new Map(snapshots.map(s => [s.id, s]));
     const courseMap = new Map(courses.map(c => [c.id, { id: c.id, code: c.course_code, name: c.name }]));
-    function summary(id: string, title: string, createdAt: string, updatedAt: string, snapshotId: string | null, sourceId: string | null, sourceTitle: string | null): LibraryArtifactSummary {
+    function summary(id: string, title: string, createdAt: string, updatedAt: string, snapshotId: string | null, sourceId: string | null, sourceTitle: string | null, kind: LibraryArtifactSummary['sourceType']): LibraryArtifactSummary {
       const snapshot = snapshotId ? snapshotMap.get(snapshotId) : null;
       const originalItems = snapshotId ? snapshotItems.filter(item => item.source_snapshot_id === snapshotId) : [];
       return { id, type: 'reviewer', title, course: snapshot ? courseMap.get(snapshot.course_id) ?? null : null,
-        sourceId: snapshot?.id ?? sourceId, sourceTitle: snapshot?.source_title ?? sourceTitle, activityId: null,
+        sourceId: snapshot?.id ?? sourceId, sourceType: kind, sourceTitle: snapshot?.source_title ?? sourceTitle, activityId: null,
         sourceMaterialId: originalItems.length === 1 && originalItems[0]!.source_row_id ? `${originalItems[0]!.source_type}:${originalItems[0]!.source_row_id}` : null,
         createdAt, updatedAt, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
     }
@@ -205,7 +211,7 @@ export class ExperienceService {
       const snapshotId = text(record(source.metadata).reviewerSourceSnapshotId);
       const id = `artifact:${artifact.id}`;
       records.push({
-        summary: summary(id, artifact.safe_title, artifact.created_at, artifact.updated_at, snapshotId, source.id, text(record(source.metadata).sourceTitle)),
+        summary: summary(id, artifact.safe_title, artifact.created_at, artifact.updated_at, snapshotId, source.id, text(record(source.metadata).sourceTitle), sourceType(source.metadata)),
         payload: version.payload,
         reviewerArtifactId: artifact.id,
         aliases: [id, ...(version.generation_job_id ? [`generation:${version.generation_job_id}`] : [])],

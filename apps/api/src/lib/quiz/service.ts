@@ -72,7 +72,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     } else {
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'preparing_source', statusMessage: 'Preparing quiz material' });
         const sources = await assembleQuizSources(client, job.user_id, input);
-        if (sources.courseId !== metadata.courseId || sources.reviewerArtifactId !== metadata.reviewerArtifactId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        if (sources.courseId !== metadata.courseId || sources.reviewerArtifactId !== metadata.reviewerArtifactId || sources.sourceVersionId !== metadata.sourceVersionId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
         regions = sources.regions; materialIds = sources.materialIds; capacity = sources.capacity.maximum;
         await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:source:ai-first', payload: json({ regions, materialIds, capacity }) });
     }
@@ -123,10 +123,10 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     }
     if (questions.length !== input.questionCount) throw new ExperienceFailure(422, 'quiz_generation_failed');
     const owned = await resolveQuizSources(client, job.user_id, input);
-    if (owned.courseId !== metadata.courseId || owned.reviewerArtifactId !== metadata.reviewerArtifactId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
+    if (owned.courseId !== metadata.courseId || owned.reviewerArtifactId !== metadata.reviewerArtifactId || owned.sourceVersionId !== metadata.sourceVersionId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving quiz' });
-    return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, materialIds, title: `${questions.length}-question quiz`, questions,
+    return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, sourceVersionId: metadata.sourceVersionId, materialIds, title: `${questions.length}-question quiz`, questions,
             provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
 }
 /** Exact stems and highly overlapping long stems are duplicate study items. */
@@ -149,7 +149,7 @@ export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Qui
     const attempts = history.filter(a => a.user_id === row.user_id && a.quiz_id === row.id).sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at) || b.id.localeCompare(a.id));
     const completed = attempts.filter(a => a.status === 'completed' && a.percentage !== null).sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!) || b.id.localeCompare(a.id));
     const ids = row.source_material_ids as string[];
-    return { id: row.id, title: row.title, courseId: row.course_id, reviewerArtifactId: row.reviewer_artifact_id, sourceId: ids[0] ?? null, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
+    return { id: row.id, title: row.title, courseId: row.course_id, reviewerArtifactId: row.reviewer_artifact_id, sourceId: row.course_id ? ids[0] ?? null : row.source_version_id, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
         attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null, questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {

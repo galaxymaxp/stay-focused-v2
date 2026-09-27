@@ -14,7 +14,7 @@ const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-2
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 let db: PGlite, quizId: string, jobId: string;
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
-const payload = { courseId: course, reviewerArtifactId: reviewer, title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
+const payload = { courseId: course, reviewerArtifactId: reviewer, sourceVersionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
 const migration = (name: string) => readFileSync(resolve('../../packages/db/migrations', name), 'utf8');
 async function asRole<T>(role: string, user: string, action: () => Promise<T>) {
     await db.exec(`begin;set local role ${role};select set_config('request.jwt.claim.sub','${user}',true);`);
@@ -61,6 +61,8 @@ beforeAll(async () => {
     await db.exec(migration('20260912110000_quiz_maker.sql'));
     await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
     await db.exec(migration('20260927140343_quiz_100_items.sql'));
+    await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
+    await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{
@@ -69,6 +71,43 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Quiz real Postgres transactions, RLS and history', () => {
+    it('completes an already accepted Canvas Quiz from an older worker payload', async () => {
+        await db.exec('begin');
+        try {
+            const olderJob = await queue('older-canvas-worker');
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [olderJob]);
+            const olderPayload: Partial<typeof payload> = { ...payload };
+            delete olderPayload.sourceVersionId;
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [olderJob, 'worker', 'quiz_generation', JSON.stringify(olderPayload)]);
+            expect((await db.query<QuizRow>('select * from quizzes where generation_id=$1', [olderJob])).rows[0]!.source_version_id).toBe('ffffffff-ffff-4fff-8fff-ffffffffffff');
+        } finally { await db.exec('rollback'); }
+    });
+    it('accepts an owned imported source without a Canvas course and binds its Quiz to the same source', async () => {
+        const sourceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const artifactId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        const versionId = '88888888-8888-4888-8888-888888888888';
+        await db.exec('begin');
+        try {
+            await db.query('insert into source_versions values($1,$2,$3,$4)', [sourceId, A, 80, JSON.stringify({ sourceType: 'text', sourceTitle: 'Own notes' })]);
+            await db.query("insert into generated_artifacts(id,user_id,artifact_type,safe_title,source_version_id) values($1,$2,'reviewer','Own notes',$3)", [artifactId, A, sourceId]);
+            await db.query("insert into generated_artifact_versions values($1,$2,$3,'reviewer',$4,$5)", [versionId, A, artifactId, sourceId, JSON.stringify({ reviewer: { id: 'own-reviewer' } })]);
+            await db.query('update generated_artifacts set latest_version_id=$1 where id=$2', [versionId, artifactId]);
+            const localRequest = { ...request, sourceIds: [artifactId], reviewerArtifactId: artifactId };
+            const localPayload = { ...payload, courseId: null, reviewerArtifactId: artifactId, sourceVersionId: sourceId, materialIds: [`source:${sourceId}`] };
+            await db.exec('savepoint other_user');
+            await expect(db.query('select * from create_quiz_processing_job($1,$2,$3,$4,$5)', [B, null, artifactId, 'other-user-local', JSON.stringify(localRequest)])).rejects.toThrow('quiz_source_unavailable');
+            await db.exec('rollback to savepoint other_user');
+            const localJob = (await db.query<{ id: string }>('select id from create_quiz_processing_job($1,$2,$3,$4,$5)', [A, null, artifactId, 'owner-local-quiz', JSON.stringify(localRequest)])).rows[0]!.id;
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [localJob]);
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [localJob, 'worker', 'quiz_generation', JSON.stringify(localPayload)]);
+            const saved = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [localJob])).rows[0]!;
+            expect(saved.course_id).toBeNull();
+            expect(saved.source_version_id).toBe(sourceId);
+            expect(saved.user_id).toBe(A);
+            expect(saved.source_material_ids).toEqual([`source:${sourceId}`]);
+            await expect(db.query('update quizzes set user_id=$1 where id=$2', [B, saved.id])).rejects.toThrow();
+        } finally { await db.exec('rollback'); }
+    });
     it('removes only the owner Quiz and its keys while preserving the source Reviewer', async () => {
         await db.exec('begin');
         try {

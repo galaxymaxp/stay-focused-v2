@@ -323,7 +323,7 @@ export async function getReviewerJobResult(
 }
 
 export function createProcessingJobIdempotencyKey(
-  jobType: ProcessingJobType,
+  jobType: ProcessingJobType | "source_import",
 ): string {
   const random = Math.random().toString(36).slice(2, 14);
   return `${jobType}:${Date.now().toString(36)}:${random}`;

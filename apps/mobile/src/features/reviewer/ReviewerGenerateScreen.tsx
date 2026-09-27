@@ -28,11 +28,8 @@ import {
   API_BASE_URL_SETUP_HINT,
 } from "../../services/reviewerApi";
 import {
-  saveReviewer,
-  type ReviewerLibraryError,
   type SavedReviewerSourceMetadata,
   type SavedReviewerSourceMode,
-  type SavedReviewerSummary,
 } from "../../services/reviewerLibraryApi";
 import {
   cancelProcessingJob,
@@ -53,9 +50,8 @@ import {
   upsertActiveProcessingJob,
 } from "../../services/activeProcessingJobStore";
 import { cacheCompletedArtifact } from "../../services/completedArtifactCache";
-import { saveProcessingDraft } from "../../services/processingDraftStore";
-import { enqueueOfflineProcessingIntent } from "../../services/processingOutboxStore";
 import { getProcessingCompletionNotice } from "../../services/processingCompletionNotice";
+import { persistCanonicalSource, type CanonicalSource } from "../../services/canonicalSourcesApi";
 import type { OcrClientError } from "../../services/ocrApi";
 import {
   captureImageWithCamera,
@@ -103,6 +99,10 @@ export function ReviewerGenerateScreen({
 
   const { session } = useAuth();
   const [sourceTitle, setSourceTitle] = useState("");
+  const [sourceModeChosen, setSourceModeChosen] = useState(false);
+  const [canonicalSource, setCanonicalSource] = useState<CanonicalSource | null>(null);
+  const [extractedSourceVersionId, setExtractedSourceVersionId] = useState<string | null>(null);
+  const [isPersistingSource, setIsPersistingSource] = useState(false);
   const [imageSourceMode, setImageSourceMode] =
     useState<Extract<SavedReviewerSourceMode, "gallery" | "camera">>("gallery");
   const [sourceState, dispatchSource] = useReducer(
@@ -113,17 +113,12 @@ export function ReviewerGenerateScreen({
   const [generationError, setGenerationError] =
     useState<GenerationDisplayError | null>(null);
   const [reviewer, setReviewer] = useState<ReviewerOutput | null>(null);
-  const [saveTitle, setSaveTitle] = useState("");
-  const [savedReviewer, setSavedReviewer] =
-    useState<SavedReviewerSummary | null>(null);
   const [recoveredReviewerSource, setRecoveredReviewerSource] = useState<{
     readonly sourceSnapshotId: string;
     readonly sourceCharacterCount: number;
     readonly sourceLabel: string;
   } | null>(null);
-  const [saveError, setSaveError] = useState<GenerationDisplayError | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSavingReviewer, setIsSavingReviewer] = useState(false);
   const [activeExtractionJob, setActiveExtractionJob] =
     useState<ProcessingJobStatusView | null>(null);
   const [activeReviewerJob, setActiveReviewerJob] =
@@ -133,6 +128,8 @@ export function ReviewerGenerateScreen({
   );
   const extractionIdempotencyKeyRef = useRef<string | null>(null);
   const reviewerIdempotencyKeyRef = useRef<string | null>(null);
+  const sourceIdempotencyKeyRef = useRef<string | null>(null);
+  const completedReviewerJobIdRef = useRef<string | null>(null);
   const extractionSubmissionInFlightRef = useRef(false);
   const reviewerSubmissionInFlightRef = useRef(false);
 
@@ -148,14 +145,15 @@ export function ReviewerGenerateScreen({
 
   const clearGeneratedReviewer = () => {
     setReviewer(null);
+    setCanonicalSource(null);
+    sourceIdempotencyKeyRef.current = null;
     setRecoveredReviewerSource(null);
-    setSavedReviewer(null);
-    setSaveTitle("");
-    setSaveError(null);
   };
 
   const handleSourceModeChange = (mode: "paste" | "image" | "pdf") => {
+    setSourceModeChosen(true);
     dispatchSource({ type: "switch_mode", mode });
+    setExtractedSourceVersionId(null);
     setValidationMessage(null);
     setGenerationError(null);
     clearGeneratedReviewer();
@@ -215,6 +213,7 @@ export function ReviewerGenerateScreen({
           pageCount: result.data.pageCount,
           sourceBlocks: result.data.sourceBlocks,
         });
+        setExtractedSourceVersionId(result.data.sourceVersionId ?? null);
         setActiveExtractionJob(null);
       } else {
         const result = await getReviewerJobResult({
@@ -244,6 +243,7 @@ export function ReviewerGenerateScreen({
           });
         }
         setReviewer(result.data.reviewer);
+        completedReviewerJobIdRef.current = job.id;
         setRecoveredReviewerSource(
           result.data.sourceSnapshotId
             ? {
@@ -252,9 +252,6 @@ export function ReviewerGenerateScreen({
                 sourceLabel: job.source.displayName,
               }
             : null,
-        );
-        setSaveTitle(
-          defaultReviewerSaveTitle(result.data.reviewer, job.source.displayName),
         );
         setActiveReviewerJob(null);
       }
@@ -326,7 +323,44 @@ export function ReviewerGenerateScreen({
     reconcileProcessingJobs,
   ]);
 
-  const handleGenerate = async () => {
+  const handleContinue = async () => {
+    if (isPersistingSource || canonicalSource) return;
+    const sourceText = visibleSourceText.trim();
+    if (!sourceText || (sourceState.mode !== "paste" && (!isReviewerSourceReadyForGeneration(sourceState) || !extractedSourceVersionId))) {
+      setValidationMessage(sourceState.mode === "paste" ? "Enter instructional material to continue." : "Finish reading the selected source before continuing.");
+      return;
+    }
+    const apiBaseUrl = getApiBaseUrl();
+    const accessToken = session?.accessToken.trim();
+    if (!apiBaseUrl || !accessToken) {
+      setGenerationError({ title: "Connection required", message: apiBaseUrl ? "Sign in again to save this source." : API_BASE_URL_SETUP_HINT });
+      return;
+    }
+    const sourceType = sourceState.mode === "paste" ? "text" : sourceState.mode === "pdf" ? "local_file" : "camera";
+    const displayName = sourceTitle.trim() || (sourceState.mode === "pdf" ? sourceState.selectedPdf?.fileName : sourceState.mode === "image" ? sourceState.selectedImage?.fileName : null) || "My notes";
+    const key = sourceIdempotencyKeyRef.current ?? createProcessingJobIdempotencyKey("source_import");
+    sourceIdempotencyKeyRef.current = key;
+    setIsPersistingSource(true);
+    setGenerationError(null);
+    setValidationMessage(null);
+    try {
+      const result = await persistCanonicalSource({
+        apiBaseUrl, accessToken, idempotencyKey: key, sourceType, displayName,
+        sourceText,
+        ...(extractedSourceVersionId ? { sourceVersionId: extractedSourceVersionId } : {}),
+      });
+      if (result.ok) setCanonicalSource(result.data);
+      else {
+        setGenerationError(formatProcessingJobApiError(result.error));
+        if (!result.error.retryable) sourceIdempotencyKeyRef.current = null;
+      }
+    } finally {
+      setIsPersistingSource(false);
+    }
+  };
+
+  const handleGenerate = async (quizAfter = false) => {
+    if (!canonicalSource) return;
     if (
       reviewerSubmissionInFlightRef.current ||
       (activeReviewerJob && isActiveProcessingJobStatus(activeReviewerJob.status))
@@ -380,9 +414,6 @@ export function ReviewerGenerateScreen({
 
     setReviewer(null);
     setRecoveredReviewerSource(null);
-    setSavedReviewer(null);
-    setSaveError(null);
-    setSaveTitle("");
     setIsGenerating(true);
     reviewerSubmissionInFlightRef.current = true;
     const idempotencyKey =
@@ -395,8 +426,8 @@ export function ReviewerGenerateScreen({
         apiBaseUrl,
         accessToken,
         idempotencyKey,
-        sourceText: trimmedSourceText,
-        ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
+        sourceVersionId: canonicalSource.id,
+        sourceTitle: trimmedSourceTitle || canonicalSource.displayName,
         ...(sourceState.sourceBlocks.length > 0
           ? {
               sourceBlocks: sourceState.sourceBlocks,
@@ -409,52 +440,9 @@ export function ReviewerGenerateScreen({
         reviewerIdempotencyKeyRef.current = null;
         setActiveReviewerJob(result.data);
         await upsertActiveProcessingJob(ownerUserId, result.data);
-        router.push({ pathname: "/generation", params: { id: result.data.id } });
+        router.push({ pathname: "/generation", params: { id: result.data.id, ...(quizAfter ? { quiz: "1" } : {}) } });
       } else {
-        if (
-          result.error.code === "network_error" ||
-          result.error.code === "request_timeout"
-        ) {
-          const localReference = `reviewer-draft:${idempotencyKey}`;
-          const saved = await saveProcessingDraft({
-            localReference,
-            ownerUserId,
-            sourceText: trimmedSourceText,
-            ...(trimmedSourceTitle ? { sourceTitle: trimmedSourceTitle } : {}),
-            ...(sourceState.sourceBlocks.length > 0
-              ? {
-                  sourceBlocks: sourceState.sourceBlocks,
-                  sourceKind: sourceState.mode === "pdf" ? "presentation" as const : "document" as const,
-                }
-              : {}),
-          });
-          if (saved) {
-            await enqueueOfflineProcessingIntent({
-              ownerUserId,
-              operation: "artifact_generation",
-              sourceLocalReference: localReference,
-              artifactType: "reviewer",
-              idempotencyKey,
-              settings: {
-                language: "auto",
-                outputMode: "standard",
-              },
-            });
-            setGenerationError({
-              title: "Waiting for connection",
-              message:
-                "This request is saved locally. It is not a server job yet; Processing will submit it with the same idempotency key when the API is reachable.",
-            });
-          } else {
-            setGenerationError({
-              title: "Offline draft is too large",
-              message:
-                "Keep this screen open and reconnect before submitting this source.",
-            });
-          }
-        } else {
-          setGenerationError(formatProcessingJobApiError(result.error));
-        }
+        setGenerationError(formatProcessingJobApiError(result.error));
         if (!result.error.retryable) reviewerIdempotencyKeyRef.current = null;
       }
     } finally {
@@ -475,6 +463,8 @@ export function ReviewerGenerateScreen({
   };
 
   const handleChooseImage = async () => {
+    clearGeneratedReviewer();
+    setExtractedSourceVersionId(null);
     setValidationMessage(null);
     setGenerationError(null);
 
@@ -486,6 +476,8 @@ export function ReviewerGenerateScreen({
   };
 
   const handleChoosePdf = async () => {
+    clearGeneratedReviewer();
+    setExtractedSourceVersionId(null);
     setValidationMessage(null);
     setGenerationError(null);
 
@@ -494,6 +486,8 @@ export function ReviewerGenerateScreen({
   };
 
   const handleCaptureImage = async () => {
+    clearGeneratedReviewer();
+    setExtractedSourceVersionId(null);
     setValidationMessage(null);
     setGenerationError(null);
 
@@ -759,114 +753,22 @@ export function ReviewerGenerateScreen({
     }
   };
 
-  const handleSaveReviewer = async () => {
-    if (!reviewer) {
-      return;
-    }
-
-    const trimmedSaveTitle = saveTitle.trim();
-    setSaveError(null);
-
-    if (!trimmedSaveTitle) {
-      setSaveError({
-        title: "Save needs a title",
-        message: "Enter a title before saving this reviewer.",
-      });
-      return;
-    }
-
-    const apiBaseUrl = getApiBaseUrl();
-    if (!apiBaseUrl) {
-      setSaveError({
-        title: "API address needs setup",
-        message: API_BASE_URL_SETUP_HINT,
-      });
-      return;
-    }
-
-    const accessToken = session?.accessToken.trim();
-    if (!accessToken) {
-      setSaveError({
-        title: "Login session expired",
-        message:
-          "Sign out and sign in again before saving this reviewer.",
-      });
-      return;
-    }
-
-    setIsSavingReviewer(true);
-
-    try {
-      const result = await saveReviewer({
-        apiBaseUrl,
-        accessToken,
-        title: trimmedSaveTitle,
-        sourceMetadata: recoveredReviewerSource
-          ? {
-              sourceCharacterCount:
-                recoveredReviewerSource.sourceCharacterCount,
-              sourceLabel: recoveredReviewerSource.sourceLabel,
-              sourceMode: "canvas",
-            }
-          : createSavedReviewerSourceMetadata({
-              imageSourceMode,
-              sourceCharacterCount,
-              sourceState,
-              sourceTitle,
-            }),
-        reviewerOutput: reviewer,
-        ...(recoveredReviewerSource
-          ? { sourceSnapshotId: recoveredReviewerSource.sourceSnapshotId }
-          : {}),
-      });
-
-      if (result.ok) {
-        setSavedReviewer(result.data);
-        setSaveTitle(result.data.title);
-      } else {
-        setSaveError(formatSaveReviewerError(result.error));
-      }
-    } finally {
-      setIsSavingReviewer(false);
-    }
-  };
-
   return (
     <Sheet
       title="Other source"
       onClose={() => router.back()}
       footer={
-        reviewer ? (
-          <>
-            {isSavingReviewer ? (
-              <Text accessibilityLiveRegion="polite" style={styles.footerNote}>
-                Saving to Study Library.
-              </Text>
-            ) : savedReviewer ? (
-              <Text accessibilityLiveRegion="polite" style={styles.footerNote}>
-                Saved to Study Library as {savedReviewer.title}.
-              </Text>
-            ) : null}
-            <Button
-              disabled={Boolean(savedReviewer) || saveTitle.trim().length === 0}
-              fullWidth
-              loading={isSavingReviewer}
-              onPress={() => void handleSaveReviewer()}
-              testID="reviewer-save-button"
-            >
-              {savedReviewer ? "Saved" : "Save reviewer"}
-            </Button>
-          </>
+        !sourceModeChosen ? null : reviewer ? (
+          <Button fullWidth onPress={() => completedReviewerJobIdRef.current
+            ? router.push({ pathname: "/artifact", params: { id: `generation:${completedReviewerJobIdRef.current}` } })
+            : onOpenLibrary?.()} testID="reviewer-open-saved-button">Open saved Reviewer</Button>
+        ) : !canonicalSource ? (
+          <Button disabled={!sourceIsReadyForGeneration || (sourceState.mode !== "paste" && !extractedSourceVersionId)} fullWidth loading={isPersistingSource} onPress={() => void handleContinue()} testID="source-continue-button">Continue</Button>
         ) : (
-          <Button
-            disabled={!sourceIsReadyForGeneration || reviewerJobIsActive}
-            fullWidth
-            loading={isGenerating}
-            onPress={handleGenerate}
-            testID="reviewer-generate-button"
-          >
-            Generate reviewer
-          </Button>
+          <View style={{ gap: 10 }}>
+            <Button disabled={reviewerJobIsActive} fullWidth loading={isGenerating} onPress={() => void handleGenerate()} testID="reviewer-generate-button">Generate Reviewer</Button>
+            <Button disabled={reviewerJobIsActive} fullWidth variant="secondary" onPress={() => void handleGenerate(true)} testID="source-quiz-button">Create Quiz</Button>
+          </View>
         )
       }
     >
@@ -874,7 +776,13 @@ export function ReviewerGenerateScreen({
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.stack}
       >
-        <View style={styles.formCard} testID="reviewer-generate-screen">
+        {!sourceModeChosen ? (
+          <View style={styles.formCard} testID="source-choice-sheet">
+            <Button fullWidth variant="secondary" onPress={() => handleSourceModeChange("paste")} testID="source-choice-text">Text</Button>
+            <Button fullWidth variant="secondary" onPress={() => { handleSourceModeChange("image"); void handleCaptureImage(); }} testID="source-choice-camera">Camera</Button>
+            <Button fullWidth variant="secondary" onPress={() => { handleSourceModeChange("pdf"); void handleChoosePdf(); }} testID="source-choice-file">Local File (PDF)</Button>
+          </View>
+        ) : <View style={styles.formCard} testID="reviewer-generate-screen">
           <TextField
             label="Source title"
             onChangeText={(value) => {
@@ -891,6 +799,8 @@ export function ReviewerGenerateScreen({
             <Text style={styles.fieldLabel}>Source</Text>
             <SegmentedControl segments={[{ value: "paste", label: "Text" }, { value: "image", label: "Camera" }, { value: "pdf", label: "Local File" }]} value={sourceState.mode} onChange={handleSourceModeChange} />
           </View>
+
+          {canonicalSource ? <View style={styles.successBox} testID="canonical-source-ready"><Text style={styles.successText}>{canonicalSource.displayName} is ready. Choose Reviewer or Quiz.</Text></View> : null}
 
           {sourceState.mode === "image" ? (
             <ImageImportPanel
@@ -967,7 +877,7 @@ export function ReviewerGenerateScreen({
             </View>
           ) : null}
 
-        </View>
+        </View>}
 
         {activeExtractionJob ? (
           <ProcessingJobCard
@@ -996,20 +906,6 @@ export function ReviewerGenerateScreen({
               Keep Stay Focused open until the server accepts the job.
             </Text>
           </Card>
-        ) : null}
-
-        {reviewer ? (
-          <SaveReviewerPanel
-            isSaving={isSavingReviewer}
-            onChangeTitle={(value) => {
-              setSaveTitle(value);
-              setSaveError(null);
-            }}
-            onOpenLibrary={onOpenLibrary}
-            savedReviewer={savedReviewer}
-            saveError={saveError}
-            saveTitle={saveTitle}
-          />
         ) : null}
 
         {reviewer ? (
@@ -1398,75 +1294,6 @@ function PdfImportPanel({
   );
 }
 
-function SaveReviewerPanel({
-  isSaving,
-  onChangeTitle,
-  onOpenLibrary,
-  savedReviewer,
-  saveError,
-  saveTitle,
-}: {
-  readonly isSaving: boolean;
-  readonly onChangeTitle: (value: string) => void;
-  readonly onOpenLibrary?: () => void;
-  readonly savedReviewer: SavedReviewerSummary | null;
-  readonly saveError: GenerationDisplayError | null;
-  readonly saveTitle: string;
-}) {
-  const colors = useLegacyTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
-  return (
-    <Card style={styles.saveCard} testID="reviewer-save-card">
-      <View style={styles.saveHeader}>
-        <Text style={styles.statusTitle}>Save to Study Library</Text>
-        <Text style={styles.statusText}>
-          Save this validated reviewer so you can reopen it later without
-          regenerating.
-        </Text>
-      </View>
-
-      <TextField
-        editable={!savedReviewer}
-        label="Saved reviewer title"
-        onChangeText={onChangeTitle}
-        testID="reviewer-save-title-input"
-        value={saveTitle}
-      />
-
-      {saveError ? (
-        <View style={styles.errorBox} testID="reviewer-save-error">
-          <Text style={styles.errorTitle}>{saveError.title}</Text>
-          <Text style={styles.errorText}>{saveError.message}</Text>
-          {saveError.detail ? (
-            <Text style={styles.errorDetail}>{saveError.detail}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {savedReviewer ? (
-        <View style={styles.successBox} testID="reviewer-save-success">
-          <Text style={styles.successText}>
-            Saved to Study Library as {savedReviewer.title}.
-          </Text>
-        </View>
-      ) : null}
-
-      {onOpenLibrary ? (
-        <Button
-          disabled={isSaving}
-          fullWidth
-          onPress={onOpenLibrary}
-          testID="reviewer-save-open-library-button"
-          variant="secondary"
-        >
-          Open Study Library
-        </Button>
-      ) : null}
-    </Card>
-  );
-}
-
 function formatImageSize(bytes: number): string {
   return formatFileSize(bytes);
 }
@@ -1548,61 +1375,6 @@ function toOcrCompatibleJobError(error: ProcessingJobApiError): OcrClientError {
     ...(error.status !== undefined ? { status: error.status } : {}),
     apiCode: error.code,
   };
-}
-
-function formatSaveReviewerError(
-  error: ReviewerLibraryError,
-): GenerationDisplayError {
-  const detail =
-    error.status !== undefined
-      ? `Details: HTTP ${error.status}, code ${error.apiCode ?? error.code}.`
-      : `Details: code ${error.apiCode ?? error.code}.`;
-
-  if (error.code === "unauthorized" || error.code === "missing_access_token") {
-    return {
-      title: "Login session expired",
-      message: "Sign out and sign in again before saving this reviewer.",
-      detail,
-    };
-  }
-
-  if (error.code === "invalid_title") {
-    return {
-      title: "Save title needs a change",
-      message: error.message,
-      detail,
-    };
-  }
-
-  if (error.code === "network_error") {
-    return {
-      title: "Could not reach the API",
-      message: "Check the API address and network connection.",
-      detail,
-    };
-  }
-
-  if (error.code === "reviewer_storage_not_configured") {
-    return {
-      title: "Study Library is not configured",
-      message: error.message,
-      detail,
-    };
-  }
-
-  return {
-    title: "Reviewer could not be saved",
-    message: error.message,
-    detail,
-  };
-}
-
-function defaultReviewerSaveTitle(
-  reviewer: ReviewerOutput,
-  sourceTitle: string,
-): string {
-  const title = sourceTitle.trim() || reviewer.title.trim();
-  return title || "Untitled reviewer";
 }
 
 function createSavedReviewerSourceMetadata({

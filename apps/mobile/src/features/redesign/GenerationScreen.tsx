@@ -27,7 +27,7 @@ import { useExperience, useExperienceClient } from "./useExperience";
 import { useListPreferences } from "./useListPreferences";
 
 export function GenerationScreen() {
-  const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string }>();
+  const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string; quiz?: string }>();
   // Requests made from a Generate action start at once; only an old saved
   // request reopened from Queue still asks before it starts.
   const autoStart = params.start === "1";
@@ -128,7 +128,7 @@ export function GenerationScreen() {
     try {
       const result = await experienceRequest<{ id: string }>(client, `/api/jobs/${encodeURIComponent(id)}/retry`, { method: "POST", key: retryKey });
       activity.refresh();
-      router.replace({ pathname: "/generation", params: { id: result.id } });
+      router.replace({ pathname: "/generation", params: { id: result.id, ...(params.quiz === "1" ? { quiz: "1" } : {}) } });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not retry this generation.");
     } finally {
@@ -222,7 +222,7 @@ export function GenerationScreen() {
             onPress={() =>
               router.replace({
                 pathname: "/artifact",
-                params: { id: data.artifactId! },
+                params: { id: data.artifactId!, ...(params.quiz === "1" ? { quiz: "1" } : {}) },
               })
             }
           >

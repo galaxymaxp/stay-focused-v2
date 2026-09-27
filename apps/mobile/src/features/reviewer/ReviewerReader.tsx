@@ -75,10 +75,12 @@ export function ReviewerReaderScreen({
   artifact,
   reviewer,
   deviceCopy,
+  openQuizInitially = false,
 }: {
   artifact: LibraryArtifactSummary;
   reviewer: ReviewerReaderModel;
   deviceCopy: boolean;
+  openQuizInitially?: boolean;
 }) {
   const { colors, reducedMotion } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
@@ -96,7 +98,7 @@ export function ReviewerReaderScreen({
   const anchors = useMemo(() => reviewerAnchors(reviewer), [reviewer]);
 
   const [query, setQuery] = useState("");
-  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizOpen, setQuizOpen] = useState(openQuizInitially);
   const { session } = useAuth();
   const [assistPassage, setAssistPassage] = useState<{ section: string; block: string; point?: number } | null>(null);
   const assistTarget = useMemo<AssistTarget | null>(() => {
@@ -332,7 +334,7 @@ export function ReviewerReaderScreen({
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
       <View style={{ gap: spacing[1], paddingRight: spacing[2] }}>
         <Copy muted size="caption">
-          {courseTitle ?? "Your study tools"}
+          {courseTitle ?? (artifact.sourceType === "text" ? "Imported Text" : artifact.sourceType === "camera" ? "Imported Camera" : artifact.sourceType === "local_file" ? "Imported Local File" : "Your study tools")}
           {artifact.sourceTitle ? ` · ${artifact.sourceTitle}` : ""}
         </Copy>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>

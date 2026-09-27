@@ -1,5 +1,11 @@
 # Roadmap
 
+## B37.1a source convergence (2026-09-28)
+
+The local implementation reuses owner-bound `source_versions` for Text, Camera and Local PDF; Reviewer and Quiz share canonical source identity, existing generation, capacity and Library persistence in code. Canvas-specific IDs remain source provenance only. Non-Canvas sources do not use fake Canvas IDs. The rising Other source sheet persists on Continue, with no manual Save. Activity remains a separate Canvas assignment flow. The live Supabase migration was rejected by automatic approval review because its production Quiz constraint and RPC changes lacked clear authorization; the physical app's API was unreachable. Obtain approval for the reviewed scoped migration, roll out the API, and complete physical Android source and Library acceptance. Then run fresh small-source, 30-item and 100-item B37.1 production acceptance and Queue/Library reopen before B37.2 authentication. Study Assist latency follows B37 closure. [Ledger](ai/acceptance/b37/study-experience-overhaul.md).
+
+Source acquisition may differ. After normalization/persistence, generation uses the same current engine.
+
 ## B37.1 capacity and non-Canvas decision (2026-09-28)
 
 **PARTIAL.** The Generate UI now offers Text, Camera and Local File in a rising sheet verified on realme. Finish the canonical ownership/provenance design for those sources so they can use the same Reviewer, Quiz and Library pipeline as Canvas without invented Canvas IDs. Then deploy the scoped capacity/repair code, verify the small VPN source, find a legitimate instructional source with capacity at least 100, and run fresh 30/100-item and remaining physical acceptance. Study Assist selected-Reviewer fetch optimization follows B37 closure. [Checkpoint](ai/acceptance/b37/study-experience-overhaul.md).

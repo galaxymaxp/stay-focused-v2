@@ -17,7 +17,7 @@ vi.mock('@/lib/canvas-reviewer-sources', () => ({ prepareCanvasReviewerSources: 
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
 const asJson = (v: unknown) => JSON.parse(JSON.stringify(v)) as Json;
-const quiz: QuizRow = { id, user_id: A, course_id: id, reviewer_id: null, reviewer_artifact_id: id, generation_id: id, title: 'Academic quiz', source_material_ids: asJson(['page:' + id]), question_count: 5, difficulty: 'mixed', questions: asJson(questions.map(learnerQuestion)), created_at: '2026-09-12T00:00:00Z', updated_at: '2026-09-12T00:00:00Z' };
+const quiz: QuizRow = { id, user_id: A, course_id: id, reviewer_id: null, reviewer_artifact_id: id, source_version_id: null, generation_id: id, title: 'Academic quiz', source_material_ids: asJson(['page:' + id]), question_count: 5, difficulty: 'mixed', questions: asJson(questions.map(learnerQuestion)), created_at: '2026-09-12T00:00:00Z', updated_at: '2026-09-12T00:00:00Z' };
 const attempt: AttemptRow = { id, user_id: A, quiz_id: id, request_key: 'test-request', status: 'in_progress', answers: [], started_at: quiz.created_at, completed_at: null, percentage: null };
 type Data = Record<string, Record<string, unknown>[]>;
 function client(data: Data = {}) {
@@ -95,6 +95,22 @@ describe('Quiz source selection', () => {
         expect(value.capacity.topicCount).toBe(0);
         expect(value.reviewerArtifactId).toBe(id);
         expect(mocks.structure).not.toHaveBeenCalled();
+    });
+    it.each(['text', 'camera', 'local_file'] as const)('uses an owned %s source for the same Quiz capacity and regions', async kind => {
+        const data = canonical(A, 'reviewer', '');
+        Object.assign(data.source_versions[0]!, { source_text: 'Mitochondria produce ATP. Ribosomes synthesize proteins. Nuclei contain DNA.', metadata: { sourceType: kind, sourceTitle: 'Cell notes' } });
+        data.generated_artifact_versions[0]!.payload.reviewer.sections[0]!.items[0]!.sourceCore.keyPoints = ['Mitochondria produce ATP', 'Ribosomes synthesize proteins', 'Nuclei contain DNA'];
+        const resolved = await assembleQuizSources(client(data), A, input);
+        expect(resolved.courseId).toBeNull();
+        expect(resolved.materialIds).toEqual([`source:${A}`]);
+        expect(resolved.sourceVersionId).toBe(A);
+        expect(resolved.capacity.maximum).toBeGreaterThanOrEqual(5);
+        expect(resolved.regions[0]!.sourceRefs[0]!.materialId).toBe(`source:${A}`);
+    });
+    it('refuses a snapshotless source without a canonical non-Canvas type', async () => {
+        const data = canonical(A, 'reviewer', '');
+        Object.assign(data.source_versions[0]!, { source_text: 'Some notes' });
+        await expect(assembleQuizSources(client(data), A, input)).rejects.toThrow('quiz_source_unavailable');
     });
     it('limits Quiz context to selected owned Reviewer topics', async () => {
         const data = canonical();

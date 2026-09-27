@@ -1,5 +1,11 @@
 # Current State
 
+## B37.1a canonical source implementation (2026-09-28)
+
+The local B37.1a implementation uses `source_versions` to anchor non-Canvas Text, Camera/OCR and Local PDF sources under the authenticated `user_id`. Existing Canvas File and Page Reviewers continue to use that table and retain snapshot/course/material provenance; new jobs label their source type. The non-Canvas sheet persists a source on Continue, then sends its source ID through the durable Reviewer path. Quiz resolves the same persisted Reviewer and source; the forward migration allows an owner-bound Quiz with a null Canvas course and a required source version. Library code retains source name/type and can reopen both artifacts. The old manual Save screen is removed from this route. No fake Canvas IDs are used for non-Canvas sources. Activity remains Canvas assignment based. The physical app reached Text entry, camera launch and PDF selection, but its API was unreachable, so persistence and Library reopening are unverified. Automatic approval review rejected the live Supabase migration; no production schema/data changed. Physical and production acceptance are tracked in the [B37 ledger](ai/acceptance/b37/study-experience-overhaul.md).
+
+Source acquisition may differ. After normalization/persistence, generation uses the same current engine.
+
 ## B37.1 capacity lock checkpoint (2026-09-28)
 
 **PARTIAL — local Quiz capacity and repair implementation passes focused checks; production acceptance is pending.** Capacity is calculated from persisted Reviewer titles and key points with deterministic deduplication and no provider calls. API admission, worker execution and old-job Retry enforce the same maximum; repair rejects a replacement that repeats its rejected original. Generate now shows Other source near the top and opens a rising sheet with Text, Camera and Local File. The connected realme confirmed text entry, native camera launch and selection of an instructional PDF. Its underlying flow remains Reviewer-only with a manual Save step; Quiz persistence still requires Canvas IDs, so converging non-Canvas generation exceeds this scoped task's stop condition. No production deployment, EAS build, fresh Quiz or Library acceptance occurred. See [B37 acceptance checkpoint](ai/acceptance/b37/study-experience-overhaul.md). Study Assist latency remains separate.

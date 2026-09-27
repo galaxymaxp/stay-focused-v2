@@ -314,6 +314,7 @@ function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArti
           <View style={{ backgroundColor: soft, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}><Copy size="caption" color={tone} style={{ fontWeight: "700" }}>{typeLabel}</Copy></View>
         </View>
         <Copy size="h3" style={{ lineHeight: 23 }}>{item.title}</Copy>
+        {!item.course && item.sourceType ? <Copy muted size="caption">{sourceTypeLabel(item.sourceType)}{item.sourceTitle ? ` · ${item.sourceTitle}` : ""}</Copy> : null}
         <Copy muted size="caption">
           Updated {new Date(item.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
           {item.quiz ? ` · ${item.quiz.questionCount} questions${item.quiz.bestScore !== null ? ` · Best ${item.quiz.bestScore}%` : ""}` : ""}
@@ -323,16 +324,20 @@ function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArti
   );
 }
 
+function sourceTypeLabel(kind: NonNullable<LibraryArtifactSummary['sourceType']>): string {
+  return kind === 'local_file' ? 'Local File' : kind === 'camera' ? 'Camera' : kind === 'text' ? 'Text' : kind === 'canvas_page' ? 'Canvas Page' : kind === 'canvas_file' ? 'Canvas File' : 'Canvas';
+}
+
 function LibrarySkeleton() {
   return <View accessibilityLabel="Loading Library" style={{ gap: spacing[3] }}>{[0, 1, 2].map((index) => <Surface key={index} style={{ minHeight: 104, justifyContent: "center", gap: spacing[2] }}><SkeletonBlock width={"28%"} height={10} radius={5} /><SkeletonBlock width={index === 1 ? "88%" : "68%"} height={18} radius={8} /><SkeletonBlock width={"44%"} height={10} radius={5} /></Surface>)}</View>;
 }
 
 export function ArtifactScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, quiz } = useLocalSearchParams<{ id: string; quiz?: string }>();
   const result = useLocalArtifact(id ?? null);
   const detail = result.data;
   if (detail && "reviewer" in detail) {
-    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} />;
+    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} />;
   }
   return (
     <Page title="Library" back>
@@ -351,7 +356,7 @@ export function ArtifactScreen() {
       {detail && (
         <>
           <Copy muted size="caption">
-            {detail.artifact.course?.name ?? "Your study tools"}
+            {detail.artifact.course?.name ?? (detail.artifact.sourceType ? `Imported ${sourceTypeLabel(detail.artifact.sourceType)}` : "Your study tools")}
             {detail.artifact.sourceTitle ? ` · ${detail.artifact.sourceTitle}` : ""}
           </Copy>
           <Copy size="h1">{detail.artifact.title}</Copy>

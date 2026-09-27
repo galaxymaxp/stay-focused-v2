@@ -159,6 +159,7 @@ export interface LibraryArtifactSummary {
   readonly title: string;
   readonly course: CourseReference | null;
   readonly sourceId: string | null;
+  readonly sourceType?: 'canvas_file' | 'canvas_page' | 'canvas_mixed' | 'text' | 'camera' | 'local_file' | null;
   /** Original Canvas material when a Reviewer was generated from one item. */
   readonly sourceMaterialId?: string | null;
   readonly sourceTitle: string | null;

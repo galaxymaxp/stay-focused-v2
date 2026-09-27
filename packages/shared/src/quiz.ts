@@ -35,7 +35,7 @@ export interface QuizQuestion {
 export interface QuizSummary {
     readonly id: string;
     readonly title: string;
-    readonly courseId: string;
+    readonly courseId: string | null;
     readonly reviewerArtifactId: string | null;
     readonly sourceId: string | null;
     readonly sourceMaterialIds: readonly string[];

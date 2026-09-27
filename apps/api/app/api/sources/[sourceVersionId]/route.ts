@@ -36,6 +36,8 @@ export async function GET(
       data: {
         ...toSourceVersionSummary(version),
         sourceText: version.source_text,
+        sourceType: typeof version.metadata === "object" && version.metadata && !Array.isArray(version.metadata) ? (version.metadata as Record<string, unknown>).sourceType ?? null : null,
+        displayName: typeof version.metadata === "object" && version.metadata && !Array.isArray(version.metadata) ? (version.metadata as Record<string, unknown>).sourceTitle ?? null : null,
       },
     });
   } catch {

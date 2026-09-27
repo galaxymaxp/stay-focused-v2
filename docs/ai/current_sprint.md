@@ -1,5 +1,11 @@
 # Current Sprint
 
+## B37.1a canonical non-Canvas sources (2026-09-28)
+
+**PARTIAL — implementation complete locally; production and physical acceptance pending.** `source_versions.id` is the canonical persisted source identity and `user_id` is the authenticated owner. Text creates an imported source; Camera and PDF reuse the normalized OCR/extraction source (or an owner-linked correction revision). Each carries source type, display name and applicable asset provenance. The Other source rising sheet offers Text, Camera and Local File, persists on Continue, and offers Reviewer or Quiz. Quiz prepares a saved Reviewer and opens the existing Quiz setup with local capacity; both use the existing worker and Library. The manual Save step is gone. Canvas snapshot checks remain for Canvas sources; non-Canvas sources use no fake Canvas IDs. Activity remains assignment based and is deferred. The realme confirmed the sheet and Text entry; PDF extraction failed to reach the configured API, and camera capture was not completed. Automatic approval review rejected the live Supabase Quiz migration because its production constraint and RPC changes lacked clear authorization. No production data was changed, EAS build used, or push made. [B37 ledger](acceptance/b37/study-experience-overhaul.md).
+
+Source acquisition may differ. After normalization/persistence, generation uses the same current engine.
+
 ## B37.1 source capacity checkpoint (2026-09-28)
 
 **PARTIAL.** Local deterministic Reviewer concept counting now limits Quiz setup, API admission, worker batching and old-job Retry. Repair rejects a self-repeating replacement after its single repair call. Focused code checks pass. The user's UI correction moved Other source near the top of Generate and into a rising Text/Camera/Local File sheet; the reloaded realme verified text entry, native camera launch and instructional PDF selection. The underlying flow remains Reviewer-only while Quiz ownership requires Canvas snapshot IDs, triggering B37.1's architecture stop condition. No production deployment, fresh Quiz, EAS build or push. Decide canonical non-Canvas provenance, then resume production acceptance. [Checkpoint](acceptance/b37/study-experience-overhaul.md).

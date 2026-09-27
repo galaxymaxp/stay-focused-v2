@@ -1075,9 +1075,9 @@ export interface Database {
         ];
       };
       quizzes: {
-        Row: {id:string;user_id:string;course_id:string;reviewer_id:string|null;reviewer_artifact_id:string|null;generation_id:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at:string;updated_at:string};
-        Insert: {id?:string;user_id:string;course_id:string;reviewer_id?:string|null;reviewer_artifact_id?:string|null;generation_id?:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at?:string;updated_at?:string};
-        Update: {reviewer_id?:string|null;reviewer_artifact_id?:string|null;generation_id?:string|null};
+        Row: {id:string;user_id:string;course_id:string|null;reviewer_id:string|null;reviewer_artifact_id:string|null;source_version_id:string|null;generation_id:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at:string;updated_at:string};
+        Insert: {id?:string;user_id:string;course_id?:string|null;reviewer_id?:string|null;reviewer_artifact_id?:string|null;source_version_id?:string|null;generation_id?:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at?:string;updated_at?:string};
+        Update: {reviewer_id?:string|null;reviewer_artifact_id?:string|null;source_version_id?:string|null;generation_id?:string|null};
         Relationships: [];
       };
       quiz_keys: {
@@ -4204,7 +4204,7 @@ export interface Database {
         Returns: ProcessingNotificationDeliveryRow[];
       };
       create_quiz_processing_job: {
-        Args: {p_user_id:string;p_course_id:string;p_reviewer_artifact_id:string;p_idempotency_key:string;p_input:Json};
+        Args: {p_user_id:string;p_course_id:string|null;p_reviewer_artifact_id:string;p_idempotency_key:string;p_input:Json};
         Returns: ProcessingJobDatabaseRow[];
       };
       rename_reviewer_artifact: {

@@ -221,6 +221,11 @@ export async function createReviewerProcessingJob({
   readonly userId: string;
 }): Promise<ProcessingJobDatabaseRow> {
   const normalizedTitle = source.sourceTitle?.trim();
+  const privateMetadata = isRecord(source.sourcePrivateMetadata) ? source.sourcePrivateMetadata : {};
+  const canvasItems = Array.isArray(privateMetadata.canvasItemIds) ? privateMetadata.canvasItemIds : [];
+  const canvasSourceType = canvasItems.length === 1 && typeof canvasItems[0] === "string"
+    ? canvasItems[0].startsWith("file:") ? "canvas_file" : canvasItems[0].startsWith("page:") ? "canvas_page" : "canvas_mixed"
+    : canvasItems.length > 1 ? "canvas_mixed" : null;
   const resolvedSource = source.sourceVersionId
     ? await resolveReviewerSource(client, userId, source)
     : {
@@ -278,9 +283,8 @@ export async function createReviewerProcessingJob({
       sourceCharacterCount: resolvedSource.sourceText.length,
       sourceMetadata,
       sourcePrivateMetadata: toJson({
-        ...(isRecord(source.sourcePrivateMetadata)
-          ? source.sourcePrivateMetadata
-          : {}),
+        ...privateMetadata,
+        ...(canvasSourceType ? { sourceType: canvasSourceType } : {}),
         ...(normalizedTitle ? { sourceTitle: normalizedTitle } : {}),
         ...(source.sourceKind ? { reviewerSourceKind: source.sourceKind } : {}),
         ...(source.sourceBlocks && source.sourceBlocks.length > 0
