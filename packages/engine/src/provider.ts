@@ -7,6 +7,8 @@ export interface GenerationRequest<TOutput> {
   readonly schema: StructuredOutputSchema;
   readonly model: string;
   readonly temperature?: number;
+  /** Lower effort for short, low-stakes outputs; omitted uses the model default. */
+  readonly reasoningEffort?: "low" | "medium" | "high";
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 

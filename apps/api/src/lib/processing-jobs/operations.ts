@@ -178,7 +178,8 @@ export async function processQuizStep(jobId: string, workerId: string): Promise<
     const { ExperienceFailure } = await import("@/lib/experience/errors");
     const output = await processQuizJob(client, existing, workerId).catch(async (error: unknown) => {
       if (error instanceof ExperienceFailure && error.status < 500) {
-        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Quiz questions could not pass source validation.", retryable: false, automaticRetryable: false });
+        // A learner may retry a generation that failed validation; the retry is a new job with the same request and a fresh call budget.
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Quiz questions could not pass source validation.", retryable: error.code === "quiz_generation_failed", automaticRetryable: false });
         throw new FatalError(error.code);
       }
       throw error;

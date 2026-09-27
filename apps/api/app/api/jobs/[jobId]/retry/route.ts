@@ -4,6 +4,7 @@ import { verifyBearerToken } from "@/lib/auth";
 import { validateIdempotencyKey } from "@/lib/processing-jobs/creation";
 import {
   createProcessingJobServiceClient,
+  findLiveProcessingJobRetry,
   ProcessingJobRepositoryError,
   retryProcessingJob,
   toProcessingJobStatusView,
@@ -39,6 +40,13 @@ export async function POST(
 
   try {
     const client = createProcessingJobServiceClient();
+    const live = await findLiveProcessingJobRetry(client, user.id, jobId);
+    if (live) {
+      return NextResponse.json(
+        { ok: true, data: toProcessingJobStatusView(live) },
+        { status: 202, headers: corsHeaders() },
+      );
+    }
     const job = await retryProcessingJob(
       client,
       user.id,

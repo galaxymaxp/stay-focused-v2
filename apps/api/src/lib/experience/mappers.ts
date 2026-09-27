@@ -148,7 +148,12 @@ export function generationView(job: ProcessingJobStatusView, artifactId: string 
   const progress = p.completedUnits != null && p.totalUnits != null && p.unitLabel && Number.isInteger(p.completedUnits) && Number.isInteger(p.totalUnits) && p.totalUnits > 0 && p.completedUnits >= 0 && p.completedUnits <= p.totalUnits
     ? { completed: p.completedUnits, total: p.totalUnits, unit: p.unitLabel } : null;
   return { id: job.id, state, updatedAt: job.updatedAt, progress, artifactId: state === 'completed' ? artifactId : null,
-    error: state === 'failed' ? normalizeExperienceError(new ExperienceFailure(422, 'generation_failed')).error : null };
+    error: state === 'failed' ? failedGenerationError(job.retryable === true) : null };
+}
+/** A retryable failure offers Retry, which starts a new job from the same saved request. */
+function failedGenerationError(retryable: boolean): GenerationView['error'] {
+  const error = normalizeExperienceError(new ExperienceFailure(422, 'generation_failed')).error;
+  return retryable ? { ...error, message: 'This generation didn’t pass its checks. Retry to try again with the same settings.', retryable: true, action: 'retry' } : error;
 }
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};

@@ -145,6 +145,18 @@ const checks: readonly ContractCheck[] = [
     },
   },
   {
+    name: "passes reasoning effort when provided and omits it otherwise",
+    run: async () => {
+      const client = new FakeClient({ output_text: '{"value":"ok"}' });
+      await new OpenAIProvider({ client }).generate(
+        createRequest({ reasoningEffort: "low" }),
+      );
+      assertEqual(client.lastRequest?.reasoning?.effort, "low");
+      await new OpenAIProvider({ client }).generate(createRequest());
+      assertEqual(client.lastRequest?.reasoning, undefined);
+    },
+  },
+  {
     name: "parses output_text JSON",
     run: async () => {
       const provider = new OpenAIProvider({

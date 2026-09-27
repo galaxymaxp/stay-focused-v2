@@ -30,6 +30,7 @@ export interface OpenAIResponsesCreateRequest {
   readonly model: string;
   readonly input: string;
   readonly temperature?: number;
+  readonly reasoning?: { readonly effort: "low" | "medium" | "high" };
   readonly text: OpenAITextFormat;
 }
 
@@ -113,6 +114,7 @@ export class OpenAIProvider implements GenerationProvider {
       ...(request.temperature !== undefined
         ? { temperature: request.temperature }
         : {}),
+      ...(request.reasoningEffort ? { reasoning: { effort: request.reasoningEffort } } : {}),
       text: {
         format: {
           type: "json_schema",
@@ -200,6 +202,7 @@ function createOpenAIResponsesClient(apiKey: string, timeoutMs = OPENAI_PROVIDER
           ...(request.temperature !== undefined
             ? { temperature: request.temperature }
             : {}),
+          ...(request.reasoning ? { reasoning: { effort: request.reasoning.effort } } : {}),
         };
         const response = await client.responses.create(sdkRequest);
         return { output_text: response.output_text };

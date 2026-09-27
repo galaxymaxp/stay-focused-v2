@@ -23,7 +23,9 @@ describe('Study Assist generation', () => {
     const result = await generateStudyAssist({ request, reviewer, sourceExcerpt, provider: p.instance });
     expect(result).toMatchObject({ ...request, text: 'The nucleus holds DNA.' });
     expect(p.generate).toHaveBeenCalledTimes(1);
-    const call = p.generate.mock.calls[0] as unknown as [{ prompt: string; instructions: string }];
+    const call = p.generate.mock.calls[0] as unknown as [{ prompt: string; instructions: string; reasoningEffort?: string }];
+    // A short explanation should not wait on default reasoning.
+    expect(call[0].reasoningEffort).toBe('low');
     expect(call[0].prompt).toContain(sourceExcerpt);
     expect(call[0].prompt).not.toContain('UNRELATED_DO_NOT_SEND');
     expect(call[0].instructions).toContain('Original-source evidence is the factual authority');

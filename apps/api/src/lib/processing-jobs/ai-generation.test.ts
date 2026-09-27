@@ -47,6 +47,26 @@ describe('AI generation durable call budget', () => {
     await expect(durableGenerationProvider(client, 'job', 'worker').generate(request)).rejects.toThrow();
     expect(mocks.generate).not.toHaveBeenCalled();
   });
+  it('scales the job budget to a batched Quiz and still refuses the call after the cap', async () => {
+    for (let call = 0; call < 10; call++) await durableGenerationProvider(client, 'job', 'worker', { maxCalls: 10 }).generate({ ...request, prompt: `batch call ${call}` });
+    await expect(durableGenerationProvider(client, 'job', 'worker', { maxCalls: 10 }).generate({ ...request, prompt: 'eleventh' })).rejects.toMatchObject({ findings: ['durable_provider_budget_exhausted'] });
+    expect(mocks.generate).toHaveBeenCalledTimes(10);
+    expect(checkpoints.get('ai-first:calls:quiz_set')).toEqual({ count: 10 });
+  });
+  it('gives a repair a fresh provider response even when its prompt matches a saved call', async () => {
+    mocks.state.mockResolvedValue({ status: 'running', lease_owner: 'worker', execution_backend: 'google_cloud' });
+    mocks.generate.mockResolvedValueOnce({ attempt: 'first' }).mockResolvedValueOnce({ attempt: 'repair' });
+    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const initial = await durableGenerationProvider(client, 'job', 'worker', { maxCalls: 4, callIdentity: 'quiz:batch:20:initial' }).generate(request);
+    const repair = await durableGenerationProvider(client, 'job', 'worker', { maxCalls: 4, callIdentity: 'quiz:batch:20:repair' }).generate(request);
+    expect([initial, repair]).toEqual([{ attempt: 'first' }, { attempt: 'repair' }]);
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+    // Redelivery of the same logical call still reuses its saved response without billing again.
+    expect(await durableGenerationProvider(client, 'job', 'worker', { maxCalls: 4, callIdentity: 'quiz:batch:20:repair' }).generate(request)).toEqual({ attempt: 'repair' });
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledWith('ai_generation.saved_response_reused', expect.objectContaining({ callIdentity: 'quiz:batch:20:repair' }));
+    log.mockRestore();
+  });
   it('allows one condensation call per distinct source group', async () => {
     const notes = { ...request, schema: { ...request.schema, name: 'source_context_notes' } };
     const provider = durableGenerationProvider(client, 'job', 'worker');

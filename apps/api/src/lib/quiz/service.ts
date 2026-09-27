@@ -11,9 +11,9 @@ import { findProcessingJobSource } from '../processing-jobs/repository';
 import { updateProcessingJobProgress } from '../processing-jobs/worker-repository';
 import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
 import { readProcessingJobCheckpoint,writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
-import { AI_FIRST_QUIZ_MODEL,generateQuizSet } from './ai-first';
+import { AI_FIRST_QUIZ_MODEL,generateQuizBatch,prepareQuizSource,QuizBatchError,quizProviderCallBudget } from './ai-first';
 import type { QuizRegion,StoredQuestion } from './generation';
-import { normalized,quizQuestionKey } from './generation';
+import { isRepeatedQuizQuestion,normalized,quizMixSurplus } from './generation';
 import { assembleQuizSources,readQuizRequest,resolveQuizSources } from './sources';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
@@ -68,20 +68,27 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Creating your quiz' });
         try {
             questions = [];
-            for (const { offset, size } of quizBatches(input.questionCount)) {
+            // Job-wide ceiling: one first call and one repair per batch, at most ten for 100 items.
+            const maxCalls = quizProviderCallBudget(input.questionCount);
+            const providerFor = (callIdentity?: string) => durableGenerationProvider(client, job.id, workerId, { maxCalls, ...(callIdentity ? { callIdentity } : {}) });
+            const batches = quizBatches(input.questionCount);
+            let sourceContext: string | null = null;
+            for (const [index, { offset, size }] of batches.entries()) {
                 const checkpointKey = `quiz:batch:ai-first:${String(offset).padStart(3, '0')}`;
                 const savedBatch = await readProcessingJobCheckpoint(client, job.id, checkpointKey);
                 let batch = savedBatch ? record(savedBatch.payload).questions as StoredQuestion[] : null;
                 if (batch && batch.length !== size) throw new GenerationContractError([`batch_${offset}:count`]);
                 if (!batch) {
-                    const provider = durableGenerationProvider(client, job.id, workerId);
-                    for (let retry = 0; retry < 3; retry++) {
-                        const candidate = await generateQuizSet(provider, { ...input, questionCount: size }, regions, undefined, questions);
-                        batch = candidate.map((question, index) => ({ ...question, id: `q${offset + index + 1}` }));
-                        if (!hasRepeatedQuizQuestions([...questions, ...batch]) && !hasUnbalancedQuizMix([...questions, ...batch], input.questionTypes)) break;
-                        batch = null;
+                    sourceContext ??= await prepareQuizSource(providerFor(), regions);
+                    try {
+                        const outcome = await generateQuizBatch({ providerFor, request: input, regions, source: sourceContext, offset, size, previous: questions });
+                        console.info('quiz_batch.result', { jobId: job.id, batch: index + 1, of: batches.length, calls: outcome.calls, repaired: outcome.repaired, repairedFindings: categories(outcome.repairedFindings) });
+                        batch = outcome.questions;
                     }
-                    if (!batch) throw new GenerationContractError([`batch_${offset}:duplicate_question`]);
+                    catch (error) {
+                        console.info('quiz_batch.failed', { jobId: job.id, batch: index + 1, of: batches.length, repairRan: error instanceof QuizBatchError, findings: error instanceof GenerationContractError ? error.findings.slice(0, 40) : undefined, category: error instanceof GenerationContractError ? 'contract' : 'provider' });
+                        throw error;
+                    }
                     await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey, payload: json({ questions: batch }) });
                 }
                 questions.push(...batch);
@@ -104,24 +111,13 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
 }
 /** Exact stems and highly overlapping long stems are duplicate study items. */
 export function hasRepeatedQuizQuestions(questions: readonly (Pick<StoredQuestion, 'prompt'> & Partial<Pick<StoredQuestion, 'type' | 'leftItem'>>)[]): boolean {
-    const stems = questions.map(quizQuestionKey);
-    for (let i = 0; i < stems.length; i++) for (let j = 0; j < i; j++) {
-        if (stems[i] === stems[j]) return true;
-        if (questions[i]!.type === 'matching' || questions[j]!.type === 'matching') continue;
-        const a = new Set(stems[i]!.split(' ').filter(Boolean)), b = new Set(stems[j]!.split(' ').filter(Boolean));
-        if (a.size < 8 || b.size < 8) continue;
-        const intersection = [...a].filter(word => b.has(word)).length;
-        if (intersection / new Set([...a, ...b]).size > 0.85) return true;
-    }
-    return false;
+    return questions.some((question, index) => isRepeatedQuizQuestion(question, questions.slice(0, index)));
 }
 export function hasUnbalancedQuizMix(questions: readonly Pick<StoredQuestion, 'type'>[], requestedTypes: readonly StoredQuestion['type'][] | undefined): boolean {
-    const allowed = requestedTypes ?? ['single_select', 'identification', 'true_false', 'modified_true_false', 'matching'];
-    if (allowed.length < 3 || questions.length < 10) return false;
-    const counts = new Map<string, number>();
-    for (const question of questions) counts.set(question.type, (counts.get(question.type) ?? 0) + 1);
-    return Math.max(...counts.values()) > Math.ceil(questions.length * 0.6) || counts.size < Math.min(3, allowed.length);
+    return quizMixSurplus(questions, requestedTypes) !== null;
 }
+/** Finding categories without item labels, for logs. */
+const categories = (findings: readonly string[]) => [...new Set(findings.map(finding => finding.slice(finding.lastIndexOf(':') + 1)))];
 export function quizBatches(count: number): { offset: number; size: number }[] {
     if (!Number.isInteger(count) || count < 5 || count > 100) throw new Error('invalid_quiz_count');
     return Array.from({ length: Math.ceil(count / 20) }, (_, index) => ({ offset: index * 20, size: Math.min(20, count - index * 20) }));

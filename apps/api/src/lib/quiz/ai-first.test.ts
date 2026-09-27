@@ -118,6 +118,36 @@ describe('AI-first context and product contracts', () => {
     Object.assign(raw.questions[0]!, { correctOptionIds: ['SSL VPN'], acceptedAnswers: ['SSL VPN', 'SSL/TLS VPN'] });
     expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
   });
+  it('accepts only exact source wording for modified true/false corrections', () => {
+    const raw = quiz();
+    const source = [{ ...regions[0]!, text: 'Fourth, the browser chooses to either trust or not trust. Traffic tunnels through the internet into the VPN provider’s servers.' }];
+    const mtf = (correction: string, incorrectTerm = 'router') => ({ type: 'modified_true_false', prompt: `Fourth, the ${incorrectTerm} chooses to either trust or not trust.`, options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['b', correction], acceptedAnswers: [correction], incorrectTerm, leftItem: '' });
+    Object.assign(raw.questions[0]!, mtf('browser'));
+    expect(validateQuizSet(raw, request, source)[0]!.correctOptionIds).toEqual(['b', 'browser']);
+    Object.assign(raw.questions[0]!, mtf('after'));
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+    Object.assign(raw.questions[0]!, mtf('through the provider’s servers'));
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+    Object.assign(raw.questions[0]!, mtf('browser', 'gateway'), { prompt: 'Fourth, the router chooses to either trust or not trust.' });
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+  });
+  it('accepts only exact source wording for identification answers', () => {
+    const raw = quiz();
+    const source = [{ ...regions[0]!, text: 'The lesson emphasizes that SSL/TLS VPNs are an important technology for secure personal device access.' }];
+    const id = (term: string) => ({ type: 'identification', prompt: 'Name the VPN technology used for secure personal device access.', options: [], correctOptionIds: [term], acceptedAnswers: [term], leftItem: '', incorrectTerm: '' });
+    Object.assign(raw.questions[0]!, id('SSL/TLS VPNs'));
+    expect(validateQuizSet(raw, request, source)[0]!.acceptedAnswers).toEqual(['SSL/TLS VPNs']);
+    Object.assign(raw.questions[0]!, id('Secure socket VPN'));
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+  });
+  it('states the exact-wording and single-format contract in every quiz call', async () => {
+    const calls: GenerationRequest<unknown>[] = [];
+    await generateQuizSet(provider(quiz(), calls), { ...request, questionTypes: ['single_select'] }, regions);
+    expect(calls[0]!.instructions).toContain('copied exactly from the cited source text');
+    expect(calls[0]!.instructions).toContain('the original term copied exactly from the cited source');
+    expect(calls[0]!.instructions).toContain('Every question must have type "single_select"');
+    expect(calls[0]!.instructions).not.toContain('mixed mode');
+  });
   it('rejects recurring meta-question stems for repair', () => {
     const raw = quiz();
     raw.questions[0]!.prompt = 'According to the provided material, what is the term?';

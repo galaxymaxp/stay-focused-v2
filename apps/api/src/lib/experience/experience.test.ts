@@ -302,6 +302,11 @@ describe('lifecycle and errors', () => {
     expect(view.artifactId).toBe(expected === 'completed' ? 'artifact:artifact' : null);
     expect(JSON.stringify(view)).not.toContain('private');
   });
+  it('offers Retry only for a failed job marked retryable', () => {
+    const failed = { id: 'job', status: 'failed', stage: 'generating_sections', updatedAt: date, progress: { completedUnits: null, totalUnits: null, unitLabel: null, message: 'private' } } as ProcessingJobStatusView;
+    expect(generationView({ ...failed, retryable: true }, null).error).toMatchObject({ retryable: true, action: 'retry' });
+    expect(generationView({ ...failed, retryable: false }, null).error).toMatchObject({ retryable: false, action: 'choose_material' });
+  });
   it('reports genuine unit progress and rejects impossible progress', () => {
     const job = { id: 'job', status: 'running', stage: 'generating_sections', updatedAt: date, progress: { completedUnits: 2, totalUnits: 5, unitLabel: 'sections', message: 'private' } } as ProcessingJobStatusView;
     expect(generationView(job, null).progress).toEqual({ completed: 2, total: 5, unit: 'sections' });
