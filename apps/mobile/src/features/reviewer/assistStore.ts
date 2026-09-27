@@ -48,6 +48,11 @@ export function assistMark(entries: AssistEntries | undefined): AssistMark {
   return null;
 }
 
+/** Any saved explanation for the passage, seen or not. */
+export function hasAssistResult(entries: AssistEntries | undefined): boolean {
+  return !!entries && ASSIST_TYPES.some((type) => entries[type]?.status === "ready");
+}
+
 const EMPTY: AssistEntries = Object.freeze({});
 let entries: Record<string, AssistEntries> = {};
 let openKey: string | null = null;

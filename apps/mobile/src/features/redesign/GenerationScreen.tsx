@@ -117,6 +117,24 @@ export function GenerationScreen() {
     ["queued", "preparing", "generating", "finalizing"].includes(data.state);
   const stalled = !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
   const [cancelling, setCancelling] = useState(false);
+  // One key per failed screen: a double tap returns the same retry instead of a second job.
+  const [retryKey] = useState(newRequestKey);
+  const [retrying, setRetrying] = useState(false);
+  const canRetry = data?.state === "failed" && data.error?.retryable === true;
+  async function retryFailed() {
+    if (!id || retrying) return;
+    setRetrying(true);
+    setError(null);
+    try {
+      const result = await experienceRequest<{ id: string }>(client, `/api/jobs/${encodeURIComponent(id)}/retry`, { method: "POST", key: retryKey });
+      activity.refresh();
+      router.replace({ pathname: "/generation", params: { id: result.id } });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not retry this generation.");
+    } finally {
+      setRetrying(false);
+    }
+  }
   async function cancelStalled() {
     if (!id || cancelling) return;
     setCancelling(true);
@@ -172,6 +190,9 @@ export function GenerationScreen() {
           {stalled ? (
             <View style={{ width: 240 }}><Action disabled={cancelling} pill onPress={() => void cancelStalled()}>{cancelling ? "Cancelling…" : "Cancel generation"}</Action></View>
           ) : null}
+          {canRetry ? (
+            <View style={{ width: 240 }}><Action disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Retry"}</Action></View>
+          ) : null}
           <View style={{ width: 240 }}><Action secondary pill onPress={() => router.push("/generation-queue")}>View Queue</Action></View>
         </View>
         {(error || generation.error) && (
@@ -189,9 +210,11 @@ export function GenerationScreen() {
         )}
         {data?.error && (
           <Notice>
-            {data.error.code === "quiz_generation_failed"
-              ? "The quiz could not be completed. Try another material."
-              : "This generation could not be completed. Open Queue to review it."}
+            {canRetry
+              ? "This didn’t pass its checks. Retry uses the same settings and topics."
+              : data.error.code === "quiz_generation_failed"
+                ? "The quiz could not be completed. Try another material."
+                : "This generation could not be completed. Open Queue to review it."}
           </Notice>
         )}
         {data?.artifactId && (

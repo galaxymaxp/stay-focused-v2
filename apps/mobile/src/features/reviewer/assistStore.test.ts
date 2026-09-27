@@ -8,7 +8,7 @@ vi.mock("../../services/studyAssist", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../services/studyAssist")>();
   return { ...original, studyAssist: { request: vi.fn(), peek: vi.fn(async () => null) } };
 });
-const { assistMark, assistStore, keyOf } = await import("./assistStore");
+const { assistMark, assistStore, hasAssistResult, keyOf } = await import("./assistStore");
 const { studyAssist } = await import("../../services/studyAssist");
 
 const detail = reviewerDetail();
@@ -21,6 +21,17 @@ afterEach(() => {
 });
 
 describe("Study Assist passage state", () => {
+  it("remembers a seen saved explanation so a key point tap can open it", async () => {
+    const target = { selection, pointIndex: 1 };
+    vi.mocked(studyAssist.peek).mockImplementation(async (_owner, _selection, type) => (type === "explain_simply" ? { text: "Saved explanation" } : null) as never);
+    expect(hasAssistResult(assistStore.get(keyOf(target)))).toBe(false);
+    await assistStore.hydrate("owner", target);
+    const entries = assistStore.get(keyOf(target));
+    expect(hasAssistResult(entries)).toBe(true);
+    // Already seen, so no green mark, but the explanation is still there to open.
+    expect(assistMark(entries)).toBeNull();
+    expect(entries.explain_simply?.text).toBe("Saved explanation");
+  });
   it("shows a passage as working, then green until opened", async () => {
     let finish!: (value: { text: string }) => void;
     vi.mocked(studyAssist.request).mockReturnValue(new Promise((resolve) => { finish = resolve as never; }) as never);

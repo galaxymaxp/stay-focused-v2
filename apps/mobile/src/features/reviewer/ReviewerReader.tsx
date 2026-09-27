@@ -31,7 +31,7 @@ import {
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { haptic } from "../../design/haptics";
-import { assistMark, assistStore, assistTargetKey, keyOf, useAssistMarks, type AssistMark, type AssistReadyEvent, type AssistTarget } from "./assistStore";
+import { assistMark, assistStore, assistTargetKey, hasAssistResult, keyOf, useAssistMarks, type AssistMark, type AssistReadyEvent, type AssistTarget } from "./assistStore";
 import { PassageMark, PickBar, ReadyBanner } from "./AssistMarks";
 import { courseIdentity } from "../../design/courseIdentity";
 import { Action, Copy, Notice, Page, SearchField, SegmentedControl, Sheet } from "../../design/primitives";
@@ -119,6 +119,28 @@ export function ReviewerReaderScreen({
     if (!all.length) return;
     haptic.press();
     setPicking((current) => current?.block === block && current.points.length === all.length ? { section, block, points: [] } : { section, block, points: all });
+  };
+  // Saved explanations live on the device; load their presence so a tap can open them.
+  const owner = session?.user.id ?? "";
+  useEffect(() => {
+    if (!owner) return;
+    for (const section of reviewer.sections) for (const block of section.blocks) {
+      const selection = selectAssistBlock(reviewer, section.id, block.id);
+      if (!selection) continue;
+      void assistStore.hydrate(owner, { selection });
+      block.keyPoints.forEach((_, pointIndex) => void assistStore.hydrate(owner, { selection, pointIndex }));
+    }
+  }, [owner, reviewer]);
+  const pointHasResult = (block: string, index: number) => hasAssistResult(marks[assistTargetKey(reviewer.id, block, index)]);
+  /** A point with an explanation opens it; otherwise a tap selects the point for Study Assist. */
+  const pressPoint = (section: string, block: string, index: number) => {
+    if (picking?.block !== block && pointHasResult(block, index)) {
+      haptic.tap();
+      setPicking(null);
+      setAssistPassage({ section, block, point: index });
+      return;
+    }
+    tapPoint(section, block, index);
   };
   const tapPoint = (section: string, block: string, index: number) => {
     haptic.select();
@@ -382,8 +404,8 @@ export function ReviewerReaderScreen({
                               ref={register(segmentIds.keyPoint(block.id, index))}
                               accessibilityRole="checkbox"
                               accessibilityState={{ checked: !!picked }}
-                              accessibilityHint="Tap to select this key point. Hold to select the group."
-                              onPress={() => tapPoint(section.id, block.id, index)}
+                              accessibilityHint={!pickingHere && pointHasResult(block.id, index) ? "Tap to open its explanation. Hold to select the group." : "Tap to select this key point. Hold to select the group."}
+                              onPress={() => pressPoint(section.id, block.id, index)}
                               onLongPress={() => startPicking(section.id, block.id, block.keyPoints)}
                               style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}
                             >
@@ -391,6 +413,7 @@ export function ReviewerReaderScreen({
                             </Text>
                             {mark === "pending" ? <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 2 }} /> : null}
                             {mark === "fresh" ? <Sparkles size={16} color={colors.green} strokeWidth={2} style={{ marginTop: 4 }} /> : null}
+                            {!mark && !pickingHere && pointHasResult(block.id, index) ? <Sparkles size={14} color={colors.textMuted} strokeWidth={1.8} style={{ marginTop: 5 }} /> : null}
                           </View>
                         </PassageMark>
                       );
@@ -487,7 +510,7 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
     <Sheet
       title="New Quiz"
       onClose={onClose}
-      footer={<Action disabled={busy || !reviewerArtifactId || !session || !validCount || selectedTopics.length === 0} onPress={() => void next()}>{busy ? "Preparing…" : "Continue"}</Action>}
+      footer={<Action disabled={busy || !reviewerArtifactId || !session || !validCount || selectedTopics.length === 0} onPress={() => void next()}>{busy ? "Starting…" : "Create Quiz"}</Action>}
     >
       <View style={{ gap: spacing[1] }}>
         <Copy muted size="caption">Source</Copy>
@@ -529,7 +552,7 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
       </View>
       {!reviewerArtifactId ? <Notice>This Reviewer isn&apos;t saved to your account yet, so it can&apos;t be used for a Quiz.</Notice> : null}
       {deviceCopy ? <Notice>Quiz generation needs a connection.</Notice> : null}
-      <Copy muted size="caption">Next you&apos;ll review the request. Nothing is generated until you confirm.</Copy>
+      <Copy muted size="caption">Your quiz starts generating as soon as you tap Create Quiz. You can leave while it works.</Copy>
       {error ? <Notice>{error}</Notice> : null}
     </Sheet>
   );
