@@ -495,7 +495,14 @@ export function Sheet({
         : Animated.timing(rise, { toValue: panelHeight.current, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
     ]).start(() => onClose());
   };
-  const pull = useSheetDrag(dismiss);
+  // Android's native ScrollView takes vertical drags from its content, so content that
+  // fits does not scroll; a swipe down anywhere, or up when nothing scrolls, closes the sheet.
+  const [viewport, setViewport] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const contentFits = viewport > 0 && contentHeight > 0 && contentHeight <= viewport + 1;
+  const fitsRef = useRef(contentFits);
+  fitsRef.current = contentFits;
+  const pull = useSheetDrag(dismiss, { upwardCloses: () => fitsRef.current });
   // The backdrop lightens as the panel is pulled down.
   const shade = Animated.multiply(tint, pull.drag.interpolate({ inputRange: [0, 420], outputRange: [1, 0.35], extrapolate: "clamp" }));
 
@@ -507,7 +514,7 @@ export function Sheet({
         </Animated.View>
         <Animated.View
           accessibilityViewIsModal
-          {...pull.panHandlers}
+          {...pull.touchHandlers}
           onLayout={(event) => {
             panelHeight.current = event.nativeEvent.layout.height;
           }}
@@ -536,6 +543,9 @@ export function Sheet({
           </View>
           <ScrollView
             style={{ flexShrink: 1 }}
+            scrollEnabled={!contentFits}
+            onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
+            onContentSizeChange={(_width, height) => setContentHeight(height)}
             onScroll={pull.onScroll}
             scrollEventThrottle={16}
             alwaysBounceVertical={false}

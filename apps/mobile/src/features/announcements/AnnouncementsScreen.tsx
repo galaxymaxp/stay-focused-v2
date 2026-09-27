@@ -240,7 +240,7 @@ export function AnnouncementDetailScreen() {
       </Animated.View>
       <Animated.View
         accessibilityViewIsModal
-        {...pull.panHandlers}
+        {...pull.touchHandlers}
         style={{
           maxHeight: height - insets.top - spacing[6],
           minHeight: Math.min(360, height * 0.5),
