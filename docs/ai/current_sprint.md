@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B37.1 source capacity checkpoint (2026-09-28)
+
+**PARTIAL.** Local deterministic Reviewer concept counting now limits Quiz setup, API admission, worker batching and old-job Retry. Repair rejects a self-repeating replacement after its single repair call. Focused code checks pass. The user's UI correction moved Other source near the top of Generate and into a rising Text/Camera/Local File sheet; the reloaded realme verified text entry, native camera launch and instructional PDF selection. The underlying flow remains Reviewer-only while Quiz ownership requires Canvas snapshot IDs, triggering B37.1's architecture stop condition. No production deployment, fresh Quiz, EAS build or push. Decide canonical non-Canvas provenance, then resume production acceptance. [Checkpoint](acceptance/b37/study-experience-overhaul.md).
+
 ## B37 study experience overhaul (2026-09-27)
 
 **PARTIAL - 100-item Quiz stopped for review.** Owner-approved Quiz batching is live: two provider calls per 20-item batch (cap 10), repair of only rejected items with a distinct call identity, single formats kept across batches, exact source wording for recall answers, and retryable failed Quizzes without duplicate retries. Production 30-item Mixed (via Retry) and 30-item Multiple Choice Quizzes pass; the 100-item Mixed smoke failed at batch 3 of 5 on duplicate questions after one fresh repair (5 of 10 calls) and was stopped as instructed. Reviewer key-point results open on tap and sheets close by swiping on Android. No EAS build used (0 of 1). [B37 report](acceptance/b37/study-experience-overhaul.md).

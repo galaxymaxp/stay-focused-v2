@@ -1,5 +1,9 @@
 # Roadmap
 
+## B37.1 capacity and non-Canvas decision (2026-09-28)
+
+**PARTIAL.** The Generate UI now offers Text, Camera and Local File in a rising sheet verified on realme. Finish the canonical ownership/provenance design for those sources so they can use the same Reviewer, Quiz and Library pipeline as Canvas without invented Canvas IDs. Then deploy the scoped capacity/repair code, verify the small VPN source, find a legitimate instructional source with capacity at least 100, and run fresh 30/100-item and remaining physical acceptance. Study Assist selected-Reviewer fetch optimization follows B37 closure. [Checkpoint](ai/acceptance/b37/study-experience-overhaul.md).
+
 ## B37 study experience overhaul (2026-09-27)
 
 **PARTIAL.** Batched Quiz generation, retry, exact-wording contract, key-point result reopening and Android sheet swipe-to-close are live and verified; 30-item production Quizzes pass. Next: decide how 100-item Quizzes stay unique (concept planning before batches or a source-size guard), make Study Assist reads scoped or co-locate the API with Supabase, then finish device acceptance and spend the single EAS build only after every gate passes. [Implementation and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).

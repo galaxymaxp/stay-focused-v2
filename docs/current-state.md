@@ -1,5 +1,9 @@
 # Current State
 
+## B37.1 capacity lock checkpoint (2026-09-28)
+
+**PARTIAL — local Quiz capacity and repair implementation passes focused checks; production acceptance is pending.** Capacity is calculated from persisted Reviewer titles and key points with deterministic deduplication and no provider calls. API admission, worker execution and old-job Retry enforce the same maximum; repair rejects a replacement that repeats its rejected original. Generate now shows Other source near the top and opens a rising sheet with Text, Camera and Local File. The connected realme confirmed text entry, native camera launch and selection of an instructional PDF. Its underlying flow remains Reviewer-only with a manual Save step; Quiz persistence still requires Canvas IDs, so converging non-Canvas generation exceeds this scoped task's stop condition. No production deployment, EAS build, fresh Quiz or Library acceptance occurred. See [B37 acceptance checkpoint](ai/acceptance/b37/study-experience-overhaul.md). Study Assist latency remains separate.
+
 ## B37 study experience overhaul (2026-09-27)
 
 **PARTIAL - 100-item production Quiz stopped at batch 3.** Quiz generation now budgets two calls per 20-item batch (cap 10), repairs only rejected items with fresh responses, keeps single-format requests single-format, and requires exact source wording for recall answers; failed Quizzes can be retried without duplicates. Worker `generation-worker-00008-8q5` and Vercel `dpl_4m9zHz7epmr7qHtG427gJgZgBMQi` are live. 30-item Mixed and Multiple Choice production Quizzes pass and reopen from Library; the 100-item Mixed run failed on repeated questions in batch 3 and awaits an owner decision. Study Assist is still about 20 s because each request loads every Reviewer from Tokyo into `iad1`. No EAS build used. See [B37 acceptance](ai/acceptance/b37/study-experience-overhaul.md).
