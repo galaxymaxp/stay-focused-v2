@@ -12,6 +12,7 @@ import {
 
 export type ProcessingExecutionBackend =
   | "database_worker"
+  | "google_cloud"
   | "vercel_workflow";
 
 interface DispatchDependencies {
@@ -24,6 +25,8 @@ interface DispatchDependencies {
 export function getProcessingExecutionBackend(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): ProcessingExecutionBackend {
+  if (environment.GENERATION_BACKEND === "google-cloud") return "google_cloud";
+  if (environment.GENERATION_BACKEND === "vercel") return "vercel_workflow";
   const configured = environment.PROCESSING_EXECUTION_BACKEND?.trim();
   if (configured === "database_worker" || configured === "vercel_workflow") {
     return configured;
@@ -35,7 +38,14 @@ export async function dispatchAcceptedProcessingJob(
   job: ProcessingJobDatabaseRow,
   dependencies: DispatchDependencies = {},
 ): Promise<ProcessingJobDatabaseRow> {
-  if (getProcessingExecutionBackend() === "database_worker") {
+  const backend = job.execution_backend === "database_worker"
+    ? getProcessingExecutionBackend()
+    : job.execution_backend;
+  if (backend === "google_cloud") {
+    const { dispatchGoogleJob } = await import("./google-cloud");
+    return dispatchGoogleJob(job, dependencies);
+  }
+  if (backend === "database_worker") {
     return job;
   }
   const canRecoverDispatchFailure =

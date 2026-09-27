@@ -458,7 +458,8 @@ export type ProcessingJobDatabaseRow = {
   readonly lease_owner: string | null;
   readonly lease_expires_at: string | null;
   readonly heartbeat_at: string | null;
-  readonly execution_backend: "database_worker" | "vercel_workflow";
+  readonly execution_backend: "database_worker" | "vercel_workflow" | "google_cloud";
+  readonly google_dispatch_id: string | null;
   readonly workflow_run_id: string | null;
   readonly workflow_dispatched_at: string | null;
   readonly source_version_id: string | null;
@@ -1862,6 +1863,7 @@ export interface Database {
           request_fingerprint: string;
           retry_idempotency_key?: string | null;
           idempotency_expires_at?: string;
+          google_dispatch_id?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           worker_id?: string | null;
@@ -1901,6 +1903,7 @@ export interface Database {
           request_fingerprint?: string;
           retry_idempotency_key?: string | null;
           idempotency_expires_at?: string;
+          google_dispatch_id?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           worker_id?: string | null;
@@ -3805,7 +3808,8 @@ export interface Database {
           lease_owner?: string | null;
           lease_expires_at?: string | null;
           heartbeat_at?: string | null;
-          execution_backend?: "database_worker" | "vercel_workflow";
+          execution_backend?: "database_worker" | "vercel_workflow" | "google_cloud";
+          google_dispatch_id?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           source_version_id?: string | null;
@@ -4304,6 +4308,14 @@ export interface Database {
           p_workflow_run_id: string;
           p_dispatched_at?: string;
         };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      prepare_google_processing_job_v1: {
+        Args: { p_job_id: string };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      claim_google_processing_job_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string; p_worker_id: string; p_now?: string };
         Returns: ProcessingJobDatabaseRow[];
       };
       prepare_processing_job_workflow_dispatch_v1: {

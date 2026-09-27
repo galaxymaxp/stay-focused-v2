@@ -327,6 +327,7 @@ function makeJob(
     failed_at: null,
     heartbeat_at: null,
     execution_backend: "database_worker",
+    google_dispatch_id: null,
     workflow_run_id: null,
     workflow_dispatched_at: null,
     source_version_id: null,

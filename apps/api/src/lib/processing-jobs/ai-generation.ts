@@ -15,6 +15,17 @@ export function durableGenerationProvider(client: ProcessingJobServiceClient, jo
   return { async generate<T>(request: GenerationRequest<T>): Promise<T> {
     const job = await readProcessingJobState(client, jobId);
     if (job.status !== 'running' || job.lease_owner !== workerId) throw new ExperienceFailure(409, 'generation_failed');
+    // A queue redelivery can resume a validated response, but an interrupted
+    // external call has an unknowable outcome. Fail safely instead of billing twice.
+    const googleKey = job.execution_backend === 'google_cloud'
+      ? `google:provider:${createHash('sha256').update(JSON.stringify([request.model, request.schema.name, request.prompt])).digest('hex')}`
+      : null;
+    if (googleKey) {
+      const saved = await readProcessingJobCheckpoint(client, jobId, googleKey);
+      const response = saved?.payload as { state?: string; value?: Json } | undefined;
+      if (response?.state === 'completed') return response.value as T;
+      if (response) throw new GenerationContractError(['provider_outcome_uncertain']);
+    }
     const condensation = request.schema.name === 'source_context_notes';
     const suffix = condensation ? createHash('sha256').update(request.prompt).digest('hex') : request.schema.name;
     const key = `ai-first:calls:${suffix}`;
@@ -23,9 +34,15 @@ export function durableGenerationProvider(client: ProcessingJobServiceClient, jo
     const count = payload?.count ?? 0;
     if (!Number.isInteger(count) || count >= (condensation ? 1 : 2)) throw new GenerationContractError(['durable_provider_budget_exhausted']);
     await writeProcessingJobCheckpoint(client, { jobId, checkpointKey: key, payload: { count: count + 1 } as Json });
+    if (googleKey) await writeProcessingJobCheckpoint(client, { jobId, checkpointKey: googleKey, payload: { state: 'pending' } });
     console.info('ai_generation.request', { jobId, schema: request.schema.name, attempt: count + 1, sourceBytes: Buffer.byteLength(request.prompt), model: request.model });
     const started = Date.now();
-    try { return await provider.generate<T>(request); }
+    try {
+      const result = await provider.generate<T>(request);
+      if (googleKey) await writeProcessingJobCheckpoint(client, { jobId, checkpointKey: googleKey,
+        payload: { state: 'completed', value: JSON.parse(JSON.stringify(result)) as Json } });
+      return result;
+    }
     catch { throw new ExperienceFailure(503, 'generation_failed'); }
     finally { console.info('ai_generation.request_finished', { jobId, schema: request.schema.name, durationMs: Date.now() - started }); }
   } };

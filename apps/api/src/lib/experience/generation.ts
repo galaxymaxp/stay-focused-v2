@@ -13,7 +13,10 @@ import { ExperienceFailure } from './errors';
 import { record } from './mappers';
 
 export interface StartReviewerGeneration { readonly courseId: string; readonly materialId: string }
-export async function startReviewerGeneration(client: SupabaseClient<Database>, userId: string, input: StartReviewerGeneration, requestKey: string | null): Promise<ProcessingJobDatabaseRow> {
+export async function startReviewerGeneration(client: SupabaseClient<Database>, userId: string, input: StartReviewerGeneration, requestKey: string | null, dependencies: {
+  readonly schedule?: typeof scheduleAcceptedProcessingJobDispatch;
+} = {}): Promise<ProcessingJobDatabaseRow> {
+  const schedule = dependencies.schedule ?? scheduleAcceptedProcessingJobDispatch;
   logGenerationAdmissionMemory('request_started', { sourceCount: 1 });
   let key: string;
   try { key = validateIdempotencyKey(requestKey); } catch { throw new ExperienceFailure(400, 'invalid_request'); }
@@ -25,7 +28,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     const source = await findProcessingJobSource(client, existing);
     const metadata = record(source.metadata);
     if (existing.user_id !== userId || existing.job_type !== 'reviewer_generation' || metadata.canvasCourseId !== input.courseId || !Array.isArray(metadata.canvasItemIds) || metadata.canvasItemIds.length !== 1 || metadata.canvasItemIds[0] !== input.materialId) throw new ExperienceFailure(409, 'conflict');
-    scheduleAcceptedProcessingJobDispatch(existing);
+    schedule(existing);
     logGenerationAdmissionMemory('existing_job_dispatch_scheduled', { jobCount: 1 });
     return existing;
   }
@@ -61,7 +64,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
       const metadata = record(storedSource.metadata);
       if (job.user_id !== userId || job.job_type !== 'reviewer_generation' || metadata.canvasCourseId !== input.courseId || !Array.isArray(metadata.canvasItemIds) || metadata.canvasItemIds.length !== 1 || metadata.canvasItemIds[0] !== input.materialId) throw new ExperienceFailure(409, 'conflict');
       logGenerationAdmissionMemory('deferred_job_created', { jobCount: 1 });
-      scheduleAcceptedProcessingJobDispatch(job);
+      schedule(job);
       logGenerationAdmissionMemory('workflow_dispatch_scheduled', { jobCount: 1 });
       return job;
     } catch (error) {
@@ -111,7 +114,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     const metadata = record(storedSource.metadata);
     if (metadata.canvasCourseId !== input.courseId || !Array.isArray(metadata.canvasItemIds) || metadata.canvasItemIds.length !== 1 || metadata.canvasItemIds[0] !== input.materialId) throw new ExperienceFailure(409, 'conflict');
     logGenerationAdmissionMemory('job_created', { jobCount: 1 });
-    scheduleAcceptedProcessingJobDispatch(job);
+    schedule(job);
     logGenerationAdmissionMemory('workflow_dispatch_scheduled', { jobCount: 1 });
     return job;
   } catch (error) {

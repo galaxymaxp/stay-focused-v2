@@ -16,6 +16,7 @@ describe("processing workflow dispatch", () => {
   afterEach(() => {
     delete process.env.PROCESSING_EXECUTION_BACKEND;
     delete process.env.VERCEL;
+    delete process.env.GENERATION_BACKEND;
   });
 
   it("keeps the database worker as the explicit local default", () => {
@@ -62,6 +63,16 @@ describe("processing workflow dispatch", () => {
       "start",
       "attach_processing_job_workflow_v1",
     ]);
+  });
+
+  it("keeps an accepted Vercel job on its persisted backend across a Google switch", async () => {
+    process.env.GENERATION_BACKEND = "google-cloud";
+    const prepared = job({ execution_backend: "vercel_workflow" });
+    const rpc = vi.fn().mockResolvedValue({ data: [prepared], error: null });
+    const startWorkflow = vi.fn().mockResolvedValue({ runId: "wfr_existing_backend" });
+    await dispatchAcceptedProcessingJob(prepared, { client: { rpc } as never, startWorkflow });
+    expect(startWorkflow).toHaveBeenCalledWith("job-1");
+    expect(rpc.mock.calls[0]?.[0]).toBe("prepare_processing_job_workflow_dispatch_v1");
   });
 
   it("records a safe retryable failure when Vercel never accepts the run", async () => {
