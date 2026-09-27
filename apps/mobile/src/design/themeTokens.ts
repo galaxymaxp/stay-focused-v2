@@ -66,47 +66,40 @@ export type ThemeColors = {
 
 /**
  * UC-inspired palette family, for evaluation with the University of the
- * Cordilleras. NOT official UC branding: no verified UC brand source or token
- * exists in this repository, so the crimson accent is an approximation chosen
- * for contrast, not a sanctioned institutional value. Red is reserved for
- * selection, primary actions, active controls and progress; surfaces stay
- * neutral, and "danger" moves to burnt orange so overdue work never reads as
- * the brand color.
+ * Cordilleras. NOT official UC branding: there is no licensed token source in
+ * this repository, but the accent is now grounded in the public uc-bcf.edu.ph
+ * site's own stylesheet (its buttons, links and icons render on `#07683b`,
+ * a deep forest green, over a warm ivory page background), not a guess.
+ * Danger/warning/red keep their standard meaning since the brand color is no
+ * longer red.
  */
 export const ucInspiredPalettes: { readonly light: ThemeColors; readonly dark: ThemeColors } = {
   light: {
     ...palettes.light,
-    backgroundPrimary: "#F6F6F4",
+    backgroundPrimary: "#F7F6F0",
     surfacePrimary: "rgba(255,255,255,0.92)",
     surfaceElevated: "#FFFFFF",
-    surfaceSecondary: "#EFEFED",
+    surfaceSecondary: "#EFEEE6",
     textPrimary: "#161616",
     textSecondary: "#58585B",
     textMuted: "#6C6C70",
     separator: "rgba(0,0,0,0.08)",
-    accent: "#9E1B32",
+    accent: "#07683B",
     onAccent: "#FFFFFF",
-    danger: "#B4470F",
-    warning: "#8A5A10",
-    shadow: "#2B2B2B",
-    red: "#9E1B32",
-    redSoft: "#F7E4E7",
+    shadow: "#1B2B22",
   },
   dark: {
     ...palettes.dark,
-    backgroundPrimary: "#0B0B0C",
-    surfacePrimary: "#19191B",
-    surfaceElevated: "#252527",
-    surfaceSecondary: "#323235",
-    textPrimary: "#F4F4F4",
-    textSecondary: "#B3B3B7",
-    textMuted: "#9D9DA2",
+    backgroundPrimary: "#0B0C0A",
+    surfacePrimary: "#171A17",
+    surfaceElevated: "#232823",
+    surfaceSecondary: "#2F352E",
+    textPrimary: "#F4F4F1",
+    textSecondary: "#B3B7B1",
+    textMuted: "#9DA29C",
     separator: "rgba(255,255,255,0.09)",
-    accent: "#F08C99",
-    onAccent: "#3B0B14",
-    danger: "#FFB27D",
-    red: "#F08C99",
-    redSoft: "#46222A",
+    accent: "#7FD9A6",
+    onAccent: "#04291B",
   },
 };
 
