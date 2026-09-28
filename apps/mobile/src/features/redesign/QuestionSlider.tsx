@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { View, Text, type GestureResponderEvent } from 'react-native';
 import { useTheme } from '../../design/theme';
-import { sliderQuestionIndex } from './questionSliderModel';
+import { sliderQuestionIndexFromPageX } from './questionSliderModel';
 
 /** A question-position scrubber. The question itself changes only on release. */
 export function QuestionSlider({ current, count, onSettle }: {
@@ -9,11 +9,14 @@ export function QuestionSlider({ current, count, onSettle }: {
 }) {
   const { colors } = useTheme();
   const width = useRef(1);
+  const track = useRef<View>(null);
+  const trackLeft = useRef<number | null>(null);
   const preview = useRef(current);
   const [dragging, setDragging] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(current);
   const move = (event: GestureResponderEvent) => {
-    const next = sliderQuestionIndex(event.nativeEvent.locationX, width.current, count);
+    if (trackLeft.current === null) return;
+    const next = sliderQuestionIndexFromPageX(event.nativeEvent.pageX, trackLeft.current, width.current, count);
     preview.current = next;
     setPreviewIndex(old => old === next ? old : next);
   };
@@ -22,11 +25,15 @@ export function QuestionSlider({ current, count, onSettle }: {
       {dragging ? `Question ${previewIndex + 1} / ${count}` : `Question ${current + 1} of ${count}`}
     </Text>
     <View
+      ref={track}
       accessible accessibilityRole="adjustable" accessibilityLabel="Question slider"
       accessibilityValue={{ min: 1, max: count, now: current + 1, text: `Question ${current + 1} of ${count}` }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={event => onSettle(Math.max(0, Math.min(count - 1, current + (event.nativeEvent.actionName === 'increment' ? 1 : -1))))}
-      onLayout={event => { width.current = event.nativeEvent.layout.width; }}
+      onLayout={event => {
+        width.current = event.nativeEvent.layout.width;
+        track.current?.measureInWindow(x => { trackLeft.current = x; });
+      }}
       onStartShouldSetResponder={() => true}
       onMoveShouldSetResponder={() => true}
       onResponderGrant={event => { setDragging(true); move(event); }}
