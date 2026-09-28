@@ -4,6 +4,7 @@ import { POST } from "./route";
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const sourceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const childId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const assetId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const mocks = vi.hoisted(() => ({ owner: "", rows: { source_versions: [] as Record<string, unknown>[], document_assets: [] as Record<string, unknown>[] } }));
 
@@ -22,10 +23,12 @@ vi.mock("@/lib/processing-jobs/repository", () => ({ createProcessingJobServiceC
       update: (value: Record<string, unknown>) => { update = value; return query; },
       single: async () => {
         if (insertion) {
-          const row = { id: sourceId, ...insertion };
+          const row = { id: mocks.rows[table].length === 0 ? sourceId : childId, ...insertion };
           mocks.rows[table].push(row);
           return { data: row, error: null };
         }
+        // Mirrors the source_versions_are_immutable trigger.
+        if (update && table === "source_versions") return { data: null, error: { message: "immutable_processing_version" } };
         const row = mocks.rows[table].find(value => filters.every(check => check(value)));
         if (row && update) Object.assign(row, update);
         return { data: row ?? null, error: row ? null : { message: "missing" } };
@@ -63,10 +66,16 @@ describe("canonical source creation", () => {
     mocks.rows.source_versions.push({ id: sourceId, user_id: A, revision_kind: "normalized", source_text: "A page about cells", document_asset_id: assetId, extraction_result_id: sourceId, metadata: {} });
     mocks.rows.document_assets.push({ id: assetId, user_id: A, mime_type: "application/pdf", original_file_name: "cells.pdf" });
     expect((await POST(request({ sourceType: "camera", displayName: "Photo", sourceVersionId: sourceId }))).status).toBe(409);
-    const claimed = await POST(request({ sourceType: "local_file", displayName: "Cells", sourceVersionId: sourceId }));
+    const claimed = await POST(request({ sourceType: "local_file", displayName: "Cells", sourceVersionId: sourceId, sourceText: "A page about cells" }));
     expect(claimed.status).toBe(200);
-    expect(mocks.rows.source_versions).toHaveLength(1);
-    expect(mocks.rows.source_versions[0]!.metadata).toMatchObject({ sourceType: "local_file", originalFileName: "cells.pdf", mimeType: "application/pdf" });
+    expect((await claimed.json()).data.id).toBe(childId);
+    expect(mocks.rows.source_versions).toHaveLength(2);
+    expect(mocks.rows.source_versions[0]!.metadata).toEqual({});
+    expect(mocks.rows.source_versions[1]).toMatchObject({ parent_source_version_id: sourceId, revision_kind: "user_edited", source_text: "A page about cells",
+      metadata: { sourceType: "local_file", sourceTitle: "Cells", originalFileName: "cells.pdf", mimeType: "application/pdf" } });
+    const replayed = await POST(request({ sourceType: "local_file", displayName: "Cells", sourceVersionId: sourceId, sourceText: "A page about cells" }));
+    expect((await replayed.json()).data.id).toBe(childId);
+    expect(mocks.rows.source_versions).toHaveLength(2);
     expect((await POST(request({ sourceType: "local_file", displayName: "Another title", sourceVersionId: sourceId }))).status).toBe(409);
     mocks.owner = B;
     expect((await POST(request({ sourceType: "local_file", displayName: "Cells", sourceVersionId: sourceId }, "other-user-key"))).status).toBe(404);
@@ -77,9 +86,17 @@ describe("canonical source creation", () => {
     mocks.rows.document_assets.push({ id: assetId, user_id: A, mime_type: "image/jpeg", original_file_name: "page.jpg" });
     const response = await POST(request({ sourceType: "camera", displayName: "Biology page", sourceVersionId: sourceId, sourceText: "Cells have nuclei" }));
     expect(response.status).toBe(200);
-    expect(mocks.rows.source_versions[0]).toMatchObject({ user_id: A, document_asset_id: assetId, extraction_result_id: sourceId,
+    expect(mocks.rows.source_versions).toHaveLength(2);
+    expect(mocks.rows.source_versions[1]).toMatchObject({ user_id: A, document_asset_id: assetId, extraction_result_id: sourceId, parent_source_version_id: sourceId,
       metadata: { sourceType: "camera", sourceTitle: "Biology page", originalFileName: "page.jpg", mimeType: "image/jpeg" } });
-    expect(mocks.rows.source_versions).toHaveLength(1);
+  });
+
+  it("claims a corrected OCR text as the reviewed revision", async () => {
+    mocks.rows.source_versions.push({ id: sourceId, user_id: A, revision_kind: "normalized", source_text: "Cels have nucle1", document_asset_id: assetId, extraction_result_id: sourceId, metadata: {} });
+    mocks.rows.document_assets.push({ id: assetId, user_id: A, mime_type: "image/jpeg", original_file_name: "page.jpg" });
+    const response = await POST(request({ sourceType: "camera", displayName: "Biology page", sourceVersionId: sourceId, sourceText: " Cells have nuclei 🧬 " }));
+    expect(response.status).toBe(200);
+    expect(mocks.rows.source_versions[1]).toMatchObject({ revision_kind: "user_edited", source_text: "Cells have nuclei 🧬", character_count: 19 });
   });
 
   it("never trusts a body owner or accepts an unauthenticated import", async () => {

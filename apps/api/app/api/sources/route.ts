@@ -51,7 +51,7 @@ export async function POST(request: Request): Promise<Response> {
       : reply(409, "conflict");
     const inserted = await client.from("source_versions").insert({
       user_id: user.id, revision_kind: "imported_text", content_sha256: digest,
-      source_text: normalized, character_count: normalized.length,
+      source_text: normalized, character_count: [...normalized].length,
       normalization_version: "engine-stage0-v1", created_by: "user",
       metadata: { sourceType, sourceTitle: displayName, importKey: key },
     }).select("id").single();
@@ -96,28 +96,21 @@ export async function POST(request: Request): Promise<Response> {
   const metadata = metadataOf(source.data.metadata);
   if (metadata.sourceType && metadata.sourceType !== sourceType) return reply(409, "conflict");
   if (metadata.importKey && metadata.importKey !== key) return reply(409, "conflict");
-  const corrected = input.sourceText;
-  if (typeof corrected === "string" && corrected.trim() !== source.data.source_text.trim()) {
-    const normalized = corrected.trim();
-    const inserted = await client.from("source_versions").insert({
-      user_id: user.id, document_asset_id: source.data.document_asset_id,
-      extraction_result_id: source.data.extraction_result_id,
-      parent_source_version_id: source.data.id, revision_kind: "user_edited",
-      content_sha256: createHash("sha256").update(normalized).digest("hex"),
-      source_text: normalized, character_count: normalized.length,
-      normalization_version: source.data.normalization_version, created_by: "user",
-      metadata: { ...metadata, sourceType, sourceTitle: displayName, importKey: key,
-        originalFileName: asset.data.original_file_name, mimeType: asset.data.mime_type },
-    }).select("id").single();
-    if (inserted.error || !inserted.data) return reply(503, "source_unavailable");
-    return NextResponse.json({ ok: true, data: { id: inserted.data.id, sourceType, displayName } });
-  }
-  const updated = await client.from("source_versions").update({ metadata: {
-    ...metadata, sourceType, sourceTitle: displayName, importKey: key,
-    originalFileName: asset.data.original_file_name, mimeType: asset.data.mime_type,
-  } }).eq("id", source.data.id).eq("user_id", user.id).select("id").single();
-  if (updated.error || !updated.data) return reply(503, "source_unavailable");
-  return NextResponse.json({ ok: true, data: { id: updated.data.id, sourceType, displayName } });
+  // Source versions are immutable, so the reviewed text is always claimed as a
+  // new child revision, even when the user kept the extracted text unchanged.
+  const reviewed = typeof input.sourceText === "string" ? input.sourceText.trim() : source.data.source_text.trim();
+  const inserted = await client.from("source_versions").insert({
+    user_id: user.id, document_asset_id: source.data.document_asset_id,
+    extraction_result_id: source.data.extraction_result_id,
+    parent_source_version_id: source.data.id, revision_kind: "user_edited",
+    content_sha256: createHash("sha256").update(reviewed).digest("hex"),
+    source_text: reviewed, character_count: [...reviewed].length,
+    normalization_version: source.data.normalization_version, created_by: "user",
+    metadata: { ...metadata, sourceType, sourceTitle: displayName, importKey: key,
+      originalFileName: asset.data.original_file_name, mimeType: asset.data.mime_type },
+  }).select("id").single();
+  if (inserted.error || !inserted.data) return reply(503, "source_unavailable");
+  return NextResponse.json({ ok: true, data: { id: inserted.data.id, sourceType, displayName } });
 }
 
 export function OPTIONS(): Response {
