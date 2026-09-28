@@ -68,6 +68,7 @@ import {
 import {
   canExtractOcrText,
   canExtractPdfText,
+  extractionJobFailure,
   getCurrentSourceText,
   getSourceCharacterCount,
   initialReviewerSourceState,
@@ -194,6 +195,12 @@ export function ReviewerGenerateScreen({
         setActiveReviewerJob(job);
       }
 
+      if (job.jobType === "document_extraction") {
+        // Stop the panel's upload spinner and show why, instead of leaving
+        // the reason only in the job card further down the sheet.
+        const failure = extractionJobFailure(job);
+        if (failure) dispatchSource({ type: "ocr_failed", error: failure });
+      }
       if (job.status !== "succeeded" || !job.resultAvailable) return;
 
       if (job.jobType === "document_extraction") {
@@ -743,10 +750,7 @@ export function ReviewerGenerateScreen({
       setActiveExtractionJob(null);
       dispatchSource({
         type: "ocr_failed",
-        error: {
-          code: "request_cancelled",
-          message: job.safeErrorMessage ?? "Extraction did not complete.",
-        },
+        error: extractionJobFailure(job) ?? { code: "request_cancelled", message: "Extraction did not complete." },
       });
     } else {
       setActiveReviewerJob(null);

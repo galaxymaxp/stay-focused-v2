@@ -1,5 +1,6 @@
 import type { SourceNormalizationBlockInput } from "@stay-focused/engine";
-import type { OcrClientError } from "../../services/ocrApi";
+import type { ProcessingJobStatusView } from "@stay-focused/shared";
+import { mapApiErrorCode, type OcrClientError } from "../../services/ocrApi";
 import type {
   GallerySelectionError,
   SelectedGalleryImage,
@@ -584,4 +585,20 @@ function formatIncompleteDocumentMessage(error: OcrClientError): string {
       ? ` Affected ${affectedPages.length === 1 ? "page" : "pages"}: ${affectedPages.join(", ")}.`
       : "";
   return `Not every page could be read.${pageDetail} Retry, rescan the affected pages, or choose another document.`;
+}
+
+/**
+ * The source-panel error for an extraction job that ended without a result,
+ * or null while it is still running or succeeded. Uses the server's failure
+ * code so an unreadable photo reads as "No readable text found", not as a
+ * cancellation.
+ */
+export function extractionJobFailure(
+  job: Pick<ProcessingJobStatusView, "status" | "errorCode" | "safeErrorMessage">,
+): OcrClientError | null {
+  if (job.status !== "failed" && job.status !== "expired" && job.status !== "cancelled") return null;
+  const code = job.status === "cancelled"
+    ? "request_cancelled"
+    : job.errorCode ? mapApiErrorCode(job.errorCode) : "unknown_error";
+  return { code, message: job.safeErrorMessage ?? "Extraction did not complete." };
 }

@@ -5,6 +5,7 @@ import type { SelectedGalleryImage } from "./galleryImage";
 import type { SelectedPdfDocument } from "./pdfDocument";
 import {
   canExtractPdfText,
+  extractionJobFailure,
   formatOcrClientError,
   getCurrentSourceText,
   initialReviewerSourceState,
@@ -544,5 +545,24 @@ describe("durable upload failure presentation", () => {
     const formatted = formatOcrClientError(ocrError("invalid_response", "Bad payload"));
 
     expect(formatted.detail).toBe("Details: code invalid_response.");
+  });
+});
+
+describe("extraction job failure", () => {
+  it("reports an unreadable photo as no readable text, not a cancellation", () => {
+    const error = extractionJobFailure({ status: "failed", errorCode: "ocr_empty_result", safeErrorMessage: "No readable text was detected in the source." });
+    expect(error).toEqual({ code: "ocr_empty_result", message: "No readable text was detected in the source." });
+    expect(formatOcrClientError(error!).title).toBe("No readable text found");
+  });
+
+  it("keeps cancellation and unknown failures distinct", () => {
+    expect(extractionJobFailure({ status: "cancelled", errorCode: null, safeErrorMessage: null })?.code).toBe("request_cancelled");
+    expect(extractionJobFailure({ status: "expired", errorCode: "something_new", safeErrorMessage: null })?.code).toBe("unknown_error");
+  });
+
+  it("ignores jobs that are still running or succeeded", () => {
+    for (const status of ["queued", "running", "cancellation_requested", "succeeded"] as const) {
+      expect(extractionJobFailure({ status, errorCode: null, safeErrorMessage: null })).toBeNull();
+    }
   });
 });

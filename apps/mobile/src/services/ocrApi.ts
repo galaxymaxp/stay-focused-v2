@@ -663,7 +663,7 @@ function clientError(
   };
 }
 
-function mapApiErrorCode(code: string): OcrClientErrorCode {
+export function mapApiErrorCode(code: string): OcrClientErrorCode {
   switch (code) {
     case "unauthorized":
     case "unsupported_media_type":
