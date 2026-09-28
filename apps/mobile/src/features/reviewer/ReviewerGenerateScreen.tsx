@@ -128,6 +128,9 @@ export function ReviewerGenerateScreen({
     AppState.currentState === "active",
   );
   const extractionIdempotencyKeyRef = useRef<string | null>(null);
+  // The extraction the source panel is waiting on. Other stored jobs (such as
+  // an earlier failed attempt) must not overwrite the panel.
+  const pendingExtractionJobIdRef = useRef<string | null>(null);
   const reviewerIdempotencyKeyRef = useRef<string | null>(null);
   const sourceIdempotencyKeyRef = useRef<string | null>(null);
   const completedReviewerJobIdRef = useRef<string | null>(null);
@@ -199,7 +202,10 @@ export function ReviewerGenerateScreen({
         // Stop the panel's upload spinner and show why, instead of leaving
         // the reason only in the job card further down the sheet.
         const failure = extractionJobFailure(job);
-        if (failure) dispatchSource({ type: "ocr_failed", error: failure });
+        if (failure && job.id === pendingExtractionJobIdRef.current) {
+          pendingExtractionJobIdRef.current = null;
+          dispatchSource({ type: "ocr_failed", error: failure });
+        }
       }
       if (job.status !== "succeeded" || !job.resultAvailable) return;
 
@@ -303,6 +309,14 @@ export function ReviewerGenerateScreen({
       }
     }
   }, [applyObservedJob, session?.accessToken, session?.user.id]);
+
+  const refreshExtractionJob = useCallback(async (jobId: string): Promise<void> => {
+    const accessToken = session?.accessToken.trim();
+    const apiBaseUrl = getApiBaseUrl();
+    if (!accessToken || !apiBaseUrl) return;
+    const status = await getProcessingJobStatus({ apiBaseUrl, accessToken, jobId });
+    if (status.ok) await applyObservedJob(status.data);
+  }, [applyObservedJob, session?.accessToken]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -612,8 +626,12 @@ export function ReviewerGenerateScreen({
 
       if (result.ok) {
         extractionIdempotencyKeyRef.current = null;
+        pendingExtractionJobIdRef.current = result.data.id;
         setActiveExtractionJob(result.data);
         await upsertActiveProcessingJob(ownerUserId, result.data);
+        // A reused extraction is accepted already finished, so polling
+        // (which runs only for active jobs) would never apply it.
+        if (!isActiveProcessingJobStatus(result.data.status)) await refreshExtractionJob(result.data.id);
       } else {
         dispatchSource({
           type: "ocr_failed",
@@ -689,8 +707,12 @@ export function ReviewerGenerateScreen({
 
       if (result.ok) {
         extractionIdempotencyKeyRef.current = null;
+        pendingExtractionJobIdRef.current = result.data.id;
         setActiveExtractionJob(result.data);
         await upsertActiveProcessingJob(ownerUserId, result.data);
+        // A reused extraction is accepted already finished, so polling
+        // (which runs only for active jobs) would never apply it.
+        if (!isActiveProcessingJobStatus(result.data.status)) await refreshExtractionJob(result.data.id);
       } else {
         dispatchSource({
           type: "ocr_failed",
