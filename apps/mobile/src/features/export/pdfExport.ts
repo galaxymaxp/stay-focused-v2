@@ -3,16 +3,21 @@ import { styledRuns, type ExportDocument, type ExportBlock } from './exportLayou
 
 const PAGE_WIDTH = 612, PAGE_HEIGHT = 792, MARGIN = 48, BODY_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const ink = rgb(0.12, 0.16, 0.15), muted = rgb(0.38, 0.42, 0.41), accent = rgb(0.09, 0.35, 0.25), highlight = rgb(0.90, 0.94, 0.70);
-/** Standard PDF fonts are WinAnsi. Keep unsupported glyphs visible as a fallback. */
-const safe = (value: string) => value.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, '-')
-  .replace(/[\u2022]/g, '*').replace(/[\u00b7]/g, '-').replace(/[\u2192]/g, '->').replace(/[\u2190]/g, '<-')
-  .replace(/[\u00a0]/g, ' ').replace(/[^\x20-\x7E\n]/g, '?');
-
 export async function createStudyPdf(document: ExportDocument): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(document.title); pdf.setAuthor('Stay Focused');
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const glyphs = new Map<string, string>();
+  /** Retain every character the embedded WinAnsi font can encode. */
+  const safe = (value: string) => [...value.replace(/[\u2192]/g, '->').replace(/[\u2190]/g, '<-')].map(char => {
+    if (char === '\n') return char;
+    if (char === '\u00a0') return ' ';
+    if (!glyphs.has(char)) {
+      try { regular.encodeText(char); glyphs.set(char, char); } catch { glyphs.set(char, '?'); }
+    }
+    return glyphs.get(char)!;
+  }).join('');
   let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN;
   const newPage = () => { page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]); y = PAGE_HEIGHT - MARGIN; };

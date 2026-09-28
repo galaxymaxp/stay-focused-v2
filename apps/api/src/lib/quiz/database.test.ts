@@ -61,8 +61,8 @@ beforeAll(async () => {
     await db.exec(migration('20260912110000_quiz_maker.sql'));
     await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
     await db.exec(migration('20260927140343_quiz_100_items.sql'));
-    await db.exec(migration('20260928130000_quiz_study_state.sql'));
-    await db.exec(migration('20260928130001_matching_blocks.sql'));
+    await db.exec(migration('20260928131426_quiz_study_state.sql'));
+    await db.exec(migration('20260928131513_matching_blocks.sql'));
     await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
     await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
     jobId = await queue('quiz-generation-1');

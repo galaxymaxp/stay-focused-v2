@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { LibraryArtifactDetail } from "@stay-focused/shared";
+import type { LibraryArtifactDetail, QuizAttempt } from "@stay-focused/shared";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createLocalArtifactStore, LOCAL_PAYLOAD_SCHEMA } from "./artifactStore";
@@ -54,6 +54,22 @@ describe("local Library schema", () => {
 });
 
 describe("local artifact store", () => {
+  it("keeps an unfinished Quiz attempt and draft owner scoped through restart", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sf-quiz-"));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const path = join(dir, "library.db");
+    const attempt = { id: 'local:one', quizId: 'quiz-one', status: 'in_progress', currentQuestion: 3,
+      answers: [], feedback: [], skippedQuestionIds: [], revealedQuestionIds: [], assistedQuestionIds: [] } as unknown as QuizAttempt;
+    const snapshot = { attempt, result: null, selected: ['b'], dirty: true };
+    const first = await freshStore(path);
+    await first.store.saveQuizPractice(OWNER_A, 'quiz-one', snapshot);
+    first.close();
+    const second = await freshStore(path);
+    await expect(second.store.readQuizPractice(OWNER_A, 'quiz-one')).resolves.toEqual(snapshot);
+    await expect(second.store.readQuizPractice(OWNER_B, 'quiz-one')).resolves.toBeNull();
+    await second.store.purgeOwner(OWNER_A);
+    await expect(second.store.readQuizPractice(OWNER_A, 'quiz-one')).resolves.toBeNull();
+  });
   it.each([
     ["Reviewer", reviewerDetail()],
     ["Quiz", quizDetail()],

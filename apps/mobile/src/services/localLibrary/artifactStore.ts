@@ -2,6 +2,8 @@ import type {
   LibraryArtifactDetail,
   LibraryArtifactSummary,
   LibraryArtifactType,
+  QuizAttempt,
+  QuizResult,
 } from "@stay-focused/shared";
 
 import type { LocalSqlDatabase, LocalSqlExecutor } from "./sqlDatabase";
@@ -18,7 +20,17 @@ export interface LocalArtifactDetail {
   readonly bodyBehindCloud: boolean;
 }
 
+/** A local copy of one attempt; only unfinished drafts may be pending sync. */
+export interface LocalQuizPractice {
+  readonly attempt: QuizAttempt | null;
+  readonly result: QuizResult | null;
+  readonly selected: readonly string[];
+  readonly dirty: boolean;
+}
+
 export interface LocalArtifactStore extends AssistCache {
+  readQuizPractice(ownerUserId: string, quizId: string): Promise<LocalQuizPractice | null>;
+  saveQuizPractice(ownerUserId: string, quizId: string, practice: LocalQuizPractice): Promise<void>;
   readActivityResponse(ownerUserId: string, artifactId: string): Promise<{ responses: Record<string, string>; completed: boolean; updatedAt: string } | null>;
   saveActivityResponse(ownerUserId: string, artifactId: string, responses: Record<string, string>, completed: boolean): Promise<void>;
   listSummaries(ownerUserId: string): Promise<LibraryArtifactSummary[]>;
@@ -62,6 +74,28 @@ export function createLocalArtifactStore(
 ): LocalArtifactStore {
   return {
     ...createAssistCache(db),
+    async readQuizPractice(ownerUserId, quizId) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ snapshot_json: string }>(
+        'SELECT snapshot_json FROM quiz_practice WHERE owner_user_id = ? AND quiz_id = ?', [ownerUserId, quizId]);
+      if (!row) return null;
+      try {
+        const parsed = JSON.parse(row.snapshot_json) as LocalQuizPractice;
+        if (!parsed || typeof parsed !== 'object' || typeof parsed.dirty !== 'boolean' ||
+          !Array.isArray(parsed.selected) || parsed.selected.some(value => typeof value !== 'string') ||
+          (parsed.attempt !== null && (parsed.attempt?.quizId !== quizId || !Array.isArray(parsed.attempt?.answers))) ||
+          (parsed.result !== null && parsed.result?.quizId !== quizId)) return null;
+        return parsed;
+      } catch { return null; }
+    },
+    async saveQuizPractice(ownerUserId, quizId, practice) {
+      requireOwner(ownerUserId);
+      if (practice.attempt && practice.attempt.quizId !== quizId) throw new Error('quiz_identity_mismatch');
+      await db.runAsync(`INSERT INTO quiz_practice(owner_user_id, quiz_id, snapshot_json, updated_at)
+        VALUES (?, ?, ?, ?) ON CONFLICT(owner_user_id, quiz_id) DO UPDATE SET
+        snapshot_json = excluded.snapshot_json, updated_at = excluded.updated_at`,
+      [ownerUserId, quizId, JSON.stringify(practice), now()]);
+    },
     async listSummaries(ownerUserId) {
       requireOwner(ownerUserId);
       // The list reads summaries only; bodies stay on disk until an artifact opens.
@@ -74,9 +108,22 @@ export function createLocalArtifactStore(
       const responseRows = await db.getAllAsync<{ artifact_id: string; responses_json: string; completed: number }>(
         'SELECT artifact_id, responses_json, completed FROM activity_responses WHERE owner_user_id = ?', [ownerUserId]);
       const responses = new Map(responseRows.map(row => [row.artifact_id, row]));
+      const quizRows = await db.getAllAsync<{ quiz_id: string; snapshot_json: string }>(
+        'SELECT quiz_id, snapshot_json FROM quiz_practice WHERE owner_user_id = ?', [ownerUserId]);
+      const practices = new Map(quizRows.flatMap(row => {
+        try { return [[row.quiz_id, JSON.parse(row.snapshot_json) as LocalQuizPractice] as const]; } catch { return []; }
+      }));
       return rows.flatMap((row) => {
         const summary = parseSummary(row.summary_json);
         if (!summary) return [];
+        if (summary.type === 'quiz' && summary.quiz) {
+          const attempt = practices.get(summary.quiz.id)?.attempt;
+          if (attempt?.status === 'in_progress') return [{ ...summary, quiz: { ...summary.quiz, activeAttempt: {
+            id: attempt.id, currentQuestion: attempt.currentQuestion,
+            answeredCount: attempt.answers.filter(answer => answer.finalizedAt).length,
+            skippedCount: attempt.skippedQuestionIds.filter(id => !attempt.answers.some(answer => answer.questionId === id && answer.finalizedAt)).length,
+            revealedCount: attempt.revealedQuestionIds.length } } }];
+        }
         const response = responses.get(summary.id);
         if (!response || summary.type !== 'activity_output') return [summary];
         let count = 0;
@@ -185,6 +232,7 @@ export function createLocalArtifactStore(
       await db.withExclusiveTransactionAsync(async (transaction) => {
         const canonical = await resolveAlias(transaction, ownerUserId, artifactId);
         await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ? AND artifact_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
+        await transaction.runAsync("DELETE FROM quiz_practice WHERE owner_user_id = ? AND quiz_id IN (?, ?)", [ownerUserId, artifactId.replace(/^quiz:/, ''), canonical.replace(/^quiz:/, '')]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ? AND reviewer_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
         await transaction.runAsync(
           "DELETE FROM library_artifacts WHERE owner_user_id = ? AND artifact_id IN (?, ?)",
@@ -201,6 +249,7 @@ export function createLocalArtifactStore(
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
         await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ?", [ownerUserId]);
+        await transaction.runAsync("DELETE FROM quiz_practice WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifacts WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifact_aliases WHERE owner_user_id = ?", [ownerUserId]);
