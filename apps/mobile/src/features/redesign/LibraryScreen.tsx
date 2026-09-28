@@ -7,7 +7,7 @@ import type {
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
@@ -22,6 +22,7 @@ import { useTheme } from "../../design/theme";
 import { experienceRequest } from "../../services/experienceApi";
 import { createGenerationIntent } from "../../services/generationRecovery";
 import { removeLocalArtifact } from "../../services/localLibrary/deviceLibrary";
+import { getLocalArtifactStore } from "../../services/localLibrary/localArtifactDatabase";
 import { deleteReviewer } from "../../services/reviewerLibraryApi";
 import { reviewerArtifactIdFromLibraryId } from "./quizRequest";
 import { available } from "./presentation";
@@ -39,6 +40,7 @@ import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
 import { arrangeList } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
 import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
+import { ExportSheet } from '../export/ExportSheet';
 
 const LOCAL_PAGE_SIZE = 50;
 const GRID_GAP = 12;
@@ -319,6 +321,11 @@ function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArti
           Updated {new Date(item.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
           {item.quiz ? ` · ${item.quiz.questionCount} questions${item.quiz.bestScore !== null ? ` · Best ${item.quiz.bestScore}%` : ""}` : ""}
         </Copy>
+        {item.type === 'activity_output' ? <Copy muted size="caption">{item.activityStudyStatus === 'completed' ? 'Completed' : item.activityStudyStatus === 'in_progress' ? 'In progress' : 'Not started'}</Copy> : null}
+        {item.quiz ? <Copy muted size="caption">{item.quiz.activeAttempt
+          ? `In progress · ${item.quiz.activeAttempt.answeredCount} / ${item.quiz.questionCount} answered · Question ${item.quiz.activeAttempt.currentQuestion + 1}`
+          : item.quiz.latestScore !== null ? `Completed · Latest ${item.quiz.latestScore}% · ${item.quiz.attemptCount} attempt${item.quiz.attemptCount === 1 ? '' : 's'}`
+          : 'Not started'}</Copy> : null}
       </RowLink>
     </Surface>
   );
@@ -336,6 +343,7 @@ export function ArtifactScreen() {
   const { id, quiz } = useLocalSearchParams<{ id: string; quiz?: string }>();
   const result = useLocalArtifact(id ?? null);
   const detail = result.data;
+  const [exportOpen, setExportOpen] = useState(false);
   if (detail && "reviewer" in detail) {
     return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} />;
   }
@@ -360,6 +368,7 @@ export function ArtifactScreen() {
             {detail.artifact.sourceTitle ? ` · ${detail.artifact.sourceTitle}` : ""}
           </Copy>
           <Copy size="h1">{detail.artifact.title}</Copy>
+          {'draft' in detail ? <Action secondary onPress={() => setExportOpen(true)}>Export</Action> : null}
           <Copy muted size="caption">
             Generated {new Date(detail.artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
           </Copy>
@@ -382,6 +391,10 @@ export function ArtifactScreen() {
             </Surface>
           )}
           {"draft" in detail && (
+            <ActivityWork key={`work-${detail.draft.id}`} draft={detail.draft} artifactId={detail.artifact.id} />
+          )}
+          {exportOpen && 'draft' in detail ? <ExportSheet detail={detail} onClose={() => setExportOpen(false)} /> : null}
+          {"draft" in detail && (
             <DraftEditor
               key={`${detail.draft.id}-${detail.draft.revision}`}
               draft={detail.draft}
@@ -398,6 +411,65 @@ export function ArtifactScreen() {
     </Page>
   );
 }
+/** Student work is device-persisted separately from the generated Activity definition. */
+function ActivityWork({ draft, artifactId }: { draft: ActivityDraft; artifactId: string }) {
+  const { session } = useAuth();
+  const { colors } = useTheme();
+  const [responses, setResponses] = useState<Record<string, string>>({});
+  const [completed, setCompleted] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [saveState, setSaveState] = useState('Loading your work…');
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const owner = session?.user.id;
+  useEffect(() => {
+    if (!owner) return;
+    let live = true;
+    void (async () => {
+      const store = await getLocalArtifactStore();
+      const saved = await store?.readActivityResponse(owner, artifactId);
+      if (!live) return;
+      setResponses(saved?.responses ?? {});
+      setCompleted(saved?.completed ?? false);
+      setLoaded(true);
+      setSaveState(store ? 'Saved on this device' : 'Device saving unavailable');
+    })();
+    return () => { live = false; };
+  }, [owner, artifactId]);
+  function persist(next: Record<string, string>, done: boolean) {
+    if (!owner) return;
+    setSaveState('Saving…');
+    queue.current = queue.current.then(async () => {
+      const store = await getLocalArtifactStore();
+      if (!store) throw new Error('device_store_unavailable');
+      await store.saveActivityResponse(owner, artifactId, next, done);
+      setSaveState('Saved on this device');
+    }).catch(() => setSaveState('Could not save on this device. Try editing again.'));
+  }
+  const tasks = draft.sections.length ? draft.sections.map((section, index) => ({ id: section.id, title: section.heading || `Task ${index + 1}` })) :
+    draft.slides.map((slide, index) => ({ id: `slide-${slide.number}`, title: slide.title || `Task ${index + 1}` }));
+  if (!loaded) return <Surface><Copy muted>Loading your work…</Copy></Surface>;
+  return <Surface>
+    <Copy size="h2">Study activity</Copy>
+    <Copy muted size="caption">{draft.type.replace(/_/g, ' ')} · {completed ? 'Completed' : Object.values(responses).some(value => value.trim()) ? 'In progress' : 'Not started'}</Copy>
+    <Copy size="h3">Instructions</Copy>
+    <Copy>Work through each task in your own words. Your responses save on this device as you type.</Copy>
+    <Copy size="h3">Questions / Tasks</Copy>
+    {tasks.map((task, index) => <View key={task.id} style={{ gap: 8 }}>
+      <Copy>{index + 1}. {task.title}</Copy>
+      <Copy muted size="caption">My work</Copy>
+      <TextInput accessibilityLabel={`My work for ${task.title}`} multiline value={responses[task.id] ?? ''}
+        onChangeText={value => { const next = { ...responses, [task.id]: value }; setResponses(next); persist(next, completed); }}
+        placeholder="Write your response" placeholderTextColor={colors.textMuted}
+        style={{ minHeight: 120, textAlignVertical: 'top', color: colors.textPrimary, backgroundColor: colors.surfaceSecondary,
+          borderColor: colors.separator, borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 }} />
+    </View>)}
+    <Copy muted size="caption">{saveState}</Copy>
+    <Action secondary onPress={() => { setCompleted(!completed); persist(responses, !completed); }}>
+      {completed ? 'Mark as in progress' : 'Mark as completed'}
+    </Action>
+  </Surface>;
+}
+
 function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft: ActivityDraft) => void }) {
   const navigation = useNavigation();
   const client = useExperienceClient(),
@@ -464,6 +536,10 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
       setBusy(false);
     }
   }
+  // Keep the existing editable generated draft, now saved after a short pause.
+  // The separate student worksheet above is saved directly in the device store.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!dirty || busy) return; const timer = setTimeout(() => void save(), 700); return () => clearTimeout(timer); }, [content, dirty, busy]);
   return (
     <View style={{ gap: 16 }}>
       <Copy muted>{dirty ? "Unsaved changes" : "Saved draft"}</Copy>

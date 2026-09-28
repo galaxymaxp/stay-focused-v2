@@ -19,6 +19,8 @@ export interface LocalArtifactDetail {
 }
 
 export interface LocalArtifactStore extends AssistCache {
+  readActivityResponse(ownerUserId: string, artifactId: string): Promise<{ responses: Record<string, string>; completed: boolean; updatedAt: string } | null>;
+  saveActivityResponse(ownerUserId: string, artifactId: string, responses: Record<string, string>, completed: boolean): Promise<void>;
   listSummaries(ownerUserId: string): Promise<LibraryArtifactSummary[]>;
   readDetail(ownerUserId: string, artifactId: string): Promise<LocalArtifactDetail | null>;
   upsertSummaries(
@@ -69,10 +71,36 @@ export function createLocalArtifactStore(
           ORDER BY cloud_updated_at DESC, artifact_id ASC`,
         [ownerUserId],
       );
+      const responseRows = await db.getAllAsync<{ artifact_id: string; responses_json: string; completed: number }>(
+        'SELECT artifact_id, responses_json, completed FROM activity_responses WHERE owner_user_id = ?', [ownerUserId]);
+      const responses = new Map(responseRows.map(row => [row.artifact_id, row]));
       return rows.flatMap((row) => {
         const summary = parseSummary(row.summary_json);
-        return summary ? [summary] : [];
+        if (!summary) return [];
+        const response = responses.get(summary.id);
+        if (!response || summary.type !== 'activity_output') return [summary];
+        let count = 0;
+        try { count = Object.values(JSON.parse(response.responses_json) as Record<string, unknown>).filter(value => typeof value === 'string' && !!value.trim()).length; } catch { /* Corrupt local work must not hide the artifact. */ }
+        return [{ ...summary, activityStudyStatus: response.completed ? 'completed' : count ? 'in_progress' : 'not_started' }];
       });
+    },
+    async readActivityResponse(ownerUserId, artifactId) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ responses_json: string; completed: number; updated_at: string }>(
+        'SELECT responses_json, completed, updated_at FROM activity_responses WHERE owner_user_id = ? AND artifact_id = ?', [ownerUserId, artifactId]);
+      if (!row) return null;
+      try {
+        const parsed = JSON.parse(row.responses_json) as Record<string, unknown>;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.values(parsed).some(value => typeof value !== 'string')) return null;
+        return { responses: parsed as Record<string, string>, completed: row.completed === 1, updatedAt: row.updated_at };
+      } catch { return null; }
+    },
+    async saveActivityResponse(ownerUserId, artifactId, responses, completed) {
+      requireOwner(ownerUserId);
+      await db.runAsync(`INSERT INTO activity_responses(owner_user_id, artifact_id, responses_json, completed, updated_at)
+        VALUES (?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, artifact_id) DO UPDATE SET
+        responses_json=excluded.responses_json, completed=excluded.completed, updated_at=excluded.updated_at`,
+      [ownerUserId, artifactId, JSON.stringify(responses), completed ? 1 : 0, now()]);
     },
 
     async readDetail(ownerUserId, artifactId) {
@@ -156,6 +184,7 @@ export function createLocalArtifactStore(
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
         const canonical = await resolveAlias(transaction, ownerUserId, artifactId);
+        await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ? AND artifact_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ? AND reviewer_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
         await transaction.runAsync(
           "DELETE FROM library_artifacts WHERE owner_user_id = ? AND artifact_id IN (?, ?)",
@@ -171,6 +200,7 @@ export function createLocalArtifactStore(
     async purgeOwner(ownerUserId) {
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
+        await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifacts WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifact_aliases WHERE owner_user_id = ?", [ownerUserId]);

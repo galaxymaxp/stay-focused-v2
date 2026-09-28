@@ -212,4 +212,19 @@ describe("local artifact store", () => {
     await expect(store.listSummaries(OWNER_A)).resolves.toEqual([]);
     expect(raw.prepare("SELECT COUNT(*) AS n FROM library_artifact_aliases").get()).toEqual({ n: 0 });
   });
+  it('autosaved Activity responses survive a database reopen and remain separate from the generated draft', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'sf-activity-'));
+    cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+    const path = join(directory, 'library.db');
+    const first = await freshStore(path);
+    const detail = draftDetail();
+    await first.store.upsertDetail(OWNER_A, detail.artifact.id, detail);
+    await first.store.saveActivityResponse(OWNER_A, detail.artifact.id, { section1: 'My own explanation' }, true);
+    first.close();
+    const reopened = await freshStore(path);
+    expect(await reopened.store.readActivityResponse(OWNER_A, detail.artifact.id)).toMatchObject({ responses: { section1: 'My own explanation' }, completed: true });
+    expect((await reopened.store.readDetail(OWNER_A, detail.artifact.id))?.detail).toEqual(detail);
+    expect((await reopened.store.listSummaries(OWNER_A))[0]?.activityStudyStatus).toBe('completed');
+    expect(await reopened.store.readActivityResponse(OWNER_B, detail.artifact.id)).toBeNull();
+  });
 });
