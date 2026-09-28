@@ -18,6 +18,7 @@ import type {
 } from "./authTypes";
 import { classifySignUpResult } from "./signUpOutcome";
 import { AUTH_CALLBACK_URL } from "./authCallback";
+import { ensureSecurePkceCrypto } from "./pkceCrypto";
 import { getSupabaseClientResult } from "./supabaseClient";
 
 interface OAuthProviderConfig {
@@ -95,6 +96,7 @@ export async function signUpWithEmailPassword(
   email: string,
   password: string,
 ): Promise<AuthResult<SignUpOutcome>> {
+  if (!await ensureSecurePkceCrypto()) return authFailure("oauth_provider_error", "Update Stay Focused to create an account securely.");
   const normalizedEmail = email.trim().toLowerCase();
   if (!isValidEmail(normalizedEmail)) {
     return authFailure("invalid_email", "A valid email address is required.");
@@ -253,6 +255,7 @@ async function startOAuthSignIn(
   providerConfig: OAuthProviderConfig,
   options: OAuthSignInOptions,
 ): Promise<AuthResult<OAuthSignInStart>> {
+  if (!await ensureSecurePkceCrypto()) return authFailure("oauth_provider_error", "Update Stay Focused to use secure provider sign-in.");
   const redirectTo = options.redirectTo.trim();
   if (!redirectTo) {
     return authFailure(

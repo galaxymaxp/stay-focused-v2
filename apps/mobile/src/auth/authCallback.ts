@@ -5,6 +5,27 @@ export type AuthCallback =
   | { readonly kind: "error" }
   | { readonly kind: "ignored" };
 
+/**
+ * Rebuilds the callback from the params Expo Router bound to this route.
+ * `Linking.useURL()` cannot be used here: the route mounts after the warm
+ * `url` event has fired, so the hook falls back to the launch URL instead.
+ * Repeated keys are kept so ambiguous callbacks are still rejected.
+ */
+export function authCallbackUrlFromParams(
+  params: Readonly<Record<string, string | readonly string[] | undefined>>,
+): string {
+  const query = new URLSearchParams();
+  let hash = "";
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    const values = typeof value === "string" ? [value] : value;
+    if (key === "#") hash = values.join("");
+    else for (const entry of values) query.append(key, entry);
+  }
+  const search = query.toString();
+  return `${AUTH_CALLBACK_URL}${search ? `?${search}` : ""}${hash ? `#${hash}` : ""}`;
+}
+
 /** Accept only our callback and authorization codes; never accept bearer tokens. */
 export function parseAuthCallback(value: string): AuthCallback {
   try {

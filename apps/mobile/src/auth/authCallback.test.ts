@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAuthCallback } from "./authCallback";
+import { authCallbackUrlFromParams, parseAuthCallback } from "./authCallback";
 
 describe("mobile auth callback boundary", () => {
   it.each(["stayfocused://auth/callback?code=one", "stayfocused:///auth/callback?code=one"])("accepts exact callback %s", (url) => {
@@ -13,5 +13,18 @@ describe("mobile auth callback boundary", () => {
   });
   it.each(["?code=one&code=two", "?code=", "?error=access_denied&error_description=PRIVATE", "#access_token=PRIVATE&refresh_token=PRIVATE"])("rejects ambiguous/error/token callback %s", (suffix) => {
     expect(parseAuthCallback("stayfocused://auth/callback" + suffix)).toEqual({ kind: "error" });
+  });
+  it("rebuilds warm and cold route params into a parseable callback", () => {
+    expect(parseAuthCallback(authCallbackUrlFromParams({ code: "one" }))).toEqual({ kind: "code", code: "one", recovery: false });
+    expect(parseAuthCallback(authCallbackUrlFromParams({ mode: "recovery", code: "one" }))).toEqual({ kind: "code", code: "one", recovery: true });
+  });
+  it.each([
+    [{}],
+    [{ code: ["one", "two"] }],
+    [{ code: "" }],
+    [{ error: "access_denied", error_description: "PRIVATE" }],
+    [{ "#": "access_token=PRIVATE" }],
+  ])("keeps malformed route params rejectable %j", (params) => {
+    expect(parseAuthCallback(authCallbackUrlFromParams(params))).toEqual({ kind: "error" });
   });
 });

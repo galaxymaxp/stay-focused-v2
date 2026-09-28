@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { completeAuthCallback, openProviderAuth, requestPasswordReset, updateRecoveredPassword } from "./providerAuth";
 const mocks = vi.hoisted(() => ({
   openURL: vi.fn(), getItemAsync: vi.fn(), setItemAsync: vi.fn(), deleteItemAsync: vi.fn(),
   auth: { signInWithOAuth: vi.fn(), linkIdentity: vi.fn(), getUser: vi.fn(), exchangeCodeForSession: vi.fn(), signOut: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn() },
@@ -6,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("react-native", () => ({ Linking: { openURL: mocks.openURL } }));
 vi.mock("expo-secure-store", () => ({ getItemAsync: mocks.getItemAsync, setItemAsync: mocks.setItemAsync, deleteItemAsync: mocks.deleteItemAsync }));
 vi.mock("./supabaseClient", () => ({ getSupabaseClientResult: () => ({ ok: true, data: { auth: mocks.auth } }) }));
-import { completeAuthCallback, openProviderAuth, requestPasswordReset, updateRecoveredPassword } from "./providerAuth";
+vi.mock("./pkceCrypto", () => ({ ensureSecurePkceCrypto: () => Promise.resolve(true) }));
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.auth.signInWithOAuth.mockResolvedValue({ data: { url: "https://auth.example" }, error: null });

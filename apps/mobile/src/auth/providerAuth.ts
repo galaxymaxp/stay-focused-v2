@@ -2,6 +2,7 @@ import { Linking } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { AUTH_CALLBACK_URL, parseAuthCallback } from "./authCallback";
 import { getSupabaseClientResult } from "./supabaseClient";
+import { ensureSecurePkceCrypto } from "./pkceCrypto";
 import type { AuthResult, OAuthProvider } from "./authTypes";
 
 const LINK_OWNER_KEY = "stay-focused-v2.auth.link-owner";
@@ -9,6 +10,7 @@ const completions = new Map<string, Promise<AuthResult<{ recovery: boolean }>>>(
 const failure = (message: string): AuthResult<never> => ({ ok: false, error: { code: "oauth_provider_error", message } });
 
 export async function openProviderAuth(provider: OAuthProvider, link = false): Promise<AuthResult<void>> {
+  if (!await ensureSecurePkceCrypto()) return failure("Update Stay Focused to use secure provider sign-in.");
   const client = getSupabaseClientResult();
   if (!client.ok) return client;
   try {
@@ -67,6 +69,7 @@ async function exchange(code: string, recovery: boolean): Promise<AuthResult<{ r
 
 export async function requestPasswordReset(email: string): Promise<AuthResult<void>> {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return failure("Enter your email address first.");
+  if (!await ensureSecurePkceCrypto()) return failure("Update Stay Focused to use secure password recovery.");
   const client = getSupabaseClientResult();
   if (!client.ok) return client;
   try {
