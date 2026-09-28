@@ -63,6 +63,7 @@ beforeAll(async () => {
     await db.exec(migration('20260927140343_quiz_100_items.sql'));
     await db.exec(migration('20260928131426_quiz_study_state.sql'));
     await db.exec(migration('20260928131513_matching_blocks.sql'));
+    await db.exec(migration('20260928134856_quiz_clear_drafts.sql'));
     await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
     await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
     jobId = await queue('quiz-generation-1');
@@ -240,6 +241,21 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         await expect(answer(a.id, 'q1', ['b'])).rejects.toThrow('quiz_answer_already_finalized');
         const resumed = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
         expect(resumed.answers).toEqual(finalized.answers);
+    });
+    it('clears unfinished identification and correction drafts for offline replay', async () => {
+        await db.exec('begin');
+        try {
+            const modified = questions.map((item, index) => index === 2
+                ? { ...item, type: 'identification', options: [], correctOptionIds: ['Firewall'] }
+                : index === 3 ? { ...item, type: 'modified_true_false', options: [{ id: 't', text: 'True' }, { id: 'f', text: 'False' }], correctOptionIds: ['t'] } : item);
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(modified), quizId]);
+            const a = await start('clear-text-drafts');
+            for (const [questionId, value] of [['q3', 'temporary term'], ['q4', 't']]) {
+                await answer(a.id, questionId!, [value!], false);
+                const cleared = await answer(a.id, questionId!, [], false);
+                expect(cleared.answers.find(entry => entry.questionId === questionId)?.selectedOptionIds).toEqual([]);
+            }
+        } finally { await db.exec('rollback'); }
     });
     it.each([['a', 'a'], ['missing'], [], ['a', 'b']].map(selected => [selected]))('rejects invalid finalized single-select %j', async (selected) => {
         const a = await start(`bad-answer-${selected.join('-') || 'empty'}`);
