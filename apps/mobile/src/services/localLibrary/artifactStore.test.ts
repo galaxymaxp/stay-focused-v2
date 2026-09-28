@@ -59,7 +59,11 @@ describe("local artifact store", () => {
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
     const path = join(dir, "library.db");
     const attempt = { id: 'local:one', quizId: 'quiz-one', status: 'in_progress', currentQuestion: 3,
-      answers: [], feedback: [], skippedQuestionIds: [], revealedQuestionIds: [], assistedQuestionIds: [] } as unknown as QuizAttempt;
+      answers: [
+        { questionId: 'q1', selectedOptionIds: ['a'], finalizedAt: '2026-09-28T00:00:00Z' },
+        { questionId: 'q2', selectedOptionIds: ['left:right'], finalizedAt: null },
+        { questionId: 'q3', selectedOptionIds: [], finalizedAt: null },
+      ], feedback: [], skippedQuestionIds: ['legacy-skip'], revealedQuestionIds: ['q1'], assistedQuestionIds: [] } as unknown as QuizAttempt;
     const snapshot = { attempt, result: null, selected: ['b'], dirty: true };
     const first = await freshStore(path);
     await first.store.saveQuizPractice(OWNER_A, 'quiz-one', snapshot);

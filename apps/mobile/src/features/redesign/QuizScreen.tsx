@@ -226,45 +226,25 @@ export function QuizScreen() {
       setOfflineMode(true); localMove();
     }
   }
-  async function markState(action: 'skip' | 'reveal') {
-    if (!attempt || !question || !quizData) return;
-    if (offline) {
-      if (action === 'reveal') throw new Error('Connect to reveal the answer. Your draft is saved on this device.');
-      const next = Math.min(index + 1, quizData.questions.length - 1);
-      const value = moveOffline(attempt, question.id, selected, next, true);
-      setAttempt(value); setIndex(next);
-      setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
-      setDirty(true); setMatchingReady(false); setMatchingLeft(null);
-      return;
-    }
+  async function revealAnswer() {
+    if (!attempt || !question) return;
+    if (offline) throw new Error('Connect to reveal the answer. Your draft is saved on this device.');
     try {
-    if (!feedback && JSON.stringify(selected) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === question.id)?.selectedOptionIds ?? [])) {
-      const savedAttempt = await experienceRequest<QuizAttempt>(client,
-        `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
-        { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
-      setAttempt(compatibleAttempt(savedAttempt));
-    }
-    const next = action === 'skip' ? Math.min(index + 1, quizData.questions.length - 1) : index;
-    const value = await experienceRequest<QuizAttempt>(client,
-      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/study-state`,
-      { method: 'PATCH', body: { action, questionId: question.id, position: next } });
-    setAttempt(compatibleAttempt(value));
-    if (action === 'skip') {
-      setIndex(next);
-      setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
-      setMatchingReady(false);
-      setMatchingLeft(null);
-    }
-    setDirty(false);
+      if (!feedback && JSON.stringify(selected) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === question.id)?.selectedOptionIds ?? [])) {
+        const savedAttempt = await experienceRequest<QuizAttempt>(client,
+          `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
+          { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
+        setAttempt(compatibleAttempt(savedAttempt));
+      }
+      const value = await experienceRequest<QuizAttempt>(client,
+        `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/study-state`,
+        { method: 'PATCH', body: { action: 'reveal', questionId: question.id, position: index } });
+      setAttempt(compatibleAttempt(value));
+      setDirty(false);
     } catch (cause) {
       if (!(cause instanceof ExperienceApiError) || cause.code !== 'connection') throw cause;
       setOfflineMode(true);
-      if (action === 'reveal') throw new Error('Connect to reveal the answer. Your draft is saved on this device.');
-      const next = Math.min(index + 1, quizData.questions.length - 1);
-      const value = moveOffline(attempt, question.id, selected, next, true);
-      setAttempt(value); setIndex(next);
-      setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
-      setDirty(true);
+      throw new Error('Connect to reveal the answer. Your draft is saved on this device.');
     }
   }
   async function reconnectPractice() {
@@ -294,10 +274,7 @@ export function QuizScreen() {
             {savedQuiz.questions[index]!.leftItem ? <Copy>{savedQuiz.questions[index]!.leftItem}</Copy> : null}
             {savedQuiz.questions[index]!.options.map((option) => <Copy key={option.id} muted>• {option.text}</Copy>)}
           </Surface> : null}
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Action secondary disabled={index === 0} onPress={() => setIndex(value => value - 1)}>Previous</Action>
-            <Action secondary disabled={index + 1 >= savedQuiz.questionCount} onPress={() => setIndex(value => value + 1)}>Next</Action>
-          </View>
+          <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} />
           {localReady && <Action onPress={() => {
             const value = newOfflineAttempt(savedQuiz.id, newRequestKey());
             setAttempt(value); setResult(null); setIndex(0); setSelected([]); setDirty(true);
@@ -335,12 +312,9 @@ export function QuizScreen() {
           {offline && <Notice>Offline practice is saved on this device. Connect to check or reveal answers and sync your progress.</Notice>}
           {offline && <Action secondary disabled={busy} onPress={() => void run(reconnectPractice)}>Sync progress</Action>}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
-            <Copy muted size="caption">{index + 1} / {quizData?.questionCount}</Copy>
+            <Copy muted size="caption">{attempt.answers.filter(answer => answer.finalizedAt).length} answered · {quizData!.questions.length - attempt.answers.filter(answer => answer.finalizedAt).length} unanswered</Copy>
             <Action secondary onPress={() => setOverviewOpen(true)}>Questions</Action>
           </View>
-          <QuestionSlider current={index} count={quizData!.questions.length} onSettle={next => void run(() => moveTo(next))} />
-          <Copy muted size="caption">{attempt.answers.filter(answer => answer.finalizedAt).length} answered · {attempt.skippedQuestionIds.filter(id => !attempt.answers.some(answer => answer.questionId === id && answer.finalizedAt)).length} skipped</Copy>
           <Surface>
             <Copy size="h2">{question.prompt}</Copy>
             <Copy muted>{question.selectionInstruction}</Copy>
@@ -417,11 +391,8 @@ export function QuizScreen() {
               Check answer
             </Action>
           )}
-          {!attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline} onPress={() => void run(() => markState('reveal'))}>Reveal Answer</Action>}
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-            <Action secondary disabled={busy} onPress={() => void run(() => markState('skip'))}>Skip</Action>
-            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
-          </View>
+          {!attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline} onPress={() => void run(() => revealAnswer())}>Reveal Answer</Action>}
+          <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} />
           <Action
               disabled={busy || offline}
               onPress={() =>
@@ -448,7 +419,7 @@ export function QuizScreen() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {quizData.questions.map((item, position) => {
             const answer = attempt.answers.find(entry => entry.questionId === item.id);
-            const state = position === index ? 'Current' : attempt.revealedQuestionIds.includes(item.id) ? 'Revealed' : answer?.finalizedAt ? 'Answered' : attempt.skippedQuestionIds.includes(item.id) ? 'Skipped' : 'Unanswered';
+            const state = position === index ? 'Current' : attempt.revealedQuestionIds.includes(item.id) ? 'Revealed' : answer?.finalizedAt ? 'Answered' : 'Unanswered';
             return <Action key={item.id} secondary={position !== index} label={`Question ${position + 1}, ${state}`} onPress={() => { setOverviewOpen(false); void run(() => moveTo(position)); }}>{position + 1} · {state}</Action>;
           })}
         </View>
