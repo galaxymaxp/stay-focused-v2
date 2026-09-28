@@ -458,7 +458,8 @@ function ConnectCanvas({ onConnected, request, initialBaseUrl = "" }: { initialB
     <Surface style={{ gap: spacing[3] }}>
       <Copy size="h3">Connect Canvas</Copy>
       <Copy muted size="bodySmall">In Canvas, open Account → Settings → Approved Integrations → New Access Token. Create a token for your own account and paste it here. Reconnect using the same account and school.</Copy>
-      <TextInput accessibilityLabel="Canvas address" testID="canvas-base-url-input" value={baseUrl} onChangeText={setBaseUrl} placeholder="https://school.instructure.com" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} inputMode="url" style={field} />
+      <Copy muted size="caption">Enter your school’s Canvas domain. HTTPS is added automatically.</Copy>
+      <TextInput accessibilityLabel="Canvas address" testID="canvas-base-url-input" value={baseUrl} onChangeText={setBaseUrl} placeholder="school.instructure.com" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} inputMode="url" style={field} />
       <TextInput accessibilityLabel="Canvas access token" testID="canvas-token-input" value={token} onChangeText={setToken} placeholder="Access token" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} secureTextEntry style={field} />
       <Action disabled={busy || !baseUrl.trim() || !token.trim()} onPress={() => void connect()} testID="canvas-connect-button">{busy ? "Connecting…" : "Connect"}</Action>
       {error ? <Notice>{error}</Notice> : null}

@@ -856,10 +856,13 @@ export async function connectCanvas(
   const endpoint = createEndpoint(input.apiBaseUrl, CONNECTION_PATH);
   if (!endpoint.ok) return endpoint;
 
-  const baseUrl = input.baseUrl.trim();
-  if (!baseUrl) {
+  const enteredBaseUrl = input.baseUrl.trim();
+  if (!enteredBaseUrl) {
     return clientError("missing_canvas_url", "Enter your Canvas URL.");
   }
+  const baseUrl = /^[a-z][a-z0-9+.-]*:/i.test(enteredBaseUrl)
+    ? enteredBaseUrl
+    : `https://${enteredBaseUrl}`;
 
   const personalAccessToken = input.personalAccessToken.trim();
   if (!personalAccessToken) {
