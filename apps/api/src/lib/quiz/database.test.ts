@@ -66,6 +66,7 @@ beforeAll(async () => {
     await db.exec(migration('20260928134856_quiz_clear_drafts.sql'));
     await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
     await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
+    await db.exec(migration('20260928143546_quiz_matching_public_projection.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{
@@ -118,6 +119,31 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
             expect((await db.query('delete from quizzes where id=$1 and user_id=$2 returning id', [quizId, A])).rows).toHaveLength(1);
             expect((await db.query('select quiz_id from quiz_keys where quiz_id=$1', [quizId])).rows).toHaveLength(0);
             expect((await db.query('select id from generated_artifacts where id=$1', [reviewer])).rows).toHaveLength(1);
+        } finally { await db.exec('rollback'); }
+    });
+    it('publishes Matching labels without private associations through the actual completion RPC', async () => {
+        await db.exec('begin');
+        try {
+            const id = await queue('matching-publication');
+            const matching = { ...questions[4]!, type: 'matching' as const, leftItem: '',
+                matchingPairs: [
+                    { id: 'p1', leftItem: 'Confidentiality', rightOptionId: 'a' },
+                    { id: 'p2', leftItem: 'Integrity', rightOptionId: 'b' },
+                    { id: 'p3', leftItem: 'Availability', rightOptionId: 'c' },
+                ], matchingAnswers: [{ id: 'p1', rightOptionId: 'a' }, { id: 'p2', rightOptionId: 'b' }, { id: 'p3', rightOptionId: 'c' }],
+                correctOptionIds: ['p1:a', 'p2:b', 'p3:c'] };
+            const generated = { ...payload, questions: [...questions.slice(0, 4), matching] };
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [id]);
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [id, 'worker', 'quiz_generation', JSON.stringify(generated)]);
+            const row = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [id])).rows[0]!;
+            const learner = quizView(row).questions[4]!;
+            expect(learner.matchingPairs).toEqual(matching.matchingPairs.map(({ id, leftItem }) => ({ id, leftItem })));
+            expect(learner.selectionInstruction).toBe('Match each term to one meaning.');
+            const serialized = JSON.stringify(row.questions);
+            for (const field of ['rightOptionId', 'matchingAnswers', 'correctOptionIds', 'explanation', 'sourceRefs']) expect(serialized).not.toContain(field);
+            const key = (await db.query<{ questions: unknown }>('select questions from quiz_keys where quiz_id=$1', [row.id])).rows[0]!;
+            expect(key.questions).toEqual(generated.questions);
+            expect((await db.query('select id from quizzes where generation_id=$1', [id])).rows).toHaveLength(1);
         } finally { await db.exec('rollback'); }
     });
     it('stores 100 questions without truncating the learner projection or private key', async () => {
@@ -246,14 +272,14 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         await db.exec('begin');
         try {
             const modified = questions.map((item, index) => index === 2
-                ? { ...item, type: 'identification', options: [], correctOptionIds: ['Firewall'] }
-                : index === 3 ? { ...item, type: 'modified_true_false', options: [{ id: 't', text: 'True' }, { id: 'f', text: 'False' }], correctOptionIds: ['t'] } : item);
+                ? { ...item, type: 'identification' as const, options: [], correctOptionIds: ['Firewall'] }
+                : index === 3 ? { ...item, type: 'modified_true_false' as const, options: [{ id: 't', text: 'True' }, { id: 'f', text: 'False' }], correctOptionIds: ['t'] } : item);
             await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(modified), quizId]);
             const a = await start('clear-text-drafts');
             for (const [questionId, value] of [['q3', 'temporary term'], ['q4', 't']]) {
                 await answer(a.id, questionId!, [value!], false);
                 const cleared = await answer(a.id, questionId!, [], false);
-                expect(cleared.answers.find(entry => entry.questionId === questionId)?.selectedOptionIds).toEqual([]);
+                expect(attemptView(cleared, modified).answers.find(entry => entry.questionId === questionId)?.selectedOptionIds).toEqual([]);
             }
         } finally { await db.exec('rollback'); }
     });
