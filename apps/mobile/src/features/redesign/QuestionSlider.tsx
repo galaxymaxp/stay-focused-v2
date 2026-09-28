@@ -65,7 +65,7 @@ export function QuestionSlider({ current, count, onSettle, disabled = false }: {
       onResponderGrant={event => { setDragging(true); move(event); }}
       onResponderMove={move}
       onResponderTerminationRequest={() => intent.current !== 'horizontal'}
-      onResponderRelease={settle}
+      onResponderRelease={event => { move(event); settle(); }}
       onResponderTerminate={() => { intent.current = 'vertical'; setDragging(false); }}
       onTouchEnd={event => {
         // A tap can jump directly, but a scroll or an ambiguous drag cannot.

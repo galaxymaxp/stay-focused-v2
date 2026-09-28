@@ -138,8 +138,9 @@ describe('slider responder ownership', () => {
     expect(track().props.onResponderTerminationRequest()).toBe(false);
     expect(track().props.onMoveShouldSetResponderCapture(event(271, 190))).toBe(true);
     expect(track().props.accessibilityValue.now).toBe(10);
-    await act(async () => track().props.onResponderRelease());
-    expect(track().props.accessibilityValue.now).toBe(21);
+    // The final release coordinate can be newer than the last move sample.
+    await act(async () => track().props.onResponderRelease(event(278, 190)));
+    expect(track().props.accessibilityValue.now).toBe(22);
   });
 
   it('lets a dominant vertical gesture scroll and never jumps when that touch ends', async () => {
