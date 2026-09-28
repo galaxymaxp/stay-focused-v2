@@ -1,9 +1,11 @@
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "../../auth";
+import { openProviderAuth } from "../../auth/providerAuth";
+import type { OAuthProvider } from "../../auth/authTypes";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
@@ -26,6 +28,15 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { isSigningOut, session, signOut } = useAuth();
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkNotice, setLinkNotice] = useState<string | null>(null);
+  async function link(provider: OAuthProvider) {
+    if (linkBusy || isSigningOut) return;
+    setLinkBusy(true);
+    const result = await openProviderAuth(provider, true);
+    setLinkNotice(result.ok ? "Complete account linking in your browser. Your saved work stays with this account." : result.error.message);
+    setLinkBusy(false);
+  }
 
   return (
     <Screen>
@@ -41,6 +52,10 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           <Text style={styles.body} testID="settings-account-email">
             {session?.user.email ?? "No email on this account"}
           </Text>
+          <Text style={styles.body}>Link another sign-in method while signed in to keep your saved work in this account.</Text>
+          <Button disabled={linkBusy || isSigningOut} onPress={() => void link("google")} variant="secondary">Link Google</Button>
+          <Button disabled={linkBusy || isSigningOut} onPress={() => void link("microsoft")} variant="secondary">Link Microsoft</Button>
+          {linkNotice ? <Text accessibilityRole="alert" style={styles.body}>{linkNotice}</Text> : null}
           <Button
             fullWidth
             loading={isSigningOut}

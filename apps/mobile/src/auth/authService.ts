@@ -17,6 +17,7 @@ import type {
   SupabaseUser,
 } from "./authTypes";
 import { classifySignUpResult } from "./signUpOutcome";
+import { AUTH_CALLBACK_URL } from "./authCallback";
 import { getSupabaseClientResult } from "./supabaseClient";
 
 interface OAuthProviderConfig {
@@ -111,6 +112,7 @@ export async function signUpWithEmailPassword(
     const { data, error } = await client.data.auth.signUp({
       email: normalizedEmail,
       password,
+      options: { emailRedirectTo: AUTH_CALLBACK_URL },
     });
 
     if (error) {
@@ -234,8 +236,7 @@ export function onAuthStateChange(
   };
 }
 
-// Future login screens should open the returned URL with Expo AuthSession or
-// WebBrowser, then let Supabase exchange the redirect callback into a session.
+// providerAuth opens the browser and the auth/callback route performs PKCE exchange.
 export async function signInWithMicrosoft(
   options: OAuthSignInOptions,
 ): Promise<AuthResult<OAuthSignInStart>> {

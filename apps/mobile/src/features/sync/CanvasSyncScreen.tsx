@@ -28,6 +28,7 @@ type Load =
   | { readonly state: "loading" }
   | { readonly state: "error"; readonly message: string }
   | { readonly state: "disconnected" }
+  | { readonly state: "reconnect"; readonly connection: CanvasConnectionSummary }
   | { readonly state: "connected"; readonly connection: CanvasConnectionSummary; readonly courses: readonly CanvasCourseInventoryItem[] };
 
 /** Plain words for the student; codes and HTTP details stay out of the UI. */
@@ -87,8 +88,16 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
       setLoad({ state: "disconnected" });
       return;
     }
+    if (connection.data.connection.status !== "active") {
+      setLoad({ state: "reconnect", connection: connection.data.connection });
+      return;
+    }
     const courses = await listCanvasCourses(input);
     if (!courses.ok) {
+      if (courses.error.code === "invalid_canvas_token") {
+        setLoad({ state: "reconnect", connection: connection.data.connection });
+        return;
+      }
       if (!quiet) setLoad({ state: "error", message: friendlyError(courses.error) });
       return;
     }
@@ -139,7 +148,9 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
       title="Canvas courses"
       subtitle={connected ? load.connection.baseUrl.replace(/^https?:\/\//, "").replace(/\/$/, "") : undefined}
       onRefresh={() => void reload(true)}
-      actions={connected ? [{ label: "Disconnect Canvas", onPress: disconnect }] : []}
+      actions={connected || load.state === "reconnect" ? [{ label: "Replace access token", onPress: () => {
+        if (load.state === "connected") setLoad({ state: "reconnect", connection: load.connection });
+      } }, { label: "Disconnect Canvas", onPress: disconnect }] : []}
       headerBelow={connected ? <CourseSearch value={query} onChange={setQuery} /> : undefined}
     >
       {load.state === "loading" ? <SyncSkeleton /> : null}
@@ -151,6 +162,10 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
         </Surface>
       ) : null}
       {load.state === "disconnected" ? <ConnectCanvas onConnected={() => void reload(false)} request={request} /> : null}
+      {load.state === "reconnect" ? <>
+        <Notice>{load.connection.status === "disconnected" ? "Canvas is disconnected." : "Reconnect Canvas with a valid token to resume syncing."} Your saved sources, courses and study work remain available.</Notice>
+        <ConnectCanvas initialBaseUrl={load.connection.baseUrl} onConnected={() => void reload(false)} request={request} />
+      </> : null}
       {note ? <Notice>{note}</Notice> : null}
       {connected ? (
         <>
@@ -411,9 +426,9 @@ function CourseOptions({
   );
 }
 
-function ConnectCanvas({ onConnected, request }: { onConnected: () => void; request: () => { apiBaseUrl: string; accessToken: string } | null }) {
+function ConnectCanvas({ onConnected, request, initialBaseUrl = "" }: { initialBaseUrl?: string; onConnected: () => void; request: () => { apiBaseUrl: string; accessToken: string } | null }) {
   const { colors } = useTheme();
-  const [baseUrl, setBaseUrl] = useState("");
+  const [baseUrl, setBaseUrl] = useState(initialBaseUrl);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -442,7 +457,7 @@ function ConnectCanvas({ onConnected, request }: { onConnected: () => void; requ
   return (
     <Surface style={{ gap: spacing[3] }}>
       <Copy size="h3">Connect Canvas</Copy>
-      <Copy muted size="bodySmall">Use an access token from your own Canvas account (Account → Settings → New access token).</Copy>
+      <Copy muted size="bodySmall">In Canvas, open Account → Settings → Approved Integrations → New Access Token. Create a token for your own account and paste it here. Reconnect using the same account and school.</Copy>
       <TextInput accessibilityLabel="Canvas address" testID="canvas-base-url-input" value={baseUrl} onChangeText={setBaseUrl} placeholder="https://school.instructure.com" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} inputMode="url" style={field} />
       <TextInput accessibilityLabel="Canvas access token" testID="canvas-token-input" value={token} onChangeText={setToken} placeholder="Access token" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} secureTextEntry style={field} />
       <Action disabled={busy || !baseUrl.trim() || !token.trim()} onPress={() => void connect()} testID="canvas-connect-button">{busy ? "Connecting…" : "Connect"}</Action>

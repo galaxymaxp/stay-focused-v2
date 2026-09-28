@@ -183,15 +183,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const ownerUserId = session?.user.id;
       const result = await signOutSession();
       if (result.ok) {
+        applySession(null);
         if (ownerUserId) {
-          await Promise.all([
+          const cleanup = await Promise.allSettled([
             pauseOfflineProcessingIntents(ownerUserId),
             clearProcessingJobReferencesForOwner(ownerUserId),
             clearCanvasReviewerRecoveryForOwner(ownerUserId),
             purgeLocalLibraryForOwner(ownerUserId),
           ]);
+          if (cleanup.some((entry) => entry.status === "rejected")) {
+            setError({ code: "sign_out_failed", message: "Signed out. Some offline data could not be cleared; sign in again to retry cleanup." });
+          }
         }
-        applySession(null);
       } else {
         setError(result.error);
       }

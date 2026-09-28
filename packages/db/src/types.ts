@@ -864,10 +864,10 @@ export interface Database {
           canvas_user_id: string;
           canvas_user_name: string;
           canvas_user_email: string | null;
-          token_ciphertext: string;
-          token_iv: string;
-          token_auth_tag: string;
-          encryption_version: string;
+          token_ciphertext: string | null;
+          token_iv: string | null;
+          token_auth_tag: string | null;
+          encryption_version: string | null;
           status: string;
           last_verified_at: string;
           last_error_code: string | null;
@@ -881,10 +881,10 @@ export interface Database {
           canvas_user_id: string;
           canvas_user_name: string;
           canvas_user_email?: string | null;
-          token_ciphertext: string;
-          token_iv: string;
-          token_auth_tag: string;
-          encryption_version: string;
+          token_ciphertext: string | null;
+          token_iv: string | null;
+          token_auth_tag: string | null;
+          encryption_version: string | null;
           status?: string;
           last_verified_at: string;
           last_error_code?: string | null;
@@ -898,10 +898,10 @@ export interface Database {
           canvas_user_id?: string;
           canvas_user_name?: string;
           canvas_user_email?: string | null;
-          token_ciphertext?: string;
-          token_iv?: string;
-          token_auth_tag?: string;
-          encryption_version?: string;
+          token_ciphertext?: string | null;
+          token_iv?: string | null;
+          token_auth_tag?: string | null;
+          encryption_version?: string | null;
           status?: string;
           last_verified_at?: string;
           last_error_code?: string | null;
@@ -5175,6 +5175,14 @@ export interface Database {
           created_at: string;
           updated_at: string;
         }>;
+      };
+      disconnect_canvas_connection_v1: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      mark_canvas_reconnect_required_v1: {
+        Args: { p_user_id: string; p_connection_id: string; p_expected_updated_at: string };
+        Returns: undefined;
       };
       update_canvas_sync_run_progress: {
         Args: {

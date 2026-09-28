@@ -23,6 +23,7 @@ import {
   createCanvasClient,
   decryptConnectionToken,
 } from "@/lib/canvas-routes";
+import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import {
   beginCanvasSyncUnitAttempt,
   CANVAS_SYNC_JOB_DEADLINE_MS,
@@ -122,6 +123,9 @@ export async function executeCanvasSyncUnit(
       status: completed?.status === "cancelled" ? "cancelled" : "succeeded",
     };
   } catch (error) {
+    if (error instanceof CanvasClientError && error.code === "canvas_unauthorized") {
+      await markCanvasReconnectRequired(client, context.connection);
+    }
     return handleUnitFailure(client, unit, input.workerId, error);
   }
 }

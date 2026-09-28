@@ -27,6 +27,7 @@ import {
   type SyncRejection,
 } from "../../services/canvasAccountSync";
 import {
+  getCanvasConnection,
   getCanvasCoursePreferences,
   getCanvasSyncJob,
   listCanvasCourses,
@@ -277,6 +278,8 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
   const resume = useCallback(async () => {
     const input = request();
     if (!input || running.current) return;
+    const connection = await getCanvasConnection(input);
+    if (!connection.ok || connection.data.connection?.status !== "active") return;
     const { jobs } = await reconcileCanvasSyncJobs(input);
     const active = jobs.filter((job) => !isFinishedSyncJob(job));
     if (active.length > 0 && live.current) {

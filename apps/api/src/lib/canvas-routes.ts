@@ -326,6 +326,9 @@ export function createCapabilityInserts({
 }
 
 export function decryptConnectionToken(row: CanvasConnectionRow): string {
+  if (row.status !== "active" || !row.token_ciphertext || !row.token_iv || !row.token_auth_tag || !row.encryption_version) {
+    throw new CanvasClientError("canvas_unauthorized", "Reconnect Canvas before synchronizing.");
+  }
   return decryptCanvasToken({
     ciphertext: row.token_ciphertext,
     iv: row.token_iv,
@@ -531,6 +534,7 @@ export async function replaceConnectionWithCapabilities({
   | { readonly ok: true; readonly row: CanvasConnectionSummaryRow }
   | { readonly ok: false }
 > {
+  if (!connection.token_ciphertext || !connection.token_iv || !connection.token_auth_tag || !connection.encryption_version) return { ok: false };
   const { data, error } = await client
     .rpc("replace_canvas_connection_with_capabilities", {
       p_base_url: connection.base_url,

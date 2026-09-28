@@ -23,6 +23,7 @@ import {
   mapCanvasClientError,
   readConnection,
 } from "@/lib/canvas-routes";
+import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
 const COURSE_COLUMNS =
@@ -108,19 +109,20 @@ export async function loadCanvasCourseInventory({
   readonly now?: Date;
   readonly userId: string;
 }): Promise<CanvasCourseSelectionResult<CanvasCourseInventory>> {
-  const connection = await loadConnectionAndToken(client, userId);
+  const connection = await loadConnectionAndToken(client, userId, allowStoredFallback);
   if (!connection.ok) {
     return connection;
   }
 
   let liveCourses: readonly CanvasCourse[] | null;
   try {
-    liveCourses = await createCanvasClient(
+    liveCourses = connection.value.token === null ? null : await createCanvasClient(
       connection.value.connection.base_url,
       connection.value.token,
     ).listCourseInventory();
   } catch (error) {
     const mapped = mapCanvasClientError(error);
+    if (mapped.code === "invalid_canvas_token") await markCanvasReconnectRequired(client, connection.value.connection);
     if (!allowStoredFallback) {
       return {
         ok: false,
@@ -417,10 +419,11 @@ export async function loadSelectedSyncCourse({
 async function loadConnectionAndToken(
   client: SupabaseClient<Database>,
   userId: string,
+  allowInactive: boolean,
 ): Promise<
   CanvasCourseSelectionResult<{
     readonly connection: CanvasConnectionRow;
-    readonly token: string;
+    readonly token: string | null;
   }>
 > {
   const connection = await readConnection(client, userId, CONNECTION_SECRET_COLUMNS);
@@ -439,6 +442,10 @@ async function loadConnectionAndToken(
       code: "canvas_connection_missing",
       message: "Connect Canvas before loading courses.",
     };
+  }
+  if (connection.row.status !== "active") {
+    if (allowInactive) return { ok: true, value: { connection: connection.row, token: null } };
+    return { ok: false, status: 409, code: "invalid_canvas_token", message: "Reconnect Canvas to resume synchronization. Your saved work remains available." };
   }
 
   try {

@@ -18,7 +18,7 @@ import { classifyStoredCanvasCourse, loadCanvasCourseInventory } from "./canvas-
 
 type Row = Record<string, unknown>;
 const now = new Date("2026-09-24T00:00:00Z");
-const connection = { id: "connection", user_id: "owner", base_url: "https://canvas.example" };
+const connection = { id: "connection", user_id: "owner", base_url: "https://canvas.example", status: "active" };
 function courseRow(id: string, overrides: Row = {}): Row {
   return { id, user_id: "owner", canvas_connection_id: "connection", canvas_course_id: `canvas-${id}`, name: id, course_code: id, workflow_state: "available", start_at: null, end_at: null, ...overrides };
 }
@@ -84,6 +84,16 @@ describe("loadCanvasCourseInventory stored fallback", () => {
     const { client } = fakeClient(tables());
     const result = await loadCanvasCourseInventory({ client, now, userId: "owner" });
     expect(result).toMatchObject({ ok: false, status: 503, code: "canvas_unavailable" });
+  });
+  it.each(["disconnected", "reconnect_required"])("serves saved courses without using %s credentials", async (status) => {
+    mocks.readConnection.mockResolvedValue({ ok: true, row: { ...connection, status } });
+    const { client, writes } = fakeClient(tables());
+    const strict = await loadCanvasCourseInventory({ client, now, userId: "owner" });
+    expect(strict).toMatchObject({ ok: false, status: 409, code: "invalid_canvas_token" });
+    const saved = await loadCanvasCourseInventory({ client, now, userId: "owner", allowStoredFallback: true });
+    expect(saved.ok && saved.value.classificationSource).toBe("stored");
+    expect(mocks.listCourseInventory).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
   });
 
   it("serves owner-scoped stored courses and database sync state for read-only callers", async () => {

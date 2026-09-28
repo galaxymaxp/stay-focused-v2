@@ -27,6 +27,7 @@ import type {
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fingerprintCanvasCourseSnapshot } from "@/lib/canvas-sync-fingerprint";
+import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import {
   createCanvasFileInventoryPayload,
   type CanvasFileInventoryPayload,
@@ -451,7 +452,7 @@ export async function syncCanvasAcademicGraph({
       message: "Canvas connection could not be loaded.",
     };
   }
-  if (!connection.row) {
+  if (!connection.row || connection.row.status !== "active") {
     return {
       ok: false,
       status: 404,
@@ -528,6 +529,7 @@ export async function syncCanvasAcademicGraph({
     courses = await canvas.listCourses();
   } catch (error) {
     const mapped = mapCanvasClientError(error);
+    if (mapped.code === "invalid_canvas_token") await markCanvasReconnectRequired(client, connectionRow);
     const failureCode = syncFailureCodeForCanvasError(error);
     const resourceCounts = emptyResourceCounts();
     const totals = {

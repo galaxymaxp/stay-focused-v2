@@ -189,7 +189,7 @@ export async function loadCanvasSyncCheckpointContext(
         .eq("user_id", job.user_id)
         .maybeSingle(),
     ]);
-  if (connectionError || courseError || !connection || !course) return null;
+  if (connectionError || courseError || !connection || !course || connection.status !== "active") return null;
   return {
     job,
     connection: connection as CanvasConnectionRow,

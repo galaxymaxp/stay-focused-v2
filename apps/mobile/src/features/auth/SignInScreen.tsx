@@ -3,6 +3,8 @@ import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "../../auth";
+import { openProviderAuth, requestPasswordReset } from "../../auth/providerAuth";
+import type { OAuthProvider } from "../../auth/authTypes";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
@@ -13,11 +15,6 @@ interface SignInScreenProps {
   readonly onCreateAccount: () => void;
 }
 
-/**
- * Moved out of the former `app/index.tsx` switcher. Behavior, copy, test IDs,
- * and styling are unchanged; the only addition is the account-creation entry
- * point, without which the sign-up route would be unreachable.
- */
 export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
   const colors = useLegacyTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -25,10 +22,28 @@ export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
   const { clearError, error, isSigningIn, signInWithEmailPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [providerBusy, setProviderBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const handleSignIn = async () => {
     await signInWithEmailPassword(email, password);
+    setPassword("");
   };
+  async function providerSignIn(provider: OAuthProvider) {
+    if (providerBusy || isSigningIn) return;
+    setProviderBusy(true);
+    setNotice(null);
+    const result = await openProviderAuth(provider);
+    setProviderBusy(false);
+    if (!result.ok) setNotice(result.error.message);
+  }
+  async function resetPassword() {
+    if (providerBusy || isSigningIn) return;
+    setProviderBusy(true);
+    const result = await requestPasswordReset(email);
+    setProviderBusy(false);
+    setNotice(result.ok ? "If this account exists, a reset link will arrive by email. Open it on this device." : result.error.message);
+  }
 
   return (
     <Screen centered contentContainerStyle={styles.authContent}>
@@ -89,6 +104,7 @@ export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
           <Button
             fullWidth
             loading={isSigningIn}
+            disabled={providerBusy}
             onPress={handleSignIn}
             testID="auth-submit-button"
             variant="primary"
@@ -97,12 +113,13 @@ export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
           </Button>
 
           <View style={styles.divider} />
+          {notice ? <Text accessibilityRole="alert" style={styles.oauthNote}>{notice}</Text> : null}
+          <Button fullWidth disabled={providerBusy || isSigningIn} onPress={() => void providerSignIn("google")} testID="auth-google-button" variant="secondary">Continue with Google</Button>
+          <Button fullWidth disabled={providerBusy || isSigningIn} onPress={() => void providerSignIn("microsoft")} testID="auth-microsoft-button" variant="secondary">Continue with Microsoft</Button>
+          <Button fullWidth disabled={providerBusy || isSigningIn} onPress={() => void resetPassword()} testID="auth-reset-button" variant="ghost">Forgot password?</Button>
           <Button fullWidth onPress={onCreateAccount} variant="ghost">
             Create an account
           </Button>
-          <Text style={styles.oauthNote}>
-            Microsoft and Google sign-in are coming later.
-          </Text>
         </Card>
       </KeyboardAvoidingView>
     </Screen>
