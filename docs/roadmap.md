@@ -1,5 +1,15 @@
 # Roadmap
 
+## B37.2 non-Canvas acceptance and build gate (2026-09-28)
+
+**PARTIAL.** Non-Canvas sources (Text, Camera, Local File) and the 100-item Quiz pass physically after the immutable-source claim fix and two extraction-panel fixes. Canvas sync is blocked by the Vercel Workflow quota, so B37 closure and the signed preview APK wait for a fresh Canvas sync and a disconnect/reconnect check. Canvas sync jobs still run on Vercel Workflow; moving them to the Google worker would remove this failure mode. Consider this for B38. [Ledger](ai/acceptance/b37/study-experience-overhaul.md).
+
+## B37.2 continuation in progress (2026-09-28)
+
+Authentication and Canvas lifecycle implementation is deployed; email/password restoration, native S256, invalid Canvas token handling and same-account replacement have fresh device evidence. Owner/history fingerprints are retained. Resend delivered one deduplicated server-originated test message; a verified sender domain is still needed for general student delivery. Manual linking readiness now returns 200 after the user's saved setting change. Google/Microsoft device acceptance is continuing.
+
+The normal quota admitted the fresh VPN 30 Mixed (30 persisted, two calls, no repairs) and Firewalls 100 Mixed (batch 4 duplicate rejection after seven calls, no published result). Finish provider flows, Canvas disconnect/reconnect/sync, Queue/Library reopen and Text/Camera/Local File physical acceptance before deciding B37 closure. Study Assist latency optimization remains deferred. API `dpl_6A3CygzdmL4u3jzUd9zkKZZb8afL`, unchanged private worker `generation-worker-00009-jzb`, Canvas migration `20260928001117`; 0 EAS builds, no push, `tmp/` untouched. [Ledger](ai/acceptance/b37/study-experience-overhaul.md). Earlier quota-stop checkpoints remain historical.
+
 ## B37.2 opening production gate (2026-09-28)
 
 **PARTIAL — migration/deployment/small-source rejection verified; fresh 30 Mixed blocked at the existing daily quota (25/25), so B37.2 is NOT STARTED.**

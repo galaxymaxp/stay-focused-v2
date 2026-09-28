@@ -1,5 +1,15 @@
 # Current Sprint
 
+## B37.2 non-Canvas acceptance and build gate (2026-09-28)
+
+**PARTIAL.** Text, Camera and Local File pass on realme after two fixes. The API (`dpl_Ehds5J5evWG1zwj7JT68CZaYZRnR`) now claims unedited Camera/PDF text as a new revision, because `source_versions` is immutable and the old path returned 503. The mobile source panel now shows extraction failures and applies reused extractions. The 100-item Firewalls Quiz produced 100 unique, sourced items in 10 bounded calls, and the 30- and 100-item Quizzes reopen physically. The recovery email reached the owner via the Resend test sender, and Google sign-out/sign-in keeps the same owner. The stale Canvas provider test mock is fixed (692/692 mobile, 1066 API). **Canvas sync is BLOCKED** by the Vercel Workflow usage limit (ThrottleError; stuck `queued` jobs return 409 until about 23:30Z). **No EAS build.** Next: once the quota clears, run a Canvas sync plus disconnect/reconnect, then build one preview APK (it needs native `expo-crypto`). [Evidence](acceptance/b37/study-experience-overhaul.md). No push; `tmp/` untouched.
+
+## B37.2 continuation in progress (2026-09-28)
+
+Core implementation is deployed. Email/password sign-out/sign-in and restored owner session pass; the locally upgraded realme client proves native S256 with 0 EAS builds. Manual linking is now ready (fresh 200 after the user saved the toggle), and Google/Microsoft physical acceptance is continuing. Invalid Canvas credential handling and user-entered same-account replacement preserve original owner/connection IDs and historical data fingerprints. Hostname-only Canvas input adds HTTPS. Live disconnect/reconnect and sync remain pending.
+
+One server-originated Resend test message is delivered; replay deduplicates. No verified sender domain exists, so broad student delivery remains unproven. Fresh 30 Mixed persisted exactly 30 with two calls/no repairs. Fresh capacity-100 Firewalls stopped in batch 4 on duplicate validation after seven calls and published no Quiz. Next: provider completion, Canvas disconnect/reconnect, physical Queue/Library reopen and Text/Camera/Local File acceptance; then final B37 verdict. API `dpl_6A3CygzdmL4u3jzUd9zkKZZb8afL`, migration `20260928001117`, worker unchanged. [Evidence](acceptance/b37/study-experience-overhaul.md). Historical quota-stop sections below are superseded. `tmp/` untouched; no push.
+
 ## B37.2 opening production gate (2026-09-28)
 
 **PARTIAL — migration/deployment/small-source rejection verified; fresh 30 Mixed blocked at the existing daily quota (25/25), so B37.2 is NOT STARTED.**

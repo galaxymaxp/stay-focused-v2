@@ -1,5 +1,17 @@
 # Current State
 
+## B37.2 non-Canvas acceptance and build gate (2026-09-28)
+
+**PARTIAL.** Production API `dpl_Ehds5J5evWG1zwj7JT68CZaYZRnR` (commit `f729596`) fixes the Camera/Local File source claim, which returned 503 because `source_versions` is immutable. Text, Camera and Local File each reach Reviewer, Quiz and Library, and persist through force-stop. The 100-item Quiz passes (100/100 unique, sourced, 10 calls). Recovery email delivery works through the Resend test sender (owner only; no verified domain). **Canvas sync is BLOCKED** by the Vercel Workflow usage limit. No EAS build; the installed preview APK lacks `expo-crypto`, so provider sign-in fails closed there until a new native build ships. [Evidence](ai/acceptance/b37/study-experience-overhaul.md).
+
+## B37.2 continuation in progress (2026-09-28)
+
+Core auth, owner-safe supported linking, Canvas credential lifecycle and server-only Resend acceptance are implemented. API `dpl_6A3CygzdmL4u3jzUd9zkKZZb8afL` is READY; health 200 and signed-out protected routes 401. Forward Canvas migration is recorded once as `20260928001117`; the existing private worker is unchanged. Email/password sign-out/sign-in and session restoration pass on realme. The upgraded local test client proves native S256 PKCE; **0 EAS builds**. After the user saved the manual-linking setting, its fresh production probe returned 200. Google/Microsoft physical flows are continuing.
+
+Invalid Canvas token handling and same-account replacement pass physically; original owner/connection and all historical source/course/task/Reviewer/Quiz/activity ID fingerprints are preserved. Hostname-only address input adds HTTPS. Live disconnect/reconnect, sync and remaining source paths are pending. One real Resend message is delivered and replay is deduplicated; a test sender with no verified domains does not establish broad student delivery.
+
+Fresh VPN 30 Mixed persisted exactly 30 items in two calls with no repairs; physical Queue/Library reopen is pending. Fresh capacity-100 Firewalls failed duplicate validation in batch 4 after seven bounded calls and published no Quiz. No automatic retry or weakened validation. Next: finish provider auth, Canvas disconnect/reconnect and Text/Camera/Local File physical acceptance, then reconcile the final B37 verdict. [Current evidence](ai/acceptance/b37/study-experience-overhaul.md). The older quota-stop sections below are historical. `tmp/` untouched; no push.
+
 ## B37.2 opening production gate (2026-09-28)
 
 **PARTIAL — migration/deployment/small-source rejection verified; fresh 30 Mixed blocked at the existing daily quota (25/25), so B37.2 is NOT STARTED.**
