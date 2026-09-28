@@ -1,5 +1,11 @@
 # Roadmap
 
+## B37.1 pre-APK polish and B38 order (2026-09-28)
+
+**B37.1 PARTIAL; B37 PARTIAL.** Reviewer emphasis, Matching, Quiz controls/state, Activities and the clarified export scope are implemented locally. Realme Activity persistence and generated Activity PDF/DOCX/PPTX plus Reviewer PDF passed; Quiz production/physical and offline-attempt acceptance remain open. Do not make the EAS build yet. [B37.1 evidence](ai/acceptance/b37/pre-apk-study-experience-polish.md).
+
+After B37.1 passes, **B38 — Durable Canvas Sync Migration to Google Worker** is next. Keep Mobile → authenticated Vercel API → durable Supabase job → internal Google worker → Canvas → canonical Supabase data. Vercel owns validation, ownership, job start/status and lightweight API; the existing Google worker owns pagination, courses/modules/instructional files/Pages/tasks/announcements, downloads, checkpointed ingestion and bounded retry. Supabase owns job state, RLS, provenance, normalized data and generated artifacts. Design for interruption recovery, observable progress, isolated material failures, idempotent repeat sync, historical data retention and disconnect/reconnect. Preserve instructional material → Generate, deadline work → Tasks and announcements → Announcements. Keep worker credentials out of Mobile and logs. **B38 is not implemented.** Then run production Canvas lifecycle acceptance, make one new EAS preview APK and finish physical-device acceptance.
+
 ## B37.2 non-Canvas acceptance and build gate (2026-09-28)
 
 **PARTIAL.** Non-Canvas sources (Text, Camera, Local File) and the 100-item Quiz pass physically after the immutable-source claim fix and two extraction-panel fixes. Canvas sync is blocked by the Vercel Workflow quota, so B37 closure and the signed preview APK wait for a fresh Canvas sync and a disconnect/reconnect check. Canvas sync jobs still run on Vercel Workflow; moving them to the Google worker would remove this failure mode. Consider this for B38. [Ledger](ai/acceptance/b37/study-experience-overhaul.md).

@@ -1,5 +1,11 @@
 # Current State
 
+## B37.1 pre-APK study experience polish (2026-09-28)
+
+**PARTIAL; B37 remains PARTIAL.** Local code adds AI-authored Reviewer emphasis (validated sparse exact spans), 3–6-pair Matching generation/scoring, Quiz question navigation and draggable slider, reveal with assisted scoring, server-persisted attempt position/state, and locally persisted Activity responses/completion. The user clarified export scope: generated Activities in Library support PDF, DOCX and PPTX; Reviewers support PDF only. A realme dev-client run proved Activity autosave/completion after force-stop and three Activity files, plus Reviewer PDF. New Quiz RPC migrations and API remain local; offline active Quiz attempts, fresh generated Reviewer emphasis/Matching, and the complete physical Quiz path remain unaccepted. No EAS build. [B37.1 ledger](ai/acceptance/b37/pre-apk-study-experience-polish.md).
+
+Once B37.1 passes, B38 will move durable Canvas sync execution to the existing Google worker. Mobile calls an authenticated Vercel API; Vercel validates owner and creates/queries a durable Supabase job; the internal Google worker paginates Canvas and performs bounded, checkpointed ingestion; Supabase holds owner-scoped status and canonical data. Preserve routing, provenance, history, retries, progress, and disconnect/reconnect. This is an architecture decision only. Production Canvas lifecycle acceptance, then one new EAS preview APK and final physical acceptance, follow B38.
+
 ## B37.2 non-Canvas acceptance and build gate (2026-09-28)
 
 **PARTIAL.** Production API `dpl_Ehds5J5evWG1zwj7JT68CZaYZRnR` (commit `f729596`) fixes the Camera/Local File source claim, which returned 503 because `source_versions` is immutable. Text, Camera and Local File each reach Reviewer, Quiz and Library, and persist through force-stop. The 100-item Quiz passes (100/100 unique, sourced, 10 calls). Recovery email delivery works through the Resend test sender (owner only; no verified domain). **Canvas sync is BLOCKED** by the Vercel Workflow usage limit. No EAS build; the installed preview APK lacks `expo-crypto`, so provider sign-in fails closed there until a new native build ships. [Evidence](ai/acceptance/b37/study-experience-overhaul.md).

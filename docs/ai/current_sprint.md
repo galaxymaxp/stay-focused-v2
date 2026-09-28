@@ -1,5 +1,11 @@
 # Current Sprint
 
+## B37.1 pre-APK study experience polish (2026-09-28)
+
+**PARTIAL; remain on B37.1.** Local Reviewer emphasis, multi-pair Matching, Quiz navigation/slider/reveal, server-owned study state, Activity response autosave/completion, and export changes are implemented. The clarified export scope is **generated Activities in Library: PDF, DOCX, PPTX; Reviewer: PDF only**. The realme retained an Activity response and completion through force-stop and saved all three Activity formats plus a Reviewer PDF. New Quiz migrations/API are not deployed, and offline Quiz attempts and full physical Quiz acceptance remain open; no final B37 verdict or EAS build is claimed. [B37.1 evidence](acceptance/b37/pre-apk-study-experience-polish.md).
+
+The next milestone, **after B37.1 passes**, is B38: move durable Canvas sync execution from Vercel Workflow to the existing Google worker, with Vercel retaining the authenticated API and Supabase retaining owner-scoped job/data state. Production Canvas lifecycle acceptance follows B38, then one new EAS preview APK and final physical acceptance. B38 is a recorded decision, not implemented. B37 remains PARTIAL.
+
 ## B37.2 non-Canvas acceptance and build gate (2026-09-28)
 
 **PARTIAL.** Text, Camera and Local File pass on realme after two fixes. The API (`dpl_Ehds5J5evWG1zwj7JT68CZaYZRnR`) now claims unedited Camera/PDF text as a new revision, because `source_versions` is immutable and the old path returned 503. The mobile source panel now shows extraction failures and applies reused extractions. The 100-item Firewalls Quiz produced 100 unique, sourced items in 10 bounded calls, and the 30- and 100-item Quizzes reopen physically. The recovery email reached the owner via the Resend test sender, and Google sign-out/sign-in keeps the same owner. The stale Canvas provider test mock is fixed (692/692 mobile, 1066 API). **Canvas sync is BLOCKED** by the Vercel Workflow usage limit (ThrottleError; stuck `queued` jobs return 409 until about 23:30Z). **No EAS build.** Next: once the quota clears, run a Canvas sync plus disconnect/reconnect, then build one preview APK (it needs native `expo-crypto`). [Evidence](acceptance/b37/study-experience-overhaul.md). No push; `tmp/` untouched.

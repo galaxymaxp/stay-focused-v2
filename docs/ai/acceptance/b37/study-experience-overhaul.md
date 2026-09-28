@@ -1,5 +1,9 @@
 # B37 study experience overhaul - 2026-09-27
 
+## B37.1 pre-APK polish checkpoint (2026-09-28)
+
+**PARTIAL.** The current Reviewer, Quiz, Activity and clarified export implementation and physical evidence are in [the B37.1 ledger](pre-apk-study-experience-polish.md). B37 remains PARTIAL; B38 is next only after B37.1 passes. The final EAS build follows B38 and production Canvas lifecycle acceptance.
+
 ## B37.2 non-Canvas source acceptance and build gate (2026-09-28, continued)
 
 **PARTIAL — Text, Camera and Local File pass physically after two production fixes; 100-item Quiz passes; Canvas sync is BLOCKED by the Vercel Workflow usage limit. No EAS build was created.** Starting HEAD `ba1fb6e71d8aee30aa8568b8e52f5f1b5449ee35` with the OAuth/PKCE, Settings/Queue and Canvas-hostname work uncommitted. The work was split into `d3d6984` (auth callback + fail-closed PKCE), `f50bf4a` (Settings/Queue), `5d40378` (Canvas hostname) and `b398db2` (Canvas test mock), followed by `f729596`, `c9391ed` and `c5e8ae7` below. Device: realme RMX3151, b37debug client on Metro (`--dev-client --offline`, production API). `tmp/` and the Resend credential backup were untouched. No push.
