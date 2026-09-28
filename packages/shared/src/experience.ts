@@ -154,6 +154,8 @@ export type LibraryArtifactType = 'reviewer' | 'quiz' | 'activity_output';
 export type GenerationState = 'queued' | 'preparing' | 'generating' | 'finalizing' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
 export interface LibraryArtifactSummary {
   readonly quiz?: import('./quiz').QuizSummary;
+  /** Device-local editable worksheet state; absent on historical artifacts. */
+  readonly activityStudyStatus?: 'not_started' | 'in_progress' | 'completed';
   readonly id: string;
   readonly type: LibraryArtifactType;
   readonly title: string;
@@ -197,6 +199,12 @@ export interface ReviewerReaderModel {
       readonly title: string;
       readonly explanation: string;
       readonly keyPoints: readonly string[];
+      readonly emphasis?: readonly {
+        readonly target: 'explanation' | 'key_point';
+        readonly index: number;
+        readonly text: string;
+        readonly style: 'bold' | 'underline' | 'highlight';
+      }[];
       readonly evidence: readonly { readonly kind: 'code' | 'formula' | 'table' | 'result' | 'example' | 'source'; readonly text: string }[];
     }[];
   }[];

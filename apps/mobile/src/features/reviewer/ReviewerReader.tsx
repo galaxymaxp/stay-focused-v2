@@ -51,8 +51,8 @@ import {
   type ReviewerMatch,
 } from "./reviewerNavigation";
 import { createGenerationIntent } from "../../services/generationRecovery";
-import { memoryKeywordRanges } from "./memoryKeywords";
 import { QUIZ_DIFFICULTIES, quizIntentInput, reviewerArtifactIdFromLibraryId } from "../redesign/quizRequest";
+import { ExportSheet } from '../export/ExportSheet';
 
 type Measurable = View | Text;
 /** Keeps a found line below the header/search bar with readable context above it. */
@@ -99,6 +99,7 @@ export function ReviewerReaderScreen({
 
   const [query, setQuery] = useState("");
   const [quizOpen, setQuizOpen] = useState(openQuizInitially);
+  const [exportOpen, setExportOpen] = useState(false);
   const { session } = useAuth();
   const [assistPassage, setAssistPassage] = useState<{ section: string; block: string; point?: number } | null>(null);
   const assistTarget = useMemo<AssistTarget | null>(() => {
@@ -237,30 +238,25 @@ export function ReviewerReaderScreen({
     if (node) segmentRefs.current.set(id, node);
     else segmentRefs.current.delete(id);
   };
-  const render = (id: string, text: string) => {
+  const render = (id: string, text: string, marks: readonly { text: string; style: 'bold' | 'underline' | 'highlight' }[] = []) => {
     const entry = bySegment.get(id);
-    if (!entry) return text;
-    const active = matches[activeMatch]?.segmentId === id ? activeMatch - entry.first : null;
-    return highlightRuns(text, entry.items, active).map((run, index) =>
-      run.kind === "plain" ? (
-        run.text
-      ) : (
-        <Text key={index} style={{ backgroundColor: run.kind === "active" ? colors.findActive : colors.findMatch, color: colors.textPrimary }}>
-          {run.text}
-        </Text>
-      ),
-    );
-  };
-  const renderKeyPoint = (id: string, text: string, context: readonly string[]) => {
-    if (bySegment.has(id)) return render(id, text);
-    const ranges = memoryKeywordRanges(text, context);
-    if (!ranges.length) return text;
+    if (entry) {
+      const active = matches[activeMatch]?.segmentId === id ? activeMatch - entry.first : null;
+      return highlightRuns(text, entry.items, active).map((run, index) =>
+        run.kind === "plain" ? run.text : <Text key={index} style={{ backgroundColor: run.kind === "active" ? colors.findActive : colors.findMatch, color: colors.textPrimary }}>{run.text}</Text>,
+      );
+    }
+    if (!marks.length) return text;
+    const ranges = marks.map(mark => ({ ...mark, start: text.indexOf(mark.text) }))
+      .filter(mark => mark.start >= 0).sort((a, b) => a.start - b.start);
     const runs: ReactNode[] = [];
     let from = 0;
     ranges.forEach((range, index) => {
+      if (range.start < from) return;
       if (range.start > from) runs.push(text.slice(from, range.start));
-      runs.push(<Text key={index} style={{ fontWeight: "700", textDecorationLine: "underline" }}>{text.slice(range.start, range.end)}</Text>);
-      from = range.end;
+      runs.push(<Text key={index} style={range.style === 'highlight' ? { backgroundColor: colors.findMatch, color: colors.textPrimary } :
+        range.style === 'underline' ? { textDecorationLine: 'underline', textDecorationColor: colors.textPrimary } : { fontWeight: '700' }}>{range.text}</Text>);
+      from = range.start + range.text.length;
     });
     if (from < text.length) runs.push(text.slice(from));
     return runs;
@@ -340,6 +336,7 @@ export function ReviewerReaderScreen({
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
         {anchors.length > 1 ? <Copy muted size="caption">{anchors.length} topics</Copy> : null}
         <View style={{ paddingTop: spacing[2] }}><Action hero onPress={() => setQuizOpen(true)}>Generate Quiz</Action></View>
+        <Action secondary onPress={() => setExportOpen(true)}>Export</Action>
         <Copy muted size="caption">Tap a key point to select it. Hold its group to select all.</Copy>
       </View>
       <View
@@ -382,7 +379,7 @@ export function ReviewerReaderScreen({
                 ) : null}
                 <PassageMark mark={markFor(block.id)} onPress={() => openAssist(section.id, block.id)}>
                   <Text ref={register(segmentIds.explanation(block.id))} accessibilityRole="button" accessibilityHint="Opens Study Assist for this concept" onPress={() => openAssist(section.id, block.id)} style={{ color: colors.textPrimary, fontSize: 16, lineHeight: 26 }}>
-                    {render(segmentIds.explanation(block.id), block.explanation)}
+                    {render(segmentIds.explanation(block.id), block.explanation, block.emphasis?.filter(mark => mark.target === 'explanation' && mark.index === 0) ?? [])}
                   </Text>
                 </PassageMark>
                 {block.keyPoints.length > 0 ? (
@@ -411,7 +408,7 @@ export function ReviewerReaderScreen({
                               onLongPress={() => startPicking(section.id, block.id, block.keyPoints)}
                               style={{ flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 24 }}
                             >
-                              {renderKeyPoint(segmentIds.keyPoint(block.id, index), point, [block.title, section.title])}
+                              {render(segmentIds.keyPoint(block.id, index), point, block.emphasis?.filter(mark => mark.target === 'key_point' && mark.index === index) ?? [])}
                             </Text>
                             {mark === "pending" ? <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 2 }} /> : null}
                             {mark === "fresh" ? <Sparkles size={16} color={colors.green} strokeWidth={2} style={{ marginTop: 4 }} /> : null}
@@ -441,6 +438,7 @@ export function ReviewerReaderScreen({
         ))}
       </View>
       {quizOpen ? <QuizFromReviewerSheet artifact={artifact} reviewer={reviewer} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
+      {exportOpen ? <ExportSheet detail={{ artifact, reviewer }} onClose={() => setExportOpen(false)} /> : null}
       {assistPassage ? <StudyAssistSheet key={openKey ?? "missing"} target={assistTarget} onClose={() => setAssistPassage(null)} /> : null}
     </Page>
   );

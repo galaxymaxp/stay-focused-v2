@@ -309,6 +309,13 @@ export interface ReviewerEvidenceBlock {
 export interface SourceGroundedCore {
   readonly explanation: string;
   readonly keyPoints: readonly string[];
+  /** AI-selected exact substrings of the visible text. Older artifacts omit this. */
+  readonly emphasis?: readonly {
+    readonly target: 'explanation' | 'key_point';
+    readonly index: number;
+    readonly text: string;
+    readonly style: 'bold' | 'underline' | 'highlight';
+  }[];
   readonly evidence?: readonly ReviewerEvidenceBlock[];
 }
 

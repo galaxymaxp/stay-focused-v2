@@ -174,7 +174,17 @@ export function reviewerReader(payload: unknown, summary: LibraryArtifactSummary
         if (!['code', 'formula', 'table', 'result', 'example', 'source'].includes(String(e.kind)) || typeof e.text !== 'string') throw new ExperienceFailure(503, 'unavailable');
         return { kind: e.kind as 'code' | 'formula' | 'table' | 'result' | 'example' | 'source', text: e.text };
       }) : [];
-      return { id: item.id, title: item.title, explanation: core.explanation, keyPoints: core.keyPoints as string[], evidence };
+      const emphasis = Array.isArray(core.emphasis) ? core.emphasis.map((value: unknown) => {
+        const mark = record(value);
+        if (!['explanation', 'key_point'].includes(String(mark.target)) || !Number.isInteger(mark.index) ||
+          !['bold', 'underline', 'highlight'].includes(String(mark.style)) || typeof mark.text !== 'string') throw new ExperienceFailure(503, 'unavailable');
+        const body = mark.target === 'explanation' && mark.index === 0 ? core.explanation as string :
+          mark.target === 'key_point' ? (core.keyPoints as string[])[mark.index as number] : undefined;
+        if (!body?.includes(mark.text) || !mark.text.trim()) throw new ExperienceFailure(503, 'unavailable');
+        return { target: mark.target as 'explanation' | 'key_point', index: mark.index as number,
+          text: mark.text, style: mark.style as 'bold' | 'underline' | 'highlight' };
+      }) : [];
+      return { id: item.id, title: item.title, explanation: core.explanation, keyPoints: core.keyPoints as string[], emphasis, evidence };
     }) };
   });
   return { id: summary.id, title: summary.title, course: summary.course, source: { id: summary.sourceId, title: summary.sourceTitle }, generatedAt: summary.createdAt, freshness, sections };
