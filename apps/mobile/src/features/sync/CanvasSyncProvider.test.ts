@@ -6,6 +6,7 @@ import type { CanvasSyncJobStatusView } from "../../services/canvasApi";
 
 const mocks = vi.hoisted(() => ({
   listCourses: vi.fn(),
+  getConnection: vi.fn(),
   getJob: vi.fn(),
   start: vi.fn(),
   reconcile: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" 
 vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => "https://api.example" }));
 vi.mock("../../services/canvasApi", () => ({
   listCanvasCourses: mocks.listCourses,
+  getCanvasConnection: mocks.getConnection,
   getCanvasSyncJob: mocks.getJob,
   getCanvasCoursePreferences: mocks.readSelection,
   saveCanvasCoursePreferences: mocks.saveSelection,
@@ -53,6 +55,7 @@ beforeEach(() => {
   latest = null;
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mocks.reconcile.mockResolvedValue({ jobs: [], newlyCompleted: [] });
+  mocks.getConnection.mockResolvedValue({ ok: true, data: { connection: { status: "active" } } });
 });
 afterEach(async () => {
   if (rendered) await act(async () => rendered!.unmount());
@@ -94,6 +97,16 @@ describe("CanvasSyncProvider", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(10); });
     expect(mocks.start).toHaveBeenCalled();
     expect(latest!.snapshot.phase).toBe("syncing");
+  });
+
+  it.each(["reconnect_required", "disconnected"])("does not refresh on launch while the connection is %s", async (status) => {
+    mocks.listCourses.mockResolvedValue(inventory("2026-09-19T14:45:00.000Z"));
+    mocks.getConnection.mockResolvedValue({ ok: true, data: { connection: { status } } });
+    await mount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    expect(mocks.reconcile).not.toHaveBeenCalled();
+    expect(mocks.start).not.toHaveBeenCalled();
+    expect(latest!.snapshot.phase).toBe("idle");
   });
 
   it("shows a calm failure when Canvas cannot be reached, and keeps the last sync time", async () => {
