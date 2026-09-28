@@ -126,7 +126,7 @@ export function QuizScreen() {
   }
   async function moveTo(next: number) {
     if (!attempt || !quizData || next < 0 || next >= quizData.questions.length || next === index) return;
-    if (selected.length && !feedback) {
+    if (!feedback && JSON.stringify(selected) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === question!.id)?.selectedOptionIds ?? [])) {
       const savedAttempt = await experienceRequest<QuizAttempt>(client,
         `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question!.id)}`,
         { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
@@ -143,7 +143,7 @@ export function QuizScreen() {
   }
   async function markState(action: 'skip' | 'reveal') {
     if (!attempt || !question || !quizData) return;
-    if (selected.length && !feedback) {
+    if (!feedback && JSON.stringify(selected) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === question.id)?.selectedOptionIds ?? [])) {
       const savedAttempt = await experienceRequest<QuizAttempt>(client,
         `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
         { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
