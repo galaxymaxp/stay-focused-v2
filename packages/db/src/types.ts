@@ -1087,7 +1087,7 @@ export interface Database {
         Relationships: [];
       };
       quiz_attempts: {
-        Row: {id:string;user_id:string;quiz_id:string;request_key:string;status:string;answers:Json;started_at:string;completed_at:string|null;percentage:number|null};
+        Row: {id:string;user_id:string;quiz_id:string;request_key:string;status:string;answers:Json;started_at:string;completed_at:string|null;percentage:number|null;study_state:Json;updated_at:string};
         Insert: {user_id:string;quiz_id:string;request_key:string};
         Update: never;
         Relationships: [];
@@ -4225,6 +4225,10 @@ export interface Database {
       };
       save_quiz_answer: {
         Args: {p_user_id:string;p_attempt_id:string;p_question_id:string;p_selected:Json;p_finalize:boolean};
+        Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
+      };
+      update_quiz_attempt_study_state: {
+        Args: {p_user_id:string;p_attempt_id:string;p_action:string;p_question_id:string;p_position:number};
         Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
       };
       complete_quiz_attempt: {

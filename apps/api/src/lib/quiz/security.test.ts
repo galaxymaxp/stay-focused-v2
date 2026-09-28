@@ -18,7 +18,7 @@ const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-2
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
 const asJson = (v: unknown) => JSON.parse(JSON.stringify(v)) as Json;
 const quiz: QuizRow = { id, user_id: A, course_id: id, reviewer_id: null, reviewer_artifact_id: id, source_version_id: null, generation_id: id, title: 'Academic quiz', source_material_ids: asJson(['page:' + id]), question_count: 5, difficulty: 'mixed', questions: asJson(questions.map(learnerQuestion)), created_at: '2026-09-12T00:00:00Z', updated_at: '2026-09-12T00:00:00Z' };
-const attempt: AttemptRow = { id, user_id: A, quiz_id: id, request_key: 'test-request', status: 'in_progress', answers: [], started_at: quiz.created_at, completed_at: null, percentage: null };
+const attempt: AttemptRow = { id, user_id: A, quiz_id: id, request_key: 'test-request', status: 'in_progress', answers: [], started_at: quiz.created_at, completed_at: null, percentage: null, study_state: { currentQuestion: 0, skipped: [], revealed: [] }, updated_at: quiz.created_at };
 type Data = Record<string, Record<string, unknown>[]>;
 function client(data: Data = {}) {
     return { from: vi.fn((table: string) => {

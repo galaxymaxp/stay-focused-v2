@@ -1,15 +1,16 @@
-import type { Quiz, QuizAttempt, QuizResult } from "@stay-focused/shared";
-import { useLocalSearchParams } from "expo-router";
+import type { Quiz, QuizAttempt, QuizResult, QuizQuestion } from "@stay-focused/shared";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { TextInput, View } from "react-native";
 
-import { Action, Copy, Notice, Page, Surface, SkeletonCards } from "../../design/primitives";
+import { Action, Copy, Notice, Page, Surface, SkeletonCards, Sheet } from "../../design/primitives";
 import { haptic } from "../../design/haptics";
 import { playFeedbackSound } from "../../design/feedback";
 import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { useLocalArtifact } from "./useLocalLibrary";
+import { QuestionSlider } from './QuestionSlider';
 
 type AttemptHistory = {
   id: string;
@@ -17,6 +18,17 @@ type AttemptHistory = {
   startedAt: string;
   percentage: number | null;
 }[];
+function answerText(question: QuizQuestion | undefined, values: readonly string[]): string {
+  if (!values.length) return 'No answer';
+  return values.map(value => {
+    const [leftId, rightId] = value.split(':');
+    if (question?.matchingPairs?.length && rightId) {
+      const left = question.matchingPairs.find(pair => pair.id === leftId)?.leftItem ?? leftId;
+      return `${left} → ${question.options.find(option => option.id === rightId)?.text ?? rightId}`;
+    }
+    return question?.options.find(option => option.id === value)?.text ?? value;
+  }).join('; ');
+}
 export function QuizScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const quiz = useExperience<Quiz>(
@@ -39,6 +51,9 @@ export function QuizScreen() {
     [error, setError] = useState<string | null>(null),
     [key, setKey] = useState(newRequestKey);
   const [matchingReady, setMatchingReady] = useState(false);
+  const [matchingLeft, setMatchingLeft] = useState<string | null>(null);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const initialized = useRef<string | null>(null);
   const question = quizData?.questions[index],
     feedback = attempt?.feedback.find(
@@ -68,7 +83,9 @@ export function QuizScreen() {
     setIndex(0);
     setSelected([]);
     setMatchingReady(false);
+    setMatchingLeft(null);
     setResult(null);
+    setReviewing(false);
     history.refresh();
   }
   useEffect(() => {
@@ -81,12 +98,14 @@ export function QuizScreen() {
   }, [id, quiz.data, history.loading, history.error, history.data]);
   async function resume(attemptId: string, completed: boolean) {
     if (completed) {
-      setResult(
+      const completedResult =
         await experienceRequest<QuizResult>(
           client,
           `/api/experience/quiz-attempts/${encodeURIComponent(attemptId)}/result`,
-        ),
-      );
+        );
+      setResult(completedResult);
+      setAttempt(null);
+      setReviewing(false);
       return;
     }
     const value = await experienceRequest<QuizAttempt>(
@@ -94,8 +113,7 @@ export function QuizScreen() {
       `/api/experience/quiz-attempts/${encodeURIComponent(attemptId)}`,
     );
     setAttempt(value);
-    const firstUnanswered = quizData?.questions.findIndex((question) => !value.feedback.some((item) => item.questionId === question.id)) ?? 0;
-    const next = firstUnanswered < 0 ? Math.max(0, (quizData?.questions.length ?? 1) - 1) : firstUnanswered;
+    const next = Number.isInteger(value.currentQuestion) && value.currentQuestion >= 0 && value.currentQuestion < (quizData?.questions.length ?? 0) ? value.currentQuestion : 0;
     setIndex(next);
     setSelected(
       value.answers
@@ -103,7 +121,45 @@ export function QuizScreen() {
         ?.selectedOptionIds.slice() ?? [],
     );
     setMatchingReady(false);
+    setMatchingLeft(null);
     setResult(null);
+  }
+  async function moveTo(next: number) {
+    if (!attempt || !quizData || next < 0 || next >= quizData.questions.length || next === index) return;
+    if (selected.length && !feedback) {
+      const savedAttempt = await experienceRequest<QuizAttempt>(client,
+        `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question!.id)}`,
+        { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
+      setAttempt(savedAttempt);
+    }
+    const value = await experienceRequest<QuizAttempt>(client,
+      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/study-state`,
+      { method: 'PATCH', body: { action: 'navigate', position: next } });
+    setAttempt(value);
+    setIndex(next);
+    setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
+    setMatchingReady(false);
+    setMatchingLeft(null);
+  }
+  async function markState(action: 'skip' | 'reveal') {
+    if (!attempt || !question || !quizData) return;
+    if (selected.length && !feedback) {
+      const savedAttempt = await experienceRequest<QuizAttempt>(client,
+        `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
+        { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
+      setAttempt(savedAttempt);
+    }
+    const next = action === 'skip' ? Math.min(index + 1, quizData.questions.length - 1) : index;
+    const value = await experienceRequest<QuizAttempt>(client,
+      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/study-state`,
+      { method: 'PATCH', body: { action, questionId: question.id, position: next } });
+    setAttempt(value);
+    if (action === 'skip') {
+      setIndex(next);
+      setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
+      setMatchingReady(false);
+      setMatchingLeft(null);
+    }
   }
   return (
     <Page title="Quiz" back>
@@ -153,16 +209,34 @@ export function QuizScreen() {
       )}
       {attempt && question && !result && (
         <>
-          <Copy muted>
-            Question {index + 1} of {quizData?.questionCount}
-          </Copy>
-          <View accessibilityLabel={`${index + 1} of ${quizData?.questionCount} questions`} style={{ height: 4, borderRadius: 2, backgroundColor: "#88888844", overflow: "hidden" }}><View style={{ width: `${((index + 1) / (quizData?.questionCount ?? 1)) * 100}%`, height: 4, backgroundColor: "#888888" }} /></View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
+            <Copy muted size="caption">{index + 1} / {quizData?.questionCount}</Copy>
+            <Action secondary onPress={() => setOverviewOpen(true)}>Questions</Action>
+          </View>
+          <QuestionSlider current={index} count={quizData!.questions.length} onSettle={next => void run(() => moveTo(next))} />
+          <Copy muted size="caption">{attempt.answers.filter(answer => answer.finalizedAt).length} answered · {attempt.skippedQuestionIds.filter(id => !attempt.answers.some(answer => answer.questionId === id && answer.finalizedAt)).length} skipped</Copy>
           <Surface>
             <Copy size="h2">{question.prompt}</Copy>
             <Copy muted>{question.selectionInstruction}</Copy>
             {question.type === "matching" && question.leftItem ? <Action secondary={!matchingReady} disabled={busy || !!feedback} onPress={() => { haptic.select(); setMatchingReady(true); }}>{question.leftItem}</Action> : null}
+            {question.matchingPairs?.length ? <>
+              <Copy size="h3">Terms</Copy>
+              {question.matchingPairs.map((pair, position) => {
+                const linked = selected.find(value => value.startsWith(`${pair.id}:`))?.split(':')[1];
+                return <Action key={pair.id} secondary={matchingLeft !== pair.id} disabled={busy || !!feedback} onPress={() => setMatchingLeft(pair.id)}>
+                  {String.fromCharCode(65 + position)}. {pair.leftItem}{linked ? ` → ${question.options.find(option => option.id === linked)?.text ?? linked}` : ''}
+                </Action>;
+              })}
+              <Copy size="h3">Meanings</Copy>
+              <Copy muted>Tap a term, then its meaning. Each meaning can be used once.</Copy>
+              {question.options.map((option, position) => <Action key={option.id} secondary disabled={busy || !!feedback || !matchingLeft} onPress={() => {
+                setSelected(old => [...old.filter(value => !value.startsWith(`${matchingLeft}:`) && !value.endsWith(`:${option.id}`)), `${matchingLeft}:${option.id}`]);
+                setMatchingLeft(null);
+              }}>{position + 1}. {option.text}</Action>)}
+            </> : null}
             {question.type === "identification" ? <TextInput accessibilityLabel="Type your answer" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected[0] ?? ""} onChangeText={value => setSelected(value ? [value] : [])} placeholder="Type the term" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
-            {question.options.map((option) => (
+            {!question.matchingPairs?.length && question.options.map((option) => (
               <Action
                 key={option.id}
                 secondary={!selected.includes(option.id)}
@@ -185,14 +259,15 @@ export function QuizScreen() {
           </Surface>
           {feedback ? (
             <Surface>
-              <Copy size="h2">
-                {feedback.correct ? "Correct" : "Keep learning"}
-              </Copy>
+              <Copy size="h2">{feedback.assisted ? 'Revealed · no recall credit' : feedback.correct ? 'Correct' : 'Keep learning'}</Copy>
+              <Copy muted>Your answer: {answerText(question, feedback.selectedOptionIds)}</Copy>
+              <Copy>Correct answer: {answerText(question, feedback.correctOptionIds)}</Copy>
+              {feedback.pairCount ? <Copy>{feedback.pairCorrectCount} / {feedback.pairCount} pairs correct</Copy> : null}
               <Copy>{feedback.explanation}</Copy>
             </Surface>
           ) : (
             <Action
-              disabled={busy || selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim())}
+              disabled={busy || (question.matchingPairs?.length ? selected.length !== question.matchingPairs.length : selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim()))}
               onPress={() =>
                 void run(async () => {
                   const value = await experienceRequest<QuizAttempt>(
@@ -216,27 +291,12 @@ export function QuizScreen() {
               Check answer
             </Action>
           )}
-          {feedback && index + 1 < (quizData?.questionCount ?? 0) && (
-            <Action
-              onPress={() => {
-                const next = index + 1;
-                setIndex(next);
-                setMatchingReady(false);
-                setSelected(
-                  attempt.answers
-                    .find(
-                      (answer) =>
-                        answer.questionId === quizData?.questions[next]?.id,
-                    )
-                    ?.selectedOptionIds.slice() ?? [],
-                );
-              }}
-            >
-              Next question
-            </Action>
-          )}
-          {feedback && index + 1 === quizData?.questionCount && (
-            <Action
+          {!attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy} onPress={() => void run(() => markState('reveal'))}>Reveal Answer</Action>}
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <Action secondary disabled={busy} onPress={() => void run(() => markState('skip'))}>Skip</Action>
+            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
+          </View>
+          <Action
               disabled={busy}
               onPress={() =>
                 void run(async () => {
@@ -252,18 +312,36 @@ export function QuizScreen() {
                   history.refresh();
                 })
               }
-            >
-              See results
-            </Action>
-          )}
+            >Finish quiz</Action>
         </>
       )}
+      {overviewOpen && attempt && quizData && <Sheet title="Questions" onClose={() => setOverviewOpen(false)}>
+        <Copy muted>Choose any question. Answers stay with this attempt.</Copy>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {quizData.questions.map((item, position) => {
+            const answer = attempt.answers.find(entry => entry.questionId === item.id);
+            const state = position === index ? 'Current' : attempt.revealedQuestionIds.includes(item.id) ? 'Revealed' : answer?.finalizedAt ? 'Answered' : attempt.skippedQuestionIds.includes(item.id) ? 'Skipped' : 'Unanswered';
+            return <Action key={item.id} secondary={position !== index} label={`Question ${position + 1}, ${state}`} onPress={() => { setOverviewOpen(false); void run(() => moveTo(position)); }}>{position + 1} · {state}</Action>;
+          })}
+        </View>
+      </Sheet>}
       {result && (
         <>
           <Copy size="display">{result.percentage}%</Copy>
-          <Copy>
-            {result.correctCount} of {result.totalQuestions} correct
-          </Copy>
+          <Copy>{result.earnedPoints} / {result.possiblePoints} points</Copy>
+          <Copy>{result.correctCount} correct · {result.incorrectCount} incorrect · {result.skippedCount} skipped · {result.revealedCount} revealed before answer</Copy>
+          <Action secondary onPress={() => setReviewing(value => !value)}>{reviewing ? 'Hide answers' : 'Review answers'}</Action>
+          {reviewing && result.questions.map((entry, position) => {
+            const item = quizData?.questions[position];
+            return <Surface key={entry.questionId}>
+              <Copy size="h3">{position + 1}. {item?.prompt ?? entry.questionId}</Copy>
+              <Copy muted>{entry.assisted ? 'Revealed' : entry.skipped ? 'Skipped' : entry.correct ? 'Correct' : 'Incorrect'}</Copy>
+              <Copy>Your answer: {answerText(item, entry.selectedOptionIds)}</Copy>
+              <Copy>Correct answer: {answerText(item, entry.correctOptionIds)}</Copy>
+              {entry.pairCount ? <Copy>{entry.pairCorrectCount} / {entry.pairCount} pairs correct</Copy> : null}
+              <Copy muted>{entry.explanation}</Copy>
+            </Surface>;
+          })}
           <Copy size="h2">Keep building on these ideas</Copy>
           {result.weakAreas.length ? (
             result.weakAreas.map((area) => (
@@ -284,8 +362,9 @@ export function QuizScreen() {
               void run(() => start(nextKey));
             }}
           >
-            Practice again
+            Retake quiz
           </Action>
+          <Action secondary onPress={() => router.back()}>Back to Library</Action>
         </>
       )}
       {error && (

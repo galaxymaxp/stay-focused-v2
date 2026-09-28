@@ -7,6 +7,8 @@ export interface QuizRegion {
     reviewerSectionIds: string[];
 }
 export interface StoredQuestion extends QuizQuestion {
+    /** Private canonical answer for each stable matching left ID. */
+    matchingAnswers?: { id: string; rightOptionId: string }[];
     correctOptionIds: string[];
     explanation: string;
     topicId: string;
@@ -24,7 +26,9 @@ export interface StoredQuestion extends QuizQuestion {
 }
 export const normalized = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 /** Matching items share an instruction stem, so their left-side term identifies them. */
-export const quizQuestionKey = (q: { readonly prompt: string; readonly type?: string; readonly leftItem?: string }) => q.type === 'matching' && q.leftItem ? `matching ${normalized(q.leftItem)}` : normalized(q.prompt);
+export const quizQuestionKey = (q: { readonly prompt: string; readonly type?: string; readonly leftItem?: string; readonly matchingPairs?: readonly { readonly leftItem: string }[] }) =>
+    q.type === 'matching' && q.matchingPairs?.length ? `matching ${q.matchingPairs.map(pair => normalized(pair.leftItem)).sort().join('|')}` :
+    q.type === 'matching' && q.leftItem ? `matching ${normalized(q.leftItem)}` : normalized(q.prompt);
 /** Exact keys and highly overlapping long non-matching stems are duplicate study items. */
 export function isRepeatedQuizQuestion(candidate: Pick<StoredQuestion, 'prompt'> & Partial<Pick<StoredQuestion, 'type' | 'leftItem'>>, pool: readonly (Pick<StoredQuestion, 'prompt'> & Partial<Pick<StoredQuestion, 'type' | 'leftItem'>>)[]): boolean {
     const key = quizQuestionKey(candidate);

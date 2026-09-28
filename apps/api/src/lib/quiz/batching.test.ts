@@ -39,8 +39,12 @@ function item(type: QuizQuestionType, id: string): Record<string, unknown> {
     }
     const options = [{ id: 'a', text: `Supported ${n}` }, { id: 'b', text: `Other B ${n}` }, { id: 'c', text: `Other C ${n}` }, { id: 'd', text: `Other D ${n}` }];
     if (type === 'matching') {
-        const pick = words[matchingIndex++ % words.length]!;
-        return { ...base, prompt: 'Match the term to its meaning.', leftItem: pick.word, sourceRefs: [pick.region], options, correctOptionIds: ['a'] };
+        const picks = [0, 1, 2].map(index => words[(matchingIndex * 3 + index) % words.length]!);
+        matchingIndex++;
+        return { ...base, prompt: 'Match each term to its meaning.', sourceRefs: [...new Set(picks.map(pick => pick.region))],
+            options: picks.map((pick, index) => ({ id: `r${index + 1}`, text: `Meaning of ${pick.word}` })),
+            matchingPairs: picks.map((pick, index) => ({ id: `p${index + 1}`, leftItem: pick.word, rightOptionId: `r${index + 1}` })),
+            correctOptionIds: ['p1:r1', 'p2:r2', 'p3:r3'] };
     }
     return { ...base, options, correctOptionIds: ['a'] };
 }
@@ -127,20 +131,22 @@ describe('Quiz batching, budget and repair', () => {
         expect(questions[22]!.prompt).not.toBe('Item 23 prompt.');
         expect(questions[26]!.prompt).not.toBe('Item 1 prompt.');
     });
-    it('names a reused matching term so the repair can replace it with a new concept', async () => {
+    it('names a reused matching block so the repair can replace it with a new concept', async () => {
         useRequest({ questionCount: 30, questionTypes: ALL });
-        let firstTerm = '';
-        const reuse: Fault = produced => ({ ...produced, type: 'matching', prompt: 'Match the term to its description.', leftItem: firstTerm, sourceRefs: [words[0]!.region], options: [{ id: 'a', text: 'W1' }, { id: 'b', text: 'X1' }, { id: 'c', text: 'Y1' }, { id: 'd', text: 'Z1' }], correctOptionIds: ['a'], acceptedAnswers: [], incorrectTerm: '' });
-        firstTerm = words[0]!.word;
+        const firstTerms = words.slice(0, 3);
+        const reuse: Fault = produced => ({ ...produced, type: 'matching', prompt: 'Match these terms to their descriptions.', leftItem: '', sourceRefs: [...new Set(firstTerms.map(term => term.region))],
+            options: firstTerms.map((term, index) => ({ id: `r${index + 1}`, text: `Meaning of ${term.word}` })),
+            matchingPairs: firstTerms.map((term, index) => ({ id: `p${index + 1}`, leftItem: term.word, rightOptionId: `r${index + 1}` })),
+            correctOptionIds: ['p1:r1', 'p2:r2', 'p3:r3'], acceptedAnswers: [], incorrectTerm: '' });
         const calls = scriptedModel({ 'quiz:batch:20:initial#7': reuse });
         const questions = await run();
         const quiz = quizCalls(calls);
         expect(quiz[1]!.request.prompt).toContain('MATCHING TERMS ALREADY USED');
-        expect(quiz[1]!.request.prompt).toContain(firstTerm);
+        expect(quiz[1]!.request.prompt).toContain(firstTerms[0]!.word);
         const repair = quiz[2]!;
         expect(repair.identity).toBe('quiz:batch:20:repair');
-        expect(repair.request.prompt).toContain(`"leftItem":"${firstTerm}"`);
-        expect(questions.filter(q => q.leftItem === firstTerm)).toHaveLength(1);
+        expect(repair.request.prompt).toContain(`"matchingTerms":["${firstTerms[0]!.word}"`);
+        expect(questions.filter(q => q.matchingPairs?.map(pair => pair.leftItem).join('|') === firstTerms.map(term => term.word).join('|'))).toHaveLength(1);
     });
     it('fails a batch after its single repair and reports both calls without more attempts', async () => {
         useRequest({ questionCount: 30, questionTypes: ALL });

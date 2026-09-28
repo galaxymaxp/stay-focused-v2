@@ -143,18 +143,32 @@ export function quizBatches(count: number): { offset: number; size: number }[] {
     return Array.from({ length: Math.ceil(count / 20) }, (_, index) => ({ offset: index * 20, size: Math.min(20, count - index * 20) }));
 }
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
-    return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : q.type === 'identification' ? 'Type the term.' : q.type === 'modified_true_false' ? 'Mark true, or mark false and correct the wrong term.' : q.type === 'matching' ? 'Match the term to its meaning.' : 'Choose one answer.', ...(q.type === 'matching' && q.leftItem ? { leftItem: q.leftItem } : {}) };
+    const orderKey = (id: string) => [...`${q.id}:${id}`].reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0, 2166136261);
+    const options = q.options.map(o => ({ id: o.id, text: o.text }));
+    if (q.matchingPairs?.length) options.sort((a, b) => orderKey(a.id) - orderKey(b.id) || a.id.localeCompare(b.id));
+    return { id: q.id, type: q.type, prompt: q.prompt, options, difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : q.type === 'identification' ? 'Type the term.' : q.type === 'modified_true_false' ? 'Mark true, or mark false and correct the wrong term.' : q.type === 'matching' ? 'Match each term to one meaning.' : 'Choose one answer.', ...(q.type === 'matching' && q.leftItem ? { leftItem: q.leftItem } : {}), ...(q.matchingPairs?.length ? { matchingPairs: q.matchingPairs.map(pair => ({ id: pair.id, leftItem: pair.leftItem })) } : {}) };
 }
 export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Quiz {
     const attempts = history.filter(a => a.user_id === row.user_id && a.quiz_id === row.id).sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at) || b.id.localeCompare(a.id));
     const completed = attempts.filter(a => a.status === 'completed' && a.percentage !== null).sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!) || b.id.localeCompare(a.id));
+    const active = attempts.find(a => a.status === 'in_progress');
+    const activeState = active ? record(active.study_state) : {};
     const ids = row.source_material_ids as string[];
     return { id: row.id, title: row.title, courseId: row.course_id, reviewerArtifactId: row.reviewer_artifact_id, sourceId: row.course_id ? ids[0] ?? null : row.source_version_id, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
-        attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null, questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
+        attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null,
+        activeAttempt: active ? { id: active.id, currentQuestion: Number.isInteger(activeState.currentQuestion) ? activeState.currentQuestion as number : 0,
+          answeredCount: (active.answers as unknown as QuizAttemptAnswer[]).filter(answer => answer.finalizedAt).length,
+          skippedCount: Array.isArray(activeState.skipped) ? activeState.skipped.length : 0,
+          revealedCount: Array.isArray(activeState.revealed) ? activeState.revealed.length : 0 } : null,
+        questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {
-    const correct = [...normalizeSubmittedAnswer(question, answer.selectedOptionIds)].sort().join('|') === [...question.correctOptionIds].sort().join('|');
-    return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct, explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
+    const submitted = normalizeSubmittedAnswer(question, answer.selectedOptionIds);
+    const pairCount = question.matchingPairs?.length ?? 0;
+    const pairCorrectCount = pairCount ? submitted.filter(value => question.correctOptionIds.includes(value)).length : 0;
+    const correct = pairCount ? pairCorrectCount === pairCount && submitted.length === pairCount : [...submitted].sort().join('|') === [...question.correctOptionIds].sort().join('|');
+    return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct,
+      ...(pairCount ? { pairCount, pairCorrectCount } : {}), explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
 }
 export function normalizeSubmittedAnswer(question: StoredQuestion, selected: readonly string[]): string[] {
     if (question.type !== 'identification' && question.type !== 'modified_true_false') return [...selected];
@@ -167,18 +181,30 @@ export function normalizeSubmittedAnswer(question: StoredQuestion, selected: rea
 }
 export function attemptView(row: AttemptRow, questions: readonly StoredQuestion[]): QuizAttempt {
     const answers = (row.answers as unknown as QuizAttemptAnswer[]).map(a => ({ questionId: a.questionId, selectedOptionIds: [...a.selectedOptionIds], finalizedAt: a.finalizedAt }));
-    return { id: row.id, quizId: row.quiz_id, startedAt: row.started_at, completedAt: row.completed_at, status: row.status as QuizAttempt['status'], answers, feedback: answers.filter(a => a.finalizedAt !== null).map(a => {
-            const q = questions.find(q => q.id === a.questionId);
-            if (!q)
-                throw new ExperienceFailure(503, 'unavailable');
-            return evaluateAnswer(q, a);
+    const state = record(row.study_state);
+    const skippedQuestionIds = Array.isArray(state.skipped) ? state.skipped.filter((id): id is string => typeof id === 'string') : [];
+    const revealedQuestionIds = Array.isArray(state.revealed) ? state.revealed.filter((id): id is string => typeof id === 'string') : [];
+    const assistedQuestionIds = Array.isArray(state.assisted) ? state.assisted.filter((id): id is string => typeof id === 'string') : [];
+    const currentQuestion = Number.isInteger(state.currentQuestion) ? Math.max(0, Math.min(questions.length - 1, state.currentQuestion as number)) : 0;
+    const visible = questions.filter(q => revealedQuestionIds.includes(q.id) || answers.some(a => a.questionId === q.id && a.finalizedAt !== null));
+    return { id: row.id, quizId: row.quiz_id, startedAt: row.started_at, completedAt: row.completed_at, status: row.status as QuizAttempt['status'],
+      currentQuestion, skippedQuestionIds, revealedQuestionIds, assistedQuestionIds, updatedAt: row.updated_at ?? row.started_at, answers, feedback: visible.map(q => {
+            const a = answers.find(answer => answer.questionId === q.id) ?? { questionId: q.id, selectedOptionIds: [], finalizedAt: null };
+            const result = evaluateAnswer(q, a);
+            return revealedQuestionIds.includes(q.id) ? { ...result, correct: assistedQuestionIds.includes(q.id) ? false : result.correct, revealed: true, assisted: assistedQuestionIds.includes(q.id) } : result;
         }) };
 }
 export function resultView(attempt: QuizAttempt, questions: readonly StoredQuestion[]): QuizResult {
-    if (attempt.status !== 'completed' || attempt.feedback.length !== questions.length)
+    if (attempt.status !== 'completed')
         throw new ExperienceFailure(409, 'quiz_result_unavailable');
-    const results = attempt.feedback;
+    const results = questions.map(q => attempt.feedback.find(result => result.questionId === q.id) ??
+      { ...evaluateAnswer(q, { questionId: q.id, selectedOptionIds: [], finalizedAt: null }), correct: false, skipped: true });
     const correctCount = results.filter(r => r.correct).length;
+    const possiblePoints = results.reduce((sum, r) => sum + (r.pairCount ?? 1), 0);
+    const earnedPoints = results.reduce((sum, r) => sum + (r.assisted || r.skipped ? 0 : r.pairCount ? r.pairCorrectCount ?? 0 : Number(r.correct)), 0);
+    const revealedCount = results.filter(r => r.assisted).length;
+    const skippedCount = results.filter(r => r.skipped).length;
+    const incorrectCount = results.length - correctCount - revealedCount - skippedCount;
     const topics = new Map<string, QuizTopicPerformance>();
     for (const r of results) {
         const previous = topics.get(r.topicId);
@@ -187,7 +213,8 @@ export function resultView(attempt: QuizAttempt, questions: readonly StoredQuest
             sourceRefs: [...new Map([...(previous?.sourceRefs ?? []), ...r.sourceRefs].map(ref => [JSON.stringify(ref), ref])).values()], reviewerSectionIds: [...new Set([...(previous?.reviewerSectionIds ?? []), ...r.reviewerSectionIds])] });
     }
     const topicPerformance = [...topics.values()].sort((a, b) => a.accuracy - b.accuracy || a.topicId.localeCompare(b.topicId));
-    return { attemptId: attempt.id, quizId: attempt.quizId, correctCount, incorrectCount: results.length - correctCount, totalQuestions: results.length, percentage: Math.round(correctCount / results.length * 10000) / 100, questions: results, topicPerformance,
+    return { attemptId: attempt.id, quizId: attempt.quizId, correctCount, incorrectCount, skippedCount, revealedCount, totalQuestions: results.length,
+      earnedPoints, possiblePoints, percentage: Math.round(earnedPoints / possiblePoints * 10000) / 100, questions: results, topicPerformance,
         weakAreas: topicPerformance.filter(t => t.asked === 1 ? t.missed === 1 : t.accuracy < 60).map(t => ({ ...t, kind: t.asked === 1 ? 'missed_topic' : 'weak_area' })) };
 }
 const rpcCodes = ['quiz_not_found', 'quiz_attempt_not_found', 'quiz_attempt_completed', 'quiz_question_not_found', 'quiz_answer_invalid', 'quiz_answer_already_finalized', 'quiz_result_unavailable', 'conflict'] as const;
@@ -259,6 +286,21 @@ export async function saveAnswer(client: Client, userId: string, attemptId: stri
     rpcError(error);
     if (!data?.[0] || data[0].user_id !== userId)
         throw new ExperienceFailure(404, 'quiz_attempt_not_found');
+    return attemptView(data[0], await keys(client, userId, data[0].quiz_id));
+}
+export async function updateAttemptStudyState(client: Client, userId: string, attemptId: string, value: unknown): Promise<QuizAttempt> {
+    const input = record(value);
+    if (Object.keys(input).some(key => !['action', 'questionId', 'position'].includes(key)) ||
+        !['navigate', 'skip', 'reveal'].includes(String(input.action)) ||
+        !Number.isInteger(input.position) || (input.position as number) < 0 || (input.position as number) >= 100 ||
+        (input.action !== 'navigate' && (typeof input.questionId !== 'string' || !/^q\d{1,3}$/.test(input.questionId))))
+        throw new ExperienceFailure(400, 'quiz_answer_invalid');
+    const { data, error } = await client.rpc('update_quiz_attempt_study_state', {
+        p_user_id: userId, p_attempt_id: attemptId, p_action: input.action as string,
+        p_question_id: input.action === 'navigate' ? '' : input.questionId as string, p_position: input.position as number,
+    });
+    rpcError(error);
+    if (!data?.[0] || data[0].user_id !== userId) throw new ExperienceFailure(404, 'quiz_attempt_not_found');
     return attemptView(data[0], await keys(client, userId, data[0].quiz_id));
 }
 export async function completeAttempt(client: Client, userId: string, attemptId: string, abandon = false) {

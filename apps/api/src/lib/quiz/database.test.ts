@@ -61,6 +61,8 @@ beforeAll(async () => {
     await db.exec(migration('20260912110000_quiz_maker.sql'));
     await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
     await db.exec(migration('20260927140343_quiz_100_items.sql'));
+    await db.exec(migration('20260928130000_quiz_study_state.sql'));
+    await db.exec(migration('20260928130001_matching_blocks.sql'));
     await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
     await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
     jobId = await queue('quiz-generation-1');
@@ -243,12 +245,49 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const a = await start(`bad-answer-${selected.join('-') || 'empty'}`);
         await expect(answer(a.id, 'q1', selected)).rejects.toThrow('quiz_answer_invalid');
     });
-    it('refuses incomplete results, foreign answer/complete, and unknown question', async () => {
+    it('finishes unanswered questions as skipped and denies foreign or unknown answers', async () => {
         const a = await start('incomplete-attempt');
-        await expect(complete(a.id)).rejects.toThrow('quiz_result_unavailable');
         await expect(answer(a.id, 'q1', ['a'], true, B)).rejects.toThrow('quiz_attempt_not_found');
         await expect(complete(a.id, false, B)).rejects.toThrow('quiz_attempt_not_found');
         await expect(answer(a.id, 'q99', ['a'])).rejects.toThrow('quiz_question_not_found');
+        const done = await complete(a.id);
+        expect(Number(done.percentage)).toBe(0);
+        expect(resultView(attemptView(done, questions), questions)).toMatchObject({ skippedCount: 5, revealedCount: 0, incorrectCount: 0 });
+    });
+    it('persists current position, skip and reveal; a pre-answer reveal cannot earn credit', async () => {
+        const a = await start('study-state-attempt');
+        const state = async (action: string, questionId: string, position: number) =>
+            (await db.query<AttemptRow>('select * from update_quiz_attempt_study_state($1,$2,$3,$4,$5)', [A, a.id, action, questionId, position])).rows[0]!;
+        await state('navigate', '', 3);
+        await state('skip', 'q4', 4);
+        const revealed = await state('reveal', 'q5', 4);
+        expect(attemptView(revealed, questions)).toMatchObject({ currentQuestion: 4, skippedQuestionIds: ['q4'], revealedQuestionIds: ['q5'], assistedQuestionIds: ['q5'] });
+        await answer(a.id, 'q5', questions[4]!.correctOptionIds);
+        const done = await complete(a.id);
+        expect(Number(done.percentage)).toBe(0);
+        expect(resultView(attemptView(done, questions), questions)).toMatchObject({ revealedCount: 1, skippedCount: 4, earnedPoints: 0 });
+    });
+    it('scores a matching block by pairs while preserving one-to-one display IDs', async () => {
+        await db.exec('begin');
+        try {
+            const matching = { ...questions[4]!, type: 'matching' as const, prompt: 'Match each term.', leftItem: '',
+                options: [{ id: 'r1', text: 'One' }, { id: 'r2', text: 'Two' }, { id: 'r3', text: 'Three' }, { id: 'r4', text: 'Four' }, { id: 'r5', text: 'Distractor' }],
+                matchingPairs: [{ id: 'p1', leftItem: 'A' }, { id: 'p2', leftItem: 'B' }, { id: 'p3', leftItem: 'C' }, { id: 'p4', leftItem: 'D' }],
+                matchingAnswers: [{ id: 'p1', rightOptionId: 'r1' }, { id: 'p2', rightOptionId: 'r2' }, { id: 'p3', rightOptionId: 'r3' }, { id: 'p4', rightOptionId: 'r4' }],
+                correctOptionIds: ['p1:r1', 'p2:r2', 'p3:r3', 'p4:r4'] };
+            const modified = [...questions.slice(0, 4), matching];
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(modified), quizId]);
+            const a = await start('matching-pair-attempt');
+            for (const q of modified.slice(0, 4)) await answer(a.id, q.id, q.correctOptionIds);
+            await db.exec('savepoint duplicate_match');
+            await expect(answer(a.id, 'q5', ['p1:r1', 'p2:r1', 'p3:r3', 'p4:r4'])).rejects.toThrow('quiz_answer_invalid');
+            await db.exec('rollback to savepoint duplicate_match');
+            const saved = await answer(a.id, 'q5', ['p1:r1', 'p2:r2', 'p3:r3', 'p4:r5']);
+            expect(attemptView(saved, modified).feedback.find(item => item.questionId === 'q5')).toMatchObject({ pairCorrectCount: 3, pairCount: 4, correct: false });
+            const done = await complete(a.id);
+            expect(Number(done.percentage)).toBe(87.5);
+            expect(resultView(attemptView(done, modified), modified)).toMatchObject({ earnedPoints: 7, possiblePoints: 8, percentage: 87.5 });
+        } finally { await db.exec('rollback'); }
     });
     it('exact-set multi-select and deterministic SQL/API scores agree; second attempt preserved', async () => {
         const a = await start('scored-attempt');

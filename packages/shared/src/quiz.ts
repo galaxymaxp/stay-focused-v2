@@ -30,6 +30,8 @@ export interface QuizQuestion {
     readonly selectionInstruction: string;
     /** A matching item asks for one pair; this is its visible left side. */
     readonly leftItem?: string;
+    /** Matching block: stable left IDs; right-side options are the normal options array. */
+    readonly matchingPairs?: readonly { readonly id: string; readonly leftItem: string }[];
     readonly difficulty: QuizDifficulty;
 }
 export interface QuizSummary {
@@ -46,6 +48,7 @@ export interface QuizSummary {
     readonly attemptCount: number;
     readonly latestScore: number | null;
     readonly bestScore: number | null;
+    readonly activeAttempt?: { readonly id: string; readonly currentQuestion: number; readonly answeredCount: number; readonly skippedCount: number; readonly revealedCount: number } | null;
 }
 export interface Quiz extends QuizSummary {
     readonly questions: readonly QuizQuestion[];
@@ -60,6 +63,11 @@ export interface QuizQuestionResult {
     readonly selectedOptionIds: readonly string[];
     readonly correctOptionIds: readonly string[];
     readonly correct: boolean;
+    readonly revealed?: boolean;
+    readonly assisted?: boolean;
+    readonly skipped?: boolean;
+    readonly pairCorrectCount?: number;
+    readonly pairCount?: number;
     readonly explanation: string;
     readonly topicId: string;
     readonly topic: string;
@@ -72,6 +80,11 @@ export interface QuizAttempt {
     readonly startedAt: string;
     readonly completedAt: string | null;
     readonly status: 'in_progress' | 'completed' | 'abandoned';
+    readonly currentQuestion: number;
+    readonly skippedQuestionIds: readonly string[];
+    readonly revealedQuestionIds: readonly string[];
+    readonly assistedQuestionIds: readonly string[];
+    readonly updatedAt: string;
     readonly answers: readonly QuizAttemptAnswer[];
     /** Only intentionally finalized questions appear here. */
     readonly feedback: readonly QuizQuestionResult[];
@@ -93,7 +106,12 @@ export interface QuizResult {
     readonly quizId: string;
     readonly correctCount: number;
     readonly incorrectCount: number;
+    readonly skippedCount: number;
+    /** Answers revealed before final submission, with no recall credit. */
+    readonly revealedCount: number;
     readonly totalQuestions: number;
+    readonly earnedPoints: number;
+    readonly possiblePoints: number;
     readonly percentage: number;
     readonly questions: readonly QuizQuestionResult[];
     readonly topicPerformance: readonly QuizTopicPerformance[];

@@ -9,6 +9,22 @@ const regions = [{ id: 'page-1', label: 'Lecture', text: 'Complete lecture with 
 function quiz() { return { questions: Array.from({ length: 5 }, (_, i) => ({ id: `q${i + 1}`, type: 'single_select', prompt: `Question ${i + 1}?`, options: [{ id: 'a', text: 'First' }, { id: 'b', text: 'Second' }, { id: 'c', text: 'Third' }, { id: 'd', text: 'Fourth' }], correctOptionIds: ['a'], explanation: 'Explanation from the lecture.', difficulty: 'easy', concept: `Concept ${i + 1}`, sourceRefs: ['page-1'] })) }; }
 const provider = (response: unknown, capture?: GenerationRequest<unknown>[]): GenerationProvider => ({ generate: async <T>(r: GenerationRequest<T>) => { capture?.push(r); return response as T; } });
 describe('AI-first context and product contracts', () => {
+  it('validates stable one-to-one matching blocks and scores pairs individually', () => {
+    const raw = quiz();
+    const source = [{ ...regions[0]!, text: 'Firewall controls traffic. Phishing steals information. Ransomware locks data. Spyware monitors activity.' }];
+    const block = { type: 'matching', prompt: 'Match each threat or defense to its effect.', leftItem: '',
+      options: [{ id: 'r3', text: 'Locks data' }, { id: 'r1', text: 'Controls traffic' }, { id: 'r4', text: 'Monitors activity' }, { id: 'r2', text: 'Steals information' }],
+      matchingPairs: [{ id: 'p1', leftItem: 'Firewall', rightOptionId: 'r1' }, { id: 'p2', leftItem: 'Phishing', rightOptionId: 'r2' },
+        { id: 'p3', leftItem: 'Ransomware', rightOptionId: 'r3' }, { id: 'p4', leftItem: 'Spyware', rightOptionId: 'r4' }],
+      correctOptionIds: ['p1:r1', 'p2:r2', 'p3:r3', 'p4:r4'] };
+    Object.assign(raw.questions[0]!, block);
+    const question = validateQuizSet(raw, request, source)[0]!;
+    expect(learnerQuestion(question).matchingPairs).toHaveLength(4);
+    expect(learnerQuestion(question)).not.toHaveProperty('matchingAnswers');
+    expect(evaluateAnswer(question, { questionId: question.id, selectedOptionIds: ['p1:r1', 'p2:r3', 'p3:r2', 'p4:r4'], finalizedAt: 'now' })).toMatchObject({ pairCorrectCount: 2, pairCount: 4, correct: false });
+    Object.assign(raw.questions[0]!, { matchingPairs: block.matchingPairs.map((pair, index) => index === 1 ? { ...pair, rightOptionId: 'r1' } : pair) });
+    expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
+  });
   it('plans 100 items in five bounded batches with stable global offsets', () => {
     expect(quizBatches(100)).toEqual([{ offset: 0, size: 20 }, { offset: 20, size: 20 }, { offset: 40, size: 20 }, { offset: 60, size: 20 }, { offset: 80, size: 20 }]);
     expect(quizBatches(45).at(-1)).toEqual({ offset: 40, size: 5 });
@@ -84,28 +100,26 @@ describe('AI-first context and product contracts', () => {
   });
   it('validates five grounded formats and normalizes source-supported recall aliases', () => {
     const raw = quiz();
-    const source = [{ ...regions[0]!, text: 'The CIA triad consists of Confidentiality, Integrity, and Availability. Confidentiality prevents unauthorized disclosure.' }];
+    const source = [{ ...regions[0]!, text: 'The CIA triad consists of Confidentiality, Integrity, and Availability. Confidentiality prevents unauthorized disclosure. Integrity protects accuracy. Availability keeps resources accessible.' }];
     Object.assign(raw.questions[0]!, { type: 'identification', prompt: 'Name the CIA triad.', options: [], correctOptionIds: ['CIA triad'], acceptedAnswers: ['CIA triad'], leftItem: '', incorrectTerm: '' });
     Object.assign(raw.questions[1]!, { type: 'modified_true_false', prompt: 'Availability prevents unauthorized disclosure.', options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['b', 'Confidentiality'], acceptedAnswers: ['Confidentiality'], incorrectTerm: 'Availability', leftItem: '' });
-    Object.assign(raw.questions[2]!, { type: 'matching', prompt: 'Match the term to its meaning.', leftItem: 'Confidentiality', options: [{ id: 'a', text: 'Uptime' }, { id: 'b', text: 'Accuracy' }, { id: 'c', text: 'Prevention of unauthorized disclosure' }, { id: 'd', text: 'Recovery' }], correctOptionIds: ['c'], acceptedAnswers: [], incorrectTerm: '' });
+    Object.assign(raw.questions[2]!, { type: 'matching', prompt: 'Match each security property to its meaning.', leftItem: '', options: [{ id: 'a', text: 'Accessible resources' }, { id: 'b', text: 'Accuracy' }, { id: 'c', text: 'Prevention of unauthorized disclosure' }], matchingPairs: [{ id: 'p1', leftItem: 'Confidentiality', rightOptionId: 'c' }, { id: 'p2', leftItem: 'Integrity', rightOptionId: 'b' }, { id: 'p3', leftItem: 'Availability', rightOptionId: 'a' }], correctOptionIds: ['p1:c', 'p2:b', 'p3:a'], acceptedAnswers: [], incorrectTerm: '' });
     Object.assign(raw.questions[3]!, { type: 'true_false', prompt: 'The CIA triad includes Integrity.', options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['a'], acceptedAnswers: [], leftItem: '', incorrectTerm: '' });
     const validated = validateQuizSet(raw, request, source);
     expect(validated.map(question => question.type)).toEqual(['identification', 'modified_true_false', 'matching', 'true_false', 'single_select']);
     expect(normalizeSubmittedAnswer(validated[0]!, ['  cia triad! '])).toEqual(['CIA triad']);
     expect(normalizeSubmittedAnswer(validated[1]!, ['b', 'confidentiality.'])).toEqual(['b', 'Confidentiality']);
-    expect(learnerQuestion(validated[2]!)).toHaveProperty('leftItem', 'Confidentiality');
+    expect(learnerQuestion(validated[2]!).matchingPairs).toHaveLength(3);
     expect(learnerQuestion(validated[1]!)).not.toHaveProperty('acceptedAnswers');
     (raw.questions[0] as typeof raw.questions[0] & { acceptedAnswers: string[] }).acceptedAnswers = ['Invented alias'];
     expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
   });
-  it('treats matching items with a shared stem as distinct by their left-side term', () => {
+  it('rejects legacy single-term matching in newly generated quizzes', () => {
     const raw = quiz();
     const source = [{ ...regions[0]!, text: 'OpenVPN and Cisco AnyConnect are VPN applications. OpenVPN is open source.' }];
     const matching = (leftItem: string) => ({ type: 'matching', prompt: 'Match the VPN application to its description.', leftItem, options: [{ id: 'a', text: 'Open source client' }, { id: 'b', text: 'Vendor client' }, { id: 'c', text: 'Browser plugin' }, { id: 'd', text: 'Firewall' }], correctOptionIds: ['a'], acceptedAnswers: [], incorrectTerm: '' });
     Object.assign(raw.questions[0]!, matching('OpenVPN'));
     Object.assign(raw.questions[1]!, matching('Cisco AnyConnect'));
-    expect(validateQuizSet(raw, request, source).map(question => question.leftItem).slice(0, 2)).toEqual(['OpenVPN', 'Cisco AnyConnect']);
-    Object.assign(raw.questions[1]!, matching('OpenVPN'));
     expect(() => validateQuizSet(raw, request, source)).toThrow(GenerationContractError);
   });
   it('drops ungrounded recall aliases but keeps a grounded canonical answer', () => {
