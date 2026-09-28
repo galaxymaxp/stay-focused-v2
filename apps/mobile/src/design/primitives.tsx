@@ -750,7 +750,7 @@ export function ProfileButton() {
           </RowLink>
           <RowLink label="Settings" icon={<RowIcon><Settings size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/appearance")}>
             <Copy>Settings</Copy>
-            <Copy muted size="caption">Appearance, account and sign out</Copy>
+            <Copy muted size="caption">Account, sign-in methods and appearance</Copy>
           </RowLink>
         </Sheet>
       ) : null}

@@ -272,12 +272,8 @@ export function QueueScreen() {
     "/api/jobs?scope=all&limit=50",
     5000,
   );
-  const { session } = useAuth(),
-    client = useExperienceClient();
+  const { session } = useAuth();
   const [pending, setPending] = useState<GenerationIntent[]>([]),
-    [more, setMore] = useState<ProcessingJobStatusView[]>([]),
-    [cursor, setCursor] = useState<string | null>(null),
-    [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -296,37 +292,9 @@ export function QueueScreen() {
       live = false;
     };
   }, [session, queue.data]);
-  useEffect(() => {
-    if (more.length === 0) setCursor(queue.data?.nextCursor ?? null);
-  }, [queue.data, more.length]);
-  async function loadMore() {
-    if (!cursor || busy) return;
-    setBusy(true);
-    try {
-      const page = await experienceRequest<ProcessingJobListPage>(
-        client,
-        `/api/jobs?scope=all&limit=50&cursor=${encodeURIComponent(cursor)}`,
-      );
-      setMore((old) => [...old, ...page.jobs]);
-      setCursor(page.nextCursor);
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not load older generations.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
   const { prefs, hide } = useListPreferences();
   const cleared = new Set(prefs.hidden.queue);
-  const jobs = [
-    ...(queue.data?.jobs ?? []),
-    ...more.filter(
-      (job) => !queue.data?.jobs.some((current) => current.id === job.id),
-    ),
-  ].filter((job) => !cleared.has(job.id));
+  const jobs = (queue.data?.jobs ?? []).filter((job) => !cleared.has(job.id));
   const sections = queueSections(jobs);
   const attention = sections.find((section) => section.key === "attention")?.jobs ?? [];
   const completed = sections.find((section) => section.key === "completed")?.jobs ?? [];
@@ -347,7 +315,6 @@ export function QueueScreen() {
       title="Queue"
       back
       onRefresh={queue.refresh}
-      actions={[{ label: "Uploads & recovery tools", onPress: () => router.push("/processing") }]}
     >
       {queue.error && <Notice>{queue.error}</Notice>}
       {error && <Notice>{error}</Notice>}
@@ -393,11 +360,6 @@ export function QueueScreen() {
           <Copy size="h3">Nothing in your Queue</Copy>
           <Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they’re made, then stay in Library.</Copy>
         </Surface>
-      )}
-      {cursor && (
-        <Action secondary disabled={busy} onPress={() => void loadMore()}>
-          Older generations
-        </Action>
       )}
     </Page>
   );
