@@ -55,7 +55,7 @@ export function TasksScreen() {
       actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >
       <SyncStatus />
-      {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading your activities" /> : null}
+      {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading your tasks" /> : null}
       {tasks.error && !tasks.data ? (
         <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
       ) : null}
@@ -246,9 +246,9 @@ export function ActivityScreen() {
     }
   }
   return (
-    <Page title="Activity" back onRefresh={activity.refresh}>
+    <Page title="Assignment" back onRefresh={activity.refresh}>
       {activity.error && <Notice>{activity.error}</Notice>}
-      {activity.loading && <SkeletonCards rows={2} label="Loading activity" />}
+      {activity.loading && <SkeletonCards rows={2} label="Loading assignment" />}
       {activity.data && (
         <>
           <Copy muted>{activity.data.course?.name ?? "Personal task"}</Copy>
@@ -298,7 +298,7 @@ export function ActivityScreen() {
                 })
               }
             >
-              Open {output.title}
+              Open Draft: {output.title}
             </Action>
           ))}
           <Action
@@ -307,7 +307,7 @@ export function ActivityScreen() {
             }
             onPress={() => void create()}
           >
-            Create Draft
+            Generate Draft
           </Action>
           {!available(activity.data.generation.activityAssistance) && (
             <Notice>

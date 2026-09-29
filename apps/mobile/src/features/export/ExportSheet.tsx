@@ -15,7 +15,7 @@ export function ExportSheet({ detail, onClose }: { detail: LibraryArtifactDetail
     if (!session || busy) return;
     setBusy(true); setNote(null);
     try {
-      const name = await saveStudyFile(detail, format, session.user.id);
+      const name = await saveStudyFile(detail, format);
       setNote(name ? `Saved ${name} to the selected folder.` : 'Save cancelled.');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '';

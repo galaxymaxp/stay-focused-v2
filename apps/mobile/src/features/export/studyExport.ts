@@ -1,5 +1,4 @@
 import type { LibraryArtifactDetail } from '@stay-focused/shared';
-import { getLocalArtifactStore } from '../../services/localLibrary/localArtifactDatabase';
 import { activityExport, exportFileName, reviewerExport, type StudyFormat } from './exportLayout';
 import { createStudyPdf } from './pdfExport';
 import { createStudyDocx } from './docxExport';
@@ -9,13 +8,12 @@ export function formatsFor(detail: LibraryArtifactDetail): readonly StudyFormat[
   return 'reviewer' in detail ? ['pdf'] : 'draft' in detail ? ['pdf', 'docx', 'pptx'] : [];
 }
 
-/** No provider request: all bytes are produced from the saved artifact and local work. */
-export async function createStudyFile(detail: LibraryArtifactDetail, format: StudyFormat, ownerUserId: string): Promise<{ name: string; bytes: Uint8Array }> {
+/** No provider request: all bytes are produced from the saved artifact. */
+export async function createStudyFile(detail: LibraryArtifactDetail, format: StudyFormat): Promise<{ name: string; bytes: Uint8Array }> {
   if (!formatsFor(detail).includes(format)) throw new Error('unsupported_export_format');
   if ('quiz' in detail) throw new Error('unsupported_export_format');
   const document = 'reviewer' in detail ? reviewerExport(detail.artifact, detail.reviewer) :
-    activityExport(detail.artifact, detail.draft,
-      (await (await getLocalArtifactStore())?.readActivityResponse(ownerUserId, detail.artifact.id))?.responses ?? {});
+    activityExport(detail.artifact, detail.draft);
   const bytes = format === 'pdf' ? await createStudyPdf(document) : format === 'docx' ? createStudyDocx(document) : createStudyPptx(document);
   return { name: exportFileName(detail.artifact, format), bytes };
 }
@@ -32,9 +30,9 @@ const base64 = (bytes: Uint8Array): string => {
   return out;
 };
 
-export async function saveStudyFile(detail: LibraryArtifactDetail, format: StudyFormat, ownerUserId: string): Promise<string | null> {
+export async function saveStudyFile(detail: LibraryArtifactDetail, format: StudyFormat): Promise<string | null> {
   const { EncodingType, StorageAccessFramework } = await import('expo-file-system/legacy');
-  const { name, bytes } = await createStudyFile(detail, format, ownerUserId);
+  const { name, bytes } = await createStudyFile(detail, format);
   const permission = await StorageAccessFramework.requestDirectoryPermissionsAsync();
   if (!permission.granted) return null;
   const mime = format === 'pdf' ? 'application/pdf' : format === 'docx' ?

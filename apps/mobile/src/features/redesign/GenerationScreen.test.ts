@@ -1,6 +1,7 @@
 import { createElement, type ReactElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GenerationView } from "@stay-focused/shared";
 import type { GenerationIntent } from "../../services/generationRecovery";
 import { GenerationScreen } from "./GenerationScreen";
 
@@ -8,11 +9,13 @@ const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
   read: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
+  generation: null as GenerationView | null,
   params: { intent: "pending-key" } as Record<string, string>,
 }));
 
 vi.mock("expo-router", () => ({
-  router: { push: mocks.push, replace: vi.fn() },
+  router: { push: mocks.push, replace: mocks.replace },
   useLocalSearchParams: () => mocks.params,
 }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" } } }) }));
@@ -27,7 +30,7 @@ vi.mock("./useListPreferences", () => ({ useListPreferences: () => ({ prefs: { h
 vi.mock("../../design/appActivity", () => ({ useAppActivity: () => ({ refresh: vi.fn() }) }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({ baseUrl: "https://api.example", accessToken: "token" }),
-  useExperience: () => ({ data: null, error: null, refresh: vi.fn() }),
+  useExperience: () => ({ data: mocks.generation, error: null, refresh: vi.fn() }),
 }));
 vi.mock("../../design/theme", () => ({ useTheme: () => ({ reducedMotion: true, colors: {} }) }));
 vi.mock("../../design/primitives", () => ({
@@ -51,6 +54,7 @@ const pending: GenerationIntent = { key: "pending-key", title: "Reviewer request
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.params = { intent: "pending-key" };
+  mocks.generation = null;
   mocks.read.mockResolvedValue([pending]);
   mocks.accept.mockResolvedValue({ ...pending, generationId: "job-id" });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -110,5 +114,26 @@ describe("Queue generation confirmation safety", () => {
     const root = await render(createElement(GenerationScreen));
     expect(mocks.accept).not.toHaveBeenCalled();
     expect(root.findAll(node => String(node.type) === "Action" && node.props.children === "Start generation")).toHaveLength(0);
+  });
+});
+
+describe("Draft generation result", () => {
+  it("reopens a completed assignment generation directly as the saved Draft", async () => {
+    mocks.params = { id: "job-id" };
+    mocks.generation = { id: "job-id", state: "completed", artifactId: "activity:saved", updatedAt: "2026-09-29", progress: null, error: null };
+    const root = await render(createElement(GenerationScreen));
+    const open = root.findAll(node => String(node.type) === "Action").find(node => node.props.children === "Open Draft")!;
+    expect(open).toBeDefined();
+    expect(root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ")).toContain("Draft ready");
+    await act(async () => open.props.onPress());
+    expect(mocks.replace).toHaveBeenCalledWith({ pathname: "/artifact", params: { id: "activity:saved" } });
+    expect(mocks.accept).not.toHaveBeenCalled();
+  });
+
+  it("keeps Reviewer completion unchanged", async () => {
+    mocks.params = { id: "job-id" };
+    mocks.generation = { id: "job-id", state: "completed", artifactId: "artifact:saved", updatedAt: "2026-09-29", progress: null, error: null };
+    const root = await render(createElement(GenerationScreen));
+    expect(root.findAll(node => String(node.type) === "Action" && node.props.children === "Open in Library")).toHaveLength(1);
   });
 });

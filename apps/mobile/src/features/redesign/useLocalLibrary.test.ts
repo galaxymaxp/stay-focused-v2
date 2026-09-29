@@ -7,6 +7,7 @@ import {
   OWNER_A,
   OWNER_B,
   openNodeSqlite,
+  draftDetail,
   quizDetail,
   reviewerDetail,
 } from "../../services/localLibrary/localLibrary.testSupport";
@@ -159,5 +160,26 @@ describe("useLocalArtifact", () => {
     expect(artifact.data).toBeNull();
     expect(artifact.error).toBe("not_found");
     await expect(mocks.store!.listSummaries(OWNER_A)).resolves.toEqual([]);
+  });
+});
+
+describe("saved Draft revision", () => {
+  it("updates the open Draft and export source immediately, then reopens that revision offline without a duplicate", async () => {
+    const original = draftDetail();
+    await mocks.store!.upsertDetail(OWNER_A, original.artifact.id, original);
+    mocks.request.mockRejectedValue(new RemoteError("connection"));
+    await act(async () => { rendered = create(createElement(ArtifactProbe, { id: original.artifact.id })); });
+    await flush();
+    const edited = draftDetail({ title: "Edited scenario", revision: 2, updatedAt: "2026-09-29T04:00:00Z", status: "edited" });
+    await act(async () => artifact.storeConfirmed(edited));
+    await flush();
+    expect(artifact.data).toEqual(edited);
+    expect(artifact.deviceCopy).toBe(false);
+    await act(async () => rendered!.unmount());
+    await act(async () => { rendered = create(createElement(ArtifactProbe, { id: original.artifact.id })); });
+    await flush();
+    expect(artifact.data).toEqual(edited);
+    expect(artifact.deviceCopy).toBe(true);
+    expect((await mocks.store!.listSummaries(OWNER_A)).map(item => item.id)).toEqual([original.artifact.id]);
   });
 });

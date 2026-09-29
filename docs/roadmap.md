@@ -1,5 +1,9 @@
 # Roadmap
 
+## B38 draft-first assignment UX (2026-09-29)
+
+**PASS.** Draft-first assignment UX is complete locally and accepted on realme: Task -> Assignment -> Generate Draft -> saved editable Draft. Library uses Drafts and the separate Study Activity artifact is no longer exposed. Internal Activity pipeline and B37 source handling remain intact. Fresh Firewall/VPN and Dice Roller each persist once; Firewall/VPN offline force-stop/reopen passes. Automated checks pass. Next: distribute the tested mobile UX through the existing preview update channel; no rollout or next milestone started. Earlier B38 architecture entries below describe separate historical scopes. [Acceptance](ai/acceptance/b38/draft-first-assignment-ux.md).
+
 ## B37.1 firewall/VPN Activity acceptance (2026-09-29)
 
 **This generation bug PASS; B37.1 remains PARTIAL.** Course-aware assignment link resolution fixes the specific pre-provider source failure. The same firewall/VPN assignment and Dice Roller generated fresh drafts on realme through private Google worker `generation-worker-00011-n2s`; Queue, Library and firewall force-stop/reopen pass, with one result/draft per new job. Supplemental API error-message rollout awaits explicit authorization after automatic approval review rejection. Other B37.1 gates remain; no B38 work, EAS build or push. [Evidence](ai/acceptance/b37/activity-firewall-vpn-generation.md).

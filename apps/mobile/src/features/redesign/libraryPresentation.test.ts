@@ -26,8 +26,8 @@ describe("Library presentation", () => {
     ]);
   });
 
-  it("filters one course by All / Reviewers / Quizzes / Activities", () => {
-    expect(librarySegments.map((segment) => segment.label)).toEqual(["All", "Reviewers", "Quizzes", "Activities"]);
+  it("filters one course by All / Reviewers / Quizzes / Drafts", () => {
+    expect(librarySegments.map((segment) => segment.label)).toEqual(["All", "Reviewers", "Quizzes", "Drafts"]);
     expect(filterCourseLibrary(items, "capstone", "all").map((entry) => entry.id)).toEqual(["r1", "q1"]);
     expect(filterCourseLibrary(items, "capstone", "reviewer").map((entry) => entry.id)).toEqual(["r1"]);
     expect(filterCourseLibrary(items, "capstone", "quiz").map((entry) => entry.id)).toEqual(["q1"]);
@@ -38,6 +38,6 @@ describe("Library presentation", () => {
 
   it("describes only the kinds a course actually has", () => {
     expect(describeLibraryCounts({ reviewer: 3, quiz: 1, activity_output: 0 })).toBe("3 reviewers · 1 quiz");
-    expect(describeLibraryCounts({ reviewer: 0, quiz: 2, activity_output: 1 })).toBe("2 quizzes · 1 activity");
+    expect(describeLibraryCounts({ reviewer: 0, quiz: 2, activity_output: 1 })).toBe("2 quizzes · 1 draft");
   });
 });

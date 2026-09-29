@@ -27,7 +27,7 @@ export function styledRuns(block: ExportBlock): { text: string; style: 'normal' 
 export function exportFileName(summary: Pick<LibraryArtifactSummary, 'title' | 'type' | 'course'>, format: StudyFormat): string {
   const clean = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 70);
   const course = summary.course?.code ? `${clean(summary.course.code)}_` : '';
-  const type = summary.type === 'activity_output' ? 'Activity' : 'Reviewer';
+  const type = summary.type === 'activity_output' ? 'Draft' : 'Reviewer';
   return `${course}${clean(summary.title) || 'Study'}_${type}.${format}`;
 }
 
@@ -58,16 +58,18 @@ export function reviewerExport(summary: LibraryArtifactSummary, reviewer: Review
   return { title: summary.title, blocks };
 }
 
-export function activityExport(summary: LibraryArtifactSummary, draft: ActivityDraft, responses: Readonly<Record<string, string>> = {}): ExportDocument {
+export function activityExport(summary: LibraryArtifactSummary, draft: ActivityDraft): ExportDocument {
   const blocks: ExportBlock[] = [{ kind: 'brand', text: 'Stay Focused' },
     ...(summary.course ? [{ kind: 'subtitle' as const, text: summary.course.name }] : []),
-    { kind: 'title', text: summary.title }, { kind: 'heading', text: 'Instructions' },
-    { kind: 'body', text: 'Work through each task in your own words.' }];
-  const tasks = draft.sections.length ? draft.sections.map((section, index) => ({ id: section.id, title: section.heading || `Task ${index + 1}` })) :
-    draft.slides.map((slide, index) => ({ id: `slide-${slide.number}`, title: slide.title || `Task ${index + 1}` }));
-  tasks.forEach((task, index) => {
-    blocks.push({ kind: 'question', text: `${index + 1}. ${task.title}` });
-    blocks.push({ kind: 'answer', text: `My work: ${responses[task.id]?.trim() || '________________________________________________\n________________________________________________'}` });
+    { kind: 'title', text: draft.title }];
+  draft.sections.forEach((section, index) => {
+    blocks.push({ kind: 'heading', text: section.heading || `Section ${index + 1}` });
+    blocks.push({ kind: 'body', text: section.content });
   });
-  return { title: summary.title, blocks };
+  draft.slides.forEach(slide => {
+    blocks.push({ kind: 'heading', text: slide.title });
+    blocks.push({ kind: 'body', text: slide.body });
+    if (slide.speakerNotes) blocks.push({ kind: 'body', text: `Speaker notes: ${slide.speakerNotes}` });
+  });
+  return { title: draft.title, blocks };
 }

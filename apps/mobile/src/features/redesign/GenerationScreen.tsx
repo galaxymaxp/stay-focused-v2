@@ -99,6 +99,7 @@ export function GenerationScreen() {
       ["queued", "preparing", "generating", "finalizing"].includes(value.state),
   );
   const data = generation.data;
+  const isDraft = intent?.type === "activity_output" || data?.artifactId?.startsWith("activity:") === true;
   // Completed and cloud-persisted: keep a device copy for Library and offline reading.
   const persistedId = persistedArtifactId(data);
   const ownerUserId = session?.user.id;
@@ -171,7 +172,7 @@ export function GenerationScreen() {
           accessibilityLiveRegion="polite"
           style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
-          <GenerationStatus message={stalled ? "Still waiting to start" : data ? generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
+          <GenerationStatus message={stalled ? "Still waiting to start" : data ? isDraft && data.state === "completed" ? "Draft ready" : generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
           <GenerationCore state={generationCoreState(data?.state ?? null, !!id)} />
           <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
@@ -228,7 +229,7 @@ export function GenerationScreen() {
               })
             }
           >
-            Open in Library
+            {isDraft ? "Open Draft" : "Open in Library"}
           </Action>
         )}
       </View>
@@ -383,7 +384,7 @@ function QueueCard({
     job.jobType === "quiz_generation"
       ? "Quiz"
       : job.jobType === "activity_generation"
-        ? "Activity Draft"
+        ? "Draft"
         : job.jobType === "document_extraction"
           ? "Material preparation"
           : "Reviewer";
@@ -458,12 +459,12 @@ function QueueCard({
   }
   return (
     <Surface>
-      <RowLink inset disabled={busy} label={job.status === "succeeded" ? `Open saved output: ${job.source.displayName || type}` : `View generation: ${job.source.displayName || type}`} onPress={() => void open()} icon={<ContentIcon kind={job.jobType === "quiz_generation" ? "quiz" : job.jobType === "activity_generation" ? "activity_output" : "reviewer"} />} trailing={job.status === "succeeded" ? <CheckCircle2 size={19} color={colors.success} /> : job.status === "running" ? <CircleDashed size={19} color={colors.accent} /> : job.status === "queued" ? <Clock3 size={19} color={colors.textMuted} /> : <AlertCircle size={19} color={colors.warning} />}>
+      <RowLink inset disabled={busy} label={job.status === "succeeded" ? `${job.jobType === "activity_generation" ? "Open Draft" : "Open saved output"}: ${job.source.displayName || type}` : `View generation: ${job.source.displayName || type}`} onPress={() => void open()} icon={<ContentIcon kind={job.jobType === "quiz_generation" ? "quiz" : job.jobType === "activity_generation" ? "activity_output" : "reviewer"} />} trailing={job.status === "succeeded" ? <CheckCircle2 size={19} color={colors.success} /> : job.status === "running" ? <CircleDashed size={19} color={colors.accent} /> : job.status === "queued" ? <Clock3 size={19} color={colors.textMuted} /> : <AlertCircle size={19} color={colors.warning} />}>
       <Copy muted size="caption">{type}</Copy>
       <Copy size="h3">{job.source.displayName || type}</Copy>
       <Copy muted size="caption">
         {job.status === "succeeded"
-          ? "Completed"
+          ? job.jobType === "activity_generation" ? "Draft ready" : "Completed"
           : job.status === "running"
             ? "Generating"
             : job.status === "failed" || job.status === "expired"

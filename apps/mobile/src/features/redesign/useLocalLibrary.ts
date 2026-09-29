@@ -163,7 +163,12 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
   /** Records a server-confirmed change (for example a saved draft revision). */
   const storeConfirmed = useCallback(
     (detail: LibraryArtifactDetail) => {
-      if (ownerUserId) void storeLocalArtifactDetail(ownerUserId, detail);
+      if (ownerUserId) {
+        if ("draft" in detail) setState((old) => old.data?.artifact.id === detail.artifact.id
+          ? { ...old, data: detail, deviceCopy: false }
+          : old);
+        void storeLocalArtifactDetail(ownerUserId, detail);
+      }
     },
     [ownerUserId],
   );

@@ -2,6 +2,9 @@ import { createElement, type ReactElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ActivityDetail,
+  ActivityDraft,
+  LibraryArtifactDetail,
   CourseLearningWorkspace,
   CourseSummary,
   GenerateCourseSummary,
@@ -10,14 +13,16 @@ import type {
   TodayOverview,
 } from "@stay-focused/shared";
 import { GenerateCourseScreen, GenerateMaterialScreen, GenerateScreen } from "./GenerateScreen";
-import { LibraryCourseScreen, LibraryScreen } from "./LibraryScreen";
-import { TasksCourseScreen, TasksScreen } from "./TasksScreen";
+import { ArtifactScreen, LibraryCourseScreen, LibraryScreen } from "./LibraryScreen";
+import { ActivityScreen, TasksCourseScreen, TasksScreen } from "./TasksScreen";
 import { TodayScreen } from "./TodayScreen";
 import { DayRingClock } from "./DayRingClock";
 import { localDate } from "./presentation";
 import { AnnouncementDetailScreen, AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 
 const mocks = vi.hoisted(() => ({
+  artifact: null as LibraryArtifactDetail | null,
+  storeConfirmed: vi.fn(),
   data: {} as Record<string, unknown>,
   errors: {} as Record<string, { message: string; code: string }>,
   paths: [] as string[],
@@ -200,7 +205,7 @@ vi.mock("./useExperience", () => ({
 }));
 vi.mock("./useLocalLibrary", () => ({
   useLocalLibrary: () => ({ ...mocks.library, refresh: vi.fn() }),
-  useLocalArtifact: () => ({ data: null, loading: false, error: null, deviceCopy: false, refresh: vi.fn(), storeConfirmed: vi.fn() }),
+  useLocalArtifact: () => ({ data: mocks.artifact, loading: false, error: null, deviceCopy: false, refresh: vi.fn(), storeConfirmed: mocks.storeConfirmed }),
 }));
 vi.mock("../../services/experienceApi", () => ({
   experienceRequest: mocks.request,
@@ -211,6 +216,7 @@ vi.mock("../../services/generationRecovery", () => ({
 
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
+  mocks.artifact = null;
   mocks.data = {};
   mocks.errors = {};
   mocks.paths = [];
@@ -953,5 +959,71 @@ describe("B25 screen interactions", () => {
     // A plain deadline: a time today, or a short date further out.
     expect(text).toMatch(/Due (\d|[A-Z][a-z]{2} \d)/);
     expect(root.findAll((node) => node.props.label === "Add a task" || node.props.children === "New Task")).toHaveLength(0);
+  });
+});
+
+describe("B38 saved assignment Draft", () => {
+  const draft: ActivityDraft = {
+    id: "draft-one", activityId: "assignment", courseId: "security", type: "presentation", title: "Firewalls and VPN",
+    sections: [], slides: [{ number: 1, title: "Scenario", body: "[Add your assigned scenario]", speakerNotes: null, sourceRefs: ["instructions"] }],
+    sources: [{ id: "instructions", title: "Assignment", role: "instructions" }], warnings: [{ code: "missing_source_information", sectionId: "slide-1", message: "Add scenario" }],
+    generationId: "job", createdAt: "2026-09-29", updatedAt: "2026-09-29", editable: true, revision: 1, status: "draft",
+  };
+  const artifact: LibraryArtifactSummary = { ...savedQuiz, id: "activity:draft-one", type: "activity_output", title: draft.title, activityId: "assignment" };
+
+  it("shows the saved Draft editor without a separate Study Activity or worksheet", async () => {
+    mocks.params = { id: artifact.id };
+    mocks.artifact = { artifact, draft };
+    const root = await render(createElement(ArtifactScreen));
+    expect(root.findAll(node => String(node.type) === "Page")[0]!.props.title).toBe("Draft");
+    const copy = root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ");
+    expect(copy).toContain("Saved draft");
+    expect(copy).not.toMatch(/Study activity|Questions \/ Tasks|My work|Mark as completed/);
+    expect(root.findAll(node => String(node.type) === "TextInput" && node.props.accessibilityLabel === "Slide 1")[0]!.props.value).toBe("[Add your assigned scenario]");
+  });
+
+  it("saves edited placeholders into the same Draft and device copy", async () => {
+    vi.useFakeTimers();
+    mocks.params = { id: artifact.id };
+    mocks.artifact = { artifact, draft };
+    const root = await render(createElement(ArtifactScreen));
+    const slide = root.findAll(node => String(node.type) === "TextInput" && node.props.accessibilityLabel === "Slide 1")[0]!;
+    await act(async () => slide.props.onChangeText("My assigned scenario"));
+    const edited = { ...draft, revision: 2, status: "edited" as const, slides: [{ ...draft.slides[0]!, body: "My assigned scenario" }] };
+    mocks.request.mockResolvedValue(edited);
+    await act(async () => root.findAll(node => String(node.type) === "Action" && node.props.children === "Save draft")[0]!.props.onPress());
+    expect(mocks.request).toHaveBeenCalledWith(expect.anything(), "/api/experience/activity-drafts/draft-one", { method: "PATCH", body: { revision: 1, content: { title: draft.title, sections: [], slides: edited.slides } } });
+    expect(mocks.storeConfirmed).toHaveBeenCalledWith({ artifact: expect.objectContaining({ id: artifact.id }), draft: edited });
+    expect(mocks.createIntent).not.toHaveBeenCalled();
+  });
+
+  it("lists the assignment output once under Drafts without worksheet completion status", async () => {
+    mocks.params = { courseKey: "personal" };
+    mocks.library.items = [{ ...artifact, activityStudyStatus: "not_started" }];
+    const root = await render(createElement(LibraryCourseScreen));
+    const segment = root.findAll(node => String(node.type) === "Page")[0]!.props.headerBelow.props.children;
+    expect(segment.props.segments.map((value: { label: string }) => value.label)).toEqual(["All", "Reviewers", "Quizzes", "Drafts"]);
+    await act(async () => segment.props.onChange("activity_output"));
+    const cards = root.findAll(node => String(node.type) === "RowLink");
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.props.label).toBe(`Draft: ${draft.title}`);
+    expect(root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ")).not.toContain("Not started");
+    await act(async () => cards[0]!.props.onPress());
+    expect(mocks.push).toHaveBeenCalledWith({ pathname: "/artifact", params: { id: artifact.id } });
+  });
+
+  it("keeps Canvas assignments separate and generates through the existing draft endpoint", async () => {
+    mocks.params = { id: "canvas:assignment" };
+    mocks.data["/api/experience/activities/canvas%3Aassignment"] = {
+      id: "canvas:assignment", title: "Firewalls and VPN", course: null, instructions: "Use the assigned scenario", dueAt: null, resources: [], taskId: null,
+      outputs: [artifact], generation: { activityAssistance: supported, reviewer: unavailable, quiz: unavailable },
+    } satisfies Pick<ActivityDetail, "id" | "title" | "course" | "instructions" | "dueAt" | "resources" | "taskId" | "outputs" | "generation">;
+    mocks.createIntent.mockResolvedValue({ key: "draft-request" });
+    const root = await render(createElement(ActivityScreen));
+    expect(root.findAll(node => String(node.type) === "Page")[0]!.props.title).toBe("Assignment");
+    const generate = root.findAll(node => String(node.type) === "Action" && node.props.children === "Generate Draft")[0]!;
+    await act(async () => generate.props.onPress());
+    expect(mocks.createIntent).toHaveBeenCalledWith("owner", { title: draft.title, type: "activity_output", path: "/api/experience/activities/canvas%3Aassignment/generate", body: { mode: "draft" } });
+    expect(mocks.push).toHaveBeenCalledWith({ pathname: "/generation", params: { intent: "draft-request", start: "1" } });
   });
 });

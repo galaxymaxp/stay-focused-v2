@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B38 draft-first assignment UX (2026-09-29)
+
+**PASS.** Completed the user-requested B38 Draft-first assignment UX. Draft is the immediate saved/editable assignment result; no Study Activity worksheet/status; Library categories are All / Reviewers / Quizzes / Drafts. Saved-Draft export and immediate confirmed-revision display are covered. Backend Activity infrastructure, B37 cross-course resolution, Tasks model and offline copies remain. Fresh physical Firewall/VPN and Dice Roller generation/opening, one result each, and Firewall/VPN offline force-stop/reopen pass. Fresh mobile 733/API 1,076 tests, focused mobile 103/Activity-worker 70, Workflow, typechecks/lint/diff check pass with four existing mobile lint warnings. Next: preview-channel mobile distribution, not started. No API/worker rollout, migration, EAS build/update or push. [Acceptance](acceptance/b38/draft-first-assignment-ux.md).
+
 ## B37.1 firewall/VPN Activity generation (2026-09-29)
 
 **Specific bug PASS; remain on B37.1.** The failed physical job had zero provider calls: a page URL scoped to another Canvas course was incorrectly treated as required local material. Narrow course-aware preparation is deployed to private worker `generation-worker-00011-n2s`; the same assignment now produces one 12-slide presentation draft, completes Queue, lists in Library and reopens after force-stop. Fresh Dice Roller also passes. API 1,076/mobile 726 tests, focused Activity/Google worker 72 tests, typechecks and lint pass (four existing mobile warnings). Safe API error mapping is tested locally; production deployment awaits explicit authorization after automatic approval review rejected it. Separate B37.1/Matching/native Office gates remain. No EAS build, B38 work or push. [Evidence](acceptance/b37/activity-firewall-vpn-generation.md).

@@ -245,7 +245,7 @@ export function GenerateCourseScreen() {
       {workspace.data ? (
         <Surface style={{ overflow: "hidden" }}>
           <RowLink inset label="Open this course in Tasks" onPress={() => router.navigate({ pathname: "/work/[courseKey]", params: { courseKey: courseId } })} icon={<ClipboardList color={colors.green} size={20} strokeWidth={1.7} />}>
-            <Copy size="bodySmall" style={{ fontWeight: "600" }}>Activities and tasks</Copy>
+            <Copy size="bodySmall" style={{ fontWeight: "600" }}>Assignments and tasks</Copy>
             <Copy muted size="caption">Deadline-bearing Canvas work stays in Tasks.</Copy>
           </RowLink>
         </Surface>

@@ -9,7 +9,7 @@ export const librarySegments: readonly { value: LibraryFilter; label: string }[]
   { value: "all", label: "All" },
   { value: "reviewer", label: "Reviewers" },
   { value: "quiz", label: "Quizzes" },
-  { value: "activity_output", label: "Activities" },
+  { value: "activity_output", label: "Drafts" },
 ];
 
 export function libraryCourseKey(item: Pick<LibraryArtifactSummary, "course">): string {
@@ -57,6 +57,6 @@ export function describeLibraryCounts(counts: Readonly<Record<LibraryArtifactTyp
   const parts: string[] = [];
   if (counts.reviewer) parts.push(`${counts.reviewer} reviewer${counts.reviewer === 1 ? "" : "s"}`);
   if (counts.quiz) parts.push(`${counts.quiz} quiz${counts.quiz === 1 ? "" : "zes"}`);
-  if (counts.activity_output) parts.push(`${counts.activity_output} activit${counts.activity_output === 1 ? "y" : "ies"}`);
+  if (counts.activity_output) parts.push(`${counts.activity_output} draft${counts.activity_output === 1 ? "" : "s"}`);
   return parts.join(" · ");
 }
