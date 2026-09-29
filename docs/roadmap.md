@@ -1,5 +1,9 @@
 # Roadmap
 
+## B39 EAS preview distribution (2026-09-29)
+
+**PASS after authorized native preview-build fallback.** B38 plus header cleanup was delivered by preview OTA, then the old APK's missing native crypto required owner-authorized APK `21be5ea3-f224-4be4-a707-643c7957dd15` from `2c66889`, Android runtime `2.0.1`. Realme Google sign-in, Draft-first UI/headers, Library categories, Reviewer controls, Quiz progress, offline force-stop/reopen and unchanged Draft cards/count pass without Metro. FRESH focused mobile 147/auth 29 tests, typecheck/lint, diff check, export and APK build pass. Preview channel retained; future Android updates target `2.0.1`; no backend rollout, production channel change or push. Next: complete separate native Office DOCX/PPTX-opening acceptance. [Acceptance](ai/acceptance/b39/eas-preview-b38-distribution.md).
+
 ## Artifact header simplification (2026-09-29)
 
 Removed repeated course/source banners and generated-date lines from saved Draft/Quiz previews, and repeated course/source context from the Reviewer header. Draft uses one multiline editable title and a header Export action; Quiz preview titles are compact. Topic navigation, question progress, Draft save status, actions and course organization remain. FRESH verification: 67 focused mobile tests, mobile typecheck, changed-screen lint and git diff check pass. Existing Draft, Quiz preview and Reviewer opened on realme with the cleaned headers; no generation or account data changed. Local debug JS only, no deployment or push.
