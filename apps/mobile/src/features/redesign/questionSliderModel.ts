@@ -14,7 +14,9 @@ export type SliderIntent = 'pending' | 'horizontal' | 'vertical';
 export function sliderGestureIntent(intent: SliderIntent, dx: number, dy: number): SliderIntent {
   if (intent !== 'pending') return intent;
   const x = Math.abs(dx), y = Math.abs(dy);
-  if (x >= 6 && x > y * 1.2) return 'horizontal';
-  if (y >= 6 && y > x * 1.2) return 'vertical';
+  if (x >= 8 && x >= y * 1.2) return 'horizontal';
+  // A small vertical lead is common at touch-down. Keep deciding until the
+  // movement is large enough to clearly be a scroll, then yield for this touch.
+  if (y >= 16 && y > x * 1.2) return 'vertical';
   return 'pending';
 }

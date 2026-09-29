@@ -36,6 +36,7 @@ function arrow(direction: 'left' | 'right') {
   return tree.root.findByProps({ accessibilityLabel: `Go one question ${direction}` });
 }
 function track() { return tree.root.findByProps({ accessibilityLabel: 'Question slider' }); }
+function page() { return tree.root.findByType('Page' as ElementType); }
 function action(text: string) {
   return tree.root.findAllByType('Action' as ElementType).find(node => node.children.includes(text))!;
 }
@@ -99,6 +100,29 @@ describe('minimal Quiz navigation', () => {
     expect(arrow('right').props.disabled).toBe(true);
   });
 
+  it('shows the destination immediately on release while the online position save is pending', async () => {
+    await mount();
+    let finishSave!: (value: QuizAttempt) => void;
+    mocks.request.mockImplementationOnce(() => new Promise<QuizAttempt>(resolve => { finishSave = resolve; }));
+    await act(async () => tree.root.findByType(QuestionSlider).props.onSettle(24));
+    expect(track().props.accessibilityValue.now).toBe(25);
+    expect(tree.root.findAllByType('Copy' as ElementType).flatMap(node => node.children)).toContain('Prompt 25');
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    await act(async () => finishSave({ ...mocks.remote!, currentQuestion: 24 }));
+    expect(track().props.accessibilityValue.now).toBe(25);
+    expect(mocks.practice!.attempt!.currentQuestion).toBe(24);
+  });
+
+  it('restores the previous question and draft if an online navigation save is rejected', async () => {
+    mocks.practice = { ...mocks.practice!, selected: ['a'] };
+    await mount();
+    mocks.request.mockRejectedValueOnce(new Error('save rejected'));
+    await act(async () => tree.root.findByType(QuestionSlider).props.onSettle(24));
+    expect(track().props.accessibilityValue.now).toBe(10);
+    expect(mocks.practice!.selected).toEqual(['a']);
+    expect(mocks.practice!.attempt!.currentQuestion).toBe(9);
+  });
+
   it.each([['single_select', ['a']], ['multi_select', ['a', 'b']], ['matching', ['left:a', 'other:b']], ['identification', ['written draft']]] as const)(
     'retains a %s draft across arrow and slider jumps', async (type, selection) => {
       mocks.quiz = { ...mocks.quiz!, questions: mocks.quiz!.questions.map((question, i) => i === 9 ? { ...question, type } : question) };
@@ -127,29 +151,75 @@ describe('minimal Quiz navigation', () => {
 });
 
 describe('slider responder ownership', () => {
-  it.each([-8, 8, 0])('retains a horizontal drag with %i dp vertical drift until release', async drift => {
+  it.each([
+    [[0, 0], [5, 1], [14, 4], [28, 7], [45, 10], [70, 8], [120, 15], [170, -10]],
+    [[0, 0], [-6, 2], [-18, 5], [-35, 9], [-60, 14], [-120, 20]],
+    [[0, 0], [10, 2], [20, 6], [35, 3], [50, 9], [70, 5]],
+  ].map(points => [points]))('retains the responder and only navigates on release for %j', async points => {
     await mount();
     await act(async () => track().props.onLayout({ nativeEvent: { layout: { width: 300 } } }));
-    track().props.onTouchStart(event(100));
-    expect(track().props.onStartShouldSetResponder()).toBe(false);
-    expect(track().props.onMoveShouldSetResponderCapture(event(130, 100 + drift))).toBe(true);
-    await act(async () => track().props.onResponderGrant(event(130, 100 + drift)));
-    await act(async () => track().props.onResponderMove(event(270, 150)));
-    expect(track().props.onResponderTerminationRequest()).toBe(false);
-    expect(track().props.onMoveShouldSetResponderCapture(event(271, 190))).toBe(true);
+    const slider = tree.root.findByType(QuestionSlider);
+    expect(track().props.onStartShouldSetResponder()).toBe(true);
+    track().props.onResponderGrant(event(200));
+    expect(page().props.scrollEnabled).toBe(true);
+    for (const [dx, dy] of points.slice(1)) {
+      await act(async () => track().props.onResponderMove(event(200 + dx, 100 + dy)));
+      expect(track().props.onResponderTerminationRequest(event(200 + dx, 100 + dy))).toBe(false);
+      expect(tree.root.findByType(QuestionSlider)).toBe(slider);
+    }
+    expect(page().props.scrollEnabled).toBe(false);
     expect(track().props.accessibilityValue.now).toBe(10);
-    // The final release coordinate can be newer than the last move sample.
-    await act(async () => track().props.onResponderRelease(event(278, 190)));
-    expect(track().props.accessibilityValue.now).toBe(22);
+    const [dx, dy] = points.at(-1)!;
+    await act(async () => track().props.onResponderRelease(event(200 + dx, 100 + dy)));
+    expect(page().props.scrollEnabled).toBe(true);
+    expect(track().props.accessibilityValue.now).not.toBe(10);
   });
 
   it('lets a dominant vertical gesture scroll and never jumps when that touch ends', async () => {
     await mount();
-    track().props.onTouchStart(event(100));
-    expect(track().props.onMoveShouldSetResponderCapture(event(103, 125))).toBe(false);
-    expect(track().props.onResponderTerminationRequest()).toBe(true);
-    expect(track().props.onMoveShouldSetResponderCapture(event(250, 126))).toBe(false);
-    await act(async () => track().props.onTouchEnd(event(250, 126)));
+    expect(track().props.onStartShouldSetResponder()).toBe(true);
+    track().props.onResponderGrant(event(100));
+    await act(async () => track().props.onResponderMove(event(103, 108)));
+    expect(page().props.scrollEnabled).toBe(true);
+    expect(track().props.onResponderTerminationRequest(event(103, 108))).toBe(false);
+    await act(async () => track().props.onResponderMove(event(103, 125)));
+    expect(track().props.onResponderTerminationRequest(event(103, 125))).toBe(true);
+    await act(async () => track().props.onResponderTerminate());
+    expect(page().props.scrollEnabled).toBe(true);
     expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it('restores page scrolling without navigation when an active drag is cancelled', async () => {
+    await mount();
+    track().props.onResponderGrant(event(100));
+    await act(async () => track().props.onResponderMove(event(140, 106)));
+    expect(page().props.scrollEnabled).toBe(false);
+    await act(async () => track().props.onResponderTerminate());
+    expect(page().props.scrollEnabled).toBe(true);
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it('keeps a 100-question drag mounted through long vertical wobble and settles once', async () => {
+    mocks.quiz = { ...mocks.quiz!, questionCount: 100, questions: Array.from({ length: 100 }, (_, i) => ({
+      ...mocks.quiz!.questions[0]!, id: `q${i + 1}`, prompt: `Prompt ${i + 1}`,
+    })) };
+    mocks.practice = { ...mocks.practice!, attempt: { ...mocks.practice!.attempt!, currentQuestion: 4 } };
+    mocks.remote = mocks.practice.attempt;
+    await mount();
+    await act(async () => track().props.onLayout({ nativeEvent: { layout: { width: 300 } } }));
+    const slider = tree.root.findByType(QuestionSlider);
+    track().props.onResponderGrant(event(72));
+    for (const [x, y] of [[90, 101], [160, 115], [240, 90], [340, 120]]) {
+      await act(async () => track().props.onResponderMove(event(x, y)));
+      expect(tree.root.findByType(QuestionSlider)).toBe(slider);
+      expect(track().props.onResponderTerminationRequest(event(x, y))).toBe(false);
+      expect(track().props.accessibilityValue.now).toBe(5);
+    }
+    expect(page().props.scrollEnabled).toBe(false);
+    expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => track().props.onResponderRelease(event(345, 130)));
+    expect(track().props.accessibilityValue.now).toBe(95);
+    expect(page().props.scrollEnabled).toBe(true);
+    expect(mocks.request).toHaveBeenCalledTimes(1);
   });
 });

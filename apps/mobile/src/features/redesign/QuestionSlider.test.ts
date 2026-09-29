@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sliderGestureIntent, sliderQuestionIndex, sliderQuestionIndexFromPageX } from './questionSliderModel';
+import { sliderGestureIntent, sliderQuestionIndex, sliderQuestionIndexFromPageX, type SliderIntent } from './questionSliderModel';
 
 describe('question slider snapping', () => {
   it.each([10, 30, 100])('maps the track to valid question indices for %i questions', count => {
@@ -18,17 +18,24 @@ describe('question slider snapping', () => {
 });
 
 describe('slider gesture intent', () => {
-  it.each([-1, 1])('locks slow and fast horizontal movement with drift in direction %i', direction => {
-    let intent = sliderGestureIntent('pending', 3, direction * 2);
-    expect(intent).toBe('pending');
-    intent = sliderGestureIntent(intent, 7, direction * 3);
+  it.each([
+    [[0, 0], [5, 1], [14, 4], [28, 7], [45, 10], [70, 8]],
+    [[0, 0], [-6, 2], [-18, 5], [-35, 9], [-60, 14]],
+    [[0, 0], [10, 2], [20, 6], [35, 3], [50, 9], [70, 5]],
+    [[0, 0], [4, 7], [7, 10], [18, 11], [40, 8], [80, 20]],
+  ].map(points => [points]))('locks horizontal intent through a realistic movement sequence: %j', points => {
+    let intent: SliderIntent = 'pending';
+    for (const [dx, dy] of points) {
+      intent = sliderGestureIntent(intent, dx, dy);
+      expect(intent).not.toBe('vertical');
+    }
     expect(intent).toBe('horizontal');
-    expect(sliderGestureIntent(intent, 100, direction * 20)).toBe('horizontal');
-    expect(sliderGestureIntent(intent, 2, direction * 150)).toBe('horizontal');
-    expect(sliderGestureIntent('pending', 120, direction * 16)).toBe('horizontal');
+    expect(sliderGestureIntent(intent, 100, -10)).toBe('horizontal');
+    expect(sliderGestureIntent(intent, 100, 50)).toBe('horizontal');
   });
   it('leaves dominant vertical scrolling with the parent for the entire touch', () => {
-    const intent = sliderGestureIntent('pending', 2, 8);
+    expect(sliderGestureIntent('pending', 2, 8)).toBe('pending');
+    const intent = sliderGestureIntent('pending', 3, 18);
     expect(intent).toBe('vertical');
     expect(sliderGestureIntent(intent, 150, 10)).toBe('vertical');
   });

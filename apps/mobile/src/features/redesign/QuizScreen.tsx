@@ -69,6 +69,7 @@ export function QuizScreen() {
   const [localReady, setLocalReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
+  const [sliderDragging, setSliderDragging] = useState(false);
   const initialized = useRef<string | null>(null);
   const localWrites = useRef<Promise<void>>(Promise.resolve());
   const question = quizData?.questions[index],
@@ -196,34 +197,45 @@ export function QuizScreen() {
   }
   async function moveTo(next: number) {
     if (!attempt || !quizData || next < 0 || next >= quizData.questions.length || next === index) return;
-    const localMove = () => {
-      const value = moveOffline(attempt, question!.id, selected, next);
-      setAttempt(value);
-      setIndex(next);
-      setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
-      setDirty(true);
-      setMatchingReady(false); setMatchingLeft(null);
-    };
-    if (offline) { localMove(); return; }
-    try {
-    if (!feedback && JSON.stringify(selected) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === question!.id)?.selectedOptionIds ?? [])) {
-      const savedAttempt = await experienceRequest<QuizAttempt>(client,
-        `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question!.id)}`,
-        { method: 'PATCH', body: { selectedOptionIds: selected, finalize: false } });
-      setAttempt(compatibleAttempt(savedAttempt));
-    }
-    const value = await experienceRequest<QuizAttempt>(client,
-      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/study-state`,
-      { method: 'PATCH', body: { action: 'navigate', position: next } });
-    setAttempt(compatibleAttempt(value));
+    const previousIndex = index;
+    const previousDirty = dirty;
+    const previousMatchingReady = matchingReady;
+    const previousMatchingLeft = matchingLeft;
+    const currentQuestion = question!;
+    const draft = [...selected];
+    const optimistic = moveOffline(attempt, currentQuestion.id, draft, next);
+    // All questions are already on the device. Show the destination on release
+    // while its draft and position are saved, never while the thumb is moving.
+    setAttempt(optimistic);
     setIndex(next);
-    setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
-    setMatchingReady(false);
-    setMatchingLeft(null);
-    setDirty(false);
+    setSelected(optimistic.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
+    setDirty(true);
+    setMatchingReady(false); setMatchingLeft(null);
+    if (offline) return;
+    try {
+      if (!feedback && JSON.stringify(draft) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === currentQuestion.id)?.selectedOptionIds ?? [])) {
+        await experienceRequest<QuizAttempt>(client,
+          `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(currentQuestion.id)}`,
+          { method: 'PATCH', body: { selectedOptionIds: draft, finalize: false } });
+      }
+      const value = await experienceRequest<QuizAttempt>(client,
+        `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/study-state`,
+        { method: 'PATCH', body: { action: 'navigate', position: next } });
+      setAttempt(compatibleAttempt(value));
+      setSelected(value.answers.find(answer => answer.questionId === quizData.questions[next]?.id)?.selectedOptionIds.slice() ?? []);
+      setDirty(false);
     } catch (cause) {
-      if (!(cause instanceof ExperienceApiError) || cause.code !== 'connection') throw cause;
-      setOfflineMode(true); localMove();
+      if (cause instanceof ExperienceApiError && cause.code === 'connection') {
+        setOfflineMode(true);
+        return;
+      }
+      setAttempt(attempt);
+      setIndex(previousIndex);
+      setSelected(draft);
+      setDirty(previousDirty);
+      setMatchingReady(previousMatchingReady);
+      setMatchingLeft(previousMatchingLeft);
+      throw cause;
     }
   }
   async function revealAnswer() {
@@ -261,7 +273,7 @@ export function QuizScreen() {
     quiz.refresh(); history.refresh();
   }
   return (
-    <Page title="Quiz" back>
+    <Page title="Quiz" back scrollEnabled={!sliderDragging}>
       {quiz.error && !savedQuiz && <Notice>{quiz.error}</Notice>}
       {quiz.loading && !quizData && <SkeletonCards rows={2} label="Loading your quiz" />}
       {quizData && <Copy size="h2">{quizData.title}</Copy>}
@@ -274,7 +286,7 @@ export function QuizScreen() {
             {savedQuiz.questions[index]!.leftItem ? <Copy>{savedQuiz.questions[index]!.leftItem}</Copy> : null}
             {savedQuiz.questions[index]!.options.map((option) => <Copy key={option.id} muted>• {option.text}</Copy>)}
           </Surface> : null}
-          <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} />
+          <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} onDragActiveChange={setSliderDragging} />
           {localReady && <Action onPress={() => {
             const value = newOfflineAttempt(savedQuiz.id, newRequestKey());
             setAttempt(value); setResult(null); setIndex(0); setSelected([]); setDirty(true);
@@ -392,7 +404,7 @@ export function QuizScreen() {
             </Action>
           )}
           {!attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline} onPress={() => void run(() => revealAnswer())}>Reveal Answer</Action>}
-          <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} />
+          <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} onDragActiveChange={setSliderDragging} />
           <Action
               disabled={busy || offline}
               onPress={() =>
