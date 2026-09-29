@@ -1824,6 +1824,10 @@ export interface Database {
           request_fingerprint: string;
           retry_idempotency_key: string | null;
           idempotency_expires_at: string;
+          google_dispatch_id: string | null;
+          google_dispatch_key: string | null;
+          google_dispatched_at: string | null;
+          google_worker_lease_expires_at: string | null;
           workflow_run_id: string | null;
           workflow_dispatched_at: string | null;
           worker_id: string | null;
@@ -1864,6 +1868,9 @@ export interface Database {
           retry_idempotency_key?: string | null;
           idempotency_expires_at?: string;
           google_dispatch_id?: string | null;
+          google_dispatch_key?: string | null;
+          google_dispatched_at?: string | null;
+          google_worker_lease_expires_at?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           worker_id?: string | null;
@@ -1904,6 +1911,9 @@ export interface Database {
           retry_idempotency_key?: string | null;
           idempotency_expires_at?: string;
           google_dispatch_id?: string | null;
+          google_dispatch_key?: string | null;
+          google_dispatched_at?: string | null;
+          google_worker_lease_expires_at?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           worker_id?: string | null;
@@ -4517,6 +4527,26 @@ export interface Database {
           p_request_fingerprint: string;
           p_source_metadata: Json;
         };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      prepare_canvas_sync_job_google_dispatch_v1: {
+        Args: { p_job_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      mark_canvas_sync_job_google_dispatched_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      mark_canvas_sync_job_google_dispatch_failed_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      claim_canvas_sync_job_google_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string; p_worker_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      heartbeat_canvas_sync_job_google_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string; p_worker_id: string };
         Returns: CanvasSyncJobDatabaseRow[];
       };
       prepare_canvas_sync_job_workflow_dispatch_v1: {

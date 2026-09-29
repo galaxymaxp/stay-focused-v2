@@ -57,6 +57,7 @@ export async function executeCanvasSyncUnit(
   input: {
     readonly unitId: string;
     readonly workerId: string;
+    readonly accessToken?: string;
   },
 ): Promise<CanvasSyncUnitExecutionResult> {
   const unit = await beginCanvasSyncUnitAttempt(
@@ -101,7 +102,7 @@ export async function executeCanvasSyncUnit(
   }
 
   try {
-    const token = decryptConnectionToken(context.connection);
+    const token = input.accessToken ?? decryptConnectionToken(context.connection);
     const canvas = createCanvasClient(context.connection.base_url, token);
     const result = await runUnit({
       canvas,

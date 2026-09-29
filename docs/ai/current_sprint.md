@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B37 Canvas sync Google worker cutover (2026-09-29)
+
+**PARTIAL.** Production Canvas jobs enqueue to the existing Google Tasks queue and run on private Cloud Run. After correcting legacy finalization token decrypts, fresh realme CC6, CIT17 and SOC SCI 103N content/grade jobs all reached terminal success; content was partial for inaccessible Canvas resources, with no Workflow run IDs. Generate showed CIT17 PDFs, Tasks showed submitted assignments, and relaunch retained the signed-in session and canonical row counts. Opening Generate and relaunching started extra 7-course sync batches; one repeat CC6 content delivery failed before units. An empty CIT17 administrative Page appeared as a learning source. Full physical acceptance and the architecture commit remain open. The older P0 note below is historical.
+
 ## Canvas sync P0 (2026-09-29)
 
 Production Workflow queue deliveries fail with `ThrottleError: Workflow usage limit exceeded`; CC6, CIT17 and SOC SCI 103N jobs were accepted but never claimed. The existing Canvas credential works for live course inventory. Applied forward expiry migration `20260929060000`; the original six jobs now expire to a safe terminal state. Mobile now reconciles terminal jobs on foreground, polls beyond 15 minutes, persists a restart cooldown, and shows a retryable failure. Android preview OTA `bbf3c411-38b7-4c26-880b-61a6f9206514` is published but realme activation is unconfirmed. Do not trigger more automatic sync attempts while capacity is exhausted. Next: restore Workflow capacity or move Canvas execution to the Google worker, then retest all three courses and finish physical acceptance. Scoped code remains uncommitted until that acceptance passes.

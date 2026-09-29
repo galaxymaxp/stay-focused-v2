@@ -2,6 +2,8 @@
 
 ## Immediate P0: Canvas sync capacity (2026-09-29)
 
+The direct Google Cloud Tasks to private Cloud Run Canvas path is deployed and proved by fresh terminal content/grade jobs for CC6, CIT17 and SOC SCI 103N, all without Workflow. The finalization token handoff bug is corrected. Physical acceptance remains PARTIAL: app navigation and relaunch started additional 7-course batches, one repeat CC6 content delivery failed before units, and an empty CIT17 administrative Page appeared in Generate. Next: correct automatic sync freshness/relaunch admission and the repeat-delivery failure, then rerun physical routing and relaunch acceptance. The earlier capacity note below records the pre-cutover state.
+
 Vercel Workflow has exhausted its usage limit, so accepted Canvas jobs do not execute. Overdue-job expiry and client failure convergence are implemented, with the database reaper applied and Android preview OTA published. Fresh CC6, CIT17 and SOC SCI 103N syncs remain blocked. Restore Workflow capacity or implement the already planned Google-worker Canvas sync migration, then run the three-course physical acceptance and commit the scoped repair only after it passes.
 
 ## B39 EAS preview distribution (2026-09-29)

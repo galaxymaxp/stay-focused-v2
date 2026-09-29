@@ -785,6 +785,7 @@ export async function syncCanvasAcademicGraph({
 }
 
 export async function syncSelectedCanvasCourse({
+  accessToken,
   canvasClient,
   client,
   connection,
@@ -793,6 +794,7 @@ export async function syncSelectedCanvasCourse({
   retryPolicy: retryPolicyInput,
   userId,
 }: {
+  readonly accessToken?: string;
   readonly canvasClient?: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
@@ -818,7 +820,7 @@ export async function syncSelectedCanvasCourse({
 
   let token: string;
   try {
-    token = decryptConnectionToken(connection);
+    token = accessToken ?? decryptConnectionToken(connection);
   } catch {
     const resourceCounts = emptyResourceCounts();
     const summary = createCourseScopedSummary({
