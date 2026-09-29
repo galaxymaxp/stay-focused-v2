@@ -2,6 +2,8 @@
 
 ## B38 Canvas admission and physical gate (2026-09-29)
 
+**Deployment gate blocked.** Automatic approval review rejected the production Vercel rollout and prohibited a workaround. Obtain authorization for the prepared Vercel, Cloud Run, and preview mobile deployments, then run the realme gates. [Evidence](ai/acceptance/b38/canvas-sync-admission.md).
+
 B37 Google dispatch is committed at `46e66a8`. B38 locally removes full-course sync requests from launch, foreground stale checks, Today focus, and Generate/Tasks refresh. The existing unique active-job index is reused to return the current job on a concurrent request. A bounded token-handoff retry addresses the zero-unit repeat failure associated with a Vercel internal-route timeout, and empty Canvas Pages are excluded from Generate. Next: deploy the verified API/worker/mobile revisions, then run the realme passive-navigation, one-course-at-a-time manual sync, announcement, and relaunch gates. The preceding P0 note is historical.
 
 ## Immediate P0: Canvas sync capacity (2026-09-29)

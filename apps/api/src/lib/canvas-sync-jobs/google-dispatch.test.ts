@@ -33,6 +33,26 @@ describe("Google Canvas dispatch", () => {
     vi.unstubAllEnvs();
   });
 
+  it("lets Cloud Tasks deduplicate simultaneous submissions of one dispatch", async () => {
+    vi.stubEnv("GOOGLE_CLOUD_PROJECT_ID", "project-one");
+    vi.stubEnv("GOOGLE_GENERATION_REGION", "asia-northeast1");
+    vi.stubEnv("GOOGLE_GENERATION_QUEUE", "generation");
+    vi.stubEnv("GOOGLE_TASKS_INVOKER_EMAIL", "invoker@project-one.iam.gserviceaccount.com");
+    vi.stubEnv("GOOGLE_GENERATION_WORKER_URL", "https://worker.run.app");
+    let accepted = 0;
+    const request = vi.fn(async (_input: { data: { task: { name: string } } }) => {
+      if (accepted++ === 0) return { status: 200 };
+      throw { response: { status: 409 } };
+    });
+    await Promise.all([
+      enqueueGoogleCanvasJob(reference, { client: { request } as never }),
+      enqueueGoogleCanvasJob(reference, { client: { request } as never }),
+    ]);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[0]![0].data.task.name).toBe(request.mock.calls[1]![0].data.task.name);
+    vi.unstubAllEnvs();
+  });
+
   it("prepares before enqueue, records acceptance, and reuses the accepted job", async () => {
     const calls: string[] = [];
     const prepared = job();

@@ -963,8 +963,8 @@ describe("B25 screen interactions", () => {
 });
 
 describe("passive Canvas navigation", () => {
-  it("reads Generate and Tasks data without requesting sync, including pull to refresh", async () => {
-    for (const Screen of [GenerateScreen, TasksScreen]) {
+  it("reads Generate, Tasks, and Library without requesting sync, including pull to refresh", async () => {
+    for (const Screen of [GenerateScreen, TasksScreen, LibraryScreen]) {
       const root = await render(createElement(Screen));
       const page = root.findAll((node) => String(node.type) === "Page")[0]!;
       await act(async () => page.props.onRefresh());

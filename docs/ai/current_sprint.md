@@ -2,6 +2,8 @@
 
 ## B38 Canvas sync admission (2026-09-29)
 
+**Production rollout blocked by automatic approval review.** Vercel deployment was rejected as a consequential service mutation without separately recognized explicit authorization. No workaround or Cloud Run/EAS rollout was attempted, and the realme gates remain pending. [Evidence](acceptance/b38/canvas-sync-admission.md).
+
 **Local repair in verification.** B37 architecture is committed at `46e66a8`. The exact extra-batch paths were sign-in/foreground staleness and Today focus, with Generate/Tasks refresh also able to call account-wide `sync()`. Passive paths now restore persisted data and poll already accepted jobs; only explicit Sync actions start new work. Database unique active-job admission remains authoritative and the API reuses its winner on concurrent requests. The failed CC6 repeat content job had one claim and zero units; a contemporaneous production token-route 504 supports a pre-unit handoff timeout, now addressed with one bounded retry and a 35-second request deadline. An empty CIT17 Page is excluded by body eligibility. Deployment, realme gates, and final verdict are pending.
 
 ## B37 Canvas sync Google worker cutover (2026-09-29)

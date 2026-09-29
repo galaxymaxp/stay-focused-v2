@@ -2,6 +2,8 @@
 
 ## B38 Canvas sync admission repair (2026-09-29)
 
+**Rollout blocked by automatic approval review.** The production Vercel deployment was rejected as a consequential service change without separately recognized explicit authorization; no Cloud Run or EAS rollout followed. The physical gates remain unrun. [Evidence and trigger map](ai/acceptance/b38/canvas-sync-admission.md).
+
 **Implementation verified locally; physical acceptance pending deployment.** B37's already proven Google dispatch architecture is committed at `46e66a8`. The 14-job batch came from account-wide `sync()` calls in sign-in/foreground stale-data reconciliation and Today focus; Generate and Tasks pull-to-refresh also called it. Launch, foreground, and passive screens now read persisted data and reconcile existing jobs only. Explicit Sync actions still start content and grades jobs. The existing database partial unique index admits one active job per user/course/type; the API now returns that active job when a concurrent different-key request hits the index. The failed repeat CC6 content job `8252e7d3-0059-4965-8de3-cd91513b192d` was claimed once, had zero units, and coincided with a production `/api/internal/canvas/sync-token` timeout; worker token handoff now allows the route's 30-second budget and retries one transient failure. CIT17's published “FINAL PROJECT GROUPING” Page has an empty body and is now excluded by general Page eligibility. Deployment and realme passive/manual/relaunch gates remain open; do not claim a physical PASS yet.
 
 ## B37 Canvas sync Google worker cutover (2026-09-29)

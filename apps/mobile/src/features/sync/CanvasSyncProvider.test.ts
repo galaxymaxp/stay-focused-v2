@@ -14,9 +14,13 @@ const mocks = vi.hoisted(() => ({
   readSelection: vi.fn(),
   saveSelection: vi.fn(),
   readActive: vi.fn(),
+  foreground: null as null | ((state: string) => void),
 }));
 
-vi.mock("react-native", () => ({ AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) } }));
+vi.mock("react-native", () => ({ AppState: { currentState: "active", addEventListener: (_event: string, listener: (state: string) => void) => {
+  mocks.foreground = listener;
+  return { remove() { mocks.foreground = null; } };
+} } }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" }, accessToken: "token" } }) }));
 vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => "https://api.example" }));
 vi.mock("../../services/canvasApi", () => ({
@@ -57,6 +61,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   latest = null;
+  mocks.foreground = null;
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mocks.reconcile.mockResolvedValue({ jobs: [], newlyCompleted: [] });
   mocks.readActive.mockResolvedValue([]);
@@ -117,6 +122,14 @@ describe("CanvasSyncProvider", () => {
     expect([...latest!.selectedCourseIds!]).toEqual(["a", "b"]);
   });
 
+  it("reconciles on foreground without starting stale selected courses", async () => {
+    mocks.listCourses.mockResolvedValue(inventory("2026-09-19T14:45:00.000Z"));
+    await mount();
+    await act(async () => { mocks.foreground?.("active"); });
+    expect(mocks.reconcile).toHaveBeenCalledTimes(2);
+    expect(mocks.start).not.toHaveBeenCalled();
+  });
+
   it("does not immediately resubmit an expired job after a cold start", async () => {
     mocks.listCourses.mockResolvedValue(inventory("2026-09-19T14:45:00.000Z"));
     mocks.readActive.mockResolvedValue([{ lastStatusCheckAt: new Date().toISOString(), lastKnownStatus: "expired" }]);
@@ -166,6 +179,7 @@ describe("CanvasSyncProvider", () => {
     expect(started).toBe(true);
     expect(mocks.saveSelection).toHaveBeenCalledWith(expect.objectContaining({ selectedCourseIds: ["a", "cit17"] }));
     expect(latest!.courseStates.cit17).toBe("syncing");
+    expect(mocks.start.mock.calls.map(([input]) => input.jobType).sort()).toEqual(["course_content", "course_grades"]);
     expect(latest!.selectedCourseIds?.has("cit17")).toBe(true);
     // The header orb reads this phase while the course syncs.
     expect(latest!.snapshot.phase).toBe("syncing");
