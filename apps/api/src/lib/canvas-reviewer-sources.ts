@@ -439,6 +439,12 @@ function isCanvasGenerateCandidate(
     return false;
   }
 
+  // A Canvas Page with no readable instructional body is a grouping or
+  // navigation object, even when it is linked from a course module.
+  if (source.type === "page" && source.availability !== "available") {
+    return false;
+  }
+
   // Canvas file inventory also contains course artwork, avatars, and banners.
   // Only a direct module File item establishes image learning-material intent.
   if (source.file?.kind === "image" && source.placement.group !== "module") {

@@ -228,6 +228,21 @@ describe("Canvas reviewer source service", () => {
     ]);
   });
 
+  it("excludes a module grouping Page with an empty body without relying on its title", async () => {
+    const groupingPage = {
+      ...basePageRow(),
+      id: OTHER_PAGE_ID,
+      canvas_page_id: "grouping-page",
+      title: "Final project grouping",
+      body_html: "<div><p> </p></div>",
+    };
+    const fake = createFakeCanvasClient({ canvas_pages: [basePageRow(), groupingPage] });
+    const result = await listCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map((source) => source.id)).toEqual([`page:${PAGE_ID}`, `file:${FILE_ID}`]);
+  });
+
   it("excludes files placed in the observed Course Information Module", async () => {
     const administrativeFile = {
       ...baseFileRow(),
