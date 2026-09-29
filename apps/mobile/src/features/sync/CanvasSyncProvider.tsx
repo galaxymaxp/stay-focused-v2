@@ -34,14 +34,13 @@ import {
   saveCanvasCoursePreferences,
   type CanvasSyncJobStatusView,
 } from "../../services/canvasApi";
-import { upsertActiveCanvasSyncJob } from "../../services/activeCanvasSyncJobStore";
+import { readActiveCanvasSyncJobs, upsertActiveCanvasSyncJob } from "../../services/activeCanvasSyncJobStore";
 import {
   reconcileCanvasSyncJobs,
   startDurableCanvasSync,
 } from "../../services/canvasSyncJobCoordinator";
 
 const POLL_MS = 4_000;
-const MAX_POLL_MS = 15 * 60 * 1_000;
 
 interface CanvasSyncValue {
   readonly snapshot: AccountSyncSnapshot;
@@ -89,7 +88,6 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
   const tracked = useRef(new Map<string, CanvasSyncJobStatusView>());
   const rejected = useRef<SyncRejection[]>([]);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pollStartedAt = useRef(0);
   const live = useRef(true);
   // Timers and foreground listeners outlive renders; they read the current
   // session so a refreshed access token is used rather than the one captured.
@@ -160,12 +158,6 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
       }
       setSnapshot((current) => ({ ...current, ...summary }));
     }
-    if (Date.now() - pollStartedAt.current > MAX_POLL_MS) {
-      // Durable jobs keep running on the server; the next foreground resumes them.
-      diagnose("polling_paused", { tracked: tracked.current.size });
-      running.current = false;
-      return;
-    }
     pollTimer.current = setTimeout(() => void poll(), POLL_MS);
   }, [finish, request]);
 
@@ -211,7 +203,6 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
         ...summarizeSyncJobs(started.jobs, started.rejected),
         lastSyncedAt: started.lastSyncedAt ?? current.lastSyncedAt,
       }));
-      pollStartedAt.current = Date.now();
       pollTimer.current = setTimeout(() => void poll(), POLL_MS);
     } catch {
       diagnose("start_failed");
@@ -247,7 +238,6 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
       setSnapshot((current) => ({ ...current, ...summarizeSyncJobs([...tracked.current.values()], rejected.current) }));
       if (!running.current) {
         running.current = true;
-        pollStartedAt.current = Date.now();
         clearTimeout(pollTimer.current);
         pollTimer.current = setTimeout(() => void poll(), POLL_MS);
       }
@@ -282,29 +272,38 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     if (!connection.ok || connection.data.connection?.status !== "active") return;
     const { jobs } = await reconcileCanvasSyncJobs(input);
     const active = jobs.filter((job) => !isFinishedSyncJob(job));
-    if (active.length > 0 && live.current) {
-      running.current = true;
-      tracked.current = new Map(active.map((job) => [job.id, job]));
+    if (jobs.length > 0 && live.current) {
+      tracked.current = new Map(jobs.map((job) => [job.id, job]));
       rejected.current = [];
-      setSnapshot((current) => ({ ...current, ...summarizeSyncJobs(active, []) }));
-      setCourseStates(courseSyncStates(active, []));
-      pollStartedAt.current = Date.now();
+      setCourseStates(courseSyncStates(jobs, []));
+      if (active.length === 0) {
+        await finish();
+        return;
+      }
+      running.current = true;
+      setSnapshot((current) => ({ ...current, ...summarizeSyncJobs(jobs, []) }));
       pollTimer.current = setTimeout(() => void poll(), POLL_MS);
       return;
     }
     const lastSyncedAt = await refreshLastSynced();
-    if (shouldAutoSync({ lastSyncedAt, lastAttemptAt: lastAttemptAt.current, now: Date.now() })) {
+    const references = await readActiveCanvasSyncJobs(input.ownerUserId);
+    const persistedAttemptAt = Math.max(0, ...references.map((item) => Date.parse(item.lastStatusCheckAt)).filter(Number.isFinite));
+    const lastKnownAttemptAt = Math.max(lastAttemptAt.current ?? 0, persistedAttemptAt) || null;
+    if (shouldAutoSync({ lastSyncedAt, lastAttemptAt: lastKnownAttemptAt, now: Date.now() })) {
       diagnose("auto_refresh");
       await sync();
     }
-  }, [poll, refreshLastSynced, request, sync]);
+  }, [finish, poll, refreshLastSynced, request, sync]);
 
   useEffect(() => {
     live.current = true;
     if (!ownerUserId) return;
     void resume().catch(() => undefined);
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void resume().catch(() => undefined);
+      if (state === "active") {
+        if (running.current) void poll().catch(() => undefined);
+        else void resume().catch(() => undefined);
+      }
     });
     return () => {
       live.current = false;
@@ -312,7 +311,7 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
       clearTimeout(pollTimer.current);
       running.current = false;
     };
-  }, [ownerUserId, resume]);
+  }, [ownerUserId, poll, resume]);
 
   const value = useMemo(
     () => ({ snapshot, dataVersion, sync, courseStates, selectedCourseIds, syncCourse, unsyncCourse }),

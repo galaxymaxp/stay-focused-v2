@@ -1,5 +1,9 @@
 # Roadmap
 
+## Immediate P0: Canvas sync capacity (2026-09-29)
+
+Vercel Workflow has exhausted its usage limit, so accepted Canvas jobs do not execute. Overdue-job expiry and client failure convergence are implemented, with the database reaper applied and Android preview OTA published. Fresh CC6, CIT17 and SOC SCI 103N syncs remain blocked. Restore Workflow capacity or implement the already planned Google-worker Canvas sync migration, then run the three-course physical acceptance and commit the scoped repair only after it passes.
+
 ## B39 EAS preview distribution (2026-09-29)
 
 **PASS after authorized native preview-build fallback.** B38 plus header cleanup was delivered by preview OTA, then the old APK's missing native crypto required owner-authorized APK `21be5ea3-f224-4be4-a707-643c7957dd15` from `2c66889`, Android runtime `2.0.1`. Realme Google sign-in, Draft-first UI/headers, Library categories, Reviewer controls, Quiz progress, offline force-stop/reopen and unchanged Draft cards/count pass without Metro. FRESH focused mobile 147/auth 29 tests, typecheck/lint, diff check, export and APK build pass. Preview channel retained; future Android updates target `2.0.1`; no backend rollout, production channel change or push. Next: complete separate native Office DOCX/PPTX-opening acceptance. [Acceptance](ai/acceptance/b39/eas-preview-b38-distribution.md).

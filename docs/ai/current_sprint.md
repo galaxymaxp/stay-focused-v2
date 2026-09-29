@@ -1,5 +1,9 @@
 # Current Sprint
 
+## Canvas sync P0 (2026-09-29)
+
+Production Workflow queue deliveries fail with `ThrottleError: Workflow usage limit exceeded`; CC6, CIT17 and SOC SCI 103N jobs were accepted but never claimed. The existing Canvas credential works for live course inventory. Applied forward expiry migration `20260929060000`; the original six jobs now expire to a safe terminal state. Mobile now reconciles terminal jobs on foreground, polls beyond 15 minutes, persists a restart cooldown, and shows a retryable failure. Android preview OTA `bbf3c411-38b7-4c26-880b-61a6f9206514` is published but realme activation is unconfirmed. Do not trigger more automatic sync attempts while capacity is exhausted. Next: restore Workflow capacity or move Canvas execution to the Google worker, then retest all three courses and finish physical acceptance. Scoped code remains uncommitted until that acceptance passes.
+
 ## B39 EAS preview distribution (2026-09-29)
 
 **PASS after authorized native preview-build fallback.** Preview OTA group `cdc3f3a6-5ecb-46b5-96cb-ea1404c007bb` delivered B38/header cleanup at `b88a507`, runtime `2.0.0`. Old APK lacked native provider-auth crypto; owner-authorized preview APK `21be5ea3-f224-4be4-a707-643c7957dd15` at `2c66889`, Android runtime `2.0.1`, is built and installed. FRESH realme Google sign-in, Draft-first flow/headers, Library, Reviewer navigation, Quiz progress, offline Draft force-stop/reopen and stable Draft cards/count pass without Metro. FRESH focused mobile 147/auth 29 tests, typecheck/lint (four existing warnings), diff check, export and APK build/inspection pass. Debug app restored, connectivity restored; preview channel unchanged; future Android updates target `2.0.1`. No backend rollout, production channel change or push. Next: separate native Office DOCX/PPTX-opening acceptance. [Acceptance](acceptance/b39/eas-preview-b38-distribution.md).

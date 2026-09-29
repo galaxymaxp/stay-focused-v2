@@ -116,6 +116,7 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
     [focusCourseId, load],
   );
   const visible = visibleSyncCourses(ordered, query, expanded);
+  const hasFailedCourse = visible.items.some((course) => courseStates[course.id] === "failed");
 
   async function sync(course: CanvasCourseInventoryItem) {
     setNote(null);
@@ -167,6 +168,7 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
         <ConnectCanvas initialBaseUrl={load.connection.baseUrl} onConnected={() => void reload(false)} request={request} />
       </> : null}
       {note ? <Notice>{note}</Notice> : null}
+      {connected && hasFailedCourse && !note ? <Notice>Sync didn’t finish. Please try again later.</Notice> : null}
       {connected ? (
         <>
           {visible.items.length > 0 ? (

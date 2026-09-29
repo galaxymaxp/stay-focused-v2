@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(async () => undefined),
   readSelection: vi.fn(),
   saveSelection: vi.fn(),
+  readActive: vi.fn(),
 }));
 
 vi.mock("react-native", () => ({ AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) } }));
@@ -26,7 +27,10 @@ vi.mock("../../services/canvasApi", () => ({
   saveCanvasCoursePreferences: mocks.saveSelection,
 }));
 vi.mock("../../services/canvasSyncJobCoordinator", () => ({ startDurableCanvasSync: mocks.start, reconcileCanvasSyncJobs: mocks.reconcile }));
-vi.mock("../../services/activeCanvasSyncJobStore", () => ({ upsertActiveCanvasSyncJob: mocks.upsert }));
+vi.mock("../../services/activeCanvasSyncJobStore", () => ({
+  readActiveCanvasSyncJobs: mocks.readActive,
+  upsertActiveCanvasSyncJob: mocks.upsert,
+}));
 
 const { CanvasSyncProvider, useCanvasSync } = await import("./CanvasSyncProvider");
 
@@ -55,6 +59,7 @@ beforeEach(() => {
   latest = null;
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mocks.reconcile.mockResolvedValue({ jobs: [], newlyCompleted: [] });
+  mocks.readActive.mockResolvedValue([]);
   mocks.getConnection.mockResolvedValue({ ok: true, data: { connection: { status: "active" } } });
 });
 afterEach(async () => {
@@ -70,6 +75,18 @@ async function mount() {
 }
 
 describe("CanvasSyncProvider", () => {
+  it("reconciles a job that expired while polling was paused before foreground", async () => {
+    mocks.listCourses.mockResolvedValue(inventory(new Date().toISOString()));
+    mocks.reconcile.mockResolvedValue({
+      jobs: [{ ...job("expired", "expired"), course: { id: "cit17", displayName: "CIT17", courseCode: null } }],
+      newlyCompleted: [],
+    });
+    await mount();
+    expect(latest!.courseStates.cit17).toBe("failed");
+    expect(latest!.snapshot.phase).toBe("failed");
+    expect(latest!.dataVersion).toBe(1);
+  });
+
   it("finishes a refresh by polling started jobs directly, even when no stored reference survives", async () => {
     const fresh = new Date().toISOString();
     mocks.listCourses.mockResolvedValue(inventory(fresh));
@@ -97,6 +114,14 @@ describe("CanvasSyncProvider", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(10); });
     expect(mocks.start).toHaveBeenCalled();
     expect(latest!.snapshot.phase).toBe("syncing");
+  });
+
+  it("does not immediately resubmit an expired job after a cold start", async () => {
+    mocks.listCourses.mockResolvedValue(inventory("2026-09-19T14:45:00.000Z"));
+    mocks.readActive.mockResolvedValue([{ lastStatusCheckAt: new Date().toISOString(), lastKnownStatus: "expired" }]);
+    await mount();
+    expect(mocks.start).not.toHaveBeenCalled();
+    expect(latest!.snapshot.phase).toBe("idle");
   });
 
   it.each(["reconnect_required", "disconnected"])("does not refresh on launch while the connection is %s", async (status) => {
@@ -139,6 +164,32 @@ describe("CanvasSyncProvider", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
     expect(latest!.courseStates.cit17).toBe("synced");
     expect(latest!.snapshot.phase).toBe("succeeded");
+  });
+
+  it("keeps polling past fifteen minutes and stops when the backend expires a job", async () => {
+    mocks.listCourses.mockResolvedValue(inventory(new Date().toISOString()));
+    mocks.readSelection.mockResolvedValue({ ok: true, data: { selectedCourseIds: ["cit17"] } });
+    mocks.start.mockImplementation(async ({ courseId, jobType }: { courseId: string; jobType: string }) => ({
+      ok: true,
+      data: { ...job(`job-${jobType}`, "queued"), jobType, course: { id: courseId, displayName: courseId, courseCode: null } },
+    }));
+    let expired = false;
+    mocks.getJob.mockImplementation(async ({ jobId }: { jobId: string }) => ({
+      ok: true,
+      data: { ...job(jobId, expired ? "expired" : "queued"), course: { id: "cit17", displayName: "CIT17", courseCode: null } },
+    }));
+    await mount();
+    await act(async () => { await latest!.syncCourse({ id: "cit17", displayName: "CIT17" }); });
+
+    vi.setSystemTime(Date.now() + 16 * 60_000);
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
+    expect(latest!.courseStates.cit17).toBe("syncing");
+
+    expired = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
+    expect(latest!.courseStates.cit17).toBe("failed");
+    expect(latest!.snapshot.phase).toBe("failed");
+    expect(mocks.getJob).toHaveBeenCalledTimes(4);
   });
 
   it("unsyncs by deselecting only that course and refreshes screens", async () => {
