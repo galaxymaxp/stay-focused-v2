@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.galaxymaxp.stayfocusedv2",
+      "runtimeVersion": "2.0.1",
       "adaptiveIcon": {
         "foregroundImage": "./assets/branding/orb-adaptive-foreground.png",
         "monochromeImage": "./assets/branding/orb-monochrome.png",
