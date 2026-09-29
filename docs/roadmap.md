@@ -1,5 +1,9 @@
 # Roadmap
 
+## B37.1 firewall/VPN Activity acceptance (2026-09-29)
+
+**This generation bug PASS; B37.1 remains PARTIAL.** Course-aware assignment link resolution fixes the specific pre-provider source failure. The same firewall/VPN assignment and Dice Roller generated fresh drafts on realme through private Google worker `generation-worker-00011-n2s`; Queue, Library and firewall force-stop/reopen pass, with one result/draft per new job. Supplemental API error-message rollout awaits explicit authorization after automatic approval review rejection. Other B37.1 gates remain; no B38 work, EAS build or push. [Evidence](ai/acceptance/b37/activity-firewall-vpn-generation.md).
+
 ## B37.1 pre-APK polish and B38 order (2026-09-28)
 
 **B37.1 PARTIAL; B37 PARTIAL.** Authorized production API/private-worker rollout is complete (`dpl_6UepXtqEVSPwnZMRYejoN5rMy38x`, `generation-worker-00010-g9v`). Minimal integrated arrows/slider, realme adb navigation/drift, reveal, offline persistence/replay, completion/score and retake/history pass. Fresh Reviewer emphasis, source grounding and three-page PDF pass. Fresh Matching generation loses pair labels during publication; tested forward migration `1025208` awaits Supabase approval, followed by fresh pairing/partial-credit acceptance. Real-finger 10/30/100 slider and remaining Activity task/native Office acceptance remain open. Earlier Activity persistence/PDF/DOCX/PPTX evidence is preserved. Do not make the EAS build yet; no origin push. [B37.1 evidence](ai/acceptance/b37/pre-apk-study-experience-polish.md).

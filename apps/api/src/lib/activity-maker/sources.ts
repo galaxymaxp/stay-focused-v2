@@ -18,7 +18,7 @@ export async function ownedAssignment(client: Client, userId: string, activityId
         throw new ExperienceFailure(404, 'activity_not_found');
     return data;
 }
-export function assignmentLinks(html: string, baseUrl: string): {
+export function assignmentLinks(html: string, baseUrl: string, canvasCourseId: string): {
     kind: 'file' | 'page';
     externalId: string;
 }[] {
@@ -33,6 +33,11 @@ export function assignmentLinks(html: string, baseUrl: string): {
                 try {
                     const url = new URL(a.value, base);
                     if (url.origin !== base.origin)
+                        continue;
+                    // Canvas assignments can link to a page in another course on the
+                    // same origin. It is not part of this course's stored source set.
+                    const linkedCourse = url.pathname.match(/\/courses\/(\d+)(?:\/|$)/);
+                    if (linkedCourse && linkedCourse[1] !== canvasCourseId)
                         continue;
                     const file = url.pathname.match(/\/(?:files)\/(\d+)(?:\/|$)/);
                     const page = url.pathname.match(/\/pages\/([^/]+)\/?$/);
@@ -76,7 +81,7 @@ export async function assembleActivitySources(client: Client, userId: string, ac
     const instructions = normalizeCanvasHtmlToText(assignment.description_html);
     const sources: ActivitySource[] = [{ id: 'instructions', title: sanitizeCanvasTitleText(assignment.name).slice(0, 220), role: 'instructions', text: instructions, materialId: null }];
     const selected = new Map<string, ActivitySource['role']>();
-    const links = assignmentLinks(assignment.description_html ?? '', course.value.connection.base_url);
+    const links = assignmentLinks(assignment.description_html ?? '', course.value.connection.base_url, course.value.course.canvas_course_id);
     for (const link of links) {
         const row = link.kind === 'file' ? files.find(f => f.canvas_file_id === link.externalId) : pages.find(p => p.canvas_page_url === link.externalId);
         if (!row)

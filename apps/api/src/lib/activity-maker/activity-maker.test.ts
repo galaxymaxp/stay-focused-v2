@@ -13,7 +13,12 @@ describe('Activity input contracts', () => {
         expect(() => validateEditableContent({ title: 'X', sections: [], slides: [], user_id: 'other' }, [])).toThrow();
     });
     it('resolves only same-origin Canvas file/page links, including screenshots', () => {
-        expect(assignmentLinks('<img src="/courses/1/files/42/preview"><a href="https://evil.test/files/99">bad</a><a href="/courses/1/pages/instructions">page</a>', 'https://canvas.test')).toEqual([{ kind: 'file', externalId: '42' }, { kind: 'page', externalId: 'instructions' }]);
+        expect(assignmentLinks('<img src="/courses/1/files/42/preview"><a href="https://evil.test/files/99">bad</a><a href="/courses/1/pages/instructions">page</a>', 'https://canvas.test', '1')).toEqual([{ kind: 'file', externalId: '42' }, { kind: 'page', externalId: 'instructions' }]);
+    });
+    it('does not require a same-origin page from another Canvas course', () => {
+        const html = '<a href="https://canvas.test/courses/55287/pages/presentation-sequence-fw-and-vpn" data-api-endpoint="https://canvas.test/api/v1/courses/55287/pages/presentation-sequence-fw-and-vpn">Presentation Sequence (FW &amp; VPN)</a>';
+        expect(assignmentLinks(html, 'https://canvas.test', '61456')).toEqual([]);
+        expect(assignmentLinks(html, 'https://canvas.test', '55287')).toEqual([{ kind: 'page', externalId: 'presentation-sequence-fw-and-vpn' }]);
     });
 });
 describe('Office structure extraction', () => {

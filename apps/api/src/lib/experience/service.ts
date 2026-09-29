@@ -246,7 +246,8 @@ export class ExperienceService {
     }
     if (job.job_type === 'activity_generation') {
       const draft=job.status==='succeeded'?(await this.activityDraftRecords(userId)).find(r=>r.draft.generationId===job.id):null;
-      return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:draft?.summary.id??null,error:job.status==='failed'?{code:'activity_generation_failed',title:'Activity Maker',message:'Draft generation did not finish.',retryable:false,action:'none'}:null};
+      const sourceUnavailable = job.error_code === 'activity_source_unavailable';
+      return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:draft?.summary.id??null,error:job.status==='failed'?{code:sourceUnavailable?'activity_source_unavailable':'activity_generation_failed',title:'Activity Maker',message:sourceUnavailable?'A linked assignment resource could not be prepared. Open the assignment or choose another source.':'Draft generation did not finish.',retryable:false,action:'none'}:null};
     }
     const artifact = job.status === 'succeeded' ? (await this.artifactRecords(userId)).find(r => r.aliases.includes(`generation:${job.id}`)) : null;
     if (job.status === 'succeeded' && !artifact) throw new ExperienceFailure(404, 'not_found');

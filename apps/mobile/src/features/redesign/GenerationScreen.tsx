@@ -212,9 +212,11 @@ export function GenerationScreen() {
           <Notice>
             {canRetry
               ? "This didn’t pass its checks. Retry uses the same settings and topics."
-              : data.error.code === "quiz_generation_failed"
-                ? "The quiz could not be completed. Try another material."
-                : "This generation could not be completed. Open Queue to review it."}
+              : data.error.code === "activity_source_unavailable"
+                ? data.error.message
+                : data.error.code === "quiz_generation_failed"
+                  ? "The quiz could not be completed. Try another material."
+                  : "This generation could not be completed. Open Queue to review it."}
           </Notice>
         )}
         {data?.artifactId && (

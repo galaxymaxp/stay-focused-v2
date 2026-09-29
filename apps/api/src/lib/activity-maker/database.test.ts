@@ -2,11 +2,14 @@ import { createServerOpenAIProvider } from '@/providers';
 import { PGlite } from '@electric-sql/pglite';
 import type { Database } from '@stay-focused/db';
 import type { ActivitySource } from '@stay-focused/shared';
+import type { GenerationProvider } from '@stay-focused/engine';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll,beforeAll,describe,expect,it } from 'vitest';
 import { generateActivityDocument } from './ai-first';
 import { draftView,validateEditableContent } from './service';
+import { assignmentLinks } from './sources';
+import { normalizeCanvasHtmlToText } from '../canvas-content-normalization';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
 const activity = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', connection = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -51,6 +54,36 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Activity Maker real Postgres ownership and transactions', () => {
+    it.each([
+        { label: 'dice-roller', title: 'Lab Activity 2: Dice Roller', courseId: '66935', html: '<p>Build a Dice Roller app, test it, and export an APK.</p><a href="https://developer.android.com/codelabs/basic-android-kotlin-compose-build-a-dice-roller-app#0">Instructions</a>', type: 'programming', heading: 'Build and test', body: 'Create the app and export the tested APK.', missing: false },
+        { label: 'firewall-vpn', title: 'Implementing Firewalls and VPNs', courseId: '61456', html: '<h2>Instructions:</h2><p>Read the scenario from Group Announcement. Prepare a 10–15 minute presentation about security concerns, firewall and VPN choices.</p><a href="https://canvas.test/courses/55287/pages/presentation-sequence-fw-and-vpn" data-api-endpoint="https://canvas.test/api/v1/courses/55287/pages/presentation-sequence-fw-and-vpn">Presentation Sequence (FW &amp; VPN)</a>', type: 'presentation', heading: 'Scenario and security concerns', body: 'Add the assigned scenario and describe its security concerns before choosing a firewall or VPN.', missing: true },
+    ] as const)('validates and persists one $label draft from its source shape', async ({ label, title, courseId, html, type, heading, body, missing }) => {
+        await db.exec('begin');
+        try {
+            // Reproduce the failing link before generation, rather than assuming
+            // that a previously assembled generic source is available.
+            expect(assignmentLinks(html, 'https://canvas.test', courseId)).toEqual([]);
+            const sources: ActivitySource[] = [{ id: 'instructions', title, role: 'instructions', materialId: null, text: normalizeCanvasHtmlToText(html) }];
+            let calls = 0;
+            const provider: GenerationProvider = { async generate<TOutput>() {
+                calls++;
+                return { title, activityType: type, parts: [{ heading, content: body, sourceRefs: ['instructions'], missingInformation: missing }] } as TOutput;
+            } };
+            const generated = await generateActivityDocument(provider, title, sources);
+            validateEditableContent(generated.content, sources.map(source => source.id));
+            expect(calls).toBe(1);
+            expect(generated.activityType).toBe(type);
+            expect(generated.warnings).toHaveLength(missing ? 1 : 0);
+            const id = await queue(`source-shape-${label}`);
+            await finish(id, { ...payload, type: generated.activityType, content: generated.content, sources: [{ id: 'instructions', title, role: 'instructions' }], warnings: generated.warnings });
+            const rows = (await db.query<Database['public']['Tables']['activity_drafts']['Row']>('select * from activity_drafts where generation_id=$1', [id])).rows;
+            expect(rows).toHaveLength(1);
+            expect(draftView(rows[0]!).type).toBe(type);
+            expect((await db.query('select id from processing_job_results where job_id=$1', [id])).rows).toHaveLength(1);
+            await expect(db.query('select * from complete_activity_processing_job($1,$2,$3,$4)', [id, 'test-worker', 'activity_generation', JSON.stringify(payload)])).rejects.toThrow(/completion_rejected/);
+        }
+        finally { await db.exec('rollback'); }
+    });
     it('owner can reopen; foreign user cannot SELECT or UPDATE or DELETE', async () => {
         expect(await asUser(A, async () => (await db.query('select * from activity_drafts')).rows.length)).toBe(1);
         await asUser(B, async () => {
