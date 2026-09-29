@@ -346,7 +346,11 @@ export function ArtifactScreen() {
     return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} />;
   }
   return (
-    <Page title={detail && "draft" in detail ? "Draft" : "Library"} back>
+    <Page
+      title={detail && "draft" in detail ? "Draft" : detail && "quiz" in detail ? "Quiz" : "Library"}
+      back
+      headerAction={detail && "draft" in detail ? <Action secondary onPress={() => setExportOpen(true)}>Export</Action> : undefined}
+    >
       {result.deviceCopy && (
         <Notice>{detail && "draft" in detail ? "Showing the copy saved on this device. Saving changes needs a connection." : "Showing the copy saved on this device. Saving changes and practice need a connection."}</Notice>
       )}
@@ -361,15 +365,7 @@ export function ArtifactScreen() {
       {result.loading && !detail && <SkeletonCards rows={2} label="Opening saved work" />}
       {detail && (
         <>
-          <Copy muted size="caption">
-            {detail.artifact.course?.name ?? (detail.artifact.sourceType ? `Imported ${sourceTypeLabel(detail.artifact.sourceType)}` : "Your study tools")}
-            {detail.artifact.sourceTitle ? ` · ${detail.artifact.sourceTitle}` : ""}
-          </Copy>
-          <Copy size="h1">{detail.artifact.title}</Copy>
-          {'draft' in detail ? <Action secondary onPress={() => setExportOpen(true)}>Export</Action> : null}
-          <Copy muted size="caption">
-            Generated {new Date(detail.artifact.createdAt).toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}
-          </Copy>
+          {"draft" in detail ? null : <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{detail.artifact.title}</Copy>}
           {"quiz" in detail && (
             <Surface>
               <Copy>
@@ -477,17 +473,18 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
   useEffect(() => { if (!dirty || busy) return; const timer = setTimeout(() => void save(), 700); return () => clearTimeout(timer); }, [content, dirty, busy]);
   return (
     <View style={{ gap: 16 }}>
-      <Copy muted>{dirty ? "Unsaved changes" : "Saved draft"}</Copy>
       <TextInput
         accessibilityLabel="Draft title"
+        multiline
         value={content.title}
         editable={!busy}
-        style={inputStyle}
+        style={[inputStyle, { fontSize: 26, lineHeight: 33, textAlignVertical: "top" }]}
         onChangeText={(title) => {
           setDirty(true);
           setContent((old) => ({ ...old, title }));
         }}
       />
+      <Copy muted size="caption">{dirty ? "Unsaved changes" : "Saved draft"}</Copy>
       {content.sections.map((section, index) => (
         <View key={section.id} style={{ gap: 8 }}>
           <Copy size="h3">{section.heading}</Copy>

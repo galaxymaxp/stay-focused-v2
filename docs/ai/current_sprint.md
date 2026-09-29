@@ -1,5 +1,9 @@
 # Current Sprint
 
+## Artifact header simplification (2026-09-29)
+
+Removed repeated course/source banners and generated-date lines from saved Draft/Quiz previews, and repeated course/source context from the Reviewer header. Draft uses one multiline editable title and a header Export action; Quiz preview titles are compact. Topic navigation, question progress, Draft save status, actions and course organization remain. FRESH verification: 67 focused mobile tests, mobile typecheck, changed-screen lint and git diff check pass. Existing Draft, Quiz preview and Reviewer opened on realme with the cleaned headers; no generation or account data changed. Local debug JS only, no deployment or push.
+
 ## B38 draft-first assignment UX (2026-09-29)
 
 **PASS.** Completed the user-requested B38 Draft-first assignment UX. Draft is the immediate saved/editable assignment result; no Study Activity worksheet/status; Library categories are All / Reviewers / Quizzes / Drafts. Saved-Draft export and immediate confirmed-revision display are covered. Backend Activity infrastructure, B37 cross-course resolution, Tasks model and offline copies remain. Fresh physical Firewall/VPN and Dice Roller generation/opening, one result each, and Firewall/VPN offline force-stop/reopen pass. Fresh mobile 733/API 1,076 tests, focused mobile 103/Activity-worker 70, Workflow, typechecks/lint/diff check pass with four existing mobile lint warnings. Next: preview-channel mobile distribution, not started. No API/worker rollout, migration, EAS build/update or push. [Acceptance](acceptance/b38/draft-first-assignment-ux.md).

@@ -1,5 +1,9 @@
 # Roadmap
 
+## Artifact header simplification (2026-09-29)
+
+Removed repeated course/source banners and generated-date lines from saved Draft/Quiz previews, and repeated course/source context from the Reviewer header. Draft uses one multiline editable title and a header Export action; Quiz preview titles are compact. Topic navigation, question progress, Draft save status, actions and course organization remain. FRESH verification: 67 focused mobile tests, mobile typecheck, changed-screen lint and git diff check pass. Existing Draft, Quiz preview and Reviewer opened on realme with the cleaned headers; no generation or account data changed. Local debug JS only, no deployment or push.
+
 ## B38 draft-first assignment UX (2026-09-29)
 
 **PASS.** Draft-first assignment UX is complete locally and accepted on realme: Task -> Assignment -> Generate Draft -> saved editable Draft. Library uses Drafts and the separate Study Activity artifact is no longer exposed. Internal Activity pipeline and B37 source handling remain intact. Fresh Firewall/VPN and Dice Roller each persist once; Firewall/VPN offline force-stop/reopen passes. Automated checks pass. Next: distribute the tested mobile UX through the existing preview update channel; no rollout or next milestone started. Earlier B38 architecture entries below describe separate historical scopes. [Acceptance](ai/acceptance/b38/draft-first-assignment-ux.md).

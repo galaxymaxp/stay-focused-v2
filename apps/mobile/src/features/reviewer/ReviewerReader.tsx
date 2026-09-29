@@ -263,10 +263,9 @@ export function ReviewerReaderScreen({
   };
 
   const currentTitle = current >= 0 ? anchors[current]?.title : null;
-  const courseTitle = artifact.course ? courseIdentity(artifact.course).title : null;
   const subtitle = currentTitle
     ? `${current + 1} of ${anchors.length} · ${currentTitle}`
-    : courseTitle ?? "Reviewer";
+    : undefined;
 
   return (
     <Page
@@ -329,10 +328,6 @@ export function ReviewerReaderScreen({
     >
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
       <View style={{ gap: spacing[1], paddingRight: spacing[2] }}>
-        <Copy muted size="caption">
-          {courseTitle ?? (artifact.sourceType === "text" ? "Imported Text" : artifact.sourceType === "camera" ? "Imported Camera" : artifact.sourceType === "local_file" ? "Imported Local File" : "Your study tools")}
-          {artifact.sourceTitle ? ` · ${artifact.sourceTitle}` : ""}
-        </Copy>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
         {anchors.length > 1 ? <Copy muted size="caption">{anchors.length} topics</Copy> : null}
         <View style={{ paddingTop: spacing[2] }}><Action hero onPress={() => setQuizOpen(true)}>Generate Quiz</Action></View>
