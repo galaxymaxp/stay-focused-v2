@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { executeGoogleCanvasJob } from "./google-worker";
+import { executeGoogleCanvasJob, loadGoogleCanvasToken } from "./google-worker";
 
 const jobId = "11111111-1111-4111-8111-111111111111";
 const dispatchId = "22222222-2222-4222-8222-222222222222";
@@ -59,6 +59,30 @@ describe("Google Canvas worker delivery", () => {
     expect(storage.status()).toBe("failed");
     expect(storage.rpc).toHaveBeenCalledWith("fail_canvas_sync_job_v2", expect.objectContaining({
       p_error_code: "canvas_sync_interrupted", p_worker_id: "worker-1",
+    }));
+  });
+
+  it("retries a transient token handoff before starting units", async () => {
+    const request = vi.fn().mockRejectedValueOnce(new Error("timeout"))
+      .mockResolvedValueOnce({ data: { accessToken: "valid-token" } });
+    const delay = vi.fn(async () => undefined);
+    expect(await loadGoogleCanvasToken(reference, "worker-1", { request, delay })).toBe("valid-token");
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(delay).toHaveBeenCalledOnce();
+  });
+
+  it("does not retry a denied token handoff and records its own failure code", async () => {
+    const request = vi.fn().mockRejectedValue({ response: { status: 403 } });
+    await expect(loadGoogleCanvasToken(reference, "worker-1", { request })).rejects.toThrow("canvas_sync_token_unavailable");
+    expect(request).toHaveBeenCalledOnce();
+    const storage = client();
+    expect(await executeGoogleCanvasJob(reference, {
+      client: storage.fake as never,
+      loadToken: async () => { throw new Error("private auth detail"); },
+      workerId: "worker-1",
+    })).toBe("ack");
+    expect(storage.rpc).toHaveBeenCalledWith("fail_canvas_sync_job_v2", expect.objectContaining({
+      p_error_code: "canvas_sync_token_unavailable",
     }));
   });
 

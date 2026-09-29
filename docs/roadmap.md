@@ -1,5 +1,9 @@
 # Roadmap
 
+## B38 Canvas admission and physical gate (2026-09-29)
+
+B37 Google dispatch is committed at `46e66a8`. B38 locally removes full-course sync requests from launch, foreground stale checks, Today focus, and Generate/Tasks refresh. The existing unique active-job index is reused to return the current job on a concurrent request. A bounded token-handoff retry addresses the zero-unit repeat failure associated with a Vercel internal-route timeout, and empty Canvas Pages are excluded from Generate. Next: deploy the verified API/worker/mobile revisions, then run the realme passive-navigation, one-course-at-a-time manual sync, announcement, and relaunch gates. The preceding P0 note is historical.
+
 ## Immediate P0: Canvas sync capacity (2026-09-29)
 
 The direct Google Cloud Tasks to private Cloud Run Canvas path is deployed and proved by fresh terminal content/grade jobs for CC6, CIT17 and SOC SCI 103N, all without Workflow. The finalization token handoff bug is corrected. Physical acceptance remains PARTIAL: app navigation and relaunch started additional 7-course batches, one repeat CC6 content delivery failed before units, and an empty CIT17 administrative Page appeared in Generate. Next: correct automatic sync freshness/relaunch admission and the repeat-delivery failure, then rerun physical routing and relaunch acceptance. The earlier capacity note below records the pre-cutover state.

@@ -18,7 +18,6 @@ import {
   isFinishedSyncJob,
   latestSuccessfulSync,
   selectAndSyncCourse,
-  shouldAutoSync,
   startAccountCanvasSync,
   summarizeSyncJobs,
   type AccountSyncCourse,
@@ -34,7 +33,7 @@ import {
   saveCanvasCoursePreferences,
   type CanvasSyncJobStatusView,
 } from "../../services/canvasApi";
-import { readActiveCanvasSyncJobs, upsertActiveCanvasSyncJob } from "../../services/activeCanvasSyncJobStore";
+import { upsertActiveCanvasSyncJob } from "../../services/activeCanvasSyncJobStore";
 import {
   reconcileCanvasSyncJobs,
   startDurableCanvasSync,
@@ -84,7 +83,6 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
   const [courseStates, setCourseStates] = useState<Readonly<Record<string, CourseSyncState>>>({});
   const [selectedCourseIds, setSelectedCourseIds] = useState<ReadonlySet<string> | null>(null);
   const running = useRef(false);
-  const lastAttemptAt = useRef<number | null>(null);
   const tracked = useRef(new Map<string, CanvasSyncJobStatusView>());
   const rejected = useRef<SyncRejection[]>([]);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -165,7 +163,6 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     const input = request();
     if (!input || running.current) return;
     running.current = true;
-    lastAttemptAt.current = Date.now();
     setSnapshot((current) => ({ ...current, phase: "syncing", total: 0, finished: 0 }));
     try {
       const started = await startAccountCanvasSync(input, {
@@ -263,8 +260,8 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     return true;
   }, [request, selection]);
 
-  // On sign-in and each return to the foreground: resume jobs still running on
-  // the server, otherwise refresh automatically when the data is stale.
+  // Sign-in and foreground only restore persisted data and reconcile work that
+  // was already requested. A new sync requires an explicit user action.
   const resume = useCallback(async () => {
     const input = request();
     if (!input || running.current) return;
@@ -285,15 +282,8 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
       pollTimer.current = setTimeout(() => void poll(), POLL_MS);
       return;
     }
-    const lastSyncedAt = await refreshLastSynced();
-    const references = await readActiveCanvasSyncJobs(input.ownerUserId);
-    const persistedAttemptAt = Math.max(0, ...references.map((item) => Date.parse(item.lastStatusCheckAt)).filter(Number.isFinite));
-    const lastKnownAttemptAt = Math.max(lastAttemptAt.current ?? 0, persistedAttemptAt) || null;
-    if (shouldAutoSync({ lastSyncedAt, lastAttemptAt: lastKnownAttemptAt, now: Date.now() })) {
-      diagnose("auto_refresh");
-      await sync();
-    }
-  }, [finish, poll, refreshLastSynced, request, sync]);
+    await refreshLastSynced();
+  }, [finish, poll, refreshLastSynced, request]);
 
   useEffect(() => {
     live.current = true;

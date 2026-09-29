@@ -107,13 +107,14 @@ describe("CanvasSyncProvider", () => {
     expect(latest!.dataVersion).toBe(before + 1);
   });
 
-  it("refreshes automatically on launch when Canvas data is stale", async () => {
+  it("restores stale persisted data on launch without starting a full sync", async () => {
     mocks.listCourses.mockResolvedValue(inventory("2026-09-19T14:45:00.000Z"));
-    mocks.start.mockResolvedValue({ ok: true, data: job("job-x", "running") });
     await mount();
     await act(async () => { await vi.advanceTimersByTimeAsync(10); });
-    expect(mocks.start).toHaveBeenCalled();
-    expect(latest!.snapshot.phase).toBe("syncing");
+    expect(mocks.start).not.toHaveBeenCalled();
+    expect(latest!.snapshot.phase).toBe("idle");
+    expect(latest!.snapshot.lastSyncedAt).toBe("2026-09-19T14:45:00.000Z");
+    expect([...latest!.selectedCourseIds!]).toEqual(["a", "b"]);
   });
 
   it("does not immediately resubmit an expired job after a cold start", async () => {
@@ -122,6 +123,14 @@ describe("CanvasSyncProvider", () => {
     await mount();
     expect(mocks.start).not.toHaveBeenCalled();
     expect(latest!.snapshot.phase).toBe("idle");
+  });
+
+  it("resumes an existing queued job after relaunch without creating a replacement", async () => {
+    mocks.listCourses.mockResolvedValue(inventory("2026-09-19T14:45:00.000Z"));
+    mocks.reconcile.mockResolvedValue({ jobs: [job("existing", "queued")], newlyCompleted: [] });
+    await mount();
+    expect(latest!.snapshot.phase).toBe("syncing");
+    expect(mocks.start).not.toHaveBeenCalled();
   });
 
   it.each(["reconnect_required", "disconnected"])("does not refresh on launch while the connection is %s", async (status) => {

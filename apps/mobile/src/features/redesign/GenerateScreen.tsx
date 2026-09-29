@@ -47,7 +47,7 @@ function courseMatches(course: GenerateCourseSummary, query: string) {
 /** Level 1: synced courses grouped by term period, pinned courses first. */
 export function GenerateScreen() {
   const courses = useExperience<GenerateCourseList>("/api/experience/courses");
-  const { sync, unsyncCourse } = useCanvasSync();
+  const { unsyncCourse } = useCanvasSync();
   const { prefs, pin, hide } = useListPreferences();
   const { reducedMotion } = useTheme();
   const [showHidden, setShowHidden] = useState(false);
@@ -105,10 +105,7 @@ export function GenerateScreen() {
     <Page
       title="Generate"
       subtitle="Canvas material or your own notes."
-      onRefresh={() => {
-        courses.refresh();
-        void sync();
-      }}
+      onRefresh={courses.refresh}
       headerBelow={
         allCourses.length > 0 ? (
           <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>

@@ -120,22 +120,6 @@ export function phaseForSyncError(error: CanvasApiClientError): AccountSyncPhase
   }
 }
 
-export const AUTO_SYNC_STALE_MS = 6 * 60 * 60 * 1_000;
-const AUTO_SYNC_RETRY_MS = 30 * 60 * 1_000;
-
-/** Refresh automatically only when data is old and no recent attempt was made. */
-export function shouldAutoSync(input: {
-  readonly lastSyncedAt: string | null;
-  readonly lastAttemptAt: number | null;
-  readonly now: number;
-}): boolean {
-  if (input.lastAttemptAt !== null && input.now - input.lastAttemptAt < AUTO_SYNC_RETRY_MS) {
-    return false;
-  }
-  const last = Date.parse(input.lastSyncedAt ?? "");
-  return !Number.isFinite(last) || input.now - last >= AUTO_SYNC_STALE_MS;
-}
-
 export function describeSyncAge(iso: string | null, now = Date.now()): string {
   const value = Date.parse(iso ?? "");
   if (!Number.isFinite(value)) return "Not synced yet";

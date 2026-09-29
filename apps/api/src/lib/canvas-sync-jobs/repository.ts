@@ -98,6 +98,17 @@ export async function createCanvasSyncJob(
       );
     }
     if (message.includes("canvas_sync_job_in_progress")) {
+      // The partial unique index serialized a concurrent request for the same
+      // course and type. Return its winner so both callers observe one job.
+      const { data: active, error: activeError } = await client
+        .from("canvas_sync_jobs")
+        .select("*")
+        .eq("user_id", input.userId)
+        .eq("course_id", input.courseId)
+        .eq("job_type", input.jobType)
+        .in("status", ["queued", "running", "cancellation_requested"])
+        .maybeSingle();
+      if (!activeError && active) return active;
       throw new CanvasSyncJobRepositoryError(
         "canvas_sync_job_in_progress",
         "This Canvas course is already synchronizing.",

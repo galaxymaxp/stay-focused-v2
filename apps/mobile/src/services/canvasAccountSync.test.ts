@@ -9,7 +9,6 @@ import {
   phaseForSyncError,
   selectAndSyncCourse,
   selectedSyncCourses,
-  shouldAutoSync,
   startAccountCanvasSync,
   summarizeSyncJobs,
 } from "./canvasAccountSync";
@@ -116,14 +115,6 @@ describe("account Canvas sync", () => {
   it("asks for setup when no course is selected", async () => {
     const started = await startAccountCanvasSync(input, { listCourses: async () => ({ ok: true, data: inventory([course("a")], []) }), startCourse: vi.fn() });
     expect(started.phase).toBe("needs_setup");
-  });
-
-  it("refreshes automatically only when data is stale and no recent attempt exists", () => {
-    const now = Date.parse("2026-09-25T01:00:00.000Z");
-    expect(shouldAutoSync({ lastSyncedAt: "2026-09-19T14:45:00.000Z", lastAttemptAt: null, now })).toBe(true);
-    expect(shouldAutoSync({ lastSyncedAt: null, lastAttemptAt: null, now })).toBe(true);
-    expect(shouldAutoSync({ lastSyncedAt: "2026-09-25T00:30:00.000Z", lastAttemptAt: null, now })).toBe(false);
-    expect(shouldAutoSync({ lastSyncedAt: "2026-09-19T14:45:00.000Z", lastAttemptAt: now - 60_000, now })).toBe(false);
   });
 
   it("keeps a permanent Canvas permission limit quiet, but failures actionable", () => {

@@ -119,6 +119,14 @@ describe("durable Canvas sync coordinator", () => {
     expect(await readActiveCanvasSyncJobs("user-1")).toEqual([]);
   });
 
+  it("restores a failed job for a visible manual retry without submitting a new job", async () => {
+    await upsertActiveCanvasSyncJob("user-1", job({ id: "job-failed", status: "failed" }));
+    api.get.mockResolvedValue(ok(job({ id: "job-failed", status: "failed" })));
+    const reconciliation = await reconcileCanvasSyncJobs(base);
+    expect(reconciliation.jobs).toMatchObject([{ id: "job-failed", status: "failed" }]);
+    expect(api.start).not.toHaveBeenCalled();
+  });
+
   it("treats only finished jobs created before the request as replays", () => {
     const requestedAt = Date.parse("2026-09-25T01:00:00.000Z");
     expect(isReplayedFinishedJob(job({ status: "succeeded", createdAt: "2026-09-19T14:41:56.000Z" }), requestedAt)).toBe(true);

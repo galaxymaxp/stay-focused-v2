@@ -13,7 +13,6 @@ import { useTheme } from "../../design/theme";
 import { spacing } from "../../design/tokens";
 import { createGenerationIntent } from "../../services/generationRecovery";
 import { SyncStatus } from "../sync/SyncStatus";
-import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { available, capabilityNote, deadline } from "./presentation";
 import {
   PERSONAL_COURSE_KEY,
@@ -41,16 +40,12 @@ function identityFor(summary: Pick<TaskCourseSummary, "key" | "course">) {
 /** Level 1: one card per course, with real due/missing/completed counts. */
 export function TasksScreen() {
   const { colors } = useTheme();
-  const { sync } = useCanvasSync();
   const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
   const courses = useMemo(() => summarizeTaskCourses(tasks.data?.items ?? []), [tasks.data]);
   return (
     <Page
       title="Tasks"
-      onRefresh={() => {
-        tasks.refresh();
-        void sync();
-      }}
+      onRefresh={tasks.refresh}
       headerAction={<IconAction label="Add a task" onPress={() => router.push("/task")}><Plus size={18} color={colors.accent} /></IconAction>}
       actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >

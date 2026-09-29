@@ -962,6 +962,24 @@ describe("B25 screen interactions", () => {
   });
 });
 
+describe("passive Canvas navigation", () => {
+  it("reads Generate and Tasks data without requesting sync, including pull to refresh", async () => {
+    for (const Screen of [GenerateScreen, TasksScreen]) {
+      const root = await render(createElement(Screen));
+      const page = root.findAll((node) => String(node.type) === "Page")[0]!;
+      await act(async () => page.props.onRefresh());
+      expect(mocks.sync).not.toHaveBeenCalled();
+      await act(async () => rendered!.unmount());
+      rendered = undefined;
+    }
+  });
+
+  it("does not request sync when Today opens", async () => {
+    await render(createElement(TodayScreen));
+    expect(mocks.sync).not.toHaveBeenCalled();
+  });
+});
+
 describe("B38 saved assignment Draft", () => {
   const draft: ActivityDraft = {
     id: "draft-one", activityId: "assignment", courseId: "security", type: "presentation", title: "Firewalls and VPN",

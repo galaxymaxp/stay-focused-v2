@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B38 Canvas sync admission (2026-09-29)
+
+**Local repair in verification.** B37 architecture is committed at `46e66a8`. The exact extra-batch paths were sign-in/foreground staleness and Today focus, with Generate/Tasks refresh also able to call account-wide `sync()`. Passive paths now restore persisted data and poll already accepted jobs; only explicit Sync actions start new work. Database unique active-job admission remains authoritative and the API reuses its winner on concurrent requests. The failed CC6 repeat content job had one claim and zero units; a contemporaneous production token-route 504 supports a pre-unit handoff timeout, now addressed with one bounded retry and a 35-second request deadline. An empty CIT17 Page is excluded by body eligibility. Deployment, realme gates, and final verdict are pending.
+
 ## B37 Canvas sync Google worker cutover (2026-09-29)
 
 **PARTIAL.** Production Canvas jobs enqueue to the existing Google Tasks queue and run on private Cloud Run. After correcting legacy finalization token decrypts, fresh realme CC6, CIT17 and SOC SCI 103N content/grade jobs all reached terminal success; content was partial for inaccessible Canvas resources, with no Workflow run IDs. Generate showed CIT17 PDFs, Tasks showed submitted assignments, and relaunch retained the signed-in session and canonical row counts. Opening Generate and relaunching started extra 7-course sync batches; one repeat CC6 content delivery failed before units. An empty CIT17 administrative Page appeared as a learning source. Full physical acceptance and the architecture commit remain open. The older P0 note below is historical.

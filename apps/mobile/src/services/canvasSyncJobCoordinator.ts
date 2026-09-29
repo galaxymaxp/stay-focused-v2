@@ -79,7 +79,10 @@ export async function reconcileCanvasSyncJobs(
   const newlyCompleted: CanvasSyncJobStatusView[] = [];
 
   for (const reference of references) {
-    if (!isActiveCanvasSyncStatus(reference.lastKnownStatus)) continue;
+    // Preserve a failed/expired job as an actionable retry state after a
+    // process restart. Reconciliation never submits it again automatically.
+    if (!isActiveCanvasSyncStatus(reference.lastKnownStatus) &&
+        reference.lastKnownStatus !== "failed" && reference.lastKnownStatus !== "expired") continue;
     const result = reference.jobId
       ? await getCanvasSyncJob({ ...input, jobId: reference.jobId })
       : await submitIntent(input, reference);

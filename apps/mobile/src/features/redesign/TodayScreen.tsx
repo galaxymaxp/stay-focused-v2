@@ -47,9 +47,8 @@ import { useExperience, useExperienceClient } from "./useExperience";
 import { AnnouncementItem, useArrangedAnnouncements } from "../announcements/AnnouncementsScreen";
 import { todayHideKey } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
-import { useCanvasSync } from "../sync/CanvasSyncProvider";
 
-/** Opening Today resyncs Canvas and refreshes the day, at most every three minutes. */
+/** Opening Today refreshes its persisted read models at most every three minutes. */
 const RESYNC_MS = 3 * 60_000;
 let lastResync = 0;
 const CLOCK_LOCK_KEY = "sf.today.clock-locked";
@@ -84,10 +83,9 @@ export function TodayScreen() {
   const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
   const focused = useIsFocused();
   const client = useExperienceClient();
-  const { sync } = useCanvasSync();
   // No pull-to-refresh on Today: coming back to it is the refresh.
-  const refreshers = useRef({ today, announcements, activities, sync });
-  refreshers.current = { today, announcements, activities, sync };
+  const refreshers = useRef({ today, announcements, activities });
+  refreshers.current = { today, announcements, activities };
   useEffect(() => {
     if (!focused) return;
     const now = Date.now();
@@ -95,7 +93,6 @@ export function TodayScreen() {
     const first = lastResync === 0;
     lastResync = now;
     const current = refreshers.current;
-    void current.sync();
     // The first visit already loads fresh data on mount.
     if (!first) {
       current.today.refresh();
