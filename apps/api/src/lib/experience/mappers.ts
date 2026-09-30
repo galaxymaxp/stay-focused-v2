@@ -143,17 +143,20 @@ export function generationView(job: ProcessingJobStatusView, artifactId: string 
     job.status === 'cancellation_requested' ? 'cancelling' : job.status === 'cancelled' ? 'cancelled' :
       job.status === 'failed' || job.status === 'expired' ? 'failed' :
         ['preparing_source', 'normalizing_source', 'detecting_outline', 'planning_sections'].includes(job.stage) ? 'preparing' :
-          ['assembling_reviewer', 'storing_reviewer'].includes(job.stage) ? 'finalizing' : 'generating';
+          ['assembling_reviewer', 'storing_reviewer', 'storing_result'].includes(job.stage) ? 'finalizing' : 'generating';
   const p = job.progress;
   const progress = p.completedUnits != null && p.totalUnits != null && p.unitLabel && Number.isInteger(p.completedUnits) && Number.isInteger(p.totalUnits) && p.totalUnits > 0 && p.completedUnits >= 0 && p.completedUnits <= p.totalUnits
     ? { completed: p.completedUnits, total: p.totalUnits, unit: p.unitLabel } : null;
   return { id: job.id, state, updatedAt: job.updatedAt, progress, artifactId: state === 'completed' ? artifactId : null,
-    error: state === 'failed' ? failedGenerationError(job.retryable === true) : null };
+    error: state === 'failed' ? failedGenerationError(job) : null };
 }
 /** A retryable failure offers Retry, which starts a new job from the same saved request. */
-function failedGenerationError(retryable: boolean): GenerationView['error'] {
-  const error = normalizeExperienceError(new ExperienceFailure(422, 'generation_failed')).error;
-  return retryable ? { ...error, message: 'This generation didn’t pass its checks. Retry to try again with the same settings.', retryable: true, action: 'retry' } : error;
+function failedGenerationError(job: ProcessingJobStatusView): GenerationView['error'] {
+  const code = job.errorCode === 'insufficient_source' || job.errorCode === 'source_attachment_unavailable'
+    ? job.errorCode : 'generation_failed';
+  const error = normalizeExperienceError(new ExperienceFailure(422, code)).error;
+  const retryable = job.retryable === true;
+  return retryable ? { ...error, message: code === 'generation_failed' ? 'This generation didn’t pass its checks. Retry to try again with the same settings.' : error.message, retryable: true, action: 'retry' } : error;
 }
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};

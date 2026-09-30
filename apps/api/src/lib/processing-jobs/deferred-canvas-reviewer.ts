@@ -1,8 +1,9 @@
-import type { CanvasFileRow, Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
+import type { CanvasFileRow, CanvasPageRow, Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
 import type { OcrPage } from '@stay-focused/ocr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { CANVAS_SELECTIVE_PREVIEW_VERSION } from '@/lib/canvas-structured-blocks';
+import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { validateCanvasReviewerGenerationGate } from '@/lib/canvas-reviewer-generation-gate';
 import { isPreparedCanvasFileReadyForOcr } from '@/lib/canvas-stored-file-extraction';
 import { ExperienceFailure } from '@/lib/experience/errors';
@@ -58,7 +59,8 @@ export async function prepareDeferredCanvasReviewerSource({
   const itemIds = Array.isArray(metadata.canvasItemIds)
     ? metadata.canvasItemIds.filter((value): value is string => typeof value === 'string')
     : [];
-  const rowId = itemIds.length === 1 ? /^file:([0-9a-f-]{36})$/i.exec(itemIds[0]!)?.[1] : null;
+  const pageId = itemIds.length === 2 ? /^page:([0-9a-f-]{36})$/i.exec(itemIds[0]!)?.[1] : null;
+  const rowId = (itemIds.length === 1 || pageId) ? /^file:([0-9a-f-]{36})$/i.exec(itemIds.at(-1)!)?.[1] : null;
   if (!courseId || !rowId || !normalizedText.trim()) throw new ExperienceFailure(409, 'not_ready');
   const orderedPages = [...pages].sort((left, right) => left.pageNumber - right.pageNumber);
   if (
@@ -67,6 +69,8 @@ export async function prepareDeferredCanvasReviewerSource({
   ) {
     throw new ExperienceFailure(409, 'not_ready');
   }
+  if (normalizedText.trim().length < 80 || normalizedText.trim().split(/\s+/).length < 8)
+    throw new ExperienceFailure(422, 'insufficient_source');
 
   await updateProcessingJobProgress(client, {
     jobId: job.id,
@@ -79,9 +83,37 @@ export async function prepareDeferredCanvasReviewerSource({
   });
   const file = await readOwnedPreparedFile(client, job.user_id, courseId, rowId);
   if (!file || !isPreparedCanvasFileReadyForOcr(file)) throw new ExperienceFailure(409, 'not_ready');
+  const page = pageId ? await readOwnedPage(client, job.user_id, courseId, pageId) : null;
+  if (pageId && (!page || page.canvas_connection_id !== file.canvas_connection_id)) throw new ExperienceFailure(409, 'not_ready');
+  const pageText = page ? normalizeCanvasHtmlToText(page.body_html) : '';
+  const substantivePageText = pageText && !/^[\s\w.()\-]+\.(?:pdf|pptx|docx|png|jpe?g)$/i.test(pageText.trim()) ? pageText : '';
+  const combinedText = substantivePageText ? `${substantivePageText}\n\n${normalizedText}` : normalizedText;
 
-  const manifest: readonly CanvasSourceManifestItem[] = [{
-    ordinal: 1,
+  const manifest: readonly CanvasSourceManifestItem[] = [
+    ...(page ? [{
+      ordinal: 1,
+      source_type: 'page' as const,
+      source_title: page.title,
+      source_row_id: page.id,
+      canvas_connection_id: page.canvas_connection_id,
+      course_id: page.course_id,
+      canvas_course_id: file.canvas_course_id,
+      canvas_source_object_id: page.canvas_page_id ?? page.canvas_page_url,
+      module_id: null,
+      module_item_id: null,
+      file_id: null,
+      file_kind: null,
+      mime_type: 'text/html',
+      page_count: null,
+      canvas_updated_at: page.canvas_updated_at,
+      local_synced_at: page.last_synced_at,
+      normalized_content_sha256: sha256Utf8Hex(pageText),
+      stored_content_sha256: null,
+      parser_version: 'canvas-html-visible-text-v1',
+      ocr_version: null,
+    }] : []),
+    {
+    ordinal: page ? 2 : 1,
     source_type: 'file',
     source_title: file.display_name,
     source_row_id: file.id,
@@ -102,17 +134,21 @@ export async function prepareDeferredCanvasReviewerSource({
     parser_version: CANVAS_STORED_FILE_EXTRACTION_VERSION,
     ocr_version: CANVAS_STORED_PDF_OCR_VERSION,
   }];
-  const pageBlocks = orderedPages.filter((page) => page.text.trim()).map((page, index) => ({
-    id: `page-${page.pageNumber}`,
+  const fileBlocks = orderedPages.filter((item) => item.text.trim()).map((item, index) => ({
+    id: `page-${item.pageNumber}`,
     kind: 'paragraph' as const,
     order: index,
-    pageNumber: page.pageNumber,
-    text: page.text.trim(),
+    pageNumber: item.pageNumber,
+    text: item.text.trim(),
   }));
-  const selectedBlockManifest: readonly CanvasSelectedBlockManifestItem[] = pageBlocks.map((block, index) => ({
+  const sourceBlocks = [
+    ...(substantivePageText ? [{ id: 'canvas-page-body', kind: 'paragraph' as const, order: 0, text: substantivePageText }] : []),
+    ...fileBlocks,
+  ];
+  const selectedBlockManifest: readonly CanvasSelectedBlockManifestItem[] = sourceBlocks.map((block, index) => ({
     ordinal: index + 1,
-    source_ordinal: 1,
-    block_ordinal: index + 1,
+    source_ordinal: page && block.id !== 'canvas-page-body' ? 2 : 1,
+    block_ordinal: substantivePageText && block.id !== 'canvas-page-body' ? index : index + 1,
     block_kind: block.kind,
     block_text: block.text,
     block_sha256: sha256Utf8Hex(block.text),
@@ -120,11 +156,11 @@ export async function prepareDeferredCanvasReviewerSource({
     list_depth: null,
     list_style: null,
     table_structure: null,
-    page_number: block.pageNumber,
+    page_number: 'pageNumber' in block ? block.pageNumber : null,
     slide_number: null,
     module_position: null,
-    parser_version: CANVAS_STORED_FILE_EXTRACTION_VERSION,
-    ocr_version: CANVAS_STORED_PDF_OCR_VERSION,
+    parser_version: block.id === 'canvas-page-body' ? 'canvas-html-visible-text-v1' : CANVAS_STORED_FILE_EXTRACTION_VERSION,
+    ocr_version: block.id === 'canvas-page-body' ? null : CANVAS_STORED_PDF_OCR_VERSION,
   }));
   const preview = await createCanvasSourcePreviewSession({
     canvasConnectionId: file.canvas_connection_id,
@@ -132,10 +168,17 @@ export async function prepareDeferredCanvasReviewerSource({
     courseId,
     manifest,
     normalizationVersion: CANVAS_SELECTIVE_PREVIEW_VERSION,
-    originalPreviewText: normalizedText,
+    originalPreviewText: combinedText,
     selectedBlockManifest,
-    sourceRelationshipManifest: [],
-    suggestedTitle: file.display_name,
+    sourceRelationshipManifest: page ? [{
+      source_ordinal: 1,
+      related_source_ordinal: 2,
+      relationship_type: 'canvas_reference',
+      relationship_group_key: sha256Utf8Hex(`${page.id}:${file.id}`),
+      reference_type: 'page',
+      reference_ordinal: 1,
+    }] : [],
+    suggestedTitle: page?.title ?? file.display_name,
     userId: job.user_id,
   });
   if (!preview.ok) {
@@ -176,8 +219,8 @@ export async function prepareDeferredCanvasReviewerSource({
     client,
     userId: job.user_id,
     previewSession: accepted.value,
-    sourceText: normalizedText,
-    sourceTitle: file.display_name,
+    sourceText: combinedText,
+    sourceTitle: page?.title ?? file.display_name,
   });
   if (!snapshot.ok) {
     logProvenanceFailure('snapshot', job.id, snapshot);
@@ -190,16 +233,16 @@ export async function prepareDeferredCanvasReviewerSource({
     canvasPreviewSessionId: preview.value.previewSessionId,
     canvasResolutionFingerprint: preview.value.resolutionFingerprint,
     canvasResolvedInWorkflowVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
-    reviewerSourceBlocks: pageBlocks,
+    reviewerSourceBlocks: sourceBlocks,
     reviewerSourceKind: 'document',
     reviewerSourceSnapshotId: snapshot.value.sourceSnapshotId,
-    sourceTitle: file.display_name,
+    sourceTitle: page?.title ?? file.display_name,
   });
   const { data, error } = await client.rpc('attach_deferred_canvas_reviewer_source_v1', {
     p_job_id: job.id,
     p_worker_id: workerId,
-    p_source_text: normalizedText,
-    p_source_title: file.display_name,
+    p_source_text: combinedText,
+    p_source_title: page?.title ?? file.display_name,
     p_source_metadata: resolvedMetadata,
   });
   if (error || !data?.[0]) {
@@ -217,16 +260,22 @@ export async function prepareDeferredCanvasReviewerSource({
     payload: toJson({
       expectedPageCount: orderedPages.length,
       accountedPageNumbers: orderedPages.map((page) => page.pageNumber),
-      sourceCharacterCount: normalizedText.length,
+      sourceCharacterCount: combinedText.length,
       preparedAt: new Date().toISOString(),
     }),
   });
   logMemory('source_attached', job.id, {
     expectedPageCount: orderedPages.length,
     accountedPageCount: orderedPages.length,
-    sourceCharacterCount: normalizedText.length,
+    sourceCharacterCount: combinedText.length,
   });
   return true;
+}
+
+async function readOwnedPage(client: SupabaseClient<Database>, userId: string, courseId: string, rowId: string): Promise<CanvasPageRow | null> {
+  const { data, error } = await client.from('canvas_pages').select('*').eq('id', rowId).eq('user_id', userId).eq('course_id', courseId).maybeSingle();
+  if (error) throw new ExperienceFailure(503, 'unavailable');
+  return data as CanvasPageRow | null;
 }
 
 async function readOwnedPreparedFile(

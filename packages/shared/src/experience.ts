@@ -218,7 +218,7 @@ export interface GenerationView {
   readonly error: ExperienceError | null;
 }
 export interface ExperienceError {
-  readonly code: 'sign_in_required' | 'not_found' | 'course_not_synced' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_source_capacity_exceeded' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable';
+  readonly code: 'sign_in_required' | 'not_found' | 'course_not_synced' | 'invalid_request' | 'not_ready' | 'insufficient_source' | 'source_attachment_unavailable' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_source_capacity_exceeded' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable';
   readonly supportedMaximum?: number;
   readonly title: string;
   readonly message: string;

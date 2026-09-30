@@ -32,6 +32,8 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
     course_not_synced: { title: 'Sync this course', message: 'Synchronize this course with Stay Focused before generating from it.', retryable: false, action: 'none' },
     invalid_request: { title: 'Check your request', message: 'Some request details are invalid.', retryable: false, action: 'none' },
     not_ready: { title: 'Material not ready', message: 'Prepare this material or choose another source.', retryable: false, action: 'choose_material' },
+    insufficient_source: { title: 'Not enough lesson content', message: 'This Page and its attachments do not contain enough readable lesson content. Check the Canvas file or choose another source.', retryable: false, action: 'choose_material' },
+    source_attachment_unavailable: { title: 'Attachment could not be prepared', message: 'The linked Canvas file could not be accessed or prepared. Check access to the file in Canvas, then try again.', retryable: true, action: 'retry' },
     unavailable: { title: 'Temporarily unavailable', message: 'Please try again shortly.', retryable: true, action: 'retry' },
     generation_failed: { title: 'Generation did not finish', message: 'Your result could not be completed.', retryable: false, action: 'choose_material' },
     rate_limited: { title: 'Please wait', message: 'Try again after the current work has finished.', retryable: true, action: 'retry' },

@@ -499,7 +499,12 @@ export function mapWorkerFailure(error: unknown): WorkerJobError {
   }
   if (error instanceof WorkerJobError) return error;
   if (error instanceof ExperienceFailure) {
-    return new WorkerJobError(error.code, 'Generation could not be completed.', error.status >= 500);
+    const message = error.code === 'insufficient_source'
+      ? 'The material does not contain enough readable lesson content. Check the Canvas attachment or choose another source.'
+      : error.code === 'source_attachment_unavailable'
+        ? 'The linked Canvas file could not be prepared. Check file access in Canvas and try again.'
+        : 'Generation could not be completed.';
+    return new WorkerJobError(error.code, message, error.status >= 500);
   }
   if (error instanceof PipelineAssemblyError) {
     return new WorkerJobError(

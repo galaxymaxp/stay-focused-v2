@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), prepare: vi.fn(), structure: vi.fn(), preview: vi.fn(), validate: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), existing: vi.fn(), source: vi.fn(), create: vi.fn(), createDeferred: vi.fn(), readFile: vi.fn(), schedule: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), prepare: vi.fn(), structure: vi.fn(), preview: vi.fn(), validate: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), existing: vi.fn(), source: vi.fn(), create: vi.fn(), createDeferred: vi.fn(), readFile: vi.fn(), attachments: vi.fn(), schedule: vi.fn() }));
 vi.mock('@/lib/canvas-reviewer-sources', () => ({ listCanvasReviewerSources: mocks.list, prepareCanvasReviewerSources: mocks.prepare, structureCanvasReviewerSources: mocks.structure, previewSelectiveCanvasReviewerSources: mocks.preview }));
 vi.mock('@/lib/reviewer-source-provenance', () => ({ validateCanvasPreviewSessionForGeneration: mocks.validate, createOrReuseReviewerSourceSnapshot: mocks.snapshot }));
 vi.mock('@/lib/canvas-reviewer-generation-gate', () => ({ validateCanvasReviewerGenerationGate: mocks.gate }));
 vi.mock('@/lib/processing-jobs/repository', () => ({ findProcessingJobByIdempotencyKey: mocks.existing, findProcessingJobSource: mocks.source }));
 vi.mock('@/lib/processing-jobs/creation', () => ({ createDeferredCanvasReviewerProcessingJob: mocks.createDeferred, createReviewerProcessingJob: mocks.create, validateIdempotencyKey: (key: string | null) => { if (!key || key.length < 8) throw new Error('bad key'); return key; }, ProcessingJobCreationError: class extends Error {} }));
 vi.mock('@/lib/processing-jobs/background-dispatch', () => ({ scheduleAcceptedProcessingJobDispatch: mocks.schedule }));
+vi.mock('./canvas-page-attachments', () => ({ resolveInstructionalPageAttachments: mocks.attachments }));
 import { startReviewerGeneration } from './generation';
 const fileRowId = '00000000-0000-4000-8000-000000000001';
+const pageRowId = '00000000-0000-4000-8000-000000000002';
 const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: mocks.readFile };
 query.select.mockReturnValue(query); query.eq.mockReturnValue(query);
 const from = vi.fn(() => query);
@@ -36,6 +38,7 @@ beforeEach(() => {
     availability_status: 'available', ingestion_status: 'stored', ingestion_eligibility: 'eligible_document', filename: 'source.pdf',
   }, error: null });
   mocks.source.mockResolvedValue({ metadata: { canvasCourseId: input.courseId, canvasItemIds: [input.materialId] } });
+  mocks.attachments.mockResolvedValue([]);
 });
 describe('student Reviewer admission adapter', () => {
   it('reuses default block selection, source gate, snapshot and durable admission', async () => {
@@ -79,6 +82,14 @@ describe('student Reviewer admission adapter', () => {
     await startReviewerGeneration(client, 'owner', input, 'request-key');
     expect(mocks.prepare).toHaveBeenCalledWith({ client, userId: 'owner', courseId: 'course', sourceIds: [input.materialId] });
   });
+  it('stops before job creation when preparation fails', async () => {
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: input.materialId, capability: 'needs_preparation', file: { canPrepare: true } }], pagination: { hasMore: false } } });
+    mocks.prepare.mockResolvedValue({ ok: false, status: 503 });
+    await expect(startReviewerGeneration(client, 'owner', input, 'request-key')).rejects.toMatchObject({ code: 'not_ready' });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.createDeferred).not.toHaveBeenCalled();
+    expect(mocks.schedule).not.toHaveBeenCalled();
+  });
   it('durably accepts a ready PDF reference before OCR or source assembly', async () => {
     mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: input.materialId, title: 'Scanned notes.pdf', capability: 'ready', availability: 'available', file: { kind: 'pdf', preparationStatus: 'ready' } }], pagination: { hasMore: false } } });
     expect(await startReviewerGeneration(client, 'owner', input, 'request-key')).toEqual(job);
@@ -100,6 +111,38 @@ describe('student Reviewer admission adapter', () => {
     expect(mocks.preview).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.schedule).toHaveBeenCalledWith(job);
+  });
+  it('admits a Page with substantive body text without an attachment', async () => {
+    const pageInput = { courseId: 'course', materialId: `page:${pageRowId}` };
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: pageInput.materialId, type: 'page', capability: 'ready', availability: 'available' }], pagination: { hasMore: false } } });
+    mocks.readFile.mockResolvedValueOnce({ data: { id: pageRowId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', body_html: '<p>HTML provides semantic structure for a web page.</p>' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'course', user_id: 'owner', canvas_connection_id: 'connection' }, error: null });
+    mocks.source.mockResolvedValue({ metadata: { canvasCourseId: 'course', canvasItemIds: [pageInput.materialId] } });
+    await startReviewerGeneration(client, 'owner', pageInput, 'request-key');
+    expect(mocks.structure).toHaveBeenCalledWith(expect.objectContaining({ sourceIds: [pageInput.materialId] }));
+    expect(mocks.create).toHaveBeenCalled();
+  });
+  it('includes a linked instructional PDF in a Page job before durable extraction', async () => {
+    const pageInput = { courseId: 'course', materialId: `page:${pageRowId}` };
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: pageInput.materialId, type: 'page', capability: 'ready', availability: 'available' }], pagination: { hasMore: false } } });
+    const file = { id: fileRowId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_course_id: 'canvas-course', canvas_file_id: '42', display_name: 'Unit 3 Lesson 1.pdf', content_type: 'application/pdf', stored_content_type: 'application/pdf', stored_byte_count: 8089877, storage_bucket: 'canvas-source-files', storage_object_key: 'private/source.pdf', current_sha256: 'a'.repeat(64), availability_status: 'available', ingestion_status: 'stored', ingestion_eligibility: 'eligible_document' };
+    mocks.readFile.mockResolvedValueOnce({ data: { id: pageRowId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', body_html: '<p>Unit 3 Lesson 1.pdf</p>' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'course', user_id: 'owner', canvas_connection_id: 'connection' }, error: null })
+      .mockResolvedValueOnce({ data: file, error: null });
+    mocks.attachments.mockResolvedValue([file]);
+    mocks.prepare.mockResolvedValue({ ok: true, value: { results: [{ status: 'ready' }] } });
+    mocks.source.mockResolvedValue({ metadata: { canvasCourseId: 'course', canvasItemIds: [pageInput.materialId, `file:${fileRowId}`] } });
+    await startReviewerGeneration(client, 'owner', pageInput, 'request-key');
+    expect(mocks.prepare).toHaveBeenCalledWith(expect.objectContaining({ sourceIds: [`file:${fileRowId}`] }));
+    expect(mocks.createDeferred).toHaveBeenCalledWith(expect.objectContaining({ source: expect.objectContaining({ sourcePrivateMetadata: expect.objectContaining({ canvasItemIds: [pageInput.materialId, `file:${fileRowId}`] }) }) }));
+  });
+  it('rejects a filename-only Page when no instructional attachment is available', async () => {
+    const pageInput = { courseId: 'course', materialId: `page:${pageRowId}` };
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: pageInput.materialId, type: 'page', capability: 'ready', availability: 'available' }], pagination: { hasMore: false } } });
+    mocks.readFile.mockResolvedValueOnce({ data: { id: pageRowId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', body_html: '<p>Unit 3 Lesson 1.pdf</p>' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'course', user_id: 'owner', canvas_connection_id: 'connection' }, error: null });
+    await expect(startReviewerGeneration(client, 'owner', pageInput, 'request-key')).rejects.toMatchObject({ code: 'insufficient_source' });
+    expect(mocks.create).not.toHaveBeenCalled();
   });
   it('requires an idempotency key before doing any source work', async () => {
     await expect(startReviewerGeneration(client, 'owner', input, null)).rejects.toMatchObject({ status: 400 });

@@ -103,16 +103,23 @@ export function GenerationScreen() {
   // Completed and cloud-persisted: keep a device copy for Library and offline reading.
   const persistedId = persistedArtifactId(data);
   const ownerUserId = session?.user.id;
+  const openedCompletedArtifact = useRef<string | null>(null);
   const latestView = useRef(data);
   latestView.current = data;
   useEffect(() => {
     // Once per persisted artifact; the polled view object changes every poll.
     const view = latestView.current;
     if (!persistedId || !ownerUserId || !view) return;
-    void storeCompletedGeneration(ownerUserId, client, view).catch(() => {
-      // Library reconciliation stores it on the next refresh.
-    });
-  }, [persistedId, ownerUserId, client]);
+    void storeCompletedGeneration(ownerUserId, client, view)
+      .catch(() => {
+        // Library reconciliation stores it on the next refresh.
+      })
+      .finally(() => {
+        if (openedCompletedArtifact.current === persistedId) return;
+        openedCompletedArtifact.current = persistedId;
+        router.replace({ pathname: "/artifact", params: { id: persistedId, ...(params.quiz === "1" ? { quiz: "1" } : {}) } });
+      });
+  }, [persistedId, ownerUserId, client, params.quiz]);
   const running =
     !data ||
     ["queued", "preparing", "generating", "finalizing"].includes(data.state);
@@ -217,7 +224,7 @@ export function GenerationScreen() {
                 ? data.error.message
                 : data.error.code === "quiz_generation_failed"
                   ? "The quiz could not be completed. Try another material."
-                  : "This generation could not be completed. Open Queue to review it."}
+                  : data.error.message}
           </Notice>
         )}
         {data?.artifactId && (

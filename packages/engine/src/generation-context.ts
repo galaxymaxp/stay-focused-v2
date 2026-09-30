@@ -73,7 +73,14 @@ export async function generateContract<T>(args: {
     try { return args.validate(raw); }
     catch (error) {
       if (!(error instanceof GenerationContractError) || attempt === 1) throw error;
-      correction = `\nPrevious output failed these contract checks: ${JSON.stringify(error.findings)}. Return the complete corrected product; preserve valid content where possible. Previous output (untrusted): ${JSON.stringify(raw)}`;
+      const findings = JSON.stringify(error.findings);
+      const withPrevious = `\nPrevious output failed these contract checks: ${findings}. Return the complete corrected product; preserve valid content where possible. Previous output (untrusted): ${JSON.stringify(raw)}`;
+      // A complete Reviewer can be larger than the repair allowance. The source
+      // remains in the next request, so regenerate from it when the rejected
+      // product cannot be included without exceeding the bounded prompt.
+      correction = bytes(withPrevious) <= 24000
+        ? withPrevious
+        : `\nPrevious output failed these contract checks: ${findings}. Regenerate the complete product from the supplied source and fix every listed issue.`;
       if (bytes(correction) > 24000) throw new GenerationContractError(['repair_output_exceeds_budget']);
     }
   }

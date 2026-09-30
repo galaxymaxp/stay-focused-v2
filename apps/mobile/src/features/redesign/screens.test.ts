@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   sync: vi.fn(),
   params: {} as Record<string, string>,
   request: vi.fn(),
+  refresh: vi.fn(),
   createIntent: vi.fn(),
   vibration: vi.fn(),
   haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
@@ -55,6 +56,7 @@ vi.mock("expo-router", () => ({
   router: { push: mocks.push, navigate: mocks.navigate, back: mocks.back, replace: mocks.replace, canGoBack: () => true },
   useLocalSearchParams: () => mocks.params,
 }));
+vi.mock('./GenerationCore', () => ({ GenerationCore: 'GenerationCore' }));
 vi.mock("@react-navigation/native", () => ({
   useIsFocused: () => true,
   useNavigation: () => ({ dispatch: vi.fn() }),
@@ -199,7 +201,7 @@ vi.mock("./useExperience", () => ({
       loading: false,
       error: failure?.message ?? null,
       errorCode: failure?.code ?? null,
-      refresh: vi.fn(),
+      refresh: mocks.refresh,
     };
   },
 }));
@@ -577,6 +579,43 @@ describe("B25 screen interactions", () => {
       pathname: "/generation",
       params: { intent: "saved-key", start: "1" },
     });
+  });
+  it("shows preparation immediately and rejoins the same request after returning to the material", async () => {
+    const needsPreparation = { ...workspace.materials.items[0]!, readiness: "needs_preparation" as const };
+    mocks.data["/api/experience/courses/course"] = {
+      ...workspace,
+      materials: { ...workspace.materials, items: [needsPreparation] },
+    };
+    mocks.params = { courseId: "course", materialId: "file:one" };
+    let resolvePreparation!: (value: { items: typeof workspace.materials.items }) => void;
+    mocks.request.mockImplementationOnce(() => new Promise((resolve) => { resolvePreparation = resolve; }));
+    let root = await render(createElement(GenerateMaterialScreen));
+    const prepare = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Prepare material")!;
+    await act(async () => { void prepare.props.onPress(); });
+    expect(copyText(root).join(" ")).toContain("Preparing source");
+    expect(root.findAll((node) => String(node.type) === "GenerationCore")).toHaveLength(1);
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+
+    await act(async () => rendered!.unmount());
+    root = await render(createElement(GenerateMaterialScreen));
+    expect(copyText(root).join(" ")).toContain("Preparing source");
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    await act(async () => resolvePreparation({ items: [{ ...needsPreparation, readiness: "ready" }] }));
+    expect(root.findAll((node) => String(node.type) === "Action").some((node) => node.props.children === "Prepare material")).toBe(false);
+  });
+  it("shows submission progress while saving one Reviewer intent", async () => {
+    mocks.data["/api/experience/courses/course"] = workspace;
+    mocks.params = { courseId: "course", materialId: "file:one" };
+    let resolveIntent!: (value: { key: string }) => void;
+    mocks.createIntent.mockImplementationOnce(() => new Promise((resolve) => { resolveIntent = resolve; }));
+    const root = await render(createElement(GenerateMaterialScreen));
+    const reviewer = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Generate Reviewer")!;
+    await act(async () => { void reviewer.props.onPress(); void reviewer.props.onPress(); });
+    expect(copyText(root).join(" ")).toContain("Submitting generation");
+    expect(root.findAll((node) => String(node.type) === "GenerationCore")).toHaveLength(1);
+    expect(mocks.createIntent).toHaveBeenCalledTimes(1);
+    await act(async () => resolveIntent({ key: "intent" }));
+    expect(mocks.push).toHaveBeenCalledOnce();
   });
   it("creates Quiz only from the persisted Reviewer linked to a material", async () => {
     const reviewerWorkspace: CourseLearningWorkspace = {

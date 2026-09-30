@@ -305,7 +305,7 @@ function extractCanvasFileIdsFromHtml({
   readonly canvasBaseUrl: string;
   readonly canvasCourseId: string;
   readonly html: string | null;
-  readonly knownFileIds: ReadonlySet<string>;
+  readonly knownFileIds?: ReadonlySet<string>;
 }): {
   readonly fileIds: readonly string[];
   readonly ignored: CanvasIgnoredFileReferenceCounts;
@@ -351,6 +351,19 @@ function extractCanvasFileIdsFromHtml({
   };
 }
 
+/** Same-origin, same-course Canvas file IDs from a Page before file inventory is known. */
+export function discoverCanvasPageFileIds({
+  canvasBaseUrl,
+  canvasCourseId,
+  html,
+}: {
+  readonly canvasBaseUrl: string;
+  readonly canvasCourseId: string;
+  readonly html: string | null;
+}): readonly string[] {
+  return extractCanvasFileIdsFromHtml({ canvasBaseUrl, canvasCourseId, html }).fileIds;
+}
+
 function extractCanvasFileIdFromUrl({
   canvasCourseId,
   canvasOrigin,
@@ -359,7 +372,7 @@ function extractCanvasFileIdFromUrl({
 }: {
   readonly canvasCourseId: string;
   readonly canvasOrigin: string;
-  readonly knownFileIds: ReadonlySet<string>;
+  readonly knownFileIds?: ReadonlySet<string>;
   readonly value: string;
 }):
   | { readonly ok: true; readonly fileId: string }
@@ -409,7 +422,7 @@ function extractCanvasFileIdFromUrl({
   if (!fileId) {
     return { ok: false, reason: "malformed" };
   }
-  if (!knownFileIds.has(fileId)) {
+  if (knownFileIds && !knownFileIds.has(fileId)) {
     return { ok: false, reason: "unknownFile" };
   }
   return { ok: true, fileId };

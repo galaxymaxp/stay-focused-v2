@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   generation: null as GenerationView | null,
   params: { intent: "pending-key" } as Record<string, string>,
+  persistedId: null as string | null,
+  storeCompleted: vi.fn(),
 }));
 
 vi.mock("expo-router", () => ({
@@ -23,8 +25,8 @@ vi.mock("../../services/generationRecovery", () => ({
   acceptGeneration: mocks.accept,
   readGenerationIntents: mocks.read,
 }));
-vi.mock("../../services/localLibrary/deviceLibrary", () => ({ storeCompletedGeneration: vi.fn() }));
-vi.mock("../../services/localLibrary/librarySync", () => ({ persistedArtifactId: () => null }));
+vi.mock("../../services/localLibrary/deviceLibrary", () => ({ storeCompletedGeneration: mocks.storeCompleted }));
+vi.mock("../../services/localLibrary/librarySync", () => ({ persistedArtifactId: () => mocks.persistedId }));
 vi.mock("./GenerationCore", () => ({ GenerationCore: "GenerationCore" }));
 vi.mock("./useListPreferences", () => ({ useListPreferences: () => ({ prefs: { hidden: { queue: [] } }, hide: vi.fn() }) }));
 vi.mock("../../design/appActivity", () => ({ useAppActivity: () => ({ refresh: vi.fn() }) }));
@@ -55,6 +57,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.params = { intent: "pending-key" };
   mocks.generation = null;
+  mocks.persistedId = null;
+  mocks.storeCompleted.mockResolvedValue(undefined);
   mocks.read.mockResolvedValue([pending]);
   mocks.accept.mockResolvedValue({ ...pending, generationId: "job-id" });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -135,5 +139,22 @@ describe("Draft generation result", () => {
     mocks.generation = { id: "job-id", state: "completed", artifactId: "artifact:saved", updatedAt: "2026-09-29", progress: null, error: null };
     const root = await render(createElement(GenerationScreen));
     expect(root.findAll(node => String(node.type) === "Action" && node.props.children === "Open in Library")).toHaveLength(1);
+  });
+  it('opens a completed durable Reviewer after attempting the offline Library copy', async () => {
+    mocks.params = { id: 'job-id' };
+    mocks.persistedId = 'artifact:saved';
+    mocks.generation = { id: 'job-id', state: 'completed', artifactId: 'artifact:saved', updatedAt: '2026-09-29', progress: null, error: null };
+    await render(createElement(GenerationScreen));
+    await act(async () => { await Promise.resolve(); });
+    expect(mocks.storeCompleted).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).toHaveBeenCalledWith({ pathname: '/artifact', params: { id: 'artifact:saved' } });
+  });
+  it('shows the typed failure reason while preserving access to Queue', async () => {
+    mocks.params = { id: 'job-id' };
+    mocks.generation = { id: 'job-id', state: 'failed', artifactId: null, updatedAt: '2026-09-29', progress: null,
+      error: { code: 'insufficient_source', title: 'Not enough lesson content', message: 'Check the Canvas attachment.', retryable: false, action: 'choose_material' } };
+    const root = await render(createElement(GenerationScreen));
+    expect(root.findAll(node => String(node.type) === 'Notice').map(node => String(node.props.children)).join(' ')).toContain('Check the Canvas attachment.');
+    expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'View Queue')).toHaveLength(1);
   });
 });

@@ -20,6 +20,7 @@ import { useTheme } from "../../design/theme";
 import { readCourseIdParam } from "../../navigation/appRoutes";
 import { experienceRequest } from "../../services/experienceApi";
 import { createGenerationIntent } from "../../services/generationRecovery";
+import { GenerationCore } from "./GenerationCore";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, matchesCourseQuery, materialTypes, moduleGroups } from "./presentation";
@@ -34,6 +35,7 @@ import { useListPreferences } from "./useListPreferences";
  * The screen still reloads the course workspace for fresh capabilities.
  */
 const openedMaterials = new Map<string, LearningMaterial>();
+const pendingPreparations = new Map<string, Promise<LearningMaterial | null>>();
 
 function firstParam(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
@@ -276,6 +278,7 @@ export function GenerateMaterialScreen() {
   const { colors } = useTheme();
   const [prepared, setPrepared] = useState<LearningMaterial | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeAction, setActiveAction] = useState<"preparing" | "submitting" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
   const material =
@@ -287,17 +290,41 @@ export function GenerateMaterialScreen() {
     () => courseIdentity({ id: courseId, name: workspace.data?.course.name ?? "Course", code: workspace.data?.course.code ?? null }),
     [courseId, workspace.data?.course.code, workspace.data?.course.name],
   );
+  const preparationKey = session && material ? `${session.user.id}:${material.courseId}:${material.id}` : null;
+  const refreshWorkspace = workspace.refresh;
+  useEffect(() => {
+    if (!preparationKey) return;
+    const pending = pendingPreparations.get(preparationKey);
+    if (!pending) return;
+    let live = true;
+    setActiveAction("preparing");
+    void pending.then((next) => {
+      if (!live) return;
+      if (next) { openedMaterials.set(next.id, next); setPrepared(next); }
+      refreshWorkspace();
+    }).catch((cause) => {
+      if (live) setError(cause instanceof Error ? cause.message : "Could not prepare this material.");
+    }).finally(() => { if (live) { setActiveAction(null); setBusy(false); } });
+    return () => { live = false; };
+  }, [preparationKey, refreshWorkspace]);
 
   async function prepare() {
-    if (!material || busy) return;
+    if (!material || !preparationKey || busy) return;
     setBusy(true);
+    setActiveAction("preparing");
     setError(null);
     try {
-      const result = await experienceRequest<{ items: LearningMaterial[] }>(client, "/api/experience/materials/prepare", {
-        method: "POST",
-        body: { courseId: material.courseId, materialId: material.id },
-      });
-      const next = result.items.find((item) => item.id === material.id) ?? null;
+      let pending = pendingPreparations.get(preparationKey);
+      if (!pending) {
+        const source = material;
+        pending = experienceRequest<{ items: LearningMaterial[] }>(client, "/api/experience/materials/prepare", {
+          method: "POST",
+          body: { courseId: source.courseId, materialId: source.id },
+        }).then((result) => result.items.find((item) => item.id === source.id) ?? null);
+        pendingPreparations.set(preparationKey, pending);
+        void pending.finally(() => pendingPreparations.delete(preparationKey)).catch(() => {});
+      }
+      const next = await pending;
       if (next) {
         openedMaterials.set(next.id, next);
         setPrepared(next);
@@ -307,6 +334,7 @@ export function GenerateMaterialScreen() {
       setError(cause instanceof Error ? cause.message : "Could not prepare this material.");
     } finally {
       setBusy(false);
+      setActiveAction(null);
     }
   }
 
@@ -317,6 +345,7 @@ export function GenerateMaterialScreen() {
 
     submitting.current = true;
     setBusy(true);
+    setActiveAction("submitting");
     setError(null);
     try {
       const intent = await createGenerationIntent(
@@ -331,8 +360,21 @@ export function GenerateMaterialScreen() {
     } finally {
       submitting.current = false;
       setBusy(false);
+      setActiveAction(null);
     }
   }
+
+  if (activeAction) return (
+    <Page back title={material?.title ?? "Material"} subtitle={identity.title}>
+      <View accessibilityLiveRegion="polite" style={{ alignItems: "center", paddingTop: spacing[8], gap: spacing[3] }}>
+        <Copy size="h2" style={{ textAlign: "center" }}>{activeAction === "preparing" ? "Preparing source…" : "Submitting generation…"}</Copy>
+        <GenerationCore state="reading" />
+        <Copy muted size="bodySmall" style={{ textAlign: "center" }}>
+          {activeAction === "preparing" ? "Fetching and checking the Canvas file. Keep Stay Focused open until preparation finishes." : "Saving your request. The server will take over once it accepts the job."}
+        </Copy>
+      </View>
+    </Page>
+  );
 
   return (
     <Page back title={material?.title ?? "Material"} subtitle={identity.title}>
