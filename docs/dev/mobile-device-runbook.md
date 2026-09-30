@@ -210,6 +210,27 @@ are reachable. If the phone leaves the laptop's LAN, `auto` cannot make the
 local API publicly reachable; use a trusted HTTPS tunnel or a deployed API and
 worker instead.
 
+## Android preview updates
+
+From the repository root, publish Android preview OTA updates with:
+
+```powershell
+npm.cmd run update:preview --workspace @stay-focused/mobile -- --message "Describe the change"
+```
+
+The command checks `EXPO_PUBLIC_API_BASE_URL` in the EAS **preview** environment
+before running `eas update --channel preview --environment preview --platform android`.
+The public API address must be a valid HTTPS base URL and match the preview
+build profile in `apps/mobile/eas.json`. A missing, invalid, or mismatched
+address stops publication. Keep `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY` in the same EAS preview environment. Preview
+builds use `eas build --profile preview --platform android`, whose profile
+already selects that environment. Do not use a bare `eas update` for preview;
+its environment selection is different from the build profile.
+
+`EXPO_PUBLIC_*` values are compiled into the client. They must never contain
+private credentials.
+
 ## Hosted Expo Go prototype
 
 The Vercel Workflow prototype removes the LAN API from the accepted-job path.

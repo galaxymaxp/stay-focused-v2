@@ -23,10 +23,8 @@ import { Card } from "../../components/Card";
 import { SegmentedControl, Sheet } from "../../design/primitives";
 import { TextField } from "../../components/TextField";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import { spacing, typography } from "../../design/tokens";
-import {
-  API_BASE_URL_SETUP_HINT,
-} from "../../services/reviewerApi";
 import {
   type SavedReviewerSourceMetadata,
   type SavedReviewerSourceMode,
@@ -354,7 +352,7 @@ export function ReviewerGenerateScreen({
     const apiBaseUrl = getApiBaseUrl();
     const accessToken = session?.accessToken.trim();
     if (!apiBaseUrl || !accessToken) {
-      setGenerationError({ title: "Connection required", message: apiBaseUrl ? "Sign in again to save this source." : API_BASE_URL_SETUP_HINT });
+      setGenerationError({ title: apiBaseUrl ? "Connection required" : "App configuration error", message: apiBaseUrl ? "Sign in again to save this source." : API_CONFIGURATION_MESSAGE });
       return;
     }
     const sourceType = sourceState.mode === "paste" ? "text" : sourceState.mode === "pdf" ? "local_file" : "camera";
@@ -416,8 +414,8 @@ export function ReviewerGenerateScreen({
     const apiBaseUrl = getApiBaseUrl();
     if (!apiBaseUrl) {
       setGenerationError({
-        title: "API base URL missing",
-        message: API_BASE_URL_SETUP_HINT,
+        title: "App configuration error",
+        message: API_CONFIGURATION_MESSAGE,
       });
       return;
     }
@@ -588,7 +586,7 @@ export function ReviewerGenerateScreen({
         type: "ocr_failed",
         error: {
           code: "invalid_api_base_url",
-          message: API_BASE_URL_SETUP_HINT,
+          message: API_CONFIGURATION_MESSAGE,
         },
       });
       return;
@@ -669,7 +667,7 @@ export function ReviewerGenerateScreen({
         type: "ocr_failed",
         error: {
           code: "invalid_api_base_url",
-          message: API_BASE_URL_SETUP_HINT,
+          message: API_CONFIGURATION_MESSAGE,
         },
       });
       return;

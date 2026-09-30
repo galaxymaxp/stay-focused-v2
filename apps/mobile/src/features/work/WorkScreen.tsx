@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import { spacing } from "../../design/tokens";
 import { listTasks, updateTask } from "../../services/taskApi";
 import { WorkView } from "./WorkView";
@@ -44,7 +45,7 @@ export function WorkScreen({ onAddTask, onOpenTask, reloadToken }: WorkScreenPro
       const apiBaseUrl = getApiBaseUrl();
       const token = accessToken?.trim();
       if (!apiBaseUrl || !token) {
-        setError("Sign in again to load your work.");
+        setError(apiBaseUrl ? "Sign in again to load your work." : `App configuration error\n${API_CONFIGURATION_MESSAGE}`);
         setLoading(false);
         setRefreshing(false);
         return;
@@ -96,7 +97,10 @@ export function WorkScreen({ onAddTask, onOpenTask, reloadToken }: WorkScreenPro
     async (task: TaskView) => {
       const apiBaseUrl = getApiBaseUrl();
       const token = accessToken?.trim();
-      if (!apiBaseUrl || !token) return;
+      if (!apiBaseUrl || !token) {
+        setError(apiBaseUrl ? "Sign in again to update your work." : `App configuration error\n${API_CONFIGURATION_MESSAGE}`);
+        return;
+      }
       const nextStatus = task.status === "pending" ? "completed" : "pending";
       setBusyTaskId(task.id);
       const result = await updateTask({

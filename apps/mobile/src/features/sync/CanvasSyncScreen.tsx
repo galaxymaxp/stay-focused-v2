@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Animated, Easing, Pressable, TextInput, View 
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseMark } from "../../design/CourseViews";
 import { Action, Copy, Notice, Page, RowLink, Sheet, Surface } from "../../design/primitives";
@@ -34,6 +35,8 @@ type Load =
 /** Plain words for the student; codes and HTTP details stay out of the UI. */
 function friendlyError(error: CanvasApiClientError): string {
   switch (error.code) {
+    case "invalid_api_base_url":
+      return API_CONFIGURATION_MESSAGE;
     case "network_error":
     case "request_aborted":
       return "You’re offline. Connect to the internet and try again.";
@@ -73,6 +76,10 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
   }, [session?.accessToken]);
 
   const reload = useCallback(async (quiet: boolean) => {
+    if (!getApiBaseUrl()) {
+      setLoad({ state: "error", message: API_CONFIGURATION_MESSAGE });
+      return;
+    }
     const input = request();
     if (!input) {
       setLoad({ state: "error", message: "Sign in again to use Canvas." });
@@ -157,7 +164,7 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
       {load.state === "loading" ? <SyncSkeleton /> : null}
       {load.state === "error" ? (
         <Surface>
-          <Copy size="h3">Canvas couldn’t load</Copy>
+          <Copy size="h3">{load.message === API_CONFIGURATION_MESSAGE ? "App configuration error" : "Canvas couldn’t load"}</Copy>
           <Copy muted>{load.message}</Copy>
           <Action secondary onPress={() => void reload(false)}>Try again</Action>
         </Surface>

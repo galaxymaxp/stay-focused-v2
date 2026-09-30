@@ -36,7 +36,7 @@ import {
   retryDurableCanvasSync,
   startDurableCanvasSync,
 } from "../../services/canvasSyncJobCoordinator";
-import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import {
   formatDate,
   formatDateTime,
@@ -1047,8 +1047,8 @@ function createRequestContext(accessToken: string | undefined):
     return {
       ok: false,
       error: {
-        title: "API address needs setup",
-        message: API_BASE_URL_SETUP_HINT,
+        title: "App configuration error",
+        message: API_CONFIGURATION_MESSAGE,
       },
     };
   }

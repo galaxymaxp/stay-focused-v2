@@ -7,6 +7,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "../../auth";
+import { ApiConfigurationError } from "../../config/apiBaseUrlResolution";
 import { useTheme } from "../../design/theme";
 import { libraryRemote, storeLocalArtifactDetail } from "../../services/localLibrary/deviceLibrary";
 import { reconcileLibrary, refreshArtifactDetail } from "../../services/localLibrary/librarySync";
@@ -176,6 +177,7 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
 }
 
 function message(error: unknown) {
+  if (error instanceof ApiConfigurationError) return `App configuration error\n${error.message}`;
   return error instanceof Error ? error.message : "Please try again.";
 }
 function codeOf(error: unknown) {

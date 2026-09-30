@@ -5,6 +5,7 @@ import type {
 } from "@stay-focused/canvas";
 
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 
 const CONNECTION_PATH = "/api/canvas/connection";
 const COURSES_PATH = "/api/canvas/courses";
@@ -1456,31 +1457,11 @@ function createEndpoint(
 ):
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly error: CanvasApiClientError } {
-  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/+$/, "");
-  if (!normalizedBaseUrl) {
-    return clientError("invalid_api_base_url", API_BASE_URL_SETUP_HINT);
-  }
-
   try {
-    const parsed = new URL(normalizedBaseUrl);
-    if (
-      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return clientError(
-        "invalid_api_base_url",
-        `EXPO_PUBLIC_API_BASE_URL must be a plain HTTP(S) base URL. ${API_BASE_URL_SETUP_HINT}`,
-      );
-    }
+    return { ok: true, url: `${requireApiBaseUrl(apiBaseUrl)}${path}` };
   } catch {
-    return clientError(
-      "invalid_api_base_url",
-      `EXPO_PUBLIC_API_BASE_URL must be a valid API base URL. ${API_BASE_URL_SETUP_HINT}`,
-    );
+    return clientError("invalid_api_base_url", API_CONFIGURATION_MESSAGE);
   }
-
-  return { ok: true, url: `${normalizedBaseUrl}${path}` };
 }
 
 async function requestJson<TData>({

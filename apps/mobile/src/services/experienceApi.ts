@@ -1,4 +1,5 @@
 import type { ExperienceResponse } from "@stay-focused/shared";
+import { ApiConfigurationError, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 
 export interface ExperienceClient {
   baseUrl: string;
@@ -16,6 +17,9 @@ export class ExperienceApiError extends Error {
 }
 const messages: Record<string, string> = {
   sign_in_required: "Please sign in again.",
+  permission_denied: "You do not have permission to use this item.",
+  invalid_response: "The server returned an unexpected response. Try again later.",
+  server_error: "The server could not load this content. Try again later.",
   not_found: "This item is no longer available.",
   course_not_synced: "This course is not synced with Stay Focused yet.",
   not_ready: "This material is not ready yet. Prepare it and try again.",
@@ -49,13 +53,14 @@ export async function experienceRequest<T>(
   if (options.signal?.aborted) abort();
   const timeout = setTimeout(abort, options.method === "POST" ? 65000 : 15000);
   try {
-    if (!client.baseUrl || !client.accessToken)
+    const baseUrl = requireApiBaseUrl(client.baseUrl);
+    if (!client.accessToken)
       throw new ExperienceApiError(
         "sign_in_required",
         messages.sign_in_required!,
       );
     const response = await (client.fetchImpl ?? fetch)(
-      `${client.baseUrl.replace(/\/$/, "")}${path}`,
+      `${baseUrl}${path}`,
       {
         method: options.method ?? "GET",
         headers: {
@@ -69,7 +74,15 @@ export async function experienceRequest<T>(
         signal: controller.signal,
       },
     );
-    const value: ExperienceResponse<T> = await response.json();
+    if (response.status === 401) throw new ExperienceApiError("sign_in_required", messages.sign_in_required!);
+    if (response.status === 403) throw new ExperienceApiError("permission_denied", messages.permission_denied!);
+    if (response.status >= 500) throw new ExperienceApiError("server_error", messages.server_error!, true);
+    let value: ExperienceResponse<T>;
+    try {
+      value = await response.json();
+    } catch {
+      throw new ExperienceApiError("invalid_response", messages.invalid_response!);
+    }
     if (!response.ok || !value || value.ok !== true) {
       const code =
         value && value.ok === false && typeof value.error?.code === "string"
@@ -83,9 +96,10 @@ export async function experienceRequest<T>(
         value?.ok === false && value.error?.retryable === true,
       );
     }
-    if (!("data" in value)) throw new Error("invalid_response");
+    if (!("data" in value)) throw new ExperienceApiError("invalid_response", messages.invalid_response!);
     return value.data;
   } catch (error) {
+    if (error instanceof ApiConfigurationError) throw error;
     if (error instanceof ExperienceApiError) throw error;
     throw new ExperienceApiError(
       "connection",

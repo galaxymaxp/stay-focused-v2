@@ -52,7 +52,7 @@ export function TasksScreen() {
       <SyncStatus />
       {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading your tasks" /> : null}
       {tasks.error && !tasks.data ? (
-        <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
+        <Surface><Copy size="h3">{tasks.errorCode?.endsWith("api_base_url") ? "App configuration error" : "Tasks could not be loaded"}</Copy><Copy muted>{tasks.errorCode?.endsWith("api_base_url") ? tasks.error.split("\n").slice(1).join("\n") : tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
       ) : null}
       {tasks.data && courses.length === 0 ? (
         <Surface><Copy size="h3">No tasks yet</Copy><Copy muted>Canvas assignments with deadlines appear here after a sync. You can also add your own.</Copy></Surface>
@@ -117,7 +117,7 @@ export function TasksCourseScreen() {
     <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
       {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading tasks" /> : null}
       {tasks.error && !tasks.data ? (
-        <Surface><Copy size="h3">Tasks could not be loaded</Copy><Copy muted>{tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
+        <Surface><Copy size="h3">{tasks.errorCode?.endsWith("api_base_url") ? "App configuration error" : "Tasks could not be loaded"}</Copy><Copy muted>{tasks.errorCode?.endsWith("api_base_url") ? tasks.error.split("\n").slice(1).join("\n") : tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
       ) : null}
       {tasks.data && items.length === 0 ? (
         <Surface><Copy size="h3">No tasks in this course</Copy><Copy muted>Assignments with deadlines or submissions will appear after your next Canvas sync.</Copy></Surface>

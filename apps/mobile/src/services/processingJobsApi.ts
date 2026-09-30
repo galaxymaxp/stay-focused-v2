@@ -19,6 +19,7 @@ import type {
 } from "./ocrApi";
 import { validateOcrImageUpload, validateOcrPdfUpload } from "./ocrApi";
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 import { getSupabaseMobileConfig } from "../auth/supabaseClient";
 
 const JOBS_PATH = "/api/jobs";
@@ -423,13 +424,11 @@ async function requestJson<T>(
 function validateApiInput(
   input: ProcessingJobApiInput,
 ): ProcessingJobApiResult<{ readonly baseUrl: string; readonly accessToken: string }> {
-  const baseUrl = input.apiBaseUrl.trim().replace(/\/+$/, "");
-  if (!baseUrl) return failure("invalid_api_base_url", API_BASE_URL_SETUP_HINT, false);
+  let baseUrl: string;
   try {
-    const url = new URL(baseUrl);
-    if (!/^https?:$/.test(url.protocol) || url.search || url.hash) throw new Error();
+    baseUrl = requireApiBaseUrl(input.apiBaseUrl);
   } catch {
-    return failure("invalid_api_base_url", API_BASE_URL_SETUP_HINT, false);
+    return failure("invalid_api_base_url", API_CONFIGURATION_MESSAGE, false);
   }
   const accessToken = input.accessToken.trim();
   if (!accessToken) return failure("missing_access_token", "Sign in again to continue.", false);

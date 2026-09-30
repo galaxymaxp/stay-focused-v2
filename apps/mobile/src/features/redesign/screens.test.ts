@@ -309,6 +309,17 @@ const ringAt = (minutes: number, offset = 0) => {
   return { x: 170 + (136 + offset) * Math.cos(angle), y: 170 + (136 + offset) * Math.sin(angle) };
 };
 describe("B25 screen interactions", () => {
+  it("shows a configuration error instead of a sign-in prompt on Generate and Tasks", async () => {
+    mocks.errors["/api/experience/courses"] = { code: "missing_api_base_url", message: "App configuration error\nThis version of Stay Focused is missing its server connection configuration." };
+    const generate = await render(createElement(GenerateScreen));
+    expect(copyText(generate).join(" ")).toContain("App configuration error");
+    expect(copyText(generate).join(" ")).not.toContain("Please sign in again");
+    await act(async () => rendered!.unmount());
+    mocks.errors[`/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = { code: "missing_api_base_url", message: "App configuration error\nThis version of Stay Focused is missing its server connection configuration." };
+    const tasks = await render(createElement(TasksScreen));
+    expect(copyText(tasks).join(" ")).toContain("App configuration error");
+    expect(copyText(tasks).join(" ")).not.toContain("Please sign in again");
+  });
   it("shows an intentional announcement empty state", async () => {
     mocks.data["/api/experience/announcements?limit=100"] = { items: [], nextOffset: null };
     const root = await render(createElement(AnnouncementsScreen));

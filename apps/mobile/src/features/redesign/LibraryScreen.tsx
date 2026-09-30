@@ -203,8 +203,8 @@ export function LibraryScreen() {
   return (
     <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh}>
       {loading ? <LibrarySkeleton /> : null}
-      {!hasLocal && library.error ? <Surface><Copy size="h3">Library could not be loaded</Copy><Copy muted>{library.error}</Copy><Action secondary onPress={library.refresh}>Try again</Action></Surface> : null}
-      {hasLocal && library.error ? <Notice>Showing work saved on this device. Refresh when you are back online.</Notice> : null}
+      {!hasLocal && library.error ? <Surface><Copy size="h3">{library.error.startsWith("App configuration error") ? "App configuration error" : "Library could not be loaded"}</Copy><Copy muted>{library.error.startsWith("App configuration error") ? library.error.split("\n").slice(1).join("\n") : library.error}</Copy><Action secondary onPress={library.refresh}>Try again</Action></Surface> : null}
+      {hasLocal && library.error ? <Notice>{library.error.startsWith("App configuration error") ? library.error : "Showing work saved on this device. Refresh when you are back online."}</Notice> : null}
       {hasLocal && library.refreshing ? <Copy muted size="caption">Checking for updates…</Copy> : null}
       {!loading && !library.error && groups.length === 0 ? (
         <Surface>

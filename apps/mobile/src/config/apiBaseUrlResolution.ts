@@ -9,6 +9,39 @@ interface ApiBaseUrlResolutionInput {
   readonly platform: string;
 }
 
+export const API_CONFIGURATION_MESSAGE =
+  "This version of Stay Focused is missing its server connection configuration. Please install or update to a correctly configured build.";
+
+export class ApiConfigurationError extends Error {
+  readonly kind = "configuration";
+
+  constructor(readonly code: "missing_api_base_url" | "invalid_api_base_url") {
+    super(API_CONFIGURATION_MESSAGE);
+    this.name = "ApiConfigurationError";
+  }
+}
+
+/** Validate before constructing a request. The message never contains the input. */
+export function requireApiBaseUrl(value: string | undefined): string {
+  const normalized = value?.trim().replace(/\/+$/, "");
+  if (!normalized) throw new ApiConfigurationError("missing_api_base_url");
+  try {
+    const parsed = new URL(normalized);
+    if (
+      !["http:", "https:"].includes(parsed.protocol) ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.pathname !== "/"
+    ) throw new Error("invalid");
+  } catch {
+    throw new ApiConfigurationError("invalid_api_base_url");
+  }
+  return normalized;
+}
+
 /**
  * Resolves an explicit deployed API URL or a same-network local development URL.
  *
@@ -24,7 +57,11 @@ export function resolveApiBaseUrl(
     configuredValue &&
     configuredValue.toLowerCase() !== AUTO_API_BASE_URL
   ) {
-    return configuredValue.replace(/\/+$/, "");
+    try {
+      return requireApiBaseUrl(configuredValue);
+    } catch {
+      return undefined;
+    }
   }
 
   if (!input.isDevelopment) return undefined;

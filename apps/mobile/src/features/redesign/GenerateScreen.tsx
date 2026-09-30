@@ -122,7 +122,7 @@ export function GenerateScreen() {
       </RowLink>
       {courses.loading && !courses.data ? <GenerateSkeleton rows={3} /> : null}
       {courses.error && !courses.data ? (
-        <Surface><Copy size="h3">Courses could not be loaded</Copy><Copy muted>{courses.error}</Copy><Action secondary onPress={courses.refresh}>Try again</Action></Surface>
+        <Surface><Copy size="h3">{courses.errorCode?.endsWith("api_base_url") ? "App configuration error" : "Courses could not be loaded"}</Copy><Copy muted>{courses.errorCode?.endsWith("api_base_url") ? courses.error.split("\n").slice(1).join("\n") : courses.error}</Copy><Action secondary onPress={courses.refresh}>Try again</Action></Surface>
       ) : null}
       {courses.data?.items.length === 0 ? (
         <Surface>

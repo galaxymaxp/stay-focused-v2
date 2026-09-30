@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveApiBaseUrl } from "./apiBaseUrlResolution";
+import { ApiConfigurationError, requireApiBaseUrl, resolveApiBaseUrl } from "./apiBaseUrlResolution";
+
+describe("requireApiBaseUrl", () => {
+  it.each([undefined, "", "   "])("classifies missing API configuration %s", (value) => {
+    expect(() => requireApiBaseUrl(value)).toThrowError(ApiConfigurationError);
+    try { requireApiBaseUrl(value); } catch (error) {
+      expect(error).toMatchObject({ kind: "configuration", code: "missing_api_base_url" });
+    }
+  });
+
+  it.each(["auto", "api.example.test", "ftp://api.example.test", "https://", "https://api.example.test/path"])("rejects malformed API configuration %s", (value) => {
+    expect(() => requireApiBaseUrl(value)).toThrowError(ApiConfigurationError);
+  });
+
+  it("accepts and normalizes a valid HTTPS API URL", () => {
+    expect(requireApiBaseUrl(" https://api.example.test/// ")).toBe("https://api.example.test");
+  });
+});
 
 describe("resolveApiBaseUrl", () => {
   it("preserves an explicit deployed API URL", () => {
@@ -68,6 +85,10 @@ describe("resolveApiBaseUrl", () => {
         platform: "ios",
       }),
     ).toBeUndefined();
+  });
+
+  it("does not resolve a malformed deployed URL", () => {
+    expect(resolveApiBaseUrl({ configuredValue: "ftp://api.example.test", isDevelopment: false, platform: "android" })).toBeUndefined();
   });
 
   it("rejects an invalid custom local port", () => {

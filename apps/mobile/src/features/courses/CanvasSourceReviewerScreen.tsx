@@ -80,7 +80,7 @@ import {
   type CanvasReviewerRecoveryRecord,
 } from "../../services/canvasReviewerRecoveryStore";
 import { cacheCompletedArtifact } from "../../services/completedArtifactCache";
-import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import {
   saveReviewer,
   type ReviewerLibraryError,
@@ -2645,7 +2645,7 @@ function createRequestContext(accessToken: string | undefined):
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     return {
-      error: { message: API_BASE_URL_SETUP_HINT, title: "API address needs setup" },
+      error: { message: API_CONFIGURATION_MESSAGE, title: "App configuration error" },
       ok: false,
     };
   }

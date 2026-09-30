@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { ApiConfigurationError } from "../../config/apiBaseUrlResolution";
 import { useTheme } from "../../design/theme";
 import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
@@ -59,9 +60,14 @@ export function useExperience<T>(
           setState((old) => ({
             ...old,
             loading: false,
-            error: error instanceof Error ? error.message : "Please try again.",
-            errorCode: error instanceof ExperienceApiError ? error.code : null,
+            error: error instanceof ApiConfigurationError
+              ? `App configuration error\n${error.message}`
+              : error instanceof Error ? error.message : "Please try again.",
+            errorCode: error instanceof ApiConfigurationError
+              ? error.code
+              : error instanceof ExperienceApiError ? error.code : null,
           }));
+        if (error instanceof ApiConfigurationError) return;
       }
       if (live && pollMs) timer = setTimeout(() => void load(), pollMs);
     }
