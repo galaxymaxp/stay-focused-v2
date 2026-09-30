@@ -1,6 +1,14 @@
 # Roadmap
 
-## B38 Canvas admission and physical gate (2026-09-29)
+## B39 preview API configuration (2026-09-30)
+
+**PASS.** Runtime configuration failures are separated from authentication, and the Android preview OTA command now validates the EAS preview API address before publishing. Final update `01a0f2ae-79d7-732a-9ba4-c492f2af3545` passed realme acceptance. Canvas jobs stayed at 468 with zero passive additions. Continue using the [guarded preview command](dev/mobile-device-runbook.md#android-preview-updates) for future OTAs. [Acceptance](ai/acceptance/b39/preview-api-configuration.md).
+
+## B38 Canvas admission and physical gate (2026-09-30)
+
+**PASS.** Production API and private worker deployment, manual synchronization, passive zero-job navigation, and realme relaunch passed after explicit user authorization. [Acceptance](ai/acceptance/b38/canvas-sync-admission.md).
+
+## B38 pre-rollout snapshot (historical, 2026-09-29)
 
 **Deployment gate blocked.** Automatic approval review rejected the production Vercel rollout and prohibited a workaround. Obtain authorization for the prepared Vercel, Cloud Run, and preview mobile deployments, then run the realme gates. [Evidence](ai/acceptance/b38/canvas-sync-admission.md).
 

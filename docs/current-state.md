@@ -1,6 +1,14 @@
 # Current State
 
-## B38 Canvas sync admission repair (2026-09-29)
+## B39 preview API configuration (2026-09-30)
+
+**PASS.** Missing or invalid mobile API configuration now produces a typed configuration error before any request and shows an app configuration state without changing Supabase session, Canvas connection, or local Library data. The EAS preview environment now holds the public API address; the documented Android preview command checks it against the build profile and publishes with `--environment preview`. Final OTA `01a0f2ae-79d7-732a-9ba4-c492f2af3545` passed realme session, Generate, Tasks, Library, Today, CIT17 PDFs, Canvas connection, and force-stop/relaunch. Passive navigation kept Canvas jobs at 468 with zero active. [Acceptance](ai/acceptance/b39/preview-api-configuration.md).
+
+## B38 Canvas sync admission (2026-09-30)
+
+**PASS.** B38's Google Cloud Tasks and private Cloud Run dispatch was physically accepted after the earlier rollout block was resolved by explicit user authorization. Manual CC6, CIT17, and SOC SCI 103N synchronization completed, and passive navigation created zero jobs. [Acceptance](ai/acceptance/b38/canvas-sync-admission.md).
+
+## B38 pre-rollout snapshot (historical, 2026-09-29)
 
 **Rollout blocked by automatic approval review.** The production Vercel deployment was rejected as a consequential service change without separately recognized explicit authorization; no Cloud Run or EAS rollout followed. The physical gates remain unrun. [Evidence and trigger map](ai/acceptance/b38/canvas-sync-admission.md).
 
