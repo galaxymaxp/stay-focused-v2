@@ -1,5 +1,9 @@
 # Current State
 
+## B37 production generation regression (2026-10-01)
+
+**PARTIAL.** The Page attachment omission and 40-page PDF repair-budget failure are traced and repaired in `f334e32`. API `dpl_4ykMwdFbk5nRqhniBhMWYnsC4ZQm` and private worker `generation-worker-00015-5fn` are live; automated tests, typecheck, lint, and production build pass. Automatic approval review blocked the Android preview OTA pending explicit authorization, so the exact Page and PDF have not been retested on the realme. [Investigation and gate](ai/acceptance/b37/production-generation-regression-20261001.md).
+
 ## B39 preview API configuration (2026-09-30)
 
 **PASS.** Missing or invalid mobile API configuration now produces a typed configuration error before any request and shows an app configuration state without changing Supabase session, Canvas connection, or local Library data. The EAS preview environment now holds the public API address; the documented Android preview command checks it against the build profile and publishes with `--environment preview`. Final OTA `01a0f2ae-79d7-732a-9ba4-c492f2af3545` passed realme session, Generate, Tasks, Library, Today, CIT17 PDFs, Canvas connection, and force-stop/relaunch. Passive navigation kept Canvas jobs at 468 with zero active. [Acceptance](ai/acceptance/b39/preview-api-configuration.md).

@@ -1,5 +1,9 @@
 # Roadmap
 
+## B37 generation regression physical gate (2026-10-01)
+
+**PARTIAL.** The production API and private worker contain the Page attachment and validation repairs at `f334e32`; the mobile loading changes are committed but await preview distribution. Publish the Android preview OTA after explicit authorization, then run the five realme gates, including the exact Unit 3 Page and failed 40-page PDF. Do not close B37 on automated tests alone. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
+
 ## B39 preview API configuration (2026-09-30)
 
 **PASS.** Runtime configuration failures are separated from authentication, and the Android preview OTA command now validates the EAS preview API address before publishing. Final update `01a0f2ae-79d7-732a-9ba4-c492f2af3545` passed realme acceptance. Canvas jobs stayed at 468 with zero passive additions. Continue using the [guarded preview command](dev/mobile-device-runbook.md#android-preview-updates) for future OTAs. [Acceptance](ai/acceptance/b39/preview-api-configuration.md).

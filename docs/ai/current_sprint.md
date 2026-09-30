@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B37 production generation regression (2026-10-01)
+
+**PARTIAL.** Root-cause evidence shows that the Unit 3 Page passed only 19 filename characters to generation because its linked PDF was absent from the Files inventory. The 40-page PDF prepared and returned provider output, then failed before its one repair call because the rejected output exceeded the repair prompt limit. Commit `f334e32` repairs both paths and adds immediate preparation/submission progress, typed failure copy, and artifact opening. Vercel `dpl_4ykMwdFbk5nRqhniBhMWYnsC4ZQm` and private worker `generation-worker-00015-5fn` are live. Automatic approval review blocked EAS preview publication pending explicit authorization; physical acceptance remains open. [Evidence](acceptance/b37/production-generation-regression-20261001.md).
+
 ## B39 preview API configuration (2026-09-30)
 
 **PASS — preview API configuration is explicit and future EAS updates are guarded.** The mobile API clients validate a canonical API address before requests and render configuration-specific errors while retaining the existing session, Canvas connection, and local data. The EAS preview environment contains the public API address; the normal preview OTA command checks it against the build profile and publishes with `--environment preview`. Final Android update `01a0f2ae-79d7-732a-9ba4-c492f2af3545` passed on the realme. Generate, Tasks, Library, Today, CIT17 PDFs, Canvas connection, and force-stop/relaunch remained intact; Canvas jobs stayed at 468 with zero active. [Acceptance](acceptance/b39/preview-api-configuration.md).
