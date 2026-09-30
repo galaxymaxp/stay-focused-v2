@@ -70,3 +70,42 @@ Implementation commit: `f334e32` (19 scoped files); initial evidence commit: `1c
 ## 10. Verdict
 
 **PARTIAL.** Preparation progress and failed-job recovery were physically observed. Fresh Reviewer generation failed strict emphasis validation after the allowed repair. The two exact material retests and successful Reviewer/Library acceptance remain open. No further implementation repair was made after this physical failure.
+
+## B37.1 addendum — optional emphasis repair and fresh production gate (2026-10-01)
+
+This addendum preserves the B37 failure above. Starting HEAD was `f6a5b64` on `b25-3-3-ai-first`. The unrelated untracked `UI/`, `apps/mobile/.gitignore`, and `tmp/` were left untouched.
+
+### Exact failed response diagnosis
+
+Job `2a1aab01-23f3-4a2e-8633-c784f74fe250` has two completed provider checkpoints. The first response has 22 sections and 61 emphasis marks; the repaired response has 21 sections and 58 marks. These are the rejected marks, with only the minimum phrase text shown:
+
+| Response | Section | Target | Phrase | Exact occurrences | Normalization |
+| --- | --- | --- | --- | ---: | --- |
+| Initial | 13, Improving Decision-Making | key point 4 | “evidence rather than intuition” | 0 | Still absent after NFC, whitespace collapse, case folding, and punctuation removal |
+| Repair | 8, CRM and Educational Systems | key point 2 | “automating sales and marketing processes” | 0 | Still absent under the same checks |
+| Repair | 12, Improving Decision-Making | key point 3 | “evidence rather than intuition” | 0 | Still absent under the same checks |
+
+The earlier record's “missing or non-unique” wording was a coarse classification: all three were **missing verbatim**, not duplicate phrases. The referenced key points existed (51, 112, and 112 characters respectively). Both outputs had populated titles, explanations, and key points in every section, and every section had one or more references within the 33 supplied block IDs. Removing only invalid emphasis leaves both outputs passing these structural and source-reference checks. Those checks do not independently prove every factual statement is faithful to the PDF; the rejected output was not persisted or physically inspected.
+
+### Architecture and repair
+
+The provider's `reviewer_document` schema and prompt ask the model to select text already present in an explanation or indexed key point. `validateReviewerDocument` validates required study content and source IDs; the previous `validateReviewerEmphasis` threw a fatal contract error for absent, repeated, overlapping, malformed, or over-dense marks. `generateContract` therefore spent its one whole-product repair on optional styling. The assembler stores marks in `sourceCore.emphasis`; the API reader maps them to the shared reader model; the mobile reader and export renderer locate them with `indexOf`. Uniqueness is needed to avoid styling an arbitrary occurrence. A zero-mark section renders its unchanged plain text. Emphasis does not supply study content, source provenance, or coverage.
+
+Commit `587d5f4` keeps the provider schema and substantive prompt, then deterministically retains only well-formed, exact, unique, non-overlapping, sparse marks in the already generated prose. It discards absent or ambiguous marks without changing prose or inventing phrases. Required title, explanation, key-point, and exact source-reference failures remain fatal; source references are checked before emphasis resolution. Emphasis-only defects no longer invoke a provider repair. The existing one repair attempt remains for substantive contract failures. This change does not add semantic source-faithfulness verification to the AI-first path, whose coverage/grounding metadata describes source-reference contract checks.
+
+### Verification and deployment
+
+Focused emphasis tests passed (30 tests across the invoked root Vitest run); the API saved-reader test and mobile zero-emphasis renderer test passed. Fresh full results: API **1,110 passed, 3 existing skips**; mobile **758 passed**; Canvas **73 passed**; OCR **27 passed**; engine TypeScript eval runner **606 passed, 0 failed**. Typecheck, lint, and production build passed across all seven workspaces; lint retained four pre-existing mobile test warnings. Initial lint/build attempts failed because the sandbox denied parent-directory reads; reruns with read access passed. The engine package's `npm test` still fails before eval execution on the existing Node ESM extensionless import from `packages/shared/src/quiz-capacity`; the TypeScript eval runner passed. `git diff --check` passed.
+
+The API deployed from the scoped `587d5f4` archive as Vercel `dpl_EGpVzrU1DYJ6yHQTFpUqEFN4j6P9` (READY, production alias), with HTTP 200 at the public root. Cloud Build `120cb8f9-2616-4069-9eba-f60efdec264c` succeeded; private Cloud Run `generation-worker-00016-dvd` serves 100% of traffic. Anonymous worker health returns 403, and the new worker revision had no ERROR entries in the sanitized post-deploy check. No Expo update, production Expo publication, EAS configuration change, secret change, or migration was made; the existing preview OTA `01a0f406-bd59-7c2c-b461-cc97b6406fa3` stayed on the realme.
+
+### Fresh realme acceptance and stop gate
+
+| Case | Fresh job ID | Result | Device and production evidence |
+| --- | --- | --- | --- |
+| Introduction PDF | `3ad3df6f-a7e7-4eb2-8c51-0ed63677b436` | **PASS** | Immediate “Starting your request,” then durable generation. The 33-page native-text source had 10,048 characters. The job succeeded after one provider call, with one job for its fresh snapshot and one saved result `21bb2d8a-30f3-459c-a6dc-06acfe8917c1`. The realme opened an 18-topic, readable Reviewer covering WIS introduction, architecture, e-commerce, organizational use, servers, and HTTP/HTTPS; those topic terms are present in the extracted source blocks. Stored output has about 16,094 serialized content characters, references all 33 source blocks, and has 50 valid emphasis marks. Library lists exactly one new Web Information Systems Reviewer; it reopens after relaunch. Artifact `f90b0ba5-eb71-4413-a1a2-cbb11d310c11`, version `2e98a7b9-7dff-4ce1-9208-2dd348a4cd1a`. The visible content is substantive and source-aligned; source-reference validation and topic checks are not an exhaustive factual audit. |
+| Unit 3 Lesson 1 Page + linked PDF | **None created** | **FAIL / BLOCKED** | The realme showed immediate “Starting your request,” then “This request could not be completed. Try again.” The production API logged `POST /api/experience/generations` at 05:19:15 Manila time as HTTP 422 `insufficient_source`. Owned Page `61c8c134-9c58-4e67-b39d-7d6ce3ac5bfa` has only 19 visible filename characters. Its HTML still links to file `11574237` on the same Canvas origin and course `67174`; no `canvas_files` row for that file/course was created. Admission therefore reached the branch where no instructional attachment was returned and the Page text was too short. The metadata or eligibility reason for the empty attachment selection is not recorded in the safe logs and remains unresolved. No fresh job, prepared PDF, result, or substantive Page Reviewer exists. The mobile error map lacks `insufficient_source`, so it displayed generic copy despite the typed server response. |
+| UNIT 3 Front-End Development and Web System Design.pdf, 40 pages | **Not created** | **NOT RUN** | Stopped after the Unit 3 Page exposed a new admission failure. The previous 24-section repair-budget case therefore remains without a fresh physical retest. |
+| Force-stop during durable generation | `3ad3df6f-a7e7-4eb2-8c51-0ed63677b436` | **PASS** | The app was force-stopped while this job was `running/generating_sections`. After relaunch, Queue showed the completed output for the same job; the realme opened it from Queue and Library. Production has one job for its source snapshot, one saved result, and one resulting artifact. This claim concerns an already accepted durable job, not synchronous preparation. |
+
+**B37.1 verdict: BLOCKED.** The emphasis-only generation failure is repaired and the Introduction PDF plus successful durable recovery are physically verified. The Unit 3 Page's linked PDF was not ingested at admission, and the 40-page case was not run after that failure. Do not close B37 until the attachment eligibility cause is established, repaired if appropriate, and both pending materials pass fresh device inspection. No new implementation repair was made after this device failure.

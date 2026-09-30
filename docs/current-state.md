@@ -2,7 +2,7 @@
 
 ## B37 production generation regression (2026-10-01)
 
-**PARTIAL.** The Page attachment omission and 40-page PDF repair-budget failure are traced and repaired in `f334e32`. API `dpl_4ykMwdFbk5nRqhniBhMWYnsC4ZQm`, private worker `generation-worker-00015-5fn`, and authorized Android preview OTA `01a0f406-bd59-7c2c-b461-cc97b6406fa3` are live. The realme showed immediate preparation progress and recovered one durable job after force-stop, but that fresh 33-page PDF Reviewer job failed strict emphasis validation after its allowed repair. Per the user's stop instruction, the exact Unit 3 Page and previously failed 40-page PDF were not retested; no further code repair was made. [Investigation and gate](ai/acceptance/b37/production-generation-regression-20261001.md).
+**BLOCKED after B37.1.** Commit `587d5f4` sanitizes optional Reviewer emphasis without altering substantive content or source references. Production API `dpl_EGpVzrU1DYJ6yHQTFpUqEFN4j6P9` and private worker `generation-worker-00016-dvd` are live; the authorized Android preview OTA remains `01a0f406-bd59-7c2c-b461-cc97b6406fa3`. On the realme, a fresh 33-page Introduction PDF generated one substantive 18-topic Reviewer, opened from Queue and Library after force-stop/relaunch, with no duplicate job. The fresh Unit 3 Lesson 1 Page request then failed before admission with HTTP 422 `insufficient_source`: its linked PDF was not selected or ingested, and no job was created. The attachment eligibility cause is unresolved. The 40-page PDF retest stopped at this new failure. The preceding B37 failure and full B37.1 evidence remain in the [acceptance record](ai/acceptance/b37/production-generation-regression-20261001.md).
 
 ## B39 preview API configuration (2026-09-30)
 

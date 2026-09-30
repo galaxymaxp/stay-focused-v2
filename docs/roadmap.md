@@ -2,7 +2,7 @@
 
 ## B37 generation regression physical gate (2026-10-01)
 
-**PARTIAL.** Production API, private worker, and explicitly authorized Android preview OTA contain the `f334e32` repair. Preparation progress passed on realme, but the first fresh 33-page PDF Reviewer job failed validation after its allowed repair; Queue recovered the failed job across force-stop without duplication. Stop on this genuine defect before further repair or the exact Unit 3 Page and 40-page PDF retests. Do not close B37 on automated tests alone. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
+**BLOCKED after B37.1.** The emphasis-only contract failure is repaired in `587d5f4` and deployed to API/worker. A fresh Introduction PDF Reviewer completed on the realme, was substantive and source-referenced, persisted to Library, and survived force-stop/relaunch without duplication. The next fresh Unit 3 Lesson 1 Page request failed before job creation with HTTP 422 `insufficient_source`: file `11574237` was linked but not selected/ingested. Establish its Canvas metadata/eligibility cause and repair if appropriate; then retest that Page and the 40-page PDF on the device before closing B37. The prior B37 failure remains documented. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
 
 ## B39 preview API configuration (2026-09-30)
 
