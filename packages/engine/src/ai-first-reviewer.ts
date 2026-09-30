@@ -30,34 +30,35 @@ export function createReviewerDocumentSchema(sourceIds: readonly string[]): Stru
 }
 interface ReviewerEmphasis { target: 'explanation' | 'key_point'; index: number; text: string; style: 'bold' | 'underline' | 'highlight' }
 interface ReviewerDocument { title: string; sections: { title: string; explanation: string; keyPoints: string[]; emphasis: ReviewerEmphasis[]; sourceRefs: string[] }[] }
-/** Exact, non-overlapping references to already generated visible prose. */
+/** Keep only presentation marks that resolve unambiguously to visible prose. */
 export function validateReviewerEmphasis(explanation: string, keyPoints: readonly string[], raw: unknown): ReviewerEmphasis[] {
-  if (!Array.isArray(raw) || raw.length > 40) throw new GenerationContractError(['reviewer:emphasis_count']);
+  if (!Array.isArray(raw)) return [];
   const ranges = new Map<string, { start: number; end: number }[]>();
+  const maxLength = Math.ceil((explanation.length + keyPoints.reduce((sum, point) => sum + point.length, 0)) * 0.25);
   let total = 0;
-  const marks = raw.map((entry): ReviewerEmphasis => {
+  const marks: ReviewerEmphasis[] = [];
+  for (const entry of raw.slice(0, 40)) {
     const mark = record(entry);
     if (Object.keys(mark).some(k => !['target', 'index', 'text', 'style'].includes(k)) ||
       !['explanation', 'key_point'].includes(String(mark.target)) || !Number.isInteger(mark.index) ||
       !['bold', 'underline', 'highlight'].includes(String(mark.style)) || !text(mark.text, 180))
-      throw new GenerationContractError(['reviewer:emphasis_fields']);
+      continue;
     const index = mark.index as number;
     const target = mark.target as ReviewerEmphasis['target'];
     const body = target === 'explanation' && index === 0 ? explanation : target === 'key_point' ? keyPoints[index] : undefined;
     const phrase = mark.text as string;
     const start = body?.indexOf(phrase) ?? -1;
     if (start < 0 || body!.indexOf(phrase, start + 1) >= 0 || !/[\p{L}\p{N}]/u.test(phrase))
-      throw new GenerationContractError(['reviewer:emphasis_text']);
+      continue;
     const key = `${target}:${index}`;
     const end = start + phrase.length;
     if ((ranges.get(key) ?? []).some(range => start < range.end && end > range.start))
-      throw new GenerationContractError(['reviewer:emphasis_overlap']);
+      continue;
+    if (total + phrase.length > maxLength) continue;
     ranges.set(key, [...(ranges.get(key) ?? []), { start, end }]);
     total += phrase.length;
-    return { target, index, text: phrase, style: mark.style as ReviewerEmphasis['style'] };
-  });
-  if (total > Math.ceil((explanation.length + keyPoints.reduce((sum, point) => sum + point.length, 0)) * 0.25))
-    throw new GenerationContractError(['reviewer:emphasis_density']);
+    marks.push({ target, index, text: phrase, style: mark.style as ReviewerEmphasis['style'] });
+  }
   return marks;
 }
 export function validateReviewerDocument(raw: unknown, ids: readonly string[]): ReviewerDocument {
@@ -73,7 +74,9 @@ export function validateReviewerDocument(raw: unknown, ids: readonly string[]): 
     if (!text(s.title, 500)) return fail(`section-${index}:title`);
     if (!text(s.explanation)) return fail(`section-${index}:explanation`);
     if (!Array.isArray(s.keyPoints) || !s.keyPoints.length || s.keyPoints.length > 30 || !s.keyPoints.every(p => text(p, 4000))) return fail(`section-${index}:key_points`);
-    return { title: s.title, explanation: s.explanation, keyPoints: s.keyPoints as string[], emphasis: validateReviewerEmphasis(s.explanation as string, s.keyPoints as string[], s.emphasis ?? []), sourceRefs: requireSourceRefs(s.sourceRefs, ids) };
+    const sourceRefs = requireSourceRefs(s.sourceRefs, ids);
+    return { title: s.title, explanation: s.explanation, keyPoints: s.keyPoints as string[], sourceRefs,
+      emphasis: validateReviewerEmphasis(s.explanation as string, s.keyPoints as string[], s.emphasis ?? []) };
   }) };
 }
 

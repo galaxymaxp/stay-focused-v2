@@ -295,6 +295,18 @@ describe('Library ownership and persisted output', () => {
     const summary = (await service(libraryData).api.getLibrary('owner')).items[0]!;
     expect(() => reviewerReader({ reviewer: { sections: [{ items: [{}] }] } }, summary)).toThrow(ExperienceFailure);
   });
+  it('reads a saved Reviewer whose optional emphasis was sanitized to zero', async () => {
+    const { api } = service(libraryData);
+    const summary = (await api.getLibrary('owner')).items[0]!;
+    const saved = structuredClone(payload) as typeof payload & { reviewer: { sections: { items: { sourceCore: { emphasis: unknown[] } }[] }[] } };
+    saved.reviewer.sections[0]!.items[0]!.sourceCore.emphasis = [];
+    const reader = reviewerReader(saved, summary);
+    expect(reader.sections[0]!.blocks[0]).toMatchObject({
+      explanation: 'Cells contain genetic material.',
+      keyPoints: ['Cells are living units.'],
+      emphasis: [],
+    });
+  });
 });
 describe('lifecycle and errors', () => {
   it.each([

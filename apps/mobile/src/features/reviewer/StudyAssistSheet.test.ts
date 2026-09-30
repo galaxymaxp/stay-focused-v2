@@ -42,6 +42,13 @@ function nodes(type: string) { return rendered!.root.findAll(node => String(node
 /** The four option tiles, in ASSIST_TYPES order. */
 function tiles() { return nodes('Pressable').filter(node => node.props.accessibilityState && 'selected' in node.props.accessibilityState); }
 describe('Reviewer Study Assist interaction', () => {
+  it('renders a Reviewer section with zero emphasis as readable plain text', async () => {
+    const plain = { ...reviewer, sections: reviewer.sections.map(section => ({ ...section,
+      blocks: section.blocks.map(block => ({ ...block, emphasis: [] })) })) };
+    await act(async () => { rendered = create(createElement(ReviewerReaderScreen, { artifact: detail.artifact, reviewer: plain, deviceCopy: true })); });
+    expect(nodes('Text').some(node => node.props.children === plain.sections[0]!.blocks[0]!.explanation)).toBe(true);
+    expect(nodes('Text').some(node => node.props.children === plain.sections[0]!.blocks[0]!.keyPoints[0])).toBe(true);
+  });
   it('opens from meaningful content, shows four actions, dismisses, and leaves canonical text unchanged', async () => {
     const before = JSON.stringify(reviewer);
     await act(async () => { rendered = create(createElement(ReviewerReaderScreen, { artifact: detail.artifact, reviewer, deviceCopy: true })); });
