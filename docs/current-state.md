@@ -2,7 +2,7 @@
 
 ## B37 production generation regression (2026-10-01)
 
-**PARTIAL.** The Page attachment omission and 40-page PDF repair-budget failure are traced and repaired in `f334e32`. API `dpl_4ykMwdFbk5nRqhniBhMWYnsC4ZQm` and private worker `generation-worker-00015-5fn` are live; automated tests, typecheck, lint, and production build pass. Automatic approval review blocked the Android preview OTA pending explicit authorization, so the exact Page and PDF have not been retested on the realme. [Investigation and gate](ai/acceptance/b37/production-generation-regression-20261001.md).
+**PARTIAL.** The Page attachment omission and 40-page PDF repair-budget failure are traced and repaired in `f334e32`. API `dpl_4ykMwdFbk5nRqhniBhMWYnsC4ZQm`, private worker `generation-worker-00015-5fn`, and authorized Android preview OTA `01a0f406-bd59-7c2c-b461-cc97b6406fa3` are live. The realme showed immediate preparation progress and recovered one durable job after force-stop, but that fresh 33-page PDF Reviewer job failed strict emphasis validation after its allowed repair. Per the user's stop instruction, the exact Unit 3 Page and previously failed 40-page PDF were not retested; no further code repair was made. [Investigation and gate](ai/acceptance/b37/production-generation-regression-20261001.md).
 
 ## B39 preview API configuration (2026-09-30)
 

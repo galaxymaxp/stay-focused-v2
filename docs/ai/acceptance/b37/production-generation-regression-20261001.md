@@ -45,26 +45,28 @@ The first sandboxed lint/build attempts could not read a parent directory; rerun
 
 ## 7. Physical-device acceptance
 
-| Case | Result |
-| --- | --- |
-| 1. Prepare material shows immediate accurate progress | PENDING new Android preview update |
-| 2. Reviewer generation progresses and opens a valid saved result | PENDING new Android preview update |
-| 3. Unit 3 Lesson 1 includes actual PDF lesson content and provenance | PENDING new Android preview update |
-| 4. Previously failing 40-page PDF succeeds or reports a proven typed blocker | PENDING new Android preview update |
-| 5. Force-stop/relaunch recovers a running durable job | PENDING new Android preview update |
+After the user's explicit authorization, the guarded preview command published Android update `01a0f406-bd59-7c2c-b461-cc97b6406fa3` in group `487e86ed-bdec-4f4c-b7d2-782de43d74d2`, runtime `2.0.1`, to the existing **preview** branch. The preflight verified the API address in the EAS preview environment. The connected realme downloaded the new update; after relaunch Expo reported no newer update, and the new preparation UI was visible.
 
-Do not mark any of these PASS from mocks or from the old installed Reviewer.
+| Case | Physical evidence and result |
+| --- | --- |
+| 1. Prepare material shows immediate accurate progress | **PASS for “Introduction to Web Information Systems.pdf.”** From `PDF · needs preparation`, tapping Prepare immediately displayed “Preparing source…” with the reading animation and Canvas fetch/check message. It returned to `PDF · ready`. |
+| 2. Reviewer generation progresses and opens a valid saved result | **FAIL.** The same PDF immediately entered “Starting your request…” then “Reading your material…”. Fresh job `2a1aab01-23f3-4a2e-8633-c784f74fe250` failed at `generating_sections`, `generation_failed`; Queue showed “Couldn’t finish”, and the detail screen showed the failure. There is no result or Library Reviewer to inspect. |
+| 3. Unit 3 Lesson 1 includes actual PDF lesson content and provenance | **NOT RUN.** Stopped after case 2 exposed a genuine defect, as requested. |
+| 4. Previously failing 40-page PDF succeeds or reports a proven typed blocker | **NOT RUN.** Stopped after case 2. |
+| 5. Force-stop/relaunch recovers a running durable job | **PARTIAL.** The device was force-stopped while job `2a1aab01-23f3-4a2e-8633-c784f74fe250` was `running/generating_sections`. After relaunch, Queue recovered that same job in its failed state. The database has exactly one job for its source snapshot and zero saved results; successful completion/reopening could not be verified. |
+
+The failed source prepared all 33 pages through native text (zero OCR), yielding 10,048 source characters. The worker made two provider calls; both returned structured outputs of 22 and 21 sections. The first output had one emphasis mark whose phrase was missing or non-unique in its target section; the repaired output had two such marks, with the first in section 8. The strict contract rejected the repaired output and no persistence occurred. This is a fresh contract failure after the bounded repair was actually sent, distinct from the original 40-page job's pre-repair budget failure. The safe worker log recorded category `contract`, but filtered colon-containing finding codes from its public log field. No private source text or raw provider response is recorded here.
 
 ## 8. Production verification
 
 Vercel production deployment `dpl_4ykMwdFbk5nRqhniBhMWYnsC4ZQm` is READY and aliased to the existing production hostname. The health endpoint returned 200. Allowlisted Cloud Build `142685ec-5d16-4861-91be-ddfd1e22c3be` succeeded. Private Cloud Run revision `generation-worker-00015-5fn` serves 100% of traffic; anonymous health returned 403. The build archive contained only tracked required source and no environment or private key files. No fresh generation job existed in the 20-minute production check after rollout.
 
-Automatic approval review rejected the Android preview OTA because it would publish application JavaScript and public configuration to Expo EAS without separately recognized authorization for that payload and destination. The review prohibited an indirect workaround. Explicit authorization has been requested. No OTA was published, so the exact Page and failed PDF have not been retested against this deployment on the physical device.
+Automatic approval review initially rejected the Android preview OTA because it would publish application JavaScript and public configuration to Expo EAS without separately recognized authorization for that payload and destination. The user then explicitly authorized that exact preview publication. No production Expo branch, EAS secret, or EAS configuration was changed. The exact Page and previously failed PDF remain untested on this deployment because the first fresh device generation failed and the user instructed a stop on genuine defects.
 
 ## 9. Git result
 
-Implementation commit: `f334e32` (19 scoped files). Unrelated `UI/`, `apps/mobile/.gitignore`, and `tmp/` remain untracked and untouched. The deployed API and worker were built from an allowlisted archive of this commit. This evidence document and the current-state summaries are a subsequent documentation update.
+Implementation commit: `f334e32` (19 scoped files); initial evidence commit: `1c3461f`. Unrelated `UI/`, `apps/mobile/.gitignore`, and `tmp/` remain untracked and untouched. The deployed API and worker were built from an allowlisted archive of `f334e32`. The preview bundle's mobile and package source is byte-identical to `f334e32`; its EAS metadata reports the later documentation-only HEAD `1c3461f`.
 
 ## 10. Verdict
 
-**PARTIAL.** The production code is deployed and the automated repair passes, but physical acceptance and the two exact material retests remain pending the approved Android preview OTA.
+**PARTIAL.** Preparation progress and failed-job recovery were physically observed. Fresh Reviewer generation failed strict emphasis validation after the allowed repair. The two exact material retests and successful Reviewer/Library acceptance remain open. No further implementation repair was made after this physical failure.

@@ -2,7 +2,7 @@
 
 ## B37 generation regression physical gate (2026-10-01)
 
-**PARTIAL.** The production API and private worker contain the Page attachment and validation repairs at `f334e32`; the mobile loading changes are committed but await preview distribution. Publish the Android preview OTA after explicit authorization, then run the five realme gates, including the exact Unit 3 Page and failed 40-page PDF. Do not close B37 on automated tests alone. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
+**PARTIAL.** Production API, private worker, and explicitly authorized Android preview OTA contain the `f334e32` repair. Preparation progress passed on realme, but the first fresh 33-page PDF Reviewer job failed validation after its allowed repair; Queue recovered the failed job across force-stop without duplication. Stop on this genuine defect before further repair or the exact Unit 3 Page and 40-page PDF retests. Do not close B37 on automated tests alone. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
 
 ## B39 preview API configuration (2026-09-30)
 
