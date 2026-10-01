@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B39 student workflow and Canvas Task attachments (2026-10-01)
+
+**BLOCKED at live Canvas/device acceptance.** Local Task attachment metadata/opening and Generate attachment-routing fixes are implemented; root typecheck, scoped API/Mobile tests, Canvas client tests, and lint pass. Current Canvas credentials were not inspected, fresh manual sync was not triggered, and the attached RMX3151 did not expose a controllable UI. No deployment or app data mutation occurred. Expo Sharing requires a native preview build before the physical attachment-open gate. Complete the current Canvas-auth/sync, idempotency, attachment-open, and passive-navigation checks on that build. [B39 record](acceptance/b39/student-workflow-canvas-tasks.md).
+
 ## B37 production generation regression (2026-10-01)
 
 **BLOCKED after B37.2.** B37.1's Introduction PDF and durable recovery remain PASS. B37.2 established that Page-linked Canvas file `11574237` is directly downloadable despite `hidden` and `hidden_for_user`; scoped repair `54aa9fd` is live in API `dpl_AHpKJsANQzNa3Tya3QqaYusZn89z` and preview OTA `01a0f4ef-496a-7c4c-a6e7-52617f4268bd`. The realme's fresh Unit 3 request prepared the full PDF but hit a separate database staging contract: `stage_deferred_canvas_reviewer_pdf_v1` accepts one file ID, while Page plus attachment supplies two IDs. API returned 503; job row `dde023f1-65ef-415b-b888-5550bc845494` is queued without dispatch, attempt or result. No further repair or 40-page retest was made after this failure. [Evidence](acceptance/b37/production-generation-regression-20261001.md).

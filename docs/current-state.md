@@ -1,5 +1,9 @@
 # Current State
 
+## B39 student workflow and Canvas Task attachments (2026-10-01)
+
+**BLOCKED — local implementation and regression checks pass; current Canvas authentication, a fresh manual sync, and realme attachment-open acceptance remain unverified.** Task detail now displays deduplicated owner-scoped Canvas assignment files and opens a tapped file through a server-side authenticated Canvas download, with no temporary URL returned to Mobile. Generate excludes attachment-only assignment and announcement files unless a file is separately listed as a course module resource. Expo Sharing requires a new native Android build. No production deployment, Canvas sync, job creation, or app data mutation occurred. The RMX3151 is ADB-connected but was not exposed as a UI control surface. [B39 acceptance record](ai/acceptance/b39/student-workflow-canvas-tasks.md).
+
 ## B37 production generation regression (2026-10-01)
 
 **BLOCKED after B37.2.** The earlier Introduction PDF and force-stop recovery remain PASS. B37.2 proved that Unit 3 Lesson 1's same-course PDF is directly accessible to the student's Canvas account even though hidden from the normal Files inventory. Commit `54aa9fd` scopes ingestion of that file to its authenticated Page link; API `dpl_AHpKJsANQzNa3Tya3QqaYusZn89z` is live and Android preview update `01a0f4ef-496a-7c4c-a6e7-52617f4268bd` is installed. The realme's fresh request stored all 1,495,059 PDF bytes, but the production SQL staging function still requires exactly one `file:` item while Page provenance supplies `page:` plus `file:`. API logged `ProcessingJobCreationError`/503; one generic row `dde023f1-65ef-415b-b888-5550bc845494` remains queued with zero attempts, no dispatch or result. The 40-page PDF retest was stopped. A forward-only staging contract repair and a fresh Page acceptance are required before B37 can close. [Acceptance record](ai/acceptance/b37/production-generation-regression-20261001.md).
