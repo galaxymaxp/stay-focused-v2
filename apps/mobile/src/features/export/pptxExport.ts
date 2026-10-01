@@ -27,14 +27,16 @@ function slidesFrom(document: ExportDocument): Slide[] {
       topic += 1; slides.push({ title: block.text.replace(/^Topic \d+ · /, ''), blocks: [], topic }); continue;
     }
     const content = block.kind === 'table' && block.rows ? block.rows.map(row => row.join('  |  ')).join('\n') : block.text;
-    const words = content.split(/\s+/).filter(Boolean);
+    // Each source line stays its own paragraph; only an over-long line is split, at word boundaries.
     const chunks: string[] = [];
-    let chunk = '';
-    for (const word of words) {
-      if (chunk && chunk.length + word.length + 1 > 420) { chunks.push(chunk); chunk = ''; }
-      chunk += `${chunk ? ' ' : ''}${word}`;
+    for (const line of content.split('\n')) {
+      let chunk = '';
+      for (const word of line.split(/\s+/).filter(Boolean)) {
+        if (chunk && chunk.length + word.length + 1 > 420) { chunks.push(chunk); chunk = ''; }
+        chunk += `${chunk ? ' ' : ''}${word}`;
+      }
+      if (chunk) chunks.push(chunk);
     }
-    if (chunk) chunks.push(chunk);
     for (const part of chunks) {
       let slide = slides[slides.length - 1]!;
       if (slide.blocks.reduce((sum, item) => sum + item.text.length, 0) + part.length > 420) {

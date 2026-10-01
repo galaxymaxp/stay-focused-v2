@@ -2,12 +2,13 @@ import { strToU8, zipSync } from 'fflate';
 import { styledRuns, type ExportBlock, type ExportDocument } from './exportLayout';
 
 const xml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-const run = (text: string, style: 'normal' | 'bold' | 'underline' | 'highlight' = 'normal') =>
-  `<w:r><w:rPr>${style === 'bold' ? '<w:b/>' : ''}${style === 'underline' ? '<w:u w:val="single"/>' : ''}${style === 'highlight' ? '<w:highlight w:val="yellow"/>' : ''}</w:rPr><w:t xml:space="preserve">${xml(text)}</w:t></w:r>`;
+// A line break is run content: it must sit inside <w:r>, or viewers drop it and lines run together.
+const run = (text: string, style: 'normal' | 'bold' | 'underline' | 'highlight' = 'normal', breakBefore = false) =>
+  `<w:r><w:rPr>${style === 'bold' ? '<w:b/>' : ''}${style === 'underline' ? '<w:u w:val="single"/>' : ''}${style === 'highlight' ? '<w:highlight w:val="yellow"/>' : ''}</w:rPr>${breakBefore ? '<w:br/>' : ''}<w:t xml:space="preserve">${xml(text)}</w:t></w:r>`;
 const paragraph = (block: ExportBlock) => {
   const style = block.kind === 'title' ? 'Title' : block.kind === 'heading' ? 'Heading1' : block.kind === 'question' ? 'Heading2' : block.kind === 'brand' ? 'Subtitle' : 'Normal';
   const numbering = block.kind === 'bullet' ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' : '';
-  const runs = styledRuns(block).flatMap(part => part.text.split('\n').map((line, index) => `${index ? '<w:br/>' : ''}${run(line, part.style)}`)).join('');
+  const runs = styledRuns(block).flatMap(part => part.text.split('\n').map((line, index) => run(line, part.style, index > 0))).join('');
   return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${numbering}<w:spacing w:after="${block.kind === 'heading' ? 160 : 100}"/></w:pPr>${runs}</w:p>`;
 };
 const table = (rows: readonly (readonly string[])[]) => {

@@ -46,6 +46,21 @@ describe('offline study exports', () => {
     expect(slides.join(' ')).toContain('[Add the assigned scenario]');
     expect(slides.join(' ')).toContain('Explain the concern');
   });
+  it('keeps Draft line breaks inside Word runs so viewers do not merge lines', () => {
+    const body = 'Assignment No. 5\nPrepared by: [Student Name]\n- The company environment';
+    const xml = text(createStudyDocx(activityExport({ ...summary, type: 'activity_output' }, { ...activity, sections: [{ ...activity.sections[0]!, content: body }], slides: [] })), 'word/document.xml');
+    expect(xml.match(/<w:br\/>/g)).toHaveLength(2);
+    // A break is valid only as run content, never directly under <w:p> or between runs.
+    expect(xml).not.toMatch(/<\/w:r><w:br\/>|<\/w:pPr><w:br\/>/);
+    expect(xml).toMatch(/<\/w:rPr><w:br\/><w:t xml:space="preserve">Prepared by: \[Student Name\]<\/w:t>/);
+  });
+  it('keeps each Draft slide line as its own paragraph instead of flattening it', () => {
+    const files = unzipSync(createStudyPptx(activityExport({ ...summary, type: 'activity_output' }, { ...activity, sections: [], slides: [{ number: 1, title: 'Scenario', body: 'Line one\nLine two\n- Bullet three', speakerNotes: '' }] })));
+    const slide = Object.entries(files).filter(([path]) => /^ppt\/slides\/slide\d+\.xml$/.test(path)).map(([, bytes]) => strFromU8(bytes)).find(xml => xml.includes('Line one'))!;
+    const paragraphs = [...slide.matchAll(/<a:p>(.*?)<\/a:p>/g)].map(match => [...match[1]!.matchAll(/<a:t>(.*?)<\/a:t>/g)].map(t => t[1]).join(''));
+    expect(paragraphs).toEqual(expect.arrayContaining(['Line one', 'Line two', '- Bullet three']));
+    expect(slide).not.toContain('Line one Line two');
+  });
   it('produces a valid Draft PDF', async () => {
     const pdf = await PDFDocument.load(await createStudyPdf(activityExport({ ...summary, type: 'activity_output' }, activity)));
     expect(pdf.getPageCount()).toBeGreaterThan(0);
