@@ -4,6 +4,8 @@ Date: 2026-10-01 (Asia/Manila)
 
 **Verdict: PASS — B40 Reviewer Smart Selection Learning Tools acceptance passed.**
 
+**Production-deployed (2026-10-01).** API deployment `dpl_CW3TWB9FjkXAoMvBPRbMntZvqMaR` (READY, aliased to `stay-focused-v2-prototype.vercel.app`) and preview OTA group `ded5f2a6-19a4-4934-99ea-23610409a642` (Android update `01a0f784-06f8-7b87-9527-dde51592b418`, runtime 2.0.1, commit `e52690d`). Both were smoke-tested on the installed preview app. See §18.
+
 B39 was closed before this work by the [B39.2 physical acceptance record](../b39.2/physical-canvas-android-acceptance.md) and is not reopened here. Native Office DOCX/PPTX opening acceptance moves to **B41**.
 
 ## 1. Starting state
@@ -229,6 +231,8 @@ All screenshots are in [`evidence/`](evidence/). Captures after 18:00 local time
 
 ## 17. Test environment and remaining limitations
 
+*Updated by §18: production deployment and the preview OTA are now done.*
+
 - **Environment:**
   - Acceptance ran against a **local API**: `next dev` on the laptop, with server variables from `C:\Projects\stay-focused-v2\.env.local` loaded into the process only (owner-authorized; values never read or printed). It used the production Supabase project, read-only, and the real OpenAI provider.
   - The phone ran a **locally built, coinstalled debug client** (`com.galaxymaxp.stayfocusedv2.b40debug`) over USB `adb reverse`. It was uninstalled afterwards; the installed preview app and its data were never touched.
@@ -241,3 +245,61 @@ All screenshots are in [`evidence/`](evidence/). Captures after 18:00 local time
 - **Rate limiting:** the burst guard (20 requests per user per minute) is per server instance, not a durable quota.
 - **Latency:** responses took about 4.5–12 seconds against the local API.
 - **Quick assists:** the B37 quick assists remain below the selection surface; consolidating them with the B40 actions is a product decision for later.
+
+## 18. Production closure (2026-10-01)
+
+The owner explicitly authorized the production deployment and the preview OTA.
+
+### Quick-assist / selection-action cleanup
+
+Commits `3bcbc8a` and `e52690d`:
+
+- The sheet now opens with **nothing selected** and shows the four B37 quick assists as whole-topic actions.
+- Selecting text **replaces** that area with Define · Explain · Example · Test Me · Ask. Clearing the selection brings the quick assists back, so the two sets never show together.
+- This supersedes the earlier automatic preselection of the tapped passage (§11), which would otherwise have hidden the quick assists every time the sheet opened.
+- Change selection still restores the previous range. Grounding, limits, Test Me rules and sheet state are unchanged.
+
+### Defect found on the device and fixed (`e52690d`)
+
+- **Defect:** swapping the tall quick-assist grid for the one-row action set shrank the sheet in the middle of a long-press. The text slid about 140 px under the finger, and Android stretched the selection across several lines (it captured "recognize whether … Stateless" instead of "Stateless").
+- **Fix:** the sheet content keeps the tallest height it has reached while open. Regression test added.
+- **Re-verified on the phone:** the sheet's title edge stayed at y=527 before selection, after selection and after clearing it.
+
+### Deployment identifiers
+
+| Item | Value |
+| --- | --- |
+| API deployment | `dpl_CW3TWB9FjkXAoMvBPRbMntZvqMaR`; target production; READY; alias `https://stay-focused-v2-prototype.vercel.app` |
+| API checks | `/api/health` 200; `OPTIONS /api/experience/study-tools` 204; anonymous POST 401 `sign_in_required` |
+| Preview OTA, superseded | group `38e21a1d-baf4-40cc-9331-d0a4b10e5a51` / Android `01a0f77d-3b6a-72c7-a339-3383d2bb7a16`, commit `3bcbc8a` (before the sheet-height fix) |
+| Preview OTA, current | group `ded5f2a6-19a4-4934-99ea-23610409a642` / Android `01a0f784-06f8-7b87-9527-dde51592b418`, runtime 2.0.1, branch `preview`, commit `e52690d` |
+
+Both OTAs were published with `npm.cmd run update:preview`, and the EAS preview API-address preflight passed. No new APK was built, because B40 adds no native code.
+
+### On-device smoke test (installed preview app `com.galaxymaxp.stayfocusedv2`)
+
+Reviewer: *Firewalls & VPNs — Student Reviewer*, topic 14.
+
+| Check | Result |
+| --- | --- |
+| OTA running | PASS. The new sheet appeared (selectable surface, no preselection), and the sheet-height fix was confirmed by the stable title edge. |
+| No selection → whole-topic quick assists only | PASS (`production/p1`) |
+| Selecting "Stateless" → five actions, quick assists hidden | PASS (`production/p2`) |
+| Selection action, source-grounded: **Define** | PASS. 42 words, **From your material** (`production/p3`) |
+| Selection action, source-only: **Test Me** | PASS. "What does it mean that a first-generation firewall is stateless?" (`production/p4`) |
+| Clearing the selection → quick assists return | PASS (`production/p5`) |
+| Production logs | Two `/api/experience/study-tools` requests, both 200 (`define`, `test`), `selectionCharacters: 9`, `contextCharacters: 859`, `sourceExcerpts: 1`. 0 lines of course content; 0 bearer tokens or JWTs. |
+| Passive effects (12:56 UTC) | Canvas jobs 476 (0 new), processing jobs 212 (0 new), artifacts 71, Reviewer still on its single 2026-09-26 version |
+
+### Verification
+
+All FRESH:
+
+- mobile: 780/780
+- shared: 50/50
+- typecheck and lint: 14/14, with the 4 mobile warnings that already existed
+- `git diff --check`: clean
+
+The API code was unchanged after the earlier full run (1,198 passed).
+
+**Result: B40 is production-deployed and closed.** Next: B41 native Office DOCX/PPTX opening acceptance.

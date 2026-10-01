@@ -196,7 +196,7 @@ Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo mat
 
 ## B40 Reviewer Smart Selection Learning Tools
 
-Status: **PASS (2026-10-01).** Topic tap → existing Study Assist sheet → selectable concept text → Define / Explain / Example / Test Me / Ask with lazy refinements, automatic labelled grounding, source-only Test Me, and server-enforced cost limits. Not yet deployed. [Acceptance](ai/acceptance/b40/reviewer-smart-selection-learning-tools.md).
+Status: **PASS (2026-10-01).** Topic tap → existing Study Assist sheet → selectable concept text → Define / Explain / Example / Test Me / Ask with lazy refinements, automatic labelled grounding, source-only Test Me, and server-enforced cost limits. Production-deployed (`dpl_CW3TWB9FjkXAoMvBPRbMntZvqMaR`, OTA `ded5f2a6`). [Acceptance](ai/acceptance/b40/reviewer-smart-selection-learning-tools.md).
 
 ## B41 Native Office DOCX/PPTX Opening Acceptance
 
