@@ -1,10 +1,10 @@
 # B43 Android friend APK acceptance
 
-Date: 2026-10-01 (Asia/Manila)
+Started: 2026-10-01 (Asia/Manila). Resumed: 2026-10-02.
 
 ## Verdict
 
-**BLOCKED — EAS build is still queued; no APK is available to install or hand off.** The submitted build remains active in EAS and may be resumed when a worker is assigned. No device acceptance is claimed.
+**PARTIAL — signed APK produced and installed; full primary-device acceptance is pending.** The installed APK launched standalone with the existing account and loaded Today, Generate, Tasks, Library, a saved Reviewer, Quiz and Draft. The realme disappeared from ADB before fresh Canvas sync, Announcements, token tutorial, and offline/reconnect checks could finish. No second-device PASS is claimed.
 
 ## Starting state and configuration
 
@@ -39,41 +39,61 @@ Date: 2026-10-01 (Asia/Manila)
 - Profile/distribution/artifact target: `preview` / internal / APK
 - Version/versionCode: `2.0.0` / `1`
 - Result at original report time: `IN_QUEUE` (normal priority). EAS had not assigned a worker after approximately 30 minutes; its official status page reported services operational.
-- Artifact: **NOT AVAILABLE**. EAS has not returned an APK artifact URL.
+- Final build status: **FINISHED**; no replacement build was submitted.
+- Exact hosted APK: [B43 Android APK](https://expo.dev/artifacts/eas/QSRoya4BAjP3Jvpz-01M888TVM25yMFOQt2BxHrv9sI.apk)
+- Downloaded unchanged as ignored local `.local/b43/stayfocused.apk` (123,169,674 bytes; SHA-256 `FBC62FE7D7B508B04A4CD22C983C2483DFAF80DC8C0F3ECA22268EF87319C681`). The hosted Expo filename cannot be renamed in place; the local copy uses the requested name.
+- `apksigner verify` passed; APK metadata reports package `com.galaxymaxp.stayfocusedv2`, version `2.0.0`, versionCode `1`, and launchable `MainActivity`. No `application-debuggable` flag was reported.
 
 ## Resume check
 
 At 2026-10-01 15:37 UTC (23:37 Asia/Manila), the exact same build remains `IN_QUEUE` with normal priority. Its EAS `updatedAt` remains 2026-10-01 14:30:59 UTC; no artifact URL or failure reason is present. It has been queued for about 66 minutes. No replacement build was submitted. The original EAS build remains active and can be polled at the build page above.
 
-Because this build has not produced an APK, the physical-device, Canvas-routing, offline-persistence, and friend handoff checks remain NOT TESTED/BLOCKED. Do not close B43 until this existing build produces an APK and the required real-device checks pass.
+This paragraph records the historical queue state. The build subsequently finished and the physical-device check began on October 2.
 
 ## Device acceptance
 
-Primary device is connected: realme RMX3151, Android 13, 1080×2412, density 480. The existing app package is installed. The B43 APK itself is unavailable, so no install or app-flow result below is claimed.
+Primary device: realme RMX3151, Android 13, 1080×2412, density 480. `adb install -r .local/b43/stayfocused.apk` returned `Success`; package inspection reported version `2.0.0`/code `1`. `adb reverse --list` was empty. The installed app was force-stopped, launched through its launcher, and ran without Metro, Expo Go, or a development client. The first screenshot was black because Android reported `mWakefulness=Asleep`; waking the screen revealed the running app and existing signed-in session. A transient USB disconnect occurred once during navigation; ADB later disappeared entirely during the Today/Announcements check. Neither event was counted as an app crash.
 
 | Check | Result | Notes |
 |---|---|---|
-| APK install | NOT TESTED | No artifact yet |
-| Standalone launch | NOT TESTED | No artifact yet |
-| Authentication/session | NOT TESTED | No artifact yet |
-| Today | NOT TESTED | No artifact yet |
-| Generate | NOT TESTED | No artifact yet |
-| Tasks | NOT TESTED | No artifact yet |
-| Library | NOT TESTED | No artifact yet |
-| Canvas | NOT TESTED | No artifact yet |
-| Token tutorial | NOT TESTED | No artifact yet |
-| Existing study output | NOT TESTED | No artifact yet |
-| Force-stop/relaunch | NOT TESTED | No artifact yet |
-| Persistence/offline | NOT TESTED | No artifact yet |
-| Crash loop | NOT TESTED | No artifact yet |
+| APK install | PASS | Exact downloaded B43 APK installed in place successfully |
+| Standalone launch | PASS | Launcher started the installed release package; no ADB reverse/Metro |
+| Authentication/session | PASS | Existing Galaxy session persisted and authenticated course/task/output data loaded; new sign-in not exercised |
+| Today | PARTIAL | Screen and synced overdue Tasks loaded; free-time control and Announcements below the fold remain untested |
+| Generate | PASS | Synced courses opened; CC17 instructional PPTX entries and their detail rendered; back navigation worked |
+| Tasks | PASS | Course-first totals, past-due/completed grouping, and CC16 assignment detail/instructions rendered |
+| Library | PASS | CC16 course showed 5 Reviewers, 10 Quizzes, 20 Drafts; saved output categories and cards opened |
+| Canvas sync | NOT TESTED | Existing synced course data is visible; no fresh sync completed on this APK |
+| Announcements | NOT TESTED | Device disconnected before list/detail/dismissal check |
+| Token tutorial | NOT TESTED | Device disconnected before standalone popup check |
+| Reviewer | PASS | 27-topic CC16 Reviewer rendered; search highlighted 101 matches and section jump reached topic 5 |
+| Quiz | PASS | Existing 100-question Quiz resumed at question 48 with 1/100 answered; no answer changed |
+| Activity/Draft | PASS | Existing CC16 presentation Draft opened with saved slides; `Drafts` is the current Library label |
+| Force-stop/relaunch | PARTIAL | Force-stop before standalone launch retained the existing session; explicit post-navigation repeat pending |
+| Persistence/offline | NOT TESTED | Device disconnected before network-off sequence |
+| Reconnect/no duplicates | NOT TESTED | CC16 baseline counts recorded; reconnect comparison pending |
+| Crash loop | PASS | App process and screens remained usable through tested flows; no immediate crash loop observed |
+
+Local screenshots and the downloaded APK are kept under ignored `.local/b43/` because they contain private academic content. They were not committed.
+
+## Canvas routing observed so far
+
+| Content | Expected destination | Result | Notes |
+|---|---|---|---|
+| PPTX instructional material | Generate | PASS | CC17 Lecture Presentations listed two ready PPTX files; material detail opened |
+| PDF/DOCX instructional material | Generate | NOT TESTED | Not opened during this run |
+| Canvas instructional Page | Generate | NOT TESTED | Not opened during this run |
+| Assignment/deadline/submittable item | Tasks | PASS | CC16 assignment with due date and instructions opened from Tasks; Generate course links assignments to Tasks |
+| Announcement | Announcements | NOT TESTED | Device disconnected before list/detail check |
+| Course outline/admin-only material | Excluded from Generate | NOT TESTED | No applicable exclusion inspected |
 
 ## Friend handoff
 
-**BLOCKED — APK cannot currently be handed off.** No second Android device was available or claimed. Once the EAS build finishes, install the APK from the build page above and follow [the short friend checklist](android-friend-beta-checklist.md). The target second device remains untested.
+**APK download is available; B43 friend handoff acceptance is pending the remaining primary-device checks.** The same APK can be shared using the direct artifact link above or the local file named `stayfocused.apk`; see [the short friend checklist](android-friend-beta-checklist.md). No second Android device was available or tested. Do not label second-device acceptance PASS.
 
 ## Limitations and next step
 
-- The only blocker is the EAS job remaining queued; this is not a build failure, and no local build/config defect was observed.
-- No APK installation, launch, authentication, Canvas, navigation, persistence, or second-device acceptance is claimed.
-- Poll the existing build ID rather than submitting a duplicate. When it finishes, download that APK, run the realme smoke checks, then provide the artifact link to a second-device tester.
-- B43 is not accepted; B44 and B45 have not started. The roadmap/current-state documents were not advanced because no usable APK is ready for handoff.
+- Fresh Canvas sync, Canvas token tutorial, Announcement dismissal, full force-stop/offline/reconnect behavior, and a second-device test remain unverified. B43 is not yet closed.
+- The realme disappeared from ADB during the October 2 session. Resume the remaining checks on the same installed APK when it reconnects; do not submit another build.
+- No source/configuration code changed, so the prior fresh mobile checks were not rerun. `git diff --check` applies to the documentation update.
+- B44 and B45 have not started. Roadmap/current-state closure should wait for the remaining primary acceptance gates.
