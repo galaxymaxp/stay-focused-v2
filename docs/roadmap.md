@@ -2,7 +2,7 @@
 
 ## B37 generation regression physical gate (2026-10-01)
 
-**BLOCKED after B37.1.** The emphasis-only contract failure is repaired in `587d5f4` and deployed to API/worker. A fresh Introduction PDF Reviewer completed on the realme, was substantive and source-referenced, persisted to Library, and survived force-stop/relaunch without duplication. The next fresh Unit 3 Lesson 1 Page request failed before job creation with HTTP 422 `insufficient_source`: file `11574237` was linked but not selected/ingested. Establish its Canvas metadata/eligibility cause and repair if appropriate; then retest that Page and the 40-page PDF on the device before closing B37. The prior B37 failure remains documented. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
+**BLOCKED after B37.2.** The Introduction PDF remains physically PASS. The hidden Page-linked file `11574237` is now authenticated, downloaded, validated and stored through the scoped repair `54aa9fd`, deployed as API `dpl_AHpKJsANQzNa3Tya3QqaYusZn89z` and Android preview OTA `01a0f4ef-496a-7c4c-a6e7-52617f4268bd`. Fresh Unit 3 job row `dde023f1-65ef-415b-b888-5550bc845494` cannot stage its Page plus file provenance: production `stage_deferred_canvas_reviewer_pdf_v1` requires exactly one file item. It remains queued with zero worker attempts and no result after an API 503. Next: reconcile this database contract with the already implemented two-source worker path, address the stranded row safely, then rerun fresh Unit 3 acceptance before the 40-page PDF. No further repair was made after this device failure. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
 
 ## B39 preview API configuration (2026-09-30)
 

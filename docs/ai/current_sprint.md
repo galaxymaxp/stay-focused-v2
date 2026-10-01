@@ -2,7 +2,7 @@
 
 ## B37 production generation regression (2026-10-01)
 
-**BLOCKED after B37.1.** The first fresh Introduction PDF failure had three missing model emphasis targets across its initial/repaired outputs. Commit `587d5f4` treats only this optional presentation metadata as sanitizable, retains substantive/reference failures, and is deployed as Vercel `dpl_EGpVzrU1DYJ6yHQTFpUqEFN4j6P9` plus private worker `generation-worker-00016-dvd`; no new Expo update was needed. A fresh Introduction PDF job passed on the realme with an 18-topic saved Reviewer and successful durable force-stop recovery. The next Unit 3 Lesson 1 Page request failed before job creation with HTTP 422 `insufficient_source`; linked file `11574237` was not selected or ingested, and its eligibility reason is not yet known. The 40-page PDF was not retested after that stop. [Evidence](acceptance/b37/production-generation-regression-20261001.md).
+**BLOCKED after B37.2.** B37.1's Introduction PDF and durable recovery remain PASS. B37.2 established that Page-linked Canvas file `11574237` is directly downloadable despite `hidden` and `hidden_for_user`; scoped repair `54aa9fd` is live in API `dpl_AHpKJsANQzNa3Tya3QqaYusZn89z` and preview OTA `01a0f4ef-496a-7c4c-a6e7-52617f4268bd`. The realme's fresh Unit 3 request prepared the full PDF but hit a separate database staging contract: `stage_deferred_canvas_reviewer_pdf_v1` accepts one file ID, while Page plus attachment supplies two IDs. API returned 503; job row `dde023f1-65ef-415b-b888-5550bc845494` is queued without dispatch, attempt or result. No further repair or 40-page retest was made after this failure. [Evidence](acceptance/b37/production-generation-regression-20261001.md).
 
 ## B39 preview API configuration (2026-09-30)
 
