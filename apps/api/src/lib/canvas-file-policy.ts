@@ -104,6 +104,11 @@ export function classifyCanvasFileForIngestion(
   return "metadata_only_unsupported";
 }
 
+/** Canvas can hide a Page-linked file from Files while allowing its authenticated download. */
+export function classifyDirectlyAccessiblePageFile(file: CanvasFilePolicyInput): CanvasFileIngestionEligibility {
+  return classifyCanvasFileForIngestion({ ...file, hidden: false, hiddenForUser: false });
+}
+
 export function ingestionStatusForEligibility(
   eligibility: CanvasFileIngestionEligibility,
 ): CanvasFileIngestionStatus {

@@ -64,6 +64,14 @@ describe("experience client", () => {
       fetchImpl: async () => Response.json({ ok: false, error: { code: "quiz_source_capacity_exceeded", supportedMaximum: 43, message: "private detail", retryable: false } }, { status: 422 }),
     }, "/api/experience/quizzes", { method: "POST" })).rejects.toThrow("supports up to 43 questions");
   });
+  it.each([
+    ['insufficient_source', "This Canvas page doesn't contain enough readable study material."],
+    ['source_attachment_unavailable', "The lesson attachment couldn't be accessed from Canvas. Check its access and try again."],
+  ])('maps %s to safe Page guidance', async (code, message) => {
+    await expect(experienceRequest({ baseUrl: 'https://api.example', accessToken: 'token',
+      fetchImpl: async () => Response.json({ ok: false, error: { code, message: 'private Canvas details' } }, { status: 422 }),
+    }, '/api/experience/generations', { method: 'POST' })).rejects.toMatchObject({ code, message });
+  });
   it("classifies an invalid server response separately from connectivity", async () => {
     await expect(
       experienceRequest(

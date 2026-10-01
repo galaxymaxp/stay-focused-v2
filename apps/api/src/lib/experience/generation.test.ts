@@ -133,7 +133,7 @@ describe('student Reviewer admission adapter', () => {
     mocks.prepare.mockResolvedValue({ ok: true, value: { results: [{ status: 'ready' }] } });
     mocks.source.mockResolvedValue({ metadata: { canvasCourseId: 'course', canvasItemIds: [pageInput.materialId, `file:${fileRowId}`] } });
     await startReviewerGeneration(client, 'owner', pageInput, 'request-key');
-    expect(mocks.prepare).toHaveBeenCalledWith(expect.objectContaining({ sourceIds: [`file:${fileRowId}`] }));
+    expect(mocks.prepare).toHaveBeenCalledWith(expect.objectContaining({ pageAttachmentId: pageRowId, sourceIds: [`file:${fileRowId}`] }));
     expect(mocks.createDeferred).toHaveBeenCalledWith(expect.objectContaining({ source: expect.objectContaining({ sourcePrivateMetadata: expect.objectContaining({ canvasItemIds: [pageInput.materialId, `file:${fileRowId}`] }) }) }));
   });
   it('rejects a filename-only Page when no instructional attachment is available', async () => {

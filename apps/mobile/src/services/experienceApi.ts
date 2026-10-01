@@ -23,6 +23,8 @@ const messages: Record<string, string> = {
   not_found: "This item is no longer available.",
   course_not_synced: "This course is not synced with Stay Focused yet.",
   not_ready: "This material is not ready yet. Prepare it and try again.",
+  insufficient_source: "This Canvas page doesn't contain enough readable study material.",
+  source_attachment_unavailable: "The lesson attachment couldn't be accessed from Canvas. Check its access and try again.",
   invalid_request: "Check your selection and try again.",
   conflict: "This item changed. Refresh before trying again.",
   activity_draft_conflict:

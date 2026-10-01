@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const mocks = vi.hoisted(() => ({ readConnection: vi.fn(), getCourseFile: vi.fn(), mapCanvasFile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readConnection: vi.fn(), getCourseFile: vi.fn(), downloadFile: vi.fn(), mapCanvasFile: vi.fn() }));
 vi.mock('@/lib/canvas-routes', () => ({
   CONNECTION_SECRET_COLUMNS: 'id,base_url', readConnection: mocks.readConnection,
   decryptConnectionToken: () => 'private-token',
-  createCanvasClient: () => ({ getCourseFile: mocks.getCourseFile }),
+  createCanvasClient: () => ({ getCourseFile: mocks.getCourseFile, downloadFile: mocks.downloadFile }),
 }));
 vi.mock('@/lib/canvas-file-normalize', async (load) => ({
   ...await load<typeof import('@/lib/canvas-file-normalize')>(), mapCanvasFile: mocks.mapCanvasFile,
@@ -26,6 +26,7 @@ beforeEach(() => {
   query.select.mockReturnValue(query); query.eq.mockReturnValue(query); query.insert.mockReturnValue(query);
   mocks.readConnection.mockResolvedValue({ ok: true, row: { id: 'connection', base_url: 'https://canvas.test' } });
   mocks.getCourseFile.mockResolvedValue({ id: '42' });
+  mocks.downloadFile.mockResolvedValue({ bytes: new Uint8Array([37, 80, 68, 70, 45]), byteLength: 5, contentType: 'application/pdf' });
   mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Unit 3 Lesson 1.pdf', ingestion_eligibility: 'eligible_document', metadata_fingerprint: 'a', content_version_fingerprint: 'b' });
   query.maybeSingle.mockResolvedValueOnce({ data: null, error: null }).mockResolvedValueOnce({ data: row, error: null });
   upsert.mockResolvedValue({ error: null });
@@ -54,5 +55,44 @@ describe('instructional Canvas Page attachments', () => {
     await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' }))
       .rejects.toMatchObject({ code: 'source_attachment_unavailable' });
     expect(query.insert).not.toHaveBeenCalled();
+  });
+  it('accepts a hidden same-course Page PDF only after authenticated download and signature validation', async () => {
+    mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Lesson.pdf',
+      filename: 'Lesson.pdf', content_type: 'application/pdf', size_bytes: 5,
+      hidden: true, hidden_for_user: true, locked: false, lock_at: null, unlock_at: null,
+      media_class: null, media_entry_id: null, ingestion_eligibility: 'blocked_unavailable' });
+    await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' })).resolves.toEqual([row]);
+    expect(mocks.downloadFile).toHaveBeenCalledOnce();
+    expect(query.insert).toHaveBeenCalledWith(expect.objectContaining({ hidden: true, hidden_for_user: true,
+      ingestion_eligibility: 'eligible_document' }));
+  });
+  it('returns the attachment error if the hidden PDF download is denied', async () => {
+    mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Lesson.pdf',
+      filename: 'Lesson.pdf', content_type: 'application/pdf', size_bytes: 5,
+      hidden: true, hidden_for_user: true, locked: false, lock_at: null, unlock_at: null,
+      media_class: null, media_entry_id: null, ingestion_eligibility: 'blocked_unavailable' });
+    mocks.downloadFile.mockRejectedValue(new Error('denied'));
+    await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' }))
+      .rejects.toMatchObject({ code: 'source_attachment_unavailable' });
+    expect(query.insert).not.toHaveBeenCalled();
+  });
+  it('rejects a hidden PDF with invalid binary signature', async () => {
+    mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Lesson.pdf',
+      filename: 'Lesson.pdf', content_type: 'application/pdf', size_bytes: 5,
+      hidden: true, hidden_for_user: true, locked: false, lock_at: null, unlock_at: null,
+      media_class: null, media_entry_id: null, ingestion_eligibility: 'blocked_unavailable' });
+    mocks.downloadFile.mockResolvedValue({ bytes: new Uint8Array([0, 0, 0, 0, 0]), byteLength: 5, contentType: 'application/pdf' });
+    await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' }))
+      .rejects.toMatchObject({ code: 'source_attachment_unavailable' });
+  });
+  it('keeps locked and oversized hidden files blocked', async () => {
+    for (const extra of [{ locked: true }, { size_bytes: 100_000_000 }]) {
+      mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Lesson.pdf', filename: 'Lesson.pdf',
+        content_type: 'application/pdf', size_bytes: 5, hidden: true, hidden_for_user: true,
+        locked: false, lock_at: null, unlock_at: null, media_class: null, media_entry_id: null,
+        ingestion_eligibility: 'blocked_unavailable', ...extra });
+      await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' })).resolves.toEqual([]);
+    }
+    expect(mocks.downloadFile).not.toHaveBeenCalled();
   });
 });

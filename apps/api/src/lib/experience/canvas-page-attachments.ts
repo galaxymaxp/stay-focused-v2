@@ -1,8 +1,7 @@
 import type { CanvasConnectionRow, CanvasCourseRow, CanvasFileInsert, CanvasFileRow, CanvasPageRow, Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CanvasClientError } from '@stay-focused/canvas';
 import { discoverCanvasPageFileIds, mapCanvasFile } from '@/lib/canvas-file-normalize';
-import { CANVAS_FILE_DOWNLOAD_TIMEOUT_MS, CANVAS_FILE_MAX_REDIRECTS, CANVAS_FILE_MAX_SINGLE_BYTES, validateDownloadedCanvasFileContent } from '@/lib/canvas-file-policy';
+import { CANVAS_FILE_DOWNLOAD_TIMEOUT_MS, CANVAS_FILE_MAX_REDIRECTS, CANVAS_FILE_MAX_SINGLE_BYTES, classifyDirectlyAccessiblePageFile, ingestionStatusForEligibility, validateDownloadedCanvasFileContent } from '@/lib/canvas-file-policy';
 import { CONNECTION_SECRET_COLUMNS, createCanvasClient, decryptConnectionToken, readConnection } from '@/lib/canvas-routes';
 import { ExperienceFailure } from './errors';
 
@@ -33,8 +32,6 @@ export async function resolveInstructionalPageAttachments({ client, course, page
     canvasCourseId: course.canvas_course_id,
     html: page.body_html,
   });
-  const auditPage = page.canvas_page_id === '1060153' && course.canvas_course_id === '67174';
-  if (auditPage) console.info('canvas_page_attachment.audit', { stage: 'discovery', targetFound: linkedIds.includes('11574237'), linkedCount: linkedIds.length });
   if (!linkedIds.length) return [];
   if (linkedIds.length > 40) throw new ExperienceFailure(413, 'source_attachment_unavailable');
   let canvas;
@@ -45,31 +42,29 @@ export async function resolveInstructionalPageAttachments({ client, course, page
   for (const fileId of linkedIds) {
     let file;
     try { file = await canvas.getCourseFile(course.canvas_course_id, fileId); }
-    catch (error) {
-      if (auditPage && fileId === '11574237') console.info('canvas_page_attachment.audit', { stage: 'metadata', result: 'failed', code: error instanceof CanvasClientError ? error.code : 'unknown' });
-      throw new ExperienceFailure(503, 'source_attachment_unavailable');
-    }
-    const payload = mapCanvasFile(file);
-    if (auditPage && fileId === '11574237') {
-      console.info('canvas_page_attachment.audit', { stage: 'metadata', result: 'passed', displayName: payload.display_name, filename: payload.filename,
-        contentType: payload.content_type, sizeBytes: payload.size_bytes, folderId: payload.folder_id, downloadUrlPresent: Boolean(file.downloadUrl),
-        locked: payload.locked, hidden: payload.hidden, hiddenForUser: payload.hidden_for_user, availability: file.visibilityLevel,
-        eligibility: payload.ingestion_eligibility, selected: isInstructionalPageAttachment(payload.display_name, payload.ingestion_eligibility) });
-      if ((payload.size_bytes === null || payload.size_bytes <= CANVAS_FILE_MAX_SINGLE_BYTES) &&
-        (payload.content_type === 'application/pdf' || /\.pdf$/i.test(payload.filename ?? payload.display_name))) {
-        try {
-          const downloaded = await canvas.downloadFile(file, { maxBytes: CANVAS_FILE_MAX_SINGLE_BYTES,
-            maxRedirects: CANVAS_FILE_MAX_REDIRECTS, timeoutMs: CANVAS_FILE_DOWNLOAD_TIMEOUT_MS });
-          const validation = validateDownloadedCanvasFileContent({ bytes: downloaded.bytes, contentType: payload.content_type,
-            displayName: payload.display_name, filename: payload.filename, hidden: payload.hidden, hiddenForUser: payload.hidden_for_user,
-            lockAt: payload.lock_at, locked: payload.locked, mediaClass: payload.media_class, mediaEntryId: payload.media_entry_id,
-            responseContentType: downloaded.contentType, size: payload.size_bytes, unlockAt: payload.unlock_at });
-          console.info('canvas_page_attachment.audit', { stage: 'download', result: 'passed', bytes: downloaded.byteLength,
-            pdfSignature: downloaded.bytes[0] === 0x25 && downloaded.bytes[1] === 0x50 && downloaded.bytes[2] === 0x44 && downloaded.bytes[3] === 0x46 && downloaded.bytes[4] === 0x2d,
-            validation: validation.ok ? 'passed' : validation.code });
-        } catch (error) {
-          console.info('canvas_page_attachment.audit', { stage: 'download', result: 'failed', code: error instanceof CanvasClientError ? error.code : 'unknown' });
-        }
+    catch { throw new ExperienceFailure(503, 'source_attachment_unavailable'); }
+    let payload = mapCanvasFile(file);
+    if (payload.canvas_file_id !== fileId) throw new ExperienceFailure(503, 'source_attachment_unavailable');
+    if (payload.ingestion_eligibility === 'blocked_unavailable' && (payload.hidden || payload.hidden_for_user)) {
+      const candidate = classifyDirectlyAccessiblePageFile({ contentType: payload.content_type,
+        displayName: payload.display_name, filename: payload.filename, size: payload.size_bytes,
+        locked: payload.locked, hidden: payload.hidden, hiddenForUser: payload.hidden_for_user,
+        lockAt: payload.lock_at, unlockAt: payload.unlock_at, mediaClass: payload.media_class,
+        mediaEntryId: payload.media_entry_id });
+      if (isInstructionalPageAttachment(payload.display_name, candidate)) {
+        let downloaded;
+        try { downloaded = await canvas.downloadFile(file, { maxBytes: CANVAS_FILE_MAX_SINGLE_BYTES,
+          maxRedirects: CANVAS_FILE_MAX_REDIRECTS, timeoutMs: CANVAS_FILE_DOWNLOAD_TIMEOUT_MS }); }
+        catch { throw new ExperienceFailure(503, 'source_attachment_unavailable'); }
+        const validation = validateDownloadedCanvasFileContent({ bytes: downloaded.bytes,
+          responseContentType: downloaded.contentType, contentType: payload.content_type,
+          displayName: payload.display_name, filename: payload.filename, size: payload.size_bytes,
+          locked: payload.locked, hidden: payload.hidden, hiddenForUser: payload.hidden_for_user,
+          lockAt: payload.lock_at, unlockAt: payload.unlock_at, mediaClass: payload.media_class,
+          mediaEntryId: payload.media_entry_id });
+        if (!validation.ok) throw new ExperienceFailure(503, 'source_attachment_unavailable');
+        payload = { ...payload, ingestion_eligibility: candidate,
+          ingestion_status: ingestionStatusForEligibility(candidate) };
       }
     }
     if (!isInstructionalPageAttachment(payload.display_name, payload.ingestion_eligibility)) continue;

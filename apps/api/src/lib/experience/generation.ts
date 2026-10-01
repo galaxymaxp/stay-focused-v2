@@ -51,7 +51,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     if (attachments.length) {
       hasAttachment = true;
       const fileId = `file:${attachments[0]!.id}`;
-      const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: input.courseId, sourceIds: [fileId] });
+      const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: input.courseId, pageAttachmentId: page.id, sourceIds: [fileId] });
       if (!prepared.ok || !prepared.value.results.every(result => result.status === 'ready'))
         throw new ExperienceFailure(409, 'source_attachment_unavailable');
       sourceIds.push(fileId);

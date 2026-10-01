@@ -84,6 +84,26 @@ describe("Canvas reviewer source preparation service", () => {
     expect(JSON.stringify(result)).not.toContain("current_sha256");
     expect(JSON.stringify(result)).not.toContain("token_ciphertext");
   });
+  it('allows a hidden file only through its owned Page reference', async () => {
+    const fake = createFakeCanvasClient({ canvas_files: [{ ...baseFileRow(), hidden: true,
+      hidden_for_user: true, ingestion_eligibility: 'blocked_unavailable', ingestion_status: 'unavailable' }],
+      canvas_file_references: [{ id: 'page-reference', user_id: USER_ID,
+        canvas_connection_id: CONNECTION_ID, course_id: COURSE_ID, file_id: FILE_ID,
+        reference_type: 'page', referenced_row_id: 'page-row' }],
+    });
+    await prepareCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID,
+      pageAttachmentId: 'page-row', sourceIds: [`file:${FILE_ID}`], userId: USER_ID });
+    expect(mocks.ingestCanvasFiles).toHaveBeenCalledWith({ client: fake.client,
+      directlyLinkedFileId: FILE_ID, fileIds: [FILE_ID], userId: USER_ID });
+  });
+  it('does not allow a hidden file without its owned Page reference', async () => {
+    const fake = createFakeCanvasClient({ canvas_files: [{ ...baseFileRow(), hidden: true,
+      hidden_for_user: true, ingestion_eligibility: 'blocked_unavailable', ingestion_status: 'unavailable' }] });
+    const result = await prepareCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID,
+      pageAttachmentId: 'other-page', sourceIds: [`file:${FILE_ID}`], userId: USER_ID });
+    expect(result).toMatchObject({ ok: false, code: 'canvas_file_not_found' });
+    expect(mocks.ingestCanvasFiles).not.toHaveBeenCalled();
+  });
 
   it.each([
     ["malformed source IDs", ["file:not-a-uuid"], "invalid_request"],

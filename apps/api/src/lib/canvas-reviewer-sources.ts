@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
 import {
   CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST,
+  classifyDirectlyAccessiblePageFile,
   isNewlySupportedOfficeFile,
   normalizeMimeType,
 } from "@/lib/canvas-file-policy";
@@ -1105,11 +1106,14 @@ export async function previewSelectiveCanvasReviewerSources({
 export async function prepareCanvasReviewerSources({
   client,
   courseId,
+  pageAttachmentId,
   sourceIds,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
+  /** Owned Page row ID, supplied only after resolving its authenticated same-course link. */
+  readonly pageAttachmentId?: string;
   readonly sourceIds: readonly string[];
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<CanvasReviewerSourcePrepare>> {
@@ -1163,8 +1167,20 @@ export async function prepareCanvasReviewerSources({
     };
   }
 
+  let directlyLinkedFileId: string | undefined;
+  if (pageAttachmentId) {
+    if (fileIds.length !== 1) return { ok: false, status: 400, code: 'invalid_request', message: 'Prepare one Page attachment at a time.' };
+    const { data: reference, error: referenceError } = await client.from('canvas_file_references').select('id')
+      .eq('user_id', userId).eq('canvas_connection_id', course.value.connection.id)
+      .eq('course_id', courseId).eq('file_id', fileIds[0]!)
+      .eq('reference_type', 'page').eq('referenced_row_id', pageAttachmentId).maybeSingle();
+    if (referenceError || !reference) return { ok: false, status: 404, code: 'canvas_file_not_found', message: 'The Page attachment was not found.' };
+    directlyLinkedFileId = fileIds[0];
+  }
+
   const unsupported = files.value.find(
-    (file) => !isSupportedFileForSourcePreparation(file),
+    (file) => !isSupportedFileForSourcePreparation(file) &&
+      !(file.id === directlyLinkedFileId && isDirectlyLinkedPageFileCandidate(file)),
   );
   if (unsupported) {
     const descriptor = mapFileSource(unsupported).descriptor;
@@ -1183,6 +1199,7 @@ export async function prepareCanvasReviewerSources({
 
   const ingestion = await ingestCanvasFiles({
     client,
+    ...(directlyLinkedFileId ? { directlyLinkedFileId } : {}),
     fileIds,
     userId,
   });
@@ -1225,6 +1242,17 @@ export async function prepareCanvasReviewerSources({
         .filter(isDefined),
     },
   };
+}
+
+function isDirectlyLinkedPageFileCandidate(file: CanvasFileRow): boolean {
+  const kind = classifyStoredCanvasFileKind(file);
+  if (kind === 'unsupported') return false;
+  return (file.hidden === true || file.hidden_for_user === true) &&
+    classifyDirectlyAccessiblePageFile({ contentType: file.content_type, displayName: file.display_name,
+      filename: file.filename, size: file.size_bytes, locked: file.locked,
+      hidden: file.hidden, hiddenForUser: file.hidden_for_user, lockAt: file.lock_at,
+      unlockAt: file.unlock_at, mediaClass: file.media_class, mediaEntryId: file.media_entry_id }) ===
+      fileEligibilityForKind(kind);
 }
 
 export function normalizeCanvasHtmlToText(html: string | null): string {
