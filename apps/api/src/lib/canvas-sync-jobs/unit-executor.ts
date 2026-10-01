@@ -1,6 +1,7 @@
 import {
   CanvasClientError,
   type CanvasAnnouncement,
+  type CanvasClient,
   type CanvasAssignment,
   type CanvasAssignmentGroup,
   type CanvasCourseGradeSummary,
@@ -405,7 +406,13 @@ async function runUnit({
     }
     case "assignments_page": {
       const page = await canvas.listAssignmentsPage(courseCanvasId, cursor);
-      return pageResult(unit, page.items, next(page.nextCursor));
+      const items = await resolveAssignmentFileMetadata({
+        assignments: page.items,
+        canvas,
+        canvasBaseUrl,
+        courseCanvasId,
+      });
+      return pageResult(unit, items, next(page.nextCursor));
     }
     case "announcements_page": {
       const startDate = requireCheckpointString(checkpoint, "startDate");
@@ -445,6 +452,62 @@ async function runUnit({
     default:
       throw new Error("canvas_sync_unit_kind_unsupported");
   }
+}
+
+const MAX_ASSIGNMENT_FILES_PER_PAGE = 40;
+
+/**
+ * Canvas's course file listing can omit files that are attached only through an
+ * assignment description. Resolve only file IDs extracted from same-origin,
+ * same-course Canvas links, using the course-scoped file endpoint so a foreign
+ * course file cannot enter this course's snapshot.
+ */
+export async function resolveAssignmentFileMetadata({
+  assignments,
+  canvas,
+  canvasBaseUrl,
+  courseCanvasId,
+}: {
+  readonly assignments: readonly CanvasAssignment[];
+  readonly canvas: Pick<CanvasClient, "getCourseFile">;
+  readonly canvasBaseUrl: string;
+  readonly courseCanvasId: string;
+}): Promise<readonly CanvasAssignment[]> {
+  const assignmentFileIds = assignments.map((assignment) =>
+    discoverCanvasPageFileIds({
+      canvasBaseUrl,
+      canvasCourseId: courseCanvasId,
+      html: assignment.description,
+    }),
+  );
+  const missingIds = [...new Set(assignmentFileIds.flat())]
+    .filter((fileId) => !assignments.some((assignment) =>
+      assignment.attachments?.some((file) => file.id === fileId),
+    ))
+    .slice(0, MAX_ASSIGNMENT_FILES_PER_PAGE);
+  const resolved = new Map<string, CanvasFile>();
+  for (let index = 0; index < missingIds.length; index += 3) {
+    await Promise.all(missingIds.slice(index, index + 3).map(async (fileId) => {
+      try {
+        const file = await canvas.getCourseFile(courseCanvasId, fileId);
+        if (file.id === fileId) resolved.set(fileId, file);
+      } catch {
+        // Keep the course sync usable when Canvas denies a stale or unavailable
+        // embedded file. It will simply remain absent from the attachment list.
+      }
+    }));
+  }
+
+  return assignments.map((assignment, index) => {
+    const attachments = new Map(
+      (assignment.attachments ?? []).map((file) => [file.id, file]),
+    );
+    for (const fileId of assignmentFileIds[index] ?? []) {
+      const file = resolved.get(fileId);
+      if (file) attachments.set(fileId, file);
+    }
+    return { ...assignment, attachments: [...attachments.values()] };
+  });
 }
 
 function pageResult<TItem>(
