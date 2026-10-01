@@ -65,8 +65,12 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
   // Selected text (or an open learning action) replaces the whole-topic quick assists.
   const [studying, setStudying] = useState(false);
   const scroll = useRef<ScrollView>(null);
+  // Never let the sheet shrink while open: swapping the tall quick assists for the
+  // one-row selection actions would otherwise slide the text under a finger that is
+  // still holding it, and Android would stretch the selection across the jump.
+  const [minHeight, setMinHeight] = useState(0);
   return <Sheet title="Study Assist" onClose={onClose} scrollRef={scroll}>
-    {target ? <>
+    {target ? <View onLayout={event => { const height = event.nativeEvent.layout.height; setMinHeight(current => Math.max(current, height)); }} style={{ gap: spacing[3], minHeight }}>
       <SmartSelectionPanel selection={target.selection} onActiveChange={setStudying} scrollRef={scroll} />
       {studying ? null : <>
       <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700', letterSpacing: 0.8, paddingTop: spacing[2] }}>QUICK ASSISTS · WHOLE {target.pointIndex !== undefined ? 'KEY POINT' : 'CONCEPT'}</Copy>
@@ -91,7 +95,7 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
       {current?.status === 'error' ? <Notice>{current.error}</Notice> : null}
       {!current ? <Copy muted size="caption">Results are AI-generated and saved on this device.</Copy> : null}
       </>}
-    </> : <Notice>This passage is no longer available. Reopen the Reviewer to choose another.</Notice>}
+    </View> : <Notice>This passage is no longer available. Reopen the Reviewer to choose another.</Notice>}
   </Sheet>;
 }
 

@@ -97,6 +97,14 @@ describe('Smart Selection learning sheet', () => {
     expect(pressables('tab')).toHaveLength(0);
     expect(text()).toContain('QUICK ASSISTS');
   });
+  it('never shrinks the sheet when selection swaps the tall quick assists for one row', async () => {
+    await open(undefined, null);
+    const content = () => nodes('View').find(node => typeof node.props.onLayout === 'function' && 'minHeight' in (node.props.style ?? {}))!;
+    await act(async () => content().props.onLayout({ nativeEvent: { layout: { height: 900 } } }));
+    await select('membrane controls');
+    await act(async () => content().props.onLayout({ nativeEvent: { layout: { height: 420 } } }));
+    expect(content().props.style.minHeight).toBe(900);
+  });
   it('keeps selection drags from moving the sheet', async () => {
     await open();
     const wrapper = surface()!.parent!;
