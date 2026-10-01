@@ -1,5 +1,9 @@
 # Roadmap
 
+## B39.1 deploy + physical Canvas sync and Task attachment acceptance (2026-10-01)
+
+**BLOCKED at live Canvas/device acceptance.** Offline Task attachment metadata is stored in the existing owner-scoped SQLite database. API deployment `dpl_74hWVM2kSvg21hfnRLcVu885ohFe` is READY and healthy; preview APK `de93f504-cb53-4388-b48a-47103d65eb3a` contains Expo Sharing and is installed on the RMX3151. The session exposes no Android UI control surface, so the fresh Canvas credential check/sync, attachment open, and physical workflow/passive-sync tests could not run. Next: provide supported CUA Android control for the authorized RMX3151, then finish the remaining B39 acceptance gates. [Evidence](ai/acceptance/b39.1/deploy-physical-canvas-sync.md).
+
 ## B39 student workflow and Canvas Task attachments (2026-10-01)
 
 **BLOCKED pending live Canvas and physical acceptance.** Course-first workflows and the student screens were retained. Assignment/announcement attachment-only files are now excluded from Generate; Task detail presents owner-scoped attachment metadata and a server-resolved, authenticated file open path. Local typecheck and focused sync, routing, Task, Library, Announcement, Reviewer, and Canvas-client suites pass. No production changes or fresh sync occurred. Next: run the normal manual Sync and complete realme attachment/resync/passive-navigation acceptance on a native build with `expo-sharing`. [Evidence and outstanding gates](ai/acceptance/b39/student-workflow-canvas-tasks.md).

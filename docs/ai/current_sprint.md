@@ -1,5 +1,9 @@
 # Current Sprint
 
+## B39.1 deployment + physical Canvas sync and Task attachment acceptance (2026-10-01)
+
+**BLOCKED at live Canvas/device acceptance.** Production API `dpl_74hWVM2kSvg21hfnRLcVu885ohFe` is READY and healthy. Offline Task attachment metadata is now persisted in the existing local SQLite store. Native preview APK `de93f504-cb53-4388-b48a-47103d65eb3a` from commit `80cd1b0` is installed on the RMX3151 and includes Expo Sharing. No Android UI control surface is exposed, so live Canvas authentication/sync and the physical task/Generate/Library/Announcement/Reviewer/passive-sync checks remain unverified. Do not close B39 or begin B40. Next: restore supported CUA Android control for the authorized device and resume these gates. [B39.1 record](acceptance/b39.1/deploy-physical-canvas-sync.md).
+
 ## B39 student workflow and Canvas Task attachments (2026-10-01)
 
 **BLOCKED at live Canvas/device acceptance.** Local Task attachment metadata/opening and Generate attachment-routing fixes are implemented; root typecheck, scoped API/Mobile tests, Canvas client tests, and lint pass. Current Canvas credentials were not inspected, fresh manual sync was not triggered, and the attached RMX3151 did not expose a controllable UI. No deployment or app data mutation occurred. Expo Sharing requires a native preview build before the physical attachment-open gate. Complete the current Canvas-auth/sync, idempotency, attachment-open, and passive-navigation checks on that build. [B39 record](acceptance/b39/student-workflow-canvas-tasks.md).

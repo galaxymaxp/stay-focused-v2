@@ -1,5 +1,9 @@
 # Current State
 
+## B39.1 deployment and physical Canvas acceptance (2026-10-01)
+
+**BLOCKED at live Canvas/device acceptance.** The B39 API is deployed READY as `dpl_74hWVM2kSvg21hfnRLcVu885ohFe`; production health returned 200 and the protected attachment route returned 401 without a session. The offline Task/attachment metadata gap is repaired in the existing owner-scoped SQLite store. Preview APK `de93f504-cb53-4388-b48a-47103d65eb3a` from `80cd1b0` finished and is installed on the RMX3151; APK inspection confirms native Expo Sharing. CUA exposes no Android UI surface, so Canvas authentication, manual sync, attachment open, and remaining physical/passive-sync gates are unverified. No sync action or Cloud Run deployment occurred. [B39.1 acceptance](ai/acceptance/b39.1/deploy-physical-canvas-sync.md).
+
 ## B39 student workflow and Canvas Task attachments (2026-10-01)
 
 **BLOCKED — local implementation and regression checks pass; current Canvas authentication, a fresh manual sync, and realme attachment-open acceptance remain unverified.** Task detail now displays deduplicated owner-scoped Canvas assignment files and opens a tapped file through a server-side authenticated Canvas download, with no temporary URL returned to Mobile. Generate excludes attachment-only assignment and announcement files unless a file is separately listed as a course module resource. Expo Sharing requires a new native Android build. No production deployment, Canvas sync, job creation, or app data mutation occurred. The RMX3151 is ADB-connected but was not exposed as a UI control surface. [B39 acceptance record](ai/acceptance/b39/student-workflow-canvas-tasks.md).
