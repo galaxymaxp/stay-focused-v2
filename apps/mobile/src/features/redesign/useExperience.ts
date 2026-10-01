@@ -22,10 +22,18 @@ export function useExperience<T>(
   path: string | null,
   pollMs = 0,
   pollWhile?: (data: T) => boolean,
+  offlineCache?: {
+    read(ownerUserId: string, path: string): Promise<T | null>;
+    write(ownerUserId: string, data: T): Promise<void>;
+  },
 ) {
+  const { session } = useAuth();
+  const ownerUserId = session?.user.id ?? null;
   const client = useExperienceClient();
   const pollCondition = useRef(pollWhile);
   pollCondition.current = pollWhile;
+  const offlineCacheRef = useRef(offlineCache);
+  offlineCacheRef.current = offlineCache;
   const focused = useIsFocused();
   const { active } = useTheme();
   // A finished Canvas sync bumps this so every mounted screen reloads its data
@@ -54,8 +62,26 @@ export function useExperience<T>(
           signal: controller.signal,
         });
         if (live) setState({ data, error: null, errorCode: null, loading: false });
+        if (live && ownerUserId && offlineCacheRef.current) {
+          try {
+            await offlineCacheRef.current.write(ownerUserId, data);
+          } catch {
+            // Local caching must not turn a successful online read into an error.
+          }
+        }
         if (pollCondition.current && !pollCondition.current(data)) return;
       } catch (error) {
+        if (live && ownerUserId && offlineCacheRef.current && error instanceof ExperienceApiError && error.code === "connection") {
+          try {
+            const cached = await offlineCacheRef.current.read(ownerUserId, path!);
+            if (live && cached) {
+              setState({ data: cached, error: null, errorCode: null, loading: false });
+              return;
+            }
+          } catch {
+            // A corrupt or unavailable local cache falls through to the API error.
+          }
+        }
         if (live)
           setState((old) => ({
             ...old,
@@ -77,6 +103,6 @@ export function useExperience<T>(
       controller.abort();
       clearTimeout(timer);
     };
-  }, [client, path, focused, active, version, dataVersion, pollMs]);
+  }, [client, ownerUserId, path, focused, active, version, dataVersion, pollMs]);
   return { ...state, refresh };
 }

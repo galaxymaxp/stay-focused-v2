@@ -58,10 +58,18 @@ const MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL,
      PRIMARY KEY (owner_user_id, quiz_id)
    );`,
+  `CREATE TABLE experience_activity_snapshots (
+     owner_user_id TEXT NOT NULL,
+     activity_id TEXT NOT NULL,
+     summary_json TEXT NOT NULL,
+     detail_json TEXT,
+     updated_at TEXT NOT NULL,
+     PRIMARY KEY (owner_user_id, activity_id)
+   );`,
 ];
 
 export const LOCAL_LIBRARY_SCHEMA_VERSION = MIGRATIONS.length;
-const LOCAL_TABLES = ["quiz_practice", "activity_responses", "study_assists", "library_artifact_aliases", "library_artifacts"] as const;
+const LOCAL_TABLES = ["experience_activity_snapshots", "quiz_practice", "activity_responses", "study_assists", "library_artifact_aliases", "library_artifacts"] as const;
 
 export async function migrateLocalLibrary(db: LocalSqlDatabase): Promise<number> {
   let version = await userVersion(db);

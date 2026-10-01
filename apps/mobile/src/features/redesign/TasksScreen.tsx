@@ -26,6 +26,7 @@ import {
 } from "./tasksPresentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { openCanvasTaskAttachment } from "../../services/canvasTaskAttachments";
+import { activityDetailOfflineCache, activitySummariesOfflineCache } from "../../services/localLibrary/offlineActivityCache";
 import { useListPreferences } from "./useListPreferences";
 
 function activitiesPath() {
@@ -41,7 +42,7 @@ function identityFor(summary: Pick<TaskCourseSummary, "key" | "course">) {
 /** Level 1: one card per course, with real due/missing/completed counts. */
 export function TasksScreen() {
   const { colors } = useTheme();
-  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 0, undefined, activitySummariesOfflineCache);
   const courses = useMemo(() => summarizeTaskCourses(tasks.data?.items ?? []), [tasks.data]);
   return (
     <Page
@@ -96,7 +97,7 @@ export function TasksCourseScreen() {
   const { colors } = useTheme();
   const { courseKey: rawKey } = useLocalSearchParams<{ courseKey?: string }>();
   const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? PERSONAL_COURSE_KEY;
-  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 0, undefined, activitySummariesOfflineCache);
   const [showCompleted, setShowCompleted] = useState(false);
   const now = Date.now();
   const items = useMemo(() => (tasks.data?.items ?? []).filter((item) => courseKeyOf(item) === courseKey), [courseKey, tasks.data]);
@@ -208,6 +209,9 @@ export function ActivityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const activity = useExperience<ActivityDetail>(
     id ? `/api/experience/activities/${encodeURIComponent(id)}` : null,
+    0,
+    undefined,
+    activityDetailOfflineCache,
   );
   const { session } = useAuth();
   const client = useExperienceClient();

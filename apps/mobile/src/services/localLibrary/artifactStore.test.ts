@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { LibraryArtifactDetail, QuizAttempt } from "@stay-focused/shared";
+import type { ActivityDetail, ActivitySummary, LibraryArtifactDetail, QuizAttempt } from "@stay-focused/shared";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createLocalArtifactStore, LOCAL_PAYLOAD_SCHEMA } from "./artifactStore";
@@ -54,6 +54,43 @@ describe("local Library schema", () => {
 });
 
 describe("local artifact store", () => {
+  it("persists Task attachment metadata across restart and keeps snapshots owner scoped", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sf-task-cache-"));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const path = join(dir, "library.db");
+    const summary: ActivitySummary = {
+      id: "canvas:assignment-1", taskId: null, course: { id: "course-1", code: "BIO 101", name: "Biology" },
+      title: "Lab report", dueAt: "2026-10-04T00:00:00Z", status: "unknown", priority: "medium",
+      estimatedMinutes: null, submissionTypes: ["online_upload"], source: "canvas", isOverdue: false,
+      urgency: "next", hasGeneratedDraft: false,
+    };
+    const detail = {
+      ...summary, instructions: "Submit the report.", resources: [],
+      attachments: [{ key: "file-1", filename: "Lab Template.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", extension: "DOCX", size: 2345 }],
+      courseMaterials: null,
+      generation: { reviewer: { status: "unavailable" }, quiz: { status: "unavailable" }, activityAssistance: { status: "unavailable" } },
+      outputs: [],
+    } as ActivityDetail;
+
+    const first = await freshStore(path);
+    await first.store.saveActivitySummaries(OWNER_A, [summary]);
+    await first.store.saveActivityDetail(OWNER_A, detail);
+    first.close();
+
+    const reopened = await freshStore(path);
+    await expect(reopened.store.readActivitySummaries(OWNER_A)).resolves.toEqual([summary]);
+    await expect(reopened.store.readActivityDetail(OWNER_A, summary.id)).resolves.toMatchObject({
+      attachments: [{ filename: "Lab Template.docx", contentType: detail.attachments[0]!.contentType }],
+    });
+    await expect(reopened.store.readActivitySummaries(OWNER_B)).resolves.toBeNull();
+    await expect(reopened.store.readActivityDetail(OWNER_B, summary.id)).resolves.toBeNull();
+    await reopened.store.saveActivitySummaries(OWNER_A, [summary]);
+    await expect(reopened.store.readActivityDetail(OWNER_A, summary.id)).resolves.toMatchObject({ attachments: detail.attachments });
+    await reopened.store.purgeOwner(OWNER_A);
+    await expect(reopened.store.readActivitySummaries(OWNER_A)).resolves.toBeNull();
+    await expect(reopened.store.readActivityDetail(OWNER_A, summary.id)).resolves.toBeNull();
+  });
+
   it("keeps an unfinished Quiz attempt and draft owner scoped through restart", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sf-quiz-"));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));

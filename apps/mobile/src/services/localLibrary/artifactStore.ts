@@ -4,6 +4,8 @@ import type {
   LibraryArtifactType,
   QuizAttempt,
   QuizResult,
+  ActivityDetail,
+  ActivitySummary,
 } from "@stay-focused/shared";
 
 import type { LocalSqlDatabase, LocalSqlExecutor } from "./sqlDatabase";
@@ -29,6 +31,10 @@ export interface LocalQuizPractice {
 }
 
 export interface LocalArtifactStore extends AssistCache {
+  readActivitySummaries(ownerUserId: string): Promise<ActivitySummary[] | null>;
+  saveActivitySummaries(ownerUserId: string, summaries: readonly ActivitySummary[]): Promise<void>;
+  readActivityDetail(ownerUserId: string, activityId: string): Promise<ActivityDetail | null>;
+  saveActivityDetail(ownerUserId: string, detail: ActivityDetail): Promise<void>;
   readQuizPractice(ownerUserId: string, quizId: string): Promise<LocalQuizPractice | null>;
   saveQuizPractice(ownerUserId: string, quizId: string, practice: LocalQuizPractice): Promise<void>;
   readActivityResponse(ownerUserId: string, artifactId: string): Promise<{ responses: Record<string, string>; completed: boolean; updatedAt: string } | null>;
@@ -74,6 +80,49 @@ export function createLocalArtifactStore(
 ): LocalArtifactStore {
   return {
     ...createAssistCache(db),
+    async readActivitySummaries(ownerUserId) {
+      requireOwner(ownerUserId);
+      const rows = await db.getAllAsync<{ summary_json: string }>(
+        `SELECT summary_json FROM experience_activity_snapshots
+          WHERE owner_user_id = ? ORDER BY activity_id ASC`, [ownerUserId]);
+      if (rows.length === 0) return null;
+      const summaries: ActivitySummary[] = [];
+      for (const row of rows) {
+        const summary = parseActivitySummary(row.summary_json);
+        if (!summary) return null;
+        summaries.push(summary);
+      }
+      return summaries;
+    },
+    async saveActivitySummaries(ownerUserId, summaries) {
+      requireOwner(ownerUserId);
+      await db.withExclusiveTransactionAsync(async (transaction) => {
+        for (const summary of summaries) {
+          if (!parseActivitySummary(JSON.stringify(summary))) throw new Error("invalid_activity_summary");
+          await transaction.runAsync(`INSERT INTO experience_activity_snapshots
+            (owner_user_id, activity_id, summary_json, updated_at) VALUES (?, ?, ?, ?)
+            ON CONFLICT(owner_user_id, activity_id) DO UPDATE SET
+              summary_json = excluded.summary_json, updated_at = excluded.updated_at`,
+          [ownerUserId, summary.id, JSON.stringify(summary), now()]);
+        }
+      });
+    },
+    async readActivityDetail(ownerUserId, activityId) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ detail_json: string | null }>(
+        `SELECT detail_json FROM experience_activity_snapshots
+          WHERE owner_user_id = ? AND activity_id = ?`, [ownerUserId, activityId]);
+      return row?.detail_json ? parseActivityDetail(row.detail_json, activityId) : null;
+    },
+    async saveActivityDetail(ownerUserId, detail) {
+      requireOwner(ownerUserId);
+      if (!parseActivitySummary(JSON.stringify(detail)) || !Array.isArray(detail.attachments)) throw new Error("invalid_activity_detail");
+      await db.runAsync(`INSERT INTO experience_activity_snapshots
+        (owner_user_id, activity_id, summary_json, detail_json, updated_at) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(owner_user_id, activity_id) DO UPDATE SET
+          summary_json = excluded.summary_json, detail_json = excluded.detail_json, updated_at = excluded.updated_at`,
+      [ownerUserId, detail.id, JSON.stringify(activitySummary(detail)), JSON.stringify(detail), now()]);
+    },
     async readQuizPractice(ownerUserId, quizId) {
       requireOwner(ownerUserId);
       const row = await db.getFirstAsync<{ snapshot_json: string }>(
@@ -248,6 +297,7 @@ export function createLocalArtifactStore(
     async purgeOwner(ownerUserId) {
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
+        await transaction.runAsync("DELETE FROM experience_activity_snapshots WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM quiz_practice WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ?", [ownerUserId]);
@@ -255,6 +305,44 @@ export function createLocalArtifactStore(
         await transaction.runAsync("DELETE FROM library_artifact_aliases WHERE owner_user_id = ?", [ownerUserId]);
       });
     },
+  };
+}
+
+function parseActivitySummary(json: string): ActivitySummary | null {
+  try {
+    const value = JSON.parse(json) as Partial<ActivitySummary> | null;
+    if (!value || typeof value !== "object" || typeof value.id !== "string" || !value.id ||
+      typeof value.title !== "string" || typeof value.status !== "string" ||
+      !Array.isArray(value.submissionTypes) || typeof value.hasGeneratedDraft !== "boolean") return null;
+    if (value.course !== null && (!value.course || typeof value.course !== "object" ||
+      typeof value.course.id !== "string" || typeof value.course.name !== "string")) return null;
+    return value as ActivitySummary;
+  } catch {
+    return null;
+  }
+}
+
+function parseActivityDetail(json: string, activityId: string): ActivityDetail | null {
+  try {
+    const value = JSON.parse(json) as Partial<ActivityDetail> | null;
+    if (!value || value.id !== activityId || !parseActivitySummary(json) ||
+      typeof value.instructions !== "string" && value.instructions !== null ||
+      !Array.isArray(value.attachments) || value.attachments.some(attachment =>
+        !attachment || typeof attachment.key !== "string" || typeof attachment.filename !== "string")) return null;
+    return value as ActivityDetail;
+  } catch {
+    return null;
+  }
+}
+
+function activitySummary(detail: ActivityDetail): ActivitySummary {
+  const {
+    id, taskId, course, title, dueAt, status, priority, estimatedMinutes,
+    submissionTypes, source, isOverdue, urgency, hasGeneratedDraft,
+  } = detail;
+  return {
+    id, taskId, course, title, dueAt, status, priority, estimatedMinutes,
+    submissionTypes, source, isOverdue, urgency, hasGeneratedDraft,
   };
 }
 
