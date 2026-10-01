@@ -146,3 +146,57 @@ Tapping **Generate Reviewer** for Unit 3 Lesson 1 immediately showed “Starting
 **Unit 3 physical result: FAIL.** The attachment eligibility and ingestion defect is repaired and physically exercised, but the Page plus file staging contract prevents generation. Per the stop gate, the 40-page `UNIT 3 Front-End Development and Web System Design.pdf` received **no fresh retest**. No additional implementation or database repair was made after the device failure. The existing Introduction PDF PASS and its earlier force-stop recovery remain valid. B37 cannot be closed until the staging function accepts the verified two-source Page/PDF shape, the stranded job is handled safely, and fresh Unit 3 and 40-page Reviewers are inspected on the realme.
 
 **B37.2 verdict: BLOCKED — production Page/PDF staging rejects two-source provenance after successful attachment ingestion.**
+
+## B37.3 addendum — V1 Canvas resolution adapted to durable V2 (2026-10-01)
+
+This addendum preserves every historical failure above. Starting branch was `b25-3-3-ai-first` at `07d57e7`. The V1 behavioral reference was `galaxymaxp/stay-focused`, `main` at `d26decf`. The requested V1 resolver, extraction, preservation, refresh, action, tests, and flow script were inspected before changing the V2 boundary. Implementation commit: `6c5b72b`.
+
+| Behavior | V1 | Current V2 before B37.3 | Required adaptation |
+| --- | --- | --- | --- |
+| Page body only | Normalized Page text | Structured Page source | Retain existing Page path |
+| Page + one attachment | Body and extracted file combined | API admitted pair; production PDF staging rejected two IDs | Permit owned Page plus linked PDF in staging |
+| Page + multiple attachments | Extracted ordered links into one text resource | Resolver capped at one file | Admit up to seven files in the existing eight-source snapshot; resolve one logical job in the worker |
+| Attachment-only Page | Filename-only body omitted; attachment text used | One-file PDF path omitted filename-only body | Apply same behavior to composite Pages |
+| Links embedded in Page HTML | Parsed Page anchors | Parses validated Canvas file IDs | Reuse existing parser and authenticated lookup |
+| Files absent from normal Files listing | Direct Canvas lookup | Page-scoped authenticated hidden-file exception | Retain exception and same-course checks |
+| Duplicate discovery | Deduped by URL/name | Dedupes by Canvas file ID | Keep first Page occurrence and ID identity |
+| Attachment order | First link occurrence | First link occurrence | Retain Page order in IDs, snapshot, and blocks |
+| Partial extraction failure | Continued with warning | Required Page file preparation failed closed | Typed failure for a discovered eligible required link; ignore policy-ineligible links |
+| Composite normalized content | One `ModuleResource.extractedText` | One processing job source and structured snapshot | Resolve one text source inside durable work, with component boundaries |
+| Provenance | Attachment diagnostics in resource metadata | Ordered snapshot items and block source ordinals | Retain Page and each included file as distinct internal items |
+
+V1's resolver supported multiple attachments, though its tests lacked a direct multi-attachment case. At audit time, the uncommitted V2 implementation would have structured multiple files synchronously at API admission. It was revised to structure and preview them in durable worker execution. The Page is the primary item; ordered `canvasItemIds`, one job source, snapshot items, and source block IDs retain each component. Standalone PDF/PPTX and Page-only behavior remain in the existing architecture. The `orientation` administrative filename filter remains per the user's direction.
+
+### Production contract and repair
+
+The live `public.stage_deferred_canvas_reviewer_pdf_v1(uuid,uuid,text,bigint)` definition required `jsonb_array_length(metadata->'canvasItemIds') = 1` and the sole ID to be `file:<id>`. The job source table allows `pdf`, `image`, and `text` with one storage location or normalized text. The provenance snapshot already supported multiple ordered Page/file items. SQL rejected the Page/PDF pair; the API's one-file limit and worker's PDF-only deferred path limited Page + N.
+
+Migration `20261001015348_composite_canvas_page_staging` permits a standalone PDF or one owned Page plus its directly referenced same-course PDF. Hash, byte, private bucket, MIME, role, and ownership checks remain. It adds a service-only guarded failure RPC for undispatched staging placeholders. Migration `20261001015542_close_stranded_canvas_staging` terminally failed only pre-repair, undispatched, zero-attempt Canvas placeholders with an event. Historical job `dde023f1-65ef-415b-b888-5550bc845494` is now `failed`, with one failure event and no result. It was not forced through the worker or deleted. Both migrations occur once in remote history. The deployed functions grant execution to `service_role`, not `authenticated`.
+
+The API resolves Page links in Canvas order, filters administrative and unsupported names, authenticates same-course metadata lookup, verifies directly accessible hidden files through bounded downloads and binary validation, and prepares each eligible file. A Page with at least two eligible attachments creates one text placeholder job. The private worker verifies every Page-scoped reference, builds all selectable blocks, validates preview and fingerprint, saves one ordered snapshot, and atomically attaches normalized composite text before the existing Reviewer engine runs. A missing or unreadable required attachment fails with a typed error. No new source table or generation architecture was introduced.
+
+### Verification and rollout
+
+Focused composite tests: 35 passed before migration version adjustment; 14 affected tests passed after it. Full API suite: 1,124 passed, three existing skips. API typecheck, lint, production build, and `git diff --check` passed. Engine input format and mobile code were unchanged; no Expo update was published. The existing realme preview remained installed. Synthetic tests cover Page link order, ID deduplication, hidden-file validation, administrative exclusion, multi-file job admission, worker provenance, and typed failure before attach. Existing API tests cover standalone files, Page-only, Page + one file, grounding, and saved Reviewer behavior.
+
+API deployment `dpl_GY45TeASQw6QZEhZpMbtxZyERzTR` is READY on the production alias; `/api/health` returned 200. Allowlisted Cloud Build `4ddd65ca-5cb6-4b0e-995d-0501ac46366b` succeeded. Private Cloud Run revision `generation-worker-00017-hlc` serves 100% of traffic; anonymous `/health` returned 403. The checked Vercel error log had no entries and the new worker revision had no ERROR entries. No EAS configuration or secret changed.
+
+### Physical acceptance A — Unit 3 Lesson 1
+
+Fresh realme request passed. Canvas file `11574237` was privately stored from B37.2; the new request passed composite PDF staging and worker dispatch. Job `cb9cf499-a5b0-4afc-98a0-e2939be4ffb5` succeeded on one attempt. Processing source snapshot `fc5907a0-aa58-4bb4-b89c-8019a7c75311` holds Page and PDF IDs; Reviewer provenance snapshot `a036ce73-3a2d-4ecc-af6f-9bfde98f3e90` has two ordered items. Result `4a2c4883-6c81-4f8b-a277-1e9182e7e93a`; Library artifact `278adbf1-74de-44f5-ae12-3d130aa835f7`. The Reviewer opened on realme with 17 substantive topics about globalization and industrial revolutions. Database checks found one result and one artifact version.
+
+### Physical acceptance B — Power Point Slides
+
+Fresh realme request passed. The repeated Page HTML links resolved to three distinct file IDs in teacher order; the orientation file was excluded by the explicit administrative policy. Both eligible PDFs were privately stored and prepared. Job `69a3a7a9-6e82-424d-8aff-bd7ff319f06a` succeeded on one attempt. Reviewer provenance snapshot `5055d792-5c39-4754-99fa-025fd943b195` has Page, Lesson 1 PDF, Lesson 2 PDF in order. The one normalized source has 102 distinct blocks with source ordinals 1, 2, and 3. The generated sections cite 37 source blocks across all three ordinals, confirming each component reached grounding. Result `41579f67-5fa6-40f6-87b6-d793e67f7bab`; Library artifact `44836af1-32c8-4bbc-94ef-a766580c64d9`. It opened on realme with 24 substantive topics spanning both lessons. Database checks found one job, one result, and one artifact version.
+
+| Attachment | Type | Included? | Preparation | Provenance |
+| --- | --- | --- | --- | --- |
+| Course Orientation Soc Sci 103.pptx (`11483820`) | PPTX | No; `orientation` administrative policy | Skipped before ingestion | None |
+| Unit 1 Lesson 1.pdf (`11483824`) | PDF | Yes | Stored and extracted | File item 2, block ordinal 2 |
+| Unit 1 Lesson 2.pdf (`11483833`) | PDF | Yes | Stored and extracted | File item 3, block ordinal 3 |
+
+### Physical acceptance C — 40-page PDF
+
+Fresh realme request passed after A and B. Standalone PDF job `469afb05-92a5-4900-9831-c9872a7f698f` succeeded on one attempt. The source records 40 pages and 40 numbered blocks spanning pages 1–40; Reviewer provenance snapshot `4b68a9ed-e9f9-4c09-ab77-87d09a6fb3a2` has one file item. Result `70be8d48-6559-4116-8088-a29ff4ce3d03`; Library artifact `393fc9ef-5edf-4b69-b4f3-e761ca04b32a`. The Reviewer opened on realme with 23 substantive Front-End Development topics. Historical repair-prompt-budget and emphasis failures did not recur. Database checks found one result and one artifact version.
+
+**B37.3 verdict: PASS — B37 composite Canvas generation repaired and physically verified.** Next roadmap task: continue B39 full end-to-end demo acceptance.
