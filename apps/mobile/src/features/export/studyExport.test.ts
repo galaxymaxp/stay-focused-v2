@@ -55,7 +55,7 @@ describe('offline study exports', () => {
     expect(xml).toMatch(/<\/w:rPr><w:br\/><w:t xml:space="preserve">Prepared by: \[Student Name\]<\/w:t>/);
   });
   it('keeps each Draft slide line as its own paragraph instead of flattening it', () => {
-    const files = unzipSync(createStudyPptx(activityExport({ ...summary, type: 'activity_output' }, { ...activity, sections: [], slides: [{ number: 1, title: 'Scenario', body: 'Line one\nLine two\n- Bullet three', speakerNotes: '' }] })));
+    const files = unzipSync(createStudyPptx(activityExport({ ...summary, type: 'activity_output' }, { ...activity, sections: [], slides: [{ number: 1, title: 'Scenario', body: 'Line one\nLine two\n- Bullet three', speakerNotes: '', sourceRefs: [] }] })));
     const slide = Object.entries(files).filter(([path]) => /^ppt\/slides\/slide\d+\.xml$/.test(path)).map(([, bytes]) => strFromU8(bytes)).find(xml => xml.includes('Line one'))!;
     const paragraphs = [...slide.matchAll(/<a:p>(.*?)<\/a:p>/g)].map(match => [...match[1]!.matchAll(/<a:t>(.*?)<\/a:t>/g)].map(t => t[1]).join(''));
     expect(paragraphs).toEqual(expect.arrayContaining(['Line one', 'Line two', '- Bullet three']));
