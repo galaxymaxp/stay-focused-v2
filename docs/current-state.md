@@ -1,5 +1,9 @@
 # Current State
 
+## B41 native Office DOCX/PPTX opening (2026-10-01)
+
+**PASS.** The realme had no app able to open DOCX or PPTX; with the owner's approval, Google Docs and Slides were installed. The opening test exposed a defect: exported Drafts lost every line break (DOCX breaks were written outside runs, and PPTX chunking flattened lines). Fixed in `28b81af`/`74ae2ab` with regression tests, and shipped as preview OTA `9129850a-bd65-4588-b80b-53cd53d82745` (runtime 2.0.1). The re-exported DOCX and PPTX open directly from My Files in Google Docs and Slides (18/18 slides), with lines preserved. No new jobs or artifacts. FRESH: mobile 782, typecheck and lint pass. Microsoft Word/PowerPoint not tested. [B41 acceptance](ai/acceptance/b41/native-office-docx-pptx-opening.md).
+
 ## B40 Reviewer Smart Selection learning tools (2026-10-01)
 
 **PASS.** Tapping a Reviewer topic opens the existing Study Assist sheet. The full concept is now selectable there with Android's own handles and Copy/Select All, and the sheet captures the exact range. Define, Explain, Example, Test Me and Ask then run on that selection in the same sheet, with lazy refinements (Plain words, In context, Key traits, Compare; Simpler, Deeper, Analogy, Why it matters; Real world, Step-by-step, Another, Counterexample; Test Me checking, Harder, Apply it, Explain answer, Need choices?).

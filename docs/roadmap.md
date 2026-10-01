@@ -200,11 +200,11 @@ Status: **PASS (2026-10-01).** Topic tap → existing Study Assist sheet → sel
 
 ## B41 Native Office DOCX/PPTX Opening Acceptance
 
-Status: **NEXT.** Moved here from the post-B39 plan. Physically accept opening Library and Task Office files through native Android handlers.
+Status: **PASS (2026-10-01).** Exported Draft DOCX and PPTX files open in Google Docs and Slides on the realme, after a line-break export fix shipped by OTA `9129850a`. [Acceptance](ai/acceptance/b41/native-office-docx-pptx-opening.md).
 
 ## Capstone & Release Hardening (formerly labelled B40)
 
-Status: Planned after B41.
+Status: **NEXT.**
 
 Close release, evidence, operational, security, and capstone presentation readiness without weakening the accepted product contracts.
 
