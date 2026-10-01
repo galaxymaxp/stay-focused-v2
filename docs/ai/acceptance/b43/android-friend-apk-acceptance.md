@@ -38,8 +38,14 @@ Date: 2026-10-01 (Asia/Manila)
 - Source commit: `5f0d75210ab6d519e852bc3127d3d58b3de62cd3`
 - Profile/distribution/artifact target: `preview` / internal / APK
 - Version/versionCode: `2.0.0` / `1`
-- Result at report time: `IN_QUEUE` (normal priority). EAS had not assigned a worker after approximately 30 minutes; its official status page reported services operational.
+- Result at original report time: `IN_QUEUE` (normal priority). EAS had not assigned a worker after approximately 30 minutes; its official status page reported services operational.
 - Artifact: **NOT AVAILABLE**. EAS has not returned an APK artifact URL.
+
+## Resume check
+
+At 2026-10-01 15:37 UTC (23:37 Asia/Manila), the exact same build remains `IN_QUEUE` with normal priority. Its EAS `updatedAt` remains 2026-10-01 14:30:59 UTC; no artifact URL or failure reason is present. It has been queued for about 66 minutes. No replacement build was submitted. The original EAS build remains active and can be polled at the build page above.
+
+Because this build has not produced an APK, the physical-device, Canvas-routing, offline-persistence, and friend handoff checks remain NOT TESTED/BLOCKED. Do not close B43 until this existing build produces an APK and the required real-device checks pass.
 
 ## Device acceptance
 
