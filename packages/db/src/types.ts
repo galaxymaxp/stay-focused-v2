@@ -4174,6 +4174,10 @@ export interface Database {
         };
         Returns: ProcessingJobDatabaseRow[];
       };
+      mark_canvas_reviewer_staging_failed_v1: {
+        Args: { p_job_id: string };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       import_canvas_assignments_as_tasks_v1: {
         Args: {
           p_user_id: string;

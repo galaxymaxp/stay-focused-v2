@@ -365,6 +365,11 @@ export async function createDeferredCanvasReviewerProcessingJob({
   });
   const staged = data?.[0];
   if (error || !staged) {
+    // The staging RPC is transactional. Mark only an undispatched placeholder
+    // as failed; a staged source remains eligible for idempotent reconnect.
+    await stagingClient.rpc("mark_canvas_reviewer_staging_failed_v1", {
+      p_job_id: job.id,
+    });
     throw new ProcessingJobCreationError(
       "processing_job_persistence_failed",
       "The Canvas PDF reference could not be staged durably.",

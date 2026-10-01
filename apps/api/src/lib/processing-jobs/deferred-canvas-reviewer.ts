@@ -34,7 +34,8 @@ export async function isDeferredCanvasReviewerJob({
   readonly job: ProcessingJobDatabaseRow;
 }): Promise<boolean> {
   const source = await findProcessingJobSource(client, job);
-  return record(source.metadata).canvasDeferredResolutionVersion === DEFERRED_CANVAS_REVIEWER_VERSION;
+  return source.source_kind === 'pdf' &&
+    record(source.metadata).canvasDeferredResolutionVersion === DEFERRED_CANVAS_REVIEWER_VERSION;
 }
 
 export async function prepareDeferredCanvasReviewerSource({

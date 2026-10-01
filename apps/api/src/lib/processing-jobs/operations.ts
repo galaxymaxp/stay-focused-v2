@@ -792,6 +792,18 @@ export async function processAIReviewerStep(jobId: string, workerId: string): Pr
   if (job.status === "succeeded") return;
   await withWorkflowLease(client, jobId, workerId, async () => {
     await assertWorkflowJobMayContinue(client, jobId, workerId);
+    try {
+      const { prepareDeferredCanvasCompositeSource } = await import('./deferred-canvas-composite');
+      await prepareDeferredCanvasCompositeSource(client, job, workerId);
+    } catch (error) {
+      if (error instanceof ExperienceFailure && error.status < 500) {
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code,
+          safeErrorMessage: 'The Canvas Page attachments could not be prepared completely.',
+          retryable: false, automaticRetryable: false });
+        throw new FatalError(error.code);
+      }
+      throw error;
+    }
     const output = await processAIReviewerJob(client, job, workerId).catch(async (error: unknown) => {
       if (error instanceof ExperienceFailure && error.status < 500) {
         await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Reviewer generation could not be completed.", retryable: false, automaticRetryable: false });

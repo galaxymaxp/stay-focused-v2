@@ -667,12 +667,15 @@ export async function structureCanvasReviewerSources({
   client,
   courseId,
   ocrProvider,
+  pageBundleSourceId,
   sourceIds,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
   readonly ocrProvider?: OcrProvider;
+  /** Internal admission path for one owned Page and its already checked file links. */
+  readonly pageBundleSourceId?: string;
   readonly sourceIds: readonly string[];
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<CanvasSourceStructure>> {
@@ -683,16 +686,21 @@ export async function structureCanvasReviewerSources({
   const ocrFileCount = normalizedIds.value.filter(
     (source) => source.type === "file",
   ).length;
-  if (ocrFileCount > CANVAS_REVIEWER_MAX_OCR_FILES) {
+  const pageBundle = pageBundleSourceId !== undefined &&
+    normalizedIds.value[0]?.original === pageBundleSourceId &&
+    normalizedIds.value[0]?.type === 'page' &&
+    normalizedIds.value.every((source, index) => index === 0 || source.type === 'file');
+  const fileLimit = pageBundle ? CANVAS_REVIEWER_MAX_SOURCES - 1 : CANVAS_REVIEWER_MAX_OCR_FILES;
+  if (ocrFileCount > fileLimit) {
     return {
       ok: false,
       status: 400,
       code: "canvas_source_ocr_file_limit_exceeded",
       details: {
-        maximumSourceCount: CANVAS_REVIEWER_MAX_OCR_FILES,
+        maximumSourceCount: fileLimit,
         selectedSourceCount: ocrFileCount,
       },
-      message: "You can use one PDF or image per reviewer preview.",
+      message: `You can use at most ${fileLimit} files for this reviewer source.`,
     };
   }
 

@@ -6,7 +6,8 @@ import { CONNECTION_SECRET_COLUMNS, createCanvasClient, decryptConnectionToken, 
 import { ExperienceFailure } from './errors';
 
 const ADMINISTRATIVE_FILE = /\b(?:syllabus|course[ _-]*outline|grading|attendance|calendar|schedule|policy|policies|orientation|rubric)\b/i;
-const MAX_PAGE_FILES = 1; // Existing Reviewer structure admits one extracted file.
+// One Page plus at most seven file components fits the existing eight-source snapshot.
+const MAX_PAGE_FILES = 7;
 
 export function isInstructionalPageAttachment(name: string, eligibility: string): boolean {
   return (eligibility === 'eligible_document' || eligibility === 'eligible_image') &&

@@ -43,8 +43,23 @@ describe('instructional Canvas Page attachments', () => {
     expect(query.insert).toHaveBeenCalledTimes(1);
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ reference_type: 'page', referenced_row_id: 'page-row', file_id: 'file-row' }), expect.anything());
   });
+  it('preserves first Page link order and deduplicates repeated links', async () => {
+    const orderedPage = { ...page, body_html: '<a href="/courses/101/files/12">Second.pdf</a><a href="/courses/101/files/42">First.pptx</a><a href="/courses/101/files/12">Again</a><a href="/courses/101/files/99">Third.pdf</a>' };
+    mocks.getCourseFile.mockImplementation(async (_course: string, id: string) => ({ id }));
+    mocks.mapCanvasFile.mockImplementation((file: { id: string }) => ({ canvas_file_id: file.id, display_name: `Lesson ${file.id}.pdf`, ingestion_eligibility: 'eligible_document' }));
+    query.maybeSingle.mockReset();
+    const ids = ['12', '42', '99'];
+    for (const id of ids) {
+      query.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+        .mockResolvedValueOnce({ data: { ...row, id: `row-${id}`, canvas_file_id: id }, error: null });
+    }
+    const result = await resolveInstructionalPageAttachments({ client, course: course as never, page: orderedPage as never, userId: 'owner' });
+    expect(result.map(file => file.canvas_file_id)).toEqual(ids);
+    expect(mocks.getCourseFile.mock.calls.map(call => call[1])).toEqual(ids);
+  });
   it('keeps administrative and unsupported links out of generation', async () => {
     expect(isInstructionalPageAttachment('Course outline.pdf', 'eligible_document')).toBe(false);
+    expect(isInstructionalPageAttachment('Course Orientation Soc Sci 103.pptx', 'eligible_document')).toBe(false);
     expect(isInstructionalPageAttachment('Lesson.zip', 'metadata_only_unsupported')).toBe(false);
     mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Course outline.pdf', ingestion_eligibility: 'eligible_document' });
     await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' })).resolves.toEqual([]);

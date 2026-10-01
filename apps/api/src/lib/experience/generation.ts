@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { listCanvasReviewerSources, prepareCanvasReviewerSources, structureCanvasReviewerSources, previewSelectiveCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { classifyStoredCanvasFileKind, isPreparedCanvasFileReadyForOcr } from '@/lib/canvas-stored-file-extraction';
 import { validateCanvasReviewerGenerationGate } from '@/lib/canvas-reviewer-generation-gate';
-import { createOrReuseReviewerSourceSnapshot, validateCanvasPreviewSessionForGeneration } from '@/lib/reviewer-source-provenance';
+import { createOrReuseReviewerSourceSnapshot, sha256Utf8Hex, validateCanvasPreviewSessionForGeneration } from '@/lib/reviewer-source-provenance';
 import { createDeferredCanvasReviewerProcessingJob, createReviewerProcessingJob, validateIdempotencyKey, ProcessingJobCreationError } from '@/lib/processing-jobs/creation';
 import { findProcessingJobByIdempotencyKey, findProcessingJobSource } from '@/lib/processing-jobs/repository';
 import { scheduleAcceptedProcessingJobDispatch } from '@/lib/processing-jobs/background-dispatch';
@@ -50,12 +50,14 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     const attachments = await resolveInstructionalPageAttachments({ client, course, page, userId });
     if (attachments.length) {
       hasAttachment = true;
-      const fileId = `file:${attachments[0]!.id}`;
-      const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: input.courseId, pageAttachmentId: page.id, sourceIds: [fileId] });
-      if (!prepared.ok || !prepared.value.results.every(result => result.status === 'ready'))
-        throw new ExperienceFailure(409, 'source_attachment_unavailable');
-      sourceIds.push(fileId);
-      if (classifyStoredCanvasFileKind(attachments[0]!) === 'pdf') attachedPdfId = fileId;
+      for (const attachment of attachments) {
+        const fileId = `file:${attachment.id}`;
+        const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: input.courseId, pageAttachmentId: page.id, sourceIds: [fileId] });
+        if (!prepared.ok || !prepared.value.results.every(result => result.status === 'ready'))
+          throw new ExperienceFailure(409, 'source_attachment_unavailable');
+        sourceIds.push(fileId);
+        if (attachments.length === 1 && classifyStoredCanvasFileKind(attachment) === 'pdf') attachedPdfId = fileId;
+      }
     } else if (!isSubstantivePageText(normalizeCanvasHtmlToText(page.body_html))) {
       throw new ExperienceFailure(422, 'insufficient_source');
     }
@@ -95,7 +97,35 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
       throw error;
     }
   }
-  const structure = await structureCanvasReviewerSources({ client, userId, courseId: input.courseId, sourceIds });
+  if (descriptor.type === 'page' && sourceIds.length > 2) {
+    try {
+      const job = await createReviewerProcessingJob({ client, userId, idempotencyKey: key, source: {
+        sourceText: `canvas-composite-reference:${sha256Utf8Hex(JSON.stringify({ courseId: input.courseId, sourceIds }))}`,
+        sourceTitle: descriptor.title,
+        sourcePrivateMetadata: {
+          canvasCourseId: input.courseId,
+          canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
+          canvasItemIds: sourceIds,
+        },
+      } });
+      const storedSource = await findProcessingJobSource(client, job);
+      const metadata = record(storedSource.metadata);
+      if (job.user_id !== userId || job.job_type !== 'reviewer_generation' || metadata.canvasCourseId !== input.courseId ||
+        !Array.isArray(metadata.canvasItemIds) || JSON.stringify(metadata.canvasItemIds) !== JSON.stringify(sourceIds))
+        throw new ExperienceFailure(409, 'conflict');
+      schedule(job);
+      logGenerationAdmissionMemory('deferred_composite_job_created', { sourceCount: sourceIds.length, jobCount: 1 });
+      return job;
+    } catch (error) {
+      if (error instanceof ProcessingJobCreationError) {
+        if (error.code === 'processing_job_idempotency_conflict') throw new ExperienceFailure(409, 'conflict');
+        if (error.code.includes('limit_reached')) throw new ExperienceFailure(429, 'rate_limited');
+      }
+      throw error;
+    }
+  }
+  const structure = await structureCanvasReviewerSources({ client, userId, courseId: input.courseId, sourceIds,
+    ...(descriptor.type === 'page' && hasAttachment ? { pageBundleSourceId: input.materialId } : {}) });
   if (!structure.ok) throw new ExperienceFailure(409, 'not_ready');
   const pageNumbers = [...new Set(structure.value.sources.flatMap(source => source.blocks.flatMap(block => block.pageNumber === undefined ? [] : [block.pageNumber])))].sort((left, right) => left - right);
   logGenerationAdmissionMemory('source_structured', {

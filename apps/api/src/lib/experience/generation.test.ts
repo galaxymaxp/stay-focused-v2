@@ -3,7 +3,11 @@ import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 const mocks = vi.hoisted(() => ({ list: vi.fn(), prepare: vi.fn(), structure: vi.fn(), preview: vi.fn(), validate: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), existing: vi.fn(), source: vi.fn(), create: vi.fn(), createDeferred: vi.fn(), readFile: vi.fn(), attachments: vi.fn(), schedule: vi.fn() }));
 vi.mock('@/lib/canvas-reviewer-sources', () => ({ listCanvasReviewerSources: mocks.list, prepareCanvasReviewerSources: mocks.prepare, structureCanvasReviewerSources: mocks.structure, previewSelectiveCanvasReviewerSources: mocks.preview }));
-vi.mock('@/lib/reviewer-source-provenance', () => ({ validateCanvasPreviewSessionForGeneration: mocks.validate, createOrReuseReviewerSourceSnapshot: mocks.snapshot }));
+vi.mock('@/lib/reviewer-source-provenance', async (load) => ({
+  ...await load<typeof import('@/lib/reviewer-source-provenance')>(),
+  validateCanvasPreviewSessionForGeneration: mocks.validate,
+  createOrReuseReviewerSourceSnapshot: mocks.snapshot,
+}));
 vi.mock('@/lib/canvas-reviewer-generation-gate', () => ({ validateCanvasReviewerGenerationGate: mocks.gate }));
 vi.mock('@/lib/processing-jobs/repository', () => ({ findProcessingJobByIdempotencyKey: mocks.existing, findProcessingJobSource: mocks.source }));
 vi.mock('@/lib/processing-jobs/creation', () => ({ createDeferredCanvasReviewerProcessingJob: mocks.createDeferred, createReviewerProcessingJob: mocks.create, validateIdempotencyKey: (key: string | null) => { if (!key || key.length < 8) throw new Error('bad key'); return key; }, ProcessingJobCreationError: class extends Error {} }));
@@ -135,6 +139,43 @@ describe('student Reviewer admission adapter', () => {
     await startReviewerGeneration(client, 'owner', pageInput, 'request-key');
     expect(mocks.prepare).toHaveBeenCalledWith(expect.objectContaining({ pageAttachmentId: pageRowId, sourceIds: [`file:${fileRowId}`] }));
     expect(mocks.createDeferred).toHaveBeenCalledWith(expect.objectContaining({ source: expect.objectContaining({ sourcePrivateMetadata: expect.objectContaining({ canvasItemIds: [pageInput.materialId, `file:${fileRowId}`] }) }) }));
+  });
+  it('keeps all Page attachments in teacher order in one provenance snapshot', async () => {
+    const pageInput = { courseId: 'course', materialId: `page:${pageRowId}` };
+    const secondFileId = '00000000-0000-4000-8000-000000000003';
+    const thirdFileId = '00000000-0000-4000-8000-000000000004';
+    const orderedIds = [pageInput.materialId, `file:${fileRowId}`, `file:${secondFileId}`, `file:${thirdFileId}`];
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: pageInput.materialId, type: 'page', capability: 'ready', availability: 'available' }], pagination: { hasMore: false } } });
+    mocks.readFile.mockResolvedValueOnce({ data: { id: pageRowId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', body_html: '<p>Lesson slides</p>' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'course', user_id: 'owner', canvas_connection_id: 'connection' }, error: null });
+    mocks.attachments.mockResolvedValue([
+      { id: fileRowId, display_name: 'First.pptx' },
+      { id: secondFileId, display_name: 'Second.pdf' },
+      { id: thirdFileId, display_name: 'Third.pdf' },
+    ]);
+    mocks.preview.mockResolvedValue({ ok: true, value: { sourceText: 'The first lesson explains the core ideas, the second lesson extends them, and the third lesson provides applied examples for students.', suggestedTitle: 'Lesson slides', previewSessionId: 'preview', resolutionFingerprint: 'fingerprint' } });
+    mocks.prepare.mockResolvedValue({ ok: true, value: { results: [{ status: 'ready' }] } });
+    mocks.source.mockResolvedValue({ metadata: { canvasCourseId: 'course', canvasItemIds: orderedIds } });
+    await startReviewerGeneration(client, 'owner', pageInput, 'request-key');
+    expect(mocks.prepare).toHaveBeenCalledTimes(3);
+    expect(mocks.structure).not.toHaveBeenCalled();
+    expect(mocks.gate).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ source: expect.objectContaining({ sourcePrivateMetadata: expect.objectContaining({ canvasItemIds: orderedIds, canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1' }) }) }));
+    expect(mocks.createDeferred).not.toHaveBeenCalled();
+    expect(mocks.schedule).toHaveBeenCalledTimes(1);
+  });
+  it('fails the whole Page bundle when any eligible attachment cannot prepare', async () => {
+    const pageInput = { courseId: 'course', materialId: `page:${pageRowId}` };
+    mocks.list.mockResolvedValue({ ok: true, value: { sources: [{ id: pageInput.materialId, type: 'page', capability: 'ready', availability: 'available' }], pagination: { hasMore: false } } });
+    mocks.readFile.mockResolvedValueOnce({ data: { id: pageRowId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', body_html: '<p>Lesson slides</p>' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'course', user_id: 'owner', canvas_connection_id: 'connection' }, error: null });
+    mocks.attachments.mockResolvedValue([{ id: fileRowId }, { id: '00000000-0000-4000-8000-000000000003' }]);
+    mocks.prepare.mockResolvedValueOnce({ ok: true, value: { results: [{ status: 'ready' }] } })
+      .mockResolvedValueOnce({ ok: true, value: { results: [{ status: 'failed' }] } });
+    await expect(startReviewerGeneration(client, 'owner', pageInput, 'request-key')).rejects.toMatchObject({ code: 'source_attachment_unavailable' });
+    expect(mocks.structure).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.schedule).not.toHaveBeenCalled();
   });
   it('rejects a filename-only Page when no instructional attachment is available', async () => {
     const pageInput = { courseId: 'course', materialId: `page:${pageRowId}` };

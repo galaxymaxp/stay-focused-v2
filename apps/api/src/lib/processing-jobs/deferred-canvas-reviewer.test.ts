@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   from.mockReturnValue(query);
   query.select.mockReturnValue(query); query.eq.mockReturnValue(query);
-  mocks.source.mockResolvedValue({ metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`file:${fileId}`] } });
+  mocks.source.mockResolvedValue({ source_kind: 'pdf', metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`file:${fileId}`] } });
   mocks.checkpoint.mockResolvedValue(null);
   mocks.readFile.mockResolvedValue({ data: {
     id: fileId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_course_id: '101', canvas_file_id: '42',
@@ -97,7 +97,7 @@ describe('deferred Canvas reviewer source preparation', () => {
   });
 
   it('combines an instructional Page and its PDF in source order with both provenance records', async () => {
-    mocks.source.mockResolvedValue({ metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`page:${linkedPageId}`, `file:${fileId}`] } });
+    mocks.source.mockResolvedValue({ source_kind: 'pdf', metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`page:${linkedPageId}`, `file:${fileId}`] } });
     const fileResult = await mocks.readFile();
     mocks.readFile.mockResolvedValueOnce(fileResult).mockResolvedValueOnce({ data: {
       id: linkedPageId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection',
@@ -117,7 +117,7 @@ describe('deferred Canvas reviewer source preparation', () => {
   });
 
   it('uses only PDF lesson text when a linked Page contains only its filename', async () => {
-    mocks.source.mockResolvedValue({ metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`page:${linkedPageId}`, `file:${fileId}`] } });
+    mocks.source.mockResolvedValue({ source_kind: 'pdf', metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`page:${linkedPageId}`, `file:${fileId}`] } });
     const fileResult = await mocks.readFile();
     mocks.readFile.mockResolvedValueOnce(fileResult).mockResolvedValueOnce({ data: {
       id: linkedPageId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection',
