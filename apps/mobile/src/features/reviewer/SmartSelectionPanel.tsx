@@ -1,7 +1,7 @@
 import {
   STUDY_ACTIONS, STUDY_ACTION_LABELS, STUDY_ACTION_TITLES, STUDY_ASK_SUGGESTIONS, STUDY_GROUNDING_DETAILS, STUDY_GROUNDING_LABELS, STUDY_LIMITS,
   STUDY_MODIFIER_LABELS, STUDY_QUESTION_TOO_LONG, STUDY_REFINEMENTS, STUDY_SELECTION_TOO_LARGE, STUDY_TOOLS_PROMPT_VERSION, checkStudySelection,
-  studySurface, studySurfaceRange, type AssistSelection, type StudyAction, type StudyFollowUp, type StudyGrounding, type StudyModifier,
+  studySurface, type AssistSelection, type StudyAction, type StudyFollowUp, type StudyGrounding, type StudyModifier,
   type StudyToolRequest, type StudyToolResult,
 } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -29,14 +29,13 @@ const stop = (event: GestureResponderEvent) => event.stopPropagation();
  * exact range, then Define, Explain, Example, Test Me or Ask run on it here.
  * Refinements generate only when tapped; repeats reuse this session's results.
  */
-export function SmartSelectionPanel({ selection, pointIndex, onActiveChange, scrollRef }: { selection: AssistSelection; pointIndex?: number; onActiveChange?: (active: boolean) => void; scrollRef?: RefObject<ScrollView | null> }) {
+export function SmartSelectionPanel({ selection, onActiveChange, scrollRef }: { selection: AssistSelection; onActiveChange?: (active: boolean) => void; scrollRef?: RefObject<ScrollView | null> }) {
   const { session } = useAuth();
   const { colors, reducedMotion } = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const surface = useMemo(() => studySurface(selection.block), [selection.block]);
-  const initial = useMemo<Range>(() => studySurfaceRange(selection.block, pointIndex === undefined ? { kind: 'explanation' } : { kind: 'keyPoint', index: pointIndex })
-    ?? { start: 0, end: 0 }, [selection.block, pointIndex]);
-  const [range, setRange] = useState<Range>(initial);
+  // Nothing is selected until the student holds a word; whole-topic quick assists show until then.
+  const [range, setRange] = useState<Range>({ start: 0, end: 0 });
   const picked = surface.slice(Math.min(range.start, range.end), Math.max(range.start, range.end));
   const check = checkStudySelection(selection.block, picked);
   const [action, setAction] = useState<StudyAction | null>(null);
@@ -50,7 +49,9 @@ export function SmartSelectionPanel({ selection, pointIndex, onActiveChange, scr
   const first = useRef<string | undefined>(undefined);
   const mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
-  useEffect(() => onActiveChange?.(action !== null), [action, onActiveChange]);
+  // A selection (even an oversized one) or an open action replaces the whole-topic quick assists.
+  const selecting = action !== null || check.ok || check.reason === 'too_large';
+  useEffect(() => onActiveChange?.(selecting), [selecting, onActiveChange]);
   const input = useRef<TextInput>(null);
   const root = useRef<View>(null);
   const answerField = useRef<TextInput>(null);
@@ -66,12 +67,12 @@ export function SmartSelectionPanel({ selection, pointIndex, onActiveChange, scr
       field.current.measureLayout(root.current, (_x, y) => scroll.scrollTo({ y: Math.max(0, y - spacing[8]), animated: !reducedMotion }), () => undefined);
     }, 80);
   }
-  // Focus without a keyboard so the starting passage shows as a native selection.
-  // Focusing reports a collapsed cursor that can land after the preselection, so
-  // collapsed reports count only once the student has touched the text.
+  // Returning from an action restores the previous range: focus without a keyboard
+  // so it shows as a native selection. Focusing reports a collapsed cursor that can
+  // land after it, so collapsed reports count only once the student touches the text.
   const touched = useRef(false);
   useEffect(() => {
-    if (action) return;
+    if (action || range.start === range.end) return;
     touched.current = false;
     const apply = () => input.current?.setSelection?.(range.start, range.end);
     const timers = [setTimeout(() => {
@@ -180,10 +181,9 @@ export function SmartSelectionPanel({ selection, pointIndex, onActiveChange, scr
       </View>
       {check.ok ? <Copy size="bodySmall" numberOfLines={3} style={{ lineHeight: 20 }}>
         <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700' }}>Selected  </Copy>{`“${check.text}”`}
-      </Copy> : check.reason === 'too_large' ? <Notice>{STUDY_SELECTION_TOO_LARGE}</Notice>
-        : <Copy muted size="caption">Select a word, phrase or sentence above.</Copy>}
+      </Copy> : check.reason === 'too_large' ? <Notice>{STUDY_SELECTION_TOO_LARGE}</Notice> : null}
     </View>}
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 6 }}>
+    {selecting ? <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 6 }}>
       {STUDY_ACTIONS.map(item => {
         const current = action === item;
         const disabled = !action && !check.ok;
@@ -193,7 +193,7 @@ export function SmartSelectionPanel({ selection, pointIndex, onActiveChange, scr
           <Copy size="caption" numberOfLines={1} color={current ? colors.onAccent : colors.textPrimary} style={{ fontWeight: '600' }}>{STUDY_ACTION_LABELS[item]}</Copy>
         </Pressable>;
       })}
-    </View>
+    </View> : null}
     {action && action !== 'test' && action !== 'ask' ? <View style={{ gap: spacing[3] }}>
       <Copy size="h3" style={{ fontWeight: '600' }}>{shown?.modifier ? `${STUDY_ACTION_TITLES[action]} · ${STUDY_MODIFIER_LABELS[shown.modifier]}` : STUDY_ACTION_TITLES[action]}</Copy>
       {shown ? <RunView run={shown.run} retry={() => shown.modifier ? refine(shown.modifier) : choose(action)}>

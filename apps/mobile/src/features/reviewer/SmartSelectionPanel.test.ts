@@ -52,17 +52,26 @@ function surface() { return nodes('TextInput').find(node => node.props.testID ==
 function text() { return JSON.stringify(rendered!.toJSON()); }
 function requests() { return network.mock.calls.map(call => (call[2] as { body: StudyToolRequest }).body); }
 const ok = (data: Record<string, unknown>) => ({ outcome: 'answer', grounding: 'source', text: 'Generated.', createdAt: '2026-10-01T00:00:00Z', ...data });
-async function open(target = { selection } as { selection: typeof selection; pointIndex?: number }) {
+/** Holds the surface, then reports the native range Android would for `phrase` (nothing selected when empty). */
+async function select(phrase: string, value = studySurface(block)) {
+  const start = phrase ? value.indexOf(phrase) : 0;
+  await act(async () => surface()!.parent!.props.onTouchStart({ stopPropagation: vi.fn() }));
+  await act(async () => surface()!.props.onSelectionChange({ nativeEvent: { selection: { start, end: start + phrase.length } } }));
+}
+/** Opens the sheet; by default the student then selects the explanation. */
+async function open(target = { selection } as { selection: typeof selection; pointIndex?: number }, phrase: string | null = block.explanation) {
   await act(async () => { rendered = create(createElement(StudyAssistSheet, { target, onClose: vi.fn() })); });
+  if (phrase) await select(phrase, studySurface(target.selection.block));
 }
 async function press(node: ReactTestInstance | undefined) {
   expect(node).toBeDefined();
   await act(async () => { node!.props.onPress(); });
   await act(async () => {});
 }
+const quoted = (phrase: string) => nodes('Copy').some(node => [node.props.children].flat().some((child: unknown) => typeof child === 'string' && child.includes(`“${phrase}”`)));
 
 describe('Smart Selection learning sheet', () => {
-  it('opens from the existing topic tap with the whole concept selectable and the tapped passage selected', async () => {
+  it('opens from the topic tap with nothing selected, showing whole-topic quick assists only', async () => {
     await act(async () => { rendered = create(createElement(ReviewerReaderScreen, { artifact: detail.artifact, reviewer, deviceCopy: false })); });
     const explanation = nodes('Text').find(node => node.props.children === block.explanation)!;
     await act(async () => explanation.props.onPress());
@@ -74,9 +83,19 @@ describe('Smart Selection learning sheet', () => {
     expect(input.props.showSoftInputOnFocus).toBe(false);
     expect(input.props.caretHidden).toBe(true);
     expect(input.props.contextMenuHidden).toBeUndefined();
-    expect(nodes('Copy').some(node => [node.props.children].flat().some((child: unknown) => typeof child === 'string' && child.includes(`“${block.explanation}”`)))).toBe(true);
-    expect(pressables('tab').map(label)).toEqual(['Define', 'Explain', 'Example', 'Test Me', 'Ask']);
+    expect(nodes('Copy').some(node => [node.props.children].flat().some((child: unknown) => typeof child === 'string' && child.startsWith('QUICK ASSISTS')))).toBe(true);
+    expect(pressables('tab')).toHaveLength(0);
     expect(network).not.toHaveBeenCalled();
+  });
+  it('replaces the quick assists with the five selection actions while text is selected, and back when cleared', async () => {
+    await open(undefined, null);
+    await select('membrane controls');
+    expect(pressables('tab').map(label)).toEqual(['Define', 'Explain', 'Example', 'Test Me', 'Ask']);
+    expect(text()).not.toContain('QUICK ASSISTS');
+    expect(quoted('membrane controls')).toBe(true);
+    await select('');
+    expect(pressables('tab')).toHaveLength(0);
+    expect(text()).toContain('QUICK ASSISTS');
   });
   it('keeps selection drags from moving the sheet', async () => {
     await open();
@@ -85,13 +104,9 @@ describe('Smart Selection learning sheet', () => {
     for (const handler of ['onTouchStart', 'onTouchMove', 'onTouchEnd']) wrapper.props[handler](event);
     expect(event.stopPropagation).toHaveBeenCalledTimes(3);
   });
-  it('preselects a tapped key point and follows the exact native range', async () => {
-    await open({ selection, pointIndex: 0 });
-    expect(text()).toContain(`“${block.keyPoints[0]}”`);
-    const value = studySurface(block);
-    const start = value.indexOf('membrane controls');
-    await act(async () => surface()!.props.onSelectionChange({ nativeEvent: { selection: { start, end: start + 'membrane controls'.length } } }));
-    expect(text()).toContain('“membrane controls”');
+  it('follows the exact native range from a tapped key point and retains it in the action', async () => {
+    await open({ selection, pointIndex: 0 }, null);
+    await select('membrane controls');
     network.mockResolvedValue(ok({ action: 'define' }));
     await press(tab('Define'));
     expect(requests()[0]).toMatchObject({ action: 'define', selection: 'membrane controls', blockId: 'block-1', contentHash: selection.contentHash });
@@ -99,22 +114,22 @@ describe('Smart Selection learning sheet', () => {
     // The selected range is retained once the action runs.
     expect(text()).toContain('“membrane controls”');
   });
-  it('keeps the preselection when focusing reports a collapsed cursor before any touch', async () => {
+  it('restores the previous range on Change selection, ignoring the collapsed cursor that focusing reports', async () => {
     await open();
+    network.mockResolvedValue(ok({ action: 'explain' }));
+    await press(tab('Explain'));
+    await press(button('Change selection'));
     await act(async () => surface()!.props.onSelectionChange({ nativeEvent: { selection: { start: 0, end: 0 } } }));
     expect(tab('Define').props.disabled).toBe(false);
-    expect(nodes('Copy').some(node => [node.props.children].flat().some((child: unknown) => typeof child === 'string' && child.includes(`“${block.explanation}”`)))).toBe(true);
+    expect(quoted(block.explanation)).toBe(true);
   });
-  it('blocks empty and oversized selections before any request', async () => {
-    await open();
-    await act(async () => surface()!.parent!.props.onTouchStart({ stopPropagation: vi.fn() }));
-    await act(async () => surface()!.props.onSelectionChange({ nativeEvent: { selection: { start: 3, end: 3 } } }));
-    expect(tab('Define').props.disabled).toBe(true);
-    const long: ReviewerReaderModel = { ...reviewer, sections: [{ ...reviewer.sections[0]!, blocks: [{ ...block, explanation: 'cells '.repeat(500) }] }] };
-    await act(async () => rendered!.unmount());
-    await open({ selection: selectAssistBlock(long, 'section-1', 'block-1')! });
+  it('blocks oversized selections before any request', async () => {
+    const long: ReviewerReaderModel = { ...reviewer, sections: [{ ...reviewer.sections[0]!, blocks: [{ ...block, explanation: 'cells '.repeat(500).trim() }] }] };
+    const longSelection = selectAssistBlock(long, 'section-1', 'block-1')!;
+    await open({ selection: longSelection }, longSelection.block.explanation);
     expect(nodes('Notice').map(node => node.props.children)).toContain(STUDY_SELECTION_TOO_LARGE);
     expect(tab('Explain').props.disabled).toBe(true);
+    expect(text()).not.toContain('QUICK ASSISTS');
     expect(network).not.toHaveBeenCalled();
   });
   it('renders a Define result with a tappable grounding badge, generating refinements only on tap', async () => {
@@ -220,10 +235,11 @@ describe('Smart Selection learning sheet', () => {
     await press(tab('Example'));
     expect(text()).toContain('Wait a moment');
   });
-  it('hides quick assists while an action is open and dismisses like any sheet', async () => {
+  it('keeps quick assists hidden while an action is open and dismisses like any sheet', async () => {
     const onClose = vi.fn();
     await act(async () => { rendered = create(createElement(StudyAssistSheet, { target: { selection }, onClose })); });
     expect(text()).toContain('QUICK ASSISTS');
+    await select(block.explanation);
     network.mockResolvedValueOnce(ok({ action: 'explain' }));
     await press(tab('Explain'));
     expect(text()).not.toContain('QUICK ASSISTS');

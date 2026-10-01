@@ -120,15 +120,6 @@ export function studySurface(block: AssistBlock): string {
     ...block.evidence.map(evidence => evidence.text.trim())];
   return parts.filter(Boolean).join('\n\n');
 }
-/** Where each passage sits in the surface, so a long-pressed passage can be preselected. */
-export function studySurfaceRange(block: AssistBlock, passage: { kind: 'explanation' } | { kind: 'keyPoint'; index: number }): { start: number; end: number } | null {
-  const surface = studySurface(block);
-  const text = passage.kind === 'explanation' ? block.explanation.trim() : block.keyPoints[passage.index]?.trim();
-  if (!text) return null;
-  // Key points are searched after their bullet so identical wording in the explanation is skipped.
-  const start = surface.indexOf(text, passage.kind === 'keyPoint' ? Math.max(0, surface.indexOf(`• ${text}`)) : 0);
-  return start < 0 ? null : { start, end: start + text.length };
-}
 /** Whitespace and bullet markers do not change what was selected. */
 export function normalizeStudyText(text: string): string {
   return text.replace(/(^|\s)•(?=\s)/gu, ' ').replace(/\s+/gu, ' ').trim();

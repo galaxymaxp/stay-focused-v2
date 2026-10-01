@@ -62,12 +62,12 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
   }
 
   const current = shown ? entries[shown] : undefined;
-  // Smart Selection replaces the quick assists on screen while one of its actions is open.
+  // Selected text (or an open learning action) replaces the whole-topic quick assists.
   const [studying, setStudying] = useState(false);
   const scroll = useRef<ScrollView>(null);
   return <Sheet title="Study Assist" onClose={onClose} scrollRef={scroll}>
     {target ? <>
-      <SmartSelectionPanel selection={target.selection} pointIndex={target.pointIndex} onActiveChange={setStudying} scrollRef={scroll} />
+      <SmartSelectionPanel selection={target.selection} onActiveChange={setStudying} scrollRef={scroll} />
       {studying ? null : <>
       <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700', letterSpacing: 0.8, paddingTop: spacing[2] }}>QUICK ASSISTS · WHOLE {target.pointIndex !== undefined ? 'KEY POINT' : 'CONCEPT'}</Copy>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
