@@ -1,5 +1,17 @@
 # Current State
 
+## B40 Reviewer Smart Selection learning tools (2026-10-01)
+
+**PASS.** Tapping a Reviewer topic opens the existing Study Assist sheet. The full concept is now selectable there with Android's own handles and Copy/Select All, and the sheet captures the exact range. Define, Explain, Example, Test Me and Ask then run on that selection in the same sheet, with lazy refinements (Plain words, In context, Key traits, Compare; Simpler, Deeper, Analogy, Why it matters; Real world, Step-by-step, Another, Counterexample; Test Me checking, Harder, Apply it, Explain answer, Need choices?).
+
+One owner-scoped `POST /api/experience/study-tools` route reuses the Study Assist ownership and source-provenance path. It verifies that the selection belongs to the owner's block, sends only bounded context (the block, nearby section content and cited source excerpts), and enforces selection, question, answer, follow-up (2) and output limits on the server. Define/Explain/Example/Ask fall back to general knowledge automatically, with a tappable From your material / Source + general knowledge / General knowledge badge. Test Me is source-only. The canonical Reviewer is never modified.
+
+Physical acceptance passed on the RMX3151 against a local API and a coinstalled local debug build: all actions and refinements, grounding states, offline message, Reduce Motion, search and the scrubber, and zero new Canvas, processing or artifact rows. FRESH: API 1,198 tests, mobile 778, shared 50; typecheck and lint 7/7. **Not yet deployed:** a production API deployment and a preview OTA are needed to ship. [B40 acceptance](ai/acceptance/b40/reviewer-smart-selection-learning-tools.md). Next: B41 native Office DOCX/PPTX opening acceptance.
+
+## B39.2 physical Canvas and Android acceptance (2026-10-01)
+
+**PASS — closes B39.** Recorded in [B39.2 acceptance](ai/acceptance/b39.2/physical-canvas-android-acceptance.md); the B39.1 BLOCKED entry below is historical.
+
 ## B39.1 deployment and physical Canvas acceptance (2026-10-01)
 
 **BLOCKED at live Canvas/device acceptance.** The B39 API is deployed READY as `dpl_74hWVM2kSvg21hfnRLcVu885ohFe`; production health returned 200 and the protected attachment route returned 401 without a session. The offline Task/attachment metadata gap is repaired in the existing owner-scoped SQLite store. Preview APK `de93f504-cb53-4388-b48a-47103d65eb3a` from `80cd1b0` finished and is installed on the RMX3151; APK inspection confirms native Expo Sharing. CUA exposes no Android UI surface, so Canvas authentication, manual sync, attachment open, and remaining physical/passive-sync gates are unverified. No sync action or Cloud Run deployment occurred. [B39.1 acceptance](ai/acceptance/b39.1/deploy-physical-canvas-sync.md).

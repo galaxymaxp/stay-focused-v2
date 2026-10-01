@@ -194,9 +194,17 @@ Status: **NEXT — ready to begin after B38.1 PASS.**
 
 Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
 
-## B40 Capstone & Release Hardening
+## B40 Reviewer Smart Selection Learning Tools
 
-Status: Planned after B39.
+Status: **PASS (2026-10-01).** Topic tap → existing Study Assist sheet → selectable concept text → Define / Explain / Example / Test Me / Ask with lazy refinements, automatic labelled grounding, source-only Test Me, and server-enforced cost limits. Not yet deployed. [Acceptance](ai/acceptance/b40/reviewer-smart-selection-learning-tools.md).
+
+## B41 Native Office DOCX/PPTX Opening Acceptance
+
+Status: **NEXT.** Moved here from the post-B39 plan. Physically accept opening Library and Task Office files through native Android handlers.
+
+## Capstone & Release Hardening (formerly labelled B40)
+
+Status: Planned after B41.
 
 Close release, evidence, operational, security, and capstone presentation readiness without weakening the accepted product contracts.
 
