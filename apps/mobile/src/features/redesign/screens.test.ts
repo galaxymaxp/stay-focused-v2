@@ -1084,8 +1084,9 @@ describe("B38 saved assignment Draft", () => {
     mocks.params = { id: "canvas:assignment" };
     mocks.data["/api/experience/activities/canvas%3Aassignment"] = {
       id: "canvas:assignment", title: "Firewalls and VPN", course: null, instructions: "Use the assigned scenario", dueAt: null, resources: [], taskId: null,
+      attachments: [],
       outputs: [artifact], generation: { activityAssistance: supported, reviewer: unavailable, quiz: unavailable },
-    } satisfies Pick<ActivityDetail, "id" | "title" | "course" | "instructions" | "dueAt" | "resources" | "taskId" | "outputs" | "generation">;
+    } satisfies Pick<ActivityDetail, "id" | "title" | "course" | "instructions" | "dueAt" | "resources" | "attachments" | "taskId" | "outputs" | "generation">;
     mocks.createIntent.mockResolvedValue({ key: "draft-request" });
     const root = await render(createElement(ActivityScreen));
     expect(root.findAll(node => String(node.type) === "Page")[0]!.props.title).toBe("Assignment");
