@@ -26,12 +26,12 @@ export function parseAssistRequest(value: unknown): AssistRequest {
   return body as unknown as AssistRequest;
 }
 
-/** Exact original-source blocks referenced by this canonical item. No retrieval from assistance. */
-export async function assistSourceExcerpt(saved: CanonicalReviewerRecord, request: AssistRequest): Promise<string> {
+/** Original-source blocks the canonical item cites, in source order. Owner scoping happens when `saved` is read. */
+export async function referencedSourceBlocks(saved: CanonicalReviewerRecord, sectionId: string, blockId: string): Promise<readonly { id: string; text: string }[]> {
   const root = record(saved.version.payload);
   const reviewer = record(root.reviewer ?? root);
-  const section = (Array.isArray(reviewer.sections) ? reviewer.sections : []).map(record).find(section => section.id === request.sectionId);
-  const item = (Array.isArray(section?.items) ? section.items : []).map(record).find(item => item.id === request.blockId);
+  const section = (Array.isArray(reviewer.sections) ? reviewer.sections : []).map(record).find(section => section.id === sectionId);
+  const item = (Array.isArray(section?.items) ? section.items : []).map(record).find(item => item.id === blockId);
   if (!item) throw new ExperienceFailure(404, 'not_found');
   const ids = Array.isArray(item.sourceBlockIds) ? item.sourceBlockIds.filter((id): id is string => typeof id === 'string') : [];
   const meta = record(saved.source.metadata);
@@ -39,7 +39,12 @@ export async function assistSourceExcerpt(saved: CanonicalReviewerRecord, reques
   const originalId = record(reviewer.metadata).sourceId;
   const source = await normalizeSource({ id: typeof originalId === 'string' ? originalId : saved.source.id,
     ...(blocks.length ? { blocks, kind: meta.reviewerSourceKind as NormalizedSourceKind | undefined } : { text: saved.source.source_text }) });
-  const referenced = source.blocks.filter(block => ids.includes(block.id));
+  return source.blocks.filter(block => ids.includes(block.id));
+}
+
+/** Exact original-source blocks referenced by this canonical item. No retrieval from assistance. */
+export async function assistSourceExcerpt(saved: CanonicalReviewerRecord, request: AssistRequest): Promise<string> {
+  const referenced = await referencedSourceBlocks(saved, request.sectionId, request.blockId);
   // Fail safely on missing provenance rather than silently using unrelated text.
   if (!referenced.length) throw new ExperienceFailure(409, 'not_ready');
   // Preserve complete excerpts: a broad item cannot silently lose a qualifier at a truncation boundary.

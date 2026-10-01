@@ -460,12 +460,15 @@ export function Sheet({
   onClose,
   title,
   footer,
+  scrollRef,
 }: {
   children: ReactNode;
   onClose: () => void;
   title?: string;
   /** Pinned below the scroll area, always visible (e.g. a secondary action). */
   footer?: ReactNode;
+  /** Lets content bring a focused field into view; the Modal does not resize for the keyboard. */
+  scrollRef?: Ref<ScrollView>;
 }) {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -542,6 +545,7 @@ export function Sheet({
             <DoneButton onPress={() => dismiss()} />
           </View>
           <ScrollView
+            ref={scrollRef}
             style={{ flexShrink: 1 }}
             scrollEnabled={!contentFits}
             onLayout={(event) => setViewport(event.nativeEvent.layout.height)}

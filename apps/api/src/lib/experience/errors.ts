@@ -38,6 +38,10 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
     generation_failed: { title: 'Generation did not finish', message: 'Your result could not be completed.', retryable: false, action: 'choose_material' },
     rate_limited: { title: 'Please wait', message: 'Try again after the current work has finished.', retryable: true, action: 'retry' },
     conflict: { title: 'Request has changed', message: 'Start a new request for the changed material.', retryable: false, action: 'none' },
+    study_selection_too_large: { title: 'Selection too large', message: 'Select a smaller part of the Reviewer to study.', retryable: false, action: 'none' },
+    study_question_too_long: { title: 'Question too long', message: 'Your question is too long. Shorten it to focus on what you want explained.', retryable: false, action: 'none' },
+    study_answer_too_long: { title: 'Answer too long', message: 'Shorten your answer to the key idea and check it again.', retryable: false, action: 'none' },
+    study_follow_up_limit: { title: 'Start a new question', message: 'This question has reached its follow-up limit. Start a new question.', retryable: false, action: 'none' },
   };
   return { status: failure.status, error: { code: failure.code, ...copy[failure.code], ...(failure.code === 'quiz_source_capacity_exceeded' && Number.isInteger(failure.supportedMaximum) ? { supportedMaximum: failure.supportedMaximum } : {}) } };
 }

@@ -1,7 +1,7 @@
 import { ASSIST_LABELS, ASSIST_RESULT_LABELS, ASSIST_TYPES, type AssistType } from '@stay-focused/shared';
 import { AlignLeft, ArrowLeftRight, Check, FlaskConical, Lightbulb, RotateCcw } from 'lucide-react-native';
-import { useEffect, useState, type ComponentType } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
+import { ActivityIndicator, Pressable, View, type ScrollView } from 'react-native';
 import { useAuth } from '../../auth';
 import { getApiBaseUrl } from '../../config/apiBaseUrl';
 import { haptic } from '../../design/haptics';
@@ -9,6 +9,7 @@ import { Copy, Notice, Sheet, SkeletonBlock } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
 import { radius, spacing } from '../../design/tokens';
 import { assistStore, keyOf, useAssistEntries, type AssistEntry, type AssistTarget } from './assistStore';
+import { SmartSelectionPanel } from './SmartSelectionPanel';
 
 const ICONS: Record<AssistType, ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
   summarize: AlignLeft, explain_simply: Lightbulb, analogy: ArrowLeftRight, example: FlaskConical,
@@ -60,17 +61,15 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
     assistStore.run(owner, { baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' }, target, type);
   }
 
-  const point = target?.pointIndex !== undefined ? target.selection.block.keyPoints[target.pointIndex] : undefined;
-  const passage = point ?? (target ? target.selection.block.explanation || target.selection.block.keyPoints.join('\n') : '');
   const current = shown ? entries[shown] : undefined;
-  return <Sheet title="Study Assist" onClose={onClose}>
+  // Smart Selection replaces the quick assists on screen while one of its actions is open.
+  const [studying, setStudying] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  return <Sheet title="Study Assist" onClose={onClose} scrollRef={scroll}>
     {target ? <>
-      <View style={{ gap: spacing[2], backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4] }}>
-        <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700', letterSpacing: 0.8 }}>
-          {point !== undefined ? 'KEY POINT' : 'CONCEPT'} · {target.selection.block.title.toUpperCase()}
-        </Copy>
-        <Copy size="bodySmall" numberOfLines={5} style={{ lineHeight: 21 }}>{passage}</Copy>
-      </View>
+      <SmartSelectionPanel selection={target.selection} pointIndex={target.pointIndex} onActiveChange={setStudying} scrollRef={scroll} />
+      {studying ? null : <>
+      <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700', letterSpacing: 0.8, paddingTop: spacing[2] }}>QUICK ASSISTS · WHOLE {target.pointIndex !== undefined ? 'KEY POINT' : 'CONCEPT'}</Copy>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
         {ASSIST_TYPES.map(type => <OptionTile key={type} type={type} entry={entries[type]} selected={shown === type} onPress={() => choose(type)} />)}
       </View>
@@ -90,7 +89,8 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
         <Copy style={{ lineHeight: 25 }}>{current.text}</Copy>
       </View> : null}
       {current?.status === 'error' ? <Notice>{current.error}</Notice> : null}
-      {!current ? <Copy muted size="caption">Choose how you want this explained. Results are AI-generated and saved on this device.</Copy> : null}
+      {!current ? <Copy muted size="caption">Results are AI-generated and saved on this device.</Copy> : null}
+      </>}
     </> : <Notice>This passage is no longer available. Reopen the Reviewer to choose another.</Notice>}
   </Sheet>;
 }

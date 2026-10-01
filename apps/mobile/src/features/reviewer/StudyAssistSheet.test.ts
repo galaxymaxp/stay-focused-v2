@@ -40,7 +40,7 @@ const selection = selectAssistBlock(reviewer, reviewer.sections[0]!.id, reviewer
 const target = { selection };
 function nodes(type: string) { return rendered!.root.findAll(node => String(node.type) === type); }
 /** The four option tiles, in ASSIST_TYPES order. */
-function tiles() { return nodes('Pressable').filter(node => node.props.accessibilityState && 'selected' in node.props.accessibilityState); }
+function tiles() { return nodes('Pressable').filter(node => node.props.accessibilityState && 'busy' in node.props.accessibilityState); }
 describe('Reviewer Study Assist interaction', () => {
   it('renders a Reviewer section with zero emphasis as readable plain text', async () => {
     const plain = { ...reviewer, sections: reviewer.sections.map(section => ({ ...section,
