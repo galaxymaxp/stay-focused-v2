@@ -1,7 +1,8 @@
 import { router } from "expo-router";
-import { Check, ChevronDown, Search, X } from "lucide-react-native";
+import { Check, ChevronDown, CircleHelp, Search, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, Pressable, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, Image, Modal, Pressable, ScrollView, TextInput, View, useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
@@ -31,6 +32,9 @@ type Load =
   | { readonly state: "disconnected" }
   | { readonly state: "reconnect"; readonly connection: CanvasConnectionSummary }
   | { readonly state: "connected"; readonly connection: CanvasConnectionSummary; readonly courses: readonly CanvasCourseInventoryItem[] };
+
+const canvasTokenTutorial = require("../../../assets/tutorials/canvas-access-token.png");
+let canvasTokenTutorialShown = false;
 
 /** Plain words for the student; codes and HTTP details stay out of the UI. */
 function friendlyError(error: CanvasApiClientError): string {
@@ -439,8 +443,14 @@ function ConnectCanvas({ onConnected, request, initialBaseUrl = "" }: { initialB
   const { colors } = useTheme();
   const [baseUrl, setBaseUrl] = useState(initialBaseUrl);
   const [token, setToken] = useState("");
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (canvasTokenTutorialShown) return;
+    canvasTokenTutorialShown = true;
+    setTutorialOpen(true);
+  }, []);
   const field = {
     minHeight: 44,
     borderRadius: radius.control,
@@ -467,13 +477,46 @@ function ConnectCanvas({ onConnected, request, initialBaseUrl = "" }: { initialB
     <Surface style={{ gap: spacing[3] }}>
       <Copy size="h3">Connect Canvas</Copy>
       <Copy muted size="bodySmall">In Canvas, open Account → Settings → Approved Integrations → New Access Token. Create a token for your own account and paste it here. Reconnect using the same account and school.</Copy>
+      <Pressable accessibilityRole="button" accessibilityLabel="How to get a Canvas token" testID="canvas-token-tutorial-open" onPress={() => setTutorialOpen(true)} style={{ minHeight: hitTarget.min, flexDirection: "row", alignItems: "center", gap: spacing[2] }}>
+        <CircleHelp size={18} color={colors.accent} />
+        <Copy color={colors.accent} style={{ fontWeight: "600" }}>How to get a Canvas token</Copy>
+      </Pressable>
       <Copy muted size="caption">Enter your school’s Canvas domain. HTTPS is added automatically.</Copy>
       <TextInput accessibilityLabel="Canvas address" testID="canvas-base-url-input" value={baseUrl} onChangeText={setBaseUrl} placeholder="school.instructure.com" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} inputMode="url" style={field} />
       <TextInput accessibilityLabel="Canvas access token" testID="canvas-token-input" value={token} onChangeText={setToken} placeholder="Access token" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} secureTextEntry style={field} />
       <Action disabled={busy || !baseUrl.trim() || !token.trim()} onPress={() => void connect()} testID="canvas-connect-button">{busy ? "Connecting…" : "Connect"}</Action>
       {error ? <Notice>{error}</Notice> : null}
       <Copy muted size="caption">Your token is stored encrypted and can be revoked in Canvas at any time.</Copy>
+      <CanvasTokenTutorial visible={tutorialOpen} onClose={() => setTutorialOpen(false)} />
     </Surface>
+  );
+}
+
+function CanvasTokenTutorial({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const [enlarged, setEnlarged] = useState(false);
+  const imageWidth = enlarged ? Math.max(width * 1.8, 640) : width;
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: colors.backgroundPrimary, paddingTop: insets.top, paddingBottom: insets.bottom }}>
+        <View style={{ minHeight: hitTarget.min + spacing[2], flexDirection: "row", alignItems: "center", paddingHorizontal: spacing[3], borderBottomWidth: 1, borderColor: colors.separator }}>
+          <Copy size="h3" style={{ flex: 1 }}>Canvas access token</Copy>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close tutorial" testID="canvas-token-tutorial-close" onPress={onClose} style={{ width: hitTarget.min, height: hitTarget.min, alignItems: "center", justifyContent: "center" }}>
+            <X size={22} color={colors.textPrimary} />
+          </Pressable>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={enlarged ? "Fit tutorial to screen" : "Enlarge tutorial for reading"} onPress={() => setEnlarged((value) => !value)} style={{ minHeight: hitTarget.min, alignItems: "center", justifyContent: "center" }}>
+          <Copy color={colors.accent} size="bodySmall">{enlarged ? "Fit to width" : "Enlarge to read"}</Copy>
+        </Pressable>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ alignItems: "center" }} showsVerticalScrollIndicator>
+          <ScrollView horizontal={enlarged} style={{ width }} showsHorizontalScrollIndicator={enlarged}>
+            <Image source={canvasTokenTutorial} accessibilityLabel="Canvas access token setup guide, steps one through six" resizeMode="contain" style={{ width: imageWidth, height: imageWidth * 1.5 }} />
+          </ScrollView>
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 

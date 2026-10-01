@@ -1,5 +1,9 @@
 # Current State
 
+## Quick Canvas token tutorial (2026-10-01)
+
+**PARTIAL physical acceptance.** The unchanged tutorial image is bundled locally. The Canvas token form opens it once per app session when the form first appears and offers a manual reopen control. The full-screen viewer preserves form state and supports vertical scrolling plus an enlarged, horizontally pannable reading mode. Android preview OTA `01a0f7d2-ca43-760b-9723-4a4ddf1f1a40` was checked on the realme: opening, reading, scrolling, closing, reopening, domain preservation, and no repeated popup on return passed. Existing connected courses still loaded. A successful new-token reconnection and real-token log check were not exercised. Canvas authentication and sync code were unchanged.
+
 ## B41 native Office DOCX/PPTX opening (2026-10-01)
 
 **PASS.** The realme had no app able to open DOCX or PPTX; with the owner's approval, Google Docs and Slides were installed. The opening test exposed a defect: exported Drafts lost every line break (DOCX breaks were written outside runs, and PPTX chunking flattened lines). Fixed in `28b81af`/`74ae2ab` with regression tests, and shipped as preview OTA `9129850a-bd65-4588-b80b-53cd53d82745` (runtime 2.0.1). The re-exported DOCX and PPTX open directly from My Files in Google Docs and Slides (18/18 slides), with lines preserved. No new jobs or artifacts. FRESH: mobile 782, typecheck and lint pass. Microsoft Word/PowerPoint not tested. [B41 acceptance](ai/acceptance/b41/native-office-docx-pptx-opening.md).

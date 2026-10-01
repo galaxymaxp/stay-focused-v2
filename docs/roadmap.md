@@ -1,5 +1,9 @@
 # Roadmap
 
+## Quick Canvas token tutorial (2026-10-01)
+
+The scoped tutorial popup is implemented and checked on the realme through preview OTA `01a0f7d2-ca43-760b-9723-4a4ddf1f1a40`. New-token reconnection remains untested on the device; no Canvas integration or footer navigation code changed. B43–B45 work has not started.
+
 ## B39.1 deploy + physical Canvas sync and Task attachment acceptance (2026-10-01)
 
 **BLOCKED at live Canvas/device acceptance.** Offline Task attachment metadata is stored in the existing owner-scoped SQLite database. API deployment `dpl_74hWVM2kSvg21hfnRLcVu885ohFe` is READY and healthy; preview APK `de93f504-cb53-4388-b48a-47103d65eb3a` contains Expo Sharing and is installed on the RMX3151. The session exposes no Android UI control surface, so the fresh Canvas credential check/sync, attachment open, and physical workflow/passive-sync tests could not run. Next: provide supported CUA Android control for the authorized RMX3151, then finish the remaining B39 acceptance gates. [Evidence](ai/acceptance/b39.1/deploy-physical-canvas-sync.md).
