@@ -84,10 +84,20 @@ export interface ActivitySummary {
   readonly hasGeneratedDraft: boolean;
 }
 export interface ActivityResource { readonly title: string; readonly url: string }
+/** Student-visible file metadata attached to an actionable Canvas assignment. */
+export interface ActivityAttachment {
+  /** Stable only within this assignment detail; never a Canvas or storage identifier. */
+  readonly key: string;
+  readonly filename: string;
+  readonly contentType: string | null;
+  readonly extension: string | null;
+  readonly size: number | null;
+}
 export interface ActivityDetail extends ActivitySummary {
   readonly latestDraftId?: string | null;
   readonly instructions: string | null;
   readonly resources: readonly ActivityResource[];
+  readonly attachments: readonly ActivityAttachment[];
   readonly courseMaterials: CourseMaterials | null;
   readonly generation: GenerationCapability;
   readonly outputs: readonly LibraryArtifactSummary[];

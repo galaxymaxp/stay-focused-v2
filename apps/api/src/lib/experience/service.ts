@@ -1,4 +1,5 @@
 import type { Quiz } from '@stay-focused/shared';
+import type { CanvasAssignmentRow } from '@stay-focused/db';
 import { quizView } from '../quiz/service';
 import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerateCourseList, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
@@ -111,6 +112,7 @@ export class ExperienceService {
     const activity = requireFound(context.activities.find(a => a.id === activityId));
     const assignment = context.assignments.find(a => `canvas:${a.id}` === activityId);
     const task = context.tasks.find(t => t.id === activity.taskId);
+    const attachments = assignment ? await this.activityAttachments(userId, assignment) : [];
     let courseMaterials: CourseMaterials | null = null;
     if (activity.course) {
       // A deselected course can still have an assignment; that activity remains
@@ -120,7 +122,34 @@ export class ExperienceService {
     }
     const drafts = (await this.activityDraftRecords(userId)).filter(r => r.summary.activityId === activityId);
     return { ...activity, hasGeneratedDraft: drafts.length > 0, latestDraftId: drafts[0]?.draft.id ?? null, instructions: assignment ? normalizeCanvasHtmlToText(assignment.description_html) || null : task?.notes ?? null,
-      resources: assignment ? assignmentResources(assignment.description_html) : [], courseMaterials, generation: { ...generationCapability(false), activityAssistance: assignment && activity.course ? { status: 'available' } : { status: 'unavailable', reasonCode: 'unsupported_material' } }, outputs: drafts.map(d => d.summary) };
+      resources: assignment ? assignmentResources(assignment.description_html).filter(resource => !isCanvasFileUrl(resource.url)) : [], attachments: attachments.map(({ canvasFileId: _canvasFileId, ...attachment }) => attachment), courseMaterials, generation: { ...generationCapability(false), activityAssistance: assignment && activity.course ? { status: 'available' } : { status: 'unavailable', reasonCode: 'unsupported_material' } }, outputs: drafts.map(d => d.summary) };
+  }
+  /** Re-resolve an attachment against owner-scoped synced assignment/file rows before download. */
+  async getActivityAttachmentDownload(userId: string, activityId: string, key: string) {
+    const context = await this.activityContext(userId);
+    const activity = requireFound(context.activities.find(item => item.id === activityId));
+    const assignment = context.assignments.find(row => `canvas:${row.id}` === activity.id);
+    if (!assignment || !activity.course) throw new ExperienceFailure(404, 'not_found');
+    const attachment = (await this.activityAttachments(userId, assignment)).find(item => item.key === key);
+    if (!attachment) throw new ExperienceFailure(404, 'not_found');
+    const course = (await this.rows('canvas_courses', userId)).find(row => row.id === assignment.course_id);
+    if (!course || course.user_id !== userId || course.canvas_connection_id !== assignment.canvas_connection_id)
+      throw new ExperienceFailure(404, 'not_found');
+    return { attachment, canvasCourseId: course.canvas_course_id, canvasConnectionId: course.canvas_connection_id };
+  }
+  private async activityAttachments(userId: string, assignment: CanvasAssignmentRow) {
+    const [files, references] = await Promise.all([this.rows('canvas_files', userId), this.rows('canvas_file_references', userId)]);
+    const courseFiles = files.filter(file => file.course_id === assignment.course_id && file.canvas_connection_id === assignment.canvas_connection_id);
+    const filesById = new Map(courseFiles.map(file => [file.id, file]));
+    const byCanvasId = new Map<string, { filename: string; contentType: string | null; size: number | null; canvasFileId: string }>();
+    for (const reference of references) {
+      if (reference.course_id !== assignment.course_id || reference.canvas_connection_id !== assignment.canvas_connection_id || reference.canvas_assignment_id !== assignment.canvas_assignment_id) continue;
+      const file = filesById.get(reference.file_id);
+      if (!file) continue;
+      byCanvasId.set(file.canvas_file_id, { filename: safeAttachmentFilename(file.filename || file.display_name), contentType: safeAttachmentMime(file.content_type), size: Number.isSafeInteger(file.size_bytes) && file.size_bytes! >= 0 ? file.size_bytes : null, canvasFileId: file.canvas_file_id });
+    }
+    return [...byCanvasId.values()].sort((a, b) => a.filename.localeCompare(b.filename) || a.canvasFileId.localeCompare(b.canvasFileId))
+      .map((item, index) => ({ key: `a${index}`, filename: item.filename, contentType: item.contentType, extension: attachmentExtension(item.filename), size: item.size, canvasFileId: item.canvasFileId }));
   }
   async getTodayOverview(userId: string, date: string, offset = 0): Promise<TodayOverview> {
     dayWindow(date, offset);
@@ -271,6 +300,23 @@ export function assignmentResources(html: string | null): ActivityDetail['resour
   }
   walk(parseFragment(html ?? ''));
   return result;
+}
+
+function isCanvasFileUrl(value: string): boolean {
+  try { return /(?:^|\/)files(?:\/|$)/i.test(new URL(value).pathname); }
+  catch { return false; }
+}
+function safeAttachmentFilename(value: string): string {
+  const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, '').replace(/[\\/]/g, '').trim().slice(0, 240);
+  return cleaned || 'Canvas attachment';
+}
+function safeAttachmentMime(value: string | null): string | null {
+  if (!value || !/^[\w.+-]+\/[\w.+-]+$/.test(value)) return null;
+  return value.toLowerCase();
+}
+function attachmentExtension(filename: string): string | null {
+  const match = /\.([a-z0-9]{1,10})$/i.exec(filename);
+  return match ? match[1]!.toUpperCase() : null;
 }
 
 export function announcementResources(html: string | null): readonly AnnouncementLink[] {

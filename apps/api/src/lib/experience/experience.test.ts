@@ -10,9 +10,11 @@ import { ExperienceFailure, normalizeExperienceError } from './errors';
 
 const now = Date.parse('2026-09-12T09:00:00Z');
 const date = '2026-09-12';
-const course = { id: 'course', user_id: 'owner', name: 'Biology', course_code: 'BIO', workflow_state: 'available', last_synced_at: date } as CanvasCourseRow;
+const course = { id: 'course', user_id: 'owner', canvas_connection_id: 'connection', canvas_course_id: 'canvas-course', name: 'Biology', course_code: 'BIO', workflow_state: 'available', last_synced_at: date } as CanvasCourseRow;
 const task = { id: 'task', user_id: 'owner', title: 'Personal work', notes: null, status: 'pending', priority: 'medium', due_at: '2026-09-12T10:00:00Z', estimated_minutes: 30, source_type: 'manual', canvas_assignment_row_id: null, created_at: '2026-09-10T00:00:00Z', updated_at: '2026-09-10T00:00:00Z' } as TaskRow;
-const assignment = { id: 'assignment', user_id: 'owner', course_id: course.id, name: 'Worksheet', due_at: '2026-09-12T08:00:00Z', submission_types: ['online_upload'], description_html: '<p>Read the chapter.</p><a href="https://canvas.example/files/1">Chapter PDF</a>' } as CanvasAssignmentRow;
+const assignment = { id: 'assignment', user_id: 'owner', canvas_connection_id: 'connection', canvas_course_id: 'canvas-course', canvas_assignment_id: 'canvas-assignment', course_id: course.id, name: 'Worksheet', due_at: '2026-09-12T08:00:00Z', submission_types: ['online_upload'], description_html: '<p>Read the chapter.</p><a href="https://canvas.example/files/1">Chapter PDF</a>' } as unknown as CanvasAssignmentRow;
+const attachmentFile = { id: 'file-row', user_id: 'owner', canvas_connection_id: 'connection', course_id: course.id, canvas_file_id: 'canvas-file-1', display_name: 'Lecture Instructions.pdf', filename: 'Lecture Instructions.pdf', content_type: 'application/pdf', size_bytes: 2048 };
+const attachmentReference = { id: 'reference', user_id: 'owner', canvas_connection_id: 'connection', course_id: course.id, file_id: attachmentFile.id, canvas_assignment_id: assignment.canvas_assignment_id, reference_type: 'typed_attachment', reference_identity: 'private-reference', referenced_row_id: null };
 const descriptor: CanvasReviewerSourceDescriptor = { id: 'file:source', type: 'file', title: 'Cells.pdf', capability: 'ready', availability: 'available', unavailableReason: 'private OCR diagnostic', updatedAt: null, estimatedCharacters: 900, placement: { group: 'module', moduleTitle: 'Cells', modulePosition: 1, itemPosition: 1 }, file: { kind: 'pdf', preparationStatus: 'ready', canPrepare: false } };
 const sourceList: CanvasReviewerSourceList = { courseId: course.id, courseName: course.name, courseSync: { status: 'partial', completedAt: null, lastSuccessfulSyncAt: null, latestResultWasPartial: true, synchronizedSourcesAvailable: true, failureCategories: ['private diagnostics'] }, availableSourceCount: 1, unavailableSourceCount: 0, sources: [descriptor], pagination: { limit: 100, offset: 0, returned: 1, hasMore: false, totalKnown: 1 } };
 const payload = { reviewer: { title: 'Cells', metadata: { provider_id: 'private', prompt: 'private' }, sections: [{ id: 's1', title: 'Cells', plannedSectionId: 'private', items: [{ id: 'i1', title: 'Cell', sourceCore: { explanation: 'Cells contain genetic material.', keyPoints: ['Cells are living units.'], evidence: [{ kind: 'formula', text: 'a + b' }, { kind: 'table', text: '| a | b |' }] }, enrichment: { note: 'private' } }] }] }, sourceSnapshotId: 'snapshot' };
@@ -213,13 +215,29 @@ describe('Learn and Activity details', () => {
     await expect(api.getCourseLearningWorkspace('owner', course.id)).rejects.toMatchObject({ status: 404 });
     expect(materials).not.toHaveBeenCalled();
   });
-  it('exposes instructions, linked resources and course materials for Activity Maker', async () => {
+  it('exposes instructions, non-file links and course materials for Activity Maker', async () => {
     const { api } = service({ canvas_courses: [course], canvas_assignments: [assignment] });
     const detail = await api.getActivityDetail('owner', 'canvas:assignment');
     expect(detail.instructions).toContain('Read the chapter.');
-    expect(detail.resources[0]?.url).toBe('https://canvas.example/files/1');
+    expect(detail.resources).toEqual([]);
+    expect(detail.attachments).toEqual([]);
     expect(detail.courseMaterials?.items).toHaveLength(1);
     expect(detail.generation.activityAssistance.status).toBe('available'); expect(detail.outputs).toEqual([]);
+  });
+  it('joins synchronized assignment attachments, deduplicates file references, and exposes safe metadata only', async () => {
+    const { api } = service({ canvas_courses: [course], canvas_assignments: [assignment], canvas_files: [attachmentFile], canvas_file_references: [attachmentReference, { ...attachmentReference, id: 'reference-description', reference_type: 'assignment' }] });
+    const detail = await api.getActivityDetail('owner', 'canvas:assignment');
+    expect(detail.attachments).toEqual([{ key: 'a0', filename: 'Lecture Instructions.pdf', contentType: 'application/pdf', extension: 'PDF', size: 2048 }]);
+    expect(JSON.stringify(detail)).not.toMatch(/canvas-file-1|file-row|private-reference|storage_object_key|download_url/i);
+    const resolved = await api.getActivityAttachmentDownload('owner', 'canvas:assignment', 'a0');
+    expect(resolved).toMatchObject({ canvasCourseId: 'canvas-course', canvasConnectionId: 'connection', attachment: { filename: 'Lecture Instructions.pdf', canvasFileId: 'canvas-file-1' } });
+  });
+  it('does not return attachments or downloads belonging to another owner', async () => {
+    const foreign = { ...attachmentFile, user_id: 'other' };
+    const foreignReference = { ...attachmentReference, user_id: 'other' };
+    const { api } = service({ canvas_courses: [course], canvas_assignments: [assignment], canvas_files: [foreign], canvas_file_references: [foreignReference] });
+    expect((await api.getActivityDetail('owner', 'canvas:assignment')).attachments).toEqual([]);
+    await expect(api.getActivityAttachmentDownload('owner', 'canvas:assignment', 'a0')).rejects.toMatchObject({ status: 404 });
   });
   it('denies another owner activity in list and detail', async () => {
     const { api } = service({ canvas_courses: [course], canvas_assignments: [{ ...assignment, user_id: 'other' }], tasks: [{ ...task, user_id: 'other' }] });

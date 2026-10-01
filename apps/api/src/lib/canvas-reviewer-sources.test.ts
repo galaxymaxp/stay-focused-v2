@@ -228,6 +228,33 @@ describe("Canvas reviewer source service", () => {
     ]);
   });
 
+  it("keeps assignment-only file attachments out of Generate but admits a separate module File item", async () => {
+    const attachmentReference = {
+      id: "55555555-5555-4555-8555-555555555555",
+      user_id: USER_ID,
+      canvas_connection_id: CONNECTION_ID,
+      course_id: COURSE_ID,
+      file_id: FILE_ID,
+      canvas_assignment_id: "canvas-assignment-101",
+      reference_type: "typed_attachment",
+    };
+    const onlyAssignmentAttachment = createFakeCanvasClient({ canvas_file_references: [attachmentReference] });
+    const taskOnly = await listCanvasReviewerSources({ client: onlyAssignmentAttachment.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(taskOnly.ok).toBe(true);
+    if (!taskOnly.ok) return;
+    expect(taskOnly.value.sources.map(source => source.id)).toEqual([`page:${PAGE_ID}`]);
+
+    const alsoModuleMaterial = createFakeCanvasClient({
+      canvas_file_references: [attachmentReference],
+      canvas_modules: [moduleRow("teaching-module", "Week 1", 1)],
+      canvas_module_items: [{ ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888887", pageUrl: "" }), module_id: "teaching-module", item_type: "File", canvas_content_id: "file-1" }],
+    });
+    const moduleFile = await listCanvasReviewerSources({ client: alsoModuleMaterial.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(moduleFile.ok).toBe(true);
+    if (!moduleFile.ok) return;
+    expect(moduleFile.value.sources.map(source => source.id)).toEqual([`file:${FILE_ID}`, `page:${PAGE_ID}`]);
+  });
+
   it("excludes a module grouping Page with an empty body without relying on its title", async () => {
     const groupingPage = {
       ...basePageRow(),
@@ -1247,6 +1274,8 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
   private filters: Array<(row: FakeRecord) => boolean> = [];
   private insertedRows: readonly FakeRecord[] | null = null;
   private limitCount: number | null = null;
+  private rangeStart: number | null = null;
+  private rangeEnd: number | null = null;
   private orders: Array<{
     readonly column: string;
     readonly ascending: boolean;
@@ -1325,6 +1354,12 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     return this;
   }
 
+  public range(from: number, to: number): this {
+    this.rangeStart = from;
+    this.rangeEnd = to;
+    return this;
+  }
+
   public async maybeSingle(): Promise<FakeQueryResult> {
     const rows = this.executeRows();
     return {
@@ -1367,7 +1402,10 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     const ordered = [...filtered].sort((left, right) =>
       compareByOrders(left, right, this.orders),
     );
-    return this.limitCount === null ? ordered : ordered.slice(0, this.limitCount);
+    const ranged = this.rangeStart === null || this.rangeEnd === null
+      ? ordered
+      : ordered.slice(this.rangeStart, this.rangeEnd + 1);
+    return this.limitCount === null ? ranged : ranged.slice(0, this.limitCount);
   }
 }
 
@@ -1482,6 +1520,7 @@ function baseCanvasTables(): Record<string, readonly FakeRecord[]> {
     canvas_course_sync_states: [baseSyncStateRow()],
     canvas_courses: [baseCourseRow()],
     canvas_files: [baseFileRow()],
+    canvas_file_references: [],
     canvas_pages: [basePageRow(), baseOtherCoursePageRow()],
     canvas_sync_course_results: [baseCourseResultRow()],
     canvas_sync_runs: [baseSyncRunRow()],

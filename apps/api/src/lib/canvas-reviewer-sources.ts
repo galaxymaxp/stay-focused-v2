@@ -298,6 +298,8 @@ interface NormalizedSourceRecord {
   readonly descriptor: CanvasReviewerSourceDescriptor;
   readonly text: string | null;
   readonly provenance?: CanvasSourceManifestItemBase;
+  /** Assignment/announcement files stay with their parent unless a module independently lists them. */
+  readonly excludeFromGenerate?: boolean;
 }
 
 export interface PreviewSourceRecord {
@@ -390,6 +392,7 @@ export async function listCanvasReviewerSources({
   }
 
   const ordered = sources.value
+    .filter((source) => !source.excludeFromGenerate)
     .map((source) => source.descriptor)
     .filter(isCanvasGenerateCandidate)
     .sort(compareSources);
@@ -1446,7 +1449,7 @@ async function loadCourseSourceDescriptors({
   readonly course: CanvasCourseRow;
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<readonly NormalizedSourceRecord[]>> {
-  const [pages, assignments, announcements, files, modules, moduleItems] = await Promise.all([
+  const [pages, assignments, announcements, files, modules, moduleItems, fileReferences] = await Promise.all([
     readPages({ client, connectionId: connection.id, courseId: course.id, userId }),
     readAssignments({
       client,
@@ -1468,6 +1471,7 @@ async function loadCourseSourceDescriptors({
       courseId: course.id,
       userId,
     }),
+    readFileReferencesForCourse({ client, connectionId: connection.id, courseId: course.id, userId }),
   ]);
 
   if (
@@ -1476,7 +1480,8 @@ async function loadCourseSourceDescriptors({
     !announcements.ok ||
     !files.ok ||
     !modules.ok ||
-    !moduleItems.ok
+    !moduleItems.ok ||
+    !fileReferences.ok
   ) {
     return storageFailure("Canvas sources could not be loaded.");
   }
@@ -1503,7 +1508,13 @@ async function loadCourseSourceDescriptors({
       ...pages.value.map(mapPageSource).map(applyPlacement),
       ...assignments.value.map(mapAssignmentSource).map(applyPlacement),
       ...announcements.value.map(mapAnnouncementSource).map(applyPlacement),
-      ...files.value.map(mapFileSource).map(applyPlacement),
+      ...files.value.map((file) => {
+        const placement = placements.get(formatSourceId("file", file.id)) ?? ungroupedPlacement();
+        const parentWorkReference = fileReferences.value.some((reference) =>
+          reference.file_id === file.id && ["assignment", "typed_attachment", "announcement"].includes(reference.reference_type),
+        );
+        return { ...mapFileSource(file), excludeFromGenerate: parentWorkReference && placement.group !== "module" };
+      }).map(applyPlacement),
     ],
   };
 }
@@ -3354,6 +3365,24 @@ async function readFileReferencesByFileIds(
     return { ok: false };
   }
   return { ok: true, value: data as readonly CanvasFileReferenceRow[] };
+}
+
+async function readFileReferencesForCourse(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[] }
+  | { readonly ok: false }
+> {
+  const references: Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[] = [];
+  for (let offset = 0; offset < 10_000; offset += 200) {
+    const { data, error } = await query.client.from("canvas_file_references")
+      .select("file_id,reference_type").eq("user_id", query.userId)
+      .eq("canvas_connection_id", query.connectionId).eq("course_id", query.courseId)
+      .order("id").range(offset, offset + 199);
+    if (error || !data) return { ok: false };
+    const page = data as unknown as readonly Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[];
+    references.push(...page);
+    if (page.length < 200) return { ok: true, value: references };
+  }
+  return { ok: false };
 }
 
 async function readModuleItemsForReferences(query: SourceQuery): Promise<

@@ -1,6 +1,6 @@
-import type { ActivityDetail, ActivitySummary } from "@stay-focused/shared";
+import type { ActivityAttachment, ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { Plus, Circle, Pin, PinOff } from "lucide-react-native";
+import { Plus, Circle, Pin, PinOff, Paperclip } from "lucide-react-native";
 import { useMemo, useRef, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 
@@ -24,7 +24,8 @@ import {
   type TaskCourseSummary,
   type TaskGroupKey,
 } from "./tasksPresentation";
-import { useExperience } from "./useExperience";
+import { useExperience, useExperienceClient } from "./useExperience";
+import { openCanvasTaskAttachment } from "../../services/canvasTaskAttachments";
 import { useListPreferences } from "./useListPreferences";
 
 function activitiesPath() {
@@ -209,9 +210,24 @@ export function ActivityScreen() {
     id ? `/api/experience/activities/${encodeURIComponent(id)}` : null,
   );
   const { session } = useAuth();
+  const client = useExperienceClient();
+  const { colors } = useTheme();
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
+  const [openingAttachment, setOpeningAttachment] = useState<string | null>(null);
+  async function openAttachment(attachment: ActivityAttachment) {
+    if (!id || !client.accessToken || openingAttachment) return;
+    setOpeningAttachment(attachment.key);
+    setError(null);
+    try {
+      await openCanvasTaskAttachment(client, id, attachment);
+    } catch (cause) {
+      setError(cause instanceof TypeError ? "Connect to the internet to open this attachment." : cause instanceof Error ? cause.message : "The attachment could not be opened.");
+    } finally {
+      setOpeningAttachment(null);
+    }
+  }
   async function create() {
     if (
       !activity.data ||
@@ -255,6 +271,21 @@ export function ActivityScreen() {
               {activity.data.instructions ?? "No instructions provided."}
             </Copy>
           </Surface>
+          {activity.data.attachments.length ? (
+            <Surface>
+              <Copy size="h2">Attachments</Copy>
+              {activity.data.attachments.map(attachment => (
+                <Pressable key={attachment.key} accessibilityRole="button" accessibilityLabel={`Open attachment ${attachment.filename}`} disabled={openingAttachment !== null} onPress={() => void openAttachment(attachment)} style={({ pressed }) => ({ minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing[3], opacity: pressed || openingAttachment === attachment.key ? 0.6 : 1 })}>
+                  <Paperclip size={17} color={colors.accent} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Copy style={{ fontWeight: "600" }}>{attachment.filename}</Copy>
+                    <Copy muted size="caption">{attachment.extension ?? attachment.contentType ?? "File"}{attachment.size !== null ? ` · ${formatAttachmentSize(attachment.size)}` : ""}</Copy>
+                  </View>
+                  {openingAttachment === attachment.key ? <Copy muted size="caption">Opening…</Copy> : null}
+                </Pressable>
+              ))}
+            </Surface>
+          ) : null}
           {activity.data.resources.map((resource) => (
             <Action
               key={resource.url}
@@ -314,4 +345,10 @@ export function ActivityScreen() {
       {error && <Notice>{error}</Notice>}
     </Page>
   );
+}
+
+function formatAttachmentSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
