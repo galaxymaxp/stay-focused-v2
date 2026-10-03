@@ -1,5 +1,9 @@
 # Current Sprint
 
+## Urgent Canvas notification system (2026-10-03)
+
+**PARTIAL: implemented locally; activation pending.** Protected metadata polling, database event deduplication and due revisions, durable Resend delivery, submission/completion suppression, and persistent per-type Settings controls are complete. Forward migration `20261003025905` has local Postgres/RLS verification. Production lacks `CRON_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL`; sender verification, rollout, developer-only live/physical acceptance, workload measurement, and enabling one Google Cloud Scheduler job remain. No production migration, deployment, Scheduler job, or real email was performed. [Architecture/runbook](../architecture/canvas-email-notifications.md).
+
 ## Quick Canvas token tutorial (2026-10-01)
 
 **PARTIAL physical acceptance.** The unchanged local image, one-time popup, manual reopen action, and scrollable full-screen viewer are on Android preview OTA `01a0f7d2-ca43-760b-9723-4a4ddf1f1a40`. The realme passed the popup, readability, scrolling, close/reopen, and edited-domain preservation checks; connected courses still loaded. A fresh Canvas token was not entered, so successful reconnection and real-token log absence remain unverified. FRESH: mobile typecheck and two focused sync test files (16 tests) pass; mobile lint has zero errors and four existing warnings in unrelated service tests.

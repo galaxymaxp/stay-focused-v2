@@ -1,5 +1,9 @@
 # Current State
 
+## Urgent Canvas sync and configurable email notifications (2026-10-03)
+
+**PARTIAL — local implementation complete; production activation pending.** A protected five-minute metadata poll reuses the Canvas client/normalizers and canonical tables, with bounded requests, independent scopes and safe partial-failure handling. Assignment/announcement changes queue transactional, deduplicated email events; deadline reminders use due-date revisions, reliable submission/completion evidence and local reminder time. Settings saves global and per-type switches, reminder time and timezone. The linked Vercel project is Hobby with Fluid Compute, so the documented external trigger is one Google Cloud Scheduler HTTP job; this work adds no Cloud Run service. Migration `20261003025905` and the missing cron/Resend environment variables, verified sender, API/Mobile rollout, controlled production/device acceptance, and workload/backlog check remain required. No production data or emails were changed. [Architecture and setup](architecture/canvas-email-notifications.md).
+
 ## Quick Canvas token tutorial (2026-10-01)
 
 **PARTIAL physical acceptance.** The unchanged tutorial image is bundled locally. The Canvas token form opens it once per app session when the form first appears and offers a manual reopen control. The full-screen viewer preserves form state and supports vertical scrolling plus an enlarged, horizontally pannable reading mode. Android preview OTA `01a0f7d2-ca43-760b-9723-4a4ddf1f1a40` was checked on the realme: opening, reading, scrolling, closing, reopening, domain preservation, and no repeated popup on return passed. Existing connected courses still loaded. A successful new-token reconnection and real-token log check were not exercised. Canvas authentication and sync code were unchanged.

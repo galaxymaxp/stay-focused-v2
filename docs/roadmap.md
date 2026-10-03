@@ -1,5 +1,9 @@
 # Roadmap
 
+## Urgent Canvas notification activation (2026-10-03)
+
+Local metadata synchronization, transactional email outbox, deadline reminders and persistent Settings controls are implemented. Next: apply the forward migration, configure cron/Resend variables and verified sender, roll out API and Mobile, perform developer-only live delivery and repeat-request/device acceptance, verify five-minute workload capacity, then enable the single Google Cloud Scheduler job. The current Hobby plan cannot provide that trigger interval through Vercel Cron. [Setup and behavior](architecture/canvas-email-notifications.md). Other phase gates below remain unchanged.
+
 ## Quick Canvas token tutorial (2026-10-01)
 
 The scoped tutorial popup is implemented and checked on the realme through preview OTA `01a0f7d2-ca43-760b-9723-4a4ddf1f1a40`. New-token reconnection remains untested on the device; no Canvas integration or footer navigation code changed. B43–B45 work has not started.
