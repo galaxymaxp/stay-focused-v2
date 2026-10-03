@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./task-planning": "./src/task-planning.ts"
+    "./task-planning": "./src/task-planning.ts",
+    "./notification-preferences": "./src/notification-preferences.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -510,9 +510,30 @@ export type PushNotificationDeviceRow =
 export type ProcessingNotificationDeliveryRow =
   Database["public"]["Tables"]["processing_notification_deliveries"]["Row"];
 
+export type NotificationPreferenceRow = {
+  user_id: string; email_enabled: boolean; announcement_email: boolean; new_assignment_email: boolean;
+  due_date_change_email: boolean; deadline_7_day: boolean; deadline_3_day: boolean; deadline_due_today: boolean;
+  reminder_time: string; timezone: string; created_at: string; updated_at: string;
+}
+export type CanvasEmailOutboxRow = {
+  id: string; user_id: string; course_id: string; canvas_assignment_id: string | null; canvas_announcement_id: string | null;
+  type: "announcement" | "new_assignment" | "due_date_change" | "deadline_7_day" | "deadline_3_day" | "deadline_due_today";
+  due_revision: number | null; dedupe_key: string; payload: Json; scheduled_for: string;
+  sent_at: string | null; failed_at: string | null; skipped_at: string | null; first_attempt_at: string | null;
+  retry_count: number; last_error: string | null; lease_owner: string | null; lease_expires_at: string | null;
+  message_id: string | null; created_at: string;
+}
+type NotificationPollRow = {
+  course_id: string; last_polled_at: string | null; next_poll_at: string; lease_owner: string | null;
+  lease_expires_at: string | null; last_error: string | null; fingerprints: Json;
+}
 export interface Database {
   public: {
     Tables: {
+      notification_preferences: { Row: NotificationPreferenceRow; Insert: Partial<NotificationPreferenceRow> & { user_id: string }; Update: Partial<NotificationPreferenceRow>; Relationships: [] };
+      notification_outbox: { Row: CanvasEmailOutboxRow; Insert: Partial<CanvasEmailOutboxRow> & Pick<CanvasEmailOutboxRow, "user_id" | "course_id" | "type" | "dedupe_key" | "payload">; Update: Partial<CanvasEmailOutboxRow>; Relationships: [] };
+      canvas_notification_poll_state: { Row: NotificationPollRow; Insert: Partial<NotificationPollRow> & { course_id: string }; Update: Partial<NotificationPollRow>; Relationships: [] };
+      canvas_notification_assignment_state: { Row: { user_id: string; course_id: string; canvas_assignment_id: string; due_at: string | null; due_revision: number }; Insert: { user_id: string; course_id: string; canvas_assignment_id: string; due_at?: string | null; due_revision?: number }; Update: { due_at?: string | null; due_revision?: number }; Relationships: [] };
       tasks: {
         Row: {
           id: string;
@@ -4155,6 +4176,14 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      notification_email_enabled_v1: { Args: { p_user_id: string; p_type: string }; Returns: boolean };
+      canvas_notification_timezone_v1: { Args: { p_user_id: string; p_course_id: string }; Returns: string };
+      count_canvas_notification_poll_backlog_v1: { Args: Record<string, never>; Returns: number };
+      canvas_notification_assignment_pending_v1: { Args: { p_assignment_id: string }; Returns: boolean };
+      queue_canvas_deadline_emails_v1: { Args: { p_now?: string }; Returns: number };
+      claim_canvas_email_outbox_v1: { Args: { p_worker_id: string; p_limit?: number }; Returns: CanvasEmailOutboxRow[] };
+      claim_canvas_notification_course_v1: { Args: { p_worker_id: string }; Returns: CanvasCourseRow[] };
+      apply_canvas_notification_metadata_v1: { Args: { p_course_id: string; p_worker_id: string; p_payload: Json; p_error?: string | null }; Returns: undefined };
       attach_deferred_canvas_reviewer_source_v1: {
         Args: {
           p_job_id: string;

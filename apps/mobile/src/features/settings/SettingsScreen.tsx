@@ -11,6 +11,7 @@ import { haptic } from "../../design/haptics";
 import { Copy, Notice, Page, SegmentedControl, Surface } from "../../design/primitives";
 import { useTheme, type PaletteFamily, type ThemePreference } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
+import { NotificationSettings } from "./NotificationSettings";
 
 const modes: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "Automatic" },
@@ -124,6 +125,7 @@ export function SettingsScreen() {
         {notice ? <Notice>{notice}</Notice> : null}
       </Section>
 
+      <NotificationSettings />
       <Section title="Appearance">
         <Surface style={{ gap: spacing[3] }}>
           <View style={{ gap: spacing[2] }}>
