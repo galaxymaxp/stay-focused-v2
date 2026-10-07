@@ -10,9 +10,11 @@ import { structuredBlockText, type StructuredDocument } from '../../../../../pac
 import { ExperienceService } from '../experience/service';
 import type { ExperienceRepository, ExperienceRow, ExperienceTable } from '../experience/repository';
 import { attemptView, resultView, quizView, type AttemptRow, type QuizRow } from './service';
+import { mixedQuestions } from './matching.fixtures';
+import type { QuizMatchPair } from '@stay-focused/shared';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-let db: PGlite, quizId: string, jobId: string;
+let db: PGlite, quizId: string, jobId: string, legacyAttemptId: string;
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
 const payload = { courseId: course, reviewerId: reviewer, title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
 const migration = (name: string) => readFileSync(resolve('../../packages/db/migrations', name), 'utf8');
@@ -55,9 +57,97 @@ beforeAll(async () => {
     quizId = (await db.query<{
         id: string;
     }>('select id from quizzes where generation_id=$1', [jobId])).rows[0]!.id;
+    const legacy = await start('legacy-before-matching');
+    legacyAttemptId = legacy.id;
+    await answer(legacy.id, 'q1', ['b'], false);
+    await db.exec(migration('20261007155114_quiz_matching.sql'));
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Quiz real Postgres transactions, RLS and history', () => {
+    it('reopens and completes choice-only data created before the Matching migration', async () => {
+        const persisted = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [legacyAttemptId])).rows[0]!;
+        expect(attemptView(persisted, questions).answers[0]).toMatchObject({ type: 'choice', selectedOptionIds: ['b'], finalizedAt: null });
+        for (const q of questions) await answer(legacyAttemptId, q.id, q.correctOptionIds);
+        expect(resultView(attemptView(await complete(legacyAttemptId), questions), questions).percentage).toBe(100);
+        expect((await start('legacy-before-matching')).id).toBe(legacyAttemptId);
+    });
+    it('persists Matching privately, edits/reloads partial drafts, rejects invalid finalization and preserves mixed history', async () => {
+        await db.exec('begin');
+        try {
+            const mixed = mixedQuestions(), matching = mixed.find(q => q.type === 'matching')!;
+            if (matching.type !== 'matching') throw new Error('Expected Matching');
+            const generation = await queue('matching-integration');
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [generation]);
+            const matchingPayload = { ...payload, questions: mixed };
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [generation, 'worker', 'quiz_generation', JSON.stringify(matchingPayload)]);
+            const q = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [generation])).rows[0]!;
+            const privateRow = (await db.query<{ questions: unknown }>('select questions from quiz_keys where quiz_id=$1', [q.id])).rows[0]!;
+            expect(JSON.stringify(privateRow.questions)).toContain('correctPairs');
+            expect(JSON.stringify(q.questions)).not.toMatch(/correctPairs|sourceEvidence|correctOptionIds|explanation/);
+            expect(JSON.stringify(q.questions)).toContain('Confidentiality');
+            const fresh = async (key: string) => (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, q.id, key])).rows[0]!;
+            const save = async (attemptId: string, pairs: readonly QuizMatchPair[], finalize = false, user = A) =>
+                (await db.query<AttemptRow>('select * from save_quiz_answer($1,$2,$3,$4,$5)', [user, attemptId, matching.id, JSON.stringify({ type: 'matching', pairs }), finalize])).rows[0]!;
+            const rejects = async (action: () => Promise<unknown>, code: string) => {
+                await db.exec('savepoint matching_reject');
+                try { await expect(action()).rejects.toThrow(code); }
+                finally { await db.exec('rollback to savepoint matching_reject;release savepoint matching_reject'); }
+            };
+            const a = await fresh('matching-draft');
+            const partial = await save(a.id, matching.correctPairs.slice(0, 1));
+            expect(attemptView(partial, mixed).feedback).toEqual([]);
+            expect(attemptView(partial, mixed).answers[0]).toMatchObject({ type: 'matching', pairs: matching.correctPairs.slice(0, 1), finalizedAt: null });
+            const reread = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
+            expect(reread.answers).toEqual(partial.answers);
+            expect(quizView(q, [partial])).toMatchObject({ learningState: 'in_progress', answeredCount: 1 });
+            const editedPair = [{ ...matching.correctPairs[0]!, rightItemId: matching.correctPairs[1]!.rightItemId }];
+            const edited = await save(a.id, editedPair);
+            expect(attemptView(edited, mixed).answers[0]).toMatchObject({ pairs: editedPair });
+            await rejects(() => save(a.id, editedPair, true), 'quiz_answer_invalid');
+            await rejects(() => complete(a.id), 'quiz_result_unavailable');
+            for (const pairs of [
+                [{ leftItemId: 'unknown', rightItemId: matching.correctPairs[0]!.rightItemId }],
+                [{ leftItemId: matching.correctPairs[0]!.leftItemId, rightItemId: 'unknown' }],
+                [matching.correctPairs[0]!, matching.correctPairs[0]!],
+                [matching.correctPairs[0]!, { ...matching.correctPairs[1]!, rightItemId: matching.correctPairs[0]!.rightItemId }],
+            ]) await rejects(() => save(a.id, pairs), 'quiz_answer_invalid');
+            await rejects(() => save(a.id, [], false, B), 'quiz_attempt_not_found');
+            await rejects(() => complete(a.id, false, B), 'quiz_attempt_not_found');
+            const wrong = matching.correctPairs.map((p, i, all) => i < 2 ? { ...p, rightItemId: all[1 - i]!.rightItemId } : p);
+            const finalized = await save(a.id, [...wrong].reverse(), true);
+            expect(attemptView(finalized, mixed).feedback[0]).toMatchObject({ type: 'matching', correct: false, correctPairs: matching.correctPairs });
+            const finalizedReload = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
+            expect(finalizedReload.answers).toEqual(finalized.answers);
+            await rejects(() => save(a.id, matching.correctPairs), 'quiz_answer_already_finalized');
+            for (const choice of mixed) if (choice.type !== 'matching') await answer(a.id, choice.id, choice.correctOptionIds);
+            const completed = await complete(a.id);
+            expect(Number(completed.percentage)).toBe(80);
+            expect(resultView(attemptView(completed, mixed), mixed)).toMatchObject({ percentage: 80, correctCount: 4, totalQuestions: 5 });
+            for (const [key, pairs, expected] of [
+                ['matching-correct', matching.correctPairs, true],
+                ['matching-all-wrong', matching.correctPairs.map((p, i, all) => ({ ...p, rightItemId: all[(i + 1) % all.length]!.rightItemId })), false],
+            ] as const) {
+                const retry = await fresh(key);
+                expect(retry.id).not.toBe(a.id); expect(retry.answers).toEqual([]);
+                const saved = await save(retry.id, pairs, true);
+                expect(attemptView(saved, mixed).feedback[0]?.correct).toBe(expected);
+                for (const choice of mixed) if (choice.type !== 'matching') await answer(retry.id, choice.id, choice.correctOptionIds);
+                expect(Number((await complete(retry.id)).percentage)).toBe(expected ? 100 : 80);
+            }
+            const history = (await db.query<AttemptRow>('select * from quiz_attempts where quiz_id=$1', [q.id])).rows;
+            expect(history).toHaveLength(3); expect(history.every(a => a.status === 'completed' && a.completed_at !== null)).toBe(true);
+            const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T, userId: string) {
+                return (table === 'quizzes' || table === 'quiz_attempts') ? (await db.query(`select * from ${table} where user_id=$1`, [userId])).rows as unknown as ExperienceRow<T>[] : [];
+            } };
+            const library = new ExperienceService({ repository, materials: async () => { throw new Error('No generation during reads'); } });
+            const reopened = await library.getLibraryArtifact(A, `quiz:${q.id}`);
+            expect(reopened).toMatchObject({ quiz: { learningState: 'completed', completedAttemptCount: 3, bestScore: 100 } });
+            expect(JSON.stringify(reopened)).not.toMatch(/correctPairs|sourceEvidence|correctOptionIds/);
+            await expect(library.getLibraryArtifact(B, `quiz:${q.id}`)).rejects.toThrow('not_found');
+            await db.exec(`set local role authenticated;select set_config('request.jwt.claim.sub','${B}',true);`);
+            expect((await db.query('select * from quiz_attempts where quiz_id=$1', [q.id])).rows).toEqual([]);
+        } finally { await db.exec('rollback'); }
+    });
     it.skipIf(process.env.B24_7_LIVE !== '1').each(['statistics', 'it-security'])('limited live %s: generation, SQL attempts and Library reopen', async (name) => {
         if (process.env.B24_7_ENV_FILE)
             process.loadEnvFile(process.env.B24_7_ENV_FILE);
@@ -97,6 +187,7 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const row = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [id])).rows[0]!;
         const attempt = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, row.id, `live-attempt-${name}`])).rows[0]!;
         for (const [i, q] of liveQuestions.entries()) {
+            if (q.type === 'matching') throw new Error('This legacy live fixture requests choice questions');
             const selected = i === 0 ? [q.options.find(o => !q.correctOptionIds.includes(o.id))!.id] : q.correctOptionIds;
             const saved = await answer(attempt.id, q.id, selected);
             expect(attemptView(saved, liveQuestions).feedback).toHaveLength(i + 1);

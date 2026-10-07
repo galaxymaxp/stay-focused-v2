@@ -3,6 +3,7 @@ import type {
   QuizAttempt,
   QuizAttemptSummary,
   QuizResult,
+  QuizMatchPair,
 } from "@stay-focused/shared";
 import { useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
@@ -11,6 +12,7 @@ import { View } from "react-native";
 import { Action, Copy, Notice, Page, Surface } from "../../design/primitives";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import { useExperience, useExperienceClient } from "./useExperience";
+import { MatchingFeedback, MatchingQuestion } from "./MatchingQuestion";
 
 function historyLabel(item: QuizAttemptSummary) {
   if (item.status === "completed") {
@@ -39,6 +41,7 @@ function QuizPractice({ id }: { id: string }) {
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null),
     [result, setResult] = useState<QuizResult | null>(null),
     [selected, setSelected] = useState<string[]>([]),
+    [pairs, setPairs] = useState<QuizMatchPair[]>([]),
     [index, setIndex] = useState(0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
@@ -77,19 +80,30 @@ function QuizPractice({ id }: { id: string }) {
       : firstUnfinished;
     setAttempt(value);
     setIndex(position);
-    setSelected(
-      value.answers.find(a => a.questionId === quiz.data?.questions[position]?.id)
-        ?.selectedOptionIds.slice() ?? [],
-    );
+    restoreSelection(value, position);
     setResult(null);
+  }
+  function restoreSelection(value: QuizAttempt, position: number) {
+    const answer = value.answers.find(a => a.questionId === quiz.data?.questions[position]?.id);
+    setSelected(answer && answer.type !== 'matching' ? [...answer.selectedOptionIds] : []);
+    setPairs(answer?.type === 'matching' ? answer.pairs.map(p => ({ ...p })) : []);
   }
   async function saveSelection(selection: string[], finalize: boolean) {
     if (!attempt || !question) return;
     const value = await experienceRequest<QuizAttempt>(
       client,
       `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
-      { method: "PATCH", body: { selectedOptionIds: selection, finalize } },
+      { method: "PATCH", body: question.type === 'matching' ? { type: 'matching', pairs, finalize } : { selectedOptionIds: selection, finalize } },
     );
+    setAttempt(value);
+    refresh();
+  }
+  async function savePairs(next: QuizMatchPair[]) {
+    if (!attempt || question?.type !== 'matching') return;
+    setPairs(next);
+    const value = await experienceRequest<QuizAttempt>(client,
+      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
+      { method: 'PATCH', body: { type: 'matching', pairs: next, finalize: false } });
     setAttempt(value);
     refresh();
   }
@@ -178,7 +192,9 @@ function QuizPractice({ id }: { id: string }) {
           <Surface>
             <Copy size="h2">{question.prompt}</Copy>
             <Copy muted>{question.selectionInstruction}</Copy>
-            {question.options.map((option) => (
+            {question.type === 'matching' ? (
+              <MatchingQuestion key={question.id} question={question} pairs={pairs} disabled={busy || !!feedback} onChange={next => void run(() => savePairs(next))} />
+            ) : question.options.map((option) => (
               <Action
                 key={option.id}
                 secondary={!selected.includes(option.id)}
@@ -206,11 +222,18 @@ function QuizPractice({ id }: { id: string }) {
                 {feedback.correct ? "Correct" : "Keep learning"}
               </Copy>
               <Copy>{feedback.explanation}</Copy>
+              {question.type === 'matching' && feedback.type === 'matching' && <MatchingFeedback question={question} feedback={feedback} />}
             </Surface>
           ) : (
             <Action
-              disabled={busy || selected.length === 0}
-              onPress={() => void run(() => saveSelection(selected, true))}
+              disabled={busy || (question.type !== 'matching' && selected.length === 0)}
+              onPress={() => {
+                if (question.type === 'matching' && pairs.length !== question.leftItems.length) {
+                  setError('Match every item before checking your answer.');
+                  return;
+                }
+                void run(() => saveSelection(selected, true));
+              }}
             >
               Check answer
             </Action>
@@ -229,14 +252,7 @@ function QuizPractice({ id }: { id: string }) {
               onPress={() => {
                 const next = index + 1;
                 setIndex(next);
-                setSelected(
-                  attempt.answers
-                    .find(
-                      (answer) =>
-                        answer.questionId === quiz.data?.questions[next]?.id,
-                    )
-                    ?.selectedOptionIds.slice() ?? [],
-                );
+                restoreSelection(attempt, next);
               }}
             >
               Next question
@@ -269,6 +285,12 @@ function QuizPractice({ id }: { id: string }) {
           <Copy>
             {result.correctCount} of {result.totalQuestions} correct
           </Copy>
+          {result.questions.map(item => {
+            const question = quiz.data?.questions.find(q => q.id === item.questionId);
+            return item.type === 'matching' && question?.type === 'matching'
+              ? <MatchingFeedback key={item.questionId} question={question} feedback={item} />
+              : null;
+          })}
           <Copy size="h2">Keep building on these ideas</Copy>
           {result.weakAreas.length ? (
             result.weakAreas.map((area) => (

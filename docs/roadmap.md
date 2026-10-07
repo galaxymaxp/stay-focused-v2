@@ -1,5 +1,23 @@
 # Roadmap
 
+## Matching Quiz support (2026-10-08)
+
+**PASS — Matching questions are supported end-to-end in local automated acceptance.** The shared Quiz question union now includes Matching with readable left/right labels and opaque IDs. Its private key remains in `quiz_keys`; student answers persist explicit pairs through the existing attempt RPC. Legacy choice payloads remain compatible.
+
+Generation plans Matching only for relationship-bearing evidence, uses strict choice/Matching schemas, and independently audits every possible pair without the proposed key. Public persistence and API projections whitelist learner fields. Both sides are ordered independently by question/item identity once, so drafts restore by ID without position-based correctness or read-time reshuffling.
+
+Partial drafts are valid; finalized Matching answers require a complete one-to-one mapping. Unknown IDs and duplicate assignments are rejected. Exact question-level scoring retains existing Quiz percentages and the finalize-every-question completion guard. Library progress keeps its existing precedence and counts nonempty Matching drafts as answered.
+
+QuizScreen uses touch selectors for both readable sides, allows pair changes/clearing, predictably releases an occupied answer, restores persisted drafts, and renders checked/result/history feedback with public labels. Missing labels fail validation rather than falling back to IDs. Private maps are revealed only through the existing finalized-question feedback boundary; owner isolation and existing choice secrecy remain enforced.
+
+Forward migration `20261007155114_quiz_matching.sql` replaces three choice-specific RPC bodies, with no table/column/RLS changes. The old RPCs require option arrays and score only `correctOptionIds`, so extending JSON types alone cannot persist/score Matching. **Apply this migration before deploying the API changes.** It has passed local Postgres integration, including choice data created before migration; remote application is NOT RUN.
+
+FRESH checks: shared **48 passed**; API **982 passed / 4 skipped**; mobile **499 passed**. Focused generation/convergence/Matching **130 passed**; persistence/security/progress/durable **75 passed / 2 skipped**; QuizScreen/screens **26 passed**. Shared/API/mobile typechecks, API/mobile lint and whitespace checks pass. Introduced SQL/test/type/lint mistakes were corrected and rerun; no unresolved failures. Opt-in live-provider, device and production checks are NOT RUN. This slice does not certify whole-web readiness.
+
+Next recommended task: **Intentional incomplete Quiz finalization / “Finish Anyway” semantics**. Not started here; current completion rules remain strict.
+
+See [implementation and acceptance record](ai/quiz-matching-2026-10-08.md).
+
 ## Shared Quiz learning progress (2026-10-07)
 
 **PASS — this focused prerequisite is implemented and verified.** Shared `QuizLearningState`, `QuizLearningProgress` and `QuizAttemptSummary` now carry server-derived learning state and history metadata. `QuizSummary` extends progress, retaining canonical `questionCount`, `attemptCount`, `latestScore` and `bestScore` names. Library's artifact `status` remains generation state; an untouched generated Quiz now says **Not started** in mobile.

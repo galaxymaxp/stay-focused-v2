@@ -15,6 +15,7 @@ import { fixturePlan, candidate, request as input } from './fixtures';
 import { validateCandidate } from './generation';
 import { learnerQuestion, attemptView, resultView, type QuizRow, type AttemptRow } from './service';
 import { ExperienceService } from '../experience/service';
+import { mixedQuestions } from './matching.fixtures';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
 const asJson = (v: unknown) => JSON.parse(JSON.stringify(v)) as Json;
@@ -42,6 +43,43 @@ function client(data: Data = {}) {
 const request = (method = 'GET', body?: unknown) => new Request('https://example.test/api/experience/quizzes', { method, headers: { authorization: 'Bearer test', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
 beforeEach(() => { vi.resetAllMocks(); mocks.auth.mockResolvedValue({ id: A }); mocks.client.mockReturnValue(client({ quizzes: [quiz], quiz_attempts: [attempt], quiz_keys: [{ quiz_id: id, user_id: A, questions }] })); });
 describe('Quiz authenticated HTTP surfaces', () => {
+    it('Matching public/read/history/result denial omit keys and foreign draft/finalized data', async () => {
+        const mixed = mixedQuestions(), matching = mixed.find(q => q.type === 'matching')!;
+        if (matching.type !== 'matching') throw new Error('Expected Matching');
+        const matchingQuiz = { ...quiz, questions: asJson(mixed.map(learnerQuestion)) };
+        for (const finalized of [false, true]) {
+            const saved = { ...attempt, answers: asJson([{ type: 'matching', questionId: matching.id, pairs: matching.correctPairs.slice(0, finalized ? 3 : 1), finalizedAt: finalized ? quiz.created_at : null }]) };
+            mocks.client.mockReturnValue(client({ quizzes: [matchingQuiz], quiz_attempts: [saved], quiz_keys: [{ quiz_id: id, user_id: A, questions: mixed }] }));
+            for (const path of [[id], [id, 'attempts']]) {
+                const response = await quizGet(request(), { params: Promise.resolve({ quizPath: path }) });
+                expect(response.status).toBe(200);
+                expect(await response.text()).not.toMatch(/correctPairs|correctOptionIds|sourceEvidence/);
+            }
+            const ownAttempt = await attemptGet(request(), { params: Promise.resolve({ attemptPath: [id] }) });
+            const json = await ownAttempt.json();
+            expect(json.data.answers[0]).toMatchObject({ type: 'matching', pairs: matching.correctPairs.slice(0, finalized ? 3 : 1) });
+            expect(json.data.feedback).toHaveLength(finalized ? 1 : 0);
+            if (!finalized) expect(JSON.stringify(json)).not.toContain('correctPairs');
+            expect((await attemptGet(request(), { params: Promise.resolve({ attemptPath: [id, 'result'] }) })).status).toBe(409);
+            mocks.auth.mockResolvedValue({ id: B });
+            for (const path of [[id], [id, 'result']]) {
+                const response = await attemptGet(request(), { params: Promise.resolve({ attemptPath: path }) });
+                expect(response.status).toBe(404); expect(await response.text()).not.toContain('opaque_l');
+            }
+            expect((await quizGet(request(), { params: Promise.resolve({ quizPath: [id, 'attempts'] }) })).status).toBe(404);
+            mocks.auth.mockResolvedValue({ id: A });
+        }
+    });
+    it('Matching PATCH rejects malformed or duplicate pairs before RPC work', async () => {
+        const c = client(); mocks.client.mockReturnValue(c);
+        for (const body of [
+            { type: 'matching', pairs: [{ leftItemId: 'l', rightItemId: 'r' }, { leftItemId: 'l2', rightItemId: 'r' }], finalize: false },
+            { type: 'matching', pairs: [{ leftItemId: 'l', rightItemId: 'r', correct: true }], finalize: false },
+            { type: 'matching', pairs: [], selectedOptionIds: ['a'], finalize: false },
+            { type: 'unknown', selectedOptionIds: ['a'], finalize: true },
+        ]) expect((await answerPatch(request('PATCH', body), { params: Promise.resolve({ attemptPath: [id, 'answers', 'q1'] }) })).status).toBe(400);
+        expect(c.rpc).not.toHaveBeenCalled();
+    });
     const routes = [
         () => generate(request('POST', input)), () => quizGet(request(), { params: Promise.resolve({ quizPath: [id] }) }),
         () => attemptStart(request('POST'), { params: Promise.resolve({ quizPath: [id, 'attempts'] }) }),

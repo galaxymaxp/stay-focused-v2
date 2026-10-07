@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer, type ReactTestInstance } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LibraryOverview, Quiz, QuizAttempt, QuizAttemptSummary, QuizLearningState, QuizResult } from "@stay-focused/shared";
+import type { LibraryOverview, Quiz, QuizAttempt, QuizAttemptSummary, QuizLearningState, QuizResult, QuizMatchingQuestion, QuizMatchPair } from "@stay-focused/shared";
 import { fixtureQuizArtifact, fixtureQuizSummary } from "../../../../../packages/shared/src/experience.fixtures";
 import { LibraryScreen } from "./LibraryScreen";
 import { QuizScreen } from "./QuizScreen";
@@ -24,6 +24,10 @@ const quizPath = "/api/experience/quizzes/quiz-example";
 const historyPath = `${quizPath}/attempts`;
 const attemptPath = "/api/experience/quiz-attempts/attempt";
 const completedAt = "2026-10-03T12:30:00Z";
+const matching: QuizMatchingQuestion = { id: 'machine_question', type: 'matching', prompt: 'Match the security objectives to their purposes.', difficulty: 'easy', selectionInstruction: 'Match each item to one answer.',
+  leftItems: [{ id: 'machine_left_a', label: 'Confidentiality' }, { id: 'machine_left_b', label: 'Integrity' }, { id: 'machine_left_c', label: 'Availability' }],
+  rightItems: [{ id: 'machine_right_x', label: 'Prevent unauthorized disclosure of protected records, including records shared with external recipients' }, { id: 'machine_right_y', label: 'Prevent unauthorized modification' }, { id: 'machine_right_z', label: 'Ensure authorized access' }] };
+const correctPairs: QuizMatchPair[] = matching.leftItems.map((left, i) => ({ leftItemId: left.id, rightItemId: matching.rightItems[i]!.id }));
 const questions: Quiz["questions"] = ["q1", "q2"].map((id, index) => ({ id, type: index === 1 ? "multi_select" : "single_select",
   prompt: `Question ${index + 1}`, selectionInstruction: index === 1 ? "Select all correct answers." : "Choose one answer.", difficulty: "easy",
   options: [{ id: "a", text: "Alpha" }, { id: "b", text: "Beta" }] }));
@@ -50,23 +54,84 @@ beforeEach(() => {
   vi.clearAllMocks(); mocks.focused = true; mocks.id = "quiz-example"; mocks.key = 0;
   quiz = { ...fixtureQuizSummary, questions }; history = []; attempt = freshAttempt();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  mocks.request.mockImplementation(async (_client, path: string, options: { method?: string; body?: { selectedOptionIds: string[]; finalize: boolean } } = {}) => {
+  mocks.request.mockImplementation(async (_client, path: string, options: { method?: string; body?: { selectedOptionIds?: string[]; type?: string; pairs?: QuizMatchPair[]; finalize: boolean } } = {}) => {
     if (path.startsWith("/api/experience/library")) return library();
     if (path === quizPath) return quiz;
     if (path === historyPath && !options.method) return history;
     if (path === historyPath && options.method === "POST") return attempt;
     if (path === attemptPath) return attempt;
-    if (path === `${attemptPath}/result` || path === `${attemptPath}/complete`) return result;
+    if (path === `${attemptPath}/result` || path === `${attemptPath}/complete`) return { ...result, questions: attempt.feedback };
     if (path.startsWith(`${attemptPath}/answers/`)) {
       const questionId = path.split("/").at(-1)!;
       const body = options.body!;
+      if (body.type === 'matching') {
+        attempt = { ...attempt, answers: [...attempt.answers.filter(a => a.questionId !== questionId), { type: 'matching', questionId, pairs: body.pairs!, finalizedAt: body.finalize ? completedAt : null }],
+          feedback: body.finalize ? [...attempt.feedback, { type: 'matching', questionId, pairs: body.pairs!, correctPairs, correct: false, explanation: 'Source-grounded matching feedback', topicId: 'security', topic: 'Security', sourceRefs: [], reviewerSectionIds: [] }] : attempt.feedback };
+        return attempt;
+      }
       attempt = { ...attempt, answers: [...attempt.answers.filter(a => a.questionId !== questionId),
-        { questionId, selectedOptionIds: body.selectedOptionIds, finalizedAt: body.finalize ? completedAt : null }],
-        feedback: body.finalize ? [...attempt.feedback, { questionId, selectedOptionIds: body.selectedOptionIds, correctOptionIds: ["b"], correct: false,
+        { questionId, selectedOptionIds: body.selectedOptionIds!, finalizedAt: body.finalize ? completedAt : null }],
+        feedback: body.finalize ? [...attempt.feedback, { questionId, selectedOptionIds: body.selectedOptionIds!, correctOptionIds: ["b"], correct: false,
           explanation: "Feedback after checking", topicId: "topic", topic: "Topic", sourceRefs: [], reviewerSectionIds: [] }] : attempt.feedback };
       return attempt;
     }
     throw new Error(`Unexpected request: ${path}`);
+  });
+});
+
+describe('Matching screen editing, drafts, feedback and reopen', () => {
+  const choose = async (leftLabel: string, rightLabel: string) => {
+    const action = (label: string) => rendered!.root.findAll(node => String(node.type) === 'Action' && node.props.label === label)[0]!;
+    await act(async () => action(`Match ${leftLabel}`).props.onPress());
+    await act(async () => action(`Use ${rightLabel}`).props.onPress());
+  };
+  const noMachineLabels = () => expect(output()).not.toMatch(/machine_left|machine_right|machine_question/);
+  it('renders both sides, persists and edits partial pairs, restores drafts, rejects incomplete check, finalizes and advances', async () => {
+    quiz = { ...quiz, questions: [matching, questions[0]!], questionCount: 2 };
+    await mount(); await press('Start practice');
+    expect(output()).toContain('Items to match'); expect(output()).toContain('Matching answers');
+    expect(output()).toContain(matching.rightItems[0]!.label); noMachineLabels();
+    await choose('Confidentiality', matching.rightItems[0]!.label);
+    expect(attempt.answers[0]).toMatchObject({ type: 'matching', pairs: correctPairs.slice(0, 1), finalizedAt: null });
+    await choose('Integrity', matching.rightItems[1]!.label);
+    const before = mocks.request.mock.calls.length;
+    await press('Check answer');
+    expect(output()).toContain('Match every item before checking');
+    expect(mocks.request).toHaveBeenCalledTimes(before); expect(attempt.feedback).toEqual([]);
+    // Reassigning a used answer clears only its previous pair; unrelated mappings survive.
+    await choose('Confidentiality', matching.rightItems[1]!.label);
+    expect(attempt.answers[0]).toMatchObject({ pairs: [{ leftItemId: correctPairs[0]!.leftItemId, rightItemId: correctPairs[1]!.rightItemId }] });
+    await choose('Integrity', matching.rightItems[0]!.label);
+    quiz = { ...quiz, activeAttemptId: attempt.id, learningState: 'in_progress' };
+    await act(async () => rendered!.unmount()); rendered = undefined;
+    await mount(); await press('Resume practice');
+    expect(output()).toContain(`Paired with: ${matching.rightItems[1]!.label}`);
+    expect(output()).toContain(`Paired with: ${matching.rightItems[0]!.label}`);
+    expect(output()).not.toContain('Source-grounded matching feedback'); noMachineLabels();
+    await choose('Availability', matching.rightItems[2]!.label);
+    await press('Check answer');
+    expect(output()).toContain('Source-grounded matching feedback');
+    expect(output()).toContain(`Confidentiality → ${matching.rightItems[1]!.label}`);
+    expect(output()).toContain(`Correct match: ${matching.rightItems[0]!.label}`); noMachineLabels();
+    expect(rendered!.root.findAll(node => String(node.type) === 'Action' && node.props.label?.startsWith('Match ')).every(node => node.props.disabled)).toBe(true);
+    await press('Next question'); expect(output()).toContain('Question 2 of 2'); expect(button('Alpha')).toBeDefined();
+    await press('Alpha'); await press('Check answer'); await press('See results');
+    expect(output()).toContain('Matching review'); noMachineLabels();
+    await press('Practice again');
+    quiz = { ...quiz, activeAttemptId: null };
+    history = [{ id: attempt.id, quizId: quiz.id, status: 'completed', startedAt: attempt.startedAt, completedAt, percentage: 50 }];
+    const page = rendered!.root.findAll(node => String(node.type) === 'Page')[0]!;
+    await act(async () => page.props.onRefresh());
+    await press('View result'); expect(output()).toContain('Matching review'); noMachineLabels();
+  });
+  it('clears a selected pair and preserves other pairs, with no private feedback before checking', async () => {
+    quiz = { ...quiz, questions: [matching] };
+    await mount(); await press('Start practice');
+    await choose('Confidentiality', matching.rightItems[0]!.label);
+    await choose('Integrity', matching.rightItems[1]!.label);
+    await press('Clear pairing');
+    expect(attempt.answers[0]).toMatchObject({ pairs: correctPairs.slice(0, 1) });
+    expect(output()).not.toContain('Correct match:'); noMachineLabels();
   });
 });
 afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; });
@@ -183,7 +248,7 @@ describe("Quiz attempt/history interactions with real refresh hooks", () => {
     await act(async () => { reject(new Error("Could not save selection")); });
     expect(output()).toContain("Could not save selection");
     await press("Retry saving selection"); expect(output()).not.toContain("Could not save selection");
-    expect(attempt.answers[0]?.selectedOptionIds).toEqual(["a"]);
+    expect(attempt.answers[0]).toMatchObject({ selectedOptionIds: ["a"] });
   });
   it("restores all-checked attempt at the last question for guarded completion, and resets on route change", async () => {
     quiz = { ...quiz, activeAttemptId: attempt.id };

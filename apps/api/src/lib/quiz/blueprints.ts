@@ -1,6 +1,7 @@
 import type { QuizDifficulty } from '@stay-focused/shared';
 import type { QuizPlan, QuizRegion } from './generation';
 import { createHash } from 'node:crypto';
+import { supportsMatching } from './matching';
 
 export const QUIZ_POOL_SIZE = 2;
 export const QUIZ_MAX_AUTHOR_CALLS = 4;
@@ -32,13 +33,14 @@ const intents: Record<QuizEvidenceAffordance, string[]> = {
 export function evidenceAffordances(region: QuizRegion): QuizEvidenceAffordance[] {
     const text = region.text;
     const values: QuizEvidenceAffordance[] = [];
+    if (supportsMatching(region)) values.push('relationship');
     if (/\b(?:whereas|compared with|in contrast|rather than|while)\b/i.test(text)) values.push('comparison');
     if (/\b(?:because|causes?|leads? to|therefore|results? in|prevents?)\b/i.test(text)) values.push('cause_effect');
     if (/\b(?:before|after|first.+then|followed by)\b/i.test(text)) values.push('sequence');
     if (/\b(?:such as|for example|classified as|categories|types of)\b/i.test(text)) values.push('classification');
     if (/\bif\b.+\b(?:then|must|should|will|restores?|requires?)\b/i.test(text)) values.push('application');
     if (/\b(?:depends? on|requires?|determines?|only when|only if|limits?|protects?|ensures?|establishes?|specifies|maps|returns?|contains?|includes?|connects?|removes?|grants?|supports?|supplies|compares?|measures?|provides?|allows?|enables?|restricts?|detects?)\b/i.test(text)) values.push('relationship');
-    return [...values, 'conceptual_recall'];
+    return [...new Set([...values, 'conceptual_recall' as const])];
 }
 export function blueprintCompatible(blueprint: QuizQuestionBlueprint, region: QuizRegion): boolean {
     return blueprint.supportIds.length === 1 && blueprint.supportIds[0] === region.id
@@ -55,8 +57,10 @@ export function planBlueprintPool(plan: QuizPlan, slot: QuizPlan['allocation'][n
     // Source subject, rather than a question ID, makes repeated concepts comparable.
     const subject = normalize(region.text.split(/\b(?:is|are|checks|grants|transforms|limits|requires|determines|before|whereas)\b/i)[0]!).split(' ').slice(0, 8).join(' ');
     const concept = createHash('sha256').update(subject || normalize(region.label)).digest('hex').slice(0, 20);
-    const available = evidenceAffordances(region).filter(affordance => slot.difficulty === 'easy' || affordance !== 'conceptual_recall');
-    const choices = available.flatMap(affordance => intents[affordance].map((questionIntent, index): QuizQuestionBlueprint => ({
+    const available = evidenceAffordances(region).filter(affordance => slot.type === 'matching' ? affordance === 'relationship' : slot.difficulty === 'easy' || affordance !== 'conceptual_recall');
+    const choices = available.flatMap(affordance => (slot.type === 'matching'
+        ? ['Associate explicitly defined source concepts with their distinct meanings.', 'Associate explicitly stated items with their distinct functions or effects.']
+        : intents[affordance]).map((questionIntent, index): QuizQuestionBlueprint => ({
         id: `${slot.id}:r${round + 1}:${affordance}:${index + 1}`, slotId: slot.id, supportIds: [region.id],
         evidenceOwnerIds: [...new Set(region.sourceRefs.map(ref => `${ref.materialId}:${ref.regionId}`))],
         targetConceptIds: [concept], affordance, difficulty: slot.difficulty, questionIntent,

@@ -21,7 +21,7 @@ export function deriveQuizLearningProgress(quiz: QuizRow, history: readonly Atte
     const scores = completed.filter(a => a.percentage !== null).map(a => Number(a.percentage));
     return {
         learningState: active ? 'in_progress' : completed.length ? 'completed' : abandoned ? 'abandoned' : 'not_started',
-        answeredCount: new Set(answers.filter(a => questionIds.has(a.questionId) && a.selectedOptionIds.length > 0).map(a => a.questionId)).size,
+        answeredCount: new Set(answers.filter(a => questionIds.has(a.questionId) && (a.type === 'matching' ? a.pairs.length > 0 : a.selectedOptionIds.length > 0)).map(a => a.questionId)).size,
         questionCount: quiz.question_count,
         activeAttemptId: active?.id ?? null,
         attemptCount: attempts.length,

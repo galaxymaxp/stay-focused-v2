@@ -15,7 +15,7 @@ export function readQuizRequest(value: unknown): QuizGenerationRequest {
         throw new ExperienceFailure(400, 'invalid_request');
     if (v.sourceType === 'reviewer' ? v.sourceIds.length !== 1 || !isId(v.sourceIds[0]) || (v.reviewerId !== undefined && v.reviewerId !== v.sourceIds[0]) : v.sourceIds.length < 1 || !v.sourceIds.every(id => typeof id === 'string' && new RegExp(`^(file|page|assignment|announcement):${uuid}$`, 'i').test(id)))
         throw new ExperienceFailure(400, 'invalid_request');
-    if (v.questionTypes !== undefined && (!Array.isArray(v.questionTypes) || !v.questionTypes.length || new Set(v.questionTypes).size !== v.questionTypes.length || !v.questionTypes.every(t => ['single_select', 'multi_select', 'true_false'].includes(t))))
+    if (v.questionTypes !== undefined && (!Array.isArray(v.questionTypes) || !v.questionTypes.length || new Set(v.questionTypes).size !== v.questionTypes.length || !v.questionTypes.every(t => ['single_select', 'multi_select', 'true_false', 'matching'].includes(t))))
         throw new ExperienceFailure(400, 'invalid_request');
     return { sourceType: v.sourceType as QuizGenerationRequest['sourceType'], sourceIds: (v.sourceIds as string[]).map(s => s.toLowerCase()).sort(), questionCount: Number(v.questionCount), difficulty: v.difficulty as QuizGenerationRequest['difficulty'], ...(v.reviewerId ? { reviewerId: String(v.reviewerId).toLowerCase() } : {}), ...(v.questionTypes ? { questionTypes: v.questionTypes as NonNullable<QuizGenerationRequest['questionTypes']> } : {}) };
 }

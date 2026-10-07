@@ -19,6 +19,7 @@ export function fixtureRegions(index = 0): QuizRegion[] {
 }
 export function candidate(plan: QuizPlan, id: string) {
     const slot = plan.allocation.find(s => s.id === id)!, region = [...plan.topics, ...(plan.reserveTopics ?? [])].find(t => t.id === slot.topicId)!;
+    if (slot.type === 'matching') throw new Error('Use a Matching candidate fixture');
     const term = region.text.split(' ').slice(0, 3).join(' ');
     const options = slot.type === 'true_false' ? [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }] : [
         { id: 'a', text: region.text }, { id: 'b', text: `The stated description of ${term} is incorrect.` }, { id: 'c', text: slot.type === 'multi_select' ? `The provided statement about ${term} is valid.` : `The reverse of the stated description of ${term} is correct.` },

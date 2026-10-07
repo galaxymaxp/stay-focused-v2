@@ -13,6 +13,7 @@ import { readProcessingJobCheckpoint, writeProcessingJobCheckpoint } from '../pr
 import { assembleQuizSources, readQuizRequest, resolveQuizSources } from './sources';
 import { generateQuiz, makeQuizPlan, QUIZ_MODEL, type QuizConvergenceState, type QuizGenerationDiagnostic, type QuizPlan, type StoredQuestion } from './generation';
 import { deriveQuizLearningProgress } from './learning-progress';
+import { pairKey, validateMatchingSides } from './matching';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
 export type AttemptRow = Database['public']['Tables']['quiz_attempts']['Row'];
@@ -87,6 +88,14 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
             provenance: { policy: 'quiz-v4', provider: `openai:${QUIZ_MODEL}`, plan, sourceSha256: createHash('sha256').update(JSON.stringify([...plan.topics, ...(plan.reserveTopics ?? [])])).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: plan.topics.length } };
 }
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
+    if (q.type === 'matching') {
+        try {
+            // Public labels must be valid; never substitute an internal ID.
+            validateMatchingSides(q);
+        } catch { throw new ExperienceFailure(503, 'unavailable'); }
+        return { id: q.id, type: q.type, prompt: q.prompt, leftItems: q.leftItems.map(i => ({ id: i.id, label: i.label })),
+            rightItems: q.rightItems.map(i => ({ id: i.id, label: i.label })), difficulty: q.difficulty, selectionInstruction: 'Match each item to one answer.' };
+    }
     return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : 'Choose one answer.' };
 }
 export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Quiz {
@@ -95,11 +104,20 @@ export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Qui
         ...deriveQuizLearningProgress(row, history), questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {
+    const common = { questionId: question.id, explanation: question.explanation, topicId: question.topicId, topic: question.topic,
+        sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
+    if (question.type === 'matching') {
+        if (answer.type !== 'matching') throw new ExperienceFailure(503, 'unavailable');
+        return { ...common, type: 'matching', pairs: answer.pairs.map(p => ({ ...p })), correctPairs: question.correctPairs.map(p => ({ ...p })), correct: pairKey(answer.pairs) === pairKey(question.correctPairs) };
+    }
+    if (answer.type === 'matching') throw new ExperienceFailure(503, 'unavailable');
     const correct = [...answer.selectedOptionIds].sort().join('|') === [...question.correctOptionIds].sort().join('|');
     return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct, explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
 }
 export function attemptView(row: AttemptRow, questions: readonly StoredQuestion[]): QuizAttempt {
-    const answers = (row.answers as unknown as QuizAttemptAnswer[]).map(a => ({ questionId: a.questionId, selectedOptionIds: [...a.selectedOptionIds], finalizedAt: a.finalizedAt }));
+    const answers: QuizAttemptAnswer[] = (row.answers as unknown as QuizAttemptAnswer[]).map(a => a.type === 'matching'
+        ? { type: 'matching', questionId: a.questionId, pairs: a.pairs.map(p => ({ leftItemId: p.leftItemId, rightItemId: p.rightItemId })), finalizedAt: a.finalizedAt }
+        : { type: 'choice', questionId: a.questionId, selectedOptionIds: [...a.selectedOptionIds], finalizedAt: a.finalizedAt });
     return { id: row.id, quizId: row.quiz_id, startedAt: row.started_at, completedAt: row.completed_at, status: row.status as QuizAttempt['status'], answers, feedback: answers.filter(a => a.finalizedAt !== null).map(a => {
             const q = questions.find(q => q.id === a.questionId);
             if (!q)
@@ -176,9 +194,19 @@ export async function startAttempt(client: Client, userId: string, quizId: strin
 }
 export async function saveAnswer(client: Client, userId: string, attemptId: string, questionId: string, value: unknown) {
     const input = record(value);
-    if (Object.keys(input).some(k => !['selectedOptionIds', 'finalize'].includes(k)) || typeof input.finalize !== 'boolean' || !Array.isArray(input.selectedOptionIds) || input.selectedOptionIds.length > 6 || !input.selectedOptionIds.every(v => typeof v === 'string' && v.length <= 30) || new Set(input.selectedOptionIds).size !== input.selectedOptionIds.length)
+    const matching = input.type === 'matching';
+    if (typeof input.finalize !== 'boolean' || Object.keys(input).some(k => !(matching ? ['type', 'pairs', 'finalize'] : ['type', 'selectedOptionIds', 'finalize']).includes(k)) || (!matching && input.type !== undefined && input.type !== 'choice'))
         throw new ExperienceFailure(400, 'quiz_answer_invalid');
-    const { data, error } = await client.rpc('save_quiz_answer', { p_user_id: userId, p_attempt_id: attemptId, p_question_id: questionId, p_selected: json(input.selectedOptionIds), p_finalize: input.finalize });
+    if (matching) {
+        if (!Array.isArray(input.pairs) || input.pairs.length > 6 || input.pairs.some(raw => {
+            const p = record(raw);
+            return Object.keys(p).length !== 2 || !['leftItemId', 'rightItemId'].every(k => typeof p[k] === 'string' && /^[a-z0-9_-]{1,30}$/i.test(String(p[k])));
+        }) || new Set(input.pairs.map(p => record(p).leftItemId)).size !== input.pairs.length || new Set(input.pairs.map(p => record(p).rightItemId)).size !== input.pairs.length)
+            throw new ExperienceFailure(400, 'quiz_answer_invalid');
+    } else if (!Array.isArray(input.selectedOptionIds) || input.selectedOptionIds.length > 6 || !input.selectedOptionIds.every(v => typeof v === 'string' && v.length <= 30) || new Set(input.selectedOptionIds).size !== input.selectedOptionIds.length)
+        throw new ExperienceFailure(400, 'quiz_answer_invalid');
+    const { data, error } = await client.rpc('save_quiz_answer', { p_user_id: userId, p_attempt_id: attemptId, p_question_id: questionId,
+        p_selected: json(matching ? { type: 'matching', pairs: input.pairs } : input.selectedOptionIds), p_finalize: input.finalize });
     rpcError(error);
     if (!data?.[0] || data[0].user_id !== userId)
         throw new ExperienceFailure(404, 'quiz_attempt_not_found');

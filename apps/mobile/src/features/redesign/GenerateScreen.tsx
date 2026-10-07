@@ -135,7 +135,7 @@ export function GenerateScreen() {
                 sourceIds: [selected.id],
                 questionCount: 5,
                 difficulty: "mixed",
-                questionTypes: ["single_select", "true_false"],
+                questionTypes: ["single_select", "true_false", "matching"],
               },
       });
       router.push({ pathname: "/generation", params: { intent: intent.key } });
