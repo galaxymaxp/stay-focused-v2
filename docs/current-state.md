@@ -1,5 +1,30 @@
 # Current State
 
+## B25.3.3 approved finite scope (2026-10-08)
+
+**Owner-approved and active for execution.** The owner explicitly selected B25.3.3 generation convergence after installation commit `93a8eb8`; the installation checkpoint's pending scope decision and historical recommendation-only wording no longer block this run. This section supersedes those scope-selection statements, without rewriting their history. **Finish Anyway semantics, B26–B28, web migration and other roadmap recommendations are excluded.** Existing all-question finalization, choice/Matching support and learning-progress contracts remain intact.
+
+Endpoint: complete B25.3.3's source-context/evidence-ownership convergence repairs and obtain every required deterministic, regression, real-source and physical production Quiz proof below; reconcile planning/acceptance records and commit scoped changes. Stop at that endpoint, or checkpoint a genuine remaining blocker/budget limit with exact evidence; PARTIAL cannot close the scope.
+
+Requirements derive from `docs/ai/acceptance/b25.3.2/quiz-candidate-convergence.md` (Precise B25.3.3 recommendation and unaccepted production/device gates). Prerequisites: inspect current implementation and applicable policies/ADRs; preserve the 16 tracked modifications and 111 untracked files present at `93a8eb8`; use the existing prepared, owned instructional source path, provider adapter, exact-count contract and pinned `gpt-5.4-2026-03-05` model. Apply/verify all deployment-required migrations, including Matching, before any API rollout. Historical provider/production attempt allowances are not silently reset; establish actual access and bounded live limits before calls, and prepare any specifically permission-dependent rollout for review before requesting it. Scope approval itself is settled.
+
+| Requirement / eligible task order | Mandatory proof | Current result |
+| --- | --- | --- |
+| 1. Source context and exact evidence ownership | Bounded support windows retain relevant definitions, conditions, contrasts, examples and consequences; original block/page/slide owners remain exact; sanitized short-fragment/coarse-owner regression fixture | NOT RUN — implementation pending |
+| 2. Evidence strength and reserve selection | Weak fragments cannot consume repeated candidate pools merely by being nonempty; alternate support ranks substantive compatible evidence and distinct understanding | NOT RUN |
+| 3. Complete-set feasibility before immutable acceptance | Full requested concept/archetype/difficulty allocation and reserve feasibility checked before authoring; mixed allocation is truthful; insufficient evidence fails explicitly | NOT RUN |
+| 4. Cross-support failure exclusions | Failure patterns and attempted intent exclusions survive concept/support changes and durable resume without rejecting genuinely new supported understanding | NOT RUN |
+| 5. Nested diagnostic serialization | Safe structured pool/blueprint/result diagnostics survive JSON logging; no private source, candidate text, key or verifier reasoning leakage | NOT RUN |
+| 6. Existing invariants and durable bounds | Exact count, strict deterministic/independent semantic gates, immutable accepted questions, model, two-candidate/four-author/four-verifier bounds, checkpoints, choice/Matching, owner isolation and key secrecy remain proven | Baseline FRESH API Quiz: 205 passed / 3 skipped; final regression pending |
+| 7. Local verification | Focused source/planning/convergence/durable tests, full affected package suites, Workflow/provider boundary checks as appropriate; forced root typecheck/lint/build with actual freshness recorded; clean scoped diff | NOT RUN — final gates pending |
+| 8. Fresh real-source generation acceptance | Instructional source, fresh complete five-question generation under strict gates, symbolic diagnostics, timing/call budgets and exact evidence; no historical output substituted as proof | NOT RUN — access/limits to establish |
+| 9. Persisted production/physical Quiz acceptance | Fresh owned source/job produces persisted Quiz; Library open, pre-finalization secrecy, answering/finalizing, expected versus actual score, persisted result/history/reopen and owner denial verified on target app/environment | NOT RUN — rollout/device prerequisites to establish |
+| 10. Closure | Requirements audited individually, limitations/failures retained, planning reconciled, scoped commits and unrelated-byte preservation verified; no mandatory row remains partial | IN PROGRESS |
+
+First eligible task: audit current `regionsFromBlocks`, `splitQuizRegion`, `makeQuizPlan`, `planBlueprintPool`, repair/checkpoint state and diagnostic logging, then implement context/feasibility repairs with the sanitized lecture acceptance fixture. Continue through eligible tasks in the table without a new scope prompt.
+
+Acceptance/checkpoint record: [B25.3.3 convergence](ai/acceptance/b25.3.3/quiz-context-convergence.md). Lifecycle API inspection found the existing installation Goal blocked and no exposed resume operation; execution continues under the owner's current instruction. A scope-specific `/goal` activation command is supplied in the session; do not claim its lifecycle changed without evidence.
+
 ## Autopilot policy installation (2026-10-08)
 
 Installed root [AUTOPILOT.md](../AUTOPILOT.md) from the supplied Downloads package, retaining finite scope, fresh evidence, scoped commits, bounded retries and truthful stopping rules. Root AGENTS.md points to it; its source-of-truth order, invariants and existing content remain intact. Repository verification commands were added using the live workspace scripts and ADR-001/ADR-011 conventions. This is documentation-only setup; no implementation, deployment, migration, provider call or app test was performed.
