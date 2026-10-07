@@ -73,6 +73,23 @@ describe('Quiz existing durable job integration', () => {
         mocks.resolve.mockRejectedValue(new Error('quiz_source_unavailable'));
         await expect(processQuizJob({} as SupabaseClient<Database>, job, 'worker')).rejects.toThrow('quiz_source_unavailable');
     });
+    it('logs parseable nested candidate-pool JSON through the actual job reporter', async () => {
+        const logger = vi.spyOn(console, 'info').mockImplementation(() => {});
+        try {
+            await processQuizJob({} as SupabaseClient<Database>, job, 'worker');
+            const records = logger.mock.calls.filter(([event]) => event === 'quiz_generation.diagnostic').map(([, payload]) => {
+                expect(typeof payload).toBe('string');
+                expect(payload).not.toContain('[Object]');
+                return JSON.parse(payload as string) as { failureClass: string; pool?: { blueprints: unknown[]; results: { index: number; findings: string[] }[] } };
+            });
+            const pools = records.filter(record => record.failureClass === 'candidate_pool');
+            expect(pools).toHaveLength(5);
+            // The legacy contract mock emits one candidate per slot; production
+            // may emit up to two. Both nested arrays must survive console logging.
+            expect(pools.every(record => record.pool?.blueprints.length && record.pool.results.length === 1)).toBe(true);
+            expect(JSON.stringify(records)).not.toMatch(/correctOptionIds|correctPairs|sourceEvidence|explanation|reasoning|prompt/);
+        } finally { logger.mockRestore(); }
+    });
     it('provider failure leaves no final payload and retains the frozen source', async () => {
         mocks.provider.mockReturnValue({ generate: vi.fn().mockRejectedValue(new Error('private provider detail')) });
         await expect(processQuizJob({} as SupabaseClient<Database>, job, 'worker')).rejects.toThrow('quiz_generation_failed');

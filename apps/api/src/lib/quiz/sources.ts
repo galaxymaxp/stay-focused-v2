@@ -78,7 +78,13 @@ export function regionsFromBlocks(materialId: string, title: string, blocks: rea
         const refs: QuizSourceReference[] = group.map(b => ({ materialId, regionId: b.id, page: b.page ?? null, slide: b.slide ?? null }));
         // Only an exact, unique source heading match can become a Reviewer deep link.
         const matched = sections.filter(s => typeof s.title === 'string' && normalized(s.title) === normalized(label) && typeof s.id === 'string');
-        regions.push({ id, label: sanitizeCanvasTitleText(label).slice(0, 220), text: group.map(b => b.text).join('\n'), sourceRefs: refs, reviewerSectionIds: matched.length === 1 ? [String(matched[0]!.id)] : [] });
+        let offset = 0;
+        const evidence = group.map((block, index) => {
+            const span = { id: `${materialId}/${block.id}`, start: offset, end: offset + block.text.length, sourceRef: refs[index]! };
+            offset = span.end + 1;
+            return span;
+        });
+        regions.push({ id, label: sanitizeCanvasTitleText(label).slice(0, 220), text: group.map(b => b.text).join('\n'), sourceRefs: refs, evidence, reviewerSectionIds: matched.length === 1 ? [String(matched[0]!.id)] : [] });
         group = [];
     };
     for (const block of blocks) {

@@ -14,6 +14,7 @@ import { assembleQuizSources, readQuizRequest, resolveQuizSources } from './sour
 import { generateQuiz, makeQuizPlan, QUIZ_MODEL, type QuizConvergenceState, type QuizGenerationDiagnostic, type QuizPlan, type StoredQuestion } from './generation';
 import { deriveQuizLearningProgress } from './learning-progress';
 import { pairKey, validateMatchingSides } from './matching';
+import { serializeQuizDiagnostic } from './diagnostics';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
 export type AttemptRow = Database['public']['Tables']['quiz_attempts']['Row'];
@@ -63,7 +64,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
             plan = makeQuizPlan(sources.regions, input);
         }
         catch (error) {
-            console.info('quiz_generation.diagnostic', { jobId: job.id, failureClass: 'planning_failure', regionCount: sources.regions.length, requestedQuestionCount: input.questionCount });
+            console.info('quiz_generation.diagnostic', JSON.stringify({ jobId: job.id, failureClass: 'planning_failure', regionCount: sources.regions.length, requestedQuestionCount: input.questionCount }));
             throw error;
         }
         materialIds = sources.materialIds;
@@ -77,7 +78,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     const questions = await generateQuiz(createServerOpenAIProvider(), plan, async (questions, convergence) => {
         await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:accepted:v4', payload: json({ questions, convergence }) });
     }, accepted, (diagnostic: QuizGenerationDiagnostic) => {
-        console.info('quiz_generation.diagnostic', { jobId: job.id, ...diagnostic });
+        console.info('quiz_generation.diagnostic', serializeQuizDiagnostic(job.id, diagnostic));
     }, previous ? record(previous.payload).convergence as QuizConvergenceState | undefined : undefined);
     if (questions.length !== input.questionCount) throw new ExperienceFailure(422, 'quiz_generation_failed');
     const owned = await resolveQuizSources(client, job.user_id, input);

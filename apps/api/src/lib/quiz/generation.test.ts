@@ -49,7 +49,7 @@ describe('Quiz source contracts and coverage', () => {
     it('does not repeatedly allocate a tiny heading group when a coarse body has enough support units', () => {
         const tiny: QuizRegion = { ...fixtureRegions()[0]!, id: 'tiny', text: 'Access is limited. Identity is checked.' };
         const body: QuizRegion = { ...fixtureRegions()[1]!, id: 'body', text: Array.from({ length: 8 }, (_, index) => `Control ${index + 1} validates a distinct protected operation using its own recorded evidence and outcome.`).join('\n') };
-        const plan = makeQuizPlan([tiny, body], { ...request, questionTypes: ['single_select', 'true_false'] });
+        const plan = makeQuizPlan([tiny, body], { ...request, difficulty: 'easy', questionTypes: ['single_select', 'true_false'] });
         expect(new Set(plan.allocation.map(slot => slot.topicId)).size).toBe(5);
         expect(plan.allocation.some(slot => slot.topicId.startsWith('tiny'))).toBe(false);
     });
@@ -222,20 +222,19 @@ describe('Quiz authoring and bounded verification', () => {
         expect(alternate).toMatchObject({ strategy: 'alternate_support' });
         expect(JSON.stringify(alternate)).toContain('alternate_support');
     });
-    it('reports the demonstrated coarse-plan failure as duplicate evidence before bounded repair exhaustion', async () => {
+    it('rejects the demonstrated coarse plan before provider calls while retaining the duplicate-evidence gate', async () => {
         const topic: QuizRegion = { ...fixtureRegions()[0]!, id: 'legacy-coarse-topic', text: 'A single coarse source region repeats this exact evidence passage even though the old planner allocated every requested question to it.' };
         const plan: QuizPlan = { requestedQuestionCount: 5, requestedDifficulty: 'mixed', topics: [topic], allocation: Array.from({ length: 5 }, (_, index) => ({ id: `q${index + 1}`, topicId: topic.id, type: index % 2 ? 'true_false' : 'single_select', difficulty: index % 2 ? 'medium' : 'easy' })) };
         const diagnostics: QuizGenerationDiagnostic[] = [];
         const provider = acceptingProvider(plan);
-        await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'repair_exhausted' });
-        expect(provider.calls.length).toBeLessThanOrEqual(6);
-        expect(diagnostics.some(diagnostic => diagnostic.findings.includes('compatible_blueprint_unavailable'))).toBe(true);
-        // The planner now blocks repeated intent before the legacy set reaches the evidence gate.
+        await expect(generateQuiz(provider, plan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'set_validation', findings: ['quiz_plan_infeasible'] });
+        expect(provider.calls).toHaveLength(0);
+        // The full-set planner rejects this before authoring; the evidence gate remains independently proven.
         const repeated = plan.allocation.map(slot => validateCandidate(candidate(plan, slot.id), plan));
         expect(conflictingQuestionFindings(repeated).get('q2')).toContain('duplicate_evidence');
-        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', round: 4, acceptedCount: 1, pendingCount: 4 });
+        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'set_validation', round: 0, acceptedCount: 0, pendingCount: 5 });
     });
-    it('reproduces the hosted two-topic q2/q4-only acceptance pattern without private source text', async () => {
+    it('rejects the historical two-topic allocation before immutable partial acceptance without private source text', async () => {
         const tiny: QuizRegion = { ...fixtureRegions()[0]!, id: 'tiny', text: 'Access is limited. Identity is checked.' };
         const firstFact = 'Authentication establishes the identity used to evaluate access to a protected learning resource.';
         const secondFact = 'Authorization determines whether that established identity may perform a particular protected action.';
@@ -247,9 +246,10 @@ describe('Quiz authoring and bounded verification', () => {
             if (q.id === 'q4') return { ...q, prompt: secondFact, sourceEvidence: [{ regionId: body.id, quote: secondFact }] };
             return { ...q, sourceEvidence: [{ regionId: tiny.id, quote: 'Unsupported evidence' }] };
         }) }));
-        await expect(generateQuiz(provider, legacyPlan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'repair_exhausted' });
-        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'repair_exhausted', questionIds: ['q1', 'q3', 'q5'], acceptedCount: 2, pendingCount: 3 });
-        const repairedPlan = makeQuizPlan([tiny, { ...body, text: Array.from({ length: 6 }, (_, index) => `Protected rule ${index + 1} uses distinct evidence to distinguish an authorized learning action from an unauthorized one.`).join('\n') }], request);
+        await expect(generateQuiz(provider, legacyPlan, undefined, [], diagnostic => diagnostics.push(diagnostic))).rejects.toMatchObject({ failureClass: 'set_validation', findings: ['quiz_plan_infeasible'] });
+        expect(provider.calls).toHaveLength(0);
+        expect(diagnostics.at(-1)).toMatchObject({ failureClass: 'set_validation', acceptedCount: 0, pendingCount: 5 });
+        const repairedPlan = makeQuizPlan([tiny, { ...body, text: Array.from({ length: 6 }, (_, index) => `Protected rule ${index + 1} uses distinct evidence to distinguish an authorized learning action from an unauthorized one.`).join('\n') }], { ...request, difficulty: 'easy' });
         expect(new Set(repairedPlan.allocation.map(slot => slot.topicId)).size).toBe(5);
         expect(repairedPlan.allocation.every(slot => !slot.topicId.startsWith('tiny'))).toBe(true);
     });

@@ -1,7 +1,7 @@
 import type { QuizDifficulty } from '@stay-focused/shared';
 import type { QuizPlan, QuizRegion } from './generation';
-import { createHash } from 'node:crypto';
 import { supportsMatching } from './matching';
+import { supportConceptId, supportStrength } from './support';
 
 export const QUIZ_POOL_SIZE = 2;
 export const QUIZ_MAX_AUTHOR_CALLS = 4;
@@ -16,9 +16,9 @@ export interface QuizQuestionBlueprint {
     difficulty: QuizDifficulty;
     questionIntent: string;
     intentKey: string;
+    patternKey: string;
     prohibitedPatterns: string[];
 }
-const normalize = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const intents: Record<QuizEvidenceAffordance, string[]> = {
     comparison: ['Distinguish the explicitly contrasted functions or conditions.', 'Identify a consequence of confusing the explicitly contrasted concepts.'],
     cause_effect: ['Explain the explicitly stated cause and its consequence.', 'Identify which stated outcome follows when the supported cause occurs.'],
@@ -44,6 +44,7 @@ export function evidenceAffordances(region: QuizRegion): QuizEvidenceAffordance[
 }
 export function blueprintCompatible(blueprint: QuizQuestionBlueprint, region: QuizRegion): boolean {
     return blueprint.supportIds.length === 1 && blueprint.supportIds[0] === region.id
+        && supportStrength(region) > 0
         && evidenceAffordances(region).includes(blueprint.affordance)
         && (blueprint.difficulty === 'easy' || blueprint.affordance !== 'conceptual_recall');
 }
@@ -52,12 +53,11 @@ export function duplicateBlueprintIntent(a: QuizQuestionBlueprint, b: QuizQuesti
         && a.targetConceptIds.some(concept => b.targetConceptIds.includes(concept)));
 }
 export function planBlueprintPool(plan: QuizPlan, slot: QuizPlan['allocation'][number], round: number,
-    used: readonly QuizQuestionBlueprint[], failedIntentKeys: readonly string[] = [], findingCodes: readonly string[] = []): QuizQuestionBlueprint[] {
+    used: readonly QuizQuestionBlueprint[], failedIntentKeys: readonly string[] = [], findingCodes: readonly string[] = [], failedPatternKeys: readonly string[] = []): QuizQuestionBlueprint[] {
     const region = [...plan.topics, ...(plan.reserveTopics ?? [])].find(topic => topic.id === slot.topicId)!;
     // Source subject, rather than a question ID, makes repeated concepts comparable.
-    const subject = normalize(region.text.split(/\b(?:is|are|checks|grants|transforms|limits|requires|determines|before|whereas)\b/i)[0]!).split(' ').slice(0, 8).join(' ');
-    const concept = createHash('sha256').update(subject || normalize(region.label)).digest('hex').slice(0, 20);
-    const available = evidenceAffordances(region).filter(affordance => slot.type === 'matching' ? affordance === 'relationship' : slot.difficulty === 'easy' || affordance !== 'conceptual_recall');
+    const concept = supportConceptId(region);
+    const available = supportStrength(region) > 0 ? evidenceAffordances(region).filter(affordance => slot.type === 'matching' ? affordance === 'relationship' : slot.difficulty === 'easy' || affordance !== 'conceptual_recall') : [];
     const choices = available.flatMap(affordance => (slot.type === 'matching'
         ? ['Associate explicitly defined source concepts with their distinct meanings.', 'Associate explicitly stated items with their distinct functions or effects.']
         : intents[affordance]).map((questionIntent, index): QuizQuestionBlueprint => ({
@@ -65,9 +65,10 @@ export function planBlueprintPool(plan: QuizPlan, slot: QuizPlan['allocation'][n
         evidenceOwnerIds: [...new Set(region.sourceRefs.map(ref => `${ref.materialId}:${ref.regionId}`))],
         targetConceptIds: [concept], affordance, difficulty: slot.difficulty, questionIntent,
         intentKey: `${concept}|${affordance}|${index}`,
+        patternKey: `${affordance}|${index}`,
         prohibitedPatterns: [...new Set(['formatting_trivia', 'list_position_trivia', 'sentence_fragment_completion', 'wording_only_recognition', 'answer_restatement', 'definition_paraphrase', 'unsupported_inference', ...findingCodes])],
     })));
-    const eligible = choices.filter(choice => !failedIntentKeys.includes(choice.intentKey)
+    const eligible = choices.filter(choice => !failedIntentKeys.includes(choice.intentKey) && !failedPatternKeys.includes(choice.patternKey)
         && !used.some(previous => duplicateBlueprintIntent(choice, previous)));
     // Balance archetypes across evidence owners/concepts; stable source order breaks ties.
     const rank = (blueprint: QuizQuestionBlueprint) => used.filter(previous => previous.affordance === blueprint.affordance).length * 4
