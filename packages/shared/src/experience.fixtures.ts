@@ -1,5 +1,6 @@
 /** Synthetic contract fixtures only. No production identities or private content. */
 import type { ActivitySummary, CourseLearningWorkspace, CourseSummary, GenerationView, LibraryArtifactSummary, LibraryOverview, ReviewerReaderModel, TodayOverview } from './experience';
+import type { QuizSummary } from './quiz';
 const unavailable = { status: 'unavailable', reasonCode: 'not_implemented' } as const;
 export const fixtureCapabilities = { reviewerGeneration: { status: 'available' }, quizGeneration: {status:'available'}, activityMaker: {status:'available'}, planner: { status: 'available' }, calendar: unavailable } as const;
 export const fixtureCourses: readonly CourseSummary[] = [
@@ -17,6 +18,16 @@ export const fixtureActivity: ActivitySummary = { id: 'canvas:activity', taskId:
 export const fixtureOverdueActivity: ActivitySummary = { ...fixtureActivity, id: 'canvas:overdue', dueAt: '2026-09-11T15:00:00Z', isOverdue: true };
 export const fixtureArtifact: LibraryArtifactSummary = { id: 'reviewer:example', type: 'reviewer', title: 'Cells', course: fixtureCourses[0]!, sourceId: 'file:example', sourceTitle: 'Cells.pdf', activityId: null, createdAt: '2026-09-12T09:00:00Z', updatedAt: '2026-09-12T09:00:00Z', lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
 export const fixtureLibrary: LibraryOverview = { items: [fixtureArtifact], categories: { reviewer: { status: 'available' }, quiz: { status: 'available' }, activity_output: unavailable }, nextOffset: null };
+export const fixtureQuizSummary: QuizSummary = {
+  id: 'quiz-example', title: 'Cells practice', courseId: 'course-a', reviewerId: null,
+  sourceId: 'file:example', sourceMaterialIds: ['file:example'], questionCount: 2, difficulty: 'mixed',
+  createdAt: fixtureArtifact.createdAt, updatedAt: fixtureArtifact.updatedAt,
+  learningState: 'not_started', answeredCount: 0, activeAttemptId: null, attemptCount: 0,
+  completedAttemptCount: 0, latestCompletedAt: null, latestScore: null, bestScore: null,
+};
+export const fixtureQuizArtifact: LibraryArtifactSummary = {
+  ...fixtureArtifact, id: `quiz:${fixtureQuizSummary.id}`, type: 'quiz', title: fixtureQuizSummary.title, quiz: fixtureQuizSummary,
+};
 export const fixtureEmptyLibrary: LibraryOverview = { ...fixtureLibrary, items: [] };
 export const fixtureGenerating: GenerationView = { id: 'generation-example', state: 'generating', updatedAt: '2026-09-12T09:00:00Z', progress: { completed: 2, total: 5, unit: 'sections' }, artifactId: null, error: null };
 export const fixtureCompleted: GenerationView = { ...fixtureGenerating, state: 'completed', artifactId: fixtureArtifact.id, progress: null };

@@ -49,6 +49,7 @@ describe('Quiz authenticated HTTP surfaces', () => {
         () => attemptGet(request(), { params: Promise.resolve({ attemptPath: [id, 'result'] }) }),
         () => answerPatch(request('PATCH', { selectedOptionIds: ['a'], finalize: true }), { params: Promise.resolve({ attemptPath: [id, 'answers', 'q1'] }) }),
         () => attemptComplete(request('POST'), { params: Promise.resolve({ attemptPath: [id, 'complete'] }) }),
+        () => quizGet(request(), { params: Promise.resolve({ quizPath: [id, 'attempts'] }) }),
     ];
     it.each(routes.map((run, i) => [i, run] as const))('requires verified JWT on route %i', async (_i, run) => { mocks.auth.mockResolvedValue(null); const response = await run(); expect(response.status).toBe(401); expect(mocks.client).not.toHaveBeenCalled(); });
     it('quiz and unanswered attempt serialization have no key/evidence/validation hints', async () => {
@@ -61,7 +62,23 @@ describe('Quiz authenticated HTTP surfaces', () => {
         }
     });
     it('incomplete result reveals nothing', async () => { const response = await routes[4]!(); expect(response.status).toBe(409); expect(await response.text()).not.toContain('correctOptionIds'); });
-    it.each([1, 2, 3, 4, 5, 6])('denies foreign user on route %i', async (i) => { mocks.auth.mockResolvedValue({ id: B }); const response = await routes[i]!(); expect(response.status).toBeGreaterThanOrEqual(400); expect(await response.text()).not.toContain('correctOptionIds'); });
+    it('history is owner/quiz scoped and serializes shared completion metadata without keys', async () => {
+        const completedAt = '2026-10-02T12:30:00Z';
+        mocks.client.mockReturnValue(client({ quizzes: [quiz], quiz_attempts: [
+            { ...attempt, status: 'completed', completed_at: completedAt, percentage: 0 },
+            { ...attempt, id: 'foreign-active', user_id: B },
+            { ...attempt, id: 'foreign-score', user_id: B, status: 'completed', completed_at: '2026-10-03T00:00:00Z', percentage: 100 },
+            { ...attempt, id: 'unrelated', quiz_id: B },
+        ] }));
+        const response = await quizGet(request(), { params: Promise.resolve({ quizPath: [id, 'attempts'] }) });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ ok: true, data: [{ id, quizId: id, status: 'completed', startedAt: attempt.started_at, completedAt, percentage: 0 }] });
+        const projection = await quizGet(request(), { params: Promise.resolve({ quizPath: [id] }) });
+        expect(await projection.json()).toMatchObject({ ok: true, data: { learningState: 'completed', activeAttemptId: null, attemptCount: 1, completedAttemptCount: 1, bestScore: 0, latestScore: 0, latestCompletedAt: completedAt } });
+        mocks.auth.mockResolvedValue({ id: B });
+        expect((await quizGet(request(), { params: Promise.resolve({ quizPath: [id, 'attempts'] }) })).status).toBe(404);
+    });
+    it.each([1, 2, 3, 4, 5, 6, 7])('denies foreign user on route %i', async (i) => { mocks.auth.mockResolvedValue({ id: B }); const response = await routes[i]!(); expect(response.status).toBeGreaterThanOrEqual(400); expect(await response.text()).not.toContain('correctOptionIds'); });
     it('rejects oversized generation input before source/provider work', async () => { const response = await generate(request('POST', { ...input, padding: 'x'.repeat(5000) })); expect(response.status).toBe(400); expect(mocks.prepare).not.toHaveBeenCalled(); });
     it('normalizes private storage errors', async () => { mocks.client.mockImplementation(() => { throw new Error('Canvas PAT sk-secret provider response'); }); const response = await routes[1]!(); expect(response.status).toBe(503); expect(await response.text()).not.toMatch(/PAT|sk-secret|provider response/); });
 });
@@ -91,10 +108,10 @@ describe('Quiz source selection', () => {
 });
 describe('Quiz Library and weak areas', () => {
     it('Library reopens persisted quiz with history without generation and filters other owners', async () => {
-        const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T) { return (table === 'quizzes' ? [quiz] : table === 'quiz_attempts' ? [{ ...attempt, status: 'completed', percentage: 80 }] : []) as unknown as ExperienceRow<T>[]; } };
+        const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T) { return (table === 'quizzes' ? [quiz] : table === 'quiz_attempts' ? [{ ...attempt, status: 'completed', completed_at: '2026-09-12T12:00:00Z', percentage: 80 }, { ...attempt, user_id: B, id: 'foreign', percentage: 100 }] : []) as unknown as ExperienceRow<T>[]; } };
         const service = new ExperienceService({ repository, materials: vi.fn() });
         const library = await service.getLibrary(A, { type: 'quiz' });
-        expect(library.items[0]).toMatchObject({ id: `quiz:${id}`, type: 'quiz', quiz: { attemptCount: 1, latestScore: 80 } });
+        expect(library.items[0]).toMatchObject({ id: `quiz:${id}`, type: 'quiz', status: 'completed', quiz: { learningState: 'completed', activeAttemptId: null, attemptCount: 1, latestScore: 80, bestScore: 80, latestCompletedAt: '2026-09-12T12:00:00Z' } });
         expect(await service.getLibraryArtifact(A, `quiz:${id}`)).toMatchObject({ quiz: { id, questionCount: 5 } });
         expect((await service.getLibrary(B)).items).toEqual([]);
         await expect(service.getLibraryArtifact(B, `quiz:${id}`)).rejects.toThrow('not_found');

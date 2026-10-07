@@ -12,6 +12,7 @@ import { updateProcessingJobProgress } from '../processing-jobs/worker-repositor
 import { readProcessingJobCheckpoint, writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
 import { assembleQuizSources, readQuizRequest, resolveQuizSources } from './sources';
 import { generateQuiz, makeQuizPlan, QUIZ_MODEL, type QuizConvergenceState, type QuizGenerationDiagnostic, type QuizPlan, type StoredQuestion } from './generation';
+import { deriveQuizLearningProgress } from './learning-progress';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
 export type AttemptRow = Database['public']['Tables']['quiz_attempts']['Row'];
@@ -89,11 +90,9 @@ export function learnerQuestion(q: QuizQuestion): QuizQuestion {
     return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : 'Choose one answer.' };
 }
 export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Quiz {
-    const attempts = history.filter(a => a.user_id === row.user_id && a.quiz_id === row.id).sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at) || b.id.localeCompare(a.id));
-    const completed = attempts.filter(a => a.status === 'completed' && a.percentage !== null).sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!) || b.id.localeCompare(a.id));
     const ids = row.source_material_ids as string[];
-    return { id: row.id, title: row.title, courseId: row.course_id, reviewerId: row.reviewer_id, sourceId: ids[0] ?? null, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
-        attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null, questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
+    return { id: row.id, title: row.title, courseId: row.course_id, reviewerId: row.reviewer_id, sourceId: ids[0] ?? null, sourceMaterialIds: ids, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
+        ...deriveQuizLearningProgress(row, history), questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {
     const correct = [...answer.selectedOptionIds].sort().join('|') === [...question.correctOptionIds].sort().join('|');

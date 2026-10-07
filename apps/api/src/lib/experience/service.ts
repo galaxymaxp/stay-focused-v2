@@ -79,6 +79,8 @@ export class ExperienceService {
   private async quizRecords(userId: string): Promise<{summary:LibraryArtifactSummary;quiz:Quiz;generationId:string|null}[]> {
     const [rows,attempts,courses] = await Promise.all([this.rows('quizzes',userId),this.rows('quiz_attempts',userId),this.getCourses(userId)]);
     return rows.map(row=>{
+      // Reuse the Quiz projection, including owner-scoped learning progress.
+      // Artifact status below continues to describe successful generation only.
       const quiz=quizView(row,attempts), course=courses.find(c=>c.id===quiz.courseId);
       const summary = { ...quiz, questions: undefined };
       return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceTitle:null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerId?[`reviewer:${quiz.reviewerId}`]:[],quiz:summary}};

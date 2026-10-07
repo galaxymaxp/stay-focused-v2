@@ -1,5 +1,19 @@
 # Roadmap
 
+## Shared Quiz learning progress (2026-10-07)
+
+**PASS — this focused prerequisite is implemented and verified.** Shared `QuizLearningState`, `QuizLearningProgress` and `QuizAttemptSummary` now carry server-derived learning state and history metadata. `QuizSummary` extends progress, retaining canonical `questionCount`, `attemptCount`, `latestScore` and `bestScore` names. Library's artifact `status` remains generation state; an untouched generated Quiz now says **Not started** in mobile.
+
+The pure API helper `deriveQuizLearningProgress` filters by owner and Quiz before applying **active attempt > completed history > abandoned-only > no attempts**. Active selection uses newest `started_at`, then greatest ID; completed selection uses newest `completed_at`, then greatest ID. Saved nonempty drafts count as answered, without unlocking results. Retries retain completion count, best score and latest completion timestamp; abandoning a retry preserves prior completion. A completed **0%** is preserved, while missing scores remain null.
+
+Quiz history now uses the shared DTO, displays completion timestamps, and exposes loading, empty, failure and retry states. Resume selects the first unchecked question, restores saved selections, and uses the existing `finalize:false` API for serialized draft saves with failure retry. Pull refresh reloads the current attempt/result and history; Library refetches through its existing focus hook. Completion guards, private keys, RLS and generation behavior are unchanged; no migration or production configuration change was needed.
+
+FRESH checks: Quiz/Experience **274 passed / 3 skipped**; full API **959 passed / 4 skipped**; mobile **497 passed** (including 16 new screen tests); shared **45 passed**; shared/API/mobile typechecks, API/mobile lint, and `git diff --check` passed. The missing Vitest files were repaired with the existing lockfile and no dependency/version changes. Initial new-test envelope/Activity-fixture mistakes were corrected and rerun. Physical-device and production verification were NOT RUN for this local slice.
+
+This completes only the shared learning-progress prerequisite; it does not certify whole-web readiness or supersede separate historical generation acceptance. Recommended next task: **Matching-question contract + renderer + persistence + scoring**, not started here.
+
+See [implementation and verification record](ai/quiz-learning-progress-2026-10-07.md).
+
 ## B25.3.2 candidate convergence (2026-09-15)
 
 Commit `79e54dd` adds source-compatible blueprints, two-candidate pools, deterministic selection, cumulative semantic-intent exclusions and v4 durable call bounds. Strict quality, secrecy, ownership and exact-count gates remain. Focused Quiz 117; full Quiz 168 passed / 3 skipped; API 944, Mobile 481, Canvas 73, Engine 606, OCR 27, Shared 44; Workflow 1, provider contract 18; fresh root typecheck/lint/build 7/7 each. One live fixture passed 5/5 in 63.331 seconds with two author/two verifier calls and 14 candidates. Deployment `dpl_peVBgRctKVmGTfkNfQqTev74QCda` is READY and canonical health is OK.

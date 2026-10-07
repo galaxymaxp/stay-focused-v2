@@ -164,6 +164,43 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const resumed = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
         expect(resumed.answers).toEqual(finalized.answers);
     });
+    it('Library reload follows real persisted start, draft, zero-score completion and retry without regeneration', async () => {
+        await db.exec('begin');
+        try {
+            const generation = await queue('learning-projection');
+            await finish(generation);
+            const q = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [generation])).rows[0]!;
+            const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T, userId: string) {
+                if (table === 'quizzes' || table === 'quiz_attempts')
+                    return (await db.query(`select * from ${table} where user_id=$1`, [userId])).rows as unknown as ExperienceRow<T>[];
+                return [];
+            } };
+            const materials = () => { throw new Error('Library must not regenerate'); };
+            const library = new ExperienceService({ repository, materials });
+            const reload = async () => (await library.getLibrary(A, { type: 'quiz' })).items.find(i => i.id === `quiz:${q.id}`)!;
+            expect(await reload()).toMatchObject({ status: 'completed', quiz: { learningState: 'not_started', attemptCount: 0, bestScore: null } });
+            const started = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, q.id, 'progress-start'])).rows[0]!;
+            expect(await reload()).toMatchObject({ quiz: { learningState: 'in_progress', activeAttemptId: started.id, answeredCount: 0 } });
+            await answer(started.id, 'q1', ['b'], false);
+            expect(await reload()).toMatchObject({ quiz: { learningState: 'in_progress', answeredCount: 1 } });
+            for (const question of questions) {
+                const wrong = [question.options.find(o => !question.correctOptionIds.includes(o.id))!.id];
+                await answer(started.id, question.id, wrong);
+            }
+            const completed = await complete(started.id);
+            expect(Number(completed.percentage)).toBe(0);
+            expect(await reload()).toMatchObject({ status: 'completed', quiz: { learningState: 'completed', answeredCount: 5,
+                completedAttemptCount: 1, latestCompletedAt: completed.completed_at, bestScore: 0, latestScore: 0 } });
+            const retry = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, q.id, 'progress-retry'])).rows[0]!;
+            expect(await reload()).toMatchObject({ quiz: { learningState: 'in_progress', activeAttemptId: retry.id, completedAttemptCount: 1, bestScore: 0 } });
+            await complete(retry.id, true);
+            expect(await reload()).toMatchObject({ quiz: { learningState: 'completed', activeAttemptId: null, attemptCount: 2, completedAttemptCount: 1, bestScore: 0 } });
+            expect((await library.getLibrary(B, { type: 'quiz' })).items).toEqual([]);
+            expect((await db.query('select id from quizzes where generation_id=$1', [generation])).rows).toHaveLength(1);
+        } finally {
+            await db.exec('rollback');
+        }
+    });
     it.each([['a', 'a'], ['missing'], [], ['a', 'b']].map(selected => [selected]))('rejects invalid finalized single-select %j', async (selected) => {
         const a = await start(`bad-answer-${selected.join('-') || 'empty'}`);
         await expect(answer(a.id, 'q1', selected)).rejects.toThrow('quiz_answer_invalid');

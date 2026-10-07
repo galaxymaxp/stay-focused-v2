@@ -2,6 +2,7 @@ import { createCanvasServiceClient } from '@/lib/canvas-db';
 import { experienceJson, experienceOptions, experienceRoute, requireId } from '@/lib/experience/http';
 import { ExperienceFailure } from '@/lib/experience/errors';
 import { attemptHistoryRows, readQuiz, startAttempt } from '@/lib/quiz/service';
+import { quizAttemptSummary } from '@/lib/quiz/learning-progress';
 export const runtime = 'nodejs';
 export const OPTIONS = experienceOptions;
 type Context = {
@@ -18,7 +19,7 @@ export async function GET(request: Request, context: Context) {
         if (path.length === 2 && path[1] === 'attempts') {
             await readQuiz(client, userId, id);
             const rows = await attemptHistoryRows(client, userId, id);
-            return experienceJson(rows.map(a => ({ id: a.id, quizId: a.quiz_id, status: a.status, startedAt: a.started_at, completedAt: a.completed_at, percentage: a.percentage === null ? null : Number(a.percentage) })));
+            return experienceJson(rows.map(quizAttemptSummary));
         }
         throw new ExperienceFailure(404, 'not_found');
     });

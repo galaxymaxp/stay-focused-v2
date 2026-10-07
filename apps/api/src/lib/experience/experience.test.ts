@@ -125,6 +125,22 @@ describe('Learn and Activity details', () => {
   });
 });
 describe('Library ownership and persisted output', () => {
+  it('preserves Reviewer and Activity Library items when Quiz learning progress changes', async () => {
+    const activity: TestData = { activity_drafts: [{ id: 'draft', user_id: 'owner', course_id: course.id, activity_id: 'assignment',
+      activity_type: 'essay', content: { title: 'Editable work', sections: [{ id: 'section-1', heading: 'Draft', level: 1, order: 1, content: 'Student draft', sourceRefs: [] }], slides: [] },
+      sources: [], warnings: [], generation_id: 'activity-job', revision: 1, status: 'draft', created_at: date, updated_at: date }] };
+    const base = { ...libraryData, ...activity };
+    const before = await service(base).api.getLibrary('owner');
+    const data: TestData = { ...base, quizzes: [{ id: 'quiz', user_id: 'owner', course_id: course.id, reviewer_id: null, title: 'Practice',
+      source_material_ids: ['file:example'], questions: [], question_count: 0, difficulty: 'mixed', created_at: date, updated_at: date }],
+      quiz_attempts: [{ id: 'attempt', user_id: 'owner', quiz_id: 'quiz', status: 'completed', answers: [], started_at: date,
+        completed_at: '2026-10-03T00:00:00Z', percentage: 0 }] };
+    const after = await service(data).api.getLibrary('owner');
+    expect(after.items.filter(item => item.type !== 'quiz')).toEqual(before.items);
+    expect(before.items.map(item => item.type).sort()).toEqual(['activity_output', 'reviewer']);
+    expect(before.items.every(item => item.status === 'completed' && item.quiz === undefined)).toBe(true);
+    expect(after.items.find(item => item.type === 'quiz')?.quiz).toMatchObject({ learningState: 'completed', bestScore: 0 });
+  });
   it('opens the persisted durable artifact without calling materials/generation', async () => {
     const { api, materials } = service(libraryData);
     const library = await api.getLibrary('owner');

@@ -29,20 +29,32 @@ export interface QuizQuestion {
     readonly selectionInstruction: 'Choose one answer.' | 'Select all correct answers.';
     readonly difficulty: QuizDifficulty;
 }
-export interface QuizSummary {
+export type QuizLearningState = 'not_started' | 'in_progress' | 'completed' | 'abandoned';
+/** Server-derived learning progress, independent of artifact generation status.
+ * questionCount and the nullable percentage scores reuse the existing Quiz names.
+ */
+export interface QuizLearningProgress {
+    readonly learningState: QuizLearningState;
+    /** Distinct questions with a saved nonempty selection, including unchecked drafts. */
+    readonly answeredCount: number;
+    readonly questionCount: number;
+    readonly activeAttemptId: string | null;
+    readonly attemptCount: number;
+    readonly completedAttemptCount: number;
+    readonly latestCompletedAt: string | null;
+    readonly latestScore: number | null;
+    readonly bestScore: number | null;
+}
+export interface QuizSummary extends QuizLearningProgress {
     readonly id: string;
     readonly title: string;
     readonly courseId: string;
     readonly reviewerId: string | null;
     readonly sourceId: string | null;
     readonly sourceMaterialIds: readonly string[];
-    readonly questionCount: number;
     readonly difficulty: QuizDifficulty | 'mixed';
     readonly createdAt: string;
     readonly updatedAt: string;
-    readonly attemptCount: number;
-    readonly latestScore: number | null;
-    readonly bestScore: number | null;
 }
 export interface Quiz extends QuizSummary {
     readonly questions: readonly QuizQuestion[];
@@ -72,6 +84,10 @@ export interface QuizAttempt {
     readonly answers: readonly QuizAttemptAnswer[];
     /** Only intentionally finalized questions appear here. */
     readonly feedback: readonly QuizQuestionResult[];
+}
+/** Public history metadata; never includes private keys or answer feedback. */
+export interface QuizAttemptSummary extends Pick<QuizAttempt, 'id' | 'quizId' | 'startedAt' | 'completedAt' | 'status'> {
+    readonly percentage: number | null;
 }
 export interface QuizTopicPerformance {
     readonly topicId: string;

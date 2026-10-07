@@ -4,6 +4,7 @@ import type {
   LibraryArtifactSummary,
   LibraryOverview,
   Quiz,
+  QuizLearningState,
   ReviewerReaderModel,
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
@@ -32,6 +33,12 @@ const filters = [
   { value: "quiz", label: "Quizzes" },
   { value: "activity_output", label: "Activity Outputs" },
 ] as const;
+const quizLearningLabels: Record<QuizLearningState, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  abandoned: "Abandoned",
+};
 export function LibraryScreen() {
   const { colors } = useTheme();
   const [filter, setFilter] =
@@ -137,7 +144,14 @@ export function LibraryScreen() {
             </Copy>
             {item.quiz && (
               <Copy muted size="caption">
+                {quizLearningLabels[item.quiz.learningState]} ·{" "}
                 {item.quiz.questionCount} questions
+                {item.quiz.learningState === "in_progress"
+                  ? ` · ${item.quiz.answeredCount} of ${item.quiz.questionCount} answered`
+                  : ""}
+                {item.quiz.completedAttemptCount > 0
+                  ? ` · ${item.quiz.completedAttemptCount} completed attempts`
+                  : ""}
                 {item.quiz.bestScore !== null
                   ? ` · Best ${item.quiz.bestScore}%`
                   : ""}

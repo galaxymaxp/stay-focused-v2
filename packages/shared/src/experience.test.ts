@@ -26,6 +26,12 @@ describe('student experience contract fixtures', () => {
     expect(fixtures.fixtureWorkspace.materials.items[1]?.generation.quiz).toEqual({ status: 'unavailable', reasonCode: 'unsupported_material' });
     expect(fixtures.fixtureCapabilities.activityMaker.status).toBe('available');
   });
+  it('serializes Quiz learning progress separately from generation completion', () => {
+    const artifact = JSON.parse(JSON.stringify(fixtures.fixtureQuizArtifact));
+    expect(artifact.status).toBe('completed');
+    expect(artifact.quiz).toMatchObject({ learningState: 'not_started', answeredCount: 0, questionCount: 2, bestScore: null });
+    expect(fixtures.fixtureArtifact.quiz).toBeUndefined();
+  });
   it('contains no diagnostic or secret fields', () => {
     expect(JSON.stringify(fixtures)).not.toMatch(/sourceCore|encrypted_token|provider_id|prompt|fingerprint|storage_object_path|ocrDiagnostics/);
   });

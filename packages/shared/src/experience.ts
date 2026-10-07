@@ -117,6 +117,7 @@ export interface LibraryArtifactSummary {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastOpenedAt: string | null;
+  /** Artifact generation state. Quiz learning state lives in quiz.learningState. */
   readonly status: GenerationState;
   readonly relatedArtifactIds: readonly string[];
 }
