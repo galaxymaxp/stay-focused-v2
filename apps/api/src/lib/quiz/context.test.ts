@@ -95,6 +95,7 @@ describe('B25.3.3 context, ownership and complete-set feasibility', () => {
         const plan = makeQuizPlan(lectureRegions(), choiceRequest), slot = plan.allocation[0]!;
         const old = planBlueprintPool(plan, slot, 0, []), replacement = plan.reserveTopics![0]!;
         const next = planBlueprintPool(plan, { ...slot, topicId: replacement.id }, 3, [], old.map(blueprint => blueprint.intentKey), ['academicValue'], old.map(blueprint => blueprint.patternKey));
+        expect(next.length).toBeGreaterThan(0);
         expect(next.every(blueprint => !old.some(previous => previous.patternKey === blueprint.patternKey))).toBe(true);
         expect(next.every(blueprint => blueprint.targetConceptIds[0] !== old[0]!.targetConceptIds[0])).toBe(true);
     });
