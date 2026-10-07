@@ -1,5 +1,24 @@
 # Current Sprint
 
+## Autopilot policy installation (2026-10-08)
+
+Installed root [AUTOPILOT.md](../../AUTOPILOT.md) from the supplied Downloads package, retaining finite scope, fresh evidence, scoped commits, bounded retries and truthful stopping rules. Root AGENTS.md points to it; its source-of-truth order, invariants and existing content remain intact. Repository verification commands were added using the live workspace scripts and ADR-001/ADR-011 conventions. This is documentation-only setup; no implementation, deployment, migration, provider call or app test was performed.
+
+Live baseline: `C:/Projects/stay-focused-v2`, branch `main`, HEAD `d0020a228fd90c1f06807f52ed19895822a0f1bd`, remote `origin` = `https://github.com/galaxymaxp/stay-focused-v2.git`, upstream `origin/main`; **53 ahead / 0 behind the locally recorded upstream** (no fetch or remote-freshness claim). Git identity remains the existing repository owner. The OneDrive directory supplied as environment cwd is not a Git checkout. Sixteen tracked modifications and 111 untracked leaf files were present; only the three planning documents overlap, and only this installation's sections are staged.
+
+**Scope selection: awaiting owner decision; no roadmap execution scope has been approved by this installation.** The latest matching section recommends intentional incomplete Quiz finalization / “Finish Anyway” semantics. The separate B25.3.2 report explicitly labels B25.3.3 a recommendation only, retains real-source production acceptance as unaccepted, and prohibits B26. Neither recommendation is silently promoted to approval. Existing Matching/local-progress PASS and B25 PARTIAL statuses remain unchanged.
+
+Available finite choices are recorded below. The owner has been asked which one to freeze; later scopes, web migration, B26–B28, production publication and unbounded paid retries are excluded unless separately authorized.
+
+| Candidate scope (not approved yet) | Endpoint / mandatory acceptance to record on selection | First eligible task after selection |
+| --- | --- | --- |
+| Intentional incomplete Quiz finalization / “Finish Anyway” only | Define and implement explicit intentional completion, unanswered scoring and feedback-release semantics; prove shared/API/SQL/mobile behavior, reload/history/progress, owner isolation, no accidental completion, and choice/Matching regressions; reconcile docs and commit; stop there | Define the completion contract and acceptance matrix before modifying the existing all-finalized guard |
+| B25.3.3 Quiz generation convergence and its real-source gate only | Follow the existing B25.3.2 recommendation for source context/evidence ownership, complete-set feasibility and sanitized regressions; retain strict gates/model/call bounds; obtain fresh real-source generation, persisted Quiz, take/score/result/reopen and secrecy proof under separately established provider/production limits; stop before B26 | Audit current source assembly and the retained symbolic failure evidence; establish the bounded acceptance plan |
+
+Installation checks: **FRESH PASS** repository identity/policy/planning inspection, documentation path and scoped diff checks, preservation inventory; **NOT APPLICABLE** implementation suites/builds for this setup. The installed CLI reports `0.159.0-alpha.12.1` with `goals stable true`; the thread lifecycle API reports an active installation Goal. This does not establish an active roadmap implementation Goal. Official Goal controls: `/goal`, `/goal pause`, `/goal resume`, `/goal clear`; see [official guidance](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex).
+
+Checkpoint: policy setup is installed; the remaining required input is the finite scope decision. No first implementation task has started. Once selected, record the stable endpoint and every mandatory acceptance row here before roadmap execution. The existing historical entries below remain unchanged.
+
 ## Matching Quiz support (2026-10-08)
 
 **PASS — Matching questions are supported end-to-end in local automated acceptance.** The shared Quiz question union now includes Matching with readable left/right labels and opaque IDs. Its private key remains in `quiz_keys`; student answers persist explicit pairs through the existing attempt RPC. Legacy choice payloads remain compatible.

@@ -42,6 +42,8 @@ Use context in this order:
 
 ## Verification
 
+When working under an active roadmap Goal, read AUTOPILOT.md and follow its execution, verification, checkpoint, and stopping rules.
+
 Run checks proportional to changed paths. Completion claims must name the exact
 suite/result and whether it was FRESH, CACHED, NOT RUN, BLOCKED, or NOT
 APPLICABLE. Record flakes and failed first attempts instead of hiding them.
