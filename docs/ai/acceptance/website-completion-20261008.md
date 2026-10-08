@@ -38,7 +38,7 @@ No API, engine, database migration, or mobile implementation was edited.
 | Local browser | FRESH PASS: course Library, filter, rename and reload, delete confirmation Cancel, desktop word selection and mobile paragraph Explain, account dark theme, side-by-side material preview, Schedule rendering |
 | Responsive layout | FRESH PASS: 1440×1000 desktop and 390×844 mobile; checked horizontal bounds and toolbar visibility |
 | Diff hygiene | FRESH PASS before release |
-| Production and main push | PENDING release |
+| Production and main push | FRESH PASS: ca524a4 READY on stay-focused-ten.vercel.app; remote main and production branch both verified at ca524a4 after normal fast-forward push |
 
 Browser verification used the supported Codex browser against fictional local
 services. No paid generation or live Canvas sync was submitted. The standalone
@@ -55,7 +55,25 @@ Publishing that branch is required to update the live website; main integration
 is a normal fast-forward preserving the shared application history. The primary
 checkout and its unrelated dirty work are left untouched. No force push.
 
-Release result: PENDING.
+Release result: READY. Deployment dpl_Fm3KXvg2MWXCs74D4nEJsSiwnktv
+serves https://stay-focused-ten.vercel.app from ca524a4. Vercel production build
+took approximately 76 seconds. The signed-in owner loaded the saved CIT17
+Reviewer, renamed it, verified persistence after reload, and restored its original
+title. Delete confirmation was captured and cancelled; no saved Reviewer was
+deleted. The live creation form was filled and captured without submitting paid
+generation. Live 1440×1000 and 390×844 layouts had no horizontal overflow.
+Four real application captures were saved outside Git for the school activity.
+
+A bounded error-log scan on the new deployment (previous hour, limit 20) returned
+zero error entries. This is a point-in-time check, not continuous monitoring.
+Drains and external monitoring configuration were NOT RUN. Two browser locator
+checks hit short loading/attachment deadlines around reload; subsequent fresh
+page observations confirmed the loaded Reviewer and persisted rename. These were
+browser timing retries, not passing test assertions hidden as fresh results.
+
+Remote main and website/functional-v1 were both verified at ca524a4 after the
+owner-authorized ordinary main push. The primary checkout was not switched or
+modified. This documentation follow-up records the completed release.
 
 Remaining limitations: OAuth round trips, live paid generation, physical mobile
 acceptance, and the wider historical roadmap are not established by this web

@@ -6,12 +6,15 @@ Owner-authorized finite scope: finish Claude's pending web changes, verify the
 website, publish it, and push to main. Existing API/mobile/database architecture
 and unrelated working-tree changes are preserved.
 
-LOCALLY VERIFIED; release pending. Course Library, reviewer management and
+PUBLISHED AND INTEGRATED INTO MAIN. Course Library, reviewer management and
 selection tools, account menu, content identity and Schedule deadlines are
 complete. Canvas refresh is explicit, bounded, owner-cancelled and honest about
 partial admission or unknown polling outcomes. Fresh web tests 66/66, reviewer
-route regression 9/9, web typecheck/lint and root typecheck/lint 8/8 pass. Root
-build, production inspection and main push remain in progress. See
+route regression 9/9, web typecheck/lint and root typecheck/lint/build 8/8 pass.
+Production deployment ca524a4 is READY. Live signed-in read, rename with reload,
+delete confirmation Cancel, and desktop/mobile layout checks passed. The normal
+main push was verified remotely; no force push. No paid generation or live
+Canvas sync was submitted. See
 [completion evidence](ai/acceptance/website-completion-20261008.md).
 
 ## Website production deployment (2026-10-08)
@@ -30,8 +33,7 @@ mirroring the mobile tokens. FRESH: web typecheck/lint/tests, both isolated
 browser runs, production build, and live checks (API proxy 200/401, anon key
 for the V2 project). NOT RUN: authenticated live use by the owner, live
 generation and OAuth round trips. Preview deployments have no Supabase key
-(`NEXT_SUPABASE_ANON_KEY` is production-only), and `main` has no `apps/web`
-yet, so its preview builds fail until the website is merged.
+(`NEXT_SUPABASE_ANON_KEY` is production-only), and `main` now includes `apps/web`; preview authentication remains unconfigured.
 
 ## Website V1.1 orb parity (2026-10-08)
 

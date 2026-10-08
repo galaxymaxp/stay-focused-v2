@@ -6,12 +6,15 @@ Owner-authorized finite scope: finish Claude's pending web changes, verify the
 website, publish it, and push to main. Existing API/mobile/database architecture
 and unrelated working-tree changes are preserved.
 
-LOCALLY VERIFIED; release pending. Course Library, reviewer management and
+PUBLISHED AND INTEGRATED INTO MAIN. Course Library, reviewer management and
 selection tools, account menu, content identity and Schedule deadlines are
 complete. Canvas refresh is explicit, bounded, owner-cancelled and honest about
 partial admission or unknown polling outcomes. Fresh web tests 66/66, reviewer
-route regression 9/9, web typecheck/lint and root typecheck/lint 8/8 pass. Root
-build, production inspection and main push remain in progress. See
+route regression 9/9, web typecheck/lint and root typecheck/lint/build 8/8 pass.
+Production deployment ca524a4 is READY. Live signed-in read, rename with reload,
+delete confirmation Cancel, and desktop/mobile layout checks passed. The normal
+main push was verified remotely; no force push. No paid generation or live
+Canvas sync was submitted. See
 [completion evidence](ai/acceptance/website-completion-20261008.md).
 
 ## Urgent Canvas notification activation (2026-10-03)
