@@ -6,6 +6,69 @@ production rollout, and physical success-path acceptance**.
 
 ## Restored baseline and changes
 
+### Published-key follow-up — 2026-10-08
+
+The owner replaced/published the OpenAI key and authorized continuation. This
+task resumes at `29aa524bc08ff11531ef80a7db4dc6c47c552ed0`, clean on the same
+scoped branch. FRESH runtime inspection observes spec revision **16**, current
+observations, enforced network policy, and the configured network secret ready.
+The attached `source_config_version_id` still identifies
+`cecfgver_6ac6ddc6309c81938cafc7edc32c2e7f`, the same saved version inspected
+before publication. The runtime tool describes this task's instance, not the
+latest published environment configuration; newly published secret adoption
+cannot be established here.
+
+The original instructional snapshot was reread through the same constrained
+owner/file/hash joins. Its 23 blocks, exact-source hash and normalized harness
+block hash match the provenance below; no generated output was reused.
+
+| Today's ledger position | FRESH result at `29aa524` | Evidence |
+| --- | --- | --- |
+| 5 — fourth real-source engine run | FAIL: 0/5, 417 ms, one author invocation, zero verifier invocations, HTTP 401 | Run `0c2ed547-41ab-40d4-8e35-65fe126dc254`; strict five-slot plan, same model/gates/bounds; `provider_failure` / `authoring_provider_failed`; `/tmp/b2533-live-attempt-5-safe.json` and corresponding `.log` |
+| 6 — independent minimal Python Responses authorization probe | FAIL: HTTP 401, `invalid_api_key`, 500 ms; no private/instructional input, no generation acceptance | Run `1f6dfca1-101e-4b9e-b6cf-2b4e7a572353`; `/tmp/b2533-authorization-attempt-6-safe.json`; preserved HTTPS proxy and CA trust, no retries |
+
+Ledger now **6/10 conservatively consumed; at most four remain for 2026-10-08**:
+four instructional generator attempts and two minimal authorization probes.
+Read-only diagnostics do not consume generation attempts. No successful
+Responses usage/billing result was returned; do not infer zero cost or reset
+the allowance. Paid retries are paused until new authorization/binding evidence.
+
+Read-only SDK/Python pinned-model GETs pass. A fake/nonexistent Responses ID
+lookup returns 404. These are not POST authorization or generation proof.
+A temporary Vitest transport probe confirms the SDK alias equals the configured
+binding, inherited proxy variables are present, `NODE_USE_ENV_PROXY=1`, and
+the worker uses `EnvHttpProxyAgent`. Python POST independently fails with the
+same `invalid_api_key`; the failure is not specific to Vitest/Node. The saved
+key's correctness and adoption remain unknown; do not blame the owner's key
+or weaken generation schema/validation based on these errors. Safe transport
+observations are `/tmp/b2533-read-only-transport-safe.json`. The temporary test
+source and private source input were removed; no product/test code changed.
+
+FRESH remote heads still contain main `cff27bc`, the three recovered checkpoints,
+and `codex/hosted-processing-prototype` at `debc23a`. Read-only fetch/inspection
+finds the latter dated 2026-08-06 and lacking the later canonical-source/
+Matching migrations; it does not resolve deployed API/worker/client lineage.
+`EXPO_PUBLIC_API_BASE_URL` still is not a usable HTTPS origin. Required learner,
+deployment/EAS credential names remain absent, with no controllable device.
+
+Mandatory row 8 remains attempted/BLOCKED and row 9 NOT RUN/BLOCKED; row 6's
+live preservation and row 10 closure remain outstanding. The earlier fresh
+cloud automation/gates below are retained evidence at unchanged product bytes,
+not rerun results for this follow-up. Only documentation changed, so new
+implementation suites/root gates are NOT APPLICABLE; scoped diff/link checks
+are required and recorded on delivery. No production data/contract was changed.
+
+The smallest next credential step is to start a fresh task from the republished
+environment and verify its attached configuration/version and a bounded
+Responses request before further acceptance. Official
+[saved-state/update guidance](https://learn.chatgpt.com/docs/environments/cloud-environments#reuse-and-update-saved-state)
+states that existing tasks retain their own state. Continue from this scoped
+branch/patch and the six-attempt ledger; never restart the scaffold or reset
+acceptance. No task creation or environment reattachment capability is exposed
+to this agent. If fresh adoption still returns 401, correct the environment's
+requested network-secret binding/Responses credential through configuration,
+without putting credential values in chat.
+
 Repository `galaxymaxp/stay-focused-v2`, initial recovered checkpoint
 `de09b9ce510ecce3a8ff3ae630234a7dfc546c9b`. FRESH remote inspection resolves
 the three supplied recovery branches; `b8967f3`, `f336d26`, and `de09b9c` are

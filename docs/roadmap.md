@@ -1,5 +1,36 @@
 # Roadmap
 
+## B25.3.3 published-key follow-up (2026-10-08)
+
+**PARTIAL / BLOCKED.** The owner published a new OpenAI key and authorized
+continuation from clean `29aa524`. FRESH runtime observes spec 16 ready/
+current and enforced policy; this task still references the same saved
+environment-version ID as before publication. New secret adoption is unknown.
+
+The fourth fresh owned instructional engine run fails 0/5 before persistence
+(one author, zero verifier, HTTP 401, 417 ms). An independent Python Responses
+POST also returns `401 invalid_api_key`. Read-only GET/transport checks
+pass; they are not generation or POST authorization proof. No key values,
+raw errors or source text are exposed. No product/contract/validation change
+was made; previous cloud suites/gates are retained evidence, not rerun here.
+
+Today's generation ledger is **6/10 conservatively used, at most four left**:
+four instructional attempts plus two minimal authorization probes. Do not
+reset it or repeat paid failures. Row 8 remains attempted/BLOCKED; live
+preservation/row 9 and closure remain outstanding. Remote-head inspection
+still lacks deployed API/worker/client source; usable/allowed HTTPS and two
+authenticated sessions, build credentials and physical device remain absent.
+
+Next credential action: start a fresh task from the republished environment,
+continue from the scoped branch/patch without recreating the scaffold, and
+verify updated binding plus a bounded Responses request. This agent cannot
+reattach the running task; existing tasks retain their saved state. All
+compatibility/version-boundary and physical criteria remain unchanged.
+See [updated acceptance](ai/acceptance/b25.3.3/quiz-context-convergence.md)
+and [follow-up provenance, failures and handoff](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+Earlier allowance/access status below is superseded; B26, Finish Anyway and
+broader website work remain excluded. No Goal lifecycle change is asserted.
+
 ## B25.3.3 cloud continuation checkpoint (2026-10-08)
 
 **PARTIAL / BLOCKED; scope remains generation convergence only.** Recovery

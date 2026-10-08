@@ -1,5 +1,37 @@
 # B25.3.3 source-context and generation convergence
 
+## Published-key follow-up — 2026-10-08
+
+**PARTIAL / BLOCKED.** Resumed at clean `29aa524` after the owner published
+the new OpenAI key. FRESH runtime observations are current/ready at spec 16,
+but this task's saved environment-version ID is unchanged from before
+publication. Adoption of the newly published key cannot be confirmed.
+
+One more fresh owned instructional generator run
+`0c2ed547-41ab-40d4-8e35-65fe126dc254` fails before persistence: 0/5,
+one author/zero verifier, HTTP 401, 417 ms. An independent minimal Python
+Responses POST also returns `401 invalid_api_key` (500 ms). Read-only GETs
+and the proxy-aware Vitest transport check pass; they do not establish POST
+authorization. No schema, strict gate, model, production contract or product
+code changed. Earlier passing cloud suites/gates are retained at unchanged
+product bytes, not rerun in this documentation follow-up.
+
+Today's ledger is now **6/10 used conservatively, at most four remaining**:
+four real-source attempts and two minimal authorization probes. No allowance
+reset or further paid retry while this failure persists. Mandatory row 8
+remains attempted/BLOCKED; production preservation and row 9 remain blocked,
+and row 10 cannot close. New remote-head inspection still does not supply
+the deployed source lineage; usable/authenticated API/build/device access
+remains unavailable.
+
+Next: use a fresh task from the republished environment, carry forward this
+scoped branch/patch and ledger, and verify updated binding/Responses access.
+Existing tasks retain saved state; this agent has no reattachment capability.
+Do not recreate the scaffold. See the
+[follow-up evidence and handoff](cloud-matching-compatibility.md).
+The prior checkpoint below is retained as history and superseded for allowance
+and current credential status.
+
 ## Cloud continuation checkpoint — 2026-10-08
 
 **PARTIAL / BLOCKED.** This section supersedes the historical environment,
