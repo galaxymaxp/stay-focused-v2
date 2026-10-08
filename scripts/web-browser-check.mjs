@@ -367,9 +367,12 @@ try {
   await page.getByRole("checkbox", { name: "Plan time before a deadline." }).click();
   await page.getByRole("toolbar", { name: "Selected key points" }).getByRole("button", { name: "Explain simply", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll(".key-point .icon").length >= 2);
-  await page.getByRole("button", { name: "Generate Quiz", exact: true }).click();
-  await page.getByRole("dialog", { name: "New Quiz" }).waitFor();
-  await page.keyboard.press("Escape");
+  const quizButton = page.getByRole("button", { name: "Generate Quiz", exact: true });
+  if (generationFixture) {
+    await quizButton.click();
+    await page.getByRole("dialog", { name: "New Quiz" }).waitFor();
+    await page.keyboard.press("Escape");
+  } else assert(await quizButton.isDisabled(), "Quiz generation was not disabled by default");
   await page.goto(`${origin}/library/activity%3A${ids.draft}`);
   await page
     .getByLabel("Reflection", { exact: true })
