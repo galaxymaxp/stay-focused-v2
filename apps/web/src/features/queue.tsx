@@ -16,7 +16,7 @@ import {
 } from "../app-model/presentation";
 import { CountUp } from "../components/count-up";
 import { useAuth } from "../components/providers";
-import { Heading, Icon, Notice, State } from "../components/ui";
+import { ContentIcon, Heading, Notice, State } from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 import { useListPreferences } from "../lib/list-preferences";
@@ -39,14 +39,6 @@ const typeLabel = (job: ProcessingJobStatusView) =>
       : job.jobType === "document_extraction"
         ? "Material preparation"
         : "Reviewer";
-const typeIcon = (job: ProcessingJobStatusView) =>
-  job.jobType === "quiz_generation"
-    ? "file-question-mark"
-    : job.jobType === "activity_generation"
-      ? "file-text"
-      : job.jobType === "document_extraction"
-        ? "layers"
-        : "book-open";
 
 export function QueueScreen() {
   const { api } = useAuth(),
@@ -227,9 +219,17 @@ function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh
         }
         onClick={open}
       >
-        <span className="content-icon">
-          <Icon name={typeIcon(job)} />
-        </span>
+        <ContentIcon
+          kind={
+            job.jobType === "quiz_generation"
+              ? "quiz"
+              : job.jobType === "activity_generation"
+                ? "activity_output"
+                : job.jobType === "document_extraction"
+                  ? "pdf"
+                  : "reviewer"
+          }
+        />
         <span className="grow">
           <span className="meta">{type}</span>
           <strong>{title}</strong>

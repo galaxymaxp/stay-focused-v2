@@ -1,5 +1,19 @@
 # Roadmap
 
+## Website completion and main integration (2026-10-08)
+
+Owner-authorized finite scope: finish Claude's pending web changes, verify the
+website, publish it, and push to main. Existing API/mobile/database architecture
+and unrelated working-tree changes are preserved.
+
+LOCALLY VERIFIED; release pending. Course Library, reviewer management and
+selection tools, account menu, content identity and Schedule deadlines are
+complete. Canvas refresh is explicit, bounded, owner-cancelled and honest about
+partial admission or unknown polling outcomes. Fresh web tests 66/66, reviewer
+route regression 9/9, web typecheck/lint and root typecheck/lint 8/8 pass. Root
+build, production inspection and main push remain in progress. See
+[completion evidence](ai/acceptance/website-completion-20261008.md).
+
 ## Urgent Canvas notification activation (2026-10-03)
 
 Local metadata synchronization, transactional email outbox, deadline reminders and persistent Settings controls are implemented. Next: apply the forward migration, configure cron/Resend variables and verified sender, roll out API and Mobile, perform developer-only live delivery and repeat-request/device acceptance, verify five-minute workload capacity, then enable the single Google Cloud Scheduler job. The current Hobby plan cannot provide that trigger interval through Vercel Cron. [Setup and behavior](architecture/canvas-email-notifications.md). Other phase gates below remain unchanged.

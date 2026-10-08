@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../components/providers";
 import { Icon } from "../../components/ui";
 import { assistStore, keyOf, useAssistEntries, type AssistEntry, type AssistTarget } from "./assist-store";
+import type { StudyAction } from "@stay-focused/shared";
 import { SmartSelectionPanel } from "./smart-selection";
 
 // Web port of apps/mobile/src/features/reviewer/StudyAssistSheet.tsx, shown as
@@ -30,11 +31,14 @@ const HINTS: Record<AssistType, string> = {
 export function StudyAssistPanel({
   target,
   initialText,
+  initialAction,
   passageLabel,
   onClose,
 }: {
   target: AssistTarget | null;
   initialText?: string;
+  /** A Smart Selection action chosen in the reader, run as the panel opens. */
+  initialAction?: StudyAction;
   /** What the panel is about, for its header. */
   passageLabel: string;
   onClose: () => void;
@@ -90,9 +94,10 @@ export function StudyAssistPanel({
       {target ? (
         <div className="assist-panel-body stack">
           <SmartSelectionPanel
-            key={`${key}|${initialText ?? ""}`}
+            key={`${key}|${initialText ?? ""}|${initialAction ?? ""}`}
             selection={target.selection}
             initialText={initialText}
+            initialAction={initialAction}
             onActiveChange={setStudying}
           />
           {!studying && (

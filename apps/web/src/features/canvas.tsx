@@ -214,7 +214,7 @@ export function CanvasScreen() {
                 : ""}
             </Notice>
           )}
-          {jobId && <State resource={job} />}
+          {jobId && job.error && <Notice error>{job.error}</Notice>}
           {disconnect && (
             <div className="surface stack" role="alert">
               <p>Disconnect Canvas? Future course sync will stop.</p>

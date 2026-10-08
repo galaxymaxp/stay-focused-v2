@@ -25,6 +25,8 @@
   --orange-soft: #fff0e3;
   --violet: #7250ae;
   --violet-soft: #eee8fa;
+  --red: #b13c36;
+  --red-soft: #fce9e5;
   --amber: #846400;
   --glass: rgba(255, 255, 255, 0.75);
   --pane: #fbfaf7;
@@ -75,6 +77,8 @@
   --orange-soft: #48301f;
   --violet: #cfbaf2;
   --violet-soft: #352a49;
+  --red: #ffaba3;
+  --red-soft: #4b2928;
   --amber: #ebc55e;
   --glass: rgba(28, 28, 30, 0.8);
   --pane: #0f0f11;
@@ -3559,7 +3563,7 @@ mark.find-active {
 }
 .detail-aside {
   position: sticky;
-  top: 16px;
+  top: 76px;
 }
 .detail-aside .surface > button {
   width: 100%;
@@ -3961,7 +3965,7 @@ mark.find-active {
 }
 .canvas-aside {
   position: sticky;
-  top: 16px;
+  top: 76px;
 }
 .canvas-aside > *,
 .canvas-courses > * {
@@ -4293,4 +4297,398 @@ mark.find-active {
     margin-left: 4px;
     padding: 1px 5px;
   }
+}
+
+/* ---------- Reader selection toolbar ---------- */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.selection-toolbar {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 4px 10px;
+  transform: translate(-50%, calc(-100% - 10px));
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  animation: chip-pop var(--spring-duration) var(--ease-spring);
+  white-space: nowrap;
+}
+.selection-toolbar > .icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+.selection-toolbar button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 550;
+}
+.selection-toolbar button:hover {
+  background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+}
+.selection-note {
+  padding: 0 6px;
+  font-size: 12.5px;
+  opacity: 0.85;
+}
+.reviewer-article ::selection {
+  background: color-mix(in srgb, var(--violet) 30%, transparent);
+}
+
+/* ---------- Content identity colors (the app's ContentIcon) ---------- */
+.content-icon.tone-blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.content-icon.tone-violet {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+.content-icon.tone-green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.content-icon.tone-orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+.content-icon.tone-red {
+  background: var(--red-soft);
+  color: var(--red);
+}
+.content-icon.small {
+  width: 30px;
+  min-width: 30px;
+  height: 34px;
+  border-radius: 8px;
+}
+.content-icon.small .icon {
+  width: 17px;
+  height: 17px;
+}
+.type-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.type-pill.tone-blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.type-pill.tone-violet {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+.type-pill.tone-green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+/* ---------- Library (course tiles, then saved work) ---------- */
+.library-course {
+  position: relative;
+}
+.library-course .course-card {
+  padding-right: 52px;
+}
+.library-course .course-card .meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library-counts {
+  color: var(--secondary);
+}
+.course-pin {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity var(--motion-small) var(--ease-standard);
+}
+.library-course:hover .course-pin,
+.course-pin:focus-visible,
+.course-pin.on {
+  opacity: 1;
+}
+.course-pin.on {
+  color: var(--text);
+}
+.library-course-head .row {
+  align-items: center;
+  gap: 14px;
+}
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 12px;
+}
+.library-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  animation: rise-in var(--spring-duration) var(--ease-spring) backwards;
+  transition:
+    border-color var(--motion-small) var(--ease-standard),
+    box-shadow var(--spring-duration) var(--ease-spring);
+}
+.library-card:nth-child(n + 4) {
+  animation-delay: 40ms;
+}
+.library-card:nth-child(n + 8) {
+  animation-delay: 80ms;
+}
+.library-card:hover {
+  border-color: var(--secondary);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+.library-card-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 8px 14px 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+.library-card-open .grow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.library-card-open strong {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.library-card-actions {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 8px 8px 8px 0;
+}
+.library-card:hover .library-card-actions,
+.library-card:focus-within .library-card-actions {
+  opacity: 1;
+  transform: none;
+}
+.library-card-actions .icon-button[aria-pressed="true"] {
+  opacity: 1;
+}
+.icon-button.danger:hover {
+  color: var(--danger);
+}
+.library-total {
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .course-pin,
+  .library-card-actions {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Account menu ---------- */
+.account-menu {
+  position: relative;
+}
+.account-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--secondary);
+  font-weight: 400;
+  text-align: left;
+}
+.account-button:hover,
+.account-button[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--text);
+}
+.account-button .account-email {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-button > .icon {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--spring-duration) var(--ease-spring);
+}
+.account-button[aria-expanded="true"] > .icon {
+  transform: rotate(180deg);
+}
+.account-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--elevated);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  animation: rise-in var(--spring-duration) var(--ease-spring);
+}
+.account-popover-head {
+  padding: 6px 8px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.account-popover-head strong,
+.account-popover-head .meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-popover a,
+.account-popover > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 450;
+  text-decoration: none;
+  text-align: left;
+}
+.account-popover a:hover,
+.account-popover > button:hover {
+  background: var(--hover);
+}
+.account-popover .segments {
+  margin: 4px 0;
+}
+.account-popover .segments button {
+  min-height: 30px;
+  padding: 4px 6px;
+}
+.account-popover .sign-out {
+  color: var(--danger);
+}
+.account-button { font-size: 13px; }
+.due-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--warning) 45%, var(--line));
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+  color: var(--text);
+  font-size: 12.5px;
+  text-decoration: none;
+  animation: rise-in var(--spring-duration) var(--ease-spring) backwards;
+  transition: background var(--motion-small) var(--ease-standard);
+}
+.due-chip:hover {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+.due-chip.overdue {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.due-chip .grow {
+  min-width: 0;
+}
+.due-chip strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.due-chip .meta {
+  display: block;
+  font-size: 11.5px;
+}
+.due-chip .course-dot,
+.due-dot {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.due-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.canvas-refresh {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  min-height: 30px;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  color: var(--secondary);
+  animation: page-in var(--motion-normal) var(--ease-out) backwards;
+}
+.canvas-refresh .status-dot {
+  display: inline-block;
+}
+.canvas-refresh.failed .status-dot,
+.canvas-refresh.partial .status-dot {
+  background: var(--warning);
+}
+.canvas-refresh.idle .status-dot {
+  background: var(--muted);
+}
+.canvas-refresh .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12.5px;
+}
+.canvas-refresh .link-button .icon {
+  width: 13px;
+  height: 13px;
+}
+.course-workspace > .canvas-refresh {
+  margin: -6px 0 10px;
+}
+.account-popover > button {
+  justify-content: flex-start;
 }

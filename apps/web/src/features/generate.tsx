@@ -24,10 +24,12 @@ import { useAuth } from "../components/providers";
 import {
   Empty,
   Heading,
+  ContentIcon,
   Icon,
   Notice,
   State,
 } from "../components/ui";
+import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 type Resource<T> = ReturnType<typeof useResource<T>>;
@@ -36,6 +38,7 @@ export function GenerateScreen() {
       "/api/experience/courses",
     ),
     [search, setSearch] = useState("");
+  const canvas = useCanvasRefresh("all", courses.refresh);
   const filtered =
     courses.data?.items.filter((c) =>
       `${c.name} ${c.code ?? ""}`.toLowerCase().includes(search.toLowerCase()),
@@ -63,6 +66,7 @@ export function GenerateScreen() {
             Connection and sync
           </Link>
         </div>
+        <CanvasRefreshStatus refresh={canvas} />
         <State resource={courses} />
         <div className="course-grid">
           <Link href="/generate/new" className="course-card own">
@@ -133,12 +137,6 @@ function capabilityLabel(capability: FeatureCapability | undefined) {
   if (capability?.status === "available") return "Available";
   return reasonLabels[capability?.reasonCode ?? ""] ?? "Unavailable";
 }
-const materialIcon = (m: LearningMaterial) =>
-  m.kind === "slides"
-    ? "presentation"
-    : m.kind === "page" || m.kind === "text"
-      ? "text-align-start"
-      : "file-text";
 const CourseContext = createContext<{
   courseId: string;
   course: Resource<CourseLearningWorkspace>;
@@ -183,6 +181,7 @@ export function CourseWorkspace({
     const key = m.moduleTitle ?? "Course materials";
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
+  const canvas = useCanvasRefresh(courseId, course.refresh);
   const name = course.data?.course.name ?? "Course materials",
     code = course.data?.course.code;
   return (
@@ -227,6 +226,7 @@ export function CourseWorkspace({
             }
           />
         </div>
+        <CanvasRefreshStatus refresh={canvas} />
         <State resource={course} />
         {course.data && (
           <div className="course-split">
@@ -254,9 +254,7 @@ export function CourseWorkspace({
                         href={`/generate/${courseId}/${encodeURIComponent(m.id)}`}
                         aria-current={m.id === selectedId ? "page" : undefined}
                       >
-                        <span className="content-icon">
-                          <Icon name={materialIcon(m)} />
-                        </span>
+                        <ContentIcon kind={m.kind} />
                         <span className="grow">
                           <strong>{m.title}</strong>
                           <span className="meta">

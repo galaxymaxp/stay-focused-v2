@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BookLoader, LogoMark } from "./brand";
 import { Breadcrumbs, CrumbProvider, trailFor, useCrumbState } from "./crumbs";
 import { useAuth } from "./providers";
@@ -82,12 +82,7 @@ export function Shell({ children }: { children: ReactNode }) {
               Settings
             </Link>
           </nav>
-          <div className="account" title={email}>
-            <span className="avatar" aria-hidden="true">
-              {email.charAt(0).toUpperCase()}
-            </span>
-            <span className="account-email">{email}</span>
-          </div>
+          <AccountMenu email={email} />
         </div>
       </aside>
       <div className="workspace">
@@ -179,4 +174,79 @@ function useSidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebar]);
   return { collapsed, toggleSidebar };
+}
+
+/** The signed-in account: a menu for settings, appearance and signing out. */
+function AccountMenu({ email }: { email: string }) {
+  const { session, client, theme, setTheme } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const name = (session?.user.user_metadata?.full_name as string | undefined) ?? null;
+  return (
+    <div className="account-menu" ref={root}>
+      {open && (
+        <div className="account-popover" role="menu" aria-label="Account">
+          <div className="account-popover-head">
+            {name && <strong>{name}</strong>}
+            <span className="meta">{email}</span>
+          </div>
+          <Link role="menuitem" href="/settings">
+            <Icon name="settings" />
+            Account settings
+          </Link>
+          <Link role="menuitem" href="/canvas">
+            <Icon name="globe" />
+            Canvas connection
+          </Link>
+          <div className="segments" role="group" aria-label="Appearance">
+            {(["system", "light", "dark"] as const).map((value) => (
+              <button key={value} aria-pressed={theme === value} onClick={() => setTheme(value)}>
+                {value[0]!.toUpperCase() + value.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button
+            role="menuitem"
+            className="sign-out"
+            onClick={async () => {
+              const result = await client?.auth.signOut({ scope: "local" });
+              if (result?.error) setError("Could not sign out. Please try again.");
+            }}
+          >
+            <Icon name="log-out" />
+            Sign out
+          </button>
+          {error && <p className="meta">{error}</p>}
+        </div>
+      )}
+      <button
+        className="account-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={email}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="avatar" aria-hidden="true">
+          {email.charAt(0).toUpperCase()}
+        </span>
+        <span className="account-email">{email}</span>
+        <Icon name="chevron-down" />
+      </button>
+    </div>
+  );
 }

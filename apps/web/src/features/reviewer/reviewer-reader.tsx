@@ -2,8 +2,12 @@
 import {
   ASSIST_LABELS,
   ASSIST_TYPES,
+  STUDY_ACTION_LABELS,
+  STUDY_ACTIONS,
+  checkStudySelection,
   selectAssistBlock,
   type AssistType,
+  type StudyAction,
   type LibraryArtifactSummary,
   type ReviewerReaderModel,
 } from "@stay-focused/shared";
@@ -17,6 +21,7 @@ import {
   segmentIds,
   type ReviewerMatch,
 } from "../../app-model/reviewerNavigation";
+import { courseIdentity } from "../../app-model/courseIdentity";
 import { useAuth } from "../../components/providers";
 import { Heading, Icon, Notice } from "../../components/ui";
 import { dateLabel } from "../../lib/api";
@@ -40,9 +45,16 @@ import { StudyAssistPanel } from "./study-assist-panel";
 // Assist in a side panel. Click a key point to select it (Shift-click for its
 // group), click an explanation for Study Assist, or select any text to study it.
 
-type Passage = { section: string; block: string; point?: number; text?: string };
+type Passage = { section: string; block: string; point?: number; text?: string; action?: StudyAction };
 type Pick = { section: string; block: string; points: readonly number[] };
 
+function readableText(range: Range): string {
+  const fragment = range.cloneContents();
+  fragment.querySelectorAll(".no-select, .point-marker, .icon, .tile-spinner").forEach((node) => node.remove());
+  // Block boundaries become spaces, so separate paragraphs never run together.
+  fragment.querySelectorAll("p, li, h2, h3, div").forEach((node) => node.append(" "));
+  return fragment.textContent ?? "";
+}
 export function ReviewerReader({
   artifact,
   reviewer,
@@ -135,9 +147,24 @@ export function ReviewerReader({
         : { section, block, points: [index] },
     );
   };
-  const openExplanation = (section: string, block: string) => {
-    if (picking || !window.getSelection()?.isCollapsed) return;
-    setPassage({ section, block });
+  // The paragraph always opens Study Assist for the whole concept, even while
+  // key points are being picked (that selection is dropped).
+  // A double or triple click selects words instead, so a single click waits a
+  // moment before opening.
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+  }, []);
+  const openExplanation = (event: MouseEvent, section: string, block: string) => {
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = null;
+    if (event.detail > 1) return;
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      if (!window.getSelection()?.isCollapsed) return;
+      setPicking(null);
+      setPassage({ section, block });
+    }, 280);
   };
   const generatePicked = (type: AssistType) => {
     if (!picking?.points.length) return;
@@ -165,18 +192,55 @@ export function ReviewerReader({
     return () => clearTimeout(timer);
   }, [ready]);
 
-  // Selecting text inside a block offers "Study selection".
-  const [selectionChip, setSelectionChip] = useState<{ x: number; y: number; section: string; block: string; text: string } | null>(null);
+  // Selecting any words (a phrase, a sentence, a whole paragraph) offers the
+  // app's Smart Selection actions right there. A selection that runs past its
+  // concept is kept to the concept it started in.
+  const [selectionChip, setSelectionChip] = useState<{
+    x: number;
+    y: number;
+    section: string;
+    block: string;
+    text: string;
+    ok: boolean;
+    reason?: string;
+  } | null>(null);
   const onArticleMouseUp = () => {
-    const selected = window.getSelection();
-    if (!selected || selected.isCollapsed || selected.rangeCount === 0) return setSelectionChip(null);
-    const range = selected.getRangeAt(0);
-    const start = (range.startContainer.parentElement ?? null)?.closest<HTMLElement>("[data-block]");
-    const end = (range.endContainer.parentElement ?? null)?.closest<HTMLElement>("[data-block]");
-    const text = selected.toString().trim();
-    if (!start || start !== end || !text) return setSelectionChip(null);
-    const box = range.getBoundingClientRect();
-    setSelectionChip({ x: box.left + box.width / 2, y: box.top, section: start.dataset.section!, block: start.dataset.block!, text });
+    // Let a triple-click finish extending the selection first.
+    requestAnimationFrame(() => {
+      const selected = window.getSelection();
+      if (!selected || selected.isCollapsed || selected.rangeCount === 0) return setSelectionChip(null);
+      const range = selected.getRangeAt(0);
+      const nodeOf = (node: Node) => (node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement);
+      const start = nodeOf(range.startContainer)?.closest<HTMLElement>("[data-block]");
+      if (!start) return setSelectionChip(null);
+      const clipped = range.cloneRange();
+      if (!start.contains(range.endContainer)) clipped.setEnd(start, start.childNodes.length);
+      const box = clipped.getBoundingClientRect();
+      const blockModel = selectAssistBlock(reviewer, start.dataset.section!, start.dataset.block!);
+      const check = blockModel ? checkStudySelection(blockModel.block, readableText(clipped)) : null;
+      if (!check || (!check.ok && check.reason === "empty")) return setSelectionChip(null);
+      setSelectionChip({
+        x: Math.min(Math.max(box.left + box.width / 2, 200), window.innerWidth - 200),
+        y: Math.max(box.top, 72),
+        section: start.dataset.section!,
+        block: start.dataset.block!,
+        text: check.ok ? check.text : "",
+        ok: check.ok,
+        reason: check.ok ? undefined : check.reason,
+      });
+    });
+  };
+  const studySelection = (action?: StudyAction) => {
+    if (!selectionChip) return;
+    setPassage({
+      section: selectionChip.section,
+      block: selectionChip.block,
+      ...(selectionChip.ok ? { text: selectionChip.text } : {}),
+      ...(action && selectionChip.ok ? { action } : {}),
+    });
+    setPicking(null);
+    setSelectionChip(null);
+    window.getSelection()?.removeAllRanges();
   };
   useEffect(() => {
     if (!selectionChip) return;
@@ -235,8 +299,12 @@ export function ReviewerReader({
       <Heading
         title={artifact.title}
         crumb={artifact.title}
+        parent={{
+          label: artifact.course ? courseIdentity(artifact.course).title : "Personal & other",
+          href: `/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`,
+        }}
         subtitle={[reviewer.course?.name, dateLabel(reviewer.generatedAt), `${reviewer.sections.length} topics`].filter(Boolean).join(" · ")}
-        back="/library"
+        back={`/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`}
         action={
           <div className="row">
             <button onClick={saveText}>Save to file</button>
@@ -306,8 +374,9 @@ export function ReviewerReader({
             </Notice>
           )}
           <p className="meta reader-hint">
-            Click an explanation for Study Assist. Click a key point to select it, Shift-click for its whole group, or
-            select any words to study exactly that.
+            Click a paragraph for Study Assist on the whole concept. Select any words, a sentence, or triple-click a
+            paragraph to Define, Explain, Test or Ask about exactly that. Click key points to pick them, Shift-click for
+            the group.
           </p>
           {reviewer.sections.map((section, sectionIndex) => (
             <section
@@ -336,14 +405,14 @@ export function ReviewerReader({
                       role="button"
                       tabIndex={0}
                       title="Open Study Assist for this concept"
-                      onClick={() => openExplanation(section.id, block.id)}
+                      onClick={(e) => openExplanation(e, section.id, block.id)}
                       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setPassage({ section: section.id, block: block.id }))}
                     >
                       {render(segmentIds.explanation(block.id), block.explanation, block.emphasis?.filter((m) => m.target === "explanation" && m.index === 0) ?? [])}
                     </p>
                     {block.keyPoints.length > 0 && (
                       <div className={`key-points${pickingHere ? " picking" : ""}`}>
-                        <span className="kicker">Key points</span>
+                        <span className="kicker no-select">Key points</span>
                         <ul>
                           {block.keyPoints.map((point, index) => {
                             const picked = pickingHere && picking.points.includes(index);
@@ -380,10 +449,10 @@ export function ReviewerReader({
                     )}
                     {block.evidence.length > 0 && (
                       <div className="evidence">
-                        <span className="kicker">Details &amp; examples</span>
+                        <span className="kicker no-select">Details &amp; examples</span>
                         {block.evidence.map((evidence, index) => (
                           <div key={index}>
-                            <span className="meta evidence-kind">{evidence.kind}</span>
+                            <span className="meta evidence-kind no-select">{evidence.kind}</span>
                             <p data-segment={segmentIds.evidence(block.id, index)} className={evidence.kind === "code" ? "code" : undefined}>
                               {render(segmentIds.evidence(block.id, index), evidence.text)}
                             </p>
@@ -403,6 +472,7 @@ export function ReviewerReader({
             key={openKey ?? "missing"}
             target={assistTarget}
             initialText={passage.text}
+            initialAction={passage.action}
             passageLabel={passageLabel}
             onClose={() => setPassage(null)}
           />
@@ -410,20 +480,31 @@ export function ReviewerReader({
       </div>
 
       {selectionChip && (
-        <button
-          className="selection-chip"
+        <div
+          className="selection-toolbar"
+          role="toolbar"
+          aria-label="Study the selected text"
           style={{ left: selectionChip.x, top: selectionChip.y }}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            setPassage({ section: selectionChip.section, block: selectionChip.block, text: selectionChip.text });
-            setPicking(null);
-            setSelectionChip(null);
-            window.getSelection()?.removeAllRanges();
-          }}
         >
-          <Icon name="sparkles" />
-          Study selection
-        </button>
+          {selectionChip.ok ? (
+            <>
+              <Icon name="sparkles" />
+              {STUDY_ACTIONS.map((action) => (
+                <button key={action} onClick={() => studySelection(action)}>
+                  {STUDY_ACTION_LABELS[action]}
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              <span className="selection-note">
+                {selectionChip.reason === "too_large" ? "Select a shorter passage" : "Select text from one concept"}
+              </span>
+              <button onClick={() => studySelection()}>Open concept</button>
+            </>
+          )}
+        </div>
       )}
       {picking && pickingBlock ? (
         <div className="pick-bar" role="toolbar" aria-label="Selected key points">

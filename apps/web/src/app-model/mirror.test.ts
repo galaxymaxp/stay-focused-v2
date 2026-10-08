@@ -12,6 +12,7 @@ const mirrors: [web: string, mobile: string, rewrites?: [string, string][]][] = 
   ["../features/day-clock/dayClock.ts", "features/redesign/dayClock.ts"],
   ["./reviewerNavigation.ts", "features/reviewer/reviewerNavigation.ts"],
   ["./announcementPresentation.ts", "features/announcements/announcementPresentation.ts"],
+  ["./libraryPresentation.ts", "features/redesign/libraryPresentation.ts"],
   ["./canvasGradePresentation.ts", "features/courses/canvasGradePresentation.ts", [["./canvasGradeTypes", "../../services/canvasApi"]]],
 ];
 const read = (path: string) =>

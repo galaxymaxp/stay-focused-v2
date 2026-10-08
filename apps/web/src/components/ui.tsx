@@ -88,44 +88,86 @@ export function Empty({
     </div>
   );
 }
-export function State({
-  resource,
-}: {
-  resource: {
-    loading: boolean;
-    error: string | null;
-    data: unknown;
-    refresh: () => void;
-  };
-}) {
-  if (resource.error)
+type Loadable = {
+  loading: boolean;
+  error: string | null;
+  data: unknown;
+  refresh: () => void;
+};
+/** One loader or error for a screen, however many requests it waits on. */
+export function State({ resource }: { resource: Loadable | readonly Loadable[] }) {
+  const all = Array.isArray(resource) ? resource : [resource as Loadable];
+  const failed = all.find((r) => r.error);
+  if (failed)
     return (
       <div>
-        <Notice error>{resource.error}</Notice>
-        <button onClick={resource.refresh}>Try again</button>
+        <Notice error>{failed.error}</Notice>
+        <button onClick={() => all.forEach((r) => r.error && r.refresh())}>Try again</button>
       </div>
     );
-  if (resource.loading && !resource.data) return <BookLoader />;
+  if (all.some((r) => r.loading && !r.data)) return <BookLoader />;
   return null;
+}
+/**
+ * Content identity, as the app's ContentIcon: Reviewers, Quizzes, Drafts,
+ * tasks and material kinds each keep one icon and one color everywhere.
+ */
+export function contentTone(kind: string) {
+  return kind === "pdf"
+    ? "red"
+    : kind === "slides"
+      ? "orange"
+      : kind === "quiz" || kind === "quiz_generation"
+        ? "violet"
+        : kind === "activity_output" || kind === "activity_generation"
+          ? "green"
+          : "blue";
+}
+export function contentIconName(kind: string) {
+  return kind === "slides"
+    ? "presentation"
+    : kind === "quiz" || kind === "quiz_generation"
+      ? "file-question-mark"
+      : kind === "reviewer" || kind === "reviewer_generation"
+        ? "book-open"
+        : kind === "activity_output" || kind === "activity_generation" || kind === "task"
+          ? "clipboard-list"
+          : kind === "page"
+            ? "globe"
+            : "file-text";
+}
+export function ContentIcon({ kind, small = false }: { kind: string; small?: boolean }) {
+  return (
+    <span className={`content-icon tone-${contentTone(kind)}${small ? " small" : ""}`} aria-hidden="true">
+      <Icon name={contentIconName(kind)} />
+    </span>
+  );
 }
 export function RowLink({
   href,
   title,
   detail,
   icon = "book-open",
+  kind,
   tag,
 }: {
   href: string;
   title: string;
   detail?: string;
   icon?: string;
+  /** Content kind; when set, the row uses that kind's icon and color. */
+  kind?: string;
   tag?: string;
 }) {
   return (
     <Link className="item-row" href={href}>
-      <span className="content-icon">
-        <Icon name={icon} />
-      </span>
+      {kind ? (
+        <ContentIcon kind={kind} />
+      ) : (
+        <span className="content-icon">
+          <Icon name={icon} />
+        </span>
+      )}
       <span className="grow">
         {tag && <span className="badge">{tag}</span>}
         <strong>{title}</strong>

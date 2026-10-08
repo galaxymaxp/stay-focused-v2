@@ -129,8 +129,7 @@ export function TasksScreen() {
             </button>
           ))}
         </div>
-        <State resource={tasks} />
-        <State resource={activities} />
+        <State resource={[tasks, activities]} />
         {filtered.length > 0 && (
           <div className="list-card task-table" role="list" aria-label="Tasks">
             <div className="task-table-head" aria-hidden="true">
@@ -349,8 +348,7 @@ export function TaskDetailScreen({ id }: { id: string }) {
         subtitle={data?.course?.name ?? (data ? "Personal task" : undefined)}
         back="/tasks"
       />
-      <State resource={activity} />
-      {id.startsWith("task:") && <State resource={task} />}
+      <State resource={id.startsWith("task:") ? [activity, task] : activity} />
       {data && (
         <div className="detail-layout">
           <div className="stack detail-main">
@@ -490,8 +488,8 @@ export function TaskDetailScreen({ id }: { id: string }) {
                     key={output.id}
                     href={`/library/${encodeURIComponent(output.id)}`}
                     title={output.title}
-                    tag="Saved output"
-                    icon="file-text"
+                    tag={output.type === "quiz" ? "Quiz" : output.type === "activity_output" ? "Draft" : "Reviewer"}
+                    kind={output.type}
                   />
                 ))}
               </section>

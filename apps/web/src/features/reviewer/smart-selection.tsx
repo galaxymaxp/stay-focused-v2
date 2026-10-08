@@ -94,11 +94,14 @@ const VERDICTS = { correct: "Correct", partial: "Partially correct", incorrect: 
 export function SmartSelectionPanel({
   selection,
   initialText,
+  initialAction,
   onActiveChange,
 }: {
   selection: AssistSelection;
   /** Text already selected in the reader, if the panel opened from it. */
   initialText?: string;
+  /** Action chosen with that text in the reader; runs once on open. */
+  initialAction?: StudyAction;
   onActiveChange?: (active: boolean) => void;
 }) {
   const { api } = useAuth();
@@ -123,6 +126,14 @@ export function SmartSelectionPanel({
     };
   }, []);
   const selecting = action !== null || check.ok || (!check.ok && check.reason === "too_large");
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || !initialAction || !check.ok) return;
+    started.current = true;
+    choose(initialAction);
+    // Runs once, for the action picked in the reader.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAction]);
   useEffect(() => onActiveChange?.(selecting), [selecting, onActiveChange]);
 
   function readSelection() {

@@ -1,0 +1,110 @@
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth } from "../components/providers";
+import { Icon } from "../components/ui";
+import {
+  performCanvasRefresh,
+  type RefreshPhase,
+  type RefreshProgress,
+} from "./canvas-refresh-core";
+
+export function useCanvasRefresh(scope: string, onSynced: () => void) {
+  const { api, session } = useAuth();
+  const owner = session?.user.id ?? "";
+  const identity = `${owner}:${scope}`;
+  const active = useRef<AbortController | null>(null);
+  const synced = useRef(onSynced);
+  synced.current = onSynced;
+  const [state, setState] = useState<{
+    identity: string;
+    phase: RefreshPhase;
+    progress: RefreshProgress;
+  }>({
+    identity,
+    phase: "idle",
+    progress: { finished: 0, total: 0 },
+  });
+  useEffect(
+    () => () => {
+      active.current?.abort();
+      active.current = null;
+    },
+    [identity, api],
+  );
+
+  const sync = useCallback(async () => {
+    if (!owner || active.current) return;
+    const controller = new AbortController();
+    active.current = controller;
+    setState({
+      identity,
+      phase: "syncing",
+      progress: { finished: 0, total: 0 },
+    });
+    try {
+      const phase = await performCanvasRefresh(
+        api,
+        scope,
+        controller.signal,
+        (progress) => {
+          if (!controller.signal.aborted)
+            setState({ identity, phase: "syncing", progress });
+        },
+      );
+      if (!controller.signal.aborted) {
+        setState((old) => ({ ...old, phase }));
+        if (phase === "synced" || phase === "partial") synced.current();
+      }
+    } catch {
+      if (!controller.signal.aborted)
+        setState((old) => ({ ...old, phase: "failed" }));
+    } finally {
+      if (active.current === controller) active.current = null;
+    }
+  }, [api, identity, owner, scope]);
+  return {
+    ...(state.identity === identity
+      ? state
+      : { phase: "idle" as const, progress: { finished: 0, total: 0 } }),
+    sync,
+  };
+}
+
+export function CanvasRefreshStatus({
+  refresh,
+}: {
+  refresh: ReturnType<typeof useCanvasRefresh>;
+}) {
+  const { phase, progress, sync } = refresh;
+  const label =
+    phase === "syncing"
+      ? progress.total
+        ? `Syncing with Canvas · ${progress.finished}/${progress.total}`
+        : "Syncing with Canvas…"
+      : phase === "synced"
+        ? "Up to date with Canvas"
+        : phase === "partial"
+          ? "Some sync requests didn’t finish"
+          : phase === "failed"
+            ? "Canvas sync didn’t finish"
+            : phase === "unconfirmed"
+              ? "Sync status unavailable. Accepted jobs may still be running."
+              : phase === "not_connected"
+                ? "Connect Canvas to sync courses"
+                : "Canvas";
+  return (
+    <span className={`canvas-refresh ${phase}`} role="status">
+      {phase === "syncing" ? (
+        <span className="tile-spinner" aria-hidden="true" />
+      ) : (
+        <Icon name="refresh-cw" />
+      )}
+      <span>{label}</span>
+      {phase !== "syncing" && (
+        <button className="link-button subtle" onClick={() => void sync()}>
+          Sync now
+        </button>
+      )}
+    </span>
+  );
+}

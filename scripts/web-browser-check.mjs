@@ -398,6 +398,15 @@ try {
   await page.getByText("Fictional define result for “pending tasks”.", { exact: true }).waitFor();
   await page.getByRole("button", { name: /From your material/ }).waitFor();
   await page.getByRole("button", { name: "Close Study Assist", exact: true }).click();
+  // Select a whole paragraph in the reader and explain exactly that.
+  await page
+    .getByText("Choose a time to study, then review your understanding.", { exact: true })
+    .click({ clickCount: 3 });
+  await page.getByRole("toolbar", { name: "Study the selected text" }).getByRole("button", { name: "Explain", exact: true }).click();
+  await page
+    .getByText("Fictional explain result for “Choose a time to study, then review your understanding.”.", { exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "Close Study Assist", exact: true }).click();
   // Pick two key points and explain both.
   await page.getByRole("checkbox", { name: "Start with your pending tasks." }).click();
   await page.getByRole("checkbox", { name: "Plan time before a deadline." }).click();
@@ -532,7 +541,12 @@ try {
   await page.getByRole("button", { name: "View result", exact: true }).click();
   await page.getByText("100%", { exact: true }).waitFor();
   await page.goto(`${origin}/library`);
+  await page.getByRole("link", { name: /Study foundations/ }).click();
+  await page.waitForURL(`**/library/course/${ids.course}`);
   await page.getByText(/Best 100%/).waitFor();
+  await page.getByRole("button", { name: "Quizzes", exact: true }).click();
+  await page.getByRole("link", { name: /^Quiz: Study practice/ }).waitFor();
+  assert.equal(await page.getByRole("link", { name: /^Reviewer:/ }).count(), 0);
   console.log(
     "PASS choice/multi/true-false/Matching, draft recovery, guarded completion, score/history/Library refresh",
   );

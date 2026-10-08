@@ -31,7 +31,7 @@ import {
 import { BookLoader } from "../../components/brand";
 import { CourseDot } from "../../components/course";
 import { useAuth } from "../../components/providers";
-import { Heading, Icon, Notice } from "../../components/ui";
+import { ContentIcon, Heading, Icon, Notice } from "../../components/ui";
 import { useResource } from "../../lib/hooks";
 import { useListPreferences } from "../../lib/list-preferences";
 import { DayRingClock } from "../day-clock/DayRingClock";
@@ -558,9 +558,13 @@ function TodayRow({
   return (
     <div className={`today-row${dominant ? " dominant item-row" : ""}`}>
       <button className="today-row-open" onClick={onOpen} aria-label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.title}`}>
-        <span className="content-icon">
-          <Icon name={session ? "book-open" : "square-check-big"} />
-        </span>
+        {session ? (
+          <span className="content-icon">
+            <Icon name="clock" />
+          </span>
+        ) : (
+          <ContentIcon kind="task" />
+        )}
         <span className="grow">
           <span className="meta">
             {pinned && <span className="pinned-label">Pinned · </span>}

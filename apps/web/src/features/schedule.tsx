@@ -1,4 +1,5 @@
 "use client";
+import type { ActivitySummary } from "@stay-focused/shared";
 import type {
   StudySessionView,
   DeterministicStudyPlan,
@@ -6,6 +7,7 @@ import type {
 } from "@stay-focused/shared/task-planning";
 import Link from "next/link";
 import { useState } from "react";
+import { CourseDot } from "../components/course";
 import { useAuth } from "../components/providers";
 import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel, localDate, timeLabel } from "../lib/api";
@@ -21,6 +23,28 @@ export function ScheduleScreen() {
   const sessions = useResource<{ sessions: StudySessionView[] }>(
     `/api/study-sessions?startsAt=${encodeURIComponent(start.toISOString())}&endsAt=${encodeURIComponent(end.toISOString())}&limit=200`,
   );
+  // Deadlines in this week, so planned time sits next to what is due.
+  const activities = useResource<{ items: ActivitySummary[] }>(
+    `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+  );
+  const dueOn = (day: Date) =>
+    (activities.data?.items ?? [])
+      .filter(
+        (a) =>
+          a.dueAt &&
+          localDate(new Date(a.dueAt)) === localDate(day) &&
+          a.status !== "completed" &&
+          a.status !== "submitted",
+      )
+      .sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!));
+  const dueThisWeek = (activities.data?.items ?? []).filter(
+      (a) =>
+        a.dueAt &&
+        Date.parse(a.dueAt) >= start.getTime() &&
+        Date.parse(a.dueAt) < end.getTime() &&
+        a.status !== "completed" &&
+        a.status !== "submitted",
+  ).length;
   const [preview, setPreview] = useState<{
       plan: DeterministicStudyPlan;
       request: StudyPlanningRequest;
@@ -54,7 +78,7 @@ export function ScheduleScreen() {
         title="Schedule"
         subtitle={
           sessions.data
-            ? `${planned} planned ${planned === 1 ? "block" : "blocks"} this week`
+            ? `${planned} planned ${planned === 1 ? "block" : "blocks"}${activities.data ? ` · ${dueThisWeek} due this week` : activities.error ? " · Deadlines unavailable" : " · Loading deadlines…"}`
             : "Make room for what matters."
         }
         back="/today"
@@ -100,7 +124,7 @@ export function ScheduleScreen() {
             <span className="desktop-only">Refresh schedule</span>
           </button>
         </div>
-        <State resource={sessions} />
+        <State resource={[sessions, activities]} />
         {sessions.data && (
           <>
             <div className="scroll-panel">
@@ -129,6 +153,23 @@ export function ScheduleScreen() {
                           })}
                         </span>
                       </h2>
+                      {dueOn(day).map((a) => (
+                        <Link
+                          key={a.id}
+                          className={`due-chip${a.isOverdue ? " overdue" : ""}`}
+                          href={`/tasks/${encodeURIComponent(a.id)}`}
+                          title={a.title}
+                        >
+                          {a.course ? <CourseDot course={a.course} /> : <span className="due-dot" aria-hidden="true" />}
+                          <span className="grow">
+                            <strong>{a.title}</strong>
+                            <span className="meta">
+                              Due {timeLabel(a.dueAt)}
+                              {a.course?.code ? ` · ${a.course.code.split("|")[0]!.trim()}` : ""}
+                            </span>
+                          </span>
+                        </Link>
+                      ))}
                       {rows.map((s) => {
                         const title = s.task?.title ?? "Study session";
                         return (
@@ -168,7 +209,7 @@ export function ScheduleScreen() {
                           </div>
                         );
                       })}
-                      {!rows.length && (
+                      {!rows.length && !dueOn(day).length && (
                         <p className="meta calendar-free">Free</p>
                       )}
                     </section>
@@ -176,7 +217,7 @@ export function ScheduleScreen() {
                 })}
               </div>
             </div>
-            {!sessions.data.sessions.length && (
+            {!sessions.data.sessions.length && !dueThisWeek && (
               <Empty title="Your schedule has room.">
                 Choose available time below to plan your pending tasks.
               </Empty>

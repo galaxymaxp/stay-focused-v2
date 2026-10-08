@@ -1,5 +1,19 @@
 # Current Sprint
 
+## Website completion and main integration (2026-10-08)
+
+Owner-authorized finite scope: finish Claude's pending web changes, verify the
+website, publish it, and push to main. Existing API/mobile/database architecture
+and unrelated working-tree changes are preserved.
+
+LOCALLY VERIFIED; release pending. Course Library, reviewer management and
+selection tools, account menu, content identity and Schedule deadlines are
+complete. Canvas refresh is explicit, bounded, owner-cancelled and honest about
+partial admission or unknown polling outcomes. Fresh web tests 66/66, reviewer
+route regression 9/9, web typecheck/lint and root typecheck/lint 8/8 pass. Root
+build, production inspection and main push remain in progress. See
+[completion evidence](acceptance/website-completion-20261008.md).
+
 ## Website production deployment (2026-10-08)
 
 Owner-authorized: the V2 website replaces retired V1 on
