@@ -1,56 +1,52 @@
-import { ExperienceFailure } from '../experience/errors';
-import { processQuizJob } from '../quiz/service';
 import type {
-  Json,
-  ProcessingJobDatabaseRow,
-  ProcessingJobSourceRow,
+Json,
+ProcessingJobDatabaseRow,
+ProcessingJobSourceRow,
 } from "@stay-focused/db";
 import {
-  PipelineAssemblyError,
-  PipelineCancellationError,
-  runPipeline,
-  type GenerationProvider,
-  type NormalizedSourceKind,
+PipelineAssemblyError,
+PipelineCancellationError
 } from "@stay-focused/engine";
 import {
-  normalizeDocumentTextWithEvidence,
-  OCR_PDF_MIME_TYPE,
+normalizeDocumentTextWithEvidence,
+OCR_PDF_MIME_TYPE,
 } from "@stay-focused/ocr";
+import { ExperienceFailure } from '../experience/errors';
+import { processQuizJob } from '../quiz/service';
+import { processAIReviewerJob } from './ai-reviewer';
 
 import { readDocumentParserConfig } from "@/lib/document-parsers/config";
 import {
-  createDocumentSignalsFromInspections,
-  createStructuredExtractionPayload,
-  tryParseStructuredPdf,
+createDocumentSignalsFromInspections,
+createStructuredExtractionPayload,
+tryParseStructuredPdf,
 } from "@/lib/document-parsers/structured-parser-service";
 import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
 import {
-  DocumentExtractionCancellationError,
-  extractPdfDocument,
-  extractWithOcrProvider,
-  type OcrExtractionResult,
+DocumentExtractionCancellationError,
+extractPdfDocument,
+extractWithOcrProvider,
+type OcrExtractionResult,
 } from "@/lib/ocr/extraction-service";
 import { inspectPdfTextPages } from "@/lib/ocr/pdf-native-text";
 import { getConfiguredDurableDocumentMaxOcrPages } from "@/lib/ocr/upload-policy";
-import { createServerOpenAIProvider } from "@/providers";
 
 import {
-  EXTRACTION_JOB_DEADLINE_MS,
-  JOB_WORKER_HEARTBEAT_INTERVAL_MS,
-  OCR_PROVIDER_CALL_TIMEOUT_MS,
+EXTRACTION_JOB_DEADLINE_MS,
+JOB_WORKER_HEARTBEAT_INTERVAL_MS,
+OCR_PROVIDER_CALL_TIMEOUT_MS,
 } from "./constants";
 import {
-  findProcessingJobSource,
-  type ProcessingJobServiceClient,
+findProcessingJobSource,
+type ProcessingJobServiceClient,
 } from "./repository";
-import { readStructuredSourceBlocks } from "./structured-source-blocks";
 import {
-  completeProcessingJob,
-  failProcessingJob,
-  heartbeatProcessingJob,
-  readProcessingJobState,
-  updateProcessingJobProgress,
-  WorkerRepositoryError,
+completeProcessingJob,
+failProcessingJob,
+heartbeatProcessingJob,
+readProcessingJobState,
+updateProcessingJobProgress,
+WorkerRepositoryError,
 } from "./worker-repository";
 
 import { processActivityJob } from "../activity-maker/service";
@@ -389,132 +385,10 @@ async function processExtractionJob({
 
 async function processReviewerJob({
   client,
-  heartbeat,
   job,
-  source,
   workerId,
 }: ProcessorContext): Promise<{ readonly payload: unknown; readonly metrics: Record<string, unknown> }> {
-  if (source.source_kind !== "text" || !source.source_text?.trim()) {
-    throw new WorkerJobError(
-      "processing_job_source_missing",
-      "The reviewer source snapshot is unavailable.",
-      false,
-    );
-  }
-
-  const privateMetadata = isRecord(source.metadata) ? source.metadata : {};
-  const sourceTitle = typeof privateMetadata.sourceTitle === "string"
-    ? privateMetadata.sourceTitle
-    : undefined;
-  const reviewerSourceSnapshotId =
-    typeof privateMetadata.reviewerSourceSnapshotId === "string"
-      ? privateMetadata.reviewerSourceSnapshotId
-      : undefined;
-  const sourceBlocks = readStructuredSourceBlocks(
-    privateMetadata.reviewerSourceBlocks,
-  ) ?? [];
-  const sourceKind = readReviewerSourceKind(privateMetadata.reviewerSourceKind);
-  const generationStartedAt = Date.now();
-  const pipelineMetrics: {
-    normalizedCharacterCount: number | null;
-    outlineItemCount: number | null;
-    plannedSectionCount: number | null;
-    providerCallCount: number;
-    retryCount: number;
-  } = {
-    normalizedCharacterCount: null,
-    outlineItemCount: null,
-    plannedSectionCount: null,
-    providerCallCount: 0,
-    retryCount: 0,
-  };
-  const provider = createServerOpenAIProvider() as GenerationProvider;
-
-  const reviewer = await runPipeline({
-    input: {
-      ...(sourceBlocks.length > 0
-        ? { blocks: sourceBlocks, kind: sourceKind ?? "unknown" }
-        : { text: source.source_text }),
-      ...(sourceTitle ? { title: sourceTitle } : {}),
-    },
-    provider,
-    shouldCancel: async () =>
-      !(await jobMayContinue(client, job.id, workerId, heartbeat)),
-    onProgress: async (progress) => {
-      pipelineMetrics.normalizedCharacterCount =
-        progress.normalizedCharacterCount ?? pipelineMetrics.normalizedCharacterCount;
-      pipelineMetrics.outlineItemCount =
-        progress.outlineItemCount ?? pipelineMetrics.outlineItemCount;
-      pipelineMetrics.plannedSectionCount =
-        progress.plannedSectionCount ?? pipelineMetrics.plannedSectionCount;
-      pipelineMetrics.providerCallCount = progress.providerCallCount;
-      pipelineMetrics.retryCount = progress.retryCount;
-      await updateProcessingJobProgress(client, {
-        jobId: job.id,
-        workerId,
-        stage: progress.stage,
-        statusMessage: reviewerStatusMessage(progress.stage),
-        ...(progress.completedUnits !== undefined
-          ? { completedUnits: progress.completedUnits }
-          : {}),
-        ...(progress.totalUnits !== undefined
-          ? { totalUnits: progress.totalUnits, unitLabel: "sections" }
-          : {}),
-        metrics: toJson({
-          sourceCharacterCount: progress.sourceCharacterCount ?? source.source_text?.length ?? 0,
-          normalizedCharacterCount: progress.normalizedCharacterCount ?? null,
-          outlineItemCount: progress.outlineItemCount ?? null,
-          plannedSectionCount: progress.plannedSectionCount ?? null,
-          providerCallCount: progress.providerCallCount,
-          retryCount: progress.retryCount,
-        }),
-      });
-    },
-  });
-
-  await updateProcessingJobProgress(client, {
-    jobId: job.id,
-    workerId,
-    stage: "storing_reviewer",
-    statusMessage: "Storing reviewer",
-    completedUnits: reviewer.sections.length,
-    totalUnits: reviewer.sections.length,
-    unitLabel: "sections",
-  });
-
-  const metrics = {
-    sourceCharacterCount: source.source_text.length,
-    normalizedCharacterCount: pipelineMetrics.normalizedCharacterCount,
-    outlineItemCount: pipelineMetrics.outlineItemCount,
-    plannedSectionCount:
-      pipelineMetrics.plannedSectionCount ?? reviewer.sections.length,
-    providerCallCount: pipelineMetrics.providerCallCount,
-    retryCount: pipelineMetrics.retryCount,
-    finalReviewerSectionCount: reviewer.sections.length,
-    coverageStatus: reviewer.metadata.coverageStatus,
-    coverageScore: reviewer.metadata.coverageScore,
-    groundingStatus: reviewer.metadata.groundingStatus,
-    groundingScore: reviewer.metadata.groundingScore,
-    leakageStatus: reviewer.metadata.leakageStatus,
-    generationDurationMs: Date.now() - generationStartedAt,
-  };
-  return {
-    payload: {
-      reviewer,
-      ...(reviewerSourceSnapshotId ? { sourceSnapshotId: reviewerSourceSnapshotId } : {}),
-    },
-    metrics,
-  };
-}
-
-function readReviewerSourceKind(value: unknown): NormalizedSourceKind | undefined {
-  return value === "document" ||
-    value === "presentation" ||
-    value === "webpage" ||
-    value === "plain-text" ||
-    value === "unknown"
-    ? value
-    : undefined;
+  return processAIReviewerJob(client, job, workerId);
 }
 
 interface ProcessorContext {
@@ -596,18 +470,6 @@ function extractionStatusMessage(stage: string): string {
   }
 }
 
-function reviewerStatusMessage(stage: string): string {
-  switch (stage) {
-    case "normalizing_source": return "Preparing source";
-    case "detecting_outline": return "Organizing topics";
-    case "planning_sections": return "Planning reviewer sections";
-    case "generating_sections": return "Creating reviewer sections";
-    case "verifying_coverage": return "Checking coverage";
-    case "retrying_sections": return "Improving sections";
-    default: return "Finishing reviewer";
-  }
-}
-
 function mapExtractionFailure(code: string): WorkerJobError {
   const retryable =
     code === "ocr_provider_failed" ||
@@ -636,8 +498,13 @@ export function mapWorkerFailure(error: unknown): WorkerJobError {
     );
   }
   if (error instanceof WorkerJobError) return error;
-  if (error instanceof ExperienceFailure && error.code.startsWith('quiz_')) {
-    return new WorkerJobError(error.code, 'Quiz generation could not be completed.', error.status >= 500);
+  if (error instanceof ExperienceFailure) {
+    const message = error.code === 'insufficient_source'
+      ? 'The material does not contain enough readable lesson content. Check the Canvas attachment or choose another source.'
+      : error.code === 'source_attachment_unavailable'
+        ? 'The linked Canvas file could not be prepared. Check file access in Canvas and try again.'
+        : 'Generation could not be completed.';
+    return new WorkerJobError(error.code, message, error.status >= 500);
   }
   if (error instanceof PipelineAssemblyError) {
     return new WorkerJobError(
@@ -692,10 +559,6 @@ function isDatabaseContractError(code: string | undefined): boolean {
 
 function toJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value)) as Json;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function withTimeout<T>(

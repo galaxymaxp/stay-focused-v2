@@ -1,13 +1,13 @@
 import type { ReviewerOutput, ReviewerSection, SectionOutput } from "@stay-focused/engine";
 import type {
-  Json,
-  ReviewerInsert,
-  ReviewerRow,
+  GeneratedArtifactRow,
+  GeneratedArtifactVersionRow,
   SavedReviewerDetail,
   SavedReviewerSourceMetadata,
   SavedReviewerSourceMode,
   SavedReviewerSourceProvenanceSummary,
   SavedReviewerSummary,
+  SourceVersionRow,
 } from "@stay-focused/db";
 
 import { DURABLE_DOCUMENT_MAX_PDF_PAGES } from "./ocr/upload-policy";
@@ -151,63 +151,61 @@ export function validateRenameReviewerRequest(
   return { ok: true, value: { title: title.value } };
 }
 
-export function createReviewerInsert(
-  userId: string,
-  value: ValidatedCreateReviewerRequest,
-): ReviewerInsert {
+export function mapCanonicalReviewerSummary(
+  artifact: GeneratedArtifactRow,
+  version: GeneratedArtifactVersionRow,
+  source: SourceVersionRow,
+): SavedReviewerSummary {
+  const payload = isRecord(version.payload) ? version.payload : {};
+  const reviewer = isRecord(payload.reviewer) ? payload.reviewer : payload;
   return {
-    user_id: userId,
-    title: value.title,
-    source_metadata: sourceMetadataToJson(value.sourceMetadata),
-    ...(value.sourceSnapshotId
-      ? { source_snapshot_id: value.sourceSnapshotId }
-      : {}),
-    reviewer_output: value.reviewerOutput as unknown as Json,
-    section_count: value.sectionCount,
+    id: artifact.id,
+    title: artifact.safe_title,
+    sourceMetadata: canonicalSourceMetadata(source),
+    sectionCount: Array.isArray(reviewer.sections) ? reviewer.sections.length : 0,
+    createdAt: artifact.created_at,
+    updatedAt: artifact.updated_at,
   };
 }
 
-export function mapReviewerSummary(row: ReviewerRow): SavedReviewerSummary {
-  return {
-    id: row.id,
-    title: row.title,
-    sourceMetadata: coerceSourceMetadata(row.source_metadata),
-    sectionCount: row.section_count,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-export function mapReviewerDetail(
-  row: ReviewerRow,
+export function mapCanonicalReviewerDetail(
+  artifact: GeneratedArtifactRow,
+  version: GeneratedArtifactVersionRow,
+  source: SourceVersionRow,
   sourceProvenance?: SavedReviewerSourceProvenanceSummary | null,
-):
-  | { readonly ok: true; readonly value: SavedReviewerDetail<ReviewerOutput> }
-  | { readonly ok: false } {
-  if (!isReviewerOutput(row.reviewer_output)) {
-    return { ok: false };
-  }
-
+): { readonly ok: true; readonly value: SavedReviewerDetail<ReviewerOutput> } | { readonly ok: false } {
+  const payload = isRecord(version.payload) ? version.payload : {};
+  const reviewer = isRecord(payload.reviewer) ? payload.reviewer : payload;
+  if (!isReviewerOutput(reviewer)) return { ok: false };
   return {
     ok: true,
     value: {
-      ...mapReviewerSummary(row),
-      reviewerOutput: row.reviewer_output,
+      ...mapCanonicalReviewerSummary(artifact, version, source),
+      reviewerOutput: reviewer,
       ...(sourceProvenance ? { sourceProvenance } : {}),
     },
   };
 }
 
-export function sourceMetadataToJson(
-  metadata: SavedReviewerSourceMetadata,
-): Json {
+export function canonicalReviewerSnapshotId(source: SourceVersionRow): string | null {
+  const metadata = isRecord(source.metadata) ? source.metadata : {};
+  return typeof metadata.reviewerSourceSnapshotId === "string"
+    ? metadata.reviewerSourceSnapshotId
+    : null;
+}
+
+function canonicalSourceMetadata(source: SourceVersionRow): SavedReviewerSourceMetadata {
+  const metadata = isRecord(source.metadata) ? source.metadata : {};
+  const snapshotId = canonicalReviewerSnapshotId(source);
+  const sourceLabel = typeof metadata.sourceTitle === "string"
+    ? metadata.sourceTitle.trim()
+    : typeof metadata.sourceLabel === "string"
+      ? metadata.sourceLabel.trim()
+      : "";
   return {
-    sourceMode: metadata.sourceMode,
-    sourceCharacterCount: metadata.sourceCharacterCount,
-    ...(metadata.pdfPageCount !== undefined
-      ? { pdfPageCount: metadata.pdfPageCount }
-      : {}),
-    ...(metadata.sourceLabel ? { sourceLabel: metadata.sourceLabel } : {}),
+    sourceMode: snapshotId ? "canvas" : "paste",
+    sourceCharacterCount: source.character_count,
+    ...(sourceLabel ? { sourceLabel: sourceLabel.slice(0, MAX_REVIEWER_TITLE_LENGTH) } : {}),
   };
 }
 
@@ -347,18 +345,6 @@ function validateOptionalSourceSnapshotId(
     return invalidRequest("sourceSnapshotId must be a valid UUID when provided.");
   }
   return { ok: true, value: value.trim() };
-}
-
-function coerceSourceMetadata(value: Json): SavedReviewerSourceMetadata {
-  const metadata = validateSourceMetadata(value);
-  if (metadata.ok) {
-    return metadata.value;
-  }
-
-  return {
-    sourceMode: "paste",
-    sourceCharacterCount: 0,
-  };
 }
 
 function isSourceMode(value: unknown): value is SavedReviewerSourceMode {

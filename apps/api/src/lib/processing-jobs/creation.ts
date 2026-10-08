@@ -30,6 +30,7 @@ import {
 } from "./contracts";
 import {
   createProcessingJobRecord,
+  createProcessingJobServiceClient,
   findProcessingJobByIdempotencyKey,
   ProcessingJobRepositoryError,
   type ProcessingJobServiceClient,
@@ -54,6 +55,14 @@ export interface ReviewerJobSourceInput {
   readonly language?: string;
   readonly outputMode?: string;
   readonly reuseMode?: GenerationReuseMode;
+}
+
+export interface DeferredCanvasReviewerJobSourceInput {
+  readonly byteSize: number;
+  readonly canvasFileRowId: string;
+  readonly contentSha256: string;
+  readonly displayName: string;
+  readonly sourcePrivateMetadata: Json;
 }
 
 export async function createExtractionProcessingJob({
@@ -212,6 +221,11 @@ export async function createReviewerProcessingJob({
   readonly userId: string;
 }): Promise<ProcessingJobDatabaseRow> {
   const normalizedTitle = source.sourceTitle?.trim();
+  const privateMetadata = isRecord(source.sourcePrivateMetadata) ? source.sourcePrivateMetadata : {};
+  const canvasItems = Array.isArray(privateMetadata.canvasItemIds) ? privateMetadata.canvasItemIds : [];
+  const canvasSourceType = canvasItems.length === 1 && typeof canvasItems[0] === "string"
+    ? canvasItems[0].startsWith("file:") ? "canvas_file" : canvasItems[0].startsWith("page:") ? "canvas_page" : "canvas_mixed"
+    : canvasItems.length > 1 ? "canvas_mixed" : null;
   const resolvedSource = source.sourceVersionId
     ? await resolveReviewerSource(client, userId, source)
     : {
@@ -269,9 +283,8 @@ export async function createReviewerProcessingJob({
       sourceCharacterCount: resolvedSource.sourceText.length,
       sourceMetadata,
       sourcePrivateMetadata: toJson({
-        ...(isRecord(source.sourcePrivateMetadata)
-          ? source.sourcePrivateMetadata
-          : {}),
+        ...privateMetadata,
+        ...(canvasSourceType ? { sourceType: canvasSourceType } : {}),
         ...(normalizedTitle ? { sourceTitle: normalizedTitle } : {}),
         ...(source.sourceKind ? { reviewerSourceKind: source.sourceKind } : {}),
         ...(source.sourceBlocks && source.sourceBlocks.length > 0
@@ -320,6 +333,50 @@ export async function createReviewerProcessingJob({
     }
     throw mapRepositoryCreationError(error);
   }
+}
+
+export async function createDeferredCanvasReviewerProcessingJob({
+  client,
+  idempotencyKey,
+  source,
+  userId,
+}: {
+  readonly client: ProcessingJobServiceClient;
+  readonly idempotencyKey: string;
+  readonly source: DeferredCanvasReviewerJobSourceInput;
+  readonly userId: string;
+}): Promise<ProcessingJobDatabaseRow> {
+  const job = await createReviewerProcessingJob({
+    client,
+    idempotencyKey,
+    userId,
+    source: {
+      sourceText: `canvas-source-reference:${source.canvasFileRowId}:${source.contentSha256}`,
+      sourceTitle: source.displayName,
+      sourcePrivateMetadata: source.sourcePrivateMetadata,
+    },
+  });
+  const stagingClient = createProcessingJobServiceClient();
+  const { data, error } = await stagingClient.rpc("stage_deferred_canvas_reviewer_pdf_v1", {
+    p_canvas_file_id: source.canvasFileRowId,
+    p_expected_byte_size: source.byteSize,
+    p_expected_content_sha256: source.contentSha256,
+    p_job_id: job.id,
+  });
+  const staged = data?.[0];
+  if (error || !staged) {
+    // The staging RPC is transactional. Mark only an undispatched placeholder
+    // as failed; a staged source remains eligible for idempotent reconnect.
+    await stagingClient.rpc("mark_canvas_reviewer_staging_failed_v1", {
+      p_job_id: job.id,
+    });
+    throw new ProcessingJobCreationError(
+      "processing_job_persistence_failed",
+      "The Canvas PDF reference could not be staged durably.",
+      true,
+    );
+  }
+  return staged;
 }
 
 export function validateIdempotencyKey(

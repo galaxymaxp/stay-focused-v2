@@ -1,15 +1,15 @@
 import type { GenerationState } from './experience';
-export type QuizChoiceQuestionType = 'single_select' | 'multi_select' | 'true_false';
-export type QuizQuestionType = QuizChoiceQuestionType | 'matching';
+export type QuizQuestionType = 'single_select' | 'multi_select' | 'true_false' | 'identification' | 'modified_true_false' | 'matching';
 export type QuizDifficulty = 'easy' | 'medium' | 'hard';
 export type QuizGenerationState = GenerationState;
 export interface QuizGenerationRequest {
     readonly sourceType: 'material' | 'reviewer';
     readonly sourceIds: readonly string[];
-    readonly reviewerId?: string;
+    readonly reviewerArtifactId?: string;
     readonly questionCount: number;
     readonly difficulty: QuizDifficulty | 'mixed';
     readonly questionTypes?: readonly QuizQuestionType[];
+    readonly selectedTopicIds?: readonly string[];
 }
 export interface QuizSourceReference {
     readonly materialId: string;
@@ -22,110 +22,72 @@ export interface QuizQuestionOption {
     readonly text: string;
 }
 /** Explicit learner projection: no key, explanation, evidence or verifier output. */
-export interface QuizChoiceQuestion {
+export interface QuizQuestion {
     readonly id: string;
-    readonly type: QuizChoiceQuestionType;
+    readonly type: QuizQuestionType;
     readonly prompt: string;
     readonly options: readonly QuizQuestionOption[];
-    readonly selectionInstruction: 'Choose one answer.' | 'Select all correct answers.';
+    readonly selectionInstruction: string;
+    /** A matching item asks for one pair; this is its visible left side. */
+    readonly leftItem?: string;
+    /** Matching block: stable left IDs; right-side options are the normal options array. */
+    readonly matchingPairs?: readonly { readonly id: string; readonly leftItem: string }[];
     readonly difficulty: QuizDifficulty;
 }
-export interface QuizMatchingItem {
-    readonly id: string;
-    readonly label: string;
-}
-export interface QuizMatchPair {
-    readonly leftItemId: string;
-    readonly rightItemId: string;
-}
-/** One-to-one relationships. Correct pairs exist only in private keys/allowed feedback. */
-export interface QuizMatchingQuestion {
-    readonly id: string;
-    readonly type: 'matching';
-    readonly prompt: string;
-    readonly leftItems: readonly QuizMatchingItem[];
-    readonly rightItems: readonly QuizMatchingItem[];
-    readonly selectionInstruction: 'Match each item to one answer.';
-    readonly difficulty: QuizDifficulty;
-}
-export type QuizQuestion = QuizChoiceQuestion | QuizMatchingQuestion;
-export type QuizLearningState = 'not_started' | 'in_progress' | 'completed' | 'abandoned';
-/** Server-derived learning progress, independent of artifact generation status.
- * questionCount and the nullable percentage scores reuse the existing Quiz names.
- */
-export interface QuizLearningProgress {
-    readonly learningState: QuizLearningState;
-    /** Distinct questions with a saved nonempty selection or mapping, including unchecked drafts. */
-    readonly answeredCount: number;
-    readonly questionCount: number;
-    readonly activeAttemptId: string | null;
-    readonly attemptCount: number;
-    readonly completedAttemptCount: number;
-    readonly latestCompletedAt: string | null;
-    readonly latestScore: number | null;
-    readonly bestScore: number | null;
-}
-export interface QuizSummary extends QuizLearningProgress {
+export interface QuizSummary {
     readonly id: string;
     readonly title: string;
-    readonly courseId: string;
-    readonly reviewerId: string | null;
+    readonly courseId: string | null;
+    readonly reviewerArtifactId: string | null;
     readonly sourceId: string | null;
     readonly sourceMaterialIds: readonly string[];
+    readonly questionCount: number;
     readonly difficulty: QuizDifficulty | 'mixed';
     readonly createdAt: string;
     readonly updatedAt: string;
+    readonly attemptCount: number;
+    readonly latestScore: number | null;
+    readonly bestScore: number | null;
+    readonly activeAttempt?: { readonly id: string; readonly currentQuestion: number; readonly answeredCount: number; readonly skippedCount: number; readonly revealedCount: number } | null;
 }
 export interface Quiz extends QuizSummary {
     readonly questions: readonly QuizQuestion[];
 }
-export interface QuizChoiceAnswer {
-    /** Missing only in legacy choice payloads; new API projections emit choice. */
-    readonly type?: 'choice';
+export interface QuizAttemptAnswer {
     readonly questionId: string;
     readonly selectedOptionIds: readonly string[];
     readonly finalizedAt: string | null;
 }
-export interface QuizMatchingAnswer {
-    readonly type: 'matching';
+export interface QuizQuestionResult {
     readonly questionId: string;
-    readonly pairs: readonly QuizMatchPair[];
-    readonly finalizedAt: string | null;
-}
-export type QuizAttemptAnswer = QuizChoiceAnswer | QuizMatchingAnswer;
-interface QuizResultFeedback {
-    readonly questionId: string;
+    readonly selectedOptionIds: readonly string[];
+    readonly correctOptionIds: readonly string[];
     readonly correct: boolean;
+    readonly revealed?: boolean;
+    readonly assisted?: boolean;
+    readonly skipped?: boolean;
+    readonly pairCorrectCount?: number;
+    readonly pairCount?: number;
     readonly explanation: string;
     readonly topicId: string;
     readonly topic: string;
     readonly sourceRefs: readonly QuizSourceReference[];
     readonly reviewerSectionIds: readonly string[];
 }
-export interface QuizChoiceQuestionResult extends QuizResultFeedback {
-    readonly type?: 'choice';
-    readonly selectedOptionIds: readonly string[];
-    readonly correctOptionIds: readonly string[];
-}
-export interface QuizMatchingQuestionResult extends QuizResultFeedback {
-    readonly type: 'matching';
-    readonly pairs: readonly QuizMatchPair[];
-    readonly correctPairs: readonly QuizMatchPair[];
-}
-export type QuizQuestionResult = QuizChoiceQuestionResult | QuizMatchingQuestionResult;
 export interface QuizAttempt {
     readonly id: string;
     readonly quizId: string;
     readonly startedAt: string;
     readonly completedAt: string | null;
     readonly status: 'in_progress' | 'completed' | 'abandoned';
+    readonly currentQuestion: number;
+    readonly skippedQuestionIds: readonly string[];
+    readonly revealedQuestionIds: readonly string[];
+    readonly assistedQuestionIds: readonly string[];
+    readonly updatedAt: string;
     readonly answers: readonly QuizAttemptAnswer[];
     /** Only intentionally finalized questions appear here. */
     readonly feedback: readonly QuizQuestionResult[];
-}
-/** Public history metadata; never includes private keys or answer feedback. */
-export interface QuizAttemptSummary extends Pick<QuizAttempt, 'id' | 'quizId' | 'startedAt' | 'completedAt' | 'status'> {
-    readonly percentage: number | null;
 }
 export interface QuizTopicPerformance {
     readonly topicId: string;
@@ -144,7 +106,12 @@ export interface QuizResult {
     readonly quizId: string;
     readonly correctCount: number;
     readonly incorrectCount: number;
+    readonly skippedCount: number;
+    /** Answers revealed before final submission, with no recall credit. */
+    readonly revealedCount: number;
     readonly totalQuestions: number;
+    readonly earnedPoints: number;
+    readonly possiblePoints: number;
     readonly percentage: number;
     readonly questions: readonly QuizQuestionResult[];
     readonly topicPerformance: readonly QuizTopicPerformance[];

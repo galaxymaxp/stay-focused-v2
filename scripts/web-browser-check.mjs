@@ -356,11 +356,11 @@ try {
     .getByRole("heading", { name: "Practice question 1", exact: true })
     .waitFor();
   await captureExperience("quiz-question");
-  assert(
-    await page
-      .getByRole("button", { name: "See results", exact: true })
-      .isDisabled(),
-  );
+  await page.getByRole("button", { name: "Finish quiz", exact: true }).click();
+  await page.getByText(/You still have 5 unanswered questions/).waitFor();
+  await page
+    .getByRole("button", { name: "Continue Quiz", exact: true })
+    .click();
   assert.equal(
     await page.getByText("Correct answer", { exact: true }).count(),
     0,
@@ -386,8 +386,14 @@ try {
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await page.getByRole("heading", { name: "Correct", exact: true }).waitFor();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByLabel("Match Planning", { exact: true }).selectOption("r1");
-  await page.getByLabel("Match Reviewing", { exact: true }).selectOption("r2");
+  await page.getByRole("button", { name: "Planning", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Set available time", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Reviewing", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Check understanding", exact: true })
+    .click();
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await page.getByRole("heading", { name: "Correct", exact: true }).waitFor();
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -411,11 +417,11 @@ try {
     .click();
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await page.getByRole("heading", { name: "Correct", exact: true }).waitFor();
-  await page.getByRole("button", { name: "See results", exact: true }).click();
+  await page.getByRole("button", { name: "Finish quiz", exact: true }).click();
   await page
     .getByRole("button", { name: "Continue Quiz", exact: true })
     .click();
-  await page.getByRole("button", { name: "See results", exact: true }).click();
+  await page.getByRole("button", { name: "Finish quiz", exact: true }).click();
   await page.getByRole("button", { name: "Finish Quiz", exact: true }).click();
   await page.getByText("100%", { exact: true }).waitFor();
   await capture("quiz-result-mobile");

@@ -1,10 +1,14 @@
 import { Stack } from "expo-router";
 
+import { hierarchyMotion } from "../../../../src/design/navigationMotion";
+import { useTheme } from "../../../../src/design/theme";
+
 /**
- * Courses owns a stack so a course's reviewer and grade screens push inside the
- * tab. Back returns to the course list and the other tabs keep their state,
- * which is what the switcher's `onBackToCourses` callbacks approximated.
+ * Generate hierarchy: course list → course → material. Each level is a real
+ * stack entry, so header back, Android back and the swipe gesture all return
+ * one level instead of leaving the tab.
  */
 export default function CoursesLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  const { colors, reducedMotion } = useTheme();
+  return <Stack screenOptions={hierarchyMotion(reducedMotion, colors.backgroundPrimary)} />;
 }

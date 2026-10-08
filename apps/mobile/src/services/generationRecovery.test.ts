@@ -33,6 +33,23 @@ describe("durable generation admission", () => {
     ]);
     expect(await readGenerationIntents("owner")).toHaveLength(2);
   });
+  it("replaces an unreadable local admission cache without duplicating server work", async () => {
+    values.set("sf.generation.v1.owner", "corrupt-local-value");
+    const intent = await createGenerationIntent("owner", input);
+    expect(await readGenerationIntents("owner")).toEqual([intent]);
+    const fetchImpl = vi.fn(async () =>
+      Response.json(
+        { ok: true, data: { id: "saved-job", state: "queued" } },
+        { status: 202 },
+      ),
+    );
+    await acceptGeneration(
+      "owner",
+      { baseUrl: "https://api.example", accessToken: "token", fetchImpl },
+      intent,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
   it("reconnects duplicate in-flight admission once even if the screen leaves", async () => {
     const intent = await createGenerationIntent("owner", input);
     let finish!: (response: Response) => void;

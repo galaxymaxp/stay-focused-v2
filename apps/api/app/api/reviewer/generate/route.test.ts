@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach,describe,expect,it,vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   class PipelineAssemblyError extends Error {
@@ -42,7 +42,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@stay-focused/engine", () => ({
   PipelineAssemblyError: mocks.PipelineAssemblyError,
-  runPipeline: mocks.runPipeline,
+  runAIReviewer: mocks.runPipeline,
 }));
 
 vi.mock("@/lib/auth", () => ({

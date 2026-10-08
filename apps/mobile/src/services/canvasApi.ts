@@ -5,6 +5,7 @@ import type {
 } from "@stay-focused/canvas";
 
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 
 const CONNECTION_PATH = "/api/canvas/connection";
 const COURSES_PATH = "/api/canvas/courses";
@@ -856,10 +857,13 @@ export async function connectCanvas(
   const endpoint = createEndpoint(input.apiBaseUrl, CONNECTION_PATH);
   if (!endpoint.ok) return endpoint;
 
-  const baseUrl = input.baseUrl.trim();
-  if (!baseUrl) {
+  const enteredBaseUrl = input.baseUrl.trim();
+  if (!enteredBaseUrl) {
     return clientError("missing_canvas_url", "Enter your Canvas URL.");
   }
+  const baseUrl = /^[a-z][a-z0-9+.-]*:/i.test(enteredBaseUrl)
+    ? enteredBaseUrl
+    : `https://${enteredBaseUrl}`;
 
   const personalAccessToken = input.personalAccessToken.trim();
   if (!personalAccessToken) {
@@ -1453,31 +1457,11 @@ function createEndpoint(
 ):
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly error: CanvasApiClientError } {
-  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/+$/, "");
-  if (!normalizedBaseUrl) {
-    return clientError("invalid_api_base_url", API_BASE_URL_SETUP_HINT);
-  }
-
   try {
-    const parsed = new URL(normalizedBaseUrl);
-    if (
-      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return clientError(
-        "invalid_api_base_url",
-        `EXPO_PUBLIC_API_BASE_URL must be a plain HTTP(S) base URL. ${API_BASE_URL_SETUP_HINT}`,
-      );
-    }
+    return { ok: true, url: `${requireApiBaseUrl(apiBaseUrl)}${path}` };
   } catch {
-    return clientError(
-      "invalid_api_base_url",
-      `EXPO_PUBLIC_API_BASE_URL must be a valid API base URL. ${API_BASE_URL_SETUP_HINT}`,
-    );
+    return clientError("invalid_api_base_url", API_CONFIGURATION_MESSAGE);
   }
-
-  return { ok: true, url: `${normalizedBaseUrl}${path}` };
 }
 
 async function requestJson<TData>({
@@ -2031,6 +2015,7 @@ function mapApiErrorCode(code: string): CanvasApiClientErrorCode {
     case "canvas_connection_corrupt":
       return "corrupted_credentials";
     case "canvas_sync_in_progress":
+    case "canvas_sync_job_in_progress":
       return "sync_in_progress";
     case "canvas_course_not_found":
       return "course_not_found";

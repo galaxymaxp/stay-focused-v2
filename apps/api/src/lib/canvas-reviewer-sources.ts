@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
 import {
   CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST,
+  classifyDirectlyAccessiblePageFile,
   isNewlySupportedOfficeFile,
   normalizeMimeType,
 } from "@/lib/canvas-file-policy";
@@ -297,6 +298,8 @@ interface NormalizedSourceRecord {
   readonly descriptor: CanvasReviewerSourceDescriptor;
   readonly text: string | null;
   readonly provenance?: CanvasSourceManifestItemBase;
+  /** Assignment/announcement files stay with their parent unless a module independently lists them. */
+  readonly excludeFromGenerate?: boolean;
 }
 
 export interface PreviewSourceRecord {
@@ -389,8 +392,9 @@ export async function listCanvasReviewerSources({
   }
 
   const ordered = sources.value
+    .filter((source) => !source.excludeFromGenerate)
     .map((source) => source.descriptor)
-    .filter((source) => source.type !== "announcement")
+    .filter(isCanvasGenerateCandidate)
     .sort(compareSources);
   const normalizedLimit = normalizeListLimit(limit);
   const normalizedOffset = normalizeListOffset(offset);
@@ -422,6 +426,72 @@ export async function listCanvasReviewerSources({
       unavailableSourceCount,
     },
   };
+}
+
+/**
+ * Generate is a learning-material surface, not a raw Canvas-object browser.
+ * Canvas object type is authoritative for assignments and announcements. For
+ * otherwise ambiguous Pages/files, use the small set of administrative labels
+ * observed in synchronized Canvas metadata and module placement. The source
+ * remains persisted for Tasks/announcement handling; it is only omitted from
+ * the study-material picker.
+ */
+function isCanvasGenerateCandidate(
+  source: CanvasReviewerSourceDescriptor,
+): boolean {
+  if (source.type === "assignment" || source.type === "announcement") {
+    return false;
+  }
+
+  // A Canvas Page with no readable instructional body is a grouping or
+  // navigation object, even when it is linked from a course module.
+  if (source.type === "page" && source.availability !== "available") {
+    return false;
+  }
+
+  // Canvas file inventory also contains course artwork, avatars, and banners.
+  // Only a direct module File item establishes image learning-material intent.
+  if (source.file?.kind === "image" && source.placement.group !== "module") {
+    return false;
+  }
+
+  const title = normalizeRoutingLabel(source.title);
+  const moduleTitle = normalizeRoutingLabel(source.placement.moduleTitle ?? "");
+
+  if (
+    /^(?:welcome|course syllabus|syllabus|course outline|course overview|instructor s profile|instructor profile|student orientation(?: .*)?|course requirements|grading (?:policy|system))$/.test(
+      title,
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    /\bcourse (?:introduction(?: and orientation)?|orientation|outline|syllabus|pacing)\b/.test(
+      title,
+    ) ||
+    /^(?:house rules|room assignment)(?: .*)?$/.test(title)
+  ) {
+    return false;
+  }
+
+  return !(
+    /^(?:general information|week 0 orientation|module 0 course information module)$/.test(
+      moduleTitle,
+    ) ||
+    /\b(?:orientation|policies and guidelines|course requirements)\b/.test(
+      moduleTitle,
+    )
+  );
+}
+
+function normalizeRoutingLabel(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[’']/g, " ")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 export async function previewCanvasReviewerSources({
@@ -600,12 +670,15 @@ export async function structureCanvasReviewerSources({
   client,
   courseId,
   ocrProvider,
+  pageBundleSourceId,
   sourceIds,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
   readonly ocrProvider?: OcrProvider;
+  /** Internal admission path for one owned Page and its already checked file links. */
+  readonly pageBundleSourceId?: string;
   readonly sourceIds: readonly string[];
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<CanvasSourceStructure>> {
@@ -616,16 +689,21 @@ export async function structureCanvasReviewerSources({
   const ocrFileCount = normalizedIds.value.filter(
     (source) => source.type === "file",
   ).length;
-  if (ocrFileCount > CANVAS_REVIEWER_MAX_OCR_FILES) {
+  const pageBundle = pageBundleSourceId !== undefined &&
+    normalizedIds.value[0]?.original === pageBundleSourceId &&
+    normalizedIds.value[0]?.type === 'page' &&
+    normalizedIds.value.every((source, index) => index === 0 || source.type === 'file');
+  const fileLimit = pageBundle ? CANVAS_REVIEWER_MAX_SOURCES - 1 : CANVAS_REVIEWER_MAX_OCR_FILES;
+  if (ocrFileCount > fileLimit) {
     return {
       ok: false,
       status: 400,
       code: "canvas_source_ocr_file_limit_exceeded",
       details: {
-        maximumSourceCount: CANVAS_REVIEWER_MAX_OCR_FILES,
+        maximumSourceCount: fileLimit,
         selectedSourceCount: ocrFileCount,
       },
-      message: "You can use one PDF or image per reviewer preview.",
+      message: `You can use at most ${fileLimit} files for this reviewer source.`,
     };
   }
 
@@ -1039,11 +1117,14 @@ export async function previewSelectiveCanvasReviewerSources({
 export async function prepareCanvasReviewerSources({
   client,
   courseId,
+  pageAttachmentId,
   sourceIds,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
+  /** Owned Page row ID, supplied only after resolving its authenticated same-course link. */
+  readonly pageAttachmentId?: string;
   readonly sourceIds: readonly string[];
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<CanvasReviewerSourcePrepare>> {
@@ -1097,8 +1178,20 @@ export async function prepareCanvasReviewerSources({
     };
   }
 
+  let directlyLinkedFileId: string | undefined;
+  if (pageAttachmentId) {
+    if (fileIds.length !== 1) return { ok: false, status: 400, code: 'invalid_request', message: 'Prepare one Page attachment at a time.' };
+    const { data: reference, error: referenceError } = await client.from('canvas_file_references').select('id')
+      .eq('user_id', userId).eq('canvas_connection_id', course.value.connection.id)
+      .eq('course_id', courseId).eq('file_id', fileIds[0]!)
+      .eq('reference_type', 'page').eq('referenced_row_id', pageAttachmentId).maybeSingle();
+    if (referenceError || !reference) return { ok: false, status: 404, code: 'canvas_file_not_found', message: 'The Page attachment was not found.' };
+    directlyLinkedFileId = fileIds[0];
+  }
+
   const unsupported = files.value.find(
-    (file) => !isSupportedFileForSourcePreparation(file),
+    (file) => !isSupportedFileForSourcePreparation(file) &&
+      !(file.id === directlyLinkedFileId && isDirectlyLinkedPageFileCandidate(file)),
   );
   if (unsupported) {
     const descriptor = mapFileSource(unsupported).descriptor;
@@ -1117,6 +1210,7 @@ export async function prepareCanvasReviewerSources({
 
   const ingestion = await ingestCanvasFiles({
     client,
+    ...(directlyLinkedFileId ? { directlyLinkedFileId } : {}),
     fileIds,
     userId,
   });
@@ -1159,6 +1253,17 @@ export async function prepareCanvasReviewerSources({
         .filter(isDefined),
     },
   };
+}
+
+function isDirectlyLinkedPageFileCandidate(file: CanvasFileRow): boolean {
+  const kind = classifyStoredCanvasFileKind(file);
+  if (kind === 'unsupported') return false;
+  return (file.hidden === true || file.hidden_for_user === true) &&
+    classifyDirectlyAccessiblePageFile({ contentType: file.content_type, displayName: file.display_name,
+      filename: file.filename, size: file.size_bytes, locked: file.locked,
+      hidden: file.hidden, hiddenForUser: file.hidden_for_user, lockAt: file.lock_at,
+      unlockAt: file.unlock_at, mediaClass: file.media_class, mediaEntryId: file.media_entry_id }) ===
+      fileEligibilityForKind(kind);
 }
 
 export function normalizeCanvasHtmlToText(html: string | null): string {
@@ -1344,7 +1449,7 @@ async function loadCourseSourceDescriptors({
   readonly course: CanvasCourseRow;
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<readonly NormalizedSourceRecord[]>> {
-  const [pages, assignments, announcements, files, modules, moduleItems] = await Promise.all([
+  const [pages, assignments, announcements, files, modules, moduleItems, fileReferences] = await Promise.all([
     readPages({ client, connectionId: connection.id, courseId: course.id, userId }),
     readAssignments({
       client,
@@ -1366,6 +1471,7 @@ async function loadCourseSourceDescriptors({
       courseId: course.id,
       userId,
     }),
+    readFileReferencesForCourse({ client, connectionId: connection.id, courseId: course.id, userId }),
   ]);
 
   if (
@@ -1374,7 +1480,8 @@ async function loadCourseSourceDescriptors({
     !announcements.ok ||
     !files.ok ||
     !modules.ok ||
-    !moduleItems.ok
+    !moduleItems.ok ||
+    !fileReferences.ok
   ) {
     return storageFailure("Canvas sources could not be loaded.");
   }
@@ -1401,7 +1508,13 @@ async function loadCourseSourceDescriptors({
       ...pages.value.map(mapPageSource).map(applyPlacement),
       ...assignments.value.map(mapAssignmentSource).map(applyPlacement),
       ...announcements.value.map(mapAnnouncementSource).map(applyPlacement),
-      ...files.value.map(mapFileSource).map(applyPlacement),
+      ...files.value.map((file) => {
+        const placement = placements.get(formatSourceId("file", file.id)) ?? ungroupedPlacement();
+        const parentWorkReference = fileReferences.value.some((reference) =>
+          reference.file_id === file.id && ["assignment", "typed_attachment", "announcement"].includes(reference.reference_type),
+        );
+        return { ...mapFileSource(file), excludeFromGenerate: parentWorkReference && placement.group !== "module" };
+      }).map(applyPlacement),
     ],
   };
 }
@@ -3252,6 +3365,24 @@ async function readFileReferencesByFileIds(
     return { ok: false };
   }
   return { ok: true, value: data as readonly CanvasFileReferenceRow[] };
+}
+
+async function readFileReferencesForCourse(query: SourceQuery): Promise<
+  | { readonly ok: true; readonly value: readonly Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[] }
+  | { readonly ok: false }
+> {
+  const references: Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[] = [];
+  for (let offset = 0; offset < 10_000; offset += 200) {
+    const { data, error } = await query.client.from("canvas_file_references")
+      .select("file_id,reference_type").eq("user_id", query.userId)
+      .eq("canvas_connection_id", query.connectionId).eq("course_id", query.courseId)
+      .order("id").range(offset, offset + 199);
+    if (error || !data) return { ok: false };
+    const page = data as unknown as readonly Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[];
+    references.push(...page);
+    if (page.length < 200) return { ok: true, value: references };
+  }
+  return { ok: false };
 }
 
 async function readModuleItemsForReferences(query: SourceQuery): Promise<

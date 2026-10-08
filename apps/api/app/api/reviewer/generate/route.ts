@@ -1,23 +1,23 @@
-import { PipelineAssemblyError, runPipeline } from "@stay-focused/engine";
+import { PipelineAssemblyError,runAIReviewer as runPipeline } from "@stay-focused/engine";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createCanvasServiceClient } from "@/lib/canvas-db";
 import { validateCanvasReviewerGenerationGate } from "@/lib/canvas-reviewer-generation-gate";
 import {
-  REVIEWER_GENERATE_MAX_JSON_BODY_BYTES,
-  REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS,
+REVIEWER_GENERATE_MAX_JSON_BODY_BYTES,
+REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS,
 } from "@/lib/reviewer-generation-limits";
 import {
-  createOrReuseReviewerSourceSnapshot,
-  validateCanvasPreviewSessionForGeneration,
-  type ValidCanvasPreviewSession,
+createOrReuseReviewerSourceSnapshot,
+validateCanvasPreviewSessionForGeneration,
+type ValidCanvasPreviewSession,
 } from "@/lib/reviewer-source-provenance";
 import { createServerOpenAIProvider } from "@/providers";
 import type {
-  ReviewerGenerateErrorResponse,
-  ReviewerGenerateRequest,
-  ReviewerGenerateResponse,
+ReviewerGenerateErrorResponse,
+ReviewerGenerateRequest,
+ReviewerGenerateResponse,
 } from "@/types/reviewer";
 
 export const runtime = "nodejs";

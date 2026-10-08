@@ -48,14 +48,14 @@ export function createFixture() {
       type: "matching",
       prompt: "Match each study action",
       difficulty: "easy",
-      selectionInstruction: "Match each item to one answer.",
-      leftItems: [
-        { id: "l1", label: "Planning" },
-        { id: "l2", label: "Reviewing" },
+      selectionInstruction: "Match each term to one meaning.",
+      matchingPairs: [
+        { id: "l1", leftItem: "Planning" },
+        { id: "l2", leftItem: "Reviewing" },
       ],
-      rightItems: [
-        { id: "r2", label: "Check understanding" },
-        { id: "r1", label: "Set available time" },
+      options: [
+        { id: "r2", text: "Check understanding" },
+        { id: "r1", text: "Set available time" },
       ],
     },
     q("q3", "multi_select"),
@@ -113,7 +113,7 @@ export function createFixture() {
     id: ids.quiz,
     title: "Study practice",
     courseId: ids.course,
-    reviewerId: ids.reviewer,
+    reviewerArtifactId: ids.reviewer,
     sourceId: ids.material,
     sourceMaterialIds: [ids.material],
     difficulty: "mixed",
@@ -121,17 +121,17 @@ export function createFixture() {
     updatedAt: now(),
     questionCount: 5,
     questions,
-    learningState:
-      attempt?.status === "completed"
-        ? "completed"
-        : attempt
-          ? "in_progress"
-          : "not_started",
-    answeredCount: attempt?.answers.length ?? 0,
-    activeAttemptId: attempt?.status === "in_progress" ? attempt.id : null,
+    activeAttempt:
+      attempt?.status === "in_progress"
+        ? {
+            id: attempt.id,
+            currentQuestion: attempt.currentQuestion,
+            answeredCount: attempt.answers.filter((a) => a.finalizedAt).length,
+            skippedCount: 0,
+            revealedCount: attempt.revealedQuestionIds.length,
+          }
+        : null,
     attemptCount: attempt ? 1 : 0,
-    completedAttemptCount: attempt?.status === "completed" ? 1 : 0,
-    latestCompletedAt: attempt?.completedAt ?? null,
     latestScore: attempt?.status === "completed" ? 100 : null,
     bestScore: attempt?.status === "completed" ? 100 : null,
   });
@@ -196,7 +196,11 @@ export function createFixture() {
     quizId: ids.quiz,
     correctCount: attempt.feedback.filter((f) => f.correct).length,
     incorrectCount: attempt.feedback.filter((f) => !f.correct).length,
+    skippedCount: 5 - attempt.feedback.length,
+    revealedCount: attempt.revealedQuestionIds.length,
     totalQuestions: 5,
+    earnedPoints: attempt.feedback.filter((f) => f.correct).length,
+    possiblePoints: 5,
     percentage: attempt.feedback.filter((f) => f.correct).length * 20,
     questions: attempt.feedback,
     topicPerformance: [],
@@ -575,6 +579,11 @@ export function createFixture() {
           startedAt: now(),
           completedAt: null,
           status: "in_progress",
+          currentQuestion: 0,
+          skippedQuestionIds: [],
+          revealedQuestionIds: [],
+          assistedQuestionIds: [],
+          updatedAt: now(),
           answers: [],
           feedback: [],
         };
@@ -607,17 +616,18 @@ export function createFixture() {
         const qid = path.split("/").at(-1);
         attempt.answers = attempt.answers.filter((a) => a.questionId !== qid);
         const answer = {
-          ...body,
           questionId: qid,
+          selectedOptionIds: body.selectedOptionIds ?? [],
           finalizedAt: body.finalize ? now() : null,
         };
-        delete answer.finalize;
         attempt.answers.push(answer);
         counts.quizWrites++;
         if (body.finalize) {
           const correct =
             qid === "q2"
-              ? body.pairs?.length === 2
+              ? ["l1:r1", "l2:r2"].every((v) =>
+                  body.selectedOptionIds?.includes(v),
+                )
               : qid === "q3"
                 ? body.selectedOptionIds?.length === 2
                 : body.selectedOptionIds?.[0] === (qid === "q5" ? "o2" : "o1");
@@ -629,27 +639,32 @@ export function createFixture() {
             topic: "Study strategies",
             sourceRefs: [],
             reviewerSectionIds: [],
-            ...(qid === "q2"
-              ? {
-                  correctPairs: [
-                    { leftItemId: "l1", rightItemId: "r1" },
-                    { leftItemId: "l2", rightItemId: "r2" },
-                  ],
-                }
-              : {
-                  correctOptionIds:
-                    qid === "q3" ? ["o1", "o2"] : [qid === "q5" ? "o2" : "o1"],
-                }),
+            correctOptionIds:
+              qid === "q2"
+                ? ["l1:r1", "l2:r2"]
+                : qid === "q3"
+                  ? ["o1", "o2"]
+                  : [qid === "q5" ? "o2" : "o1"],
+            ...(qid === "q2" ? { pairCount: 2, pairCorrectCount: correct ? 2 : 0 } : {}),
           });
         }
         send(attempt);
         return;
       }
-      if (path.endsWith("/complete")) {
-        if (attempt.answers.filter((a) => a.finalizedAt).length !== 5) {
-          fail("quiz_result_unavailable");
-          return;
+      if (path.endsWith("/study-state")) {
+        if (body.action === "reveal" && body.questionId) {
+          attempt.revealedQuestionIds = [
+            ...new Set([...attempt.revealedQuestionIds, body.questionId]),
+          ];
+          attempt.assistedQuestionIds = attempt.revealedQuestionIds;
         }
+        if (Number.isInteger(body.position)) attempt.currentQuestion = body.position;
+        attempt.updatedAt = now();
+        counts.quizWrites++;
+        send(attempt);
+        return;
+      }
+      if (path.endsWith("/complete")) {
         attempt.status = "completed";
         attempt.completedAt = now();
         send(result());

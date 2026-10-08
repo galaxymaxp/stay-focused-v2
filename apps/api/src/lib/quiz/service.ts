@@ -1,20 +1,20 @@
-import type { Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
-import type { Quiz, QuizAttempt, QuizAttemptAnswer, QuizGenerationRequest, QuizQuestion, QuizQuestionResult, QuizResult, QuizTopicPerformance } from '@stay-focused/shared';
+import type { Database,Json,ProcessingJobDatabaseRow } from '@stay-focused/db';
+import { GenerationContractError } from '@stay-focused/engine';
+import type { Quiz,QuizAttempt,QuizAttemptAnswer,QuizGenerationRequest,QuizQuestion,QuizQuestionResult,QuizResult,QuizTopicPerformance } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
-import { createServerOpenAIProvider } from '@/providers';
 import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
+import { durableGenerationProvider } from '../processing-jobs/ai-generation';
 import { validateIdempotencyKey } from '../processing-jobs/creation';
-import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
 import { findProcessingJobSource } from '../processing-jobs/repository';
 import { updateProcessingJobProgress } from '../processing-jobs/worker-repository';
-import { readProcessingJobCheckpoint, writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
-import { assembleQuizSources, readQuizRequest, resolveQuizSources } from './sources';
-import { generateQuiz, makeQuizPlan, QUIZ_MODEL, type QuizConvergenceState, type QuizGenerationDiagnostic, type QuizPlan, type StoredQuestion } from './generation';
-import { deriveQuizLearningProgress } from './learning-progress';
-import { pairKey, validateMatchingSides } from './matching';
-import { serializeQuizDiagnostic } from './diagnostics';
+import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
+import { readProcessingJobCheckpoint,writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
+import { AI_FIRST_QUIZ_MODEL,generateQuizBatch,prepareQuizSource,QuizBatchError,quizProviderCallBudget } from './ai-first';
+import type { QuizRegion,StoredQuestion } from './generation';
+import { isRepeatedQuizQuestion,normalized,quizMixSurplus } from './generation';
+import { assembleQuizSources,readQuizRequest,resolveQuizSources } from './sources';
 type Client = SupabaseClient<Database>;
 export type QuizRow = Database['public']['Tables']['quizzes']['Row'];
 export type AttemptRow = Database['public']['Tables']['quiz_attempts']['Row'];
@@ -29,8 +29,10 @@ function requestKey(value: string | null) {
 }
 export async function startQuizGeneration(client: Client, userId: string, input: QuizGenerationRequest, key: string | null) {
     const idempotencyKey = requestKey(key);
-    const source = await resolveQuizSources(client, userId, input);
-    const { data, error } = await client.rpc('create_quiz_processing_job', { p_user_id: userId, p_course_id: source.courseId, p_reviewer_id: source.reviewerId, p_idempotency_key: idempotencyKey, p_input: json(input) });
+    const source = await assembleQuizSources(client, userId, input);
+    if (input.questionCount > source.capacity.maximum)
+        throw new ExperienceFailure(422, 'quiz_source_capacity_exceeded', source.capacity.maximum);
+    const { data, error } = await client.rpc('create_quiz_processing_job', { p_user_id: userId, p_course_id: source.courseId, p_reviewer_artifact_id: source.reviewerArtifactId, p_idempotency_key: idempotencyKey, p_input: json(input) });
     if (error) {
         if (error.message === 'conflict')
             throw new ExperienceFailure(409, 'conflict');
@@ -42,95 +44,167 @@ export async function startQuizGeneration(client: Client, userId: string, input:
         throw new ExperienceFailure(503, 'quiz_generation_unavailable');
     return dispatchAcceptedProcessingJob(data[0]);
 }
+/** A failed older Quiz may have been accepted before capacity locking existed. */
+export async function quizRetryCapacity(client: Client, userId: string, jobId: string): Promise<number | null> {
+    const { data, error } = await client.from('processing_jobs').select('*').eq('user_id', userId).eq('id', jobId).maybeSingle();
+    if (error || !data || data.user_id !== userId) throw new ExperienceFailure(404, 'not_found');
+    if (data.job_type !== 'quiz_generation') return null;
+    const source = await findProcessingJobSource(client, data);
+    if (source.user_id !== userId) throw new ExperienceFailure(404, 'not_found');
+    const input = readQuizRequest(record(source.metadata).quizInput);
+    const assembled = await assembleQuizSources(client, userId, input);
+    return input.questionCount > assembled.capacity.maximum ? assembled.capacity.maximum : null;
+}
 export async function processQuizJob(client: Client, job: ProcessingJobDatabaseRow, workerId: string) {
     const source = await findProcessingJobSource(client, job);
     if (job.job_type !== 'quiz_generation' || source.user_id !== job.user_id)
         throw new ExperienceFailure(404, 'quiz_source_unavailable');
     const metadata = record(source.metadata), input = readQuizRequest(metadata.quizInput);
-    let plan: QuizPlan;
+    let regions: QuizRegion[];
     let materialIds: string[];
-    const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:plan:v4');
+    let capacity: number;
+    const saved = await readProcessingJobCheckpoint(client, job.id, 'quiz:source:ai-first');
     if (saved) {
         const value = record(saved.payload);
-        plan = value.plan as QuizPlan;
+        regions = value.regions as QuizRegion[];
         materialIds = value.materialIds as string[];
-    }
-    else {
+        capacity = Number(value.capacity);
+    } else {
         await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'preparing_source', statusMessage: 'Preparing quiz material' });
         const sources = await assembleQuizSources(client, job.user_id, input);
-        if (sources.courseId !== metadata.courseId || sources.reviewerId !== metadata.reviewerId)
-            throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        if (sources.courseId !== metadata.courseId || sources.reviewerArtifactId !== metadata.reviewerArtifactId || sources.sourceVersionId !== metadata.sourceVersionId) throw new ExperienceFailure(409, 'quiz_source_unavailable');
+        regions = sources.regions; materialIds = sources.materialIds; capacity = sources.capacity.maximum;
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:source:ai-first', payload: json({ regions, materialIds, capacity }) });
+    }
+    if (!Number.isInteger(capacity)) {
+        const refreshed = await assembleQuizSources(client, job.user_id, input);
+        capacity = refreshed.capacity.maximum;
+    }
+    if (input.questionCount > capacity) throw new ExperienceFailure(422, 'quiz_source_capacity_exceeded', capacity);
+    const complete = await readProcessingJobCheckpoint(client, job.id, 'quiz:complete:ai-first');
+    let questions: StoredQuestion[];
+    if (complete) questions = record(complete.payload).questions as StoredQuestion[];
+    else {
+        await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Creating your quiz' });
         try {
-            plan = makeQuizPlan(sources.regions, input);
+            questions = [];
+            // Job-wide ceiling: one first call and one repair per batch, at most ten for 100 items.
+            const maxCalls = quizProviderCallBudget(input.questionCount);
+            const providerFor = (callIdentity?: string) => durableGenerationProvider(client, job.id, workerId, { maxCalls, ...(callIdentity ? { callIdentity } : {}) });
+            const batches = quizBatches(input.questionCount);
+            let sourceContext: string | null = null;
+            for (const [index, { offset, size }] of batches.entries()) {
+                const checkpointKey = `quiz:batch:ai-first:${String(offset).padStart(3, '0')}`;
+                const savedBatch = await readProcessingJobCheckpoint(client, job.id, checkpointKey);
+                let batch = savedBatch ? record(savedBatch.payload).questions as StoredQuestion[] : null;
+                if (batch && batch.length !== size) throw new GenerationContractError([`batch_${offset}:count`]);
+                if (!batch) {
+                    sourceContext ??= await prepareQuizSource(providerFor(), regions);
+                    try {
+                        const outcome = await generateQuizBatch({ providerFor, request: input, regions, source: sourceContext, offset, size, previous: questions });
+                        console.info('quiz_batch.result', { jobId: job.id, batch: index + 1, of: batches.length, calls: outcome.calls, repaired: outcome.repaired, repairedFindings: categories(outcome.repairedFindings) });
+                        batch = outcome.questions;
+                    }
+                    catch (error) {
+                        console.info('quiz_batch.failed', { jobId: job.id, batch: index + 1, of: batches.length, repairRan: error instanceof QuizBatchError, findings: error instanceof GenerationContractError ? error.findings.slice(0, 40) : undefined, category: error instanceof GenerationContractError ? 'contract' : 'provider' });
+                        throw error;
+                    }
+                    await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey, payload: json({ questions: batch }) });
+                }
+                questions.push(...batch);
+                if (hasRepeatedQuizQuestions(questions)) throw new GenerationContractError([`batch_${offset}:duplicate_question`]);
+            }
         }
         catch (error) {
-            console.info('quiz_generation.diagnostic', JSON.stringify({ jobId: job.id, failureClass: 'planning_failure', regionCount: sources.regions.length, requestedQuestionCount: input.questionCount }));
-            throw error;
+            console.info('quiz_generation.failed', { jobId: job.id, category: error instanceof GenerationContractError ? 'contract' : 'provider' });
+            throw new ExperienceFailure(error instanceof GenerationContractError ? 422 : 503, 'quiz_generation_failed');
         }
-        materialIds = sources.materialIds;
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:plan:v4', payload: json({ plan, materialIds }) });
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:complete:ai-first', payload: json({ questions }) });
     }
-    // Checkpoints are private server data, not an experience endpoint. A resumed
-    // workflow retains the exact source plan and already verified questions.
-    const previous = await readProcessingJobCheckpoint(client, job.id, 'quiz:accepted:v4');
-    const accepted = previous && Array.isArray(record(previous.payload).questions) ? record(previous.payload).questions as StoredQuestion[] : [];
-    await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Generating and validating quiz questions' });
-    const questions = await generateQuiz(createServerOpenAIProvider(), plan, async (questions, convergence) => {
-        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'quiz:accepted:v4', payload: json({ questions, convergence }) });
-    }, accepted, (diagnostic: QuizGenerationDiagnostic) => {
-        console.info('quiz_generation.diagnostic', serializeQuizDiagnostic(job.id, diagnostic));
-    }, previous ? record(previous.payload).convergence as QuizConvergenceState | undefined : undefined);
     if (questions.length !== input.questionCount) throw new ExperienceFailure(422, 'quiz_generation_failed');
     const owned = await resolveQuizSources(client, job.user_id, input);
-    if (owned.courseId !== metadata.courseId || owned.reviewerId !== metadata.reviewerId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
+    if (owned.courseId !== metadata.courseId || owned.reviewerArtifactId !== metadata.reviewerArtifactId || owned.sourceVersionId !== metadata.sourceVersionId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving quiz' });
-    return { payload: { courseId: metadata.courseId, reviewerId: metadata.reviewerId, materialIds, title: `${questions.length}-question quiz`, questions,
-            provenance: { policy: 'quiz-v4', provider: `openai:${QUIZ_MODEL}`, plan, sourceSha256: createHash('sha256').update(JSON.stringify([...plan.topics, ...(plan.reserveTopics ?? [])])).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: plan.topics.length } };
+    return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, sourceVersionId: metadata.sourceVersionId, materialIds, title: `${questions.length}-question quiz`, questions,
+            provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
+}
+/** Exact stems and highly overlapping long stems are duplicate study items. */
+export function hasRepeatedQuizQuestions(questions: readonly (Pick<StoredQuestion, 'prompt'> & Partial<Pick<StoredQuestion, 'type' | 'leftItem'>>)[]): boolean {
+    return questions.some((question, index) => isRepeatedQuizQuestion(question, questions.slice(0, index)));
+}
+export function hasUnbalancedQuizMix(questions: readonly Pick<StoredQuestion, 'type'>[], requestedTypes: readonly StoredQuestion['type'][] | undefined): boolean {
+    return quizMixSurplus(questions, requestedTypes) !== null;
+}
+/** Finding categories without item labels, for logs. */
+const categories = (findings: readonly string[]) => [...new Set(findings.map(finding => finding.slice(finding.lastIndexOf(':') + 1)))];
+export function quizBatches(count: number): { offset: number; size: number }[] {
+    if (!Number.isInteger(count) || count < 5 || count > 100) throw new Error('invalid_quiz_count');
+    return Array.from({ length: Math.ceil(count / 20) }, (_, index) => ({ offset: index * 20, size: Math.min(20, count - index * 20) }));
 }
 export function learnerQuestion(q: QuizQuestion): QuizQuestion {
-    if (q.type === 'matching') {
-        try {
-            // Public labels must be valid; never substitute an internal ID.
-            validateMatchingSides(q);
-        } catch { throw new ExperienceFailure(503, 'unavailable'); }
-        return { id: q.id, type: q.type, prompt: q.prompt, leftItems: q.leftItems.map(i => ({ id: i.id, label: i.label })),
-            rightItems: q.rightItems.map(i => ({ id: i.id, label: i.label })), difficulty: q.difficulty, selectionInstruction: 'Match each item to one answer.' };
-    }
-    return { id: q.id, type: q.type, prompt: q.prompt, options: q.options.map(o => ({ id: o.id, text: o.text })), difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : 'Choose one answer.' };
+    const orderKey = (id: string) => [...`${q.id}:${id}`].reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0, 2166136261);
+    const options = q.options.map(o => ({ id: o.id, text: o.text }));
+    if (q.matchingPairs?.length) options.sort((a, b) => orderKey(a.id) - orderKey(b.id) || a.id.localeCompare(b.id));
+    return { id: q.id, type: q.type, prompt: q.prompt, options, difficulty: q.difficulty, selectionInstruction: q.type === 'multi_select' ? 'Select all correct answers.' : q.type === 'identification' ? 'Type the term.' : q.type === 'modified_true_false' ? 'Mark true, or mark false and correct the wrong term.' : q.type === 'matching' ? 'Match each term to one meaning.' : 'Choose one answer.', ...(q.type === 'matching' && q.leftItem ? { leftItem: q.leftItem } : {}), ...(q.matchingPairs?.length ? { matchingPairs: q.matchingPairs.map(pair => ({ id: pair.id, leftItem: pair.leftItem })) } : {}) };
 }
 export function quizView(row: QuizRow, history: readonly AttemptRow[] = []): Quiz {
+    const attempts = history.filter(a => a.user_id === row.user_id && a.quiz_id === row.id).sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at) || b.id.localeCompare(a.id));
+    const completed = attempts.filter(a => a.status === 'completed' && a.percentage !== null).sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!) || b.id.localeCompare(a.id));
+    const active = attempts.find(a => a.status === 'in_progress');
+    const activeState = active ? record(active.study_state) : {};
     const ids = row.source_material_ids as string[];
-    return { id: row.id, title: row.title, courseId: row.course_id, reviewerId: row.reviewer_id, sourceId: ids[0] ?? null, sourceMaterialIds: ids, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
-        ...deriveQuizLearningProgress(row, history), questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
+    return { id: row.id, title: row.title, courseId: row.course_id, reviewerArtifactId: row.reviewer_artifact_id, sourceId: row.course_id ? ids[0] ?? null : row.source_version_id, sourceMaterialIds: ids, questionCount: row.question_count, difficulty: row.difficulty as Quiz['difficulty'], createdAt: row.created_at, updatedAt: row.updated_at,
+        attemptCount: attempts.length, latestScore: completed[0] ? Number(completed[0].percentage) : null, bestScore: completed.length ? Math.max(...completed.map(a => a.percentage!)) : null,
+        activeAttempt: active ? { id: active.id, currentQuestion: Number.isInteger(activeState.currentQuestion) ? activeState.currentQuestion as number : 0,
+          answeredCount: (active.answers as unknown as QuizAttemptAnswer[]).filter(answer => answer.finalizedAt).length,
+          skippedCount: Array.isArray(activeState.skipped) ? activeState.skipped.length : 0,
+          revealedCount: Array.isArray(activeState.revealed) ? activeState.revealed.length : 0 } : null,
+        questions: (row.questions as unknown as QuizQuestion[]).map(learnerQuestion) };
 }
 export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnswer): QuizQuestionResult {
-    const common = { questionId: question.id, explanation: question.explanation, topicId: question.topicId, topic: question.topic,
-        sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
-    if (question.type === 'matching') {
-        if (answer.type !== 'matching') throw new ExperienceFailure(503, 'unavailable');
-        return { ...common, type: 'matching', pairs: answer.pairs.map(p => ({ ...p })), correctPairs: question.correctPairs.map(p => ({ ...p })), correct: pairKey(answer.pairs) === pairKey(question.correctPairs) };
-    }
-    if (answer.type === 'matching') throw new ExperienceFailure(503, 'unavailable');
-    const correct = [...answer.selectedOptionIds].sort().join('|') === [...question.correctOptionIds].sort().join('|');
-    return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct, explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
+    const submitted = normalizeSubmittedAnswer(question, answer.selectedOptionIds);
+    const pairCount = question.matchingPairs?.length ?? 0;
+    const pairCorrectCount = pairCount ? submitted.filter(value => question.correctOptionIds.includes(value)).length : 0;
+    const correct = pairCount ? pairCorrectCount === pairCount && submitted.length === pairCount : [...submitted].sort().join('|') === [...question.correctOptionIds].sort().join('|');
+    return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct,
+      ...(pairCount ? { pairCount, pairCorrectCount } : {}), explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
+}
+export function normalizeSubmittedAnswer(question: StoredQuestion, selected: readonly string[]): string[] {
+    if (question.type !== 'identification' && question.type !== 'modified_true_false') return [...selected];
+    const index = question.type === 'identification' ? 0 : selected.findIndex(value => !question.options.some(option => option.id === value));
+    if (index < 0 || selected.length <= index) return [...selected];
+    const answer = normalized(selected[index]!);
+    const accepted = question.acceptedAnswers ?? [];
+    const canonical = question.type === 'identification' ? question.correctOptionIds[0] : question.correctOptionIds.find(value => !question.options.some(option => option.id === value));
+    return selected.map((value, position) => position === index ? accepted.some(alias => normalized(alias) === answer) && canonical ? canonical : answer : value);
 }
 export function attemptView(row: AttemptRow, questions: readonly StoredQuestion[]): QuizAttempt {
-    const answers: QuizAttemptAnswer[] = (row.answers as unknown as QuizAttemptAnswer[]).map(a => a.type === 'matching'
-        ? { type: 'matching', questionId: a.questionId, pairs: a.pairs.map(p => ({ leftItemId: p.leftItemId, rightItemId: p.rightItemId })), finalizedAt: a.finalizedAt }
-        : { type: 'choice', questionId: a.questionId, selectedOptionIds: [...a.selectedOptionIds], finalizedAt: a.finalizedAt });
-    return { id: row.id, quizId: row.quiz_id, startedAt: row.started_at, completedAt: row.completed_at, status: row.status as QuizAttempt['status'], answers, feedback: answers.filter(a => a.finalizedAt !== null).map(a => {
-            const q = questions.find(q => q.id === a.questionId);
-            if (!q)
-                throw new ExperienceFailure(503, 'unavailable');
-            return evaluateAnswer(q, a);
+    const answers = (row.answers as unknown as QuizAttemptAnswer[]).map(a => ({ questionId: a.questionId, selectedOptionIds: [...a.selectedOptionIds], finalizedAt: a.finalizedAt }));
+    const state = record(row.study_state);
+    const skippedQuestionIds = Array.isArray(state.skipped) ? state.skipped.filter((id): id is string => typeof id === 'string') : [];
+    const revealedQuestionIds = Array.isArray(state.revealed) ? state.revealed.filter((id): id is string => typeof id === 'string') : [];
+    const assistedQuestionIds = Array.isArray(state.assisted) ? state.assisted.filter((id): id is string => typeof id === 'string') : [];
+    const currentQuestion = Number.isInteger(state.currentQuestion) ? Math.max(0, Math.min(questions.length - 1, state.currentQuestion as number)) : 0;
+    const visible = questions.filter(q => revealedQuestionIds.includes(q.id) || answers.some(a => a.questionId === q.id && a.finalizedAt !== null));
+    return { id: row.id, quizId: row.quiz_id, startedAt: row.started_at, completedAt: row.completed_at, status: row.status as QuizAttempt['status'],
+      currentQuestion, skippedQuestionIds, revealedQuestionIds, assistedQuestionIds, updatedAt: row.updated_at ?? row.started_at, answers, feedback: visible.map(q => {
+            const a = answers.find(answer => answer.questionId === q.id) ?? { questionId: q.id, selectedOptionIds: [], finalizedAt: null };
+            const result = evaluateAnswer(q, a);
+            return revealedQuestionIds.includes(q.id) ? { ...result, correct: assistedQuestionIds.includes(q.id) ? false : result.correct, revealed: true, assisted: assistedQuestionIds.includes(q.id) } : result;
         }) };
 }
 export function resultView(attempt: QuizAttempt, questions: readonly StoredQuestion[]): QuizResult {
-    if (attempt.status !== 'completed' || attempt.feedback.length !== questions.length)
+    if (attempt.status !== 'completed')
         throw new ExperienceFailure(409, 'quiz_result_unavailable');
-    const results = attempt.feedback;
+    const results = questions.map(q => attempt.feedback.find(result => result.questionId === q.id) ??
+      { ...evaluateAnswer(q, { questionId: q.id, selectedOptionIds: [], finalizedAt: null }), correct: false, skipped: true });
     const correctCount = results.filter(r => r.correct).length;
+    const possiblePoints = results.reduce((sum, r) => sum + (r.pairCount ?? 1), 0);
+    const earnedPoints = results.reduce((sum, r) => sum + (r.assisted || r.skipped ? 0 : r.pairCount ? r.pairCorrectCount ?? 0 : Number(r.correct)), 0);
+    const revealedCount = results.filter(r => r.assisted).length;
+    const skippedCount = results.filter(r => r.skipped).length;
+    const incorrectCount = results.length - correctCount - revealedCount - skippedCount;
     const topics = new Map<string, QuizTopicPerformance>();
     for (const r of results) {
         const previous = topics.get(r.topicId);
@@ -139,7 +213,8 @@ export function resultView(attempt: QuizAttempt, questions: readonly StoredQuest
             sourceRefs: [...new Map([...(previous?.sourceRefs ?? []), ...r.sourceRefs].map(ref => [JSON.stringify(ref), ref])).values()], reviewerSectionIds: [...new Set([...(previous?.reviewerSectionIds ?? []), ...r.reviewerSectionIds])] });
     }
     const topicPerformance = [...topics.values()].sort((a, b) => a.accuracy - b.accuracy || a.topicId.localeCompare(b.topicId));
-    return { attemptId: attempt.id, quizId: attempt.quizId, correctCount, incorrectCount: results.length - correctCount, totalQuestions: results.length, percentage: Math.round(correctCount / results.length * 10000) / 100, questions: results, topicPerformance,
+    return { attemptId: attempt.id, quizId: attempt.quizId, correctCount, incorrectCount, skippedCount, revealedCount, totalQuestions: results.length,
+      earnedPoints, possiblePoints, percentage: Math.round(earnedPoints / possiblePoints * 10000) / 100, questions: results, topicPerformance,
         weakAreas: topicPerformance.filter(t => t.asked === 1 ? t.missed === 1 : t.accuracy < 60).map(t => ({ ...t, kind: t.asked === 1 ? 'missed_topic' : 'weak_area' })) };
 }
 const rpcCodes = ['quiz_not_found', 'quiz_attempt_not_found', 'quiz_attempt_completed', 'quiz_question_not_found', 'quiz_answer_invalid', 'quiz_answer_already_finalized', 'quiz_result_unavailable', 'conflict'] as const;
@@ -158,6 +233,11 @@ export async function readQuiz(client: Client, userId: string, id: string): Prom
     if (!data || data.user_id !== userId)
         throw new ExperienceFailure(404, 'quiz_not_found');
     return quizView(data, await attemptHistoryRows(client, userId, id));
+}
+export async function deleteQuiz(client: Client, userId: string, id: string): Promise<void> {
+    const { data, error } = await client.from('quizzes').delete().eq('user_id', userId).eq('id', id).select('id').maybeSingle();
+    if (error) throw new ExperienceFailure(503, 'unavailable');
+    if (!data) throw new ExperienceFailure(404, 'quiz_not_found');
 }
 export async function attemptHistoryRows(client: Client, userId: string, quizId: string): Promise<AttemptRow[]> {
     const all: AttemptRow[] = [];
@@ -195,22 +275,32 @@ export async function startAttempt(client: Client, userId: string, quizId: strin
 }
 export async function saveAnswer(client: Client, userId: string, attemptId: string, questionId: string, value: unknown) {
     const input = record(value);
-    const matching = input.type === 'matching';
-    if (typeof input.finalize !== 'boolean' || Object.keys(input).some(k => !(matching ? ['type', 'pairs', 'finalize'] : ['type', 'selectedOptionIds', 'finalize']).includes(k)) || (!matching && input.type !== undefined && input.type !== 'choice'))
+    if (Object.keys(input).some(k => !['selectedOptionIds', 'finalize'].includes(k)) || typeof input.finalize !== 'boolean' || !Array.isArray(input.selectedOptionIds) || input.selectedOptionIds.length > 6 || !input.selectedOptionIds.every(v => typeof v === 'string' && v.length <= 200) || new Set(input.selectedOptionIds).size !== input.selectedOptionIds.length)
         throw new ExperienceFailure(400, 'quiz_answer_invalid');
-    if (matching) {
-        if (!Array.isArray(input.pairs) || input.pairs.length > 6 || input.pairs.some(raw => {
-            const p = record(raw);
-            return Object.keys(p).length !== 2 || !['leftItemId', 'rightItemId'].every(k => typeof p[k] === 'string' && /^[a-z0-9_-]{1,30}$/i.test(String(p[k])));
-        }) || new Set(input.pairs.map(p => record(p).leftItemId)).size !== input.pairs.length || new Set(input.pairs.map(p => record(p).rightItemId)).size !== input.pairs.length)
-            throw new ExperienceFailure(400, 'quiz_answer_invalid');
-    } else if (!Array.isArray(input.selectedOptionIds) || input.selectedOptionIds.length > 6 || !input.selectedOptionIds.every(v => typeof v === 'string' && v.length <= 30) || new Set(input.selectedOptionIds).size !== input.selectedOptionIds.length)
-        throw new ExperienceFailure(400, 'quiz_answer_invalid');
-    const { data, error } = await client.rpc('save_quiz_answer', { p_user_id: userId, p_attempt_id: attemptId, p_question_id: questionId,
-        p_selected: json(matching ? { type: 'matching', pairs: input.pairs } : input.selectedOptionIds), p_finalize: input.finalize });
+    const { data: attemptRow, error: attemptError } = await client.from('quiz_attempts').select('quiz_id').eq('user_id', userId).eq('id', attemptId).maybeSingle();
+    if (attemptError || !attemptRow) throw new ExperienceFailure(404, 'quiz_attempt_not_found');
+    const question = (await keys(client, userId, attemptRow.quiz_id)).find(item => item.id === questionId);
+    if (!question) throw new ExperienceFailure(404, 'quiz_question_not_found');
+    const normalizedSelection = normalizeSubmittedAnswer(question, input.selectedOptionIds as string[]);
+    const { data, error } = await client.rpc('save_quiz_answer', { p_user_id: userId, p_attempt_id: attemptId, p_question_id: questionId, p_selected: json(normalizedSelection), p_finalize: input.finalize });
     rpcError(error);
     if (!data?.[0] || data[0].user_id !== userId)
         throw new ExperienceFailure(404, 'quiz_attempt_not_found');
+    return attemptView(data[0], await keys(client, userId, data[0].quiz_id));
+}
+export async function updateAttemptStudyState(client: Client, userId: string, attemptId: string, value: unknown): Promise<QuizAttempt> {
+    const input = record(value);
+    if (Object.keys(input).some(key => !['action', 'questionId', 'position'].includes(key)) ||
+        !['navigate', 'skip', 'reveal'].includes(String(input.action)) ||
+        !Number.isInteger(input.position) || (input.position as number) < 0 || (input.position as number) >= 100 ||
+        (input.action !== 'navigate' && (typeof input.questionId !== 'string' || !/^q\d{1,3}$/.test(input.questionId))))
+        throw new ExperienceFailure(400, 'quiz_answer_invalid');
+    const { data, error } = await client.rpc('update_quiz_attempt_study_state', {
+        p_user_id: userId, p_attempt_id: attemptId, p_action: input.action as string,
+        p_question_id: input.action === 'navigate' ? '' : input.questionId as string, p_position: input.position as number,
+    });
+    rpcError(error);
+    if (!data?.[0] || data[0].user_id !== userId) throw new ExperienceFailure(404, 'quiz_attempt_not_found');
     return attemptView(data[0], await keys(client, userId, data[0].quiz_id));
 }
 export async function completeAttempt(client: Client, userId: string, attemptId: string, abandon = false) {

@@ -1,8 +1,10 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
+import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 
 const REVIEWER_GENERATE_PATH = "/api/reviewer/generate";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_ERROR_MESSAGE_CHARS = 300;
+
 export const API_BASE_URL_SETUP_HINT =
   "Use EXPO_PUBLIC_API_BASE_URL=auto for same-network local Expo development, or set an explicit HTTP(S) API URL for a tunnel, preview, or production build.";
 
@@ -183,38 +185,11 @@ function createReviewerEndpoint(
 ):
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly error: GenerateReviewerError } {
-  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/+$/, "");
-
-  if (!normalizedBaseUrl) {
-    return clientError(
-      "invalid_api_base_url",
-      API_BASE_URL_SETUP_HINT,
-    );
-  }
-
   try {
-    const parsed = new URL(normalizedBaseUrl);
-    if (
-      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return clientError(
-        "invalid_api_base_url",
-        `EXPO_PUBLIC_API_BASE_URL must be a plain HTTP(S) base URL. ${API_BASE_URL_SETUP_HINT}`,
-      );
-    }
+    return { ok: true, url: `${requireApiBaseUrl(apiBaseUrl)}${REVIEWER_GENERATE_PATH}` };
   } catch {
-    return clientError(
-      "invalid_api_base_url",
-      `EXPO_PUBLIC_API_BASE_URL must be a valid API base URL. ${API_BASE_URL_SETUP_HINT}`,
-    );
+    return clientError("invalid_api_base_url", API_CONFIGURATION_MESSAGE);
   }
-
-  return {
-    ok: true,
-    url: `${normalizedBaseUrl}${REVIEWER_GENERATE_PATH}`,
-  };
 }
 
 async function parseReviewerResponse(

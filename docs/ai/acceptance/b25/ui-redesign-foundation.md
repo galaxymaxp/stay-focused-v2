@@ -1,5 +1,9 @@
 # B25 — UI redesign foundation
 
+## B25.3.3 AI-first production rollout (2026-09-16)
+
+Reviewer, Quiz and Activity now use the AI-first boundary. Live-material comparison and deterministic regression pass; deployment dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4 is READY and healthy. Physical acceptance is blocked on device sign-in and selected Activity assignment. B25 remains PARTIAL; B26 may not begin. See [current acceptance](../b25.3.3/architecture-simplification.md).
+
 Date: 2026-09-13. Implementation checkout: `C:/Projects/stay-focused-v2`, branch `main`.
 Starting HEAD: `061aed3ac9c12a4df55f56b2525317d2cfa61297` (B24.7 Quiz backend). Starting origin comparison: 37 ahead, 0 behind. `git fsck --full` exited 0 with seven dangling blobs. No fetch, remote mutation, reset, clean, stash or push.
 

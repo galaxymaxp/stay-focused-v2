@@ -8,7 +8,23 @@ import type {
 } from "@stay-focused/canvas";
 import { describe, expect, it } from "vitest";
 
-import { createCanvasFileInventoryPayload } from "@/lib/canvas-file-normalize";
+import { createCanvasFileInventoryPayload, discoverCanvasPageFileIds } from "@/lib/canvas-file-normalize";
+
+describe('Canvas Page attachment discovery', () => {
+  it('finds a same-course PDF even when the course file inventory is empty', () => {
+    expect(discoverCanvasPageFileIds({
+      canvasBaseUrl: 'https://canvas.test', canvasCourseId: 'course-1',
+      html: '<a href="/courses/course-1/files/42?download=1">Lesson.pdf</a>',
+    })).toEqual(['42']);
+  });
+  it('deduplicates repeated links and excludes external and other-course URLs', () => {
+    expect(discoverCanvasPageFileIds({
+      canvasBaseUrl: 'https://canvas.test', canvasCourseId: 'course-1',
+      html: '<a href="/courses/course-1/files/42">PDF</a><img src="/api/v1/files/42" />' +
+        '<a href="/courses/other/files/43">Other course</a><a href="https://outside.test/files/44">External</a>',
+    })).toEqual(['42']);
+  });
+});
 
 describe("Canvas file inventory normalization", () => {
   it("normalizes file metadata and bounded references without content extraction", () => {
@@ -285,6 +301,8 @@ function announcement(
     published: true,
     locked: false,
     htmlUrl: "https://canvas.test/courses/course-1/discussion_topics/1",
+    authorName: null,
+    attachments: [],
     ...overrides,
   };
 }

@@ -458,7 +458,8 @@ export type ProcessingJobDatabaseRow = {
   readonly lease_owner: string | null;
   readonly lease_expires_at: string | null;
   readonly heartbeat_at: string | null;
-  readonly execution_backend: "database_worker" | "vercel_workflow";
+  readonly execution_backend: "database_worker" | "vercel_workflow" | "google_cloud";
+  readonly google_dispatch_id: string | null;
   readonly workflow_run_id: string | null;
   readonly workflow_dispatched_at: string | null;
   readonly source_version_id: string | null;
@@ -509,9 +510,30 @@ export type PushNotificationDeviceRow =
 export type ProcessingNotificationDeliveryRow =
   Database["public"]["Tables"]["processing_notification_deliveries"]["Row"];
 
+export type NotificationPreferenceRow = {
+  user_id: string; email_enabled: boolean; announcement_email: boolean; new_assignment_email: boolean;
+  due_date_change_email: boolean; deadline_7_day: boolean; deadline_3_day: boolean; deadline_due_today: boolean;
+  reminder_time: string; timezone: string; created_at: string; updated_at: string;
+}
+export type CanvasEmailOutboxRow = {
+  id: string; user_id: string; course_id: string; canvas_assignment_id: string | null; canvas_announcement_id: string | null;
+  type: "announcement" | "new_assignment" | "due_date_change" | "deadline_7_day" | "deadline_3_day" | "deadline_due_today";
+  due_revision: number | null; dedupe_key: string; payload: Json; scheduled_for: string;
+  sent_at: string | null; failed_at: string | null; skipped_at: string | null; first_attempt_at: string | null;
+  retry_count: number; last_error: string | null; lease_owner: string | null; lease_expires_at: string | null;
+  message_id: string | null; created_at: string;
+}
+type NotificationPollRow = {
+  course_id: string; last_polled_at: string | null; next_poll_at: string; lease_owner: string | null;
+  lease_expires_at: string | null; last_error: string | null; fingerprints: Json;
+}
 export interface Database {
   public: {
     Tables: {
+      notification_preferences: { Row: NotificationPreferenceRow; Insert: Partial<NotificationPreferenceRow> & { user_id: string }; Update: Partial<NotificationPreferenceRow>; Relationships: [] };
+      notification_outbox: { Row: CanvasEmailOutboxRow; Insert: Partial<CanvasEmailOutboxRow> & Pick<CanvasEmailOutboxRow, "user_id" | "course_id" | "type" | "dedupe_key" | "payload">; Update: Partial<CanvasEmailOutboxRow>; Relationships: [] };
+      canvas_notification_poll_state: { Row: NotificationPollRow; Insert: Partial<NotificationPollRow> & { course_id: string }; Update: Partial<NotificationPollRow>; Relationships: [] };
+      canvas_notification_assignment_state: { Row: { user_id: string; course_id: string; canvas_assignment_id: string; due_at: string | null; due_revision: number }; Insert: { user_id: string; course_id: string; canvas_assignment_id: string; due_at?: string | null; due_revision?: number }; Update: { due_at?: string | null; due_revision?: number }; Relationships: [] };
       tasks: {
         Row: {
           id: string;
@@ -863,10 +885,10 @@ export interface Database {
           canvas_user_id: string;
           canvas_user_name: string;
           canvas_user_email: string | null;
-          token_ciphertext: string;
-          token_iv: string;
-          token_auth_tag: string;
-          encryption_version: string;
+          token_ciphertext: string | null;
+          token_iv: string | null;
+          token_auth_tag: string | null;
+          encryption_version: string | null;
           status: string;
           last_verified_at: string;
           last_error_code: string | null;
@@ -880,10 +902,10 @@ export interface Database {
           canvas_user_id: string;
           canvas_user_name: string;
           canvas_user_email?: string | null;
-          token_ciphertext: string;
-          token_iv: string;
-          token_auth_tag: string;
-          encryption_version: string;
+          token_ciphertext: string | null;
+          token_iv: string | null;
+          token_auth_tag: string | null;
+          encryption_version: string | null;
           status?: string;
           last_verified_at: string;
           last_error_code?: string | null;
@@ -897,10 +919,10 @@ export interface Database {
           canvas_user_id?: string;
           canvas_user_name?: string;
           canvas_user_email?: string | null;
-          token_ciphertext?: string;
-          token_iv?: string;
-          token_auth_tag?: string;
-          encryption_version?: string;
+          token_ciphertext?: string | null;
+          token_iv?: string | null;
+          token_auth_tag?: string | null;
+          encryption_version?: string | null;
           status?: string;
           last_verified_at?: string;
           last_error_code?: string | null;
@@ -1074,9 +1096,9 @@ export interface Database {
         ];
       };
       quizzes: {
-        Row: {id:string;user_id:string;course_id:string;reviewer_id:string|null;generation_id:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at:string;updated_at:string};
-        Insert: {id?:string;user_id:string;course_id:string;reviewer_id?:string|null;generation_id?:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at?:string;updated_at?:string};
-        Update: {reviewer_id?:string|null;generation_id?:string|null};
+        Row: {id:string;user_id:string;course_id:string|null;reviewer_id:string|null;reviewer_artifact_id:string|null;source_version_id:string|null;generation_id:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at:string;updated_at:string};
+        Insert: {id?:string;user_id:string;course_id?:string|null;reviewer_id?:string|null;reviewer_artifact_id?:string|null;source_version_id?:string|null;generation_id?:string|null;title:string;source_material_ids:Json;question_count:number;difficulty:string;questions:Json;created_at?:string;updated_at?:string};
+        Update: {reviewer_id?:string|null;reviewer_artifact_id?:string|null;source_version_id?:string|null;generation_id?:string|null};
         Relationships: [];
       };
       quiz_keys: {
@@ -1086,7 +1108,7 @@ export interface Database {
         Relationships: [];
       };
       quiz_attempts: {
-        Row: {id:string;user_id:string;quiz_id:string;request_key:string;status:string;answers:Json;started_at:string;completed_at:string|null;percentage:number|null};
+        Row: {id:string;user_id:string;quiz_id:string;request_key:string;status:string;answers:Json;started_at:string;completed_at:string|null;percentage:number|null;study_state:Json;updated_at:string};
         Insert: {user_id:string;quiz_id:string;request_key:string};
         Update: never;
         Relationships: [];
@@ -1823,6 +1845,10 @@ export interface Database {
           request_fingerprint: string;
           retry_idempotency_key: string | null;
           idempotency_expires_at: string;
+          google_dispatch_id: string | null;
+          google_dispatch_key: string | null;
+          google_dispatched_at: string | null;
+          google_worker_lease_expires_at: string | null;
           workflow_run_id: string | null;
           workflow_dispatched_at: string | null;
           worker_id: string | null;
@@ -1862,6 +1888,10 @@ export interface Database {
           request_fingerprint: string;
           retry_idempotency_key?: string | null;
           idempotency_expires_at?: string;
+          google_dispatch_id?: string | null;
+          google_dispatch_key?: string | null;
+          google_dispatched_at?: string | null;
+          google_worker_lease_expires_at?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           worker_id?: string | null;
@@ -1901,6 +1931,10 @@ export interface Database {
           request_fingerprint?: string;
           retry_idempotency_key?: string | null;
           idempotency_expires_at?: string;
+          google_dispatch_id?: string | null;
+          google_dispatch_key?: string | null;
+          google_dispatched_at?: string | null;
+          google_worker_lease_expires_at?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           worker_id?: string | null;
@@ -2606,6 +2640,8 @@ export interface Database {
           published: boolean | null;
           locked: boolean | null;
           html_url: string | null;
+          author_name: string | null;
+          attachments: Json;
           source_fingerprint: string;
           first_synced_at: string;
           last_synced_at: string;
@@ -2629,6 +2665,8 @@ export interface Database {
           published?: boolean | null;
           locked?: boolean | null;
           html_url?: string | null;
+          author_name?: string | null;
+          attachments?: Json;
           source_fingerprint: string;
           first_synced_at?: string;
           last_synced_at?: string;
@@ -2652,6 +2690,8 @@ export interface Database {
           published?: boolean | null;
           locked?: boolean | null;
           html_url?: string | null;
+          author_name?: string | null;
+          attachments?: Json;
           source_fingerprint?: string;
           first_synced_at?: string;
           last_synced_at?: string;
@@ -3799,7 +3839,8 @@ export interface Database {
           lease_owner?: string | null;
           lease_expires_at?: string | null;
           heartbeat_at?: string | null;
-          execution_backend?: "database_worker" | "vercel_workflow";
+          execution_backend?: "database_worker" | "vercel_workflow" | "google_cloud";
+          google_dispatch_id?: string | null;
           workflow_run_id?: string | null;
           workflow_dispatched_at?: string | null;
           source_version_id?: string | null;
@@ -4135,6 +4176,37 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      notification_email_enabled_v1: { Args: { p_user_id: string; p_type: string }; Returns: boolean };
+      canvas_notification_timezone_v1: { Args: { p_user_id: string; p_course_id: string }; Returns: string };
+      count_canvas_notification_poll_backlog_v1: { Args: Record<string, never>; Returns: number };
+      canvas_notification_assignment_pending_v1: { Args: { p_assignment_id: string }; Returns: boolean };
+      queue_canvas_deadline_emails_v1: { Args: { p_now?: string }; Returns: number };
+      claim_canvas_email_outbox_v1: { Args: { p_worker_id: string; p_limit?: number }; Returns: CanvasEmailOutboxRow[] };
+      claim_canvas_notification_course_v1: { Args: { p_worker_id: string }; Returns: CanvasCourseRow[] };
+      apply_canvas_notification_metadata_v1: { Args: { p_course_id: string; p_worker_id: string; p_payload: Json; p_error?: string | null }; Returns: undefined };
+      attach_deferred_canvas_reviewer_source_v1: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_source_text: string;
+          p_source_title: string;
+          p_source_metadata: Json;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      stage_deferred_canvas_reviewer_pdf_v1: {
+        Args: {
+          p_job_id: string;
+          p_canvas_file_id: string;
+          p_expected_content_sha256: string;
+          p_expected_byte_size: number;
+        };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      mark_canvas_reviewer_staging_failed_v1: {
+        Args: { p_job_id: string };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       import_canvas_assignments_as_tasks_v1: {
         Args: {
           p_user_id: string;
@@ -4175,8 +4247,16 @@ export interface Database {
         Returns: ProcessingNotificationDeliveryRow[];
       };
       create_quiz_processing_job: {
-        Args: {p_user_id:string;p_course_id:string;p_reviewer_id:string|null;p_idempotency_key:string;p_input:Json};
+        Args: {p_user_id:string;p_course_id:string|null;p_reviewer_artifact_id:string;p_idempotency_key:string;p_input:Json};
         Returns: ProcessingJobDatabaseRow[];
+      };
+      rename_reviewer_artifact: {
+        Args: {p_artifact_id:string;p_title:string};
+        Returns: Database["public"]["Tables"]["generated_artifacts"]["Row"][];
+      };
+      delete_reviewer_artifact: {
+        Args: {p_artifact_id:string};
+        Returns: boolean;
       };
       complete_quiz_processing_job: {
         Args: {p_job_id:string;p_worker_id:string;p_result_type:string;p_payload:Json;p_metrics?:Json};
@@ -4188,6 +4268,10 @@ export interface Database {
       };
       save_quiz_answer: {
         Args: {p_user_id:string;p_attempt_id:string;p_question_id:string;p_selected:Json;p_finalize:boolean};
+        Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
+      };
+      update_quiz_attempt_study_state: {
+        Args: {p_user_id:string;p_attempt_id:string;p_action:string;p_question_id:string;p_position:number};
         Returns: Database['public']['Tables']['quiz_attempts']['Row'][];
       };
       complete_quiz_attempt: {
@@ -4271,6 +4355,14 @@ export interface Database {
           p_workflow_run_id: string;
           p_dispatched_at?: string;
         };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      prepare_google_processing_job_v1: {
+        Args: { p_job_id: string };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      claim_google_processing_job_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string; p_worker_id: string; p_now?: string };
         Returns: ProcessingJobDatabaseRow[];
       };
       prepare_processing_job_workflow_dispatch_v1: {
@@ -4468,6 +4560,26 @@ export interface Database {
           p_request_fingerprint: string;
           p_source_metadata: Json;
         };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      prepare_canvas_sync_job_google_dispatch_v1: {
+        Args: { p_job_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      mark_canvas_sync_job_google_dispatched_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      mark_canvas_sync_job_google_dispatch_failed_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      claim_canvas_sync_job_google_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string; p_worker_id: string };
+        Returns: CanvasSyncJobDatabaseRow[];
+      };
+      heartbeat_canvas_sync_job_google_v1: {
+        Args: { p_job_id: string; p_dispatch_id: string; p_worker_id: string };
         Returns: CanvasSyncJobDatabaseRow[];
       };
       prepare_canvas_sync_job_workflow_dispatch_v1: {
@@ -5130,6 +5242,14 @@ export interface Database {
           created_at: string;
           updated_at: string;
         }>;
+      };
+      disconnect_canvas_connection_v1: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      mark_canvas_reconnect_required_v1: {
+        Args: { p_user_id: string; p_connection_id: string; p_expected_updated_at: string };
+        Returns: undefined;
       };
       update_canvas_sync_run_progress: {
         Args: {

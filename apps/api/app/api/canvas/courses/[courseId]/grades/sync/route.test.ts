@@ -51,10 +51,10 @@ vi.mock("@/lib/canvas-sync-jobs/repository", () => {
   };
 });
 
-vi.mock("@/lib/canvas-sync-jobs/workflow-dispatch", () => {
-  class CanvasSyncWorkflowDispatchError extends Error {}
+vi.mock("@/lib/canvas-sync-jobs/google-dispatch", () => {
+  class CanvasGoogleDispatchError extends Error {}
   return {
-    CanvasSyncWorkflowDispatchError,
+    CanvasGoogleDispatchError,
     dispatchAcceptedCanvasSyncJob: mocks.dispatchAcceptedCanvasSyncJob,
   };
 });

@@ -1,0 +1,11 @@
+﻿text=[] desc=[Back] bounds=[60,144][204,288]
+text=[Assignment] desc=[] bounds=[204,181][1020,252]
+text=[CIT17 | CITCS 3N GROUP A | WEB INFORMATION SYSTEM] desc=[] bounds=[60,318][1020,428]
+text=[Learning Contract] desc=[] bounds=[60,470][1020,569]
+text=[Sep 7, 11:59 PM] desc=[] bounds=[60,611][1020,666]
+text=[Instructions] desc=[] bounds=[99,747][981,817]
+text=[Submit learning contract here. Use the template below.
+
+Learning-Contract-Template.docx] desc=[] bounds=[99,835][981,1055]
+text=[] desc=[Generate Draft] bounds=[60,1136][1020,1280]
+text=[Generate Draft] desc=[] bounds=[401,1180][678,1235]

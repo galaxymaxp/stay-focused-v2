@@ -235,6 +235,24 @@ export async function requestProcessingJobCancellation(
   return data?.[0] ?? null;
 }
 
+/** A retry that is still running or already succeeded; a second retry would duplicate its saved output. */
+export async function findLiveProcessingJobRetry(
+  client: ProcessingJobServiceClient,
+  userId: string,
+  jobId: string,
+): Promise<ProcessingJobDatabaseRow | null> {
+  const { data, error } = await client
+    .from("processing_jobs")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("retry_of_job_id", jobId)
+    .in("status", ["queued", "running", "cancellation_requested", "succeeded"])
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw new ProcessingJobRepositoryError("processing_job_retry_read_failed");
+  return data?.[0] ?? null;
+}
+
 export async function retryProcessingJob(
   client: ProcessingJobServiceClient,
   userId: string,

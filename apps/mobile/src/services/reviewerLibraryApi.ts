@@ -1,6 +1,7 @@
 import type { ReviewerOutput } from "@stay-focused/engine";
 
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 
 const REVIEWERS_PATH = "/api/reviewers";
 const MAX_ERROR_MESSAGE_CHARS = 300;
@@ -117,7 +118,7 @@ export interface SaveReviewerInput extends ReviewerLibraryBaseInput {
 }
 
 export interface ReviewerIdInput extends ReviewerLibraryBaseInput {
-  readonly reviewerId: string;
+  readonly reviewerArtifactId: string;
 }
 
 export interface RenameReviewerInput extends ReviewerIdInput {
@@ -137,7 +138,7 @@ export type ReviewerLibraryResult<TData> =
 export type ReviewerLibraryErrorCode =
   | "invalid_api_base_url"
   | "missing_access_token"
-  | "missing_reviewer_id"
+  | "missing_reviewer_artifact_id"
   | "invalid_title"
   | "invalid_source_metadata"
   | "invalid_reviewer_output"
@@ -146,6 +147,7 @@ export type ReviewerLibraryErrorCode =
   | "invalid_response"
   | "unauthorized"
   | "reviewer_not_found"
+  | "reviewer_has_quizzes"
   | "reviewer_storage_not_configured"
   | "reviewer_storage_failed"
   | "source_snapshot_not_found"
@@ -311,12 +313,12 @@ function createReviewerEndpoint(
 ):
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly error: ReviewerLibraryError } {
-  const reviewerId = input.reviewerId.trim();
-  if (!reviewerId) {
-    return clientError("missing_reviewer_id", "A saved reviewer ID is required.");
+  const reviewerArtifactId = input.reviewerArtifactId.trim();
+  if (!reviewerArtifactId) {
+    return clientError("missing_reviewer_artifact_id", "A saved Reviewer artifact ID is required.");
   }
 
-  return createEndpoint(input.apiBaseUrl, `${REVIEWERS_PATH}/${reviewerId}`);
+  return createEndpoint(input.apiBaseUrl, `${REVIEWERS_PATH}/${reviewerArtifactId}`);
 }
 
 function createEndpoint(
@@ -325,32 +327,11 @@ function createEndpoint(
 ):
   | { readonly ok: true; readonly url: string }
   | { readonly ok: false; readonly error: ReviewerLibraryError } {
-  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/+$/, "");
-
-  if (!normalizedBaseUrl) {
-    return clientError("invalid_api_base_url", API_BASE_URL_SETUP_HINT);
-  }
-
   try {
-    const parsed = new URL(normalizedBaseUrl);
-    if (
-      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return clientError(
-        "invalid_api_base_url",
-        `EXPO_PUBLIC_API_BASE_URL must be a plain HTTP(S) base URL. ${API_BASE_URL_SETUP_HINT}`,
-      );
-    }
+    return { ok: true, url: `${requireApiBaseUrl(apiBaseUrl)}${path}` };
   } catch {
-    return clientError(
-      "invalid_api_base_url",
-      `EXPO_PUBLIC_API_BASE_URL must be a valid API base URL. ${API_BASE_URL_SETUP_HINT}`,
-    );
+    return clientError("invalid_api_base_url", API_CONFIGURATION_MESSAGE);
   }
-
-  return { ok: true, url: `${normalizedBaseUrl}${path}` };
 }
 
 async function requestJson<TData>({
@@ -527,6 +508,7 @@ function mapApiErrorCode(code: string): ReviewerLibraryErrorCode {
     case "invalid_source_metadata":
     case "invalid_reviewer_output":
     case "reviewer_not_found":
+    case "reviewer_has_quizzes":
     case "reviewer_storage_not_configured":
     case "reviewer_storage_failed":
     case "source_snapshot_not_found":

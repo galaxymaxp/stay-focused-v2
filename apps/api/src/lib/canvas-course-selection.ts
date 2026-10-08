@@ -23,6 +23,7 @@ import {
   mapCanvasClientError,
   readConnection,
 } from "@/lib/canvas-routes";
+import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
 const COURSE_COLUMNS =
@@ -77,6 +78,11 @@ export interface CanvasCourseInventory {
   readonly courses: readonly CanvasCourseInventoryItem[];
   readonly counts: CanvasCourseInventoryCounts;
   readonly selectedCourseIds: readonly string[];
+  /**
+   * 'stored' only when the caller allowed a stored fallback and Canvas could not
+   * list courses; classifications then use saved course dates alone.
+   */
+  readonly classificationSource: "canvas" | "stored";
 }
 
 export type CanvasCourseSelectionResult<TValue> =
@@ -89,41 +95,58 @@ export type CanvasCourseSelectionResult<TValue> =
     };
 
 export async function loadCanvasCourseInventory({
+  allowStoredFallback = false,
   client,
   now = new Date(),
   userId,
 }: {
+  /**
+   * Read-only consumers (Generate) may keep working from stored courses when
+   * Canvas is unreachable. Sync-state fields never depend on live Canvas.
+   */
+  readonly allowStoredFallback?: boolean;
   readonly client: SupabaseClient<Database>;
   readonly now?: Date;
   readonly userId: string;
 }): Promise<CanvasCourseSelectionResult<CanvasCourseInventory>> {
-  const connection = await loadConnectionAndToken(client, userId);
+  const connection = await loadConnectionAndToken(client, userId, allowStoredFallback);
   if (!connection.ok) {
     return connection;
   }
 
-  let liveCourses: readonly CanvasCourse[];
+  let liveCourses: readonly CanvasCourse[] | null;
   try {
-    liveCourses = await createCanvasClient(
+    liveCourses = connection.value.token === null ? null : await createCanvasClient(
       connection.value.connection.base_url,
       connection.value.token,
     ).listCourseInventory();
   } catch (error) {
     const mapped = mapCanvasClientError(error);
-    return {
-      ok: false,
-      status: mapped.status,
-      code: mapped.code,
-      message: mapped.message,
-    };
+    if (mapped.code === "invalid_canvas_token") await markCanvasReconnectRequired(client, connection.value.connection);
+    if (!allowStoredFallback) {
+      return {
+        ok: false,
+        status: mapped.status,
+        code: mapped.code,
+        message: mapped.message,
+      };
+    }
+    console.warn("canvas.course_inventory.stored_fallback", { code: mapped.code });
+    liveCourses = null;
   }
 
-  const courseRows = await upsertCanvasCourseInventory({
-    client,
-    connection: connection.value.connection,
-    courses: liveCourses,
-    userId,
-  });
+  const courseRows = liveCourses
+    ? await upsertCanvasCourseInventory({
+        client,
+        connection: connection.value.connection,
+        courses: liveCourses,
+        userId,
+      })
+    : await readStoredCourseRows({
+        client,
+        connectionId: connection.value.connection.id,
+        userId,
+      });
   if (!courseRows.ok) {
     return {
       ok: false,
@@ -152,7 +175,7 @@ export async function loadCanvasCourseInventory({
     .filter((preference) => preference.selected && !liveRowIds.has(preference.course_id))
     .map((preference) => preference.course_id);
   const historicalRows =
-    missingSelectedCourseIds.length === 0
+    missingSelectedCourseIds.length === 0 || !liveCourses
       ? ({ ok: true, value: [] } as const)
       : await readCourseRowsByIds({
           client,
@@ -209,12 +232,14 @@ export async function loadCanvasCourseInventory({
   );
   const runsByCourseId = latestRunByCourseId(scopedRuns.value);
   const liveCoursesByCanvasId = new Map(
-    liveCourses.map((course) => [course.id, course]),
+    (liveCourses ?? []).map((course) => [course.id, course]),
   );
 
   const courses = allRows
     .map((row) => {
-      const liveCourse = liveCoursesByCanvasId.get(row.canvas_course_id) ?? null;
+      const liveCourse = liveCourses
+        ? liveCoursesByCanvasId.get(row.canvas_course_id) ?? null
+        : undefined;
       return mapInventoryItem({
         liveCourse,
         now,
@@ -238,6 +263,7 @@ export async function loadCanvasCourseInventory({
       courses,
       counts: countClassifications(courses),
       selectedCourseIds,
+      classificationSource: liveCourses ? "canvas" : "stored",
     },
   };
 }
@@ -393,10 +419,11 @@ export async function loadSelectedSyncCourse({
 async function loadConnectionAndToken(
   client: SupabaseClient<Database>,
   userId: string,
+  allowInactive: boolean,
 ): Promise<
   CanvasCourseSelectionResult<{
     readonly connection: CanvasConnectionRow;
-    readonly token: string;
+    readonly token: string | null;
   }>
 > {
   const connection = await readConnection(client, userId, CONNECTION_SECRET_COLUMNS);
@@ -415,6 +442,10 @@ async function loadConnectionAndToken(
       code: "canvas_connection_missing",
       message: "Connect Canvas before loading courses.",
     };
+  }
+  if (connection.row.status !== "active") {
+    if (allowInactive) return { ok: true, value: { connection: connection.row, token: null } };
+    return { ok: false, status: 409, code: "invalid_canvas_token", message: "Reconnect Canvas to resume synchronization. Your saved work remains available." };
   }
 
   try {
@@ -481,6 +512,31 @@ async function upsertCanvasCourseInventory({
     return { ok: false };
   }
 
+  return { ok: true, value: data as readonly CanvasCourseRow[] };
+}
+
+async function readStoredCourseRows({
+  client,
+  connectionId,
+  userId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly connectionId: string;
+  readonly userId: string;
+}): Promise<
+  | { readonly ok: true; readonly value: readonly CanvasCourseRow[] }
+  | { readonly ok: false }
+> {
+  const { data, error } = await client
+    .from("canvas_courses")
+    .select(COURSE_COLUMNS)
+    .eq("user_id", userId)
+    .eq("canvas_connection_id", connectionId)
+    .order("id");
+
+  if (error || !data) {
+    return { ok: false };
+  }
   return { ok: true, value: data as readonly CanvasCourseRow[] };
 }
 
@@ -633,7 +689,8 @@ function mapInventoryItem({
   run,
   state,
 }: {
-  readonly liveCourse: CanvasCourse | null;
+  /** Undefined means Canvas was not consulted; null means Canvas omitted it. */
+  readonly liveCourse: CanvasCourse | null | undefined;
   readonly now: Date;
   readonly preference: CanvasCourseSyncPreferenceRow | null;
   readonly row: CanvasCourseRow;
@@ -642,10 +699,12 @@ function mapInventoryItem({
 }): CanvasCourseInventoryItem {
   const classification = liveCourse
     ? classifyCanvasCourse(liveCourse, now)
-    : {
-        classification: "unavailable" as const,
-        reason: "Canvas no longer returns this course for the current connection.",
-      };
+    : liveCourse === undefined
+      ? classifyStoredCanvasCourse(row, now)
+      : {
+          classification: "unavailable" as const,
+          reason: "Canvas no longer returns this course for the current connection.",
+        };
 
   return {
     id: row.id,
@@ -661,6 +720,34 @@ function mapInventoryItem({
     selected: preference?.selected ?? false,
     lastSync: mapLastSync({ run, state }),
   };
+}
+
+/**
+ * Stored rows carry no term or enrollment evidence, so only explicit Canvas
+ * completion or saved course dates decide; everything else stays uncertain.
+ */
+export function classifyStoredCanvasCourse(
+  row: Pick<CanvasCourseRow, "workflow_state" | "start_at" | "end_at">,
+  now: Date,
+): {
+  readonly classification: CanvasCourseClassification;
+  readonly reason: string | null;
+} {
+  const workflowState = normalizeState(row.workflow_state);
+  if (workflowState === "deleted" || workflowState === "unpublished") {
+    return { classification: "unavailable", reason: "Canvas marks this course unavailable." };
+  }
+  if (workflowState === "completed" || isPastDate(row.end_at, now)) {
+    return { classification: "past_or_concluded", reason: null };
+  }
+  if (
+    workflowState === "available" &&
+    (row.start_at !== null || row.end_at !== null) &&
+    isInCurrentDateWindow({ endAt: row.end_at, now, startAt: row.start_at })
+  ) {
+    return { classification: "likely_current", reason: null };
+  }
+  return { classification: "other_or_uncertain", reason: null };
 }
 
 function classifyCanvasCourse(

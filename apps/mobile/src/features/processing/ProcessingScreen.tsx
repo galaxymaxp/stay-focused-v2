@@ -53,7 +53,7 @@ import {
   readOfflineProcessingIntents,
   type OfflineProcessingIntent,
 } from "../../services/processingOutboxStore";
-import { API_BASE_URL_SETUP_HINT } from "../../services/reviewerApi";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import { saveReviewer } from "../../services/reviewerLibraryApi";
 import { ReviewerPreview } from "../reviewer/ReviewerPreview";
 import {
@@ -127,7 +127,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
       if (!accessToken || !apiBaseUrl) {
         setOfflineIntents(outbox);
         setJobs(local.map(referenceToStatusView));
-        setError(API_BASE_URL_SETUP_HINT);
+        setError(apiBaseUrl ? "Sign in again to load processing jobs." : `App configuration error\n${API_CONFIGURATION_MESSAGE}`);
         return;
       }
 

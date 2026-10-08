@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { ApiConfigurationError } from "../../config/apiBaseUrlResolution";
 import { useTheme } from "../../design/theme";
-import { experienceRequest } from "../../services/experienceApi";
+import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
+import { useCanvasSync } from "../sync/CanvasSyncProvider";
 
 export function useExperienceClient() {
   const { session } = useAuth();
@@ -20,21 +22,34 @@ export function useExperience<T>(
   path: string | null,
   pollMs = 0,
   pollWhile?: (data: T) => boolean,
+  offlineCache?: {
+    read(ownerUserId: string, path: string): Promise<T | null>;
+    write(ownerUserId: string, data: T): Promise<void>;
+  },
 ) {
+  const { session } = useAuth();
+  const ownerUserId = session?.user.id ?? null;
   const client = useExperienceClient();
   const pollCondition = useRef(pollWhile);
   pollCondition.current = pollWhile;
+  const offlineCacheRef = useRef(offlineCache);
+  offlineCacheRef.current = offlineCache;
   const focused = useIsFocused();
   const { active } = useTheme();
+  // A finished Canvas sync bumps this so every mounted screen reloads its data
+  // in place, without clearing what is already shown.
+  const { dataVersion } = useCanvasSync();
   const [version, setVersion] = useState(0);
   const [state, setState] = useState<{
     data: T | null;
     error: string | null;
+    /** Stable server code so screens can tell a sync state from an outage. */
+    errorCode: string | null;
     loading: boolean;
-  }>({ data: null, error: null, loading: true });
+  }>({ data: null, error: null, errorCode: null, loading: true });
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
   useEffect(() => {
-    setState({ data: null, error: null, loading: !!path });
+    setState({ data: null, error: null, errorCode: null, loading: !!path });
   }, [path, client]);
   useEffect(() => {
     if (!path || !focused || !active) return;
@@ -46,15 +61,39 @@ export function useExperience<T>(
         const data = await experienceRequest<T>(client, path!, {
           signal: controller.signal,
         });
-        if (live) setState({ data, error: null, loading: false });
+        if (live) setState({ data, error: null, errorCode: null, loading: false });
+        if (live && ownerUserId && offlineCacheRef.current) {
+          try {
+            await offlineCacheRef.current.write(ownerUserId, data);
+          } catch {
+            // Local caching must not turn a successful online read into an error.
+          }
+        }
         if (pollCondition.current && !pollCondition.current(data)) return;
       } catch (error) {
+        if (live && ownerUserId && offlineCacheRef.current && error instanceof ExperienceApiError && error.code === "connection") {
+          try {
+            const cached = await offlineCacheRef.current.read(ownerUserId, path!);
+            if (live && cached) {
+              setState({ data: cached, error: null, errorCode: null, loading: false });
+              return;
+            }
+          } catch {
+            // A corrupt or unavailable local cache falls through to the API error.
+          }
+        }
         if (live)
           setState((old) => ({
             ...old,
             loading: false,
-            error: error instanceof Error ? error.message : "Please try again.",
+            error: error instanceof ApiConfigurationError
+              ? `App configuration error\n${error.message}`
+              : error instanceof Error ? error.message : "Please try again.",
+            errorCode: error instanceof ApiConfigurationError
+              ? error.code
+              : error instanceof ExperienceApiError ? error.code : null,
           }));
+        if (error instanceof ApiConfigurationError) return;
       }
       if (live && pollMs) timer = setTimeout(() => void load(), pollMs);
     }
@@ -64,6 +103,6 @@ export function useExperience<T>(
       controller.abort();
       clearTimeout(timer);
     };
-  }, [client, path, focused, active, version, pollMs]);
+  }, [client, ownerUserId, path, focused, active, version, dataVersion, pollMs]);
   return { ...state, refresh };
 }

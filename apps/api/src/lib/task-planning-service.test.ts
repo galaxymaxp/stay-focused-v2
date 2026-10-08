@@ -3,11 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  importSchedulableCanvasAssignments: vi.fn(),
   loadOwnedPlannerTasks: vi.fn(),
   persistOwnedStudyPlan: vi.fn(),
 }));
 
 vi.mock("@/lib/task-planning-repository", () => ({
+  importSchedulableCanvasAssignments: mocks.importSchedulableCanvasAssignments,
   loadOwnedPlannerTasks: mocks.loadOwnedPlannerTasks,
   persistOwnedStudyPlan: mocks.persistOwnedStudyPlan,
   toStudySessionView: (row: StudySessionRow & { task?: unknown }) => ({
@@ -65,6 +67,25 @@ describe("owned study planning service", () => {
       "user-a",
       request.taskIds,
     );
+  });
+
+  it("plans an explicit task selection without importing Canvas work", async () => {
+    await service.previewOwnedStudyPlan(client, "user-a", request);
+
+    expect(mocks.importSchedulableCanvasAssignments).not.toHaveBeenCalled();
+  });
+
+  it("makes synced Canvas work schedulable before planning the whole day", async () => {
+    const wholeDay = { planningRange: request.planningRange, availability: request.availability };
+    const order: string[] = [];
+    mocks.importSchedulableCanvasAssignments.mockImplementation(async () => { order.push("import"); return 2; });
+    mocks.loadOwnedPlannerTasks.mockImplementation(async () => { order.push("load"); return []; });
+
+    await service.previewOwnedStudyPlan(client, "user-a", wholeDay, Date.parse("2026-09-01T08:00:00.000Z"));
+
+    expect(mocks.importSchedulableCanvasAssignments).toHaveBeenCalledWith(client, "user-a", Date.parse("2026-09-01T08:00:00.000Z"));
+    expect(mocks.loadOwnedPlannerTasks).toHaveBeenCalledWith(client, "user-a", undefined);
+    expect(order).toEqual(["import", "load"]);
   });
 
   it("rejects explicit foreign or completed task IDs safely", async () => {

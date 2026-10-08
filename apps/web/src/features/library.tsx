@@ -5,6 +5,7 @@ import type {
   LibraryArtifactSummary,
   LibraryOverview,
   Quiz,
+  QuizSummary,
   ReviewerReaderModel,
 } from "@stay-focused/shared";
 import Link from "next/link";
@@ -27,12 +28,12 @@ const filters = [
   ["quiz", "Quizzes"],
   ["activity_output", "Activity Outputs"],
 ] as const;
-const learning = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  abandoned: "Abandoned",
-};
+/** Quiz progress from the summary the API sends: an open attempt, then any finished one. */
+function quizProgress(quiz: QuizSummary) {
+  if (quiz.activeAttempt) return "In progress";
+  if (quiz.latestScore !== null || quiz.bestScore !== null) return "Completed";
+  return quiz.attemptCount > 0 ? "Started" : "Not started";
+}
 export function LibraryScreen() {
   const { api } = useAuth(),
     [filter, setFilter] = useState("all"),
@@ -99,7 +100,7 @@ export function LibraryScreen() {
                     ? "Reviewer"
                     : "Activity Output"
               }
-              detail={`${item.course?.name ?? "Saved material"} · ${item.quiz ? (learning[item.quiz.learningState] ?? "Learning progress unavailable") : dateLabel(item.updatedAt)}${item.quiz?.bestScore !== null && item.quiz?.bestScore !== undefined ? ` · Best ${item.quiz.bestScore}%` : ""}`}
+              detail={`${item.course?.name ?? "Saved material"} · ${item.quiz ? quizProgress(item.quiz) : dateLabel(item.updatedAt)}${item.quiz?.bestScore !== null && item.quiz?.bestScore !== undefined ? ` · Best ${item.quiz.bestScore}%` : ""}`}
             />
           ))}
         </div>

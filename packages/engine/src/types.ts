@@ -309,6 +309,13 @@ export interface ReviewerEvidenceBlock {
 export interface SourceGroundedCore {
   readonly explanation: string;
   readonly keyPoints: readonly string[];
+  /** AI-selected exact substrings of the visible text. Older artifacts omit this. */
+  readonly emphasis?: readonly {
+    readonly target: 'explanation' | 'key_point';
+    readonly index: number;
+    readonly text: string;
+    readonly style: 'bold' | 'underline' | 'highlight';
+  }[];
   readonly evidence?: readonly ReviewerEvidenceBlock[];
 }
 
@@ -341,7 +348,7 @@ export type SectionOutput =
 
 export type CoverageStatus = "passed" | "weak" | "failed";
 export type CoverageReportStatus = "passed" | "failed";
-export type CoverageBasis = "source-outline";
+export type CoverageBasis = "source-outline" | "source-references";
 
 export type CoverageIssueSeverity = "warning" | "error";
 export type CoverageIssueType =
@@ -544,6 +551,7 @@ export interface ReviewerSection {
 }
 
 export interface ReviewerMetadata {
+  readonly validationPolicy?: 'ai-first-contract';
   readonly sourceId: string;
   readonly planId: string;
   readonly coverageReportId: string;

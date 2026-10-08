@@ -151,13 +151,13 @@ describe("Canvas reviewer source service", () => {
       synchronizedSourcesAvailable: true,
       failureCategories: ["files", "timeout"],
     });
-    expect(result.value.availableSourceCount).toBe(2);
+    expect(result.value.availableSourceCount).toBe(1);
     expect(result.value.unavailableSourceCount).toBe(1);
     expect(result.value.sources.map((entry) => entry.id)).toEqual([
       `page:${PAGE_ID}`,
-      `assignment:${ASSIGNMENT_ID}`,
       `file:${FILE_ID}`,
     ]);
+    expect(result.value.sources.some((entry) => entry.type === "assignment")).toBe(false);
     expect(result.value.sources.some((entry) => entry.type === "announcement")).toBe(false);
     expect(result.value.sources.find((entry) => entry.type === "file")).toMatchObject({
       availability: "unavailable",
@@ -178,6 +178,137 @@ describe("Canvas reviewer source service", () => {
     expect(provider.calls).toHaveLength(0);
   });
 
+  it("refuses unselected and foreign courses before reading any course source", async () => {
+    const unselected = createFakeCanvasClient({ canvas_course_sync_preferences: [{ ...basePreferenceRow(), selected: false }] });
+    const denied = await listCanvasReviewerSources({ client: unselected.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(denied).toMatchObject({ ok: false, status: 400, code: "canvas_course_not_selected" });
+    expect(unselected.calls.some((call) => ["canvas_pages", "canvas_files", "canvas_assignments", "canvas_announcements"].includes(call.table))).toBe(false);
+
+    const foreign = createFakeCanvasClient();
+    const other = await listCanvasReviewerSources({ client: foreign.client, courseId: COURSE_ID, userId: "99999999-9999-4999-8999-999999999999" });
+    expect(other.ok).toBe(false);
+    expect(other.ok ? null : other.status).toBe(404);
+    expect(foreign.calls.some((call) => call.table === "canvas_pages")).toBe(false);
+  });
+
+  it("routes learning materials to Generate while excluding coursework and administrative content", async () => {
+    const administrativePage = {
+      ...basePageRow(),
+      canvas_page_id: "course-syllabus",
+      id: OTHER_PAGE_ID,
+      title: "Course Syllabus",
+    };
+    const administrativeFile = {
+      ...baseFileRow(),
+      canvas_file_id: "orientation-file",
+      display_name: "Course Introduction and Orientation 2026.pdf",
+      filename: "course-introduction-and-orientation-2026.pdf",
+      id: OTHER_FILE_ID,
+    };
+    const fake = createFakeCanvasClient({
+      canvas_files: [baseFileRow(), administrativeFile],
+      canvas_pages: [basePageRow(), administrativePage],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map((source) => source.id)).toEqual([
+      `page:${PAGE_ID}`,
+      `file:${FILE_ID}`,
+    ]);
+    expect(result.value.sources.map((source) => source.title)).toEqual([
+      "Fictional Page",
+      "Fictional handout.pdf",
+    ]);
+  });
+
+  it("keeps assignment-only file attachments out of Generate but admits a separate module File item", async () => {
+    const attachmentReference = {
+      id: "55555555-5555-4555-8555-555555555555",
+      user_id: USER_ID,
+      canvas_connection_id: CONNECTION_ID,
+      course_id: COURSE_ID,
+      file_id: FILE_ID,
+      canvas_assignment_id: "canvas-assignment-101",
+      reference_type: "typed_attachment",
+    };
+    const onlyAssignmentAttachment = createFakeCanvasClient({ canvas_file_references: [attachmentReference] });
+    const taskOnly = await listCanvasReviewerSources({ client: onlyAssignmentAttachment.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(taskOnly.ok).toBe(true);
+    if (!taskOnly.ok) return;
+    expect(taskOnly.value.sources.map(source => source.id)).toEqual([`page:${PAGE_ID}`]);
+
+    const alsoModuleMaterial = createFakeCanvasClient({
+      canvas_file_references: [attachmentReference],
+      canvas_modules: [moduleRow("teaching-module", "Week 1", 1)],
+      canvas_module_items: [{ ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888887", pageUrl: "" }), module_id: "teaching-module", item_type: "File", canvas_content_id: "file-1" }],
+    });
+    const moduleFile = await listCanvasReviewerSources({ client: alsoModuleMaterial.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(moduleFile.ok).toBe(true);
+    if (!moduleFile.ok) return;
+    expect(moduleFile.value.sources.map(source => source.id)).toEqual([`file:${FILE_ID}`, `page:${PAGE_ID}`]);
+  });
+
+  it("excludes a module grouping Page with an empty body without relying on its title", async () => {
+    const groupingPage = {
+      ...basePageRow(),
+      id: OTHER_PAGE_ID,
+      canvas_page_id: "grouping-page",
+      title: "Final project grouping",
+      body_html: "<div><p> </p></div>",
+    };
+    const fake = createFakeCanvasClient({ canvas_pages: [basePageRow(), groupingPage] });
+    const result = await listCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map((source) => source.id)).toEqual([`page:${PAGE_ID}`, `file:${FILE_ID}`]);
+  });
+
+  it("excludes files placed in the observed Course Information Module", async () => {
+    const administrativeFile = {
+      ...baseFileRow(),
+      canvas_file_id: "student-handbook",
+      display_name: "Student Handbook-UC College.pdf",
+      filename: "student-handbook-uc-college.pdf",
+      id: OTHER_FILE_ID,
+    };
+    const fake = createFakeCanvasClient({
+      canvas_files: [baseFileRow(), administrativeFile],
+      canvas_modules: [
+        moduleRow("module-course-information", "Module 0: Course Information Module", 1),
+      ],
+      canvas_module_items: [
+        {
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888886", pageUrl: "" }),
+          module_id: "module-course-information",
+          item_type: "File",
+          canvas_content_id: "student-handbook",
+        },
+      ],
+    });
+
+    const result = await listCanvasReviewerSources({
+      client: fake.client,
+      courseId: COURSE_ID,
+      userId: USER_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map((source) => source.title)).toContain(
+      "Fictional handout.pdf",
+    );
+    expect(result.value.sources.map((source) => source.title)).not.toContain(
+      "Student Handbook-UC College.pdf",
+    );
+  });
+
   it("lists ready PDF and image descriptors as selectable without private fields", async () => {
     const pdfBytes = await createPdfBytes(1);
     const imageBytes = createPngBytes();
@@ -195,6 +326,12 @@ describe("Canvas reviewer source service", () => {
     });
     const fake = createFakeCanvasClient({
       canvas_files: [pdfFile, imageFile],
+      canvas_modules: [moduleRow("module-fictional-1", "Lecture diagrams", 1)],
+      canvas_module_items: [{
+        ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888883", pageUrl: "" }),
+        item_type: "File",
+        canvas_content_id: imageFile.canvas_file_id,
+      }],
     });
 
     const result = await listCanvasReviewerSources({
@@ -233,6 +370,56 @@ describe("Canvas reviewer source service", () => {
     const serialized = JSON.stringify(result.value);
     expect(serialized).not.toContain("storage_object_key");
     expect(serialized).not.toContain("current_sha256");
+  });
+
+  it("excludes ungrouped artwork and administrative images but retains a module teaching image", async () => {
+    const artwork = {
+      ...baseFileRow(),
+      content_type: "image/png",
+      display_name: "Course banner.png",
+      filename: "course-banner.png",
+      ingestion_eligibility: "eligible_image",
+    };
+    const administrative = {
+      ...artwork,
+      id: OTHER_FILE_ID,
+      canvas_file_id: "apa-example",
+      display_name: "APA Sample.png",
+    };
+    const teaching = {
+      ...artwork,
+      id: "44444444-4444-4444-8444-444444444446",
+      canvas_file_id: "teaching-diagram",
+      display_name: "Cell structure diagram.png",
+    };
+    const fake = createFakeCanvasClient({
+      canvas_files: [artwork, administrative, teaching],
+      canvas_modules: [
+        moduleRow("module-admin", "General Information", 1),
+        moduleRow("module-lesson", "Cell Biology", 2),
+      ],
+      canvas_module_items: [
+        {
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888884", pageUrl: "" }),
+          module_id: "module-admin",
+          item_type: "File",
+          canvas_content_id: "apa-example",
+        },
+        {
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888885", pageUrl: "" }),
+          module_id: "module-lesson",
+          item_type: "File",
+          canvas_content_id: "teaching-diagram",
+        },
+      ],
+    });
+
+    const result = await listCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID, userId: USER_ID });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.filter((source) => source.type === "file").map((source) => source.title)).toEqual([
+      "Cell structure diagram.png",
+    ]);
   });
 
   it("orders proven module sources by module and item position before stable ungrouped sources", async () => {
@@ -306,7 +493,7 @@ describe("Canvas reviewer source service", () => {
     expect(result.value.sources.at(-1)?.placement.group).toBe("ungrouped");
   });
 
-  it("returns safe source capabilities without resolving content or calling providers", async () => {
+  it("returns safe learning-material capabilities without resolving content or calling providers", async () => {
     const fake = createFakeCanvasClient({
       canvas_assignments: [{ ...baseAssignmentRow(), description_html: null }],
       canvas_files: [
@@ -330,9 +517,9 @@ describe("Canvas reviewer source service", () => {
     expect(result.value.sources.find((source) => source.type === "page")?.capability).toBe(
       "ready",
     );
-    expect(
-      result.value.sources.find((source) => source.type === "assignment")?.capability,
-    ).toBe("empty");
+    expect(result.value.sources.some((source) => source.type === "assignment")).toBe(
+      false,
+    );
     expect(result.value.sources.find((source) => source.type === "file")?.capability).toBe(
       "needs_preparation",
     );
@@ -394,6 +581,14 @@ describe("Canvas reviewer source service", () => {
   ])("lists %s file descriptors with safe state", async (_name, overrides, expected) => {
     const fake = createFakeCanvasClient({
       canvas_files: [{ ...baseFileRow(), ...overrides }],
+      ...(overrides.ingestion_eligibility === "eligible_image" ? {
+        canvas_modules: [moduleRow("module-fictional-1", "Lecture diagrams", 1)],
+        canvas_module_items: [{
+          ...moduleItemRow({ id: "88888888-8888-4888-8888-888888888886", pageUrl: "" }),
+          item_type: "File",
+          canvas_content_id: "file-1",
+        }],
+      } : {}),
     });
 
     const result = await listCanvasReviewerSources({
@@ -1079,6 +1274,8 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
   private filters: Array<(row: FakeRecord) => boolean> = [];
   private insertedRows: readonly FakeRecord[] | null = null;
   private limitCount: number | null = null;
+  private rangeStart: number | null = null;
+  private rangeEnd: number | null = null;
   private orders: Array<{
     readonly column: string;
     readonly ascending: boolean;
@@ -1157,6 +1354,12 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     return this;
   }
 
+  public range(from: number, to: number): this {
+    this.rangeStart = from;
+    this.rangeEnd = to;
+    return this;
+  }
+
   public async maybeSingle(): Promise<FakeQueryResult> {
     const rows = this.executeRows();
     return {
@@ -1199,7 +1402,10 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     const ordered = [...filtered].sort((left, right) =>
       compareByOrders(left, right, this.orders),
     );
-    return this.limitCount === null ? ordered : ordered.slice(0, this.limitCount);
+    const ranged = this.rangeStart === null || this.rangeEnd === null
+      ? ordered
+      : ordered.slice(this.rangeStart, this.rangeEnd + 1);
+    return this.limitCount === null ? ranged : ranged.slice(0, this.limitCount);
   }
 }
 
@@ -1314,6 +1520,7 @@ function baseCanvasTables(): Record<string, readonly FakeRecord[]> {
     canvas_course_sync_states: [baseSyncStateRow()],
     canvas_courses: [baseCourseRow()],
     canvas_files: [baseFileRow()],
+    canvas_file_references: [],
     canvas_pages: [basePageRow(), baseOtherCoursePageRow()],
     canvas_sync_course_results: [baseCourseResultRow()],
     canvas_sync_runs: [baseSyncRunRow()],

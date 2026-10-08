@@ -1,6 +1,7 @@
-import type { CanvasAssignmentRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
-import type { ActivitySummary, CourseSummary, ExperienceCapabilities, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
+import type { CanvasAssignmentRow, CanvasAssignmentSubmissionRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
+import type { ActivitySummary, CourseSummary, ExperienceCapabilities, GenerateCoursePeriod, GenerateCourseSummary, GenerateCourseSyncState, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceDescriptor } from '@/lib/canvas-reviewer-sources';
+import type { CanvasCourseClassification, CanvasCourseInventoryItem } from '@/lib/canvas-course-selection';
 import { ExperienceFailure, normalizeExperienceError } from './errors';
 
 const available: FeatureCapability = { status: 'available' };
@@ -8,20 +9,48 @@ const missing: FeatureCapability = { status: 'unavailable', reasonCode: 'not_imp
 export function experienceCapabilities(): ExperienceCapabilities {
   return { fileIngestion: {pdf:available,scanned_pdf:available,image:available,docx:available,pptx:available,doc:{status:'unavailable',reasonCode:'unsupported_material'},ppt:{status:'unavailable',reasonCode:'unsupported_material'},text:available,canvas_text:available}, reviewerGeneration: available, quizGeneration: available, activityMaker: available, planner: available, calendar: missing };
 }
-export function generationCapability(ready: boolean, unsupported = false): GenerationCapability {
-  return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, activityAssistance: missing };
+export function generationCapability(ready: boolean, unsupported = false, quizReady = false): GenerationCapability {
+  return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: quizReady ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, activityAssistance: missing };
 }
 export function courseSummary(row: CanvasCourseRow): CourseSummary {
   return { id: row.id, code: row.course_code, name: row.name, status: row.workflow_state, materialCount: null, reviewerCount: null, lastActivityAt: row.last_synced_at };
 }
-export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string): LearningMaterial {
+/**
+ * Mirrors the gate in listCanvasReviewerSources: materials require a selected
+ * course. A never-completed, failed, or running latest attempt is not synced.
+ */
+export function generateCourseSyncState(item: Pick<CanvasCourseInventoryItem, 'selected' | 'lastSync'>): GenerateCourseSyncState {
+  if (!item.selected || !item.lastSync) return 'not_synced';
+  if (item.lastSync.status === 'running' || item.lastSync.status === 'failed') return 'sync_incomplete';
+  return item.lastSync.completedAt ?? item.lastSync.lastCheckedAt ? 'synced' : 'sync_incomplete';
+}
+const periods: Record<CanvasCourseClassification, GenerateCoursePeriod> = { likely_current: 'current', past_or_concluded: 'previous', other_or_uncertain: 'other', unavailable: 'other' };
+export function generateCourseSummary(item: CanvasCourseInventoryItem): GenerateCourseSummary {
+  const lastSuccessfulSyncAt = item.lastSync?.lastSuccessfulSyncAt ?? (item.lastSync?.status === 'success' || item.lastSync?.status === 'partial' ? item.lastSync.completedAt : null);
+  return { id: item.id, code: item.courseCode, name: item.displayName, status: item.workflowState, materialCount: null, reviewerCount: null,
+    lastActivityAt: lastSuccessfulSyncAt, syncState: generateCourseSyncState(item), period: periods[item.classification], termName: item.term?.name?.trim() || null, lastSuccessfulSyncAt };
+}
+const periodRank: Record<GenerateCoursePeriod, number> = { current: 0, previous: 1, other: 2 };
+const syncRank: Record<GenerateCourseSyncState, number> = { synced: 0, sync_incomplete: 1, not_synced: 2 };
+function recency(value: string | null | undefined) { const parsed = value ? Date.parse(value) : NaN; return Number.isFinite(parsed) ? parsed : -Infinity; }
+/**
+ * Current before previous before other; Generate-ready first; newest term/course
+ * dates first (undated last); then code/name and id so order never depends on input.
+ */
+export function orderGenerateCourses(items: readonly CanvasCourseInventoryItem[]): GenerateCourseSummary[] {
+  return items.map(item => ({ course: generateCourseSummary(item), at: recency(item.term?.endAt ?? item.endAt ?? item.term?.startAt ?? item.startAt) }))
+    .sort((a, b) => periodRank[a.course.period] - periodRank[b.course.period] || syncRank[a.course.syncState] - syncRank[b.course.syncState] ||
+      (a.at === b.at ? 0 : b.at > a.at ? 1 : -1) || a.course.name.localeCompare(b.course.name) || a.course.id.localeCompare(b.course.id))
+    .map(entry => entry.course);
+}
+export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string, reviewerArtifactId: string | null = null): LearningMaterial {
   // Legacy availability means usable right now, so it is also unavailable for
   // preparable, empty and unsupported materials. Preserve those useful states.
   const readiness = row.capability === 'failed' || row.capability === 'inaccessible' || (row.capability === 'ready' && row.availability !== 'available') ? 'unavailable' : row.capability;
   const kind = row.file?.kind === 'docx' ? 'document' : row.file?.kind === 'pptx' ? 'slides' : row.type !== 'file' ? row.type : row.file?.kind === 'unsupported'
     ? /\.pptx?$/i.test(row.title) ? 'slides' : 'document' : row.file?.kind ?? 'document';
-  return { id: row.id, courseId, title: row.title, kind, readiness, count: null, sourceId: row.id,
-    moduleTitle: row.placement.moduleTitle, generation: generationCapability(readiness === 'ready', readiness === 'unsupported') };
+  return { id: row.id, courseId, title: row.title, kind, readiness, count: null, sourceId: row.id, reviewerArtifactId,
+    moduleTitle: row.placement.moduleTitle, generation: generationCapability(readiness === 'ready', readiness === 'unsupported', reviewerArtifactId !== null) };
 }
 export function dayWindow(date: string, offset = 0) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(offset) || offset < -720 || offset > 840) throw new ExperienceFailure(400, 'invalid_request');
@@ -44,7 +73,8 @@ export function composeActivities(input: {
   const courses = new Map(input.courses.filter(r => r.user_id === input.userId).map(r => [r.id, courseSummary(r)]));
   const tasks = input.tasks.filter(r => r.user_id === input.userId);
   const imported = new Map(tasks.filter(t => t.canvas_assignment_row_id).map(t => [t.canvas_assignment_row_id!, t]));
-  const assignments = input.assignments.filter(r => r.user_id === input.userId && courses.has(r.course_id));
+  const ownedAssignments = input.assignments.filter(r => r.user_id === input.userId && courses.has(r.course_id));
+  const assignments = ownedAssignments.filter(isActionableCanvasAssignment);
   function finish(item: Omit<ActivitySummary, 'isOverdue' | 'urgency' | 'hasGeneratedDraft'>): ActivitySummary {
     const active = item.status !== 'completed' && item.status !== 'submitted';
     const due = item.dueAt ? Date.parse(item.dueAt) : Infinity;
@@ -57,12 +87,24 @@ export function composeActivities(input: {
       title: row.name, dueAt: row.due_at, status: task?.status === 'completed' ? 'completed' : input.submittedAssignmentIds?.has(row.id) ? 'submitted' : task?.status ?? 'unknown',
       priority: task?.priority ?? 'medium', estimatedMinutes: task?.estimated_minutes ?? null, submissionTypes: [...row.submission_types], source: 'canvas' });
   });
-  const assignmentIds = new Set(assignments.map(a => a.id));
+  const assignmentIds = new Set(ownedAssignments.map(a => a.id));
   for (const task of tasks) {
     if (task.canvas_assignment_row_id && assignmentIds.has(task.canvas_assignment_row_id)) continue;
     result.push(finish({ id: `task:${task.id}`, taskId: task.id, course: null, title: task.title, dueAt: task.due_at, status: task.status, priority: task.priority, estimatedMinutes: task.estimated_minutes, submissionTypes: [], source: task.source_type === 'canvas' ? 'canvas' : 'local' }));
   }
   return result.sort(compareActivities);
+}
+
+/** Canvas already counts this submission as handed in (or excused), so no work remains. */
+export function isSubmittedCanvasSubmission(submission: Pick<CanvasAssignmentSubmissionRow, 'submitted_at' | 'excused' | 'workflow_state' | 'missing'>): boolean {
+  return Boolean(submission.submitted_at || submission.excused || submission.workflow_state === 'submitted' || submission.workflow_state === 'pending_review' || (submission.workflow_state === 'graded' && !submission.missing));
+}
+export function isActionableCanvasAssignment(assignment: Pick<CanvasAssignmentRow, 'due_at' | 'submission_types'>): boolean {
+  if (assignment.due_at !== null) return true;
+  return assignment.submission_types.some(type => {
+    const normalized = type.trim().toLowerCase();
+    return normalized !== '' && normalized !== 'none' && normalized !== 'not_graded';
+  });
 }
 export function composeToday(input: {
   userId: string; date: string; offset: number; now: number; activities: readonly ActivitySummary[];
@@ -101,12 +143,20 @@ export function generationView(job: ProcessingJobStatusView, artifactId: string 
     job.status === 'cancellation_requested' ? 'cancelling' : job.status === 'cancelled' ? 'cancelled' :
       job.status === 'failed' || job.status === 'expired' ? 'failed' :
         ['preparing_source', 'normalizing_source', 'detecting_outline', 'planning_sections'].includes(job.stage) ? 'preparing' :
-          ['assembling_reviewer', 'storing_reviewer'].includes(job.stage) ? 'finalizing' : 'generating';
+          ['assembling_reviewer', 'storing_reviewer', 'storing_result'].includes(job.stage) ? 'finalizing' : 'generating';
   const p = job.progress;
   const progress = p.completedUnits != null && p.totalUnits != null && p.unitLabel && Number.isInteger(p.completedUnits) && Number.isInteger(p.totalUnits) && p.totalUnits > 0 && p.completedUnits >= 0 && p.completedUnits <= p.totalUnits
     ? { completed: p.completedUnits, total: p.totalUnits, unit: p.unitLabel } : null;
   return { id: job.id, state, updatedAt: job.updatedAt, progress, artifactId: state === 'completed' ? artifactId : null,
-    error: state === 'failed' ? normalizeExperienceError(new ExperienceFailure(422, 'generation_failed')).error : null };
+    error: state === 'failed' ? failedGenerationError(job) : null };
+}
+/** A retryable failure offers Retry, which starts a new job from the same saved request. */
+function failedGenerationError(job: ProcessingJobStatusView): GenerationView['error'] {
+  const code = job.errorCode === 'insufficient_source' || job.errorCode === 'source_attachment_unavailable'
+    ? job.errorCode : 'generation_failed';
+  const error = normalizeExperienceError(new ExperienceFailure(422, code)).error;
+  const retryable = job.retryable === true;
+  return retryable ? { ...error, message: code === 'generation_failed' ? 'This generation didn’t pass its checks. Retry to try again with the same settings.' : error.message, retryable: true, action: 'retry' } : error;
 }
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -127,7 +177,17 @@ export function reviewerReader(payload: unknown, summary: LibraryArtifactSummary
         if (!['code', 'formula', 'table', 'result', 'example', 'source'].includes(String(e.kind)) || typeof e.text !== 'string') throw new ExperienceFailure(503, 'unavailable');
         return { kind: e.kind as 'code' | 'formula' | 'table' | 'result' | 'example' | 'source', text: e.text };
       }) : [];
-      return { id: item.id, title: item.title, explanation: core.explanation, keyPoints: core.keyPoints as string[], evidence };
+      const emphasis = Array.isArray(core.emphasis) ? core.emphasis.map((value: unknown) => {
+        const mark = record(value);
+        if (!['explanation', 'key_point'].includes(String(mark.target)) || !Number.isInteger(mark.index) ||
+          !['bold', 'underline', 'highlight'].includes(String(mark.style)) || typeof mark.text !== 'string') throw new ExperienceFailure(503, 'unavailable');
+        const body = mark.target === 'explanation' && mark.index === 0 ? core.explanation as string :
+          mark.target === 'key_point' ? (core.keyPoints as string[])[mark.index as number] : undefined;
+        if (!body?.includes(mark.text) || !mark.text.trim()) throw new ExperienceFailure(503, 'unavailable');
+        return { target: mark.target as 'explanation' | 'key_point', index: mark.index as number,
+          text: mark.text, style: mark.style as 'bold' | 'underline' | 'highlight' };
+      }) : [];
+      return { id: item.id, title: item.title, explanation: core.explanation, keyPoints: core.keyPoints as string[], emphasis, evidence };
     }) };
   });
   return { id: summary.id, title: summary.title, course: summary.course, source: { id: summary.sourceId, title: summary.sourceTitle }, generatedAt: summary.createdAt, freshness, sections };

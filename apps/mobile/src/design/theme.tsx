@@ -9,10 +9,13 @@ import {
 import { AccessibilityInfo, AppState, useColorScheme } from "react-native";
 
 import { sessionStore } from "../auth/sessionStore";
+import { loadFeedbackPreferences } from "./feedback";
 
 import {
   palettes,
+  paletteFor,
   resolveTheme,
+  type PaletteFamily,
   type ThemeColors,
   type ThemePreference,
 } from "./themeTokens";
@@ -22,16 +25,20 @@ const ThemeContext = createContext({
   mode: "light" as "light" | "dark",
   preference: "system" as ThemePreference,
   setPreference: async (_value: ThemePreference) => {},
+  family: "standard" as PaletteFamily,
+  setFamily: async (_value: PaletteFamily) => {},
   reducedMotion: true,
   active: true,
 });
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
   const [preference, updatePreference] = useState<ThemePreference>("system");
+  const [family, updateFamily] = useState<PaletteFamily>("standard");
   const [reducedMotion, setReducedMotion] = useState(true);
   const [active, setActive] = useState(AppState.currentState === "active");
   useEffect(() => {
     let live = true;
+    void loadFeedbackPreferences();
     void Promise.resolve(sessionStore.getItem("sf.appearance"))
       .then((value) => {
         if (
@@ -39,6 +46,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           (value === "dark" || value === "light" || value === "system")
         )
           updatePreference(value);
+      })
+      .catch(() => {});
+    void Promise.resolve(sessionStore.getItem("sf.palette"))
+      .then((value) => {
+        if (live && (value === "standard" || value === "uc_inspired")) updateFamily(value);
       })
       .catch(() => {});
     void AccessibilityInfo.isReduceMotionEnabled()
@@ -62,9 +74,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const mode = resolveTheme(preference, system);
   const value = useMemo(
     () => ({
-      colors: palettes[mode],
+      colors: paletteFor(family, mode),
       mode,
       preference,
+      family,
+      setFamily: async (next: PaletteFamily) => {
+        await sessionStore.setItem("sf.palette", next);
+        updateFamily(next);
+      },
       reducedMotion,
       active,
       setPreference: async (next: ThemePreference) => {
@@ -72,7 +89,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         updatePreference(next);
       },
     }),
-    [mode, preference, reducedMotion, active],
+    [family, mode, preference, reducedMotion, active],
   );
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

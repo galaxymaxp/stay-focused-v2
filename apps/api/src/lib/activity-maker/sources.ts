@@ -1,13 +1,12 @@
-import type { Database, CanvasAssignmentRow } from '@stay-focused/db';
+import type { CanvasAssignmentRow,Database } from '@stay-focused/db';
+import type { ActivitySource,TaskSpecification } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ActivitySource, TaskSpecification } from '@stay-focused/shared';
-import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+import { parseFragment,type DefaultTreeAdapterMap } from 'parse5';
 import { normalizeCanvasHtmlToText } from '../canvas-content-normalization';
+import { loadStoredSelectedCanvasCourse,prepareCanvasReviewerSources,previewCanvasReviewerSources } from '../canvas-reviewer-sources';
 import { sanitizeCanvasTitleText } from '../canvas-source-safety';
-import { loadStoredSelectedCanvasCourse, prepareCanvasReviewerSources, previewCanvasReviewerSources } from '../canvas-reviewer-sources';
-import { createServerOcrProvider } from '../ocr/create-server-ocr-provider';
 import { ExperienceFailure } from '../experience/errors';
-import { sourceRole } from './generation';
+import { createServerOcrProvider } from '../ocr/create-server-ocr-provider';
 type Client = SupabaseClient<Database>;
 export async function ownedAssignment(client: Client, userId: string, activityId: string): Promise<CanvasAssignmentRow> {
     if (!/^canvas:[0-9a-f-]{36}$/i.test(activityId))
@@ -19,7 +18,7 @@ export async function ownedAssignment(client: Client, userId: string, activityId
         throw new ExperienceFailure(404, 'activity_not_found');
     return data;
 }
-export function assignmentLinks(html: string, baseUrl: string): {
+export function assignmentLinks(html: string, baseUrl: string, canvasCourseId: string): {
     kind: 'file' | 'page';
     externalId: string;
 }[] {
@@ -34,6 +33,11 @@ export function assignmentLinks(html: string, baseUrl: string): {
                 try {
                     const url = new URL(a.value, base);
                     if (url.origin !== base.origin)
+                        continue;
+                    // Canvas assignments can link to a page in another course on the
+                    // same origin. It is not part of this course's stored source set.
+                    const linkedCourse = url.pathname.match(/\/courses\/(\d+)(?:\/|$)/);
+                    if (linkedCourse && linkedCourse[1] !== canvasCourseId)
                         continue;
                     const file = url.pathname.match(/\/(?:files)\/(\d+)(?:\/|$)/);
                     const page = url.pathname.match(/\/pages\/([^/]+)\/?$/);
@@ -77,7 +81,7 @@ export async function assembleActivitySources(client: Client, userId: string, ac
     const instructions = normalizeCanvasHtmlToText(assignment.description_html);
     const sources: ActivitySource[] = [{ id: 'instructions', title: sanitizeCanvasTitleText(assignment.name).slice(0, 220), role: 'instructions', text: instructions, materialId: null }];
     const selected = new Map<string, ActivitySource['role']>();
-    const links = assignmentLinks(assignment.description_html ?? '', course.value.connection.base_url);
+    const links = assignmentLinks(assignment.description_html ?? '', course.value.connection.base_url, course.value.course.canvas_course_id);
     for (const link of links) {
         const row = link.kind === 'file' ? files.find(f => f.canvas_file_id === link.externalId) : pages.find(p => p.canvas_page_url === link.externalId);
         if (!row)
@@ -124,7 +128,7 @@ export async function assembleActivitySources(client: Client, userId: string, ac
         if (!preview.ok)
             throw new ExperienceFailure(422, /template|worksheet/i.test(file?.display_name ?? '') ? 'activity_template_unreadable' : 'activity_source_unavailable');
         const title = sanitizeCanvasTitleText(file?.display_name ?? pages.find(p => id === `page:${p.id}`)?.title ?? 'Course material').slice(0, 220);
-        sources.push({ id: `source-${sources.length}`, title, role: sourceRole(title, preview.value.sourceText, instructions, role), text: preview.value.sourceText, materialId: id });
+        sources.push({ id: `source-${sources.length}`, title, role, text: preview.value.sourceText, materialId: id });
     }
     if (sources.reduce((n, s) => n + s.text.length, 0) > 120000)
         throw new ExperienceFailure(409, 'activity_source_unavailable');

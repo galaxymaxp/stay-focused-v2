@@ -33,7 +33,7 @@ function client(data: Record<string, Row[]> = {}) {
 }
 beforeEach(() => {
     vi.clearAllMocks();
-    mocks.course.mockResolvedValue({ ok: true, value: { course: { id: 'course', canvas_connection_id: 'connection' }, connection: { id: 'connection', base_url: 'https://canvas.test' } } });
+    mocks.course.mockResolvedValue({ ok: true, value: { course: { id: 'course', canvas_course_id: '1', canvas_connection_id: 'connection' }, connection: { id: 'connection', base_url: 'https://canvas.test' } } });
     mocks.preview.mockResolvedValue({ ok: true, value: { sourceText: 'Diffusion moves particles from high concentration to low concentration.' } });
     mocks.prepare.mockResolvedValue({ ok: true, value: { results: [{ status: 'ready' }] } });
 });
@@ -76,6 +76,17 @@ describe('Activity Maker authenticated boundaries', () => {
         expect(assembled.sources.map(s => s.role)).toEqual(['instructions', 'attachment']);
         expect(mocks.preview).toHaveBeenCalledWith(expect.objectContaining({ userId: A, courseId: 'course', sourceIds: ['page:page'] }));
     });
+    it('prepares firewall/VPN instructions with a cross-course presentation link', async () => {
+        mocks.course.mockResolvedValue({ ok: true, value: { course: { id: 'course', canvas_course_id: '61456', canvas_connection_id: 'connection', name: 'IT Security' }, connection: { id: 'connection', base_url: 'https://canvas.test' } } });
+        const html = '<h2>Instructions:</h2><p>Read your given scenario via Group Announcement. Prepare a 10–15 minute presentation about the security concerns and choose a firewall, VPN, or both.</p><a title="Presentation Sequence (FW &amp; VPN)" href="https://canvas.test/courses/55287/pages/presentation-sequence-fw-and-vpn" data-api-endpoint="https://canvas.test/api/v1/courses/55287/pages/presentation-sequence-fw-and-vpn">Presentation Sequence (FW &amp; VPN)</a>';
+        const c = client({ canvas_assignments: [{ ...assignment, description_html: html }] });
+        const assembled = await assembleActivitySources(c.value, A, `canvas:${id}`, []);
+        expect(assembled.sources).toHaveLength(1);
+        expect(assembled.sources[0]).toMatchObject({ id: 'instructions', role: 'instructions' });
+        expect(assembled.sources[0]?.text).toContain('security concerns');
+        expect(assembled.sources[0]?.text).toContain('Presentation Sequence');
+        expect(mocks.preview).not.toHaveBeenCalled();
+    });
     it('automatically includes exact same-module pages and excludes unrelated module pages', async () => {
         const c = client({ canvas_assignments: [{ ...assignment, description_html: 'Explain diffusion.' }], canvas_pages: [{ id: 'same', user_id: A, course_id: 'course', canvas_connection_id: 'connection', canvas_page_url: 'reading', title: 'Reading' }, { id: 'other', user_id: A, course_id: 'course', canvas_connection_id: 'connection', canvas_page_url: 'unrelated', title: 'Unrelated' }], canvas_module_items: [{ id: 'assignment-item', user_id: A, course_id: 'course', canvas_connection_id: 'connection', module_id: 'm1', item_type: 'Assignment', canvas_content_id: '7' }, { id: 'page-item', user_id: A, course_id: 'course', canvas_connection_id: 'connection', module_id: 'm1', item_type: 'Page', page_url: 'reading' }, { id: 'other-item', user_id: A, course_id: 'course', canvas_connection_id: 'connection', module_id: 'm2', item_type: 'Page', page_url: 'unrelated' }] });
         const result = await assembleActivitySources(c.value, A, `canvas:${id}`, []);
@@ -92,6 +103,11 @@ describe('Activity Maker authenticated boundaries', () => {
         expect(await service.getGeneration(A, 'job')).toMatchObject({ state: 'completed', artifactId: `activity:${id}`, progress: null });
         expect(mocks.dispatch).not.toHaveBeenCalled();
         expect(mocks.preview).not.toHaveBeenCalled();
+    });
+    it('returns a safe reason for a failed activity source before generation', async () => {
+        const repository = { rows: vi.fn(async (table: string) => table === 'processing_jobs' ? [{ id: 'failed-job', user_id: A, job_type: 'activity_generation', status: 'failed', stage: 'preparing_source', error_code: 'activity_source_unavailable', updated_at: '2026-09-29T00:00:00Z' }] : []) } as unknown as ExperienceRepository;
+        const service = new ExperienceService({ repository, materials: vi.fn() });
+        expect(await service.getGeneration(A, 'failed-job')).toMatchObject({ state: 'failed', artifactId: null, error: { code: 'activity_source_unavailable', message: expect.stringContaining('linked assignment resource') } });
     });
     it('read/edit/delete foreign drafts return the same safe not-found', async () => {
         const c = client({ activity_drafts: [{ id, user_id: B }] });

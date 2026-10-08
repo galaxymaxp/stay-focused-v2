@@ -1,10 +1,14 @@
 import type {
   FeatureCapability,
+  GenerateCoursePeriod,
+  GenerateCourseSummary,
   GenerationState,
   LearningMaterial,
   TodayItem,
 } from "@stay-focused/shared";
 import type { StudyPlanningRequest } from "@stay-focused/shared/task-planning";
+
+import type { CoreState } from "../generation-core/coreModel";
 
 export const primaryTabs = [
   { route: "today", title: "Today" },
@@ -66,6 +70,32 @@ export function moduleGroups(items: readonly LearningMaterial[]) {
   }
   return groups;
 }
+/**
+ * Sync status decides where a course goes; only synced courses may request
+ * materials. Unsynced and incomplete courses go to the existing Sync flow.
+ */
+export function generateCourseDestination(course: Pick<GenerateCourseSummary, "syncState">): "generate" | "sync" {
+  return course.syncState === "synced" ? "generate" : "sync";
+}
+const periodTitles: Record<GenerateCoursePeriod, string> = {
+  current: "Current courses",
+  previous: "Previous courses",
+  other: "Other courses",
+};
+/** Groups the server-ordered list by period without re-sorting within a group. */
+export function generateCourseGroups(items: readonly GenerateCourseSummary[]) {
+  return (["current", "previous", "other"] as const)
+    .map((period) => ({ key: period, title: periodTitles[period], items: items.filter((course) => course.period === period) }))
+    .filter((group) => group.items.length > 0);
+}
+export function generateCourseStatus(course: GenerateCourseSummary): string {
+  if (course.syncState === "not_synced") return "Not synced · Tap to sync";
+  if (course.syncState === "sync_incomplete") return "Sync incomplete · Tap to retry";
+  const synced = course.lastSuccessfulSyncAt
+    ? `Synced ${new Date(course.lastSuccessfulSyncAt).toLocaleDateString([], { month: "short", day: "numeric" })}`
+    : "Synced";
+  return course.termName ? `${synced} · ${course.termName}` : synced;
+}
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -93,6 +123,55 @@ export function timeLabel(value: string | null) {
       })
     : "";
 }
+/**
+ * The line under a Today item: when it happens and whether it is finished.
+ * Internal states such as "pending" or "unknown" are never shown.
+ */
+export function todayItemDetail(item: Pick<TodayItem, "startAt" | "dueAt" | "estimatedMinutes" | "status">, now = Date.now()): string {
+  const when = item.startAt
+    ? [timeLabel(item.startAt), item.estimatedMinutes ? `${item.estimatedMinutes} min` : ""]
+    : [item.dueAt ? dueLabel(item.dueAt, now) : ""];
+  const state = item.status === "submitted" ? "Submitted" : item.status === "completed" ? "Done" : item.status === "skipped" ? "Skipped" : "";
+  return [...when, state].filter(Boolean).join(" · ");
+}
+
+/** A time alone means today; any other day names its date, and the past says so. */
+function dueLabel(dueAt: string, now: number): string {
+  const due = new Date(dueAt);
+  if (due.getTime() < now) {
+    const otherYear = due.getFullYear() !== new Date(now).getFullYear();
+    return `Past due · ${due.toLocaleDateString([], { month: "short", day: "numeric", ...(otherYear ? { year: "numeric" } : {}) })}`;
+  }
+  return due.toDateString() === new Date(now).toDateString() ? `Due ${timeLabel(dueAt)}` : `Due ${deadline(dueAt)}`;
+}
+/**
+ * A queued job is normally claimed within seconds. After this long without
+ * starting, the generation service is not picking it up (e.g. its usage limit
+ * was reached), so the job is shown as stalled and can be cancelled instead
+ * of "waiting" forever.
+ */
+export const STALLED_QUEUE_MS = 2 * 60_000;
+export function stalledInQueue(job: { readonly status: string; readonly since: string | null }, now = Date.now()) {
+  if (job.status !== "queued" || !job.since) return false;
+  const since = Date.parse(job.since);
+  return Number.isFinite(since) && now - since > STALLED_QUEUE_MS;
+}
+/**
+ * Queue sections exist only while they hold something. The generating group
+ * is named by what it is doing; the queued group by how many are waiting.
+ */
+export function queueSections<T extends { readonly status: string }>(jobs: readonly T[]) {
+  const generating = jobs.filter((job) => job.status === "running" || job.status === "cancellation_requested");
+  const queued = jobs.filter((job) => job.status === "queued");
+  const completed = jobs.filter((job) => job.status === "succeeded");
+  const attention = jobs.filter((job) => !["running", "cancellation_requested", "queued", "succeeded"].includes(job.status));
+  return [
+    { key: "generating", title: "Generating", jobs: generating },
+    { key: "queued", title: `${queued.length} queued`, jobs: queued },
+    { key: "attention", title: "Needs attention", jobs: attention },
+    { key: "completed", title: "Completed", jobs: completed },
+  ].filter((section) => section.jobs.length > 0);
+}
 export function deadline(value: string | null) {
   return value
     ? new Date(value).toLocaleString([], {
@@ -103,7 +182,13 @@ export function deadline(value: string | null) {
       })
     : "No deadline";
 }
-/** Only describes availability. The existing server planner owns allocation/order. */
+/**
+ * Only describes availability. The existing server planner owns allocation
+ * and order. The free time is the only availability, and the planning range
+ * is the whole day: applying replaces every planned block today, so all of
+ * the day's work is refit inside the free time instead of old blocks being
+ * left outside it.
+ */
 export function planningRequest(
   date: string,
   start: number,
@@ -114,9 +199,31 @@ export function planningRequest(
   const at = (minutes: number) =>
     new Date(midnight.getTime() + minutes * 60000).toISOString();
   return {
-    planningRange: { startsAt: at(start), endsAt: at(end) },
+    planningRange: { startsAt: at(0), endsAt: at(1440) },
     availability: [{ startsAt: at(start), endsAt: at(end) }],
   };
+}
+
+/**
+ * The free time that holds the day's planned blocks, for when none was saved:
+ * the run of upcoming blocks starting with the next one (blocks less than an
+ * hour apart belong together), on the fifteen-minute grid. Past blocks and
+ * stray later ones don't stretch it across the whole day.
+ */
+export function freeTimeAround(
+  segments: readonly { readonly from: number; readonly to: number }[],
+  nowMinutes: number,
+): { start: number; end: number } | null {
+  const upcoming = segments.filter((s) => s.to > nowMinutes).sort((a, b) => a.from - b.from);
+  if (upcoming.length === 0) return null;
+  let last = upcoming[0]!.to;
+  for (const segment of upcoming.slice(1)) {
+    if (segment.from - last > 60) break;
+    last = Math.max(last, segment.to);
+  }
+  const start = Math.max(0, Math.floor(upcoming[0]!.from / 15) * 15);
+  const end = Math.min(1440, Math.ceil(last / 15) * 15);
+  return end > start ? { start, end } : null;
 }
 export function timelineSegments(items: readonly TodayItem[], date: string) {
   const start = new Date(`${date}T00:00:00`).getTime();
@@ -131,4 +238,160 @@ export function timelineSegments(items: readonly TodayItem[], date: string) {
       ? [{ id: item.id, from, to, kind: item.kind, title: item.title }]
       : [];
   });
+}
+
+/**
+ * The Knowledge Core follows the real job: it reads while the source is
+ * prepared, spins fastest while generating, settles while saving, keeps
+ * slowly moving once complete, and stops only when the job cannot finish.
+ */
+export function generationCoreState(state: GenerationState | null, connecting: boolean): CoreState {
+  switch (state) {
+    case null:
+      return connecting ? "reading" : "idle";
+    case "queued":
+    case "preparing":
+      return "reading";
+    case "generating":
+      return "generating";
+    case "finalizing":
+    case "cancelling":
+      return "finalizing";
+    case "completed":
+      return "complete";
+    case "failed":
+    case "cancelled":
+      return "error";
+  }
+}
+
+/** Lowercase letters and digits only, so "cit 17", "CIT-17" and "cit17" agree. */
+function compactSearchText(value: string) {
+  return value.toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/**
+ * Course filter for Generate: matches the course code, the full Canvas name or
+ * the shortened display title, by partial text, ignoring case, spacing and
+ * punctuation. A blank query matches everything.
+ */
+export function matchesCourseQuery(fields: readonly (string | null | undefined)[], query: string): boolean {
+  const needle = compactSearchText(query);
+  if (!needle) return true;
+  return fields.some((field) => !!field && compactSearchText(field).includes(needle));
+}
+
+export interface TodayArrangement {
+  /** Pinned by the student, newest pin first. Always shown in Up Next. */
+  readonly pinned: readonly TodayItem[];
+  /** The recommended next item that is neither pinned nor hidden. */
+  readonly next: TodayItem | null;
+  readonly later: readonly TodayItem[];
+  readonly dueSoon: readonly TodayItem[];
+  /** Items dismissed from today's plan, still recoverable. */
+  readonly hidden: readonly TodayItem[];
+}
+
+/**
+ * Applies the student's Today pins and hides without changing the planner's
+ * own order. A pinned item stays in Up Next and never displaces the real
+ * recommendation: when the pinned or hidden item was the recommendation, the
+ * next one in line takes its place underneath. Hides are keyed per day.
+ */
+export function arrangeToday(
+  sections: { readonly next: TodayItem | null; readonly later: readonly TodayItem[]; readonly dueSoon: readonly TodayItem[]; readonly others?: readonly TodayItem[] },
+  pinnedIds: readonly string[],
+  hiddenKeys: readonly string[],
+  date: string,
+): TodayArrangement {
+  const hiddenSet = new Set(hiddenKeys);
+  const isHidden = (item: TodayItem) => hiddenSet.has(`${date}|${item.id}`);
+  const pinOrder = new Map(pinnedIds.map((id, index) => [id, index]));
+  const pool = new Map<string, TodayItem>();
+  for (const item of [...(sections.next ? [sections.next] : []), ...sections.later, ...sections.dueSoon, ...(sections.others ?? [])]) {
+    if (!pool.has(item.id)) pool.set(item.id, item);
+  }
+  // One activity appears once: a planned work session for it and the activity
+  // itself are the same thing to the student.
+  const shownWork = new Set<string>();
+  const firstOfWork = (item: TodayItem) => {
+    const key = workKey(item);
+    if (shownWork.has(key)) return false;
+    shownWork.add(key);
+    return true;
+  };
+  const pinned = [...pool.values()]
+    .filter((item) => pinOrder.has(item.id) && !isHidden(item))
+    .sort((a, b) => pinOrder.get(a.id)! - pinOrder.get(b.id)!);
+  const shown = new Set(pinned.map((item) => item.id));
+  pinned.forEach((item) => shownWork.add(workKey(item)));
+  const eligible = (item: TodayItem) => !shown.has(item.id) && !isHidden(item) && !shownWork.has(workKey(item));
+  const next = [...(sections.next ? [sections.next] : []), ...sections.later].find(eligible) ?? null;
+  if (next) {
+    shown.add(next.id);
+    shownWork.add(workKey(next));
+  }
+  const later = sections.later.filter((item) => eligible(item) && firstOfWork(item));
+  later.forEach((item) => shown.add(item.id));
+  const dueSoon = sections.dueSoon.filter((item) => eligible(item) && firstOfWork(item));
+  const hidden = [...pool.values()].filter(isHidden);
+  return { pinned, next, later, dueSoon, hidden };
+}
+
+/** Morning is 5–11, afternoon 12–16; late night and evening both read as evening. */
+export function greetingFor(hour: number): string {
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+export type ScheduleState = "overdue" | "current" | "upcoming" | "completed";
+export function scheduleState(item: Pick<TodayItem, "startAt" | "endAt" | "dueAt" | "status">, now = Date.now()): ScheduleState {
+  if (item.status === "completed" || item.status === "submitted") return "completed";
+  if (item.startAt && item.endAt && Date.parse(item.startAt) <= now && Date.parse(item.endAt) > now) return "current";
+  if (item.endAt && Date.parse(item.endAt) < now) return "overdue";
+  if (item.dueAt && Date.parse(item.dueAt) < now) return "overdue";
+  return "upcoming";
+}
+export function todaySchedule(items: readonly TodayItem[]): TodayItem[] {
+  return [...new Map(items.map(item => [item.id, item])).values()].sort((a, b) => {
+    const order = { overdue: 0, current: 1, upcoming: 2, completed: 3 } as const;
+    const state = order[scheduleState(a)] - order[scheduleState(b)];
+    const at = Date.parse(a.startAt ?? a.dueAt ?? "") || Number.MAX_SAFE_INTEGER;
+    const bt = Date.parse(b.startAt ?? b.dueAt ?? "") || Number.MAX_SAFE_INTEGER;
+    return state || at - bt || a.id.localeCompare(b.id);
+  });
+}
+
+/** The activity an item is about, so a work session and its activity dedupe. */
+export function workKey(item: { readonly title: string; readonly course: { readonly id: string } | null }): string {
+  return `${item.course?.id ?? ""}|${item.title.trim().toLocaleLowerCase()}`;
+}
+
+export type Urgency = "overdue" | "today" | "tomorrow" | "week" | null;
+
+/**
+ * How soon something is due, by local calendar day: past due and today are
+ * urgent (red), tomorrow is next (orange), this week is soon (amber). Done
+ * work has no urgency.
+ */
+export function urgencyOf(item: Pick<TodayItem, "dueAt" | "status">, now = Date.now()): Urgency {
+  if (!item.dueAt || ["completed", "submitted", "skipped"].includes(item.status)) return null;
+  const due = new Date(item.dueAt);
+  if (due.getTime() < now) return "overdue";
+  const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+  const days = Math.round((startOfDay(due) - startOfDay(new Date(now))) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
+  if (days <= 7) return "week";
+  return null;
+}
+
+/** Finds the activity behind a Today item (a planned work session carries only its title and course). */
+export function activityFor<T extends { readonly id: string; readonly title: string; readonly course: { readonly id: string } | null }>(
+  item: Pick<TodayItem, "title" | "course" | "deepLinkTarget">,
+  activities: readonly T[],
+): T | null {
+  if (item.deepLinkTarget.surface === "activity") return activities.find((activity) => activity.id === item.deepLinkTarget.id) ?? null;
+  const key = workKey(item);
+  return activities.find((activity) => workKey(activity) === key) ?? null;
 }

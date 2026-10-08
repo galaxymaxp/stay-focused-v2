@@ -3,16 +3,22 @@
     "name": "Stay Focused V2",
     "slug": "stay-focused-v2",
     "version": "2.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "icon": "./assets/branding/app-icon.png",
+    "runtimeVersion": "2.0.0",
     "orientation": "portrait",
     "scheme": "stayfocused",
     "ios": {
-      "bundleIdentifier": "com.galaxymaxp.stayfocusedv2"
+      "bundleIdentifier": "com.galaxymaxp.stayfocusedv2",
+      "icon": "./assets/branding/app-icon.png"
     },
     "android": {
       "package": "com.galaxymaxp.stayfocusedv2",
+      "runtimeVersion": "2.0.1",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/branding/orb-adaptive-foreground.png",
+        "monochromeImage": "./assets/branding/orb-monochrome.png",
+        "backgroundColor": "#050506"
+      },
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
@@ -28,7 +34,8 @@
           "photosPermission": "Allow Stay Focused to import study images for OCR.",
           "cameraPermission": "Allow Stay Focused to take study photos for OCR."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
@@ -39,6 +46,9 @@
         "projectId": "2b3a9db6-3712-4ed0-8365-17d9936562dd"
       }
     },
-    "owner": "galaxymaxp"
+    "owner": "galaxymaxp",
+    "updates": {
+      "url": "https://u.expo.dev/2b3a9db6-3712-4ed0-8365-17d9936562dd"
+    }
   }
 }

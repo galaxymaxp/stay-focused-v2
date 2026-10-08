@@ -1,0 +1,339 @@
+import type { CanvasFileRow, CanvasPageRow, Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
+import type { OcrPage } from '@stay-focused/ocr';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import { CANVAS_SELECTIVE_PREVIEW_VERSION } from '@/lib/canvas-structured-blocks';
+import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
+import { validateCanvasReviewerGenerationGate } from '@/lib/canvas-reviewer-generation-gate';
+import { isPreparedCanvasFileReadyForOcr } from '@/lib/canvas-stored-file-extraction';
+import { ExperienceFailure } from '@/lib/experience/errors';
+import { record } from '@/lib/experience/mappers';
+import {
+  CANVAS_STORED_FILE_EXTRACTION_VERSION,
+  CANVAS_STORED_PDF_OCR_VERSION,
+  createCanvasSourcePreviewSession,
+  createOrReuseReviewerSourceSnapshot,
+  sha256Utf8Hex,
+  validateCanvasPreviewSessionForGeneration,
+  type CanvasSelectedBlockManifestItem,
+  type CanvasSourceManifestItem,
+} from '@/lib/reviewer-source-provenance';
+
+import { findProcessingJobSource } from './repository';
+import { readProcessingJobCheckpoint, writeProcessingJobCheckpoint } from './workflow-repository';
+import { updateProcessingJobProgress } from './worker-repository';
+import { DEFERRED_CANVAS_REVIEWER_VERSION } from './deferred-canvas-reviewer-contract';
+
+const CHECKPOINT_KEY = 'reviewer:canvas-source:prepared';
+
+export async function isDeferredCanvasReviewerJob({
+  client,
+  job,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly job: ProcessingJobDatabaseRow;
+}): Promise<boolean> {
+  const source = await findProcessingJobSource(client, job);
+  return source.source_kind === 'pdf' &&
+    record(source.metadata).canvasDeferredResolutionVersion === DEFERRED_CANVAS_REVIEWER_VERSION;
+}
+
+export async function prepareDeferredCanvasReviewerSource({
+  client,
+  job,
+  normalizedText,
+  pages,
+  workerId,
+}: {
+  readonly client: SupabaseClient<Database>;
+  readonly job: ProcessingJobDatabaseRow;
+  readonly normalizedText: string;
+  readonly pages: readonly OcrPage[];
+  readonly workerId: string;
+}): Promise<boolean> {
+  const source = await findProcessingJobSource(client, job);
+  const metadata = record(source.metadata);
+  if (metadata.canvasDeferredResolutionVersion !== DEFERRED_CANVAS_REVIEWER_VERSION) return false;
+  if (await readProcessingJobCheckpoint(client, job.id, CHECKPOINT_KEY)) return true;
+
+  const courseId = typeof metadata.canvasCourseId === 'string' ? metadata.canvasCourseId : null;
+  const itemIds = Array.isArray(metadata.canvasItemIds)
+    ? metadata.canvasItemIds.filter((value): value is string => typeof value === 'string')
+    : [];
+  const pageId = itemIds.length === 2 ? /^page:([0-9a-f-]{36})$/i.exec(itemIds[0]!)?.[1] : null;
+  const rowId = (itemIds.length === 1 || pageId) ? /^file:([0-9a-f-]{36})$/i.exec(itemIds.at(-1)!)?.[1] : null;
+  if (!courseId || !rowId || !normalizedText.trim()) throw new ExperienceFailure(409, 'not_ready');
+  const orderedPages = [...pages].sort((left, right) => left.pageNumber - right.pageNumber);
+  if (
+    orderedPages.length === 0 ||
+    orderedPages.some((page, index) => page.pageNumber !== index + 1 || page.status === 'failed')
+  ) {
+    throw new ExperienceFailure(409, 'not_ready');
+  }
+  if (normalizedText.trim().length < 80 || normalizedText.trim().split(/\s+/).length < 8)
+    throw new ExperienceFailure(422, 'insufficient_source');
+
+  await updateProcessingJobProgress(client, {
+    jobId: job.id,
+    workerId,
+    stage: 'preparing_source',
+    statusMessage: 'Preserving source provenance',
+    completedUnits: orderedPages.length,
+    totalUnits: orderedPages.length,
+    unitLabel: 'pages',
+  });
+  const file = await readOwnedPreparedFile(client, job.user_id, courseId, rowId);
+  if (!file || !isPreparedCanvasFileReadyForOcr(file)) throw new ExperienceFailure(409, 'not_ready');
+  const page = pageId ? await readOwnedPage(client, job.user_id, courseId, pageId) : null;
+  if (pageId && (!page || page.canvas_connection_id !== file.canvas_connection_id)) throw new ExperienceFailure(409, 'not_ready');
+  const pageText = page ? normalizeCanvasHtmlToText(page.body_html) : '';
+  const substantivePageText = pageText && !/^[\s\w.()\-]+\.(?:pdf|pptx|docx|png|jpe?g)$/i.test(pageText.trim()) ? pageText : '';
+  const combinedText = substantivePageText ? `${substantivePageText}\n\n${normalizedText}` : normalizedText;
+
+  const manifest: readonly CanvasSourceManifestItem[] = [
+    ...(page ? [{
+      ordinal: 1,
+      source_type: 'page' as const,
+      source_title: page.title,
+      source_row_id: page.id,
+      canvas_connection_id: page.canvas_connection_id,
+      course_id: page.course_id,
+      canvas_course_id: file.canvas_course_id,
+      canvas_source_object_id: page.canvas_page_id ?? page.canvas_page_url,
+      module_id: null,
+      module_item_id: null,
+      file_id: null,
+      file_kind: null,
+      mime_type: 'text/html',
+      page_count: null,
+      canvas_updated_at: page.canvas_updated_at,
+      local_synced_at: page.last_synced_at,
+      normalized_content_sha256: sha256Utf8Hex(pageText),
+      stored_content_sha256: null,
+      parser_version: 'canvas-html-visible-text-v1',
+      ocr_version: null,
+    }] : []),
+    {
+    ordinal: page ? 2 : 1,
+    source_type: 'file',
+    source_title: file.display_name,
+    source_row_id: file.id,
+    canvas_connection_id: file.canvas_connection_id,
+    course_id: file.course_id,
+    canvas_course_id: file.canvas_course_id,
+    canvas_source_object_id: file.canvas_file_id,
+    module_id: null,
+    module_item_id: null,
+    file_id: file.canvas_file_id,
+    file_kind: 'pdf',
+    mime_type: file.stored_content_type ?? file.content_type ?? 'application/pdf',
+    page_count: orderedPages.length,
+    canvas_updated_at: file.canvas_modified_at ?? file.canvas_updated_at,
+    local_synced_at: file.last_synced_at,
+    normalized_content_sha256: sha256Utf8Hex(normalizedText),
+    stored_content_sha256: file.current_sha256,
+    parser_version: CANVAS_STORED_FILE_EXTRACTION_VERSION,
+    ocr_version: CANVAS_STORED_PDF_OCR_VERSION,
+  }];
+  const fileBlocks = orderedPages.filter((item) => item.text.trim()).map((item, index) => ({
+    id: `page-${item.pageNumber}`,
+    kind: 'paragraph' as const,
+    order: index,
+    pageNumber: item.pageNumber,
+    text: item.text.trim(),
+  }));
+  const sourceBlocks = [
+    ...(substantivePageText ? [{ id: 'canvas-page-body', kind: 'paragraph' as const, order: 0, text: substantivePageText }] : []),
+    ...fileBlocks,
+  ];
+  const selectedBlockManifest: readonly CanvasSelectedBlockManifestItem[] = sourceBlocks.map((block, index) => ({
+    ordinal: index + 1,
+    source_ordinal: page && block.id !== 'canvas-page-body' ? 2 : 1,
+    block_ordinal: substantivePageText && block.id !== 'canvas-page-body' ? index : index + 1,
+    block_kind: block.kind,
+    block_text: block.text,
+    block_sha256: sha256Utf8Hex(block.text),
+    heading_level: null,
+    list_depth: null,
+    list_style: null,
+    table_structure: null,
+    page_number: 'pageNumber' in block ? block.pageNumber : null,
+    slide_number: null,
+    module_position: null,
+    parser_version: block.id === 'canvas-page-body' ? 'canvas-html-visible-text-v1' : CANVAS_STORED_FILE_EXTRACTION_VERSION,
+    ocr_version: block.id === 'canvas-page-body' ? null : CANVAS_STORED_PDF_OCR_VERSION,
+  }));
+  const preview = await createCanvasSourcePreviewSession({
+    canvasConnectionId: file.canvas_connection_id,
+    client,
+    courseId,
+    manifest,
+    normalizationVersion: CANVAS_SELECTIVE_PREVIEW_VERSION,
+    originalPreviewText: combinedText,
+    selectedBlockManifest,
+    sourceRelationshipManifest: page ? [{
+      source_ordinal: 1,
+      related_source_ordinal: 2,
+      relationship_type: 'canvas_reference',
+      relationship_group_key: sha256Utf8Hex(`${page.id}:${file.id}`),
+      reference_type: 'page',
+      reference_ordinal: 1,
+    }] : [],
+    suggestedTitle: page?.title ?? file.display_name,
+    userId: job.user_id,
+  });
+  if (!preview.ok) {
+    logProvenanceFailure('preview', job.id, preview);
+    throw new ExperienceFailure(503, 'unavailable');
+  }
+  const accepted = await validateCanvasPreviewSessionForGeneration({
+    client,
+    userId: job.user_id,
+    previewSessionId: preview.value.previewSessionId,
+  });
+  if (!accepted.ok) {
+    logProvenanceFailure('preview_validation', job.id, accepted);
+    throw new ExperienceFailure(409, 'not_ready');
+  }
+  if (!accepted.value) {
+    console.error('deferred_canvas_reviewer.provenance_failed', {
+      jobId: job.id,
+      stage: 'preview_validation',
+      errorCode: 'canvas_preview_session_missing',
+      status: 409,
+    });
+    throw new ExperienceFailure(409, 'not_ready');
+  }
+  const gate = await validateCanvasReviewerGenerationGate({
+    client,
+    userId: job.user_id,
+    courseId,
+    itemIds,
+    previewSession: accepted.value,
+    resolutionFingerprint: preview.value.resolutionFingerprint,
+  });
+  if (!gate.ok) {
+    logProvenanceFailure('generation_gate', job.id, gate);
+    throw new ExperienceFailure(409, 'not_ready');
+  }
+  const snapshot = await createOrReuseReviewerSourceSnapshot({
+    client,
+    userId: job.user_id,
+    previewSession: accepted.value,
+    sourceText: combinedText,
+    sourceTitle: page?.title ?? file.display_name,
+  });
+  if (!snapshot.ok) {
+    logProvenanceFailure('snapshot', job.id, snapshot);
+    throw new ExperienceFailure(503, 'unavailable');
+  }
+
+  const resolvedMetadata = toJson({
+    canvasCourseId: courseId,
+    canvasItemIds: itemIds,
+    canvasPreviewSessionId: preview.value.previewSessionId,
+    canvasResolutionFingerprint: preview.value.resolutionFingerprint,
+    canvasResolvedInWorkflowVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
+    reviewerSourceBlocks: sourceBlocks,
+    reviewerSourceKind: 'document',
+    reviewerSourceSnapshotId: snapshot.value.sourceSnapshotId,
+    sourceTitle: page?.title ?? file.display_name,
+  });
+  const { data, error } = await client.rpc('attach_deferred_canvas_reviewer_source_v1', {
+    p_job_id: job.id,
+    p_worker_id: workerId,
+    p_source_text: combinedText,
+    p_source_title: page?.title ?? file.display_name,
+    p_source_metadata: resolvedMetadata,
+  });
+  if (error || !data?.[0]) {
+    console.error('deferred_canvas_reviewer.provenance_failed', {
+      jobId: job.id,
+      stage: 'source_attachment',
+      errorCode: readSafeDatabaseErrorField(error, 'code'),
+      databaseCode: readSafeDatabaseErrorField(error, 'message'),
+    });
+    throw new ExperienceFailure(503, 'unavailable');
+  }
+  await writeProcessingJobCheckpoint(client, {
+    jobId: job.id,
+    checkpointKey: CHECKPOINT_KEY,
+    payload: toJson({
+      expectedPageCount: orderedPages.length,
+      accountedPageNumbers: orderedPages.map((page) => page.pageNumber),
+      sourceCharacterCount: combinedText.length,
+      preparedAt: new Date().toISOString(),
+    }),
+  });
+  logMemory('source_attached', job.id, {
+    expectedPageCount: orderedPages.length,
+    accountedPageCount: orderedPages.length,
+    sourceCharacterCount: combinedText.length,
+  });
+  return true;
+}
+
+async function readOwnedPage(client: SupabaseClient<Database>, userId: string, courseId: string, rowId: string): Promise<CanvasPageRow | null> {
+  const { data, error } = await client.from('canvas_pages').select('*').eq('id', rowId).eq('user_id', userId).eq('course_id', courseId).maybeSingle();
+  if (error) throw new ExperienceFailure(503, 'unavailable');
+  return data as CanvasPageRow | null;
+}
+
+async function readOwnedPreparedFile(
+  client: SupabaseClient<Database>,
+  userId: string,
+  courseId: string,
+  rowId: string,
+): Promise<CanvasFileRow | null> {
+  const { data, error } = await client
+    .from('canvas_files')
+    .select('*')
+    .eq('id', rowId)
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .maybeSingle();
+  if (error) throw new ExperienceFailure(503, 'unavailable');
+  return data as CanvasFileRow | null;
+}
+
+function logMemory(stage: string, jobId: string, fields: Readonly<Record<string, number>>): void {
+  const memory = process.memoryUsage();
+  console.info('deferred_canvas_reviewer.memory', {
+    stage,
+    jobId,
+    rssBytes: memory.rss,
+    heapUsedBytes: memory.heapUsed,
+    externalBytes: memory.external,
+    arrayBufferBytes: memory.arrayBuffers,
+    ...fields,
+  });
+}
+
+function logProvenanceFailure(
+  stage: string,
+  jobId: string,
+  failure: Readonly<{ readonly code?: string; readonly status?: number }>,
+): void {
+  console.error('deferred_canvas_reviewer.provenance_failed', {
+    jobId,
+    stage,
+    errorCode: readSafeIdentifier(failure.code),
+    status: failure.status ?? null,
+  });
+}
+
+function readSafeDatabaseErrorField(
+  error: unknown,
+  field: 'code' | 'message',
+): string | null {
+  if (typeof error !== 'object' || error === null || !(field in error)) return null;
+  return readSafeIdentifier((error as Record<string, unknown>)[field]);
+}
+
+function readSafeIdentifier(value: unknown): string | null {
+  return typeof value === 'string' && /^[a-z0-9_.-]{1,120}$/i.test(value) ? value : null;
+}
+
+function toJson(value: unknown): Json {
+  return JSON.parse(JSON.stringify(value)) as Json;
+}

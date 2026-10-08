@@ -52,6 +52,7 @@ export async function finalizeCheckpointedCanvasSync(
   input: {
     readonly jobId: string;
     readonly workerId: string;
+    readonly accessToken?: string;
   },
 ): Promise<CanvasSyncFinalizeResult> {
   const state = await readCanvasSyncPlanState(client, input.jobId);
@@ -124,6 +125,7 @@ export async function finalizeCheckpointedCanvasSync(
 
   if (context.job.job_type === "course_content") {
     const result = await syncSelectedCanvasCourse({
+      accessToken: input.accessToken,
       canvasClient: provider,
       client,
       connection: context.connection,
@@ -182,6 +184,16 @@ export async function finalizeCheckpointedCanvasSync(
       courseId: context.course.id,
       dependencies: {
         createCanvasClient: () => provider,
+        ...(input.accessToken ? {
+          loadContext: async () => ({
+            ok: true as const,
+            value: {
+              connection: context.connection,
+              course: context.course,
+              token: input.accessToken!,
+            },
+          }),
+        } : {}),
       },
       userId: context.job.user_id,
     });

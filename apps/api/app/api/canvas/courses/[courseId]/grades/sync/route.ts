@@ -11,9 +11,9 @@ import {
   validateCanvasSyncIdempotencyKey,
 } from "@/lib/canvas-sync-jobs/repository";
 import {
-  CanvasSyncWorkflowDispatchError,
+  CanvasGoogleDispatchError,
   dispatchAcceptedCanvasSyncJob,
-} from "@/lib/canvas-sync-jobs/workflow-dispatch";
+} from "@/lib/canvas-sync-jobs/google-dispatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -107,7 +107,7 @@ export async function POST(
         request,
       );
     }
-    if (error instanceof CanvasSyncWorkflowDispatchError) {
+    if (error instanceof CanvasGoogleDispatchError) {
       return jsonResponse(
         {
           ok: false,

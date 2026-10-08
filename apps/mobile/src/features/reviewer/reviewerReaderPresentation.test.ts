@@ -178,6 +178,9 @@ describe("describeReviewerScale", () => {
 });
 
 describe("describeGroundingStatus", () => {
+  it('does not claim semantic verification for AI-first contract validation', () => {
+    expect(describeGroundingStatus({ ...metadata(), validationPolicy: 'ai-first-contract' })).toBeNull();
+  });
   it("reports grounded reviewers in student language, without a score", () => {
     const grounding = describeGroundingStatus(metadata());
 

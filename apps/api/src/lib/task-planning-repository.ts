@@ -17,6 +17,8 @@ import type {
 } from "@stay-focused/shared/task-planning";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { schedulableCanvasAssignmentIds } from "@/lib/canvas-task-scheduling";
+
 const TASK_COLUMNS =
   "id,user_id,title,notes,status,priority,due_at,estimated_minutes,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
 const SESSION_COLUMNS =
@@ -180,6 +182,59 @@ export async function importOwnedCanvasAssignments(
     throw storageFailure("Canvas assignments could not be imported.");
   }
   return (data ?? []) as TaskRow[];
+}
+
+const CANVAS_IMPORT_BATCH = 100;
+
+/**
+ * Makes synchronized Canvas work schedulable before planning, so the student
+ * never has to add an ordinary assignment to Tasks first. The import RPC is
+ * idempotent (existing tasks are left untouched, including their status and
+ * estimate); only the eligible IDs from `schedulableCanvasAssignmentIds` are
+ * sent. Returns how many assignments were considered new.
+ */
+export async function importSchedulableCanvasAssignments(
+  client: SupabaseClient<Database>,
+  userId: string,
+  now: number,
+): Promise<number> {
+  const [assignments, submissions, preferences, imported] = await Promise.all([
+    client
+      .from("canvas_assignments")
+      .select("id,course_id,due_at,submission_types")
+      .eq("user_id", userId)
+      .gt("due_at", new Date(now).toISOString()),
+    client
+      .from("canvas_assignment_submissions")
+      .select("assignment_id,submitted_at,excused,workflow_state,missing")
+      .eq("user_id", userId),
+    client
+      .from("canvas_course_sync_preferences")
+      .select("course_id")
+      .eq("user_id", userId)
+      .eq("selected", true),
+    client
+      .from("tasks")
+      .select("canvas_assignment_row_id")
+      .eq("user_id", userId)
+      .eq("source_type", "canvas"),
+  ]);
+  if (assignments.error || submissions.error || preferences.error || imported.error) {
+    throw storageFailure("Canvas activities could not be prepared for planning.");
+  }
+  const ids = schedulableCanvasAssignmentIds({
+    assignments: assignments.data ?? [],
+    submissions: submissions.data ?? [],
+    selectedCourseIds: new Set((preferences.data ?? []).map((row) => row.course_id)),
+    importedAssignmentIds: new Set(
+      (imported.data ?? []).flatMap((row) => (row.canvas_assignment_row_id ? [row.canvas_assignment_row_id] : [])),
+    ),
+    now,
+  });
+  for (let index = 0; index < ids.length; index += CANVAS_IMPORT_BATCH) {
+    await importOwnedCanvasAssignments(client, userId, ids.slice(index, index + CANVAS_IMPORT_BATCH));
+  }
+  return ids.length;
 }
 
 export async function loadOwnedPlannerTasks(

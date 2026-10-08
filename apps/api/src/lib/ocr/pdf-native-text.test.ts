@@ -4,6 +4,22 @@ import { describe, expect, it } from "vitest";
 import { inspectPdfTextPages, isLikelyLayoutIncompletePage, isUsableEmbeddedText } from "./pdf-native-text";
 
 describe("inspectPdfTextPages", () => {
+  it("inspects only requested pages while preserving original page numbers", async () => {
+    const document = await PDFDocument.create();
+    const font = await document.embedFont(StandardFonts.Helvetica);
+    for (const text of ["First page has native text.", "Second page has native text."]) {
+      const page = document.addPage();
+      page.drawText(text, { font, x: 40, y: 700 });
+    }
+    const bytes = await document.save();
+
+    const pages = await inspectPdfTextPages(bytes, 2, [2]);
+
+    expect(pages).toEqual([
+      expect.objectContaining({ pageNumber: 2, kind: "native_text" }),
+    ]);
+  });
+
   it("classifies native text, scanned-looking content, and a blank page independently", async () => {
     const document = await PDFDocument.create();
     const font = await document.embedFont(StandardFonts.Helvetica);

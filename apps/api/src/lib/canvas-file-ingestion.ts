@@ -16,6 +16,8 @@ import {
   CANVAS_FILE_MAX_REDIRECTS,
   CANVAS_FILE_MAX_SINGLE_BYTES,
   CANVAS_SOURCE_FILE_BUCKET,
+  classifyDirectlyAccessiblePageFile,
+  ingestionStatusForEligibility,
   isEligibleForBinaryIngestion,
   isNewlySupportedOfficeFile,
   normalizeMimeType,
@@ -41,6 +43,8 @@ type CanvasFileIngestionHttpStatus = 400 | 404 | 413 | 500;
 
 export interface IngestCanvasFilesInput {
   readonly client: SupabaseClient<Database>;
+  /** Only the authenticated Page-link preparation path supplies this row ID. */
+  readonly directlyLinkedFileId?: string;
   readonly fileIds: readonly string[];
   readonly userId: string;
 }
@@ -58,6 +62,7 @@ type ReserveBytes = (byteLength: number) => boolean;
 
 export async function ingestCanvasFiles({
   client,
+  directlyLinkedFileId,
   fileIds,
   userId,
 }: IngestCanvasFilesInput): Promise<IngestCanvasFilesResult> {
@@ -119,7 +124,7 @@ export async function ingestCanvasFiles({
   }
 
   const declaredAggregateBytes = files.rows.reduce((sum, file) => {
-    if (!isEligibleForBinaryIngestion(eligibilityForRow(file))) {
+    if (!isEligibleForBinaryIngestion(eligibilityForRow(file)) && file.id !== directlyLinkedFileId) {
       return sum;
     }
     return sum + (file.size_bytes ?? 0);
@@ -151,6 +156,7 @@ export async function ingestCanvasFiles({
         canvas,
         client,
         connectionId: connectionRow.id,
+        directlyLinked: file.id === directlyLinkedFileId,
         file,
         reserveBytes,
         userId,
@@ -199,6 +205,7 @@ async function ingestOneCanvasFile({
   canvas,
   client,
   connectionId,
+  directlyLinked,
   file,
   reserveBytes,
   userId,
@@ -206,6 +213,7 @@ async function ingestOneCanvasFile({
   readonly canvas: ReturnType<typeof createCanvasClient>;
   readonly client: SupabaseClient<Database>;
   readonly connectionId: string;
+  readonly directlyLinked: boolean;
   readonly file: CanvasFileRow;
   readonly reserveBytes: ReserveBytes;
   readonly userId: string;
@@ -229,7 +237,22 @@ async function ingestOneCanvasFile({
     });
   }
 
-  const freshPayload = mapCanvasFile(freshFile);
+  let freshPayload = mapCanvasFile(freshFile);
+  if (freshPayload.canvas_file_id !== file.canvas_file_id) {
+    return recordTerminalResult({ client, connectionId,
+      result: terminalResult(file.id, 'unavailable', 'canvas_file_unavailable', false), userId });
+  }
+  const hiddenPageLink = directlyLinked && freshPayload.ingestion_eligibility === 'blocked_unavailable' &&
+    (freshPayload.hidden === true || freshPayload.hidden_for_user === true);
+  if (hiddenPageLink) {
+    const eligibility = classifyDirectlyAccessiblePageFile({ contentType: freshPayload.content_type,
+      displayName: freshPayload.display_name, filename: freshPayload.filename, size: freshPayload.size_bytes,
+      locked: freshPayload.locked, hidden: freshPayload.hidden, hiddenForUser: freshPayload.hidden_for_user,
+      lockAt: freshPayload.lock_at, unlockAt: freshPayload.unlock_at, mediaClass: freshPayload.media_class,
+      mediaEntryId: freshPayload.media_entry_id });
+    if (isEligibleForBinaryIngestion(eligibility)) freshPayload = { ...freshPayload,
+      ingestion_eligibility: eligibility, ingestion_status: ingestionStatusForEligibility(eligibility) };
+  }
   const isEligible = isEligibleForBinaryIngestion(
     freshPayload.ingestion_eligibility,
   );
@@ -264,7 +287,8 @@ async function ingestOneCanvasFile({
     file.current_sha256 &&
     file.storage_bucket === CANVAS_SOURCE_FILE_BUCKET &&
     file.storage_object_key &&
-    file.content_version_fingerprint === freshPayload.content_version_fingerprint
+    file.content_version_fingerprint === freshPayload.content_version_fingerprint &&
+    !hiddenPageLink
   ) {
     const updateOk = await updateFileRow(client, file, {
       ...metadataUpdateForPayload(freshPayload),

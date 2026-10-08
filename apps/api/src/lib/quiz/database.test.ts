@@ -1,22 +1,20 @@
-import { beforeAll, afterAll, describe, it, expect } from 'vitest';
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fixturePlan, candidate, request } from './fixtures';
-import { generateQuiz, makeQuizPlan, validateCandidate, type StoredQuestion } from './generation';
-import { regionsFromBlocks } from './sources';
 import { createServerOpenAIProvider } from '@/providers';
-import { structuredBlockText, type StructuredDocument } from '../../../../../packages/engine/src/structured-document';
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync,writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterAll,beforeAll,describe,expect,it } from 'vitest';
+import { structuredBlockText,type StructuredDocument } from '../../../../../packages/engine/src/structured-document';
+import type { ExperienceRepository,ExperienceRow,ExperienceTable } from '../experience/repository';
 import { ExperienceService } from '../experience/service';
-import type { ExperienceRepository, ExperienceRow, ExperienceTable } from '../experience/repository';
-import { attemptView, resultView, quizView, type AttemptRow, type QuizRow } from './service';
-import { mixedQuestions } from './matching.fixtures';
-import type { QuizMatchPair } from '@stay-focused/shared';
+import { generateQuizSet } from './ai-first';
+import { candidate,fixturePlan,makeQuizPlan,request,validateCandidate } from './fixtures';
+import { attemptView,learnerQuestion,quizView,resultView,type AttemptRow,type QuizRow } from './service';
+import { regionsFromBlocks } from './sources';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
-const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-let db: PGlite, quizId: string, jobId: string, legacyAttemptId: string;
+const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+let db: PGlite, quizId: string, jobId: string;
 const plan = fixturePlan(), questions = plan.allocation.map(s => validateCandidate(candidate(plan, s.id), plan));
-const payload = { courseId: course, reviewerId: reviewer, title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
+const payload = { courseId: course, reviewerArtifactId: reviewer, sourceVersionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', title: 'Safe course quiz', materialIds: request.sourceIds, questions, provenance: { plan, policy: 'test' } };
 const migration = (name: string) => readFileSync(resolve('../../packages/db/migrations', name), 'utf8');
 async function asRole<T>(role: string, user: string, action: () => Promise<T>) {
     await db.exec(`begin;set local role ${role};select set_config('request.jwt.claim.sub','${user}',true);`);
@@ -44,7 +42,16 @@ beforeAll(async () => {
     grant usage on schema public,auth to authenticated,anon,service_role;
     create table canvas_courses(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
     insert into canvas_courses values('${course}','${A}');
-    create table reviewers(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);insert into reviewers values('${reviewer}','${A}');
+    create table reviewers(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+    create table source_versions(id uuid primary key,user_id uuid not null,character_count integer not null,metadata jsonb not null,unique(id,user_id));
+    create table generated_artifacts(id uuid primary key,user_id uuid not null,artifact_type text not null,safe_title text not null,source_version_id uuid not null,latest_version_id uuid,metadata jsonb not null default '{}',created_at timestamptz not null default now(),updated_at timestamptz not null default now(),deleted_at timestamptz,unique(id,user_id));
+    create table generated_artifact_versions(id uuid primary key,user_id uuid not null,artifact_id uuid not null,artifact_type text not null,source_version_id uuid not null,payload jsonb not null,unique(id,user_id));
+    create table reviewer_source_snapshots(id uuid primary key,user_id uuid not null,course_id uuid not null,was_edited boolean not null,unique(id,user_id));
+    insert into reviewer_source_snapshots values('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','${A}','${course}',false);
+    insert into source_versions values('ffffffff-ffff-4fff-8fff-ffffffffffff','${A}',42,'{"reviewerSourceSnapshotId":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"}');
+    insert into generated_artifacts(id,user_id,artifact_type,safe_title,source_version_id) values('${reviewer}','${A}','reviewer','Safe Reviewer','ffffffff-ffff-4fff-8fff-ffffffffffff');
+    insert into generated_artifact_versions values('99999999-9999-4999-8999-999999999999','${A}','${reviewer}','reviewer','ffffffff-ffff-4fff-8fff-ffffffffffff','{"reviewer":{"id":"persisted-reviewer"}}');
+    update generated_artifacts set latest_version_id='99999999-9999-4999-8999-999999999999' where id='${reviewer}';
     create table canvas_assignments(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,name text,unique(id,user_id,canvas_connection_id,course_id));
     create table processing_policy_config(id text primary key,max_queued_generation_jobs_per_user int,max_daily_generation_jobs int,event_retention_days int,failed_job_retention_days int,completed_job_retention_days int);
     insert into processing_policy_config values('default',100,1000,7,7,7);`);
@@ -52,100 +59,127 @@ beforeAll(async () => {
     await db.exec('create table processing_job_events(id uuid primary key,created_at timestamptz,delivered_at timestamptz,delivery_eligible boolean);create table processing_cleanup_queue(status text,not_before timestamptz);');
     await db.exec(migration('20260912100000_activity_maker.sql'));
     await db.exec(migration('20260912110000_quiz_maker.sql'));
+    await db.exec(migration('20260923000000_canonical_reviewer_artifacts.sql'));
+    await db.exec(migration('20260927140343_quiz_100_items.sql'));
+    await db.exec(migration('20260928131426_quiz_study_state.sql'));
+    await db.exec(migration('20260928131513_matching_blocks.sql'));
+    await db.exec(migration('20260928134856_quiz_clear_drafts.sql'));
+    await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
+    await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
+    await db.exec(migration('20260928143546_quiz_matching_public_projection.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{
         id: string;
     }>('select id from quizzes where generation_id=$1', [jobId])).rows[0]!.id;
-    const legacy = await start('legacy-before-matching');
-    legacyAttemptId = legacy.id;
-    await answer(legacy.id, 'q1', ['b'], false);
-    await db.exec(migration('20261007155114_quiz_matching.sql'));
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Quiz real Postgres transactions, RLS and history', () => {
-    it('reopens and completes choice-only data created before the Matching migration', async () => {
-        const persisted = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [legacyAttemptId])).rows[0]!;
-        expect(attemptView(persisted, questions).answers[0]).toMatchObject({ type: 'choice', selectedOptionIds: ['b'], finalizedAt: null });
-        for (const q of questions) await answer(legacyAttemptId, q.id, q.correctOptionIds);
-        expect(resultView(attemptView(await complete(legacyAttemptId), questions), questions).percentage).toBe(100);
-        expect((await start('legacy-before-matching')).id).toBe(legacyAttemptId);
-    });
-    it('persists Matching privately, edits/reloads partial drafts, rejects invalid finalization and preserves mixed history', async () => {
+    it('completes an already accepted Canvas Quiz from an older worker payload', async () => {
         await db.exec('begin');
         try {
-            const mixed = mixedQuestions(), matching = mixed.find(q => q.type === 'matching')!;
-            if (matching.type !== 'matching') throw new Error('Expected Matching');
-            const generation = await queue('matching-integration');
-            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [generation]);
-            const matchingPayload = { ...payload, questions: mixed };
-            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [generation, 'worker', 'quiz_generation', JSON.stringify(matchingPayload)]);
-            const q = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [generation])).rows[0]!;
-            const privateRow = (await db.query<{ questions: unknown }>('select questions from quiz_keys where quiz_id=$1', [q.id])).rows[0]!;
-            expect(JSON.stringify(privateRow.questions)).toContain('correctPairs');
-            expect(JSON.stringify(q.questions)).not.toMatch(/correctPairs|sourceEvidence|correctOptionIds|explanation/);
-            expect(JSON.stringify(q.questions)).toContain('Confidentiality');
-            const fresh = async (key: string) => (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, q.id, key])).rows[0]!;
-            const save = async (attemptId: string, pairs: readonly QuizMatchPair[], finalize = false, user = A) =>
-                (await db.query<AttemptRow>('select * from save_quiz_answer($1,$2,$3,$4,$5)', [user, attemptId, matching.id, JSON.stringify({ type: 'matching', pairs }), finalize])).rows[0]!;
-            const rejects = async (action: () => Promise<unknown>, code: string) => {
-                await db.exec('savepoint matching_reject');
-                try { await expect(action()).rejects.toThrow(code); }
-                finally { await db.exec('rollback to savepoint matching_reject;release savepoint matching_reject'); }
-            };
-            const a = await fresh('matching-draft');
-            const partial = await save(a.id, matching.correctPairs.slice(0, 1));
-            expect(attemptView(partial, mixed).feedback).toEqual([]);
-            expect(attemptView(partial, mixed).answers[0]).toMatchObject({ type: 'matching', pairs: matching.correctPairs.slice(0, 1), finalizedAt: null });
-            const reread = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
-            expect(reread.answers).toEqual(partial.answers);
-            expect(quizView(q, [partial])).toMatchObject({ learningState: 'in_progress', answeredCount: 1 });
-            const editedPair = [{ ...matching.correctPairs[0]!, rightItemId: matching.correctPairs[1]!.rightItemId }];
-            const edited = await save(a.id, editedPair);
-            expect(attemptView(edited, mixed).answers[0]).toMatchObject({ pairs: editedPair });
-            await rejects(() => save(a.id, editedPair, true), 'quiz_answer_invalid');
-            await rejects(() => complete(a.id), 'quiz_result_unavailable');
-            for (const pairs of [
-                [{ leftItemId: 'unknown', rightItemId: matching.correctPairs[0]!.rightItemId }],
-                [{ leftItemId: matching.correctPairs[0]!.leftItemId, rightItemId: 'unknown' }],
-                [matching.correctPairs[0]!, matching.correctPairs[0]!],
-                [matching.correctPairs[0]!, { ...matching.correctPairs[1]!, rightItemId: matching.correctPairs[0]!.rightItemId }],
-            ]) await rejects(() => save(a.id, pairs), 'quiz_answer_invalid');
-            await rejects(() => save(a.id, [], false, B), 'quiz_attempt_not_found');
-            await rejects(() => complete(a.id, false, B), 'quiz_attempt_not_found');
-            const wrong = matching.correctPairs.map((p, i, all) => i < 2 ? { ...p, rightItemId: all[1 - i]!.rightItemId } : p);
-            const finalized = await save(a.id, [...wrong].reverse(), true);
-            expect(attemptView(finalized, mixed).feedback[0]).toMatchObject({ type: 'matching', correct: false, correctPairs: matching.correctPairs });
-            const finalizedReload = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
-            expect(finalizedReload.answers).toEqual(finalized.answers);
-            await rejects(() => save(a.id, matching.correctPairs), 'quiz_answer_already_finalized');
-            for (const choice of mixed) if (choice.type !== 'matching') await answer(a.id, choice.id, choice.correctOptionIds);
-            const completed = await complete(a.id);
-            expect(Number(completed.percentage)).toBe(80);
-            expect(resultView(attemptView(completed, mixed), mixed)).toMatchObject({ percentage: 80, correctCount: 4, totalQuestions: 5 });
-            for (const [key, pairs, expected] of [
-                ['matching-correct', matching.correctPairs, true],
-                ['matching-all-wrong', matching.correctPairs.map((p, i, all) => ({ ...p, rightItemId: all[(i + 1) % all.length]!.rightItemId })), false],
-            ] as const) {
-                const retry = await fresh(key);
-                expect(retry.id).not.toBe(a.id); expect(retry.answers).toEqual([]);
-                const saved = await save(retry.id, pairs, true);
-                expect(attemptView(saved, mixed).feedback[0]?.correct).toBe(expected);
-                for (const choice of mixed) if (choice.type !== 'matching') await answer(retry.id, choice.id, choice.correctOptionIds);
-                expect(Number((await complete(retry.id)).percentage)).toBe(expected ? 100 : 80);
-            }
-            const history = (await db.query<AttemptRow>('select * from quiz_attempts where quiz_id=$1', [q.id])).rows;
-            expect(history).toHaveLength(3); expect(history.every(a => a.status === 'completed' && a.completed_at !== null)).toBe(true);
-            const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T, userId: string) {
-                return (table === 'quizzes' || table === 'quiz_attempts') ? (await db.query(`select * from ${table} where user_id=$1`, [userId])).rows as unknown as ExperienceRow<T>[] : [];
-            } };
-            const library = new ExperienceService({ repository, materials: async () => { throw new Error('No generation during reads'); } });
-            const reopened = await library.getLibraryArtifact(A, `quiz:${q.id}`);
-            expect(reopened).toMatchObject({ quiz: { learningState: 'completed', completedAttemptCount: 3, bestScore: 100 } });
-            expect(JSON.stringify(reopened)).not.toMatch(/correctPairs|sourceEvidence|correctOptionIds/);
-            await expect(library.getLibraryArtifact(B, `quiz:${q.id}`)).rejects.toThrow('not_found');
-            await db.exec(`set local role authenticated;select set_config('request.jwt.claim.sub','${B}',true);`);
-            expect((await db.query('select * from quiz_attempts where quiz_id=$1', [q.id])).rows).toEqual([]);
+            const olderJob = await queue('older-canvas-worker');
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [olderJob]);
+            const olderPayload: Partial<typeof payload> = { ...payload };
+            delete olderPayload.sourceVersionId;
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [olderJob, 'worker', 'quiz_generation', JSON.stringify(olderPayload)]);
+            expect((await db.query<QuizRow>('select * from quizzes where generation_id=$1', [olderJob])).rows[0]!.source_version_id).toBe('ffffffff-ffff-4fff-8fff-ffffffffffff');
+        } finally { await db.exec('rollback'); }
+    });
+    it('accepts an owned imported source without a Canvas course and binds its Quiz to the same source', async () => {
+        const sourceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const artifactId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        const versionId = '88888888-8888-4888-8888-888888888888';
+        await db.exec('begin');
+        try {
+            await db.query('insert into source_versions values($1,$2,$3,$4)', [sourceId, A, 80, JSON.stringify({ sourceType: 'text', sourceTitle: 'Own notes' })]);
+            await db.query("insert into generated_artifacts(id,user_id,artifact_type,safe_title,source_version_id) values($1,$2,'reviewer','Own notes',$3)", [artifactId, A, sourceId]);
+            await db.query("insert into generated_artifact_versions values($1,$2,$3,'reviewer',$4,$5)", [versionId, A, artifactId, sourceId, JSON.stringify({ reviewer: { id: 'own-reviewer' } })]);
+            await db.query('update generated_artifacts set latest_version_id=$1 where id=$2', [versionId, artifactId]);
+            const localRequest = { ...request, sourceIds: [artifactId], reviewerArtifactId: artifactId };
+            const localPayload = { ...payload, courseId: null, reviewerArtifactId: artifactId, sourceVersionId: sourceId, materialIds: [`source:${sourceId}`] };
+            await db.exec('savepoint other_user');
+            await expect(db.query('select * from create_quiz_processing_job($1,$2,$3,$4,$5)', [B, null, artifactId, 'other-user-local', JSON.stringify(localRequest)])).rejects.toThrow('quiz_source_unavailable');
+            await db.exec('rollback to savepoint other_user');
+            const localJob = (await db.query<{ id: string }>('select id from create_quiz_processing_job($1,$2,$3,$4,$5)', [A, null, artifactId, 'owner-local-quiz', JSON.stringify(localRequest)])).rows[0]!.id;
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [localJob]);
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [localJob, 'worker', 'quiz_generation', JSON.stringify(localPayload)]);
+            const saved = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [localJob])).rows[0]!;
+            expect(saved.course_id).toBeNull();
+            expect(saved.source_version_id).toBe(sourceId);
+            expect(saved.user_id).toBe(A);
+            expect(saved.source_material_ids).toEqual([`source:${sourceId}`]);
+            await expect(db.query('update quizzes set user_id=$1 where id=$2', [B, saved.id])).rejects.toThrow();
+        } finally { await db.exec('rollback'); }
+    });
+    it('removes only the owner Quiz and its keys while preserving the source Reviewer', async () => {
+        await db.exec('begin');
+        try {
+            expect((await db.query('delete from quizzes where id=$1 and user_id=$2 returning id', [quizId, B])).rows).toHaveLength(0);
+            expect((await db.query('delete from quizzes where id=$1 and user_id=$2 returning id', [quizId, A])).rows).toHaveLength(1);
+            expect((await db.query('select quiz_id from quiz_keys where quiz_id=$1', [quizId])).rows).toHaveLength(0);
+            expect((await db.query('select id from generated_artifacts where id=$1', [reviewer])).rows).toHaveLength(1);
+        } finally { await db.exec('rollback'); }
+    });
+    it('publishes Matching labels without private associations through the actual completion RPC', async () => {
+        await db.exec('begin');
+        try {
+            const id = await queue('matching-publication');
+            const matching = { ...questions[4]!, type: 'matching' as const, leftItem: '',
+                matchingPairs: [
+                    { id: 'p1', leftItem: 'Confidentiality', rightOptionId: 'a' },
+                    { id: 'p2', leftItem: 'Integrity', rightOptionId: 'b' },
+                    { id: 'p3', leftItem: 'Availability', rightOptionId: 'c' },
+                ], matchingAnswers: [{ id: 'p1', rightOptionId: 'a' }, { id: 'p2', rightOptionId: 'b' }, { id: 'p3', rightOptionId: 'c' }],
+                correctOptionIds: ['p1:a', 'p2:b', 'p3:c'] };
+            const generated = { ...payload, questions: [...questions.slice(0, 4), matching] };
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [id]);
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [id, 'worker', 'quiz_generation', JSON.stringify(generated)]);
+            const row = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [id])).rows[0]!;
+            const learner = quizView(row).questions[4]!;
+            expect(learner.matchingPairs).toEqual(matching.matchingPairs.map(({ id, leftItem }) => ({ id, leftItem })));
+            expect(learner.selectionInstruction).toBe('Match each term to one meaning.');
+            const serialized = JSON.stringify(row.questions);
+            for (const field of ['rightOptionId', 'matchingAnswers', 'correctOptionIds', 'explanation', 'sourceRefs']) expect(serialized).not.toContain(field);
+            const key = (await db.query<{ questions: unknown }>('select questions from quiz_keys where quiz_id=$1', [row.id])).rows[0]!;
+            expect(key.questions).toEqual(generated.questions);
+            expect((await db.query('select id from quizzes where generation_id=$1', [id])).rows).toHaveLength(1);
+        } finally { await db.exec('rollback'); }
+    });
+    it('stores 100 questions without truncating the learner projection or private key', async () => {
+        await db.exec('begin');
+        try {
+            const hundred = Array.from({ length: 100 }, (_, index) => ({ ...questions[index % questions.length]!, id: `q${index + 1}` }));
+            await db.query('update quizzes set question_count=100,questions=$1 where id=$2', [JSON.stringify(hundred.map(learnerQuestion)), quizId]);
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(hundred), quizId]);
+            expect((await db.query<QuizRow>('select * from quizzes where id=$1', [quizId])).rows[0]!.question_count).toBe(100);
+            expect((await db.query<{ questions: unknown[] }>('select questions from quiz_keys where quiz_id=$1', [quizId])).rows[0]!.questions).toHaveLength(100);
+            const hundredAttempt = await start('hundred-question-attempt');
+            for (const question of hundred) await answer(hundredAttempt.id, question.id, question.correctOptionIds);
+            expect(Number((await complete(hundredAttempt.id)).percentage)).toBe(100);
+        } finally { await db.exec('rollback'); }
+    });
+    it('accepts and scores identification, modified true or false, and matching', async () => {
+        await db.exec('begin');
+        try {
+            const variants = questions.map((question, index) => {
+                if (index === 1) return { ...question, type: 'identification', prompt: 'Name the CIA triad.', options: [], correctOptionIds: ['CIA triad'], acceptedAnswers: ['CIA triad'], selectionInstruction: 'Type the term.' };
+                if (index === 3) return { ...question, type: 'modified_true_false', prompt: 'Availability prevents unauthorized disclosure.', options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }], correctOptionIds: ['b', 'confidentiality'], acceptedAnswers: ['confidentiality'], incorrectTerm: 'Availability', selectionInstruction: 'Mark true, or mark false and correct the wrong term.' };
+                if (index === 4) return { ...question, type: 'matching', leftItem: 'Confidentiality', prompt: 'Match the term to its meaning.', options: [{ id: 'a', text: 'Accuracy' }, { id: 'b', text: 'Access' }, { id: 'c', text: 'Protection from unauthorized disclosure' }, { id: 'd', text: 'Uptime' }], correctOptionIds: ['c'], selectionInstruction: 'Match the term to its meaning.' };
+                return question;
+            });
+            const formatJob = await queue('five-format-generation');
+            await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [formatJob]);
+            await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [formatJob, 'worker', 'quiz_generation', JSON.stringify({ ...payload, questions: variants })]);
+            const formatQuizId = (await db.query<{ id: string }>('select id from quizzes where generation_id=$1', [formatJob])).rows[0]!.id;
+            const attempt = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, formatQuizId, 'five-format-attempt'])).rows[0]!;
+            for (const [index, question] of variants.entries()) await answer(attempt.id, question.id, index === 1 ? ['CIA triad'] : index === 3 ? ['b', 'confidentiality'] : question.correctOptionIds);
+            const done = await complete(attempt.id);
+            expect(Number(done.percentage)).toBe(100);
+            const publicQuestions = (await db.query<QuizRow>('select * from quizzes where id=$1', [formatQuizId])).rows[0]!.questions as unknown as Record<string, unknown>[];
+            expect(publicQuestions[1]).not.toHaveProperty('correctOptionIds');
+            expect(publicQuestions[3]).not.toHaveProperty('acceptedAnswers');
+            expect(publicQuestions[4]).toHaveProperty('leftItem', 'Confidentiality');
         } finally { await db.exec('rollback'); }
     });
     it.skipIf(process.env.B24_7_LIVE !== '1').each(['statistics', 'it-security'])('limited live %s: generation, SQL attempts and Library reopen', async (name) => {
@@ -158,28 +192,8 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const securityRegions = regionsFromBlocks(request.sourceIds[0]!, 'IT Security', [{ id: 'source-body', kind: 'paragraph', text: security }]);
         const regions = name === 'statistics' ? statsRegions : securityRegions;
         const livePlan = makeQuizPlan(regions, request);
-        if (process.env.B24_7_LIVE_OUTPUT)
-            writeFileSync(resolve(process.env.B24_7_LIVE_OUTPUT, `b24-7-live-${name}-plan.json`), JSON.stringify(livePlan, null, 2));
         let calls = 0;
-        const seedDir = process.env.B24_7_SEED_DIR;
-        const initial = seedDir ? (JSON.parse(readFileSync(resolve(seedDir, `b24-7-live-${name}-seed.json`), 'utf8')) as {
-            questions: StoredQuestion[];
-        }).questions : [];
-        let checkpointQuestions = initial;
-        const liveQuestions = await generateQuiz({ async generate<T>(r: import('@stay-focused/engine').GenerationRequest<T>) {
-                calls++;
-                const replay = process.env.B24_7_REPLAY_DIR;
-                const value = replay ? (JSON.parse(readFileSync(resolve(replay, `b24-7-live-${name}-call-${calls}.json`), 'utf8')) as {
-                    value: T;
-                }).value : await provider.generate<T>(r);
-                if (process.env.B24_7_LIVE_OUTPUT)
-                    writeFileSync(resolve(process.env.B24_7_LIVE_OUTPUT!, `b24-7-live-${name}-call-${calls}.json`), JSON.stringify({ schema: r.schema.name, value }, null, 2));
-                return value;
-            } }, livePlan, async (accepted) => {
-            checkpointQuestions = accepted;
-            if (process.env.B24_7_LIVE_OUTPUT)
-                writeFileSync(resolve(process.env.B24_7_LIVE_OUTPUT, `b24-7-live-${name}-checkpoint.json`), JSON.stringify({ questions: checkpointQuestions }, null, 2));
-        }, initial);
+        const liveQuestions = await generateQuizSet({ async generate<T>(r: import('@stay-focused/engine').GenerationRequest<T>) { calls++; return provider.generate<T>(r); } }, request, regions);
         expect(liveQuestions).toHaveLength(5);
         const id = await queue(`live-${name}`);
         await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [id]);
@@ -187,7 +201,6 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const row = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [id])).rows[0]!;
         const attempt = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, row.id, `live-attempt-${name}`])).rows[0]!;
         for (const [i, q] of liveQuestions.entries()) {
-            if (q.type === 'matching') throw new Error('This legacy live fixture requests choice questions');
             const selected = i === 0 ? [q.options.find(o => !q.correctOptionIds.includes(o.id))!.id] : q.correctOptionIds;
             const saved = await answer(attempt.id, q.id, selected);
             expect(attemptView(saved, liveQuestions).feedback).toHaveLength(i + 1);
@@ -255,53 +268,68 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const resumed = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [a.id])).rows[0]!;
         expect(resumed.answers).toEqual(finalized.answers);
     });
-    it('Library reload follows real persisted start, draft, zero-score completion and retry without regeneration', async () => {
+    it('clears unfinished identification and correction drafts for offline replay', async () => {
         await db.exec('begin');
         try {
-            const generation = await queue('learning-projection');
-            await finish(generation);
-            const q = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [generation])).rows[0]!;
-            const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T, userId: string) {
-                if (table === 'quizzes' || table === 'quiz_attempts')
-                    return (await db.query(`select * from ${table} where user_id=$1`, [userId])).rows as unknown as ExperienceRow<T>[];
-                return [];
-            } };
-            const materials = () => { throw new Error('Library must not regenerate'); };
-            const library = new ExperienceService({ repository, materials });
-            const reload = async () => (await library.getLibrary(A, { type: 'quiz' })).items.find(i => i.id === `quiz:${q.id}`)!;
-            expect(await reload()).toMatchObject({ status: 'completed', quiz: { learningState: 'not_started', attemptCount: 0, bestScore: null } });
-            const started = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, q.id, 'progress-start'])).rows[0]!;
-            expect(await reload()).toMatchObject({ quiz: { learningState: 'in_progress', activeAttemptId: started.id, answeredCount: 0 } });
-            await answer(started.id, 'q1', ['b'], false);
-            expect(await reload()).toMatchObject({ quiz: { learningState: 'in_progress', answeredCount: 1 } });
-            for (const question of questions) {
-                const wrong = [question.options.find(o => !question.correctOptionIds.includes(o.id))!.id];
-                await answer(started.id, question.id, wrong);
+            const modified = questions.map((item, index) => index === 2
+                ? { ...item, type: 'identification' as const, options: [], correctOptionIds: ['Firewall'] }
+                : index === 3 ? { ...item, type: 'modified_true_false' as const, options: [{ id: 't', text: 'True' }, { id: 'f', text: 'False' }], correctOptionIds: ['t'] } : item);
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(modified), quizId]);
+            const a = await start('clear-text-drafts');
+            for (const [questionId, value] of [['q3', 'temporary term'], ['q4', 't']]) {
+                await answer(a.id, questionId!, [value!], false);
+                const cleared = await answer(a.id, questionId!, [], false);
+                expect(attemptView(cleared, modified).answers.find(entry => entry.questionId === questionId)?.selectedOptionIds).toEqual([]);
             }
-            const completed = await complete(started.id);
-            expect(Number(completed.percentage)).toBe(0);
-            expect(await reload()).toMatchObject({ status: 'completed', quiz: { learningState: 'completed', answeredCount: 5,
-                completedAttemptCount: 1, latestCompletedAt: completed.completed_at, bestScore: 0, latestScore: 0 } });
-            const retry = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, q.id, 'progress-retry'])).rows[0]!;
-            expect(await reload()).toMatchObject({ quiz: { learningState: 'in_progress', activeAttemptId: retry.id, completedAttemptCount: 1, bestScore: 0 } });
-            await complete(retry.id, true);
-            expect(await reload()).toMatchObject({ quiz: { learningState: 'completed', activeAttemptId: null, attemptCount: 2, completedAttemptCount: 1, bestScore: 0 } });
-            expect((await library.getLibrary(B, { type: 'quiz' })).items).toEqual([]);
-            expect((await db.query('select id from quizzes where generation_id=$1', [generation])).rows).toHaveLength(1);
-        } finally {
-            await db.exec('rollback');
-        }
+        } finally { await db.exec('rollback'); }
     });
     it.each([['a', 'a'], ['missing'], [], ['a', 'b']].map(selected => [selected]))('rejects invalid finalized single-select %j', async (selected) => {
         const a = await start(`bad-answer-${selected.join('-') || 'empty'}`);
         await expect(answer(a.id, 'q1', selected)).rejects.toThrow('quiz_answer_invalid');
     });
-    it('refuses incomplete results, foreign answer/complete, and unknown question', async () => {
+    it('finishes unanswered questions as skipped and denies foreign or unknown answers', async () => {
         const a = await start('incomplete-attempt');
-        await expect(complete(a.id)).rejects.toThrow('quiz_result_unavailable');
         await expect(answer(a.id, 'q1', ['a'], true, B)).rejects.toThrow('quiz_attempt_not_found');
         await expect(complete(a.id, false, B)).rejects.toThrow('quiz_attempt_not_found');
         await expect(answer(a.id, 'q99', ['a'])).rejects.toThrow('quiz_question_not_found');
+        const done = await complete(a.id);
+        expect(Number(done.percentage)).toBe(0);
+        expect(resultView(attemptView(done, questions), questions)).toMatchObject({ skippedCount: 5, revealedCount: 0, incorrectCount: 0 });
+    });
+    it('persists current position, skip and reveal; a pre-answer reveal cannot earn credit', async () => {
+        const a = await start('study-state-attempt');
+        const state = async (action: string, questionId: string, position: number) =>
+            (await db.query<AttemptRow>('select * from update_quiz_attempt_study_state($1,$2,$3,$4,$5)', [A, a.id, action, questionId, position])).rows[0]!;
+        await state('navigate', '', 3);
+        await state('skip', 'q4', 4);
+        const revealed = await state('reveal', 'q5', 4);
+        expect(attemptView(revealed, questions)).toMatchObject({ currentQuestion: 4, skippedQuestionIds: ['q4'], revealedQuestionIds: ['q5'], assistedQuestionIds: ['q5'] });
+        await answer(a.id, 'q5', questions[4]!.correctOptionIds);
+        const done = await complete(a.id);
+        expect(Number(done.percentage)).toBe(0);
+        expect(resultView(attemptView(done, questions), questions)).toMatchObject({ revealedCount: 1, skippedCount: 4, earnedPoints: 0 });
+    });
+    it('scores a matching block by pairs while preserving one-to-one display IDs', async () => {
+        await db.exec('begin');
+        try {
+            const matching = { ...questions[4]!, type: 'matching' as const, prompt: 'Match each term.', leftItem: '',
+                options: [{ id: 'r1', text: 'One' }, { id: 'r2', text: 'Two' }, { id: 'r3', text: 'Three' }, { id: 'r4', text: 'Four' }, { id: 'r5', text: 'Distractor' }],
+                matchingPairs: [{ id: 'p1', leftItem: 'A' }, { id: 'p2', leftItem: 'B' }, { id: 'p3', leftItem: 'C' }, { id: 'p4', leftItem: 'D' }],
+                matchingAnswers: [{ id: 'p1', rightOptionId: 'r1' }, { id: 'p2', rightOptionId: 'r2' }, { id: 'p3', rightOptionId: 'r3' }, { id: 'p4', rightOptionId: 'r4' }],
+                correctOptionIds: ['p1:r1', 'p2:r2', 'p3:r3', 'p4:r4'] };
+            const modified = [...questions.slice(0, 4), matching];
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(modified), quizId]);
+            const a = await start('matching-pair-attempt');
+            for (const q of modified.slice(0, 4)) await answer(a.id, q.id, q.correctOptionIds);
+            await db.exec('savepoint duplicate_match');
+            await expect(answer(a.id, 'q5', ['p1:r1', 'p2:r1', 'p3:r3', 'p4:r4'])).rejects.toThrow('quiz_answer_invalid');
+            await db.exec('rollback to savepoint duplicate_match');
+            const saved = await answer(a.id, 'q5', ['p1:r1', 'p2:r2', 'p3:r3', 'p4:r5']);
+            expect(attemptView(saved, modified).feedback.find(item => item.questionId === 'q5')).toMatchObject({ pairCorrectCount: 3, pairCount: 4, correct: false });
+            const done = await complete(a.id);
+            expect(Number(done.percentage)).toBe(87.5);
+            expect(resultView(attemptView(done, modified), modified)).toMatchObject({ earnedPoints: 7, possiblePoints: 8, percentage: 87.5 });
+        } finally { await db.exec('rollback'); }
     });
     it('exact-set multi-select and deterministic SQL/API scores agree; second attempt preserved', async () => {
         const a = await start('scored-attempt');

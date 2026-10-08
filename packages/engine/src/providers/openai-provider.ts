@@ -58,7 +58,8 @@ async function createCompletion<TOutput>(
 ): Promise<ChatCompletion> {
   const params: ChatCompletionCreateParamsNonStreaming = {
     model: readModel(request.model),
-    messages: [{ role: "user", content: request.prompt }],
+    ...(request.maxOutputTokens ? { max_completion_tokens: request.maxOutputTokens } : {}),
+    messages: [...(request.instructions ? [{ role: "system" as const, content: request.instructions }] : []), { role: "user", content: request.prompt }],
     response_format: {
       type: "json_schema",
       json_schema: {

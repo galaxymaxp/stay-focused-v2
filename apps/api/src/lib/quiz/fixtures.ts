@@ -1,6 +1,9 @@
+import type { GenerationProvider,GenerationRequest } from '@stay-focused/engine';
 import type { QuizGenerationRequest } from '@stay-focused/shared';
-import type { GenerationProvider, GenerationRequest } from '@stay-focused/engine';
-import { makeQuizPlan, type QuizPlan, type QuizRegion } from './generation';
+import { validateQuizSet } from './ai-first';
+import type { QuizRegion } from './generation';
+type QuizPlan = { regions: QuizRegion[]; allocation: { id: string }[] };
+export function makeQuizPlan(regions: QuizRegion[], input: QuizGenerationRequest): QuizPlan { return { regions, allocation: Array.from({length: input.questionCount}, (_, i) => ({ id: `q${i + 1}` })) }; }
 export const fixtureSources = [
     ['Cybersecurity', 'Confidentiality limits disclosure to authorized recipients.', 'Integrity protects data from unauthorized alteration.', 'Availability ensures authorized users can access resources.', 'Authentication establishes the identity of a user.', 'Authorization specifies which actions an identified user can perform.'],
     ['Python', 'A list is a mutable ordered collection of values.', 'A tuple is an immutable ordered collection of values.', 'A dictionary maps unique keys to associated values.', 'A for loop iterates over the items in an iterable.', 'A function returns a value using the return statement.'],
@@ -11,42 +14,23 @@ export const fixtureSources = [
     ['Formula', 'For a rectangle, area A = length times width.', 'For a square of side s, perimeter P = 4 times s.', 'For a triangle, area A = base times height divided by 2.', 'Speed is distance traveled divided by elapsed time.', 'Density is the mass of a sample divided by its volume.'],
     ['Short source', 'A stack removes the most recently added element first.', 'A queue removes the earliest added element first.', 'A set contains distinct values without duplicate entries.', 'A tree connects nodes in a hierarchy with a root.', 'A graph contains vertices connected by edges.'],
 ] as const;
-export const request: QuizGenerationRequest = { sourceType: 'material', sourceIds: ['page:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], questionCount: 5, difficulty: 'mixed' };
+export const request: QuizGenerationRequest = { sourceType: 'reviewer', sourceIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], reviewerArtifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', questionCount: 5, difficulty: 'mixed' };
 export function fixtureRegions(index = 0): QuizRegion[] {
     const [name, ...facts] = fixtureSources[index]!;
     return facts.map((text, i) => ({ id: `topic-${i + 1}`, label: `${name} section ${i + 1}`, text,
         sourceRefs: [{ materialId: request.sourceIds[0]!, regionId: `block-${i + 1}`, page: i + 1, slide: null }], reviewerSectionIds: [`section-${i + 1}`] }));
 }
 export function candidate(plan: QuizPlan, id: string) {
-    const slot = plan.allocation.find(s => s.id === id)!, region = [...plan.topics, ...(plan.reserveTopics ?? [])].find(t => t.id === slot.topicId)!;
-    if (slot.type === 'matching') throw new Error('Use a Matching candidate fixture');
-    const term = region.text.split(' ').slice(0, 3).join(' ');
-    const options = slot.type === 'true_false' ? [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }] : [
-        { id: 'a', text: region.text }, { id: 'b', text: `The stated description of ${term} is incorrect.` }, { id: 'c', text: slot.type === 'multi_select' ? `The provided statement about ${term} is valid.` : `The reverse of the stated description of ${term} is correct.` },
-    ];
-    return { id, type: slot.type, difficulty: slot.difficulty, prompt: slot.type === 'true_false' ? region.text : `Identify the supported claim for academic section ${id}.`, options, correctOptionIds: slot.type === 'multi_select' ? ['a', 'c'] : ['a'], explanation: region.text, topicId: slot.topicId, concept: `concept ${id}`, sourceEvidence: [{ regionId: region.id, quote: region.text }] };
+ const index = Number(id.slice(1)) - 1;
+ const region = plan.regions[index % plan.regions.length]!;
+ return { id, type: index % 3 === 1 ? 'multi_select' : index % 3 === 2 ? 'true_false' : 'single_select', difficulty: 'easy', prompt: `Which claim is supported for question ${id}?`, options: index % 3 === 2 ? [{id:'a',text:'True'},{id:'b',text:'False'}] : [{id:'a',text:region.text},{id:'b',text:'Alternative B'},{id:'c',text:'Alternative C'},{id:'d',text:'Alternative D'}], correctOptionIds:index % 3 === 1 ? ['a','c'] : ['a'], explanation:region.text, concept:`Concept ${id}`, sourceRefs:[region.id] };
 }
-export function acceptingProvider(plan: QuizPlan, mutate?: (questions: ReturnType<typeof candidate>[], round: number) => unknown): GenerationProvider & {
-    calls: string[];
-} {
-    const calls: string[] = [];
-    let round = 0;
-    return { calls, async generate<T>(input: GenerationRequest<T>): Promise<T> {
-            calls.push(input.prompt);
-            const data = JSON.parse(input.prompt.slice(input.prompt.lastIndexOf('\n') + 1)) as {
-                pending?: {
-                    id: string;
-                }[];
-                questions?: {
-                    id: string;
-                    correctOptionIds: string[];
-                }[];
-            };
-            if (input.schema.name === 'quiz_questions') {
-                const questions = data.pending!.map(s => candidate(plan, s.id));
-                return (mutate ? mutate(questions, round++) : { questions }) as T;
-            }
-            return { verdicts: data.questions!.map(q => ({ id: q.id, reasoning: 'Mocked contract verdict, not academic quality evidence.', assessedDifficulty: candidate(plan, q.id.split('__candidate_')[0]!).difficulty, optionAnalysis: candidate(plan, q.id.split('__candidate_')[0]!).options.map(o => ({ id: o.id, reasoning: 'Mocked source entailment for contract verification.', supported: candidate(plan, q.id.split('__candidate_')[0]!).correctOptionIds.includes(o.id), contradicted: !candidate(plan, q.id.split('__candidate_')[0]!).correctOptionIds.includes(o.id) })), defensibleOptionIds: candidate(plan, q.id.split('__candidate_')[0]!).correctOptionIds, keyCorrect: true, distractorsWrong: true, unambiguous: true, explanationGrounded: true, sourceSufficient: true, noExternalFacts: true, plausibleOptions: true, distinctConcept: true, noLeakage: true, learnerSelfContained: true, arithmeticCorrect: true, academicValue: true, blueprintFollowed: true })) } as T;
-        } };
+export function validateCandidate(raw: ReturnType<typeof candidate>, plan: QuizPlan) {
+ const all = plan.allocation.map(slot => slot.id === raw.id ? raw : candidate(plan,slot.id));
+ return validateQuizSet({questions:all}, {...request, questionCount:all.length}, plan.regions).find(q=>q.id===raw.id)!;
+}
+export function acceptingProvider(plan: QuizPlan): GenerationProvider & {calls: string[]} {
+ const calls: string[]=[];
+ return {calls, async generate<T>(r: GenerationRequest<T>): Promise<T> { calls.push(r.prompt);return {questions:plan.allocation.map(s=>candidate(plan,s.id))} as T; }};
 }
 export const fixturePlan = () => makeQuizPlan(fixtureRegions(), request);

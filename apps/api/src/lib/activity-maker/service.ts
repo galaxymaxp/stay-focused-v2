@@ -1,16 +1,18 @@
-import type { Database, Json, ProcessingJobDatabaseRow } from '@stay-focused/db';
-import type { ActivityDraft, ActivityDraftContent, ActivitySource, GenerationView } from '@stay-focused/shared';
+import type { Database,Json,ProcessingJobDatabaseRow } from '@stay-focused/db';
+import { GenerationContractError } from '@stay-focused/engine';
+import type { ActivityDraft,ActivityDraftContent,ActivitySource,GenerationView } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
-import { createServerOpenAIProvider } from '@/providers';
+import { sanitizeCanvasTitleText } from '../canvas-source-safety';
+import { ExperienceFailure } from '../experience/errors';
+import { durableGenerationProvider } from '../processing-jobs/ai-generation';
 import { validateIdempotencyKey } from '../processing-jobs/creation';
-import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
 import { findProcessingJobSource } from '../processing-jobs/repository';
 import { updateProcessingJobProgress } from '../processing-jobs/worker-repository';
-import { ExperienceFailure } from '../experience/errors';
-import { sanitizeCanvasTitleText } from '../canvas-source-safety';
-import { assembleActivitySources, ownedAssignment } from './sources';
-import { createTaskSpecification, generateActivity, MISSING_INFORMATION } from './generation';
+import { dispatchAcceptedProcessingJob } from '../processing-jobs/workflow-dispatch';
+import { readProcessingJobCheckpoint,writeProcessingJobCheckpoint } from '../processing-jobs/workflow-repository';
+import { generateActivityDocument,MISSING_INFORMATION } from './ai-first';
+import { assembleActivitySources,ownedAssignment } from './sources';
 type Client = SupabaseClient<Database>;
 export function activityGenerationState(job: Pick<ProcessingJobDatabaseRow, 'status' | 'stage'>): GenerationView['state'] {
     if (job.status === 'succeeded')
@@ -72,15 +74,25 @@ export async function processActivityJob(client: Client, job: ProcessingJobDatab
         throw new ExperienceFailure(404, 'activity_not_found');
     const input = readGenerationInput({ mode: 'draft', materialIds: metadata.materialIds });
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'preparing_source', statusMessage: 'Preparing activity sources' });
-    const { assignment, sources, context } = await assembleActivitySources(client, job.user_id, metadata.activityId, input.materialIds);
-    const specification = { ...createTaskSpecification(metadata.activityId, sanitizeCanvasTitleText(assignment.name).slice(0, 220) || 'Activity draft', sources), context };
+    const prepared = await readProcessingJobCheckpoint(client, job.id, 'activity:source:ai-first');
+    const assembled = prepared ? prepared.payload as unknown as Awaited<ReturnType<typeof assembleActivitySources>> : await assembleActivitySources(client, job.user_id, metadata.activityId, input.materialIds);
+    const { assignment, sources, context } = assembled;
+    if (!prepared) await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'activity:source:ai-first', payload: JSON.parse(JSON.stringify({ assignment: { name: assignment.name, course_id: assignment.course_id, due_at: assignment.due_at, submission_types: assignment.submission_types }, sources, context })) as Json });
+    const specification = { title: sanitizeCanvasTitleText(assignment.name).slice(0, 220) || 'Activity draft', context, dueAt: assignment.due_at, submissionTypes: assignment.submission_types };
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Generating draft' });
-    const generated = await generateActivity(createServerOpenAIProvider(), specification, sources);
+    const saved = await readProcessingJobCheckpoint(client, job.id, 'activity:complete:ai-first');
+    let generated: Awaited<ReturnType<typeof generateActivityDocument>>;
+    if (saved) generated = saved.payload as unknown as typeof generated;
+    else {
+        try { generated = await generateActivityDocument(durableGenerationProvider(client, job.id, workerId), specification.title, sources, { dueAt: specification.dueAt, submissionTypes: specification.submissionTypes }); }
+        catch (error) { if (error instanceof ExperienceFailure) throw error; throw new ExperienceFailure(error instanceof GenerationContractError ? 422 : 503, 'activity_generation_failed'); }
+        await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'activity:complete:ai-first', payload: JSON.parse(JSON.stringify(generated)) as Json });
+    }
     validateEditableContent(generated.content, sources.map(s => s.id));
     // Ownership is rechecked immediately before transactional completion too.
     await ownedAssignment(client, job.user_id, metadata.activityId);
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving editable draft' });
-    return { payload: { activityId: metadata.activityId, courseId: assignment.course_id, type: specification.activityType, content: generated.content, specification, sources: sources.map(({ id, title, role, materialId, text }) => ({ id, title, role, materialId, contentSha256: createHash('sha256').update(text).digest('hex') })), warnings: generated.warnings }, metrics: { sourceCount: sources.length } };
+    return { payload: { activityId: metadata.activityId, courseId: assignment.course_id, type: generated.activityType, content: generated.content, specification, sources: sources.map(({ id, title, role, materialId, text }) => ({ id, title, role, materialId, contentSha256: createHash('sha256').update(text).digest('hex') })), warnings: generated.warnings }, metrics: { sourceCount: sources.length } };
 }
 export function validateEditableContent(value: unknown, sourceIds: readonly string[]): ActivityDraftContent {
     const c = object(value);

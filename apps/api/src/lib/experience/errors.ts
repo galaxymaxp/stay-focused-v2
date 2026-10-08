@@ -1,7 +1,7 @@
 import type { ExperienceError } from '@stay-focused/shared';
 
 export class ExperienceFailure extends Error {
-  constructor(readonly status: number, readonly code: ExperienceError['code']) {
+  constructor(readonly status: number, readonly code: ExperienceError['code'], readonly supportedMaximum?: number) {
     super(code);
   }
 }
@@ -10,6 +10,7 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
   const copy: Record<ExperienceError['code'], Omit<ExperienceError, 'code'>> = {
     quiz_generation_unavailable: { title: 'Quiz', message: 'Quiz generation is temporarily unavailable.', retryable: false, action: 'none' },
     quiz_source_unavailable: { title: 'Quiz', message: 'Prepare the selected course material or choose another source.', retryable: false, action: 'none' },
+    quiz_source_capacity_exceeded: { title: 'Quiz', message: 'Choose fewer questions for this material.', retryable: false, action: 'none' },
     quiz_not_found: { title: 'Quiz', message: 'Quiz could not be found.', retryable: false, action: 'none' },
     quiz_generation_failed: { title: 'Quiz', message: 'The questions did not pass source and correctness validation.', retryable: false, action: 'none' },
     quiz_attempt_not_found: { title: 'Quiz', message: 'Quiz attempt could not be found.', retryable: false, action: 'none' },
@@ -28,14 +29,21 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
     activity_draft_conflict: { title: 'Activity Maker', message: 'The draft or template requirements have changed. Reopen before saving.', retryable: false, action: 'none' },
     sign_in_required: { title: 'Sign in again', message: 'Your session is unavailable. Sign in to continue.', retryable: false, action: 'sign_in' },
     not_found: { title: 'Item unavailable', message: 'This item could not be found.', retryable: false, action: 'none' },
+    course_not_synced: { title: 'Sync this course', message: 'Synchronize this course with Stay Focused before generating from it.', retryable: false, action: 'none' },
     invalid_request: { title: 'Check your request', message: 'Some request details are invalid.', retryable: false, action: 'none' },
     not_ready: { title: 'Material not ready', message: 'Prepare this material or choose another source.', retryable: false, action: 'choose_material' },
+    insufficient_source: { title: 'Not enough lesson content', message: 'This Page and its attachments do not contain enough readable lesson content. Check the Canvas file or choose another source.', retryable: false, action: 'choose_material' },
+    source_attachment_unavailable: { title: 'Attachment could not be prepared', message: 'The linked Canvas file could not be accessed or prepared. Check access to the file in Canvas, then try again.', retryable: true, action: 'retry' },
     unavailable: { title: 'Temporarily unavailable', message: 'Please try again shortly.', retryable: true, action: 'retry' },
     generation_failed: { title: 'Generation did not finish', message: 'Your result could not be completed.', retryable: false, action: 'choose_material' },
     rate_limited: { title: 'Please wait', message: 'Try again after the current work has finished.', retryable: true, action: 'retry' },
     conflict: { title: 'Request has changed', message: 'Start a new request for the changed material.', retryable: false, action: 'none' },
+    study_selection_too_large: { title: 'Selection too large', message: 'Select a smaller part of the Reviewer to study.', retryable: false, action: 'none' },
+    study_question_too_long: { title: 'Question too long', message: 'Your question is too long. Shorten it to focus on what you want explained.', retryable: false, action: 'none' },
+    study_answer_too_long: { title: 'Answer too long', message: 'Shorten your answer to the key idea and check it again.', retryable: false, action: 'none' },
+    study_follow_up_limit: { title: 'Start a new question', message: 'This question has reached its follow-up limit. Start a new question.', retryable: false, action: 'none' },
   };
-  return { status: failure.status, error: { code: failure.code, ...copy[failure.code] } };
+  return { status: failure.status, error: { code: failure.code, ...copy[failure.code], ...(failure.code === 'quiz_source_capacity_exceeded' && Number.isInteger(failure.supportedMaximum) ? { supportedMaximum: failure.supportedMaximum } : {}) } };
 }
 export function requireFound<T>(value: T | null | undefined): T {
   if (value == null) throw new ExperienceFailure(404, 'not_found');

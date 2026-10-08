@@ -1,119 +1,252 @@
 # Roadmap
 
-## Website V1.1 orb parity (2026-10-08)
+## Urgent Canvas notification activation (2026-10-03)
 
-Owner-authorized scope: port the authoritative mobile WebGL orb, verify visual
-and behavioral parity, preserve the functional website and commit scoped work
-on `website/functional-v1`. Investigation at `6a8032a` found that the actual
-mobile Generation route uses Animated plus layered SVG, with no WebGL renderer
-or shaders in the inspected local sources. **BLOCKED** pending the actual
-WebGL source location or owner resolution of that rendering requirement. No
-replacement orb or runtime change was made. See [orb parity report](ai/acceptance/website-orb-parity.md)
-for source mapping, baseline verification and remaining differences. Existing
-V1 historical findings remain below; B25.3.3 stays paused and incomplete. No
-production deployment, provider call, schema or generation-engine change.
+Local metadata synchronization, transactional email outbox, deadline reminders and persistent Settings controls are implemented. Next: apply the forward migration, configure cron/Resend variables and verified sender, roll out API and Mobile, perform developer-only live delivery and repeat-request/device acceptance, verify five-minute workload capacity, then enable the single Google Cloud Scheduler job. The current Hobby plan cannot provide that trigger interval through Vercel Cron. [Setup and behavior](architecture/canvas-email-notifications.md). Other phase gates below remain unchanged.
 
-## Website V1 owner-approved scope (2026-10-08)
+## Quick Canvas token tutorial (2026-10-01)
 
-The owner prioritizes functional website implementation immediately. B25.3.3
-production compatibility investigation is paused; its PARTIAL/BLOCKED verdict,
-reports, repairs, and blockers remain preserved and it is not complete. This
-instruction supersedes earlier web exclusions for the finite website scope only.
+The scoped tutorial popup is implemented and checked on the realme through preview OTA `01a0f7d2-ca43-760b-9723-4a4ddf1f1a40`. New-token reconnection remains untested on the device; no Canvas integration or footer navigation code changed. B43–B45 work has not started.
 
-Endpoint: implement and locally verify the nine requested browser surfaces in
-`apps/web` over existing Supabase identity and shared API/workflows, record exact
-blockers, and commit scoped changes on `website/functional-v1`. No production
-deployments, migrations/data writes, PR #1 edits, or paid generation requests.
-See `docs/ai/acceptance/website-v1.md` and ADR-019 for the acceptance matrix.
+## B39.1 deploy + physical Canvas sync and Task attachment acceptance (2026-10-01)
 
-Task order: W1 auth/shell/Today; W2 tasks/calendar; W3 Canvas/generation/queue;
-W4 Library/Reviewer/Quiz/settings; W5 browser, regression and root verification.
-Continue independent work when live acceptance is blocked. Current result:
-LOCALLY VERIFIED; W1-W4 functional client implementations and W5 browser,
-visual, regression and fresh root TypeScript/lint/build checks pass. Live
-acceptance remains PARTIAL/BLOCKED: dedicated non-production Supabase/API and
-Canvas test access, plus a separate paid-generation allowance, are not established.
-Generation is disabled by default. Run instructions are in `apps/web/README.md`.
-Historical sections below are retained.
+**BLOCKED at live Canvas/device acceptance.** Offline Task attachment metadata is stored in the existing owner-scoped SQLite database. API deployment `dpl_74hWVM2kSvg21hfnRLcVu885ohFe` is READY and healthy; preview APK `de93f504-cb53-4388-b48a-47103d65eb3a` contains Expo Sharing and is installed on the RMX3151. The session exposes no Android UI control surface, so the fresh Canvas credential check/sync, attachment open, and physical workflow/passive-sync tests could not run. Next: provide supported CUA Android control for the authorized RMX3151, then finish the remaining B39 acceptance gates. [Evidence](ai/acceptance/b39.1/deploy-physical-canvas-sync.md).
+
+## B39 student workflow and Canvas Task attachments (2026-10-01)
+
+**BLOCKED pending live Canvas and physical acceptance.** Course-first workflows and the student screens were retained. Assignment/announcement attachment-only files are now excluded from Generate; Task detail presents owner-scoped attachment metadata and a server-resolved, authenticated file open path. Local typecheck and focused sync, routing, Task, Library, Announcement, Reviewer, and Canvas-client suites pass. No production changes or fresh sync occurred. Next: run the normal manual Sync and complete realme attachment/resync/passive-navigation acceptance on a native build with `expo-sharing`. [Evidence and outstanding gates](ai/acceptance/b39/student-workflow-canvas-tasks.md).
+
+## B37 generation regression physical gate (2026-10-01)
+
+**BLOCKED after B37.2.** The Introduction PDF remains physically PASS. The hidden Page-linked file `11574237` is now authenticated, downloaded, validated and stored through the scoped repair `54aa9fd`, deployed as API `dpl_AHpKJsANQzNa3Tya3QqaYusZn89z` and Android preview OTA `01a0f4ef-496a-7c4c-a6e7-52617f4268bd`. Fresh Unit 3 job row `dde023f1-65ef-415b-b888-5550bc845494` cannot stage its Page plus file provenance: production `stage_deferred_canvas_reviewer_pdf_v1` requires exactly one file item. It remains queued with zero worker attempts and no result after an API 503. Next: reconcile this database contract with the already implemented two-source worker path, address the stranded row safely, then rerun fresh Unit 3 acceptance before the 40-page PDF. No further repair was made after this device failure. [Evidence](ai/acceptance/b37/production-generation-regression-20261001.md).
+
+## B39 preview API configuration (2026-09-30)
+
+**PASS.** Runtime configuration failures are separated from authentication, and the Android preview OTA command now validates the EAS preview API address before publishing. Final update `01a0f2ae-79d7-732a-9ba4-c492f2af3545` passed realme acceptance. Canvas jobs stayed at 468 with zero passive additions. Continue using the [guarded preview command](dev/mobile-device-runbook.md#android-preview-updates) for future OTAs. [Acceptance](ai/acceptance/b39/preview-api-configuration.md).
+
+## B38 Canvas admission and physical gate (2026-09-30)
+
+**PASS.** Production API and private worker deployment, manual synchronization, passive zero-job navigation, and realme relaunch passed after explicit user authorization. [Acceptance](ai/acceptance/b38/canvas-sync-admission.md).
+
+## B38 pre-rollout snapshot (historical, 2026-09-29)
+
+**Deployment gate blocked.** Automatic approval review rejected the production Vercel rollout and prohibited a workaround. Obtain authorization for the prepared Vercel, Cloud Run, and preview mobile deployments, then run the realme gates. [Evidence](ai/acceptance/b38/canvas-sync-admission.md).
+
+B37 Google dispatch is committed at `46e66a8`. B38 locally removes full-course sync requests from launch, foreground stale checks, Today focus, and Generate/Tasks refresh. The existing unique active-job index is reused to return the current job on a concurrent request. A bounded token-handoff retry addresses the zero-unit repeat failure associated with a Vercel internal-route timeout, and empty Canvas Pages are excluded from Generate. Next: deploy the verified API/worker/mobile revisions, then run the realme passive-navigation, one-course-at-a-time manual sync, announcement, and relaunch gates. The preceding P0 note is historical.
+
+## Immediate P0: Canvas sync capacity (2026-09-29)
+
+The direct Google Cloud Tasks to private Cloud Run Canvas path is deployed and proved by fresh terminal content/grade jobs for CC6, CIT17 and SOC SCI 103N, all without Workflow. The finalization token handoff bug is corrected. Physical acceptance remains PARTIAL: app navigation and relaunch started additional 7-course batches, one repeat CC6 content delivery failed before units, and an empty CIT17 administrative Page appeared in Generate. Next: correct automatic sync freshness/relaunch admission and the repeat-delivery failure, then rerun physical routing and relaunch acceptance. The earlier capacity note below records the pre-cutover state.
+
+Vercel Workflow has exhausted its usage limit, so accepted Canvas jobs do not execute. Overdue-job expiry and client failure convergence are implemented, with the database reaper applied and Android preview OTA published. Fresh CC6, CIT17 and SOC SCI 103N syncs remain blocked. Restore Workflow capacity or implement the already planned Google-worker Canvas sync migration, then run the three-course physical acceptance and commit the scoped repair only after it passes.
+
+## B39 EAS preview distribution (2026-09-29)
+
+**PASS after authorized native preview-build fallback.** B38 plus header cleanup was delivered by preview OTA, then the old APK's missing native crypto required owner-authorized APK `21be5ea3-f224-4be4-a707-643c7957dd15` from `2c66889`, Android runtime `2.0.1`. Realme Google sign-in, Draft-first UI/headers, Library categories, Reviewer controls, Quiz progress, offline force-stop/reopen and unchanged Draft cards/count pass without Metro. FRESH focused mobile 147/auth 29 tests, typecheck/lint, diff check, export and APK build pass. Preview channel retained; future Android updates target `2.0.1`; no backend rollout, production channel change or push. Next: complete separate native Office DOCX/PPTX-opening acceptance. [Acceptance](ai/acceptance/b39/eas-preview-b38-distribution.md).
+
+## Artifact header simplification (2026-09-29)
+
+Removed repeated course/source banners and generated-date lines from saved Draft/Quiz previews, and repeated course/source context from the Reviewer header. Draft uses one multiline editable title and a header Export action; Quiz preview titles are compact. Topic navigation, question progress, Draft save status, actions and course organization remain. FRESH verification: 67 focused mobile tests, mobile typecheck, changed-screen lint and git diff check pass. Existing Draft, Quiz preview and Reviewer opened on realme with the cleaned headers; no generation or account data changed. Local debug JS only, no deployment or push.
+
+## B38 draft-first assignment UX (2026-09-29)
+
+**PASS.** Draft-first assignment UX is complete locally and accepted on realme: Task -> Assignment -> Generate Draft -> saved editable Draft. Library uses Drafts and the separate Study Activity artifact is no longer exposed. Internal Activity pipeline and B37 source handling remain intact. Fresh Firewall/VPN and Dice Roller each persist once; Firewall/VPN offline force-stop/reopen passes. Automated checks pass. Next: distribute the tested mobile UX through the existing preview update channel; no rollout or next milestone started. Earlier B38 architecture entries below describe separate historical scopes. [Acceptance](ai/acceptance/b38/draft-first-assignment-ux.md).
+
+## B37.1 firewall/VPN Activity acceptance (2026-09-29)
+
+**This generation bug PASS; B37.1 remains PARTIAL.** Course-aware assignment link resolution fixes the specific pre-provider source failure. The same firewall/VPN assignment and Dice Roller generated fresh drafts on realme through private Google worker `generation-worker-00011-n2s`; Queue, Library and firewall force-stop/reopen pass, with one result/draft per new job. Supplemental API error-message rollout awaits explicit authorization after automatic approval review rejection. Other B37.1 gates remain; no B38 work, EAS build or push. [Evidence](ai/acceptance/b37/activity-firewall-vpn-generation.md).
+
+## B37.1 pre-APK polish and B38 order (2026-09-28)
+
+**B37.1 PARTIAL; B37 PARTIAL.** Authorized production API/private-worker rollout is complete (`dpl_6UepXtqEVSPwnZMRYejoN5rMy38x`, `generation-worker-00010-g9v`). Minimal integrated arrows/slider, realme adb navigation/drift, reveal, offline persistence/replay, completion/score and retake/history pass. Fresh Reviewer emphasis, source grounding and three-page PDF pass. Fresh Matching generation loses pair labels during publication; tested forward migration `1025208` awaits Supabase approval, followed by fresh pairing/partial-credit acceptance. Real-finger 10/30/100 slider and remaining Activity task/native Office acceptance remain open. Earlier Activity persistence/PDF/DOCX/PPTX evidence is preserved. Do not make the EAS build yet; no origin push. [B37.1 evidence](ai/acceptance/b37/pre-apk-study-experience-polish.md).
+
+After B37.1 passes, **B38 — Durable Canvas Sync Migration to Google Worker** is next. Keep Mobile → authenticated Vercel API → durable Supabase job → internal Google worker → Canvas → canonical Supabase data. Vercel owns validation, ownership, job start/status and lightweight API; the existing Google worker owns pagination, courses/modules/instructional files/Pages/tasks/announcements, downloads, checkpointed ingestion and bounded retry. Supabase owns job state, RLS, provenance, normalized data and generated artifacts. Design for interruption recovery, observable progress, isolated material failures, idempotent repeat sync, historical data retention and disconnect/reconnect. Preserve instructional material → Generate, deadline work → Tasks and announcements → Announcements. Keep worker credentials out of Mobile and logs. **B38 is not implemented.** Then run production Canvas lifecycle acceptance, make one new EAS preview APK and finish physical-device acceptance.
+
+## B37.2 non-Canvas acceptance and build gate (2026-09-28)
+
+**PARTIAL.** Non-Canvas sources (Text, Camera, Local File) and the 100-item Quiz pass physically after the immutable-source claim fix and two extraction-panel fixes. Canvas sync is blocked by the Vercel Workflow quota, so B37 closure and the signed preview APK wait for a fresh Canvas sync and a disconnect/reconnect check. Canvas sync jobs still run on Vercel Workflow; moving them to the Google worker would remove this failure mode. Consider this for B38. [Ledger](ai/acceptance/b37/study-experience-overhaul.md).
+
+## B37.2 continuation in progress (2026-09-28)
+
+Authentication and Canvas lifecycle implementation is deployed; email/password restoration, native S256, invalid Canvas token handling and same-account replacement have fresh device evidence. Owner/history fingerprints are retained. Resend delivered one deduplicated server-originated test message; a verified sender domain is still needed for general student delivery. Manual linking readiness now returns 200 after the user's saved setting change. Google/Microsoft device acceptance is continuing.
+
+The normal quota admitted the fresh VPN 30 Mixed (30 persisted, two calls, no repairs) and Firewalls 100 Mixed (batch 4 duplicate rejection after seven calls, no published result). Finish provider flows, Canvas disconnect/reconnect/sync, Queue/Library reopen and Text/Camera/Local File physical acceptance before deciding B37 closure. Study Assist latency optimization remains deferred. API `dpl_6A3CygzdmL4u3jzUd9zkKZZb8afL`, unchanged private worker `generation-worker-00009-jzb`, Canvas migration `20260928001117`; 0 EAS builds, no push, `tmp/` untouched. [Ledger](ai/acceptance/b37/study-experience-overhaul.md). Earlier quota-stop checkpoints remain historical.
+
+## B37.2 opening production gate (2026-09-28)
+
+**PARTIAL — migration/deployment/small-source rejection verified; fresh 30 Mixed blocked at the existing daily quota (25/25), so B37.2 is NOT STARTED.**
+
+The approved B37.1a migration is recorded once in `xfdbwfqtorelmurncyql` as version `20260927230139`, name `20260928100000_canonical_non_canvas_sources`; reviewed local filename unchanged. Sources/courses/original Quiz row fingerprints match, all 15 historical Quizzes remain readable, and RLS/grants/owner-source constraints are preserved. No reset or deletion. Production API `dpl_FnAWyTzQmfNgsQLuo5rQyPKpdzbv` is READY for `0c354ac`, health 200 and signed-out Library 401. Private worker `generation-worker-00009-jzb` serves 100%; anonymous health 403. Build/digest and detailed verification are in the ledger.
+
+VPN sections 6–10 have 26 concepts, 5 duplicate exclusions and capacity 52. Direct 100-item admission returns typed 422 with maximum 52, no job and zero provider calls. The whole VPN Reviewer still calculates capacity 100; its whole-source capacity is not claimed to pass a below-100 check. Fresh 30 Mixed returns 429 `rate_limited`, no job/provider calls: 25/25 daily jobs, zero queued/running. The next window starts **2026-09-28 08:00 Manila**. An existing Canvas `2. Firewalls.pdf` Reviewer is a candidate with 138 concepts/capacity 100. No fresh 100-item, Queue/Library completion or non-Canvas physical flow was run after the required stop. Do not bypass the quota.
+
+Realme `PB6DWWEIHAUCMZOR` loaded current JS against production, retained the authorized owner's session, and loaded existing Library/Queue data. Tokens stayed in the app. The corrected config `stay-focused-v2/env.local` matches production; only variable names/presence are recorded. Initial inventory approval blocks were resolved for aggregate counts after explicit user approval; private content exports were not bypassed. Fresh Quiz tests: 157 passed, 2 existing skips; focused database tests: 30 passed, 2 skips (overlapping); production build and `git diff --check` pass. No EAS build, auth/Canvas credential/Resend implementation, live email or new lifecycle acceptance. Existing unrelated Supabase security-advisor warnings remain recorded for separate review.
+
+The authenticated Supabase user UUID is the canonical owner.
+
+Canvas credentials authorize synchronization.
+They do not own Stay Focused data.
+
+Resume the 30/100 and non-Canvas physical gate after daily admission resets, then B37.2. Study Assist latency remains approximately 20 seconds and optimization is deferred. `tmp/` untouched; no push.
+
+[Detailed B37 rollout and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).
 
 
-## B25.3.3 approved finite scope (2026-10-08)
+## B37.1a local checkpoint before rollout (2026-09-28)
 
-**Owner-approved; local repair verified, mandatory acceptance blocked.** The owner explicitly selected B25.3.3 generation convergence after installation commit `93a8eb8`; the installation checkpoint's pending scope decision and historical recommendation-only wording no longer block this run. This section supersedes those scope-selection statements, without rewriting their history. **Finish Anyway semantics, B26–B28, web migration and other roadmap recommendations are excluded.** Existing all-question finalization, choice/Matching support and learning-progress contracts remain intact.
+The local implementation reuses owner-bound `source_versions` for Text, Camera and Local PDF; Reviewer and Quiz share canonical source identity, existing generation, capacity and Library persistence in code. Canvas-specific IDs remain source provenance only. Non-Canvas sources do not use fake Canvas IDs. The rising Other source sheet persists on Continue, with no manual Save. Activity remains a separate Canvas assignment flow. The live Supabase migration was rejected by automatic approval review because its production Quiz constraint and RPC changes lacked clear authorization; the physical app's API was unreachable. That earlier approval/rollout blocker is resolved by the opening-gate checkpoint above; physical Android source and Library acceptance remains pending. Then run fresh small-source, 30-item and 100-item B37.1 production acceptance and Queue/Library reopen before B37.2 authentication. Study Assist latency follows B37 closure. [Ledger](ai/acceptance/b37/study-experience-overhaul.md).
 
-Endpoint: complete B25.3.3's source-context/evidence-ownership convergence repairs and obtain every required deterministic, regression, real-source and physical production Quiz proof below; reconcile planning/acceptance records and commit scoped changes. Stop at that endpoint, or checkpoint a genuine remaining blocker/budget limit with exact evidence; PARTIAL cannot close the scope.
+Source acquisition may differ. After normalization/persistence, generation uses the same current engine.
 
-Requirements derive from `docs/ai/acceptance/b25.3.2/quiz-candidate-convergence.md` (Precise B25.3.3 recommendation and unaccepted production/device gates). Prerequisites: inspect current implementation and applicable policies/ADRs; preserve the 16 tracked modifications and 111 untracked files present at `93a8eb8`; use the existing prepared, owned instructional source path, provider adapter, exact-count contract and pinned `gpt-5.4-2026-03-05` model. Apply/verify all deployment-required migrations, including Matching, before any API rollout. Historical provider/production attempt allowances are not silently reset; establish actual access and bounded live limits before calls, and prepare any specifically permission-dependent rollout for review before requesting it. Scope approval itself is settled.
+## B37.1 capacity and non-Canvas decision (2026-09-28)
 
-| Requirement / eligible task order | Mandatory proof | Current result |
-| --- | --- | --- |
-| 1. Source context and exact evidence ownership | Bounded support windows retain relevant definitions, conditions, contrasts, examples and consequences; original block/page/slide owners remain exact; sanitized short-fragment/coarse-owner regression fixture | FRESH PASS locally: retained bounded context, exact block/page owners and wrong/cross-block quote rejection |
-| 2. Evidence strength and reserve selection | Weak fragments cannot consume repeated candidate pools merely by being nonempty; alternate support ranks substantive compatible evidence and distinct understanding | FRESH PASS locally: weak non-assertion excluded; stronger compatible distinct reserve preferred |
-| 3. Complete-set feasibility before immutable acceptance | Full requested concept/archetype/difficulty allocation and reserve feasibility checked before authoring; mixed allocation is truthful; insufficient evidence fails explicitly | FRESH PASS locally: complete five-slot plan, capable reserve reallocation, explicit insufficiency, 20-slot variation boundary |
-| 4. Cross-support failure exclusions | Failure patterns and attempted intent exclusions survive concept/support changes and durable resume without rejecting genuinely new supported understanding | FRESH PASS locally: hash-independent pattern exclusions and legacy durable resume; counters retained |
-| 5. Nested diagnostic serialization | Safe structured pool/blueprint/result diagnostics survive JSON logging; no private source, candidate text, key or verifier reasoning leakage | FRESH PASS locally: whitelist JSON and actual job reporter retain nested pools without private text/keys |
-| 6. Existing invariants and durable bounds | Exact count, strict deterministic/independent semantic gates, immutable accepted questions, model, two-candidate/four-author/four-verifier bounds, checkpoints, choice/Matching, owner isolation and key secrecy remain proven | FRESH PASS automated: Quiz 219 passed / 3 skipped; API 996 passed / 4 skipped; strict gates and contracts retained |
-| 7. Local verification | Focused source/planning/convergence/durable tests, full affected package suites, Workflow/provider boundary checks as appropriate; forced root typecheck/lint/build with actual freshness recorded; clean scoped diff | FRESH PASS: all package suites, Workflow 1, provider contract 18; final forced typecheck/lint/build 7/7 each, zero cached; diff hygiene |
-| 8. Fresh real-source generation acceptance | Instructional source, fresh complete five-question generation under strict gates, symbolic diagnostics, timing/call budgets and exact evidence; no historical output substituted as proof | BLOCKED / NOT RUN: live source/job acceptance requires established authenticated access, compatible target and bounded paid allowance |
-| 9. Persisted production/physical Quiz acceptance | Fresh owned source/job produces persisted Quiz; Library open, pre-finalization secrecy, answering/finalizing, expected versus actual score, persisted result/history/reopen and owner denial verified on target app/environment | BLOCKED / NOT RUN: no attached Android device; live Matching uses a different contract; no production success-path proof |
-| 10. Closure | Requirements audited individually, limitations/failures retained, planning reconciled, scoped commits and unrelated-byte preservation verified; no mandatory row remains partial | PARTIAL / BLOCKED: local implementation f336d26 verified and committed; mandatory rows 8/9 remain unaccepted |
+**PARTIAL.** The Generate UI now offers Text, Camera and Local File in a rising sheet verified on realme. Finish the canonical ownership/provenance design for those sources so they can use the same Reviewer, Quiz and Library pipeline as Canvas without invented Canvas IDs. Then deploy the scoped capacity/repair code, verify the small VPN source, find a legitimate instructional source with capacity at least 100, and run fresh 30/100-item and remaining physical acceptance. Study Assist selected-Reviewer fetch optimization follows B37 closure. [Checkpoint](ai/acceptance/b37/study-experience-overhaul.md).
 
-Checkpoint: **PARTIAL / BLOCKED**, not complete. Scoped repair `f336d26` preserves context/owners, preflights the full set, ranks substantive reserves, carries failure exclusions across supports and logs safe nested JSON. Final Quiz 219 / 3 skipped; API 996 / 4 skipped; mobile 499, shared 48, Canvas 73, engine 606, OCR 27; Workflow 1 and provider contract 18. Final forced root typecheck/lint/build each pass 7/7 with zero cached tasks. Introduced fixture/type issues and the concurrent build/typecheck generated-file race were repaired and retained in the acceptance report.
+## B37 study experience overhaul (2026-09-27)
 
-Next eligible work remains B25.3.3 rows 8/9. FRESH ADB discovery found no device, and no authenticated app session was established. Read-only Supabase inspection found later migrations absent from this checkout and live `matchingPairs`/`selectedOptionIds` behavior, which differs from the pending local `leftItems`/`rightItems`/`correctPairs` contract. Verify target deployment lineage and prepare a compatible forward rollout before any production write. Establish a connected authenticated device and this run's bounded paid allowance before fresh instructional generation and complete Library/attempt/secrecy/score/result/history/reopen/owner-denial proof. No deployment, migration, paid call or production write occurred; historical outputs/limits are not reused or reset. Scope approval does not need renewal.
+**PARTIAL.** Batched Quiz generation, retry, exact-wording contract, key-point result reopening and Android sheet swipe-to-close are live and verified; 30-item production Quizzes pass. Next: decide how 100-item Quizzes stay unique (concept planning before batches or a source-size guard), make Study Assist reads scoped or co-locate the API with Supabase, then finish device acceptance and spend the single EAS build only after every gate passes. [Implementation and acceptance ledger](ai/acceptance/b37/study-experience-overhaul.md).
 
-Acceptance/checkpoint record: [B25.3.3 convergence](ai/acceptance/b25.3.3/quiz-context-convergence.md). Lifecycle API inspection found the existing installation Goal blocked and no exposed resume operation; execution continues under the owner's current instruction. A scope-specific `/goal` activation command is supplied in the session; do not claim its lifecycle changed without evidence.
+## B38 Google generation cutover readiness (2026-09-27)
 
-## Autopilot policy installation (2026-10-08)
+**PASS — production generation cutover complete.** The B37 Quiz failure was a multi-select prompt/type mismatch; the prompt was repaired without relaxing validation. Fresh Google-backed Quiz, terminal duplicate replay, scoped Vercel OIDC federation and authenticated dispatch pass. After the user confirmed deployment capacity, one READY production deployment `dpl_Cgp6geT9JJrE2epyR9zQDmmYxvbL` switched routing to Google Cloud. Health and one owner-authenticated real instructional Quiz passed through the production API, queue, worker, persistence and Library reopen. Vercel Workflow remains the rollback path; no Android/EAS build was used. See [acceptance](ai/acceptance/b38/google-generation-cutover-readiness.md).
 
-Installed root [AUTOPILOT.md](../AUTOPILOT.md) from the supplied Downloads package, retaining finite scope, fresh evidence, scoped commits, bounded retries and truthful stopping rules. Root AGENTS.md points to it; its source-of-truth order, invariants and existing content remain intact. Repository verification commands were added using the live workspace scripts and ADR-001/ADR-011 conventions. This is documentation-only setup; no implementation, deployment, migration, provider call or app test was performed.
+## B37 Google Cloud generation foundation (2026-09-27)
 
-Live baseline: `C:/Projects/stay-focused-v2`, branch `main`, HEAD `d0020a228fd90c1f06807f52ed19895822a0f1bd`, remote `origin` = `https://github.com/galaxymaxp/stay-focused-v2.git`, upstream `origin/main`; **53 ahead / 0 behind the locally recorded upstream** (no fetch or remote-freshness claim). Git identity remains the existing repository owner. The OneDrive directory supplied as environment cwd is not a Git checkout. Sixteen tracked modifications and 111 untracked leaf files were present; only the three planning documents overlap, and only this installation's sections are staged.
+**PARTIAL.** A private Cloud Run worker and OIDC Cloud Tasks queue in the existing Stay Focus project executed the shared Reviewer/Quiz/Activity pipeline without a Vercel deployment. Five fresh Reviewer source formats and Activity succeeded, including existing scanned-PDF Google OCR and Library reopen. Quiz failed existing source validation; terminal replay was not executed after automatic approval review hit its usage limit. Vercel dispatcher workload identity and deployment capacity remain B38 prerequisites. Production still uses Vercel Workflow. See [acceptance](ai/acceptance/b37/google-cloud-generation-foundation.md).
 
-**Scope selection: awaiting owner decision; no roadmap execution scope has been approved by this installation.** The latest matching section recommends intentional incomplete Quiz finalization / “Finish Anyway” semantics. The separate B25.3.2 report explicitly labels B25.3.3 a recommendation only, retains real-source production acceptance as unaccepted, and prohibits B26. Neither recommendation is silently promoted to approval. Existing Matching/local-progress PASS and B25 PARTIAL statuses remain unchanged.
+## B37 Reviewer Study Assist (2026-09-27)
 
-Available finite choices are recorded below. The owner has been asked which one to freeze; later scopes, web migration, B26–B28, production publication and unbounded paid retries are excluded unless separately authorized.
+**PASS - production and realme acceptance complete.** On-demand Summarize, Explain simply, Analogy and Example use existing canonical Reviewer blocks and the contextual sheet, with a separate owner-scoped SQLite cache, content/prompt invalidation and concurrent-request deduplication. Reviewer and Quiz prompts/schemas are unchanged; cache isolation is regression-tested. Fresh mobile 677/677, API 947 passed / 3 existing opt-in skips, shared 44/44, provider contracts 19/19, forced typecheck/lint 7/7, API build and mobile export pass. Production deployment dpl_F87NsbQVEkbisWzJ1VZqiXtt5RKD is READY. EAS preview group c52531f9-a177-4b82-b73b-533f7ef0b93c reached the realme. All four live assists, cached sheet/Reviewer reopen, offline cached reuse after force-stop/relaunch, uncached-offline guidance, canonical integrity and Quiz UI pass. Logs show exactly four successful generation requests and zero additional calls for cached reuse; no deployment error entries. See [acceptance](ai/acceptance/b37/reviewer-study-assist-acceptance.md). Reviewer generation-quality review remains a separate user-guided milestone.
 
-| Candidate scope (not approved yet) | Endpoint / mandatory acceptance to record on selection | First eligible task after selection |
-| --- | --- | --- |
-| Intentional incomplete Quiz finalization / “Finish Anyway” only | Define and implement explicit intentional completion, unanswered scoring and feedback-release semantics; prove shared/API/SQL/mobile behavior, reload/history/progress, owner isolation, no accidental completion, and choice/Matching regressions; reconcile docs and commit; stop there | Define the completion contract and acceptance matrix before modifying the existing all-finalized guard |
-| B25.3.3 Quiz generation convergence and its real-source gate only | Follow the existing B25.3.2 recommendation for source context/evidence ownership, complete-set feasibility and sanitized regressions; retain strict gates/model/call bounds; obtain fresh real-source generation, persisted Quiz, take/score/result/reopen and secrecy proof under separately established provider/production limits; stop before B26 | Audit current source assembly and the retained symbolic failure evidence; establish the bounded acceptance plan |
+### B38.2.1 ribbon refinement (2026-09-26)
 
-Installation checks: **FRESH PASS** repository identity/policy/planning inspection, documentation path and scoped diff checks, preservation inventory; **NOT APPLICABLE** implementation suites/builds for this setup. The installed CLI reports `0.159.0-alpha.12.1` with `goals stable true`; the thread lifecycle API reports an active installation Goal. This does not establish an active roadmap implementation Goal. Official Goal controls: `/goal`, `/goal pause`, `/goal resume`, `/goal clear`; see [official guidance](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex).
+Dev-lab glow, palette flow and true ribbon-shape morphing are implemented and physically checked; mobile 576/576, typecheck and lint pass. Continuous completion and stopped failure/Reduced Motion are preserved. See [follow-up](ai/acceptance/b38-2-1/ribbon-glow-refinement.md). Original visual acceptance remains PARTIAL: approve material/shape and directly profile GL before production integration.
 
-Checkpoint: policy setup is installed; the remaining required input is the finite scope decision. No first implementation task has started. Once selected, record the stable endpoint and every mandatory acceptance row here before roadmap execution. The existing historical entries below remain unchanged.
+## B38.2.1 Knowledge Core visual prototype (2026-09-26)
 
-## Matching Quiz support (2026-10-08)
+**PARTIAL — prototype-only; production integration remains gated.** Real GL geometry, six states, theme variants and Reduced Motion work on the realme. Complete keeps moving slowly; Error stops. Mobile 574/574, typecheck and lint pass with four existing warnings. Materials/transparency and direct GL pacing still need acceptance; UI-frame evidence alone is insufficient. See [acceptance](ai/acceptance/b38-2-1/generation-core-prototype.md). Next for this visual: refine geometry/materials, reprofile, and approve before replacing the production SVG. B39 E2E remains separate; no job/Queue behavior changed.
 
-**PASS — Matching questions are supported end-to-end in local automated acceptance.** The shared Quiz question union now includes Matching with readable left/right labels and opaque IDs. Its private key remains in `quiz_keys`; student answers persist explicit pairs through the existing attempt RPC. Legacy choice payloads remain compatible.
+## B38.2 physical-use repair (2026-09-25)
 
-Generation plans Matching only for relationship-bearing evidence, uses strict choice/Matching schemas, and independently audits every possible pair without the proposed key. Public persistence and API projections whitelist learner fields. Both sides are ordered independently by question/item identity once, so drafts restore by ID without position-based correctness or read-time reshuffling.
+**PASS with limitations — Canvas sync, navigation, Reviewer navigation, course-first IA, motion and theme are repaired and physically accepted on the realme RMX3151.** Canvas sync had not run for six days. Durable jobs and credentials were healthy, but the only trigger was a buried legacy page, and every visible Refresh re-read stale rows. No account had ever synced submissions either, so Tasks counted submitted work as missing. Mobile now has one account-level sync (content + grades per selected course): it resumes on foreground, refreshes automatically when data is older than 6 hours, and shows a calm status line with Retry. Two latent defects were also fixed: stale idempotency-key replay and a lost-update race on job references. Announcement detail is a dismissible modal route; the old sheet re-selected the deep-linked announcement on every dismissal. Generate, Tasks and Library use one stack route per level, so header, Android and swipe back walk the hierarchy. Reviewers gain local find (highlights, count, previous/next) and a right-edge topic scrubber that activates only on a still hold. Also delivered: course-first Tasks with real due/past-due/completed counts, a uniform Library course grid with an All/Reviewers/Quizzes/Activities control, and title-first shared course identity. Motion uses native hierarchy slides, modal rises and tab fades, with a Reduced Motion fallback. The free-time ring is calm and theme-accented. A labelled UC-inspired (not official) palette is available. Mobile-only: no API, schema or migration change. Fresh mobile 569/569, typecheck, and lint with 0 errors. Delivered as EAS preview update `7b04c8e2` at `2974ced`. Screen recording is NOT RUN (ROM lacks `screenrecord`); physical Reduced Motion is BLOCKED (settings writes denied). Frame timing (17% janky over transitions) needs a performance pass. See [B38.2 acceptance](ai/acceptance/b38-2/physical-use-repair.md). Next: B39 Full E2E / Demo Acceptance.
 
-Partial drafts are valid; finalized Matching answers require a complete one-to-one mapping. Unknown IDs and duplicate assignments are rejected. Exact question-level scoring retains existing Quiz percentages and the finalize-every-question completion guard. Library progress keeps its existing precedence and counts nonempty Matching drafts as answered.
+## B38.1 production generation quality acceptance (2026-09-24)
 
-QuizScreen uses touch selectors for both readable sides, allows pair changes/clearing, predictably releases an occupied answer, restores persisted drafts, and renders checked/result/history feedback with public labels. Missing labels fail validation rather than falling back to IDs. Private maps are revealed only through the existing finalized-question feedback boundary; owner isolation and existing choice secrecy remain enforced.
+**PASS.** Fresh production PDF Reviewer, same-source Quiz, PPTX Reviewer, and assignment-grounded Activity Output passed source fidelity, coverage, correctness, readability, physical-device presentation, Queue/background, Library, and relaunch acceptance. A real PPTX contract-budget failure was traced to the response schema's per-source-ID enum, repaired without weakening local exact-reference validation, deployed as `dpl_EBwoR9gdNTvWBTMdezJD1ydqDXdk`, and successfully retested. See [B38.1 acceptance](ai/acceptance/b38-1/production-generation-quality-acceptance.md). Next: B39 Full E2E / Demo Acceptance.
 
-Forward migration `20261007155114_quiz_matching.sql` replaces three choice-specific RPC bodies, with no table/column/RLS changes. The old RPCs require option arrays and score only `correctOptionIds`, so extending JSON types alone cannot persist/score Matching. **Apply this migration before deploying the API changes.** It has passed local Postgres integration, including choice data created before migration; remote application is NOT RUN.
+## B38.0 Generate course state and material loading repair (2026-09-24)
 
-FRESH checks: shared **48 passed**; API **982 passed / 4 skipped**; mobile **499 passed**. Focused generation/convergence/Matching **130 passed**; persistence/security/progress/durable **75 passed / 2 skipped**; QuizScreen/screens **26 passed**. Shared/API/mobile typechecks, API/mobile lint and whitespace checks pass. Introduced SQL/test/type/lint mistakes were corrected and rerun; no unresolved failures. Opt-in live-provider, device and production checks are NOT RUN. This slice does not certify whole-web readiness.
+**PASS.** This was a blocking repair before B38 quality testing. Generate now uses the Sync page's course inventory, so tapping a course follows its sync status: unsynced or incomplete courses go to Canvas sync, synced courses open Generate. What a synced course shows follows material eligibility: its materials or "No study materials found". Current courses come before previous ones. The HIST 100 "Materials could not be loaded" defect was an unselected course reported as a server outage. Deployed without a migration and accepted on Android. See [B38.0 acceptance](ai/acceptance/b38-0/generate-course-state-and-material-repair.md). Next: B38 Production Generation Quality Acceptance.
 
-Next recommended task: **Intentional incomplete Quiz finalization / “Finish Anyway” semantics**. Not started here; current completion rules remain strict.
+## B37.1 production migration and runtime closure (2026-09-24)
 
-See [implementation and acceptance record](ai/quiz-matching-2026-10-08.md).
+**PASS.** Production migration metadata was reconciled, the canonical Reviewer migration and owner-scoped read-grant follow-up were applied, and the corrected API deployment is READY. Signed Android acceptance covered both Quiz gates, explicit-confirmation spend safety, one real canonical Quiz through the durable Queue, offline SQLite reopen, canonical management, successful disposable deletion, and dependency-protected deletion. Legacy `reviewers` remains compatibility-only with zero rows and no active runtime reads. See [B37 acceptance](ai/acceptance/b37/generated-artifact-convergence.md). Next: B38 Generation Quality Acceptance.
 
-## Shared Quiz learning progress (2026-10-07)
+Current milestone order: B34 Current Mobile UX Repair → B35 On-Device Artifact Persistence → B36 Signed Physical UX + Offline Acceptance → B37 Generated Artifact Model Convergence → B38 Generation Quality Acceptance → B39 Full E2E / Demo Acceptance → B40 Capstone & Release Hardening.
 
-**PASS — this focused prerequisite is implemented and verified.** Shared `QuizLearningState`, `QuizLearningProgress` and `QuizAttemptSummary` now carry server-derived learning state and history metadata. `QuizSummary` extends progress, retaining canonical `questionCount`, `attemptCount`, `latestScore` and `bestScore` names. Library's artifact `status` remains generation state; an untouched generated Quiz now says **Not started** in mobile.
+## B37 generated artifact model convergence (2026-09-23)
 
-The pure API helper `deriveQuizLearningProgress` filters by owner and Quiz before applying **active attempt > completed history > abandoned-only > no attempts**. Active selection uses newest `started_at`, then greatest ID; completed selection uses newest `completed_at`, then greatest ID. Saved nonempty drafts count as answered, without unlocking results. Retries retain completion count, best score and latest completion timestamp; abandoning a retry preserves prior completion. A completed **0%** is preserved, while missing scores remain null.
+**PARTIAL — canonical implementation passes locally; production migration and workflow acceptance remain.** All current source consumers now use owner-scoped `generated_artifacts` identity and persisted current versions. The forward migration preserves historical Quiz rows, adds an owner-safe canonical Quiz FK, and keeps the legacy table for later audited retirement. Saved-Reviewer management/deletion and B35 local removal use canonical IDs. Queue opening no longer accepts billable work. Production was not mutated because the known remote migration-history mismatch remains unresolved and no safe Supabase access path was available. See [B37 acceptance](ai/acceptance/b37/generated-artifact-convergence.md). Next: controlled B37 production rollout/smoke, then B38.
 
-Quiz history now uses the shared DTO, displays completion timestamps, and exposes loading, empty, failure and retry states. Resume selects the first unchecked question, restores saved selections, and uses the existing `finalize:false` API for serialized draft saves with failure retry. Pull refresh reloads the current attempt/result and history; Library refetches through its existing focus hook. Completion guards, private keys, RLS and generation behavior are unchanged; no migration or production configuration change was needed.
+## B36 signed physical UX + offline acceptance (2026-09-23)
 
-FRESH checks: Quiz/Experience **274 passed / 3 skipped**; full API **959 passed / 4 skipped**; mobile **497 passed** (including 16 new screen tests); shared **45 passed**; shared/API/mobile typechecks, API/mobile lint, and `git diff --check` passed. The missing Vitest files were repaired with the existing lockfile and no dependency/version changes. Initial new-test envelope/Activity-fixture mistakes were corrected and rerun. Physical-device and production verification were NOT RUN for this local slice.
+**PARTIAL — signed post-B35 physical acceptance completed; two items are unreachable on this branch.** Signed preview APK `245ccaec` at `1e81edd` (expo-sqlite included, signing identity unchanged) was installed on the realme RMX3151. B34's pending physical matrix now passes: Generate synced-course browser, Reviewer hierarchy, generation visual with status-independent layout, Library paging and indicator, Today handle geometry, and motion. B35 passes on device: local-first Library before any network call, force-stop/relaunch from the device store, full airplane-mode reading of Reviewer, Quiz (read-only, no answer keys, no scoring), and Activity Output, and reconnect with no duplicates or loss. Logout clears the session and the owner re-authenticated. Two bounded layout defects were repaired in `1e81edd`. Quiz generation and the supported Reviewer deletion flow remain unreachable because the Quiz gate, quiz source resolution, and Reviewer management still read the retired `reviewers` table while artifacts live in `generated_artifacts`; that needs a migration and RPC change, not an on-device repair. No second test account exists, so cross-account isolation stays covered by automated tests. See [B36 acceptance](ai/acceptance/b36/signed-physical-offline-acceptance.md). Next: B37.
 
-This completes only the shared learning-progress prerequisite; it does not certify whole-web readiness or supersede separate historical generation acceptance. Recommended next task: **Matching-question contract + renderer + persistence + scoring**, not started here.
+## B35 on-device artifact persistence (2026-09-22)
 
-See [implementation and verification record](ai/quiz-learning-progress-2026-10-07.md).
+**PASS — completed Reviewers, Quizzes, and Activity outputs are stored on the device and the Library is local-first.** An owner-scoped, versioned expo-sqlite store holds the authoritative cloud copy after the server has persisted the artifact. The Library renders from it before any network call, reconciles in the background without blanking, retains local rows on failure or remote-list absence, and removes a row only on an explicit owner-authenticated `not_found`. Explicit sign-out purges that owner's rows. Supabase, RLS, durable generation, and Queue are unchanged. A new native build is required. See [B35 acceptance](ai/acceptance/b35/on-device-artifact-persistence.md). Next: B36.
+
+## B34 current mobile UX repair (2026-09-21)
+
+**PARTIAL — the connected mobile UX implementation and automated gates pass; authenticated changed-build physical acceptance is pending.** The repaired surfaces are Generate information architecture, persisted Reviewer→Quiz dependency, Reviewer hierarchy, generation visual/stable layout, Library paging/loading/cards, Today handle geometry, and shared reduced-motion-aware interactions. The ADB-authorized realme loaded the local changed bundle but Expo Go has no access to the signed app's session; a signed EAS preview requires explicit upload approval. See [B34 acceptance](ai/acceptance/b34/current-mobile-ux-repair.md).
+
+## B33 student-material ingestion closure audit (2026-09-21)
+
+**PASS — supported student-material ingestion matrix is closed.** The former standalone DOCX/PPTX production milestone was absorbed by B31, and B32 closed scanned-PDF reliability; those production jobs should not be repeated without a new reproduced defect. B33 verified the complete Page/PDF/Office/image eligibility, acquisition, extraction, provenance, durable-generation, Queue, persistence, and Library evidence chain and repaired the one remaining concrete boundary defect: Tasks now admits Canvas assignments only when deadline-bearing and/or submittable. Positive Canvas instructional-image discovery remains naturally fixture/Student-permission limited and does not block the roadmap. See [B33 acceptance](ai/acceptance/b33/student-material-ingestion-closure-audit.md). Next: B34 generation quality acceptance.
+
+## B32 scanned-PDF runtime reliability (2026-09-20)
+
+**PASS — the 16-page Accounting scan now completes through checkpointed production inspection, OCR, ordered source attachment, AI generation, Queue, and Android Library persistence/reopen.** The final READY deployment is `dpl_EekcdmCmpfdoobvYouekuXrUmMEd`; the accepted fresh job is `a85bd672-2aed-401b-a37e-fd1c794d826f`. See [B32 acceptance](ai/acceptance/b32/scanned-pdf-runtime-reliability-acceptance.md). Next: B34 generation quality acceptance; revisit B33 only for a newly proven DOCX/PPTX defect.
+
+## B31 student-accessible Canvas material acceptance (2026-09-19)
+
+**PARTIAL — fresh Student-accessible Canvas text PDF, DOCX, PPTX, and Page Reviewers pass production generation, persistence, Queue/background use, Android Library retrieval, and relaunch reopen.** A proven FL 100 administrative-module routing defect was narrowly repaired and deployed as READY production `dpl_DKat3ypp6q4V5UETSKuDbJjLymcK`. The real 16-page Accounting scan now prepares to `PDF · ready`, but generation submission OOMs before durable job creation; exact internal provenance/byte/signature fields were not safely inspectable from student-facing surfaces. No eligible instructional image exists. See [B31 acceptance](ai/acceptance/b31/student-accessible-canvas-material-production-acceptance.md). Next: B32 scanned-PDF reliability.
+
+## B30 Canvas instructional-image production acceptance (2026-09-19)
+
+**PARTIAL / CLOSED WITH PLATFORM LIMITATION — the image-routing guard is deployed, READY, healthy, and verified to exclude administrative and ungrouped image noise after fresh physical-device synchronization.** The Student-only Canvas identity cannot create a direct teaching-module image fixture. Teacher/Designer cooperation and sandbox access will not be pursued. Automated routing tests remain the acceptance evidence unless a suitable student-accessible instructional image occurs naturally. This external Canvas-permission limitation does not block the student product roadmap. See [B30 acceptance](ai/acceptance/b30/canvas-instructional-image-production-acceptance.md).
+
+## Former B33 DOCX and PPTX production milestone (absorbed)
+
+Status: **Closed and superseded by the B33 closure audit above.** Real Student-accessible Canvas DOCX and PPTX acquisition, extraction, durable generation, persistence, Queue, physical Android rendering, and Library reopen were completed early in B31. B32 then closed the remaining scanned-PDF format blocker. Do not repeat a standalone Office-format milestone unless a new student-facing defect is reproduced.
+
+## B36 Signed Physical UX + Offline Acceptance
+
+Status: **PARTIAL and closed.** Signed post-B35 builds were produced and accepted on the realme RMX3151; see the dated entry above. Do not repeat the physical matrix without a new reproduced defect.
+
+Complete B34's pending physical matrix (Today, Generate, Queue, Library, Reviewer, generation, motion, gesture conflicts, relaunch, accessibility) and accept B35 on device: generation completion stored locally, force-stop/relaunch Library before network, airplane-mode Library and Reviewer/Quiz/Activity opening, reconnect reconciliation, and sign-out/account-switch isolation.
+
+## B37 Generated Artifact Model Convergence
+
+Status: **PARTIAL.** Implemented and locally verified; production migration, deployment, authenticated smoke, safe deletion, and physical accidental-spend acceptance remain.
+
+## B38 Generation Quality Acceptance
+
+Status: **PASS and closed by B38.1.**
+
+Fresh PDF Reviewer/Quiz, PPTX Reviewer, and Activity Output acceptance covered grounding, source fidelity, formatting, larger extracted context, durable Queue behavior, Library, and relaunch. The reproduced PPTX `request_exceeds_context_budget` defect was repaired at the structured-output contract boundary and retested in production. Previously accepted ingestion work remains historical evidence rather than being duplicated. See the dated B38.1 entry above.
+
+## B39 Full E2E / Demo Acceptance
+
+Status: **NEXT — ready to begin after B38.1 PASS.**
+
+Run the complete authenticated Canvas-to-generation-to-Queue-to-Library demo matrix, including background/relaunch and failure recovery.
+
+## B40 Reviewer Smart Selection Learning Tools
+
+Status: **PASS (2026-10-01).** Topic tap → existing Study Assist sheet → selectable concept text → Define / Explain / Example / Test Me / Ask with lazy refinements, automatic labelled grounding, source-only Test Me, and server-enforced cost limits. Production-deployed (`dpl_CW3TWB9FjkXAoMvBPRbMntZvqMaR`, OTA `ded5f2a6`). [Acceptance](ai/acceptance/b40/reviewer-smart-selection-learning-tools.md).
+
+## B41 Native Office DOCX/PPTX Opening Acceptance
+
+Status: **PASS (2026-10-01).** Exported Draft DOCX and PPTX files open in Google Docs and Slides on the realme, after a line-break export fix shipped by OTA `9129850a`. [Acceptance](ai/acceptance/b41/native-office-docx-pptx-opening.md).
+
+## Capstone & Release Hardening (formerly labelled B40)
+
+Status: **NEXT.**
+
+Close release, evidence, operational, security, and capstone presentation readiness without weakening the accepted product contracts.
+
+## Canvas permission boundary
+
+Stay Focused V2 will not depend on teacher or instructor cooperation for development, testing, demonstration, or capstone acceptance. Features requiring Teacher/Designer privileges must be supported by automated tests, exercised only through naturally available student-accessible content, or documented as external platform-permission limitations. They do not block the core student product roadmap.
+
+## B29 live OCR and learning-image acceptance (2026-09-19)
+
+**PARTIAL — live one-page scanned-PDF OCR, instructional-image OCR, fresh Reviewer generation, persistence, and Android Library retrieval pass.** The synchronized Canvas account provides no eligible direct-module teaching image, so Canvas learning-image discovery and the local routing repair remain physically unexercised. Generate now rejects ungrouped Canvas images such as course banners/profile artwork while retaining direct teaching-module images; administrative exclusions remain. One 16-page image-only accounting scan stalled before OCR and was cancelled safely. See [B29 acceptance](ai/acceptance/b29/live-ocr-learning-image-acceptance.md). Next bounded task: B30 deploy and physically accept one consented direct-module Canvas instructional PNG/JPEG, including provenance and decorative-image exclusion.
+
+## B28 ingestion coverage and document-format acceptance (2026-09-19)
+
+**PARTIAL — fresh production PDF, PPTX, and Canvas Page ingestion and generation passed; live OCR and Canvas DOCX coverage remain.** Three new owner-linked Reviewers completed and opened on physical Android from substantive CC16, CC17, and CC13 materials. The source snapshots retained 33 PDF pages, 39 PPTX slide markers, and 137 Page blocks. DOCX is implemented and extracted from a local fixture but absent in the Canvas account; scanned PDF and instructional image OCR await real sources. The accepted B27 deployment remains live. See [B28 acceptance](ai/acceptance/b28/ingestion-document-format-acceptance.md). Next bounded task: B29 live scanned-PDF and instructional-image OCR, including a decision on whether module-linked learning images should appear in Generate.
+
+## B27 student-facing Canvas announcements (2026-09-18)
+
+**PASS — B27 production rollout and authenticated physical announcement acceptance are complete.** Implementation commit `6b0a806` is live in READY deployment `dpl_BXWY9fC2L59bzJnPscspMdKLZHpT`; the metadata schema is applied, a fresh Canvas sync retained author data, and the signed Android app passed real Today/list/detail/Canvas-handoff and B26 routing checks. Links and attachments have no current source example. Reconcile the connector-assigned remote migration-history version with the local filename before a future CLI push. See [B27.1 acceptance](ai/acceptance/b27/student-facing-announcements.md). Next: B28 ingestion coverage and document-format acceptance.
+
+## B26.1 deployed Canvas routing and Activity reliability acceptance (2026-09-18)
+
+**PASS — B26 Canvas routing and Activity reliability acceptance is complete. B27 may begin.** The routing repair and two generic Activity requirement/personalization repairs are live in READY production deployment `dpl_GKBaGect3Gvh4Nq6w7Ny8HzYVz7v`. Standalone realme validation before and after normal sync confirms learning Pages/PDF/PPTX in Generate, assignments in Tasks, announcements separated, and retained orientation material excluded. Five completed fresh Activity types passed all prewritten mandatory checks; a sixth was consistently source-limited before provider execution. Full verification passes except the existing local Expo external-link export limitation. See [B26.1 acceptance](ai/acceptance/b26.1/deployed-routing-and-activity-reliability.md). Next milestone: B27 remaining application redesign, beginning with a student-facing announcement experience.
+
+## B25.3.4 standalone and AI-first production acceptance (2026-09-17)
+
+**PASS — B25 is complete; B26 may begin.** The repaired existing APK passed physical standalone acceptance on the realme RMX3151: session/Canvas, one new completed Reviewer, five-question server-scored Quiz, one Canvas-instruction-grounded Activity draft, and Queue/Library cold-relaunch persistence. AI-first production paths, API security/health, and mobile regressions passed. See [B25.3.4 acceptance](ai/acceptance/b25.3.4/device-standalone-ai-first-acceptance.md). Next: B26 generation-quality evaluation across multiple real Reviewer materials and Activity assignment types. Earlier PARTIAL entries are historical.
+
+## B25.4 physical-device acceptance (2026-09-16)
+
+Authenticated physical production-API runs completed a real CIT6 Reviewer, exact 5/5 Quiz with server-scored 100% attempt, and CC16 Learning Contract Activity. Queue and Library persisted all three and the result reopened. A corrupt local generation cache defect was fixed and retested in Expo Go; the full regression passed. The patched standalone APK is being built for installation and release-path retest, so **B25 remains PARTIAL; B26 may not begin**. See [B25.4 device checkpoint](ai/acceptance/b25.3.3/device-acceptance.md).
+
+## B25.3.3 AI-first generator migration (2026-09-16)
+
+Real-material comparison is complete. Reviewer routes/worker/Workflow, whole-set Quiz and Activity now use the shared coherent-context/AI/thin-contract boundary. Legacy Quiz and Activity semantic planners and the duplicate Reviewer Workflow pipeline are removed. Full deterministic regression, typecheck, lint and build pass. Production 09835be / dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4 is READY and healthy. Physical acceptance is blocked on direct device sign-in and Activity assignment selection; B25 remains PARTIAL and B26 may not begin. See docs/ai/acceptance/b25.3.3/architecture-simplification.md and the accepted ADR.
 
 ## B25.3.2 candidate convergence (2026-09-15)
 

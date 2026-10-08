@@ -19,6 +19,7 @@ import type {
 } from "./ocrApi";
 import { validateOcrImageUpload, validateOcrPdfUpload } from "./ocrApi";
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 import { getSupabaseMobileConfig } from "../auth/supabaseClient";
 
 const JOBS_PATH = "/api/jobs";
@@ -55,7 +56,7 @@ export interface CreateExtractionJobInput extends ProcessingJobApiInput {
 
 export interface CreateReviewerJobInput extends ProcessingJobApiInput {
   readonly idempotencyKey: string;
-  readonly sourceText: string;
+  readonly sourceText?: string;
   readonly sourceTitle?: string;
   readonly sourceKind?: NormalizedSourceKind;
   readonly sourceBlocks?: readonly SourceNormalizationBlockInput[];
@@ -183,14 +184,16 @@ export async function createReviewerJob(
 ): Promise<ProcessingJobApiResult<ProcessingJobStatusView>> {
   const setup = validateApiInput(input);
   if (!setup.ok) return setup;
-  const sourceText = input.sourceText.trim();
-  if (!sourceText) return failure("missing_source_text", "Source text is required.", false);
+  const sourceText = input.sourceText?.trim() ?? "";
+  if (!sourceText && !input.sourceVersionId && !input.canvasPreviewSessionId) {
+    return failure("missing_source_text", "Source text is required.", false);
+  }
 
   return await requestJobStatusView({
     ...setup.data,
     body: JSON.stringify({
       jobType: "reviewer_generation",
-      sourceText,
+      ...(sourceText ? { sourceText } : {}),
       ...(input.sourceTitle?.trim() ? { sourceTitle: input.sourceTitle.trim() } : {}),
       ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
       ...(input.sourceBlocks && input.sourceBlocks.length > 0
@@ -321,7 +324,7 @@ export async function getReviewerJobResult(
 }
 
 export function createProcessingJobIdempotencyKey(
-  jobType: ProcessingJobType,
+  jobType: ProcessingJobType | "source_import",
 ): string {
   const random = Math.random().toString(36).slice(2, 14);
   return `${jobType}:${Date.now().toString(36)}:${random}`;
@@ -421,13 +424,11 @@ async function requestJson<T>(
 function validateApiInput(
   input: ProcessingJobApiInput,
 ): ProcessingJobApiResult<{ readonly baseUrl: string; readonly accessToken: string }> {
-  const baseUrl = input.apiBaseUrl.trim().replace(/\/+$/, "");
-  if (!baseUrl) return failure("invalid_api_base_url", API_BASE_URL_SETUP_HINT, false);
+  let baseUrl: string;
   try {
-    const url = new URL(baseUrl);
-    if (!/^https?:$/.test(url.protocol) || url.search || url.hash) throw new Error();
+    baseUrl = requireApiBaseUrl(input.apiBaseUrl);
   } catch {
-    return failure("invalid_api_base_url", API_BASE_URL_SETUP_HINT, false);
+    return failure("invalid_api_base_url", API_CONFIGURATION_MESSAGE, false);
   }
   const accessToken = input.accessToken.trim();
   if (!accessToken) return failure("missing_access_token", "Sign in again to continue.", false);

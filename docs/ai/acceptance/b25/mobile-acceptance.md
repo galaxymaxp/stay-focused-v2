@@ -112,3 +112,7 @@ These are the 72 files changed by B25. The three current-state documents contain
 - `docs/current-state.md`
 - `docs/roadmap.md`
 - `package-lock.json`
+
+## B25.3.3 superseding update (2026-09-16)
+
+The AI-first migration is deployed READY as dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4. Live comparison passes three five-question sets and three Reviewers plus the Activity fixture. Physical acceptance is pending device sign-in and the selected Activity assignment. B25 remains PARTIAL; B26 is blocked. See [architecture acceptance](../b25.3.3/architecture-simplification.md). Historical records below remain unchanged.

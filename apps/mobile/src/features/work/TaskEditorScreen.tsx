@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
+import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import { Screen } from "../../components/Screen";
 
 import { createTask, deleteTask, listTasks, updateTask } from "../../services/taskApi";
@@ -34,7 +35,7 @@ export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenP
     const apiBaseUrl = getApiBaseUrl();
     const token = accessToken?.trim();
     if (!apiBaseUrl || !token) {
-      setError("Sign in again to open this task.");
+      setError(apiBaseUrl ? "Sign in again to open this task." : `App configuration error\n${API_CONFIGURATION_MESSAGE}`);
       setLoading(false);
       return;
     }
@@ -63,7 +64,7 @@ export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenP
       const apiBaseUrl = getApiBaseUrl();
       const token = accessToken?.trim();
       if (!apiBaseUrl || !token) {
-        setError("Sign in again to save this task.");
+        setError(apiBaseUrl ? "Sign in again to save this task." : `App configuration error\n${API_CONFIGURATION_MESSAGE}`);
         return;
       }
       setSaving(true);
@@ -83,7 +84,10 @@ export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenP
   const handleDelete = useCallback(async () => {
     const apiBaseUrl = getApiBaseUrl();
     const token = accessToken?.trim();
-    if (!apiBaseUrl || !token || !taskId) return;
+    if (!apiBaseUrl || !token || !taskId) {
+      if (!apiBaseUrl) setError(`App configuration error\n${API_CONFIGURATION_MESSAGE}`);
+      return;
+    }
     setDeleting(true);
     const result = await deleteTask({ accessToken: token, apiBaseUrl, taskId });
     setDeleting(false);

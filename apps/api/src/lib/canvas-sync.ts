@@ -27,6 +27,7 @@ import type {
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fingerprintCanvasCourseSnapshot } from "@/lib/canvas-sync-fingerprint";
+import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import {
   createCanvasFileInventoryPayload,
   type CanvasFileInventoryPayload,
@@ -451,7 +452,7 @@ export async function syncCanvasAcademicGraph({
       message: "Canvas connection could not be loaded.",
     };
   }
-  if (!connection.row) {
+  if (!connection.row || connection.row.status !== "active") {
     return {
       ok: false,
       status: 404,
@@ -528,6 +529,7 @@ export async function syncCanvasAcademicGraph({
     courses = await canvas.listCourses();
   } catch (error) {
     const mapped = mapCanvasClientError(error);
+    if (mapped.code === "invalid_canvas_token") await markCanvasReconnectRequired(client, connectionRow);
     const failureCode = syncFailureCodeForCanvasError(error);
     const resourceCounts = emptyResourceCounts();
     const totals = {
@@ -783,6 +785,7 @@ export async function syncCanvasAcademicGraph({
 }
 
 export async function syncSelectedCanvasCourse({
+  accessToken,
   canvasClient,
   client,
   connection,
@@ -791,6 +794,7 @@ export async function syncSelectedCanvasCourse({
   retryPolicy: retryPolicyInput,
   userId,
 }: {
+  readonly accessToken?: string;
   readonly canvasClient?: CanvasCourseSyncProvider;
   readonly client: SupabaseClient<Database>;
   readonly connection: CanvasConnectionRow;
@@ -816,7 +820,7 @@ export async function syncSelectedCanvasCourse({
 
   let token: string;
   try {
-    token = decryptConnectionToken(connection);
+    token = accessToken ?? decryptConnectionToken(connection);
   } catch {
     const resourceCounts = emptyResourceCounts();
     const summary = createCourseScopedSummary({

@@ -26,9 +26,16 @@ export async function readGenerationIntents(
 ): Promise<GenerationIntent[]> {
   const raw = await sessionStore.getItem(storageKey(owner));
   if (!raw) return [];
-  const entries: unknown = JSON.parse(raw);
-  if (!Array.isArray(entries))
-    throw new Error("Could not read saved generation requests.");
+  let entries: unknown;
+  try {
+    entries = JSON.parse(raw);
+  } catch {
+    // Accepted jobs remain authoritative and discoverable through the server
+    // Queue. An unreadable local admission cache must not permanently block
+    // the owner from creating new work; the next save replaces it atomically.
+    return [];
+  }
+  if (!Array.isArray(entries)) return [];
   return entries.filter(
     (entry): entry is GenerationIntent =>
       typeof entry === "object" &&
@@ -65,6 +72,19 @@ async function save(owner: string, intent: GenerationIntent) {
   writes.set(owner, operation);
   await operation;
 }
+/** Drops saved requests that were never accepted (Queue > Clear). */
+export async function discardGenerationIntents(owner: string, keys: readonly string[]) {
+  const drop = new Set(keys);
+  const operation = (writes.get(owner) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      const items = await readGenerationIntents(owner);
+      await sessionStore.setItem(storageKey(owner), JSON.stringify(items.filter((item) => !drop.has(item.key) || !!item.generationId)));
+    });
+  writes.set(owner, operation);
+  await operation;
+}
+
 export async function createGenerationIntent(
   owner: string,
   input: Omit<GenerationIntent, "key">,

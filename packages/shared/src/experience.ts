@@ -25,6 +25,26 @@ export interface CourseSummary extends CourseReference {
   readonly reviewerCount: number | null;
   readonly lastActivityAt: string | null;
 }
+/**
+ * Synced: selected for sync and the latest attempt completed (fully or partially).
+ * Not synced: never selected or never synchronized. Incomplete: the latest attempt
+ * failed or is still running. Only synced courses may open Generate materials.
+ */
+export type GenerateCourseSyncState = 'synced' | 'not_synced' | 'sync_incomplete';
+/** Derived from Canvas enrollment, term, and course dates; never from titles. */
+export type GenerateCoursePeriod = 'current' | 'previous' | 'other';
+export interface GenerateCourseSummary extends CourseSummary {
+  readonly syncState: GenerateCourseSyncState;
+  readonly period: GenerateCoursePeriod;
+  readonly termName: string | null;
+  readonly lastSuccessfulSyncAt: string | null;
+}
+export interface GenerateCourseList {
+  /** Ordered: current, previous, then other; synced first; most recent term first. */
+  readonly items: readonly GenerateCourseSummary[];
+  /** 'stored' means Canvas was unreachable and periods come from saved course dates only. */
+  readonly classificationSource: 'canvas' | 'stored';
+}
 export interface LearningMaterial {
   readonly id: string;
   readonly courseId: string;
@@ -33,6 +53,8 @@ export interface LearningMaterial {
   readonly readiness: 'ready' | 'needs_preparation' | 'empty' | 'unsupported' | 'unavailable';
   readonly count: number | null;
   readonly sourceId: string;
+  /** Latest owner-persisted Reviewer grounded in this exact Canvas material. */
+  readonly reviewerArtifactId: string | null;
   readonly moduleTitle: string | null;
   readonly generation: GenerationCapability;
 }
@@ -62,10 +84,20 @@ export interface ActivitySummary {
   readonly hasGeneratedDraft: boolean;
 }
 export interface ActivityResource { readonly title: string; readonly url: string }
+/** Student-visible file metadata attached to an actionable Canvas assignment. */
+export interface ActivityAttachment {
+  /** Stable only within this assignment detail; never a Canvas or storage identifier. */
+  readonly key: string;
+  readonly filename: string;
+  readonly contentType: string | null;
+  readonly extension: string | null;
+  readonly size: number | null;
+}
 export interface ActivityDetail extends ActivitySummary {
   readonly latestDraftId?: string | null;
   readonly instructions: string | null;
   readonly resources: readonly ActivityResource[];
+  readonly attachments: readonly ActivityAttachment[];
   readonly courseMaterials: CourseMaterials | null;
   readonly generation: GenerationCapability;
   readonly outputs: readonly LibraryArtifactSummary[];
@@ -103,21 +135,50 @@ export interface TodayOverview {
     readonly needsTaskImport: boolean;
   };
 }
+export interface AnnouncementLink {
+  readonly label: string;
+  readonly url: string;
+}
+export interface AnnouncementAttachment extends AnnouncementLink {
+  readonly contentType: string | null;
+  readonly size: number | null;
+}
+export interface StudentAnnouncement {
+  readonly id: string;
+  readonly course: CourseReference;
+  readonly title: string;
+  /** Readable text converted from Canvas HTML; raw markup is never returned. */
+  readonly body: string;
+  readonly preview: string | null;
+  readonly postedAt: string | null;
+  readonly authorName: string | null;
+  readonly htmlUrl: string | null;
+  readonly attachments: readonly AnnouncementAttachment[];
+  readonly links: readonly AnnouncementLink[];
+}
+export interface StudentAnnouncementList {
+  readonly items: readonly StudentAnnouncement[];
+  readonly nextOffset: number | null;
+}
 export type LibraryArtifactType = 'reviewer' | 'quiz' | 'activity_output';
 export type GenerationState = 'queued' | 'preparing' | 'generating' | 'finalizing' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
 export interface LibraryArtifactSummary {
   readonly quiz?: import('./quiz').QuizSummary;
+  /** Device-local editable worksheet state; absent on historical artifacts. */
+  readonly activityStudyStatus?: 'not_started' | 'in_progress' | 'completed';
   readonly id: string;
   readonly type: LibraryArtifactType;
   readonly title: string;
   readonly course: CourseReference | null;
   readonly sourceId: string | null;
+  readonly sourceType?: 'canvas_file' | 'canvas_page' | 'canvas_mixed' | 'text' | 'camera' | 'local_file' | null;
+  /** Original Canvas material when a Reviewer was generated from one item. */
+  readonly sourceMaterialId?: string | null;
   readonly sourceTitle: string | null;
   readonly activityId: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastOpenedAt: string | null;
-  /** Artifact generation state. Quiz learning state lives in quiz.learningState. */
   readonly status: GenerationState;
   readonly relatedArtifactIds: readonly string[];
 }
@@ -125,7 +186,14 @@ export interface LibraryOverview {
   readonly items: readonly LibraryArtifactSummary[];
   readonly categories: Readonly<Record<LibraryArtifactType, FeatureCapability>>;
   readonly nextOffset: number | null;
+  /** Older Reviewer cards superseded by a generation from the same material. */
+  readonly supersededReviewerIds?: readonly string[];
 }
+/** Full owner-scoped artifact returned by `GET /api/experience/library/:id`. */
+export type LibraryArtifactDetail =
+  | { readonly artifact: LibraryArtifactSummary; readonly reviewer: ReviewerReaderModel }
+  | { readonly artifact: LibraryArtifactSummary; readonly quiz: import('./quiz').Quiz }
+  | { readonly artifact: LibraryArtifactSummary; readonly draft: import('./activity-maker').ActivityDraft };
 export interface ReviewerReaderModel {
   readonly id: string;
   readonly title: string;
@@ -141,6 +209,12 @@ export interface ReviewerReaderModel {
       readonly title: string;
       readonly explanation: string;
       readonly keyPoints: readonly string[];
+      readonly emphasis?: readonly {
+        readonly target: 'explanation' | 'key_point';
+        readonly index: number;
+        readonly text: string;
+        readonly style: 'bold' | 'underline' | 'highlight';
+      }[];
       readonly evidence: readonly { readonly kind: 'code' | 'formula' | 'table' | 'result' | 'example' | 'source'; readonly text: string }[];
     }[];
   }[];
@@ -154,7 +228,8 @@ export interface GenerationView {
   readonly error: ExperienceError | null;
 }
 export interface ExperienceError {
-  readonly code: 'sign_in_required' | 'not_found' | 'invalid_request' | 'not_ready' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable';
+  readonly code: 'sign_in_required' | 'not_found' | 'course_not_synced' | 'invalid_request' | 'not_ready' | 'insufficient_source' | 'source_attachment_unavailable' | 'unavailable' | 'generation_failed' | 'rate_limited' | 'conflict' | 'activity_not_found' | 'activity_generation_unavailable' | 'activity_source_unavailable' | 'activity_template_unreadable' | 'unsupported_attachment_type' | 'activity_draft_not_found' | 'activity_generation_failed' | 'activity_draft_conflict' | 'quiz_generation_unavailable' | 'quiz_source_unavailable' | 'quiz_source_capacity_exceeded' | 'quiz_not_found' | 'quiz_generation_failed' | 'quiz_attempt_not_found' | 'quiz_attempt_completed' | 'quiz_question_not_found' | 'quiz_answer_invalid' | 'quiz_answer_already_finalized' | 'quiz_result_unavailable' | 'study_selection_too_large' | 'study_question_too_long' | 'study_answer_too_long' | 'study_follow_up_limit';
+  readonly supportedMaximum?: number;
   readonly title: string;
   readonly message: string;
   readonly retryable: boolean;

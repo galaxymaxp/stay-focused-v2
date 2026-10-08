@@ -102,6 +102,14 @@ describe("Canvas planner and announcement normalization", () => {
           delayedPostAt: "2026-07-11T00:00:00.000Z",
           message: "<p>Fictional announcement.</p>",
           postedAt: null,
+          authorName: "Instructor Example",
+          attachments: [{
+            id: "attachment-1",
+            displayName: "Week 1 guide.pdf",
+            contentType: "application/pdf",
+            size: 512,
+            url: "https://canvas.example.invalid/files/1/download",
+          }],
         }),
       ],
     });
@@ -112,6 +120,14 @@ describe("Canvas planner and announcement normalization", () => {
           delayedPostAt: "2026-07-11T00:00:00.000Z",
           message: "<p>Fictional announcement.</p>",
           postedAt: null,
+          authorName: "Instructor Example",
+          attachments: [{
+            id: "attachment-1",
+            displayName: "Week 1 guide.pdf",
+            contentType: "application/pdf",
+            size: 512,
+            url: "https://canvas.example.invalid/files/1/download",
+          }],
         }),
       ],
     });
@@ -126,6 +142,14 @@ describe("Canvas planner and announcement normalization", () => {
       message_html: "<p>Fictional announcement.</p>",
       posted_at: null,
       delayed_post_at: "2026-07-11T00:00:00.000Z",
+      author_name: "Instructor Example",
+      attachments: [{
+        id: "attachment-1",
+        display_name: "Week 1 guide.pdf",
+        content_type: "application/pdf",
+        size: 512,
+        url: "https://canvas.example.invalid/files/1/download",
+      }],
     });
     expect(second[0]?.source_fingerprint).toBe(first[0]?.source_fingerprint);
     expect(changed[0]?.source_fingerprint).not.toBe(
@@ -180,6 +204,8 @@ function announcement(
     published: true,
     locked: false,
     htmlUrl: "https://canvas.example.invalid/announcement",
+    authorName: null,
+    attachments: [],
     ...overrides,
   };
 }

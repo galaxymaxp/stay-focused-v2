@@ -8,6 +8,8 @@ import { prepareCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
 import { validateStudyPlanningRequest } from '@stay-focused/shared/task-planning';
 import { previewOwnedStudyPlan, applyOwnedStudyPlan } from '@/lib/task-planning-service';
+import { CONNECTION_SECRET_COLUMNS, createCanvasClient, decryptConnectionToken, readConnection } from '@/lib/canvas-routes';
+import { CANVAS_FILE_DOWNLOAD_TIMEOUT_MS, CANVAS_FILE_MAX_REDIRECTS, CANVAS_FILE_MAX_SINGLE_BYTES } from '@/lib/canvas-file-policy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,8 +21,15 @@ export async function GET(request: Request, context: Context): Promise<Response>
     const query = new URL(request.url).searchParams;
     const [surface, id, action] = path;
     if (path.length === 1 && surface === 'capabilities') return experienceJson(experienceCapabilities());
+    if (path.length === 1 && surface === 'announcements') {
+      return experienceJson(await service.getAnnouncements(userId, {
+        ...(query.get('courseId') ? { courseId: requireId(query.get('courseId')!) } : {}),
+        offset: readInteger(query.get('offset'), 0, 0, 10000),
+        limit: readInteger(query.get('limit'), 50, 1, 100),
+      }));
+    }
     if (surface === 'courses') {
-      if (path.length === 1) return experienceJson({ items: await service.getCourses(userId) });
+      if (path.length === 1) return experienceJson(await service.getGenerateCourses(userId));
       requireId(id!);
       if (path.length === 2) return experienceJson(await service.getCourseLearningWorkspace(userId, id!));
       if (path.length === 3 && action === 'materials') return experienceJson(await service.getCourseMaterials(userId, id!, readInteger(query.get('offset'), 0, 0, 1000)));
@@ -36,6 +45,31 @@ export async function GET(request: Request, context: Context): Promise<Response>
         if (!/^(canvas|task):/.test(id!)) throw new ExperienceFailure(404, 'not_found');
         requireId(id!.slice(id!.indexOf(':') + 1));
         return experienceJson(await service.getActivityDetail(userId, id!));
+      }
+      if (path.length === 4 && action === 'attachments') {
+        if (!/^canvas:/.test(id!) || !/^a\d{1,3}$/.test(path[3]!)) throw new ExperienceFailure(404, 'not_found');
+        requireId(id!.slice('canvas:'.length));
+        const resolved = await service.getActivityAttachmentDownload(userId, id!, path[3]!);
+        const connection = await readConnection(createCanvasServiceClient(), userId, CONNECTION_SECRET_COLUMNS);
+        if (!connection.ok || !connection.row || connection.row.id !== resolved.canvasConnectionId || connection.row.status !== 'active') throw new ExperienceFailure(409, 'not_ready');
+        let canvas;
+        try { canvas = createCanvasClient(connection.row.base_url, decryptConnectionToken(connection.row)); }
+        catch { throw new ExperienceFailure(409, 'not_ready'); }
+        let metadata;
+        try { metadata = await canvas.getCourseFile(resolved.canvasCourseId, resolved.attachment.canvasFileId); }
+        catch { throw new ExperienceFailure(409, 'not_ready'); }
+        if (metadata.id !== resolved.attachment.canvasFileId) throw new ExperienceFailure(404, 'not_found');
+        let downloaded;
+        try { downloaded = await canvas.downloadFile(metadata, { maxBytes: CANVAS_FILE_MAX_SINGLE_BYTES, maxRedirects: CANVAS_FILE_MAX_REDIRECTS, timeoutMs: CANVAS_FILE_DOWNLOAD_TIMEOUT_MS }); }
+        catch { throw new ExperienceFailure(409, 'not_ready'); }
+        const mime = resolved.attachment.contentType ?? downloaded.contentType ?? 'application/octet-stream';
+        const body = new ArrayBuffer(downloaded.byteLength);
+        new Uint8Array(body).set(downloaded.bytes);
+        return new Response(body, { status: 200, headers: {
+          'Cache-Control': 'private, no-store', 'Content-Type': mime, 'Content-Length': String(downloaded.byteLength),
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(resolved.attachment.filename)}`,
+          'X-Content-Type-Options': 'nosniff',
+        } });
       }
     }
     if (surface === 'library') {

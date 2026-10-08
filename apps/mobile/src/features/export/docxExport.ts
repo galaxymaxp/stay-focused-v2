@@ -1,0 +1,30 @@
+import { strToU8, zipSync } from 'fflate';
+import { styledRuns, type ExportBlock, type ExportDocument } from './exportLayout';
+
+const xml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+// A line break is run content: it must sit inside <w:r>, or viewers drop it and lines run together.
+const run = (text: string, style: 'normal' | 'bold' | 'underline' | 'highlight' = 'normal', breakBefore = false) =>
+  `<w:r><w:rPr>${style === 'bold' ? '<w:b/>' : ''}${style === 'underline' ? '<w:u w:val="single"/>' : ''}${style === 'highlight' ? '<w:highlight w:val="yellow"/>' : ''}</w:rPr>${breakBefore ? '<w:br/>' : ''}<w:t xml:space="preserve">${xml(text)}</w:t></w:r>`;
+const paragraph = (block: ExportBlock) => {
+  const style = block.kind === 'title' ? 'Title' : block.kind === 'heading' ? 'Heading1' : block.kind === 'question' ? 'Heading2' : block.kind === 'brand' ? 'Subtitle' : 'Normal';
+  const numbering = block.kind === 'bullet' ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' : '';
+  const runs = styledRuns(block).flatMap(part => part.text.split('\n').map((line, index) => run(line, part.style, index > 0))).join('');
+  return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${numbering}<w:spacing w:after="${block.kind === 'heading' ? 160 : 100}"/></w:pPr>${runs}</w:p>`;
+};
+const table = (rows: readonly (readonly string[])[]) => {
+  const cols = Math.max(...rows.map(row => row.length));
+  return `<w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders></w:tblPr><w:tblGrid>${Array.from({ length: cols }, () => `<w:gridCol w:w="${Math.floor(9360 / cols)}"/>`).join('')}</w:tblGrid>${rows.map((row, rowIndex) => `<w:tr>${Array.from({ length: cols }, (_, index) => `<w:tc><w:tcPr><w:tcW w:w="${Math.floor(9360 / cols)}" w:type="dxa"/></w:tcPr><w:p>${run(row[index] ?? '', rowIndex === 0 ? 'bold' : 'normal')}</w:p></w:tc>`).join('')}</w:tr>`).join('')}</w:tbl>`;
+};
+
+export function createStudyDocx(document: ExportDocument): Uint8Array {
+  const body = document.blocks.map(block => block.kind === 'table' && block.rows?.length ? table(block.rows) : paragraph(block)).join('');
+  const files: Record<string, Uint8Array> = {
+    '[Content_Types].xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>`),
+    '_rels/.rels': strToU8(`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`),
+    'word/_rels/document.xml.rels': strToU8(`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/></Relationships>`),
+    'word/document.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080"/></w:sectPr></w:body></w:document>`),
+    'word/styles.xml': strToU8(`<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:sz w:val="40"/><w:color w:val="183D31"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:rPr><w:sz w:val="20"/><w:color w:val="64746D"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="300" w:after="120"/></w:pPr><w:rPr><w:b/><w:sz w:val="30"/><w:color w:val="185A40"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style></w:styles>`),
+    'word/numbering.xml': strToU8(`<?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>`),
+  };
+  return zipSync(files, { level: 6 });
+}

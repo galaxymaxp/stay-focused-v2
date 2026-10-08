@@ -1,17 +1,19 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type { Database, ReviewerRow } from "@stay-focused/db";
+import type { Database } from "@stay-focused/db";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
 import { createCanvasServiceClient } from "@/lib/canvas-db";
 import { createReviewerUserClient } from "@/lib/reviewer-db";
+import { listCanonicalReviewerRecords } from "@/lib/canonical-reviewers";
 import {
   readSafeReviewerSourceProvenanceSummary,
   verifyReviewerSourceSnapshotForSave,
 } from "@/lib/reviewer-source-provenance";
 import {
-  createReviewerInsert,
-  mapReviewerSummary,
+  canonicalReviewerSnapshotId,
+  mapCanonicalReviewerDetail,
+  mapCanonicalReviewerSummary,
   readBearerToken,
   validateCreateReviewerRequest,
 } from "@/lib/reviewers";
@@ -23,8 +25,6 @@ import type {
 
 export const runtime = "nodejs";
 
-const REVIEWER_SUMMARY_COLUMNS =
-  "id,title,source_metadata,section_count,created_at,updated_at";
 const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
 const CORS_ALLOWED_HEADERS = "authorization, content-type";
 const CORS_MAX_AGE_SECONDS = "600";
@@ -41,13 +41,8 @@ export async function GET(request: Request): Promise<Response> {
     return auth.response;
   }
 
-  const { data, error } = await auth.value.client
-    .from("reviewers")
-    .select(REVIEWER_SUMMARY_COLUMNS)
-    .order("updated_at", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (error || !data) {
+  const records = await listCanonicalReviewerRecords(auth.value.client, auth.value.user.id);
+  if (!records.ok) {
     return errorResponse(
       500,
       "reviewer_storage_failed",
@@ -59,7 +54,7 @@ export async function GET(request: Request): Promise<Response> {
   return jsonResponse(
     {
       ok: true,
-      reviewers: data.map((row) => mapReviewerSummary(row as ReviewerRow)),
+      reviewers: records.value.map(({ artifact, version, source }) => mapCanonicalReviewerSummary(artifact, version, source)),
     },
     200,
     request,
@@ -104,8 +99,31 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  const records = await listCanonicalReviewerRecords(auth.value.client, auth.value.user.id);
+  if (!records.ok) {
+    return errorResponse(500, "reviewer_storage_failed", "Saved reviewer could not be loaded.", request);
+  }
+  const matches = records.value.filter(({ version }) => {
+    const payload = version.payload;
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+    const reviewer = (payload as Readonly<Record<string, unknown>>).reviewer;
+    return typeof reviewer === "object" && reviewer !== null && !Array.isArray(reviewer) && (reviewer as Readonly<Record<string, unknown>>).id === validation.value.reviewerOutput.id;
+  });
+  if (matches.length !== 1) {
+    return errorResponse(404, "reviewer_not_found", "The canonical generated Reviewer could not be identified.", request);
+  }
+  let record = matches[0]!;
+  if (record.artifact.safe_title !== validation.value.title) {
+    const renamed = await auth.value.client.rpc("rename_reviewer_artifact", { p_artifact_id: record.artifact.id, p_title: validation.value.title });
+    if (renamed.error || !renamed.data?.[0]) {
+      return errorResponse(500, "reviewer_storage_failed", "Saved reviewer could not be renamed.", request);
+    }
+    record = { ...record, artifact: renamed.data[0] };
+  }
+
   let sourceProvenance = null;
-  if (validation.value.sourceMetadata.sourceMode === "canvas") {
+  const sourceSnapshotId = canonicalReviewerSnapshotId(record.source);
+  if (sourceSnapshotId) {
     let provenanceClient: ReturnType<typeof createCanvasServiceClient>;
     try {
       provenanceClient = createCanvasServiceClient();
@@ -120,9 +138,8 @@ export async function POST(request: Request): Promise<Response> {
 
     const snapshot = await verifyReviewerSourceSnapshotForSave({
       client: provenanceClient,
-      sourceCharacterCount:
-        validation.value.sourceMetadata.sourceCharacterCount,
-      sourceSnapshotId: validation.value.sourceSnapshotId,
+      sourceCharacterCount: record.source.character_count,
+      sourceSnapshotId,
       userId: auth.value.user.id,
     });
     if (!snapshot.ok) {
@@ -150,33 +167,12 @@ export async function POST(request: Request): Promise<Response> {
     sourceProvenance = summary.value;
   }
 
-  const { data, error } = await auth.value.client
-    .from("reviewers")
-    .upsert(createReviewerInsert(auth.value.user.id, validation.value), {
-      onConflict: "user_id,source_snapshot_id",
-    })
-    .select(
-      `${REVIEWER_SUMMARY_COLUMNS},reviewer_output`,
-    )
-    .single();
-
-  if (error || !data) {
-    return errorResponse(
-      500,
-      "reviewer_storage_failed",
-      "Saved reviewer could not be created.",
-      request,
-    );
-  }
-
+  const detail = mapCanonicalReviewerDetail(record.artifact, record.version, record.source, sourceProvenance);
+  if (!detail.ok) return errorResponse(500, "reviewer_storage_failed", "Saved reviewer could not be loaded.", request);
   return jsonResponse(
     {
       ok: true,
-      reviewer: {
-        ...mapReviewerSummary(data as ReviewerRow),
-        reviewerOutput: validation.value.reviewerOutput,
-        ...(sourceProvenance ? { sourceProvenance } : {}),
-      },
+      reviewer: detail.value,
     },
     201,
     request,

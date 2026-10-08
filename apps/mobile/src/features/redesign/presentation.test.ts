@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { LearningMaterial, TodayItem } from "@stay-focused/shared";
+import type { GenerateCourseSummary, LearningMaterial, TodayItem } from "@stay-focused/shared";
 import {
   available,
   clockMinutes,
+  generateCourseDestination,
+  generateCourseGroups,
+  generateCourseStatus,
   generationMessages,
   moduleGroups,
   planningRequest,
@@ -74,14 +77,13 @@ describe("day-ring input and planner boundary", () => {
     expect(snapMinutes(-10)).toBe(0);
     expect(snapMinutes(1500)).toBe(1440);
   });
-  it("sends availability to the authoritative planner without client sessions", () => {
+  it("offers only the free time, but replans the whole day so every block fits inside it", () => {
     const request = planningRequest("2026-09-13", 600, 720);
-    expect(request.availability).toEqual([request.planningRange]);
     expect(Object.keys(request)).toEqual(["planningRange", "availability"]);
-    expect(
-      Date.parse(request.planningRange.endsAt) -
-        Date.parse(request.planningRange.startsAt),
-    ).toBe(120 * 60000);
+    const [window] = request.availability;
+    expect(Date.parse(window!.endsAt) - Date.parse(window!.startsAt)).toBe(120 * 60000);
+    expect(request.planningRange.startsAt).toBe(new Date("2026-09-13T00:00:00").toISOString());
+    expect(Date.parse(request.planningRange.endsAt) - Date.parse(request.planningRange.startsAt)).toBe(1440 * 60000);
     expect(() => planningRequest("2026-09-13", 720, 600)).toThrow();
   });
   it("draws only real timed blocks and excludes skipped sessions", () => {
@@ -136,4 +138,30 @@ describe("appearance and ambient lifecycle", () => {
   );
   it("animates only a visible active screen without reduced motion", () =>
     expect(shouldAnimate(false, true, true)).toBe(true));
+});
+
+function generateCourse(id: string, overrides: Partial<GenerateCourseSummary> = {}): GenerateCourseSummary {
+  return { id, code: id, name: id, status: "available", materialCount: null, reviewerCount: null, lastActivityAt: null, syncState: "synced", period: "current", termName: null, lastSuccessfulSyncAt: null, ...overrides };
+}
+describe("Generate course list", () => {
+  it("opens Generate only for synced courses and Sync for every other state", () => {
+    expect(generateCourseDestination({ syncState: "synced" })).toBe("generate");
+    expect(generateCourseDestination({ syncState: "not_synced" })).toBe("sync");
+    expect(generateCourseDestination({ syncState: "sync_incomplete" })).toBe("sync");
+  });
+  it("groups current before previous before other while preserving server order", () => {
+    const groups = generateCourseGroups([
+      generateCourse("current-b"), generateCourse("previous", { period: "previous" }), generateCourse("current-a", { syncState: "not_synced" }), generateCourse("other", { period: "other" }),
+    ]);
+    expect(groups.map((group) => [group.title, group.items.map((course) => course.id)])).toEqual([
+      ["Current courses", ["current-b", "current-a"]], ["Previous courses", ["previous"]], ["Other courses", ["other"]],
+    ]);
+    expect(generateCourseGroups([generateCourse("only-previous", { period: "previous" })]).map((group) => group.key)).toEqual(["previous"]);
+  });
+  it("labels every sync state without implying an unsynced course is ready", () => {
+    expect(generateCourseStatus(generateCourse("a", { syncState: "not_synced", lastActivityAt: "2026-08-29T00:00:00Z" }))).toBe("Not synced · Tap to sync");
+    expect(generateCourseStatus(generateCourse("a", { syncState: "sync_incomplete" }))).toBe("Sync incomplete · Tap to retry");
+    expect(generateCourseStatus(generateCourse("a", { termName: "2026-27-1T" }))).toBe("Synced · 2026-27-1T");
+    expect(generateCourseStatus(generateCourse("a", { lastSuccessfulSyncAt: "2026-09-20T12:00:00Z" }))).toMatch(/^Synced .+/);
+  });
 });

@@ -63,7 +63,7 @@ describe("GET /api/reviewers/[id]/source-status", () => {
     });
     expect(mocks.readReviewerSourceStatus).toHaveBeenCalledWith({
       client: mocks.createCanvasServiceClient.mock.results[0].value,
-      reviewerId: REVIEWER_ID,
+      reviewerArtifactId: REVIEWER_ID,
       userId: USER_ID,
     });
     expect(text).not.toContain("source_snapshot_id");

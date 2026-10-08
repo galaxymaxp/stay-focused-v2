@@ -1,6 +1,7 @@
 import {
   CanvasClientError,
   type CanvasAnnouncement,
+  type CanvasClient,
   type CanvasAssignment,
   type CanvasAssignmentGroup,
   type CanvasCourseGradeSummary,
@@ -23,6 +24,8 @@ import {
   createCanvasClient,
   decryptConnectionToken,
 } from "@/lib/canvas-routes";
+import { discoverCanvasPageFileIds } from "@/lib/canvas-file-normalize";
+import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import {
   beginCanvasSyncUnitAttempt,
   CANVAS_SYNC_JOB_DEADLINE_MS,
@@ -56,6 +59,7 @@ export async function executeCanvasSyncUnit(
   input: {
     readonly unitId: string;
     readonly workerId: string;
+    readonly accessToken?: string;
   },
 ): Promise<CanvasSyncUnitExecutionResult> {
   const unit = await beginCanvasSyncUnitAttempt(
@@ -100,10 +104,11 @@ export async function executeCanvasSyncUnit(
   }
 
   try {
-    const token = decryptConnectionToken(context.connection);
+    const token = input.accessToken ?? decryptConnectionToken(context.connection);
     const canvas = createCanvasClient(context.connection.base_url, token);
     const result = await runUnit({
       canvas,
+      canvasBaseUrl: context.connection.base_url,
       client,
       courseCanvasId: context.course.canvas_course_id,
       courseId: context.course.id,
@@ -122,6 +127,9 @@ export async function executeCanvasSyncUnit(
       status: completed?.status === "cancelled" ? "cancelled" : "succeeded",
     };
   } catch (error) {
+    if (error instanceof CanvasClientError && error.code === "canvas_unauthorized") {
+      await markCanvasReconnectRequired(client, context.connection);
+    }
     return handleUnitFailure(client, unit, input.workerId, error);
   }
 }
@@ -217,6 +225,7 @@ interface UnitRunResult {
 
 async function runUnit({
   canvas,
+  canvasBaseUrl,
   client,
   courseCanvasId,
   courseId,
@@ -224,6 +233,7 @@ async function runUnit({
   userId,
 }: {
   readonly canvas: ReturnType<typeof createCanvasClient>;
+  readonly canvasBaseUrl: string;
   readonly client: CanvasSyncJobServiceClient;
   readonly courseCanvasId: string;
   readonly courseId: string;
@@ -250,6 +260,21 @@ async function runUnit({
           ),
         ]
       : [];
+
+  const pageDetailResult = (detail: CanvasPageDetail): UnitRunResult => {
+    const fileIds = discoverCanvasPageFileIds({
+      canvasBaseUrl,
+      canvasCourseId: courseCanvasId,
+      html: detail.body,
+    });
+    if (fileIds.length > 40) throw new Error("canvas_page_file_link_limit_exceeded");
+    return {
+      ...itemResult(unit, detail),
+      discoveredUnits: fileIds.map((fileId) =>
+        createCanvasSyncUnit("module_file", "files", 0, false, { fileId }),
+      ),
+    };
+  };
 
   switch (unit.unit_kind) {
     case "modules_page": {
@@ -318,7 +343,7 @@ async function runUnit({
     }
     case "module_page_detail": {
       const pageUrl = requireCheckpointString(checkpoint, "pageUrl");
-      return itemResult(unit, await canvas.getPage(courseCanvasId, pageUrl));
+      return pageDetailResult(await canvas.getPage(courseCanvasId, pageUrl));
     }
     case "module_assignment": {
       const assignmentId = requireCheckpointString(checkpoint, "assignmentId");
@@ -359,7 +384,7 @@ async function runUnit({
     case "page_detail": {
       const pageUrl = requireCheckpointString(checkpoint, "pageUrl");
       const detail = await canvas.getPage(courseCanvasId, pageUrl);
-      return itemResult(unit, detail);
+      return pageDetailResult(detail);
     }
     case "page_detail_reuse": {
       const summary = readPageSummary(checkpoint.pageSummary);
@@ -371,9 +396,9 @@ async function runUnit({
       });
       if (!detail) {
         const page = await canvas.getPage(courseCanvasId, summary.url);
-        return itemResult(unit, page);
+        return pageDetailResult(page);
       }
-      return itemResult(unit, detail);
+      return pageDetailResult(detail);
     }
     case "assignment_groups_page": {
       const page = await canvas.listAssignmentGroupsPage(courseCanvasId, cursor);
@@ -381,7 +406,13 @@ async function runUnit({
     }
     case "assignments_page": {
       const page = await canvas.listAssignmentsPage(courseCanvasId, cursor);
-      return pageResult(unit, page.items, next(page.nextCursor));
+      const items = await resolveAssignmentFileMetadata({
+        assignments: page.items,
+        canvas,
+        canvasBaseUrl,
+        courseCanvasId,
+      });
+      return pageResult(unit, items, next(page.nextCursor));
     }
     case "announcements_page": {
       const startDate = requireCheckpointString(checkpoint, "startDate");
@@ -421,6 +452,62 @@ async function runUnit({
     default:
       throw new Error("canvas_sync_unit_kind_unsupported");
   }
+}
+
+const MAX_ASSIGNMENT_FILES_PER_PAGE = 40;
+
+/**
+ * Canvas's course file listing can omit files that are attached only through an
+ * assignment description. Resolve only file IDs extracted from same-origin,
+ * same-course Canvas links, using the course-scoped file endpoint so a foreign
+ * course file cannot enter this course's snapshot.
+ */
+export async function resolveAssignmentFileMetadata({
+  assignments,
+  canvas,
+  canvasBaseUrl,
+  courseCanvasId,
+}: {
+  readonly assignments: readonly CanvasAssignment[];
+  readonly canvas: Pick<CanvasClient, "getCourseFile">;
+  readonly canvasBaseUrl: string;
+  readonly courseCanvasId: string;
+}): Promise<readonly CanvasAssignment[]> {
+  const assignmentFileIds = assignments.map((assignment) =>
+    discoverCanvasPageFileIds({
+      canvasBaseUrl,
+      canvasCourseId: courseCanvasId,
+      html: assignment.description,
+    }),
+  );
+  const missingIds = [...new Set(assignmentFileIds.flat())]
+    .filter((fileId) => !assignments.some((assignment) =>
+      assignment.attachments?.some((file) => file.id === fileId),
+    ))
+    .slice(0, MAX_ASSIGNMENT_FILES_PER_PAGE);
+  const resolved = new Map<string, CanvasFile>();
+  for (let index = 0; index < missingIds.length; index += 3) {
+    await Promise.all(missingIds.slice(index, index + 3).map(async (fileId) => {
+      try {
+        const file = await canvas.getCourseFile(courseCanvasId, fileId);
+        if (file.id === fileId) resolved.set(fileId, file);
+      } catch {
+        // Keep the course sync usable when Canvas denies a stale or unavailable
+        // embedded file. It will simply remain absent from the attachment list.
+      }
+    }));
+  }
+
+  return assignments.map((assignment, index) => {
+    const attachments = new Map(
+      (assignment.attachments ?? []).map((file) => [file.id, file]),
+    );
+    for (const fileId of assignmentFileIds[index] ?? []) {
+      const file = resolved.get(fileId);
+      if (file) attachments.set(fileId, file);
+    }
+    return { ...assignment, attachments: [...attachments.values()] };
+  });
 }
 
 function pageResult<TItem>(

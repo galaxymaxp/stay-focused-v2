@@ -1,19 +1,30 @@
 import { router } from "expo-router";
-import { ArrowLeft, ChevronRight, Layers, MoreHorizontal, FileText, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, ChevronRight, FileText, RefreshCw, Search, Settings, X, BookOpen, ClipboardList, Presentation, FileQuestion, Globe, Info } from "lucide-react-native";
+import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
+import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
   Animated,
+  Easing,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   View,
+  useWindowDimensions,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuth } from "../auth";
+import { haptic } from "./haptics";
+import { QueueButton } from "./QueueButton";
+import { useSheetDrag } from "./sheetDrag";
 import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing, typography } from "./tokens";
 
@@ -23,16 +34,19 @@ export function Copy({
   muted = false,
   color,
   style,
+  numberOfLines,
 }: {
   children: ReactNode;
   size?: "display" | "h1" | "h2" | "h3" | "body" | "bodySmall" | "caption";
   muted?: boolean;
   color?: string;
   style?: StyleProp<import("react-native").TextStyle>;
+  numberOfLines?: number;
 }) {
   const { colors } = useTheme();
   return (
     <Text
+      numberOfLines={numberOfLines}
       style={[
         {
           color: color ?? (muted ? colors.textSecondary : colors.textPrimary),
@@ -77,12 +91,33 @@ export function Surface({
     </View>
   );
 }
+
+function usePressMotion(disabled = false) {
+  const { reducedMotion } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => () => scale.stopAnimation(), [scale]);
+  const animate = (value: number) => {
+    scale.stopAnimation();
+    if (reducedMotion) {
+      scale.setValue(1);
+      return;
+    }
+    Animated.spring(scale, { toValue: value, ...motion.spring, useNativeDriver: true }).start();
+  };
+  return {
+    scale,
+    onPressIn: () => { if (!disabled) animate(0.985); },
+    onPressOut: () => animate(1),
+  };
+}
+
 export function Action({
   children,
   onPress,
   disabled = false,
   secondary = false,
   pill = false,
+  hero = false,
   label,
   testID,
 }: {
@@ -91,34 +126,40 @@ export function Action({
   disabled?: boolean;
   secondary?: boolean;
   pill?: boolean;
+  hero?: boolean;
   label?: string;
   testID?: string;
 }) {
   const { colors } = useTheme();
+  const press = usePressMotion(disabled);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      testID={testID}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: hitTarget.min,
-        alignSelf: secondary && !pill ? "flex-start" : "stretch",
-        paddingHorizontal: secondary ? spacing[2] : spacing[4],
-        paddingVertical: spacing[2],
-        borderRadius: pill ? radius.pill : radius.control,
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
-        backgroundColor: secondary ? (pressed ? colors.surfaceSecondary : pill ? colors.surfacePrimary : "transparent") : colors.accent,
-      })}
-    >
-      <Copy size={secondary ? "bodySmall" : "body"} color={secondary ? colors.accent : colors.onAccent}>
-        {children}
-      </Copy>
-    </Pressable>
+    <Animated.View style={{ alignSelf: secondary && !pill ? "flex-start" : "stretch", transform: [{ scale: press.scale }] }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        testID={testID}
+        onPress={() => {
+          haptic.tap();
+          onPress();
+        }}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={({ pressed }) => ({
+          minHeight: hero ? 56 : hitTarget.min,
+          paddingHorizontal: secondary ? spacing[2] : spacing[4],
+          paddingVertical: spacing[2],
+          borderRadius: pill ? radius.pill : radius.control,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: disabled ? 0.5 : pressed ? 0.82 : 1,
+          backgroundColor: secondary ? (pressed ? colors.surfaceSecondary : pill ? colors.surfacePrimary : "transparent") : colors.accent,
+        })}
+      >
+        <Copy size={secondary ? "bodySmall" : "body"} color={secondary ? colors.accent : colors.onAccent}>{children}</Copy>
+      </Pressable>
+    </Animated.View>
   );
 }
 export function IconAction({
@@ -135,7 +176,10 @@ export function IconAction({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
       style={({ pressed }) => ({
         minWidth: hitTarget.min,
         minHeight: hitTarget.min,
@@ -158,6 +202,14 @@ export function Page({
   onRefresh,
   actions = [],
   headerAction,
+  headerLeading,
+  scrollRef,
+  onScroll,
+  overlay,
+  headerBelow,
+  scrollEnabled = true,
+  scrollTouch,
+  refreshEnabled = true,
 }: {
   children: ReactNode;
   title: string;
@@ -168,18 +220,38 @@ export function Page({
   onRefresh?: () => void;
   actions?: readonly { label: string; onPress: () => void }[];
   headerAction?: ReactNode;
+  /** Small identity mark shown before the title (e.g. a course monogram). */
+  headerLeading?: ReactNode;
+  scrollRef?: Ref<ScrollView>;
+  onScroll?: React.ComponentProps<typeof ScrollView>["onScroll"];
+  /** Absolutely positioned layer above the scroll content (e.g. a scrubber). */
+  overlay?: ReactNode;
+  /** Pinned content between the header and the scroll area (e.g. find-in-page). */
+  headerBelow?: ReactNode;
+  scrollEnabled?: boolean;
+  /**
+   * Raw touch observers on the scroll view. They bubble from any content and
+   * never claim the gesture, so native scrolling is unaffected.
+   */
+  /** Turn pull-to-refresh off while a gesture on the page owns vertical drags. */
+  refreshEnabled?: boolean;
+  scrollTouch?: Pick<React.ComponentProps<typeof ScrollView>, "onTouchStart" | "onTouchMove" | "onTouchEnd" | "onTouchCancel">;
 }) {
   const { colors, mode } = useTheme();
-  const [menu, setMenu] = useState(false);
-  const menuActions = [
-    ...actions,
-    ...(onRefresh ? [{ label: "Refresh", onPress: onRefresh }] : []),
-    ...(!back ? [{ label: "Settings and appearance", onPress: () => router.push("/appearance") }] : []),
-  ];
+  const [pulling, setPulling] = useState(false);
+  // Screens nested inside a tab already sit above the tab bar.
+  const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
+  const pullToRefresh = onRefresh
+    ? () => {
+        setPulling(true);
+        onRefresh();
+        setTimeout(() => setPulling(false), 700);
+      }
+    : undefined;
   return (
     <SafeAreaView
       edges={
-        back ? ["top", "left", "right", "bottom"] : ["top", "left", "right"]
+        back && !insideTabs ? ["top", "left", "right", "bottom"] : ["top", "left", "right"]
       }
       style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}
     >
@@ -207,8 +279,9 @@ export function Page({
             <ArrowLeft size={density.utilityIcon} color={colors.textPrimary} />
           </IconAction>
         )}
+        {headerLeading ? <View style={{ marginRight: spacing[3] }}>{headerLeading}</View> : null}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Copy size="h1">{title}</Copy>
+          <Copy size={back ? "h2" : "h1"} style={back ? { fontSize: 20, lineHeight: 26 } : undefined}>{title}</Copy>
           {subtitle && (
             <Copy muted size="caption">
               {subtitle}
@@ -216,30 +289,39 @@ export function Page({
           )}
         </View>
         {headerAction}
-        {!back && (
-            <IconAction
-              label="Open Queue"
-              onPress={() => router.push("/generation-queue")}
-            >
-              <Layers color={colors.textSecondary} size={density.utilityIcon} />
-            </IconAction>
-        )}
-        {menuActions.length > 0 && <IconAction label="More options" onPress={() => setMenu(true)}><MoreHorizontal color={colors.textSecondary} size={density.utilityIcon} /></IconAction>}
+        {!back && <QueueButton />}
+        {!back && <ProfileButton />}
       </View>
+      {headerBelow}
+      <View style={{ flex: 1 }}>
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEnabled={scrollEnabled}
+          // Android's pull-to-refresh wrapper ignores a child's "don't steal
+          // this touch" request unless the scroll view nests. Without this a
+          // quick drag on a control (a clock handle, a scrubber) at the top of
+          // the page is taken as a pull-to-refresh.
+          nestedScrollEnabled
+          {...scrollTouch}
+          scrollEventThrottle={onScroll ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
+          refreshControl={pullToRefresh ? <RefreshControl enabled={refreshEnabled} refreshing={pulling} onRefresh={pullToRefresh} tintColor={colors.textSecondary} colors={[colors.accent]} progressBackgroundColor={colors.surfaceElevated} /> : undefined}
           contentContainerStyle={{
             paddingHorizontal: spacing[5],
             paddingBottom: 32,
             gap: density.screenGap,
           }}
         >
-          <Flow>{children}</Flow>
+          {children}
+          {actions.length > 0 ? <PageLinks actions={actions} /> : null}
         </ScrollView>
       ) : (
         <View style={{ flex: 1, paddingHorizontal: 20 }}>{children}</View>
       )}
+      {overlay}
+      </View>
       {footer && (
         <View
           style={{
@@ -253,23 +335,24 @@ export function Page({
           {footer}
         </View>
       )}
-      {menu && <Sheet onClose={() => setMenu(false)}><Copy size="h2">{title || "Options"}</Copy>{menuActions.map(action => <RowLink key={action.label} label={action.label} onPress={() => { setMenu(false); action.onPress(); }}><Copy>{action.label}</Copy></RowLink>)}</Sheet>}
     </SafeAreaView>
   );
 }
-export function Flow({ children }: { children: ReactNode }) {
-  const { reducedMotion } = useTheme();
-  const opacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const animation = Animated.timing(opacity, {
-      toValue: 1,
-      duration: reducedMotion ? motion.small : motion.normal,
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [opacity, reducedMotion]);
-  return <Animated.View style={{ opacity, gap: density.screenGap }}>{children}</Animated.View>;
+/**
+ * Page-specific management links (e.g. "Manage saved Reviewers") sit quietly
+ * at the end of the page instead of behind an overflow menu.
+ */
+function PageLinks({ actions }: { actions: readonly { label: string; onPress: () => void }[] }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ marginTop: spacing[2], borderTopWidth: 1, borderColor: colors.separator, paddingTop: spacing[1] }}>
+      {actions.map((action) => (
+        <RowLink key={action.label} label={action.label} onPress={action.onPress}>
+          <Copy size="bodySmall" color={colors.accent}>{action.label}</Copy>
+        </RowLink>
+      ))}
+    </View>
+  );
 }
 export function Notice({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
@@ -290,6 +373,9 @@ export function RowLink({
   trailing,
   inset = false,
   disabled = false,
+  accessibilityActions,
+  onAccessibilityAction,
+  onLongPress,
 }: {
   children: ReactNode;
   label: string;
@@ -298,15 +384,30 @@ export function RowLink({
   trailing?: ReactNode;
   inset?: boolean;
   disabled?: boolean;
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+  /** Additional options, e.g. a quick-actions sheet. */
+  onLongPress?: () => void;
 }) {
   const { colors } = useTheme();
+  const press = usePressMotion(disabled);
   return (
+    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
+      onAccessibilityAction={onAccessibilityAction}
       onPress={onPress}
+      onLongPress={onLongPress ? () => {
+        haptic.press();
+        onLongPress();
+      } : undefined}
+      delayLongPress={onLongPress ? 380 : undefined}
       disabled={disabled}
       accessibilityState={{ disabled }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       style={({ pressed }) => ({
         minHeight: hitTarget.min,
         flexDirection: "row",
@@ -321,6 +422,7 @@ export function RowLink({
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>{children}</View>
       {trailing ?? <ChevronRight size={16} color={colors.textMuted} />}
     </Pressable>
+    </Animated.View>
   );
 }
 
@@ -334,55 +436,407 @@ export function ContentIcon({ kind, small = false }: { kind: string; small?: boo
 
 export function FilterChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { colors } = useTheme();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable>;
+  const press = usePressMotion();
+  return <Animated.View style={{ transform: [{ scale: press.scale }] }}><Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={() => { haptic.select(); onPress(); }} onPressIn={press.onPressIn} onPressOut={press.onPressOut} style={{ minHeight: hitTarget.min, minWidth: hitTarget.min, justifyContent: "center" }}><View style={{ minHeight: density.filterHeight, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6, justifyContent: "center", backgroundColor: selected ? colors.blueSoft : "transparent" }}><Copy size="caption" color={selected ? colors.blue : colors.textSecondary} style={{ fontWeight: selected ? "600" : "400" }}>{label}</Copy></View></Pressable></Animated.View>;
 }
 
+/** Extra sheet surface below the screen edge, so a spring overshoot never shows a gap. */
+const SHEET_OVERSHOOT = 48;
+
+/**
+ * Bottom sheet for lightweight choices. Dismissal never depends on scrolling:
+ * the header keeps a visible Done control, the backdrop dismisses, Android
+ * back closes it, and the panel can be pulled down (from the top of its
+ * content) to close. Insets come from the app's provider because a native Modal
+ * is its own window, where a nested SafeAreaView can report zero insets under
+ * edge-to-edge and hide controls behind the navigation bar.
+ *
+ * Motion: the whole screen fades to a dark tint on its own, while the panel
+ * springs up with momentum and settles. Dismissing slides the panel back down
+ * as the tint fades out, then closes. Reduced Motion fades both.
+ */
 export function Sheet({
   children,
   onClose,
+  title,
+  footer,
+  scrollRef,
 }: {
   children: ReactNode;
   onClose: () => void;
+  title?: string;
+  /** Pinned below the scroll area, always visible (e.g. a secondary action). */
+  footer?: ReactNode;
+  /** Lets content bring a focused field into view; the Modal does not resize for the keyboard. */
+  scrollRef?: Ref<ScrollView>;
 }) {
   const { colors, reducedMotion } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const tint = useRef(new Animated.Value(0)).current;
+  const rise = useRef(new Animated.Value(reducedMotion ? 0 : windowHeight)).current;
+  const panelHeight = useRef(windowHeight);
+  const closing = useRef(false);
+
+  useEffect(() => {
+    Animated.timing(tint, { toValue: 1, duration: reducedMotion ? 160 : 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    if (!reducedMotion) Animated.spring(rise, { toValue: 0, ...motion.sheet, useNativeDriver: true }).start();
+    return () => {
+      tint.stopAnimation();
+      rise.stopAnimation();
+    };
+  }, [reducedMotion, rise, tint]);
+
+  const dismiss = (from = 0) => {
+    if (closing.current) return;
+    closing.current = true;
+    rise.setValue(from);
+    Animated.parallel([
+      Animated.timing(tint, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      reducedMotion
+        ? Animated.timing(rise, { toValue: 0, duration: 0, useNativeDriver: true })
+        : Animated.timing(rise, { toValue: panelHeight.current, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => onClose());
+  };
+  // Android's native ScrollView takes vertical drags from its content, so content that
+  // fits does not scroll; a swipe down anywhere, or up when nothing scrolls, closes the sheet.
+  const [viewport, setViewport] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const contentFits = viewport > 0 && contentHeight > 0 && contentHeight <= viewport + 1;
+  const fitsRef = useRef(contentFits);
+  fitsRef.current = contentFits;
+  const pull = useSheetDrag(dismiss, { upwardCloses: () => fitsRef.current });
+  // The backdrop lightens as the panel is pulled down.
+  const shade = Animated.multiply(tint, pull.drag.interpolate({ inputRange: [0, 420], outputRange: [1, 0.35], extrapolate: "clamp" }));
+
   return (
-    <Modal
-      transparent
-      visible
-      animationType={reducedMotion ? "fade" : "slide"}
-      onRequestClose={onClose}
-    >
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "flex-end",
-          backgroundColor: "rgba(0,0,0,0.4)",
-        }}
-      >
-        <SafeAreaView
-          edges={["bottom", "left", "right"]}
+    <Modal transparent visible statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={() => dismiss()}>
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <Animated.View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: shade }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={() => dismiss()} style={{ flex: 1 }} />
+        </Animated.View>
+        <Animated.View
+          accessibilityViewIsModal
+          {...pull.touchHandlers}
+          onLayout={(event) => {
+            panelHeight.current = event.nativeEvent.layout.height;
+          }}
           style={{
-            maxHeight: "85%",
+            maxHeight: "88%",
+            flexShrink: 1,
+            marginBottom: -SHEET_OVERSHOOT,
             backgroundColor: colors.surfaceElevated,
-            borderTopLeftRadius: radius.card,
-            borderTopRightRadius: radius.card,
-            padding: spacing[5],
+            borderTopLeftRadius: radius.page,
+            borderTopRightRadius: radius.page,
+            paddingBottom: Math.max(insets.bottom, spacing[4]) + SHEET_OVERSHOOT,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+            opacity: reducedMotion ? tint : 1,
+            transform: [{ translateY: Animated.add(rise, pull.drag) }],
           }}
         >
+          <View style={{ alignItems: "center", paddingTop: spacing[2], paddingBottom: spacing[1] }}>
+            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} />
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
+            </View>
+            <DoneButton onPress={() => dismiss()} />
+          </View>
           <ScrollView
+            ref={scrollRef}
+            style={{ flexShrink: 1 }}
+            scrollEnabled={!contentFits}
+            onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
+            onContentSizeChange={(_width, height) => setContentHeight(height)}
+            onScroll={pull.onScroll}
+            scrollEventThrottle={16}
+            alwaysBounceVertical={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              gap: spacing[3],
-              paddingBottom: spacing[4],
-            }}
+            contentContainerStyle={{ gap: spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[4] }}
           >
             {children}
           </ScrollView>
-          <Action secondary onPress={onClose}>
-            Close
-          </Action>
-        </SafeAreaView>
+          {footer ? <View style={{ paddingHorizontal: spacing[5], paddingTop: spacing[2], gap: spacing[2] }}>{footer}</View> : null}
+        </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+/** The single, always-visible local dismissal control for sheets and modals. */
+export function DoneButton({ onPress, label = "Done" }: { onPress: () => void; label?: string }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID="sheet-done"
+      onPress={() => {
+        haptic.tap();
+        onPress();
+      }}
+      hitSlop={6}
+      style={({ pressed }) => ({ minHeight: hitTarget.min, minWidth: hitTarget.min + 16, paddingHorizontal: spacing[3], alignItems: "center", justifyContent: "center", opacity: pressed ? 0.55 : 1 })}
+    >
+      <Copy size="body" color={colors.accent} style={{ fontWeight: "600" }}>{label}</Copy>
+    </Pressable>
+  );
+}
+
+/**
+ * iOS-style segmented control. The selection pill springs between segments on
+ * the native driver; with Reduced Motion it moves without travel.
+ */
+export function SegmentedControl<T extends string>({
+  segments,
+  value,
+  onChange,
+}: {
+  segments: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const { colors, mode, reducedMotion } = useTheme();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, segments.findIndex((segment) => segment.value === value));
+  const segmentWidth = width > 0 ? (width - 4) / segments.length : 0;
+  const offset = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const toValue = index * segmentWidth;
+    if (reducedMotion || segmentWidth === 0) offset.setValue(toValue);
+    else Animated.spring(offset, { toValue, ...motion.spring, useNativeDriver: true }).start();
+  }, [index, offset, reducedMotion, segmentWidth]);
+  return (
+    <View
+      accessibilityRole="tablist"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", padding: 2, minHeight: 36, borderRadius: 10, backgroundColor: colors.surfaceSecondary }}
+    >
+      {segmentWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 2,
+            bottom: 2,
+            left: 2,
+            width: segmentWidth,
+            borderRadius: 8,
+            backgroundColor: mode === "dark" ? colors.surfaceElevated : "#FFFFFF",
+            shadowColor: "#000",
+            shadowOpacity: mode === "dark" ? 0 : 0.08,
+            shadowRadius: 3,
+            shadowOffset: { width: 0, height: 1 },
+            elevation: mode === "dark" ? 0 : 1,
+            transform: [{ translateX: offset }],
+          }}
+        />
+      ) : null}
+      {segments.map((segment) => {
+        const selected = segment.value === value;
+        return (
+          <Pressable
+            key={segment.value}
+            accessibilityRole="tab"
+            accessibilityLabel={segment.label}
+            accessibilityState={{ selected }}
+            onPress={() => {
+              if (!selected) haptic.select();
+              onChange(segment.value);
+            }}
+            hitSlop={{ top: 6, bottom: 6 }}
+            style={{ flex: 1, minHeight: 32, alignItems: "center", justifyContent: "center" }}
+          >
+            <Copy size="caption" color={selected ? colors.textPrimary : colors.textSecondary} style={{ fontWeight: selected ? "600" : "500", fontSize: 13 }}>
+              {segment.label}
+            </Copy>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * Inline filter field. Results update while typing; clearing restores the
+ * full list. Styled like the system search bar.
+ */
+export function SearchField({
+  value,
+  onChangeText,
+  placeholder,
+  label,
+  autoFocus = false,
+  onSubmitEditing,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  label: string;
+  autoFocus?: boolean;
+  onSubmitEditing?: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2], minHeight: 40, borderRadius: 10, paddingHorizontal: spacing[3], backgroundColor: colors.surfaceSecondary }}>
+      <Search size={16} color={colors.textMuted} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        accessibilityLabel={label}
+        autoFocus={autoFocus}
+        autoCorrect={false}
+        autoCapitalize="none"
+        returnKeyType="search"
+        onSubmitEditing={onSubmitEditing}
+        submitBehavior={onSubmitEditing ? "submit" : "blurAndSubmit"}
+        style={{ flex: 1, minHeight: 40, color: colors.textPrimary, fontSize: 15, paddingVertical: 0 }}
+      />
+      {value ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => onChangeText("")} hitSlop={12}>
+          <X size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function initialOf(email: string | null | undefined) {
+  const letter = email?.trim()[0];
+  return letter ? letter.toLocaleUpperCase() : "·";
+}
+
+/**
+ * The account entry point on primary screens. It replaces the old overflow
+ * menu: the only things that belong here are the account itself, Canvas sync
+ * and Settings. Refreshing is pull-to-refresh on each screen.
+ */
+export function ProfileButton() {
+  const { colors } = useTheme();
+  const { session } = useAuth();
+  const [open, setOpen] = useState(false);
+  const email = session?.user.email ?? null;
+  const go = (path: "/canvas-settings" | "/appearance") => {
+    setOpen(false);
+    router.push(path);
+  };
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Profile and settings"
+        testID="profile-button"
+        onPress={() => {
+          haptic.tap();
+          setOpen(true);
+        }}
+        style={({ pressed }) => ({ minWidth: hitTarget.min, minHeight: hitTarget.min, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+      >
+        <Avatar initial={initialOf(email)} size={density.utilitySize} />
+      </Pressable>
+      {open ? (
+        <Sheet onClose={() => setOpen(false)}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], paddingBottom: spacing[2] }}>
+            <Avatar initial={initialOf(email)} size={44} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Copy size="h3" numberOfLines={1}>{email ?? "Your account"}</Copy>
+              <Copy muted size="caption">Signed in to Stay Focused</Copy>
+            </View>
+          </View>
+          <View style={{ height: 1, backgroundColor: colors.separator }} />
+          <RowLink label="Sync" icon={<RowIcon><RefreshCw size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/canvas-settings")}>
+            <Copy>Sync</Copy>
+            <Copy muted size="caption">Canvas connection and synced courses</Copy>
+          </RowLink>
+          <RowLink label="Settings" icon={<RowIcon><Settings size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/appearance")}>
+            <Copy>Settings</Copy>
+            <Copy muted size="caption">Account, sign-in methods and appearance</Copy>
+          </RowLink>
+        </Sheet>
+      ) : null}
+    </>
+  );
+}
+
+function RowIcon({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return <View style={{ width: 32, height: 32, borderRadius: radius.control - 4, backgroundColor: colors.blueSoft, alignItems: "center", justifyContent: "center" }}>{children}</View>;
+}
+
+function Avatar({ initial, size }: { initial: string; size: number }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: colors.separator, alignItems: "center", justifyContent: "center" }}
+    >
+      <Copy color={colors.blue} style={{ fontSize: size * 0.44, lineHeight: size * 0.56, fontWeight: "600" }}>{initial}</Copy>
+    </View>
+  );
+}
+
+/**
+ * One shimmer shared by every placeholder on screen, on the native driver, so
+ * all skeletons breathe together and cost nothing on the JS thread. It runs
+ * only while at least one skeleton is mounted.
+ */
+const shimmer = new Animated.Value(0);
+let shimmerUsers = 0;
+let shimmerLoop: Animated.CompositeAnimation | null = null;
+function useSharedShimmer(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    shimmerUsers += 1;
+    if (!shimmerLoop) {
+      shimmerLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmer, { toValue: 1, duration: 650, useNativeDriver: true, isInteraction: false }),
+          Animated.timing(shimmer, { toValue: 0, duration: 650, useNativeDriver: true, isInteraction: false }),
+        ]),
+      );
+      shimmerLoop.start();
+    }
+    return () => {
+      shimmerUsers -= 1;
+      if (shimmerUsers === 0) {
+        shimmerLoop?.stop();
+        shimmerLoop = null;
+      }
+    };
+  }, [enabled]);
+}
+
+/** A loading placeholder block. Under Reduced Motion it holds still. */
+export function SkeletonBlock({ width, height, radius: corner = 8, style }: { width: number | `${number}%`; height: number; radius?: number; style?: StyleProp<ViewStyle> }) {
+  const { colors, reducedMotion } = useTheme();
+  useSharedShimmer(!reducedMotion);
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[{ width, height, borderRadius: corner, backgroundColor: colors.surfaceSecondary, opacity: reducedMotion ? 0.8 : shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }, style]}
+    />
+  );
+}
+
+/** A card-shaped placeholder list for screens whose content is still loading. */
+export function SkeletonCards({ rows = 3, label = "Loading" }: { rows?: number; label?: string }) {
+  return (
+    <View accessible accessibilityLabel={label} accessibilityState={{ busy: true }} style={{ gap: spacing[3] }}>
+      {Array.from({ length: rows }, (_, index) => (
+        <Surface key={index} style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], minHeight: 76 }}>
+          <SkeletonBlock width={40} height={48} radius={10} />
+          <View style={{ flex: 1, gap: spacing[2] }}>
+            <SkeletonBlock width="34%" height={10} />
+            <SkeletonBlock width={index % 2 ? "82%" : "64%"} height={16} />
+          </View>
+        </Surface>
+      ))}
+    </View>
   );
 }

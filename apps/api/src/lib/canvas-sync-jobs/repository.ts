@@ -98,6 +98,17 @@ export async function createCanvasSyncJob(
       );
     }
     if (message.includes("canvas_sync_job_in_progress")) {
+      // The partial unique index serialized a concurrent request for the same
+      // course and type. Return its winner so both callers observe one job.
+      const { data: active, error: activeError } = await client
+        .from("canvas_sync_jobs")
+        .select("*")
+        .eq("user_id", input.userId)
+        .eq("course_id", input.courseId)
+        .eq("job_type", input.jobType)
+        .in("status", ["queued", "running", "cancellation_requested"])
+        .maybeSingle();
+      if (!activeError && active) return active;
       throw new CanvasSyncJobRepositoryError(
         "canvas_sync_job_in_progress",
         "This Canvas course is already synchronizing.",
@@ -158,58 +169,6 @@ export async function findCanvasSyncJob(
     );
   }
   return data;
-}
-
-export async function prepareCanvasSyncJobWorkflowDispatch(
-  client: CanvasSyncJobServiceClient,
-  jobId: string,
-): Promise<CanvasSyncJobDatabaseRow> {
-  return requireRpcRow(
-    client.rpc("prepare_canvas_sync_job_workflow_dispatch_v1", {
-      p_job_id: jobId,
-    }),
-    "canvas_sync_workflow_prepare_failed",
-  );
-}
-
-export async function attachCanvasSyncJobWorkflow(
-  client: CanvasSyncJobServiceClient,
-  jobId: string,
-  workflowRunId: string,
-): Promise<CanvasSyncJobDatabaseRow> {
-  return requireRpcRow(
-    client.rpc("attach_canvas_sync_job_workflow_v1", {
-      p_job_id: jobId,
-      p_workflow_run_id: workflowRunId,
-    }),
-    "canvas_sync_workflow_attach_failed",
-  );
-}
-
-export async function markCanvasSyncJobDispatchFailed(
-  client: CanvasSyncJobServiceClient,
-  jobId: string,
-): Promise<CanvasSyncJobDatabaseRow | null> {
-  return optionalRpcRow(
-    client.rpc("mark_canvas_sync_job_dispatch_failed_v1", {
-      p_job_id: jobId,
-    }),
-    "canvas_sync_workflow_dispatch_failure_record_failed",
-  );
-}
-
-export async function claimCanvasSyncJob(
-  client: CanvasSyncJobServiceClient,
-  jobId: string,
-  workerId: string,
-): Promise<CanvasSyncJobDatabaseRow | null> {
-  return optionalRpcRow(
-    client.rpc("claim_canvas_sync_job_v1", {
-      p_job_id: jobId,
-      p_worker_id: workerId,
-    }),
-    "canvas_sync_job_claim_failed",
-  );
 }
 
 export async function updateCanvasSyncJobProgress(
@@ -345,24 +304,6 @@ export class CanvasSyncJobRepositoryError extends Error {
     this.safeMessage = safeMessage;
     this.retryable = retryable;
   }
-}
-
-async function requireRpcRow(
-  query: PromiseLike<{
-    readonly data: readonly CanvasSyncJobDatabaseRow[] | null;
-    readonly error: unknown;
-  }>,
-  code: CanvasApiErrorCode,
-): Promise<CanvasSyncJobDatabaseRow> {
-  const row = await optionalRpcRow(query, code);
-  if (!row) {
-    throw new CanvasSyncJobRepositoryError(
-      code,
-      "Canvas synchronization is temporarily unavailable.",
-      true,
-    );
-  }
-  return row;
 }
 
 async function optionalRpcRow(

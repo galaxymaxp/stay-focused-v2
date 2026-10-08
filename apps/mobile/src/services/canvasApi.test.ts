@@ -22,7 +22,7 @@ const API_BASE_URL = "http://localhost:3000";
 type FetchMock = ReturnType<typeof vi.fn> & typeof fetch;
 
 describe("Canvas mobile API client", () => {
-  it("connects Canvas with bearer auth and clears token responsibility to caller", async () => {
+  it.each([" https://canvas.test ", " canvas.test "])("connects Canvas address %s with bearer auth", async (baseUrl) => {
     const fetchImpl = createFetch({
       ok: true,
       connection: connection(),
@@ -33,7 +33,7 @@ describe("Canvas mobile API client", () => {
     const result = await connectCanvas({
       accessToken: "session-token",
       apiBaseUrl: API_BASE_URL,
-      baseUrl: " https://canvas.test ",
+      baseUrl,
       fetchImpl,
       personalAccessToken: " canvas-token ",
     });

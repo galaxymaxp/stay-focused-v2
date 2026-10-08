@@ -73,3 +73,7 @@ The structural planner defect is repaired and synthetic live validation succeeds
 Commit `bd5eb15` adds finding-specific structured feedback, direct correction, full same-support reauthoring, alternate-unused-support reauthoring, source-affordance difficulty planning, deterministic academic-value examples, and immutable accepted questions. The focused, full, and bounded synthetic-live validations pass without weakening any gate. Deployment `dpl_3UxRUwZDy5iGgkX1j8HnLpJBqpnD` is `READY` on the canonical production alias.
 
 The single authorized real-material retest still failed safely: 1/5 questions accepted, `q1`, `q2`, `q3`, and `q5` pending after the alternate-support phase, terminal `repair_exhausted`. No complete Quiz was persisted, so attempt/score/result/reopen remain unaccepted. The exact current verdict is **PARTIAL — Quiz semantic convergence remains incomplete**. See [the B25.3.1 report](../b25.3.1/quiz-semantic-convergence.md). B26 was not started.
+
+## B25.3.3 superseding update (2026-09-16)
+
+The AI-first migration is deployed READY as dpl_9yAtq2sy2YYRfYjoqytHCL6aWUa4. Live comparison passes three five-question sets and three Reviewers plus the Activity fixture. Physical acceptance is pending device sign-in and the selected Activity assignment. B25 remains PARTIAL; B26 is blocked. See [architecture acceptance](../b25.3.3/architecture-simplification.md). Historical records below remain unchanged.

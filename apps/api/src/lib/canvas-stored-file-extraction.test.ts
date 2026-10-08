@@ -10,7 +10,6 @@ import { createHash } from "node:crypto";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { zipSync, strToU8 } from "fflate";
 import { OFFICE_MIME } from './activity-maker/office-extraction';
-import { createTaskSpecification } from './activity-maker/generation';
 import { describe, expect, it } from "vitest";
 
 import {
@@ -45,8 +44,7 @@ describe("Canvas stored file extraction", () => {
     const file=makeReadyFile({bytes,contentType,filename,displayName:filename});const provider=createFakeOcrProvider(instructions);
     const result=await extract(file,createStorageClient([[file.storage_object_key??'',bytes]]).client,provider);
     expect(result.ok).toBe(true);if(!result.ok)throw new Error('Expected instructions');
-    const spec=createTaskSpecification('activity','Biology',[{id:'instructions',title:'Instructions',text:result.value.text,role:'instructions',materialId:null}]);
-    expect(spec.wordOrLengthRequirements.items).toBe(3);expect(spec.constraints).toEqual(['No conclusion']);
+    expect(result.value.text).toContain(instructions);
     expect(provider.calls).toHaveLength(kind==='native PDF'?0:1);
   });
   it('extracts an owned DOCX template through private Storage into task structure without OCR',async()=>{
@@ -56,8 +54,7 @@ describe("Canvas stored file extraction", () => {
     const result=await extract(file,storage.client);
     expect(result.ok).toBe(true);
     if(!result.ok)throw new Error('Expected Office extraction');
-    const spec=createTaskSpecification('canvas:activity','Lab report',[{id:'instructions',title:'Lab',text:'Use the attached template.',role:'instructions',materialId:null},{id:'template',title:'Lab template',text:result.value.text,role:'template',materialId:null}]);
-    expect(spec.requiredOrder).toEqual(['Observations','Analysis']);
+    expect(result.value.text).toContain('# Observations\n\n# Analysis');
     expect(storage.calls).toHaveLength(1);
   });
   it("extracts ready PNG files through private Storage and fake OCR", async () => {

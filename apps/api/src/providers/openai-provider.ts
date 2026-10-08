@@ -25,9 +25,12 @@ export interface OpenAITextFormat {
 }
 
 export interface OpenAIResponsesCreateRequest {
+  readonly instructions?: string;
+  readonly max_output_tokens?: number;
   readonly model: string;
   readonly input: string;
   readonly temperature?: number;
+  readonly reasoning?: { readonly effort: "low" | "medium" | "high" };
   readonly text: OpenAITextFormat;
 }
 
@@ -64,6 +67,8 @@ export type OpenAIResponsesClientFactory = (
 ) => OpenAIResponsesClient;
 
 export interface CreateServerOpenAIProviderOptions {
+  readonly timeoutMs?: number;
+  readonly maxRetries?: number;
   readonly defaultModel?: string;
   readonly environment?: OpenAIProviderEnvironment;
   readonly clientFactory?: OpenAIResponsesClientFactory;
@@ -104,9 +109,12 @@ export class OpenAIProvider implements GenerationProvider {
     const openAIRequest: OpenAIResponsesCreateRequest = {
       model,
       input: prompt,
+      ...(request.instructions ? { instructions: request.instructions } : {}),
+      ...(request.maxOutputTokens ? { max_output_tokens: request.maxOutputTokens } : {}),
       ...(request.temperature !== undefined
         ? { temperature: request.temperature }
         : {}),
+      ...(request.reasoningEffort ? { reasoning: { effort: request.reasoningEffort } } : {}),
       text: {
         format: {
           type: "json_schema",
@@ -158,18 +166,18 @@ export function createServerOpenAIProvider(
     );
   }
 
-  const clientFactory = options.clientFactory ?? createOpenAIResponsesClient;
+  const clientFactory = options.clientFactory ?? ((key: string) => createOpenAIResponsesClient(key, options.timeoutMs, options.maxRetries));
   return new OpenAIProvider({
     client: clientFactory(apiKey),
     defaultModel: options.defaultModel,
   });
 }
 
-function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
+function createOpenAIResponsesClient(apiKey: string, timeoutMs = OPENAI_PROVIDER_REQUEST_TIMEOUT_MS, maxRetries = 1): OpenAIResponsesClient {
   const client = new OpenAI({
     apiKey,
-    timeout: OPENAI_PROVIDER_REQUEST_TIMEOUT_MS,
-    maxRetries: 1,
+    timeout: timeoutMs,
+    maxRetries,
   });
 
   return {
@@ -180,6 +188,8 @@ function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
         const sdkRequest: ResponseCreateParamsNonStreaming = {
           model: request.model,
           input: request.input,
+          ...(request.instructions ? { instructions: request.instructions } : {}),
+          ...(request.max_output_tokens ? { max_output_tokens: request.max_output_tokens } : {}),
           text: {
             format: {
               type: request.text.format.type,
@@ -192,6 +202,7 @@ function createOpenAIResponsesClient(apiKey: string): OpenAIResponsesClient {
           ...(request.temperature !== undefined
             ? { temperature: request.temperature }
             : {}),
+          ...(request.reasoning ? { reasoning: { effort: request.reasoning.effort } } : {}),
         };
         const response = await client.responses.create(sdkRequest);
         return { output_text: response.output_text };

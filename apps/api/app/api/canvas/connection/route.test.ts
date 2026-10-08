@@ -414,7 +414,9 @@ describe("/api/canvas", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(db.deletedConnectionUserId).toBe("user-1");
+    expect(db.deletedConnectionUserId).toBeUndefined();
+    expect(db.rpcPayload).toEqual({ p_user_id: "user-1" });
+    expect(db.connectionFor("user-1")).toMatchObject({ id: "connection-1", status: "disconnected", token_ciphertext: null });
   });
 
   it("lists courses through decrypted server-side credentials", async () => {
@@ -542,7 +544,7 @@ describe("/api/canvas", () => {
       const response = await connectionRoute.PUT(
         createRequest({
           body: {
-            baseUrl: "https://new.canvas.test",
+            baseUrl: "https://old.canvas.test",
             personalAccessToken: "secret-token",
           },
         }),
@@ -572,13 +574,21 @@ describe("/api/canvas", () => {
     expect(db.connectionFor("user-1")).toBeNull();
     expect(db.capabilitiesFor("user-1")).toEqual([]);
   });
+  it("rejects changing the Canvas school without altering saved credentials", async () => {
+    const db = createDbClient();
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+    const response = await connectionRoute.PUT(createRequest({ body: { baseUrl: "https://different.canvas.test", personalAccessToken: "secret-token" } }));
+    expect(response.status).toBe(409);
+    expect(db.rpcPayload).toBeUndefined();
+    expect(db.connectionFor("user-1")?.base_url).toBe("https://canvas.test");
+  });
 
   it("updates the connection and complete capabilities snapshot together", async () => {
     const db = createDbClient({
       capabilityRows: [
         capabilityRow({ capability: "old_capability", status: "available" }),
       ],
-      connectionRow: connectionRow({ base_url: "https://old.canvas.test" }),
+      connectionRow: connectionRow({ base_url: "https://canvas.test" }),
     });
     mocks.createCanvasServiceClient.mockReturnValue(db);
 
@@ -778,6 +788,11 @@ function createDbClient(options: {
     },
     rpc: vi.fn((name: string, payload: Record<string, unknown>) => {
       state.rpcPayload = payload;
+      if (name === "disconnect_canvas_connection_v1") {
+        const previous = connections.get(String(payload.p_user_id));
+        if (previous) connections.set(String(payload.p_user_id), { ...previous, status: "disconnected", token_ciphertext: null, token_iv: null, token_auth_tag: null, encryption_version: null });
+        return Promise.resolve({ data: null, error: null });
+      }
       return {
         single: vi.fn(async () => {
           if (name !== "replace_canvas_connection_with_capabilities") {

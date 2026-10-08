@@ -84,6 +84,11 @@ export async function PUT(request: Request): Promise<Response> {
   }
 
   const capabilities = await canvas.probeCapabilities();
+  const existing = await readConnection(auth.value.client, auth.value.user.id);
+  if (!existing.ok) return errorResponse(500, "canvas_storage_failed", "Canvas connection could not be loaded.", request);
+  if (existing.row && (existing.row.base_url !== normalizedBaseUrl || existing.row.canvas_user_id !== profile.id)) {
+    return errorResponse(409, "invalid_request", "Reconnect to the same Canvas account and school to preserve saved course identities.", request);
+  }
   let encryptedToken;
   try {
     encryptedToken = encryptCanvasToken(validation.value.personalAccessToken);
@@ -138,10 +143,9 @@ export async function DELETE(request: Request): Promise<Response> {
     return auth.response;
   }
 
-  const { error } = await auth.value.client
-    .from("canvas_connections")
-    .delete()
-    .eq("user_id", auth.value.user.id);
+  const { error } = await auth.value.client.rpc("disconnect_canvas_connection_v1", {
+    p_user_id: auth.value.user.id,
+  });
 
   if (error) {
     return errorResponse(
