@@ -3327,3 +3327,74 @@ mark.find-active {
     display: none;
   }
 }
+
+/* ---------- Your own material ---------- */
+.own-material {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+  max-width: 1200px;
+}
+.source-text {
+  min-height: 360px;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 200px;
+  padding: 24px;
+  border: 1.5px dashed var(--line-strong, var(--line));
+  border-radius: var(--radius-card);
+  background: var(--field);
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-small) var(--ease-standard),
+    border-color var(--motion-small) var(--ease-standard),
+    transform var(--spring-duration) var(--ease-spring);
+}
+.drop-zone:hover,
+.drop-zone.dragging {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.drop-zone.dragging {
+  transform: scale(1.01);
+}
+.drop-zone > .icon {
+  width: 28px;
+  height: 28px;
+  color: var(--secondary);
+}
+.own-material-side {
+  position: sticky;
+  top: 76px;
+}
+.own-material-side h2 {
+  font-size: 16px;
+}
+.own-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--secondary);
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+.own-steps li.done {
+  color: var(--success);
+}
+@media (max-width: 1000px) {
+  .own-material {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .own-material-side {
+    position: static;
+  }
+}

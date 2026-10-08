@@ -40,8 +40,9 @@ const fixture = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "authorization,apikey,content-type,x-client-info,x-supabase-api-version",
+    "authorization,apikey,content-type,x-client-info,x-supabase-api-version,tus-resumable,upload-length,upload-metadata,upload-offset,upload-concat,upload-defer-length",
   );
+  res.setHeader("Access-Control-Expose-Headers", "location,upload-offset,upload-length,tus-resumable");
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -57,6 +58,19 @@ const fixture = http.createServer(async (req, res) => {
     return;
   }
   const url = new URL(req.url, backend);
+  // A minimal local TUS endpoint standing in for Storage resumable uploads.
+  if (url.pathname.startsWith("/storage/v1/upload/resumable")) {
+    let size = 0;
+    for await (const chunk of req) size += chunk.length;
+    res.setHeader("Tus-Resumable", "1.0.0");
+    res.setHeader("Upload-Offset", String(size || Number(req.headers["upload-length"] ?? 0)));
+    if (req.method === "POST") {
+      res.setHeader("Location", `${backend}/storage/v1/upload/resumable/fixture-upload`);
+      res.writeHead(201);
+    } else res.writeHead(req.method === "PATCH" ? 204 : 200);
+    res.end();
+    return;
+  }
   if (url.pathname === "/auth/v1/token") {
     counts.auth++;
     send({
@@ -387,6 +401,33 @@ try {
   console.log(
     "PASS course/material, generation guard, Queue reopen, Reviewer search/export and saved draft",
   );
+  if (generationFixture) {
+    await page.goto(`${origin}/generate/new`);
+    await page
+      .getByLabel("Your notes or reading", { exact: true })
+      .fill("Plan study time before each deadline and review afterwards.");
+    await page.getByLabel("Title", { exact: true }).fill("My planning notes");
+    await page.getByRole("button", { name: "Create Reviewer", exact: true }).click();
+    await page.waitForURL("**/generation/**");
+    await page
+      .getByRole("heading", { name: "Bringing the important ideas together…", exact: true })
+      .waitFor();
+    await page.goto(`${origin}/generate/new`);
+    await page.getByRole("button", { name: "Upload a file", exact: true }).click();
+    await page.getByLabel("Choose a PDF or photo", { exact: true }).setInputFiles({
+      name: "notes.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 fictional"),
+    });
+    await page.getByRole("button", { name: "Read this file", exact: true }).click();
+    const read = page.getByLabel("Check the text we read", { exact: true });
+    await read.waitFor();
+    assert((await read.inputValue()).includes("Fictional text read from your file."));
+    await page.getByRole("button", { name: "Create Reviewer", exact: true }).click();
+    await page.waitForURL("**/generation/**");
+    assert(domain.counts.sourceWrites >= 2, "Sources were not saved before generation");
+    console.log("PASS own material: pasted text and an uploaded file into Reviewer generation");
+  }
   await page.goto(`${origin}/quiz/${ids.quiz}`);
   await page
     .getByRole("button", { name: "Start practice", exact: true })
@@ -593,7 +634,8 @@ try {
   await page.waitForURL("**/sign-in");
   assert.equal(
     domain.counts.generationCalls,
-    generationFixture ? 3 : 0,
+    // Reviewer retry pair + Quiz, then own material: one file read and two Reviewers.
+    generationFixture ? 6 : 0,
     "Unexpected generation admission",
   );
   console.log(

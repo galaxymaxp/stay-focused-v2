@@ -385,8 +385,8 @@ export function GenerationScreen({ id }: { id: string }) {
               </Link>
             )}
             {job.data.status === "succeeded" && preparingSource && (
-              <Link className="button primary" href="/generate">
-                Continue to Generate
+              <Link className="button primary" href={`/generate/new?extraction=${encodeURIComponent(id)}`}>
+                Continue
               </Link>
             )}
             {running && job.data.status !== "cancellation_requested" && (

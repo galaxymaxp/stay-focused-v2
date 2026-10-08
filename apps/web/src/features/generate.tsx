@@ -56,6 +56,12 @@ export function GenerateScreen() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
+        <RowLink
+          href="/generate/new"
+          title="Your own material"
+          detail="Paste notes, or upload a PDF or photo"
+          icon="file-text"
+        />
         <div className="row between">
           <span className="kicker">Canvas</span>
           <Link href="/canvas">Connection and sync</Link>

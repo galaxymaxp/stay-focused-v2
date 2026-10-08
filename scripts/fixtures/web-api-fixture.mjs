@@ -108,6 +108,7 @@ export function createFixture() {
       canvasWrites: 0,
       generationCalls: 0,
       assistCalls: 0,
+      sourceWrites: 0,
     };
   const now = () => new Date().toISOString();
   const quiz = () => ({
@@ -253,6 +254,62 @@ export function createFixture() {
         }),
       );
     };
+    // Your own material: canonical sources, uploads, extraction and Reviewer jobs.
+    if (path === "/api/sources" && method === "POST") {
+      if (!req.headers["idempotency-key"]) return fail("invalid_request", 400);
+      counts.sourceWrites++;
+      send({ id: crypto.randomUUID(), sourceType: body.sourceType, displayName: body.displayName });
+      return;
+    }
+    if (path === "/api/job-uploads" && method === "POST") {
+      send({
+        uploadId: "upload-1",
+        bucket: "processing-sources",
+        objectPath: `fixture/${body.displayName}`,
+        tusEndpoint: "http://127.0.0.1:3402/storage/v1/upload/resumable",
+        chunkSize: 6 * 1024 * 1024,
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      });
+      return;
+    }
+    if (path.startsWith("/api/job-uploads/") && path.endsWith("/accept")) {
+      counts.generationCalls++;
+      const id = crypto.randomUUID();
+      admittedJobs.set(id, {
+        ...job,
+        id,
+        jobType: "document_extraction",
+        status: "succeeded",
+        source: { displayName: "notes.pdf", sourceKind: "pdf", mimeType: "application/pdf" },
+      });
+      send(admittedJobs.get(id));
+      return;
+    }
+    if (path.startsWith("/api/jobs/") && path.endsWith("/result")) {
+      send({
+        text: "Fictional text read from your file. Plan time before a deadline.",
+        sourceBlocks: [],
+        pageCount: 1,
+        processedPageCount: 1,
+        sourceVersionId: crypto.randomUUID(),
+      });
+      return;
+    }
+    if (path === "/api/jobs" && method === "POST") {
+      if (!req.headers["idempotency-key"] || body.jobType !== "reviewer_generation" || !body.sourceVersionId)
+        return fail("invalid_request", 400);
+      counts.generationCalls++;
+      const id = crypto.randomUUID();
+      admittedJobs.set(id, {
+        ...job,
+        id,
+        status: "running",
+        jobType: "reviewer_generation",
+        source: { ...job.source, displayName: body.sourceTitle },
+      });
+      send(admittedJobs.get(id), 202);
+      return;
+    }
     if (
       method === "POST" &&
       ["/api/experience/generations", "/api/experience/quizzes"].includes(path)
