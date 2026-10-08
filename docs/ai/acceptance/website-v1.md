@@ -58,3 +58,18 @@ Foundation code is formatted for review. Session-bound API closures refuse a
 JWT from a different account; resource requests cancel on navigation/account
 change and polling does not overlap. Available-time controls collapse on mobile
 so Up Next remains visible above the bottom navigation.
+
+## W3 Canvas, generation and Queue checkpoint
+
+FRESH isolated browser flow: real route contracts are exercised for connection
+creation/deletion, course inventory, accepted content sync and recovery shortcut.
+The personal access token is cleared after submission and absent from browser
+storage. Course/module/material navigation and deep links pass. Generation
+admission is disabled by default; paid generation was not invoked. Queue opens
+persisted completed output without generating again. Loaded history now survives
+active-queue polling. Source preparation, Reviewer/Quiz admission, cancellation
+and retry reuse existing API safeguards and idempotency contracts.
+
+Figma Generate, Course, Generation and Queue frames were inspected. The orb is
+the supplied local SVG. Desktop arrangements derive from that same design
+language under the owner's explicit approval; no new desktop design is invented.

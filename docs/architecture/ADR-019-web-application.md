@@ -24,8 +24,11 @@ prototype bundle. The Foundations page specifies Inter as the Figma stand-in
 for the device system font, 48px targets, 12px controls and 16px cards.
 No separately version-labelled v1.2 resource or approved Authentication,
 expanded Schedule, Canvas-connection or Settings frame was located. This was
-reported before implementation; those screens reuse existing mobile behavior
-and inspected foundation components, with visual acceptance pending.
+reported before implementation. The owner subsequently confirmed that no
+desktop frames exist and authorized deriving them from the existing design
+language. Those screens reuse mobile behavior and inspected foundation
+components. Desktop adaptations use the same tokens, icons and terminology;
+no exact desktop-frame match is claimed.
 
 The Figma Quiz includes Reveal Answer and incomplete Finish Quiz controls that
 conflict with the retained backend finalization/secrecy contract. Preserve
