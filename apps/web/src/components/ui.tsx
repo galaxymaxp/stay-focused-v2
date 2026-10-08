@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BookLoader } from "./brand";
 import { PageCrumb, type Crumb } from "./crumbs";
 export function Icon({ name }: { name: string }) {
   return (
@@ -104,14 +105,7 @@ export function State({
         <button onClick={resource.refresh}>Try again</button>
       </div>
     );
-  if (resource.loading && !resource.data)
-    return (
-      <div role="status" aria-label="Loading" className="stack">
-        <div className="skeleton" />
-        <div className="skeleton" />
-        <span className="muted">Loading…</span>
-      </div>
-    );
+  if (resource.loading && !resource.data) return <BookLoader />;
   return null;
 }
 export function RowLink({

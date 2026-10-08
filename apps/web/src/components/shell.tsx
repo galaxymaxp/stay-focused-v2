@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { BookLoader, LogoMark } from "./brand";
 import { Breadcrumbs, CrumbProvider, trailFor, useCrumbState } from "./crumbs";
 import { useAuth } from "./providers";
 import { Icon, Notice } from "./ui";
@@ -19,7 +20,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),
     router = useRouter(),
     pathname = usePathname(),
-    { page, setPage } = useCrumbState();
+    { page, setPage } = useCrumbState(),
+    { collapsed, toggleSidebar } = useSidebar();
   const active = (href: string) =>
     pathname.startsWith(href) ||
     (href === "/library" && pathname.startsWith("/quiz")) ||
@@ -34,24 +36,24 @@ export function Shell({ children }: { children: ReactNode }) {
   if (loading || !session)
     return (
       <main className="auth-page">
-        <p role="status">
-          {loading ? "Restoring your session…" : "Opening sign in…"}
-        </p>
+        <BookLoader
+          label={loading ? "Restoring your session" : "Opening sign in"}
+        />
         {error && <Notice error>{error}</Notice>}
       </main>
     );
   const email = session.user.email ?? "Signed in";
   return (
     <div
-      className={`app-shell${detail ? " detail-page" : ""}`}
+      className={`app-shell${detail ? " detail-page" : ""}${collapsed ? " sidebar-collapsed" : ""}`}
       key={session.user.id}
     >
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <aside className="sidebar">
+      <aside className="sidebar" id="sidebar" inert={collapsed}>
         <Link href="/today" className="brand">
-          <Icon name="layers" />
+          <LogoMark size={22} />
           <span>Stay Focused</span>
         </Link>
         <nav aria-label="Primary navigation">
@@ -86,7 +88,19 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       <div className="workspace">
         <header className="topbar">
+          <button
+            type="button"
+            className="icon-button sidebar-toggle"
+            aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
+            aria-controls="sidebar"
+            aria-expanded={!collapsed}
+            title={`${collapsed ? "Show" : "Hide"} sidebar (Ctrl+B)`}
+            onClick={toggleSidebar}
+          >
+            <Icon name="panel-left" />
+          </button>
           <Link href="/today" className="mobile-brand">
+            <LogoMark size={20} />
             Stay Focused
           </Link>
           <Breadcrumbs trail={trailFor(pathname, page)} />
@@ -128,4 +142,44 @@ export function Shell({ children }: { children: ReactNode }) {
       </nav>
     </div>
   );
+}
+
+const sidebarKey = "stay-focused-web-sidebar";
+/** Desktop sidebar visibility, remembered per browser and toggled with Ctrl+B. */
+function useSidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(sidebarKey) === "hidden");
+    } catch {
+      /* Storage can be unavailable; the sidebar simply starts visible. */
+    }
+  }, []);
+  const toggleSidebar = useCallback(() => {
+    setCollapsed((old) => {
+      try {
+        localStorage.setItem(sidebarKey, old ? "shown" : "hidden");
+      } catch {
+        /* Not remembered this time. */
+      }
+      return !old;
+    });
+  }, []);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        event.key.toLowerCase() !== "b" ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.altKey ||
+        target?.closest("input, textarea, select, [contenteditable='true']")
+      )
+        return;
+      event.preventDefault();
+      toggleSidebar();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleSidebar]);
+  return { collapsed, toggleSidebar };
 }

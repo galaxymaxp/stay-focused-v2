@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { LogoMark } from "../components/brand";
 import { useAuth } from "../components/providers";
-import { Icon, Notice } from "../components/ui";
+import { Notice } from "../components/ui";
 import { useAction } from "../lib/hooks";
 export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
   const { client, session, loading, error, theme, setTheme } = useAuth(),
@@ -71,7 +72,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
     <main className="auth-page">
       <div className="auth-card">
         <Link className="brand" href="/sign-in">
-          <Icon name="layers" />
+          <LogoMark size={28} />
           <span>Stay Focused</span>
         </Link>
         <h1>{signUp ? "Create your account" : "Welcome back"}</h1>
