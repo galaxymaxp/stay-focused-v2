@@ -211,6 +211,12 @@ export function CanvasScreen() {
                     >
                       Open materials
                     </Link>
+                    <Link
+                      className="button subtle"
+                      href={`/canvas/${course.id}/grades`}
+                    >
+                      Grades
+                    </Link>
                     <button
                       disabled={action.busy || dirty}
                       onClick={() =>

@@ -193,14 +193,24 @@ export function CourseWorkspace({
             back="/generate"
             crumb={selectedId ? null : undefined}
             action={
-              <Link
-                href="/tasks"
-                className="button"
-                aria-label="Assignments and tasks"
-              >
-                <Icon name="clipboard-list" />
-                <span className="desktop-only">Assignments and tasks</span>
-              </Link>
+              <div className="row wrap">
+                <Link
+                  href={`/canvas/${courseId}/grades`}
+                  className="button"
+                  aria-label="Grades"
+                >
+                  <Icon name="square-check-big" />
+                  <span className="desktop-only">Grades</span>
+                </Link>
+                <Link
+                  href="/tasks"
+                  className="button"
+                  aria-label="Assignments and tasks"
+                >
+                  <Icon name="clipboard-list" />
+                  <span className="desktop-only">Assignments and tasks</span>
+                </Link>
+              </div>
             }
           />
         </div>

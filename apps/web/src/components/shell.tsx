@@ -32,7 +32,8 @@ export function Shell({ children }: { children: ReactNode }) {
     // keeps the list mounted instead of replaying the page entrance.
     screen = pathname
       .replace(/^(\/generate\/[^/]+)\/.+$/, "$1")
-      .replace(/^\/announcements\/.+$/, "/announcements");
+      .replace(/^\/announcements\/.+$/, "/announcements")
+      .replace(/^(\/canvas\/[^/]+\/grades)\/.+$/, "$1");
   useEffect(() => {
     if (!loading && !session) router.replace("/sign-in");
   }, [loading, session, router]);

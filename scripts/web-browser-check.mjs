@@ -562,6 +562,21 @@ try {
     "Canvas token leaked into browser storage",
   );
   console.log("PASS Canvas connection/disconnection and accepted course sync");
+  await page.getByRole("link", { name: "Grades", exact: true }).click();
+  await page.getByRole("heading", { name: "Study foundations", exact: true }).waitFor();
+  await page.getByText("A-", { exact: true }).first().waitFor();
+  await page.getByRole("link", { name: /Weekly study log/ }).waitFor();
+  await page.getByRole("link", { name: /Planning reflection/ }).click();
+  await page.waitForURL("**/canvas/*/grades/grade-1");
+  await page.getByText("18 / 20", { exact: true }).last().waitFor();
+  await page.getByText("Unlimited", { exact: true }).waitFor();
+  await page.getByRole("link", { name: "Back to all assignments", exact: true }).click();
+  await page.waitForURL("**/canvas/*/grades");
+  const canvasWritesBeforeGrades = domain.counts.canvasWrites;
+  await page.getByRole("button", { name: "Sync grades", exact: true }).click();
+  await page.getByText("Grade sync complete", { exact: true }).waitFor();
+  assert.equal(domain.counts.canvasWrites, canvasWritesBeforeGrades + 1);
+  console.log("PASS Canvas grades summary, assignment detail and grade sync");
   const screens = [
     ["today", "Up Next"],
     ["schedule", "Plan available time"],
@@ -574,6 +589,7 @@ try {
     ["canvas", "Canvas"],
     ["settings", "Appearance"],
     ["announcements", "Announcements"],
+    [`canvas/${ids.course}/grades`, "Study foundations"],
   ];
   for (const theme of ["light", "dark"]) {
     await page.goto(`${origin}/settings`);
@@ -601,7 +617,7 @@ try {
           `${path}/${theme}/${name}: horizontal overflow`,
         );
         await capture(
-          `${path.includes("/") ? (path.split("/")[0] === "library" ? "reviewer" : path.split("/")[0]) : path}-${theme}-${name}`,
+          `${path.endsWith("/grades") ? "grades" : path.includes("/") ? (path.split("/")[0] === "library" ? "reviewer" : path.split("/")[0]) : path}-${theme}-${name}`,
         );
       }
     }

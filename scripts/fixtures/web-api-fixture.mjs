@@ -883,6 +883,94 @@ export function createFixture() {
       );
       return;
     }
+    if (path.startsWith(`/api/canvas/courses/${ids.course}/grades`)) {
+      const sync = {
+        status: "succeeded",
+        assignmentSubmissionState: "complete",
+        courseGradeSummaryState: "complete",
+        authoritativeAssignmentSubmission: true,
+        lastCheckedAt: now(),
+        lastSuccessfulSyncAt: now(),
+        stale: false,
+        failureCode: null,
+      };
+      const assignment = (id, title, status, score) => ({
+        id,
+        title,
+        dueAt: now(),
+        unlockAt: null,
+        lockAt: null,
+        pointsPossible: 20,
+        gradingType: "points",
+        submissionTypes: ["online_upload"],
+        normalizedStatus: status,
+        workflowState: score === null ? "unsubmitted" : "graded",
+        submittedAt: score === null ? null : now(),
+        gradedAt: score === null ? null : now(),
+        attempt: score === null ? null : 1,
+        late: false,
+        missing: score === null,
+        excused: false,
+        assignmentVisible: true,
+        score: { state: score === null ? "unknown" : "visible", value: score },
+        grade: { state: score === null ? "unknown" : "visible", value: score === null ? null : "A-" },
+        lastSyncedAt: now(),
+      });
+      const items = [
+        assignment("grade-1", "Planning reflection", "graded", 18),
+        assignment("grade-2", "Weekly study log", "missing", null),
+      ];
+      const rest = path.slice(`/api/canvas/courses/${ids.course}/grades`.length);
+      if (rest === "/sync" && method === "POST") {
+        if (!req.headers["idempotency-key"]) return fail("invalid_request", 400);
+        counts.canvasWrites++;
+        send({ id: "grade-sync-1", jobType: "course_grades", status: "queued", stage: "waiting_to_start", progress: { message: "Waiting to start" }, updatedAt: now() }, 202);
+      } else if (rest === "/summary")
+        send(
+          {
+            summary: {
+              currentScore: { state: "visible", value: 92.5 },
+              currentGrade: { state: "visible", value: "A-" },
+              finalScore: { state: "visible", value: 88 },
+              finalGrade: { state: "visible", value: "B+" },
+              lastSyncedAt: now(),
+              sync,
+            },
+          },
+          200,
+          true,
+        );
+      else if (rest === "")
+        send({ items, page: { limit: 50, offset: 0, nextOffset: null, hasMore: false }, sync }, 200, true);
+      else {
+        const found = items.find((item) => `/${item.id}` === rest);
+        if (!found) return fail("not_found", 404);
+        send(
+          {
+            assignment: {
+              ...found,
+              allowedAttempts: -1,
+              hideInGradebook: false,
+              postManually: false,
+              submissionType: found.submittedAt ? "online_upload" : null,
+              postedAt: found.gradedAt,
+              secondsLate: null,
+              latePolicyStatus: null,
+              gradeMatchesCurrentSubmission: found.submittedAt ? true : null,
+              pointsPossibleAtSync: 20,
+              sync,
+            },
+          },
+          200,
+          true,
+        );
+      }
+      return;
+    }
+    if (path === "/api/canvas/sync-jobs/grade-sync-1") {
+      send({ id: "grade-sync-1", jobType: "course_grades", status: "succeeded", stage: "completed", outcome: "complete", progress: { message: "Grades are up to date" }, updatedAt: now() });
+      return;
+    }
     if (path === "/api/canvas/course-preferences") {
       selected = body.selectedCourseIds;
       counts.canvasWrites++;
