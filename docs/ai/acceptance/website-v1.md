@@ -44,3 +44,17 @@ Direct visual inspection of Today mobile/desktop captures confirms palette,
 ring, four-tab terminology and neutral glass navigation. Mobile planner controls
 push Up Next lower than the reference; this remains a correction in W5.
 Authentication visual acceptance is pending its missing approved screen frame.
+
+## W2 tasks and schedule checkpoint
+
+FRESH browser acceptance on fictional localhost services: manual task creation,
+deadline and notes editing, task-detail deep links, deterministic plan preview,
+apply and persisted session listing pass. The first browser run exposed encoded
+route parameters being encoded twice; task/material/artifact page boundaries now
+decode their route segment once. A pre-filled textarea label mismatch was also
+corrected with an explicit accessible name. No API or mobile changes.
+
+Foundation code is formatted for review. Session-bound API closures refuse a
+JWT from a different account; resource requests cancel on navigation/account
+change and polling does not overlap. Available-time controls collapse on mobile
+so Up Next remains visible above the bottom navigation.

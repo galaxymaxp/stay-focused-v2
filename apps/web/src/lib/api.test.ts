@@ -1,11 +1,90 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApi, safeUrl } from "./api";
-const response=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status});
-describe("shared bearer API boundary",()=>{
-  it("refreshes once on 401, forwards JWT and keeps idempotency identity",async()=>{const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(response({ok:false},401)).mockResolvedValueOnce(response({ok:true,data:{id:"job"}},202));const token=vi.fn().mockResolvedValueOnce("old").mockResolvedValueOnce("new"),expire=vi.fn();const result=await createApi(token,expire,fetcher)("/api/experience/generations",{method:"POST",key:"web-unchanged-key",body:{materialId:"fixture"}});expect(result).toEqual({id:"job"});expect(token.mock.calls).toEqual([[false],[true]]);expect(fetcher.mock.calls[1][1]?.headers).toMatchObject({Authorization:"Bearer new","Idempotency-Key":"web-unchanged-key"});expect(expire).not.toHaveBeenCalled();});
-  it("makes no anonymous request and closes the private session",async()=>{const fetcher=vi.fn(),expire=vi.fn();await expect(createApi(async()=>null,expire,fetcher)("/api/today")).rejects.toThrow("Please sign in again.");expect(fetcher).not.toHaveBeenCalled();expect(expire).toHaveBeenCalledOnce();});
-  it("never echoes server/provider/private errors",async()=>{const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response({ok:false,error:{code:"private_provider_error",message:"SECRET source content"}},503));await expect(createApi(async()=>"jwt",vi.fn(),fetcher)("/api/today")).rejects.toThrow("This action is unavailable right now.");});
-  it("accepts Canvas top-level envelopes explicitly",async()=>{const fetcher=vi.fn<typeof fetch>().mockResolvedValue(response({ok:true,connection:null}));expect(await createApi(async()=>"jwt",vi.fn(),fetcher)("/api/canvas/connection",{envelope:"root"})).toEqual({ok:true,connection:null});});
-  it("rejects external paths before sending credentials",async()=>{const fetcher=vi.fn();await expect(createApi(async()=>"jwt",vi.fn(),fetcher)("https://evil.test/api/today")).rejects.toThrow();expect(fetcher).not.toHaveBeenCalled();});
-  it("rejects unsafe resource links",()=>{expect(safeUrl("javascript:alert(1)")).toBeUndefined();expect(safeUrl("https://example.com/course")).toBe("https://example.com/course");});
+const response = (value: unknown, status = 200) =>
+  new Response(JSON.stringify(value), { status });
+describe("shared bearer API boundary", () => {
+  it("refreshes once on 401, forwards JWT and keeps idempotency identity", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ ok: false }, 401))
+      .mockResolvedValueOnce(response({ ok: true, data: { id: "job" } }, 202));
+    const token = vi
+        .fn()
+        .mockResolvedValueOnce("old")
+        .mockResolvedValueOnce("new"),
+      expire = vi.fn();
+    const result = await createApi(
+      token,
+      expire,
+      fetcher,
+    )("/api/experience/generations", {
+      method: "POST",
+      key: "web-unchanged-key",
+      body: { materialId: "fixture" },
+    });
+    expect(result).toEqual({ id: "job" });
+    expect(token.mock.calls).toEqual([[false], [true]]);
+    expect(fetcher.mock.calls[1][1]?.headers).toMatchObject({
+      Authorization: "Bearer new",
+      "Idempotency-Key": "web-unchanged-key",
+    });
+    expect(expire).not.toHaveBeenCalled();
+  });
+  it("makes no anonymous request and closes the private session", async () => {
+    const fetcher = vi.fn(),
+      expire = vi.fn();
+    await expect(
+      createApi(async () => null, expire, fetcher)("/api/today"),
+    ).rejects.toThrow("Please sign in again.");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(expire).toHaveBeenCalledOnce();
+  });
+  it("never echoes server/provider/private errors", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        response(
+          {
+            ok: false,
+            error: {
+              code: "private_provider_error",
+              message: "SECRET source content",
+            },
+          },
+          503,
+        ),
+      );
+    await expect(
+      createApi(async () => "jwt", vi.fn(), fetcher)("/api/today"),
+    ).rejects.toThrow("This action is unavailable right now.");
+  });
+  it("accepts Canvas top-level envelopes explicitly", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(response({ ok: true, connection: null }));
+    expect(
+      await createApi(
+        async () => "jwt",
+        vi.fn(),
+        fetcher,
+      )("/api/canvas/connection", { envelope: "root" }),
+    ).toEqual({ ok: true, connection: null });
+  });
+  it("rejects external paths before sending credentials", async () => {
+    const fetcher = vi.fn();
+    await expect(
+      createApi(
+        async () => "jwt",
+        vi.fn(),
+        fetcher,
+      )("https://evil.test/api/today"),
+    ).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("rejects unsafe resource links", () => {
+    expect(safeUrl("javascript:alert(1)")).toBeUndefined();
+    expect(safeUrl("https://example.com/course")).toBe(
+      "https://example.com/course",
+    );
+  });
 });

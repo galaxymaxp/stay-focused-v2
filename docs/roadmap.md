@@ -16,7 +16,9 @@ See `docs/ai/acceptance/website-v1.md` and ADR-019 for the acceptance matrix.
 Task order: W1 auth/shell/Today; W2 tasks/calendar; W3 Canvas/generation/queue;
 W4 Library/Reviewer/Quiz/settings; W5 browser, regression and root verification.
 Continue independent work when live acceptance is blocked. Current result:
-IN PROGRESS; W1 implementation started. Historical sections below are retained.
+IN PROGRESS; W1-W4 implementations and isolated browser flows pass. W5 final
+build, visual comparison and integration-limit documentation are underway.
+Historical sections below are retained.
 
 
 ## B25.3.3 approved finite scope (2026-10-08)
