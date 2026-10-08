@@ -16,8 +16,11 @@ See `docs/ai/acceptance/website-v1.md` and ADR-019 for the acceptance matrix.
 Task order: W1 auth/shell/Today; W2 tasks/calendar; W3 Canvas/generation/queue;
 W4 Library/Reviewer/Quiz/settings; W5 browser, regression and root verification.
 Continue independent work when live acceptance is blocked. Current result:
-IN PROGRESS; W1-W4 implementations and isolated browser flows pass. W5 final
-build, visual comparison and integration-limit documentation are underway.
+LOCALLY VERIFIED; W1-W4 functional client implementations and W5 browser,
+visual, regression and fresh root TypeScript/lint/build checks pass. Live
+acceptance remains PARTIAL/BLOCKED: dedicated non-production Supabase/API and
+Canvas test access, plus a separate paid-generation allowance, are not established.
+Generation is disabled by default. Run instructions are in `apps/web/README.md`.
 Historical sections below are retained.
 
 

@@ -336,6 +336,7 @@ export function QuizSetup({
       <label>
         Number of questions
         <select
+          aria-label="Number of questions"
           value={count}
           onChange={(e) => setCount(Number(e.target.value))}
         >
@@ -349,6 +350,7 @@ export function QuizSetup({
       <label>
         Difficulty
         <select
+          aria-label="Difficulty"
           value={difficulty}
           onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}
         >

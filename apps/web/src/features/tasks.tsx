@@ -246,6 +246,7 @@ function TaskForm({
         <label>
           Priority
           <select
+            aria-label="Priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
           >

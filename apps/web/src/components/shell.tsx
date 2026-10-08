@@ -14,6 +14,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),
     router = useRouter(),
     pathname = usePathname();
+  const active = (href: string) =>
+    pathname.startsWith(href) ||
+    (href === "/library" && pathname.startsWith("/quiz")) ||
+    (href === "/generate" && pathname.startsWith("/generation"));
+  const detail = !tabs.some((tab) => pathname === tab.href);
   useEffect(() => {
     if (!loading && !session) router.replace("/sign-in");
   }, [loading, session, router]);
@@ -27,7 +32,10 @@ export function Shell({ children }: { children: ReactNode }) {
       </main>
     );
   return (
-    <div className="app-shell" key={session.user.id}>
+    <div
+      className={`app-shell${detail ? " detail-page" : ""}`}
+      key={session.user.id}
+    >
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -43,7 +51,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link
               key={tab.href}
               href={tab.href}
-              aria-current={pathname.startsWith(tab.href) ? "page" : undefined}
+              aria-current={active(tab.href) ? "page" : undefined}
             >
               <Icon name={tab.icon} />
               <span>{tab.label}</span>
@@ -51,15 +59,24 @@ export function Shell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <nav aria-label="More" className="secondary-nav">
-          <Link href="/schedule">
+          <Link
+            href="/schedule"
+            aria-current={pathname === "/schedule" ? "page" : undefined}
+          >
             <Icon name="calendar" />
             Schedule
           </Link>
-          <Link href="/canvas">
+          <Link
+            href="/canvas"
+            aria-current={pathname === "/canvas" ? "page" : undefined}
+          >
             <Icon name="globe" />
             Canvas
           </Link>
-          <Link href="/settings">
+          <Link
+            href="/settings"
+            aria-current={pathname === "/settings" ? "page" : undefined}
+          >
             <Icon name="settings" />
             Settings
           </Link>
@@ -93,7 +110,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <Link
             key={tab.href}
             href={tab.href}
-            aria-current={pathname.startsWith(tab.href) ? "page" : undefined}
+            aria-current={active(tab.href) ? "page" : undefined}
           >
             <Icon name={tab.icon} />
             <span>{tab.label}</span>

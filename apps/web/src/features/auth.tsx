@@ -101,6 +101,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
         <label className="theme-select">
           Appearance
           <select
+            aria-label="Appearance"
             value={theme}
             onChange={(event) => setTheme(event.target.value as typeof theme)}
           >

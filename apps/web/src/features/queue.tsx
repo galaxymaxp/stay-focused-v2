@@ -79,11 +79,13 @@ export function QueueScreen() {
                       href={`/generation/${job.id}`}
                       title={job.source.displayName}
                       tag={
-                        job.jobType === "quiz_generation"
-                          ? "Quiz"
-                          : job.jobType === "activity_generation"
-                            ? "Activity Output"
-                            : "Reviewer"
+                        job.jobType === "document_extraction"
+                          ? "Source preparation"
+                          : job.jobType === "quiz_generation"
+                            ? "Quiz"
+                            : job.jobType === "activity_generation"
+                              ? "Activity Output"
+                              : "Reviewer"
                       }
                       detail={labels[job.status]}
                     />
@@ -133,6 +135,7 @@ export function GenerationScreen({ id }: { id: string }) {
   const active =
     job.data &&
     ["queued", "running", "cancellation_requested"].includes(job.data.status);
+  const preparingSource = job.data?.jobType === "document_extraction";
   return (
     <>
       <Heading title="" back="/generate" />
@@ -142,11 +145,15 @@ export function GenerationScreen({ id }: { id: string }) {
           <p className="meta">{job.data.source.displayName}</p>
           <h1>
             {job.data.status === "succeeded"
-              ? "Your study material is ready."
+              ? preparingSource
+                ? "Your source is ready."
+                : "Your study material is ready."
               : active
-                ? job.data.jobType === "quiz_generation"
-                  ? "Generating your quiz…"
-                  : "Bringing the important ideas together…"
+                ? preparingSource
+                  ? "Preparing your source…"
+                  : job.data.jobType === "quiz_generation"
+                    ? "Generating your quiz…"
+                    : "Bringing the important ideas together…"
                 : labels[job.data.status]}
           </h1>
           {active && (
@@ -163,7 +170,9 @@ export function GenerationScreen({ id }: { id: string }) {
             {active
               ? "You can leave this screen. We’ll keep working."
               : job.data.status === "succeeded"
-                ? "Open your saved output in Library."
+                ? preparingSource
+                  ? "Return to Generate to create a study tool."
+                  : "Open your saved output in Library."
                 : "Your source is safe. You can choose another material and try again."}
           </p>
           {job.data.progress.completedUnits !== null &&
@@ -181,11 +190,18 @@ export function GenerationScreen({ id }: { id: string }) {
               Open saved output
             </Link>
           )}
-          {job.data.status === "succeeded" && !view.data?.artifactId && (
-            <Link className="button" href="/library">
-              Open Library
+          {job.data.status === "succeeded" && preparingSource && (
+            <Link className="button primary" href="/generate">
+              Continue to Generate
             </Link>
           )}
+          {job.data.status === "succeeded" &&
+            !preparingSource &&
+            !view.data?.artifactId && (
+              <Link className="button" href="/library">
+                Open Library
+              </Link>
+            )}
           <Link className="button" href="/queue">
             View Queue
           </Link>
@@ -200,7 +216,7 @@ export function GenerationScreen({ id }: { id: string }) {
                 })
               }
             >
-              Cancel generation
+              {preparingSource ? "Cancel preparation" : "Cancel generation"}
             </button>
           )}
           {job.data.retryable &&
@@ -227,7 +243,7 @@ export function GenerationScreen({ id }: { id: string }) {
                   })
                 }
               >
-                Retry generation
+                {preparingSource ? "Retry preparation" : "Retry generation"}
               </button>
             )}
           {action.message && <Notice error>{action.message}</Notice>}

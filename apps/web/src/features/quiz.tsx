@@ -130,7 +130,7 @@ export function QuizScreen({ id }: { id: string }) {
           </button>
         }
       />
-      <div className="stack reader">
+      <div className="stack quiz-content">
         <State resource={quiz} />
         {quiz.data && !valid && (
           <Notice error>
@@ -184,7 +184,7 @@ export function QuizScreen({ id }: { id: string }) {
         {valid && attempt && question && !result && (
           <>
             <h2>{quiz.data!.title}</h2>
-            <p className="muted">
+            <p className="meta">
               {checked} checked · {quiz.data!.questionCount - checked} remaining
             </p>
             <progress
@@ -280,6 +280,7 @@ export function QuizScreen({ id }: { id: string }) {
             <label>
               Go to question
               <select
+                aria-label="Go to question"
                 disabled={action.busy}
                 value={index}
                 onChange={(e) => setIndex(Number(e.target.value))}

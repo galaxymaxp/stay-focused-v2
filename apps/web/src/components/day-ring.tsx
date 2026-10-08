@@ -141,7 +141,7 @@ export function DayRing({
                   );
                 }}
               >
-                <circle cx={p.x} cy={p.y} r="24" fill="transparent" />
+                <circle cx={p.x} cy={p.y} r="28" fill="transparent" />
                 <circle
                   cx={p.x}
                   cy={p.y}
@@ -195,6 +195,7 @@ export function DayRing({
           <label>
             Available from
             <input
+              aria-label="Available from"
               type="range"
               min="0"
               max="1425"
@@ -208,6 +209,7 @@ export function DayRing({
           <label>
             Available until
             <input
+              aria-label="Available until"
               type="range"
               min="15"
               max="1440"
