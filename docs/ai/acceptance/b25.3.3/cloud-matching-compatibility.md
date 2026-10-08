@@ -4,6 +4,171 @@ Date: 2026-10-08, Asia/Manila. Scope: the approval in `b8967f3`; generation
 convergence only. Overall: **PARTIAL / BLOCKED at fresh generation, compatible
 production rollout, and physical success-path acceptance**.
 
+## Direct environment-variable authentication recovery — 2026-10-08
+
+**OPENAI AUTHENTICATION RECOVERED.** Environment verification **PASS**, direct
+API-key injection **PASS**, and OpenAI authentication **PASS: HTTP 200,
+sanitized error: none**. The one permitted original-source generation also
+passes **5/5** with unchanged strict author/verifier gates and disposable SQL
+acceptance. Overall B25.3.3 remains **PARTIAL / BLOCKED** by incompatible direct
+production rollout and missing production/physical success-path evidence.
+This section supersedes the credential blocker and daily allowance in the
+historical sections below; all previous implementation and evidence are retained.
+
+### FRESH environment and safe diagnostics
+
+Resumed clean at `05928ad136fb0caccf226477866df343b0ac19a2` on
+`codex/b25.3.3-cloud-compatibility`, explicitly fetched from origin. The startup
+checkout was `work` at `cff27bc`; it was preserved, not rebuilt as B25.3.3.
+The attached instance was observed starting, then ready/running/connected.
+
+- Environment: `ccarenv_b64_Y2NhcmVudl9iN2MxZjk0NTNlZGM4MTkxOTEwN2U3NTViNWU4ODI5Mg`.
+- Source configuration: `9a643b2b-a145-4422-85fe-57ab135c6ccf~cecfg_6ac6d9f161888193a02e893fa46a7656`.
+- Attached version: `cecfgver_6ac6fc2e32c881939dfd6e2afd256c9d`, different from
+  the previously recorded `cecfgver_6ac6ee1c8dc081939d7e0e7afe70cc2f`.
+- Desired/observed revision: 2/2; observations current. The configuration lists
+  `STAY_FOCUSED_OPENAI_API_KEY` as a runtime variable and no Network Secrets
+  or outbound identities. Runtime-variable and network-policy states still
+  report `unknown`; service-reported readiness/enforcement is not claimed.
+  Effective runtime injection and successful Responses access are independently
+  verified below.
+
+| FRESH safe boolean diagnostic | Result |
+| --- | --- |
+| Direct variable present | `true` |
+| Raw OpenAI-key format plausible | `true` |
+| Placeholder marker detected | `false` |
+| No outer whitespace | `true` |
+| Command-local `OPENAI_API_KEY` assignment matches direct variable | `true` |
+| SDK receives direct variable | `true` |
+| SDK targets official Responses URL | `true` |
+| SDK outbound Authorization matches direct variable, checked without network first | `true` |
+| Organization/project override present | `false` / `false` |
+| Conflicting configured Network Secret present | `false` |
+| `api.openai.com` in configuration and executor v1 startup allowlist | `true` |
+| Inherited HTTPS proxy preserved; TLS verification retained | `true` |
+| VPN configured | `false` |
+| Minimal authentication probe retries disabled | `true` |
+| Authentication probe returns an OpenAI request ID and Responses object | `true` / `true` |
+
+No key, fragment, digest, Authorization value or other environment-variable
+value was printed, logged or committed. Only in-memory key-format checks and
+boolean comparisons were used; credential files were not inspected. Standard
+aliasing is limited to the test processes. Environment/account configuration
+and credentials were not changed.
+
+### Attempt 8 — exactly one minimal SDK authentication probe
+
+At **10:16:22 Asia/Manila**, the existing installed OpenAI SDK sent one
+`POST /v1/responses`, using the direct variable, model `gpt-4o`, harmless input
+`Reply OK.`, `max_output_tokens: 16`, `store: false`, timeout 30 seconds and
+`maxRetries: 0`. Transport used the inherited HTTPS proxy via Undici with
+normal CA trust. **One request, HTTP 200, authentication PASS, model available,
+sanitized error none; OpenAI request ID and Responses object received.**
+No instructional material or Quiz engine was used for this probe.
+Safe ephemeral summary: `/tmp/b25-3-3-direct-auth-probe.json`.
+
+### Attempt 9 — one original-source strict generation and disposable acceptance
+
+The recorded instructional snapshot `84e37782-8cff-4ad5-8dd4-9cad17080974`
+was reread through the original job owner's identity, exact file ID and current
+file/source hash constraints. The historical job's direct snapshot pointer is
+different; equating the two initially returned no source. That pointer was not
+used as instructional content. The explicit recorded snapshot is unedited,
+owner-matched, and has the same exact-source, normalized-source and stored/current
+PDF hashes listed in the retained provenance below. No generated output was
+replayed. All **23 blocks / 7,167 characters** and harness block hash
+`eb49abf8acc9be20537295d29facb50b73d6ea5cccc8a65655b113039c67f2f2` match.
+The temporary private input used file mode 0600 and was removed after acceptance.
+
+FRESH selected harness:
+`npm run test -w @stay-focused/api -- src/lib/quiz/database.test.ts -t 'B25.3.3 fresh owned prepared source: strict generation and disposable SQL persistence'`,
+with the existing `B25_3_3_LIVE`, private input and safe-report opt-ins.
+An ephemeral Node preload aliases the direct variable, preserves the inherited
+proxy/CA path, checks the outgoing credential without printing it, and stops
+further provider transport after any HTTP/transport failure. No tracked
+provider, generator, schema, validation, model, bound or test code was modified.
+
+| FRESH generation / local SQL result | Evidence |
+| --- | --- |
+| Local harness run | `e1bb868a-5e63-41ce-ab39-e7b0bc291770`; completed 10:22:33 Asia/Manila |
+| Model and authorization | Pinned `gpt-5.4-2026-03-05`; four HTTP 200 responses, all with OpenAI request IDs; no sanitized error |
+| Exact generation | **5/5 accepted**, zero pending; no partial set admitted |
+| Author/verifier invocations | **2 / 2**, within existing per-slot bounds; four SDK POSTs in one engine attempt |
+| Convergence | First round accepts four slots; unchanged direct correction accepts the fifth in round two |
+| Grounding | Same original blocks, strict exact evidence ownership and independent semantic verification; six referenced evidence owners |
+| Mixed difficulties | Three medium / two easy, as planned |
+| Generation/acceptance duration | **91,527 ms**; full selected Vitest run 96.24 s |
+| Selected test result | **1 passed / 29 filtered skips**, one file passed |
+| Disposable job / Quiz / attempt IDs | `a7a25695-120b-4ad9-a421-f40fb7ea7881` / `91d68416-3d0d-45a1-8ae3-c0e5c896d3a6` / `8fb47615-0728-4e3c-a9e5-16f3bc7defe3` |
+| Public projection and pre-finalization secrecy | PASS; no answer/evidence/explanation keys in public Quiz, no feedback before finalization |
+| Disposable persistence / reopen | PASS / PASS |
+| Score | Expected **100%**, stored and reopened **100%** |
+| Foreign-owner SQL/RLS denial | PASS |
+
+Rejected alternatives retain symbolic evidence/semantic findings, including
+`evidence_not_exact_or_wrong_topic`, `option_analysis_invalid`,
+`blueprintFollowed` and `difficulty_mismatch`. They were rejected/repaired by
+existing gates; acceptance did not weaken them. Safe ephemeral evidence:
+`/tmp/b25-3-3-generation-safe.json`,
+`/tmp/b25-3-3-generation-transport-safe.json`, and
+`/tmp/b25-3-3-generation.log`. These contain symbolic summaries, not private
+source text, generated questions, answer keys or raw provider errors.
+
+The IDs above belong only to the authorized compatible **disposable PGlite**
+harness. Its generated Quiz/attempt transaction was rolled back and the local
+database closed. They are not production job, Workflow, deployment or saved
+Library IDs. No production database write, migration, merge or deployment ran.
+Matching live acceptance was not part of this choice-only source harness.
+Production intake, actual app Library, supported-client preservation and
+physical success-path acceptance remain unproven.
+
+Retained FRESH preparation failure: the first selected suite could not import
+`@electric-sql/pglite` from dependencies installed for the initial main checkout;
+zero tests, zero provider requests, and no engine attempt occurred. A fresh
+`npm ci --no-audit --no-fund` from this branch's committed lockfile installed
+1,584 packages in 27 seconds, with no dependency/lockfile edits. The same
+single authorized generation invocation then ran successfully. This is not
+an additional paid attempt or a hidden failed generation.
+
+### Ledger, mandatory rows and next action
+
+| 2026-10-08 Asia/Manila allowance | Conservatively charged |
+| --- | --- |
+| Carried forward, unchanged | 7 / 10 |
+| Attempt 8 | One minimal SDK authentication probe; PASS |
+| Attempt 9 | One original-source engine/disposable SQL invocation; PASS |
+| Total consumed / daily allowance | **9 / 10**: five instructional attempts and four minimal authorization probes |
+| Daily remaining | **At most 1**; no reset |
+| This task's additional attempts | **2 / 2 used**; no further paid request in this task |
+
+Mandatory row 8 now has **FRESH PASS at original-source engine/disposable SQL
+level**; production source-intake/job proof is not inferred. Row 6's live
+preservation, row 9's persisted production/physical success path and row 10's
+closure remain **BLOCKED / unaccepted**. Direct production compatibility stays
+**INCOMPATIBLE**, based on the retained inspection, not a new deployment/database
+compatibility assessment. Fresh presence checks find no usable HTTPS API origin,
+learner/test-denial credentials, deployment/EAS credentials, adb/emulator binary
+or controllable physical device.
+
+**Exact next action:** obtain actual deployed producer/API/worker/client source
+refs and release IDs, then prepare and verify the convergence-only repair on
+that lineage (or a reviewed preservation/version boundary) in compatible
+staging/disposable infrastructure. Establish an allowed HTTPS target, two
+owner sessions, authenticated APK build access and a controllable Android
+device before production/physical acceptance. Carry forward **9/10**, reserve
+the final daily attempt, and do not repeat authentication probes now that
+Responses access is recovered. Retain the rollout/rollback and device procedure
+below. Keep PR #1 draft; do not merge, deploy, apply production migrations or
+rewrite saved Matching/scoring behavior.
+
+FRESH checks for this documentation-only checkpoint: the selected live harness
+passes as recorded above; `git diff --check`, staged whitespace, new local-link
+checks, historical-text preservation and unchanged non-documentation bytes PASS.
+Root implementation suites/typecheck/lint/build are **NOT APPLICABLE / NOT
+RERUN** for these documentation changes. Earlier suites/gates remain historical
+checkpoint evidence rather than new verification claims.
+
 ## Restored baseline and changes
 
 ### Fresh republished-environment verification — 2026-10-08

@@ -1,5 +1,38 @@
 # Roadmap
 
+## B25.3.3 direct variable recovery (2026-10-08)
+
+**OPENAI AUTHENTICATION RECOVERED; overall PARTIAL / BLOCKED.** Resumed clean
+at `05928ad` on `codex/b25.3.3-cloud-compatibility` in the fresh environment.
+Direct raw-key injection and SDK/header verification PASS, no configured Network
+Secret conflicts; one minimal SDK Responses request returns **HTTP 200** with
+zero retries and no sanitized error. Runtime readiness remains `unknown`;
+effective runtime injection and Responses access are independently proven.
+
+One original-source engine invocation on the retained 23-block/hash-matched
+snapshot accepts **5/5** under unchanged strict gates, with two author/two
+verifier calls, all HTTP 200, in 91,527 ms. Compatible disposable SQL persistence,
+pre-finalization secrecy, score/reopen (100%) and foreign-owner denial PASS.
+Selected harness **1 passed / 29 filtered skips**; its generated transaction was
+rolled back. Initial missing-PGlite preparation failure sent no provider request;
+committed-lockfile `npm ci` resolved it without dependency/product changes.
+
+Ledger **9/10 consumed, at most 1 remaining** on October 8 Asia/Manila; this
+task's **2/2** additional attempts are used. Earlier failures/allowances below
+are historical and preserved. Row 8 passes at original-source engine/disposable
+SQL level; row 6's live preservation, row 9's production/physical success path
+and row 10 closure remain blocked. Direct rollout stays **INCOMPATIBLE**; the
+local SQL result does not establish production intake, persisted Library or
+physical acceptance.
+
+Next: obtain deployed producer/API/worker/client refs/releases and prove a
+compatible convergence/preservation repair in staging/disposable infrastructure;
+then establish the allowed target, two owners, APK build access and physical
+device for the existing acceptance procedure. Reserve the last daily attempt;
+do not repeat auth probes. PR #1 stays draft. No merge, deployment, production
+migration/write or unrelated code change. Documentation checks are fresh;
+root gates are NOT APPLICABLE / NOT RERUN. [Recovery evidence](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+
 ## B25.3.3 fresh environment verification (2026-10-08)
 
 **PARTIAL / BLOCKED.** Continued clean at `fb8c25a` on the existing scoped

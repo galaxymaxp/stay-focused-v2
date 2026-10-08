@@ -1,5 +1,34 @@
 # B25.3.3 source-context and generation convergence
 
+## Direct environment-variable recovery — 2026-10-08
+
+**OPENAI AUTHENTICATION RECOVERED.** Resumed clean at `05928ad` in a newly
+provisioned cloud environment. Direct variable/runtime/SDK/header checks PASS;
+no configured Network Secret conflicts. One minimal SDK Responses probe returns
+**HTTP 200**, model available, no sanitized error, zero retries. Runtime service
+readiness remains `unknown`; effective injection and Responses access are proven
+independently. No credential value was exposed or configuration changed.
+
+One fresh invocation on the same original 23-block source produces **5/5**,
+with strict gates unchanged: two author/two verifier calls, all HTTP 200,
+91,527 ms. Run `e1bb868a-5e63-41ce-ab39-e7b0bc291770`: first round 4/5,
+direct correction 5/5; final set three medium/two easy. Compatible disposable
+PGlite persistence, public/pre-finalization secrecy, expected/stored/reopened
+100% score and foreign-owner denial PASS; generated transaction rolled back.
+Selected test **1 passed / 29 filtered skips**. The initial dependency-import
+failure sent no provider request; branch-lockfile `npm ci` resolved it.
+
+Daily ledger **9/10 consumed, at most 1 remaining**; this task's maximum two
+additional attempts are used. Historical failures and ledger are preserved.
+Row 8 passes at original-source engine/disposable SQL level; row 6's production
+preservation, row 9's production/physical acceptance and row 10 closure remain
+blocked. **Overall PARTIAL / BLOCKED; direct rollout INCOMPATIBLE.** No product,
+migration, production data, deployment or merge change. Obtain the deployed
+lineage and verify a compatible preservation repair before the production/device
+procedure; no new authentication probe is needed. PR #1 stays draft.
+See [full recovery evidence, allowance and next action](cloud-matching-compatibility.md).
+Earlier credential/access/allowance statements below are historical.
+
 ## Fresh republished-environment verification — 2026-10-08
 
 **PARTIAL / BLOCKED.** Resumed clean at `fb8c25a` in a newly provisioning
