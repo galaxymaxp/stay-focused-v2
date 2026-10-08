@@ -11,11 +11,10 @@ import type {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "../components/providers";
+import { ReviewerReader } from "./reviewer/reviewer-reader";
 import { Empty, Heading, Notice, RowLink, State } from "../components/ui";
 import { dateLabel } from "../lib/api";
-import { generationEnabled } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
-import { QuizSetup } from "./generate";
 type Artifact = {
   artifact: LibraryArtifactSummary;
   reviewer?: ReviewerReaderModel;
@@ -140,146 +139,25 @@ export function LibraryScreen() {
 }
 export function ArtifactScreen({ id }: { id: string }) {
   const artifact = useResource<Artifact>(
-      `/api/experience/library/${encodeURIComponent(id)}`,
-    ),
-    [search, setSearch] = useState(""),
-    [quiz, setQuiz] = useState(false),
-    reader = artifact.data?.reviewer;
-  const sections =
-    reader?.sections.filter((s) =>
-      `${s.title} ${s.blocks.map((b) => `${b.title} ${b.explanation} ${b.keyPoints.join(" ")}`).join(" ")}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-    ) ?? [];
-  function saveText() {
-    if (!reader) return;
-    const body = [
-      reader.title,
-      ...reader.sections.flatMap((s) => [
-        s.title,
-        ...s.blocks.flatMap((b) => [b.title, b.explanation, ...b.keyPoints]),
-      ]),
-    ].join("\n\n");
-    const url = URL.createObjectURL(
-      new Blob([body], { type: "text/plain;charset=utf-8" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "reviewer.txt";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
+    `/api/experience/library/${encodeURIComponent(id)}`,
+  );
+  const data = artifact.data;
+  if (data?.reviewer)
+    return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} />;
   return (
     <>
       <Heading
-        title={
-          reader
-            ? "Reviewer"
-            : (artifact.data?.artifact.title ?? "Saved material")
-        }
-        subtitle={reader?.title}
+        title={data?.artifact.title ?? "Saved material"}
         back="/library"
-        crumb={reader?.title}
-        action={
-          reader && (
-            <button className="subtle" onClick={saveText}>
-              Save to file
-            </button>
-          )
-        }
+        crumb={data?.artifact.title}
       />
       <State resource={artifact} />
-      {reader && (
-        <article className="reader stack">
-          <p className="meta">
-            {reader.course?.name ?? "Saved Reviewer"} ·{" "}
-            {dateLabel(reader.generatedAt)}
-          </p>
-          {reader.freshness !== "current" && (
-            <Notice>
-              {reader.freshness === "changed"
-                ? "Your source has changed since this Reviewer was saved."
-                : reader.freshness === "attention_required"
-                  ? "This Reviewer’s source needs attention."
-                  : "Source freshness has not been confirmed."}
-            </Notice>
-          )}
-          <label>
-            Search topics, terms, definitions
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search topics, terms, definitions"
-            />
-          </label>
-          <details>
-            <summary>Contents</summary>
-            <div className="stack">
-              {sections.map((s) => (
-                <a key={s.id} href={`#section-${encodeURIComponent(s.id)}`}>
-                  {s.title}
-                </a>
-              ))}
-            </div>
-          </details>
-          {sections.map((section) => (
-            <section
-              key={section.id}
-              id={`section-${encodeURIComponent(section.id)}`}
-              className="stack"
-            >
-              <h2>{section.title}</h2>
-              {section.blocks.map((block) => (
-                <div key={block.id} className="stack">
-                  <h3>{block.title}</h3>
-                  <p>{block.explanation}</p>
-                  {block.keyPoints.length > 0 && (
-                    <div className="key-points">
-                      <span className="kicker">Key points</span>
-                      <ul>
-                        {block.keyPoints.map((point, i) => (
-                          <li key={i}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {block.evidence.map((e, i) => (
-                    <pre key={i}>{e.text}</pre>
-                  ))}
-                </div>
-              ))}
-            </section>
-          ))}
-          {!sections.length && <p className="muted">No matching topics.</p>}
-          {artifact.data?.artifact.id.startsWith("reviewer:") && (
-            <>
-              <button
-                className="primary"
-                disabled={!generationEnabled}
-                onClick={() => setQuiz(!quiz)}
-              >
-                Quiz me
-              </button>
-              {quiz && (
-                <QuizSetup
-                  sourceType="reviewer"
-                  sourceId={artifact.data.artifact.id.slice(9)}
-                />
-              )}
-            </>
-          )}
-        </article>
-      )}
-      {artifact.data?.quiz && (
-        <Link
-          className="button primary"
-          href={`/quiz/${artifact.data.quiz.id}`}
-        >
+      {data?.quiz && (
+        <Link className="button primary" href={`/quiz/${data.quiz.id}`}>
           Open Quiz
         </Link>
       )}
-      {artifact.data?.draft && <DraftEditor draft={artifact.data.draft} />}
+      {data?.draft && <DraftEditor draft={data.draft} />}
     </>
   );
 }

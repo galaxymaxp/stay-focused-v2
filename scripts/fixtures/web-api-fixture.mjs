@@ -107,6 +107,7 @@ export function createFixture() {
       quizWrites: 0,
       canvasWrites: 0,
       generationCalls: 0,
+      assistCalls: 0,
     };
   const now = () => new Date().toISOString();
   const quiz = () => ({
@@ -136,7 +137,8 @@ export function createFixture() {
     bestScore: attempt?.status === "completed" ? 100 : null,
   });
   const summary = (type, id, title) => ({
-    id: `${type}:${id}`,
+    // Saved Reviewers are addressed as `artifact:<id>`, as in production.
+    id: type === "reviewer" ? `artifact:${id}` : `${type}:${id}`,
     type: title === "Study reflection" ? "activity_output" : type,
     title,
     course,
@@ -322,7 +324,7 @@ export function createFixture() {
         artifactId: done
           ? admittedJobs.get(id).jobType === "quiz_generation"
             ? `quiz:${ids.quiz}`
-            : `reviewer:${ids.reviewer}`
+            : `artifact:${ids.reviewer}`
           : null,
         error: null,
       });
@@ -419,6 +421,33 @@ export function createFixture() {
       );
       counts.sessionWrites++;
       send(sessions[0]);
+      return;
+    }
+    if (path === "/api/experience/study-assist" && method === "POST") {
+      counts.assistCalls++;
+      send({
+        ...body,
+        text: `Fictional ${body.assistType.replace("_", " ")} for this passage.`,
+        createdAt: now(),
+      });
+      return;
+    }
+    if (path === "/api/experience/study-tools" && method === "POST") {
+      counts.assistCalls++;
+      const asking = body.action === "test" && !body.modifier;
+      send({
+        action: body.action,
+        ...(body.modifier ? { modifier: body.modifier } : {}),
+        outcome: asking ? "question" : body.modifier === "check" ? "checked" : "answer",
+        grounding: "source",
+        text: asking ? "" : `Fictional ${body.action} result for “${body.selection}”.`,
+        ...(asking ? { question: "What should you plan before a deadline?" } : {}),
+        ...(body.modifier === "choices"
+          ? { choices: ["Study time", "A vacation"], question: body.question }
+          : {}),
+        ...(body.modifier === "check" ? { verdict: "correct" } : {}),
+        createdAt: now(),
+      });
       return;
     }
     if (path === "/api/experience/capabilities") {
@@ -735,7 +764,7 @@ export function createFixture() {
         state: "completed",
         updatedAt: now(),
         progress: { completed: 3, total: 3, unit: "sections" },
-        artifactId: `reviewer:${ids.reviewer}`,
+        artifactId: `artifact:${ids.reviewer}`,
         error: null,
       });
       return;

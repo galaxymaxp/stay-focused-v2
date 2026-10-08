@@ -332,6 +332,44 @@ try {
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save to file", exact: true }).click();
   await downloaded;
+  // Study Assist: a whole-concept quick assist, then Smart Selection on chosen words.
+  await page
+    .getByText("Choose a time to study, then review your understanding.", { exact: true })
+    .click();
+  await page.getByRole("complementary", { name: "Study Assist" }).waitFor();
+  await page.getByRole("button", { name: /^Summarize,/ }).click();
+  await page.getByText("Fictional summarize for this passage.", { exact: true }).waitFor();
+  const assistBefore = domain.counts.assistCalls;
+  await page.getByRole("button", { name: "Close Study Assist", exact: true }).click();
+  await page
+    .getByText("Choose a time to study, then review your understanding.", { exact: true })
+    .click();
+  await page.getByText("Fictional summarize for this passage.", { exact: true }).waitFor();
+  assert.equal(domain.counts.assistCalls, assistBefore, "A saved explanation was requested again");
+  await page.evaluate(() => {
+    const surface = document.querySelector('[data-testid="smart-selection-surface"]');
+    const text = surface.firstChild;
+    const at = text.textContent.indexOf("pending tasks");
+    const range = document.createRange();
+    range.setStart(text, at);
+    range.setEnd(text, at + "pending tasks".length);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    surface.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+  await page.getByRole("tab", { name: "Define", exact: true }).click();
+  await page.getByText("Fictional define result for “pending tasks”.", { exact: true }).waitFor();
+  await page.getByRole("button", { name: /From your material/ }).waitFor();
+  await page.getByRole("button", { name: "Close Study Assist", exact: true }).click();
+  // Pick two key points and explain both.
+  await page.getByRole("checkbox", { name: "Start with your pending tasks." }).click();
+  await page.getByRole("checkbox", { name: "Plan time before a deadline." }).click();
+  await page.getByRole("toolbar", { name: "Selected key points" }).getByRole("button", { name: "Explain simply", exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll(".key-point .icon").length >= 2);
+  await page.getByRole("button", { name: "Generate Quiz", exact: true }).click();
+  await page.getByRole("dialog", { name: "New Quiz" }).waitFor();
+  await page.keyboard.press("Escape");
   await page.goto(`${origin}/library/activity%3A${ids.draft}`);
   await page
     .getByLabel("Reflection", { exact: true })
@@ -465,7 +503,7 @@ try {
     ["generate", "Generate"],
     ["queue", "Queue"],
     ["library", "Library"],
-    [`library/reviewer%3A${ids.reviewer}`, "Planning study time"],
+    [`library/artifact%3A${ids.reviewer}`, "Planning study time"],
     [`quiz/${ids.quiz}`, "Attempt history"],
     ["canvas", "Canvas"],
     ["settings", "Appearance"],
