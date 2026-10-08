@@ -25,6 +25,7 @@ const sections = [
   { prefixes: ["/canvas"], href: "/canvas", label: "Canvas" },
   { prefixes: ["/settings"], href: "/settings", label: "Settings" },
   { prefixes: ["/queue"], href: "/queue", label: "Queue" },
+  { prefixes: ["/announcements"], href: "/announcements", label: "Announcements" },
 ];
 
 /** Builds the top-bar trail: section root, optional parent, current page. */

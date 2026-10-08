@@ -249,6 +249,13 @@ try {
   await page.getByLabel("Notes", { exact: true }).fill("Read and reflect.");
   await page.getByRole("button", { name: "Save task", exact: true }).click();
   await page.getByText("Read and reflect.", { exact: true }).waitFor();
+  const createDraft = page.getByRole("button", { name: "Create Draft", exact: true });
+  if (generationFixture) {
+    await createDraft.click();
+    await page.waitForURL("**/generation/**");
+    domain.finishAdmitted();
+    await page.waitForURL(`**/library/activity%3A${ids.draft}`, { timeout: 15000 });
+  } else assert(await createDraft.isDisabled(), "Create Draft was not disabled");
   await page.goto(`${origin}/schedule`);
   await page
     .getByRole("button", { name: "Preview study plan", exact: true })
@@ -264,6 +271,21 @@ try {
     .waitFor();
   assert(domain.counts.taskWrites >= 2);
   assert(domain.counts.sessionWrites >= 1);
+  const [planned] = domain.sessions();
+  const sessionDate = planned.startsAt.slice(0, 10);
+  await page.goto(`${origin}/schedule/session/${planned.id}?date=${sessionDate}`);
+  await page.getByRole("link", { name: "Open activity", exact: true }).waitFor();
+  const writesBeforeDone = domain.counts.sessionWrites;
+  await page.getByRole("button", { name: "Mark this block done", exact: true }).click();
+  await page.getByRole("button", { name: "Keep it planned", exact: true }).waitFor();
+  assert.equal(domain.counts.sessionWrites, writesBeforeDone + 1);
+  await page.goto(`${origin}/announcements`);
+  await page.getByRole("link", { name: /^Unread: Week 3 reading is posted/ }).click();
+  await page.waitForURL("**/announcements/announcement-1");
+  await page.getByText("Read the planning chapter before Friday.", { exact: true }).last().waitFor();
+  await page.getByRole("link", { name: "Back to all", exact: true }).click();
+  await page.getByRole("link", { name: /^Week 3 reading is posted/ }).waitFor();
+  console.log("PASS study session status and announcements read state");
   console.log(
     "PASS task create/edit/deadline and schedule preview/persistence",
   );
@@ -551,6 +573,7 @@ try {
     [`quiz/${ids.quiz}`, "Attempt history"],
     ["canvas", "Canvas"],
     ["settings", "Appearance"],
+    ["announcements", "Announcements"],
   ];
   for (const theme of ["light", "dark"]) {
     await page.goto(`${origin}/settings`);
@@ -634,8 +657,9 @@ try {
   await page.waitForURL("**/sign-in");
   assert.equal(
     domain.counts.generationCalls,
-    // Reviewer retry pair + Quiz, then own material: one file read and two Reviewers.
-    generationFixture ? 6 : 0,
+    // Reviewer retry pair + Quiz, own material (one file read and two
+    // Reviewers), then a task's Create Draft.
+    generationFixture ? 7 : 0,
     "Unexpected generation admission",
   );
   console.log(

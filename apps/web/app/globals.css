@@ -3398,3 +3398,233 @@ mark.find-active {
     position: static;
   }
 }
+
+/* ---------- Announcements ---------- */
+.announcements-split {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  height: calc(100dvh - 52px - 28px - 82px - 32px);
+  min-height: 520px;
+  background: var(--elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  animation: rise-in var(--spring-duration) var(--ease-spring) backwards;
+}
+.announcements-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0 12px;
+  background: var(--pane);
+  border-right: 1px solid var(--line);
+}
+.announcements-detail {
+  min-width: 0;
+  overflow-y: auto;
+}
+.announcement-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 1px 8px;
+  border-radius: 8px;
+  animation: rise-in var(--spring-duration) var(--ease-spring) backwards;
+}
+.announcement-item:hover {
+  background: var(--hover);
+}
+.announcement-item:has(.announcement-open[aria-current="page"]) {
+  background: var(--elevated);
+  box-shadow: 0 0 0 1px var(--line), 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+.announcement-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 4px 10px 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+.announcement-open:active {
+  opacity: 0.75;
+  transition-duration: var(--motion-press);
+}
+.announcement-open strong {
+  display: block;
+  margin-top: 1px;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.announcement-item.read .announcement-open strong {
+  font-weight: 450;
+  color: var(--secondary);
+}
+.announcement-open .meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.announcement-open .preview {
+  margin-top: 2px;
+}
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background var(--motion-small) var(--ease-standard);
+}
+.unread-dot.on {
+  background: var(--accent);
+}
+.announcement-item .row-actions {
+  padding-right: 4px;
+}
+.announcement-item:hover .row-actions,
+.announcement-item:focus-within .row-actions {
+  opacity: 1;
+  transform: none;
+}
+.announcement-article {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+  padding: 28px 32px 40px;
+  animation: page-in var(--motion-normal) var(--ease-out) backwards;
+}
+.announcement-article header .row {
+  align-items: center;
+}
+.announcement-article header .meta {
+  display: block;
+}
+.announcement-article h2 {
+  font-size: 22px;
+  line-height: 1.3;
+}
+.announcement-body,
+.instructions {
+  white-space: pre-wrap;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.resource-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 14px;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: var(--radius-control);
+}
+.resource-row:hover {
+  background: var(--hover);
+}
+.list-card .resource-row {
+  border-radius: 0;
+}
+.list-card .resource-row + .resource-row {
+  border-top: 1px solid var(--line);
+}
+.resource-row > .icon:first-child {
+  color: var(--secondary);
+}
+
+/* ---------- Task detail and study session ---------- */
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+.detail-main > *,
+.detail-aside > * {
+  animation: rise-in var(--spring-duration) var(--ease-spring) backwards;
+}
+.detail-aside > :nth-child(2) {
+  animation-delay: 50ms;
+}
+.detail-aside > :nth-child(n + 3) {
+  animation-delay: 100ms;
+}
+.detail-aside {
+  position: sticky;
+  top: 16px;
+}
+.detail-aside .surface > button {
+  width: 100%;
+}
+.detail-facts {
+  align-items: center;
+  gap: 10px;
+}
+.session-card {
+  max-width: 760px;
+  animation: rise-in var(--spring-duration) var(--ease-spring) backwards;
+}
+.session-card .row {
+  align-items: center;
+}
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .announcements-split {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+@media (max-width: 760px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .detail-aside {
+    position: static;
+  }
+  /* Phones keep two screens: the list, then the announcement. */
+  .announcements-split {
+    display: block;
+    height: auto;
+    min-height: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .announcements-list {
+    padding: 0;
+    background: transparent;
+    border: 0;
+  }
+  .announcements-list .pane-group-title {
+    padding: 16px 4px 6px;
+  }
+  .announcement-item {
+    margin: 2px 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .announcement-item .row-actions {
+    opacity: 1;
+    transform: none;
+  }
+  .announcements-workspace:not(.has-selection) .announcements-detail,
+  .announcements-workspace.has-selection .announcements-list,
+  .announcements-workspace.has-selection .announcements-heading {
+    display: none;
+  }
+  .announcement-article {
+    padding: 0;
+  }
+}

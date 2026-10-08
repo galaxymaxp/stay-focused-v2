@@ -11,6 +11,7 @@ const mirrors: [web: string, mobile: string, rewrites?: [string, string][]][] = 
   ["./calendarPresentation.ts", "features/redesign/calendarPresentation.ts"],
   ["../features/day-clock/dayClock.ts", "features/redesign/dayClock.ts"],
   ["./reviewerNavigation.ts", "features/reviewer/reviewerNavigation.ts"],
+  ["./announcementPresentation.ts", "features/announcements/announcementPresentation.ts"],
 ];
 const read = (path: string) =>
   readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8").replace(/\r\n/g, "\n");

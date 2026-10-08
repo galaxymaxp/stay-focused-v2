@@ -193,7 +193,8 @@ export function TodayScreen() {
     if (activity) router.push(`/tasks/${encodeURIComponent(activity.id)}`);
     else if (item.deepLinkTarget.surface === "activity")
       router.push(`/tasks/${encodeURIComponent(item.deepLinkTarget.id)}`);
-    else router.push("/schedule");
+    else
+      router.push(`/schedule/session/${encodeURIComponent(item.deepLinkTarget.id)}?date=${date}`);
   };
 
   // Canvas deadlines in the coming week that are not already scheduled today.

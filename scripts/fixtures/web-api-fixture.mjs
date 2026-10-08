@@ -381,7 +381,9 @@ export function createFixture() {
         artifactId: done
           ? admittedJobs.get(id).jobType === "quiz_generation"
             ? `quiz:${ids.quiz}`
-            : `artifact:${ids.reviewer}`
+            : admittedJobs.get(id).jobType === "activity_generation"
+              ? `activity:${ids.draft}`
+              : `artifact:${ids.reviewer}`
           : null,
         error: null,
       });
@@ -460,6 +462,21 @@ export function createFixture() {
     }
     if (path === "/api/experience/activities") {
       send({ items: [...tasks.values()].map(taskActivity) });
+      return;
+    }
+    if (path.startsWith("/api/experience/activities/") && path.endsWith("/generate")) {
+      if (method !== "POST" || !req.headers["idempotency-key"] || body.mode !== "draft")
+        return fail("invalid_request", 400);
+      counts.generationCalls++;
+      const id = crypto.randomUUID();
+      admittedJobs.set(id, {
+        ...job,
+        id,
+        status: "running",
+        jobType: "activity_generation",
+        source: { ...job.source, displayName: "Draft" },
+      });
+      send({ id, state: "queued", progress: null }, 202);
       return;
     }
     if (path.startsWith("/api/experience/activities/")) {
@@ -903,6 +920,7 @@ export function createFixture() {
   return {
     handle,
     counts,
+    sessions: () => sessions,
     finishAdmitted: () => {
       for (const [id, job] of admittedJobs) {
         if (typeof job === "object")

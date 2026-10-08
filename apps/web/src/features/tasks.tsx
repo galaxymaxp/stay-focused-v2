@@ -8,7 +8,10 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../components/providers";
-import { Empty, Heading, Notice, RowLink, State } from "../components/ui";
+import { CourseMark } from "../components/course";
+import { Empty, Heading, Icon, Notice, RowLink, State } from "../components/ui";
+import { available, capabilityNote, urgencyOf } from "../app-model/presentation";
+import { generationEnabled, generationKey } from "../lib/generation";
 import { dateLabel, safeUrl } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
 type TaskPage = { tasks: TaskView[]; nextCursor: string | null };
@@ -263,7 +266,7 @@ function TaskForm({
   );
 }
 export function TaskDetailScreen({ id }: { id: string }) {
-  const { api } = useAuth(),
+  const { api, session } = useAuth(),
     router = useRouter(),
     activity = useResource<ActivityDetail>(
       `/api/experience/activities/${encodeURIComponent(id)}`,
@@ -271,141 +274,183 @@ export function TaskDetailScreen({ id }: { id: string }) {
     task = useResource<TaskView>(
       id.startsWith("task:") ? `/api/tasks/${id.slice(5)}` : null,
     ),
-    action = useAction();
+    action = useAction(),
+    draft = useAction();
   const [editing, setEditing] = useState(false),
     [deleting, setDeleting] = useState(false);
+  const data = activity.data;
+  const assistance = data?.generation.activityAssistance;
+  const canDraft = generationEnabled && available(assistance);
+  // The app's Create Draft: an AI first draft of this activity, saved to Library.
+  function createDraft() {
+    if (!data || !session || !canDraft) return;
+    void draft.run(async () => {
+      const key = generationKey(session.user.id, `draft:${data.id}`, { mode: "draft" });
+      const view = await api<{ id: string }>(
+        `/api/experience/activities/${encodeURIComponent(data.id)}/generate`,
+        { method: "POST", body: { mode: "draft" }, key: key.key },
+      );
+      key.accepted();
+      router.push(`/generation/${encodeURIComponent(view.id)}`);
+    });
+  }
+  const urgency = data ? urgencyOf(data) : null;
   return (
     <>
       <Heading
-        title={activity.data?.title ?? "Task"}
-        subtitle={activity.data?.course?.name}
+        title={data?.title ?? "Task"}
+        subtitle={data?.course?.name ?? (data ? "Personal task" : undefined)}
         back="/tasks"
       />
       <State resource={activity} />
       {id.startsWith("task:") && <State resource={task} />}
-      {activity.data && (
-        <div className="stack reader">
-          <p className="muted">
-            {dateLabel(activity.data.dueAt)} · {activity.data.priority} priority
-            · {activity.data.status}
-          </p>
-          {activity.data.instructions && (
-            <p style={{ whiteSpace: "pre-wrap" }}>
-              {activity.data.instructions}
-            </p>
-          )}
-          {activity.data.resources.map((r, i) => {
-            const href = safeUrl(r.url);
-            return href ? (
-              <a key={i} href={href} target="_blank" rel="noopener noreferrer">
-                {r.title}
-              </a>
-            ) : null;
-          })}
-          {task.data && (
-            <>
-              <div className="row wrap">
-                <button onClick={() => setEditing(!editing)}>
-                  {editing ? "Cancel editing" : "Edit task"}
-                </button>
-                <button
-                  disabled={action.busy}
-                  onClick={() =>
-                    void action.run(async () => {
-                      await api(`/api/tasks/${task.data!.id}`, {
-                        method: "PATCH",
-                        body: {
-                          status:
-                            task.data!.status === "completed"
-                              ? "pending"
-                              : "completed",
-                        },
-                      });
-                      task.refresh();
-                      activity.refresh();
-                    })
-                  }
-                >
-                  {task.data.status === "completed"
-                    ? "Reopen task"
-                    : "Complete task"}
-                </button>
-                <button
-                  className="danger subtle"
-                  onClick={() => setDeleting(true)}
-                >
-                  Delete task
-                </button>
-              </div>
-              {editing && (
+      {data && (
+        <div className="detail-layout">
+          <div className="stack detail-main">
+            <div className="row wrap detail-facts">
+              {data.course && <CourseMark course={data.course} size={34} />}
+              <span className={`meta due ${urgency ?? ""}`}>
+                {data.dueAt ? `Due ${dateLabel(data.dueAt)}` : "No due date"}
+              </span>
+              <span className="badge">{data.priority} priority</span>
+              <span className="badge">{data.status.replaceAll("_", " ")}</span>
+            </div>
+            <section className="surface stack">
+              <h2>Instructions</h2>
+              {data.instructions ? (
+                <p className="instructions">{data.instructions}</p>
+              ) : (
+                <p className="muted">No instructions provided.</p>
+              )}
+            </section>
+            {data.resources.length > 0 && (
+              <section className="stack">
+                <h2>Resources</h2>
+                <div className="list-card">
+                  {data.resources.map((r, i) => {
+                    const href = safeUrl(r.url);
+                    return href ? (
+                      <a key={i} className="resource-row" href={href} target="_blank" rel="noopener noreferrer">
+                        <Icon name="file-text" />
+                        <span className="grow">{r.title}</span>
+                        <Icon name="chevron-right" />
+                      </a>
+                    ) : null;
+                  })}
+                </div>
+              </section>
+            )}
+            {editing && task.data && (
+              <section className="surface stack">
+                <h2>Edit task</h2>
                 <TaskForm
                   key={task.data.updatedAt}
                   task={task.data}
                   busy={action.busy}
                   onSave={(body) =>
                     void action.run(async () => {
-                      await api(`/api/tasks/${task.data!.id}`, {
-                        method: "PATCH",
-                        body,
-                      });
+                      await api(`/api/tasks/${task.data!.id}`, { method: "PATCH", body });
                       setEditing(false);
                       task.refresh();
                       activity.refresh();
                     })
                   }
                 />
-              )}
-            </>
-          )}
-          {deleting && (
-            <div className="surface stack" role="alert">
-              <p>Delete this task and its study sessions?</p>
-              <div className="row">
-                <button onClick={() => setDeleting(false)}>Keep task</button>
+              </section>
+            )}
+          </div>
+          <aside className="stack detail-aside">
+            <section className="surface stack">
+              <h2>Create Draft</h2>
+              <p className="muted">
+                A first draft for this activity from its instructions and your course material, saved to your
+                Library. You can leave while it works.
+              </p>
+              <button className="primary" disabled={!canDraft || draft.busy} onClick={createDraft}>
+                {draft.busy ? "Starting…" : "Create Draft"}
+              </button>
+              {!available(assistance) && <p className="meta">{capabilityNote(assistance)}</p>}
+              {!generationEnabled && <p className="meta">Generation is unavailable in this environment.</p>}
+              {draft.message && <Notice error>{draft.message}</Notice>}
+            </section>
+            {task.data && (
+              <section className="surface stack">
+                <h2>Task</h2>
                 <button
-                  className="danger"
+                  className={task.data.status === "completed" ? "" : "primary"}
                   disabled={action.busy}
                   onClick={() =>
                     void action.run(async () => {
                       await api(`/api/tasks/${task.data!.id}`, {
-                        method: "DELETE",
-                        envelope: "root",
+                        method: "PATCH",
+                        body: { status: task.data!.status === "completed" ? "pending" : "completed" },
                       });
-                      router.push("/tasks");
+                      task.refresh();
+                      activity.refresh();
                     })
                   }
                 >
-                  Delete task permanently
+                  {task.data.status === "completed" ? "Reopen task" : "Complete task"}
                 </button>
-              </div>
-            </div>
-          )}
-          {activity.data.source === "canvas" && !activity.data.taskId && (
-            <button
-              disabled={action.busy}
-              onClick={() =>
-                void action.run(async () => {
-                  await api("/api/tasks/import/canvas", {
-                    method: "POST",
-                    body: { assignmentIds: [id.slice(id.indexOf(":") + 1)] },
-                  });
-                  activity.refresh();
-                  action.setMessage("Assignment added to your tasks.");
-                })
-              }
-            >
-              Add to my tasks
-            </button>
-          )}
-          {activity.data.outputs.map((output) => (
-            <RowLink
-              key={output.id}
-              href={`/library/${encodeURIComponent(output.id)}`}
-              title={output.title}
-              tag="Saved output"
-            />
-          ))}
-          {action.message && <Notice>{action.message}</Notice>}
+                <button onClick={() => setEditing(!editing)}>{editing ? "Cancel editing" : "Edit task"}</button>
+                <button className="danger subtle" onClick={() => setDeleting(true)}>
+                  Delete task
+                </button>
+                {deleting && (
+                  <div className="stack finish-confirm" role="alert">
+                    <p>Delete this task and its study sessions?</p>
+                    <div className="row wrap">
+                      <button onClick={() => setDeleting(false)}>Keep task</button>
+                      <button
+                        className="danger"
+                        disabled={action.busy}
+                        onClick={() =>
+                          void action.run(async () => {
+                            await api(`/api/tasks/${task.data!.id}`, { method: "DELETE", envelope: "root" });
+                            router.push("/tasks");
+                          })
+                        }
+                      >
+                        Delete task permanently
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+            {data.source === "canvas" && !data.taskId && (
+              <button
+                disabled={action.busy}
+                onClick={() =>
+                  void action.run(async () => {
+                    await api("/api/tasks/import/canvas", {
+                      method: "POST",
+                      body: { assignmentIds: [id.slice(id.indexOf(":") + 1)] },
+                    });
+                    activity.refresh();
+                    action.setMessage("Assignment added to your tasks.");
+                  })
+                }
+              >
+                Add to my tasks
+              </button>
+            )}
+            {data.outputs.length > 0 && (
+              <section className="stack">
+                <h2>Made for this</h2>
+                {data.outputs.map((output) => (
+                  <RowLink
+                    key={output.id}
+                    href={`/library/${encodeURIComponent(output.id)}`}
+                    title={output.title}
+                    tag="Saved output"
+                    icon="file-text"
+                  />
+                ))}
+              </section>
+            )}
+            {action.message && <Notice>{action.message}</Notice>}
+          </aside>
         </div>
       )}
     </>

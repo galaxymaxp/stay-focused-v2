@@ -30,7 +30,9 @@ export function Shell({ children }: { children: ReactNode }) {
   const detail = !tabs.some((tab) => pathname === tab.href),
     // A course and its materials are one screen, so choosing a material
     // keeps the list mounted instead of replaying the page entrance.
-    screen = pathname.replace(/^(\/generate\/[^/]+)\/.+$/, "$1");
+    screen = pathname
+      .replace(/^(\/generate\/[^/]+)\/.+$/, "$1")
+      .replace(/^\/announcements\/.+$/, "/announcements");
   useEffect(() => {
     if (!loading && !session) router.replace("/sign-in");
   }, [loading, session, router]);
