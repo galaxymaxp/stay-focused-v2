@@ -12,6 +12,11 @@ import type { ExperienceRepository, ExperienceRow, ExperienceTable } from '../ex
 import { attemptView, resultView, quizView, type AttemptRow, type QuizRow } from './service';
 import { mixedQuestions } from './matching.fixtures';
 import type { QuizMatchPair } from '@stay-focused/shared';
+import { assessQuizDeployment, checkpointQuizRpcFingerprints, quizDeploymentInspectionSql } from './deployment-compatibility';
+import { createHash, randomUUID } from 'node:crypto';
+import { serializeQuizDiagnostic } from './diagnostics';
+import { QuizGenerationFailure, QUIZ_MODEL, type QuizGenerationDiagnostic } from './generation';
+import { record } from '../experience/mappers';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
 const course = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reviewer = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 let db: PGlite, quizId: string, jobId: string, legacyAttemptId: string;
@@ -64,6 +69,144 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Quiz real Postgres transactions, RLS and history', () => {
+    it.skipIf(process.env.B25_3_3_LIVE !== '1')('B25.3.3 fresh owned prepared source: strict generation and disposable SQL persistence', async () => {
+        // One invocation is one generation attempt. No fixture, historical
+        // generated output, private transcript or key is printed/written here.
+        const runId = randomUUID(), startedAt = Date.now();
+        const summary: Record<string, unknown> = { runId, mode: 'cloud-engine-disposable-postgres', model: QUIZ_MODEL,
+            authorCalls: 0, verifierCalls: 0, acceptedCount: 0, diagnostics: [] };
+        try {
+            if (!process.env.B25_3_3_LIVE_INPUT) throw new Error('live_prepared_source_missing');
+            const input = record(JSON.parse(readFileSync(process.env.B25_3_3_LIVE_INPUT, 'utf8')));
+            if (typeof input.materialId !== 'string' || typeof input.title !== 'string' || !Array.isArray(input.blocks) || !input.blocks.length)
+                throw new Error('live_prepared_source_invalid');
+            const blocks = input.blocks.map(value => {
+                const block = record(value);
+                if (typeof block.id !== 'string' || typeof block.kind !== 'string' || typeof block.text !== 'string'
+                    || (block.page != null && (!Number.isInteger(block.page) || Number(block.page) < 1)))
+                    throw new Error('live_prepared_source_invalid');
+                return { id: block.id, kind: block.kind, text: block.text, ...(block.page != null ? { page: Number(block.page) } : {}),
+                    ...(Number.isInteger(block.slide) ? { slide: Number(block.slide) } : {}) };
+            });
+            if (new Set(blocks.map(block => block.id)).size !== blocks.length) throw new Error('live_prepared_source_invalid');
+            summary.sourceBlocksSha256 = createHash('sha256').update(JSON.stringify(blocks)).digest('hex');
+            summary.sourceBlockCount = blocks.length;
+            summary.sourceCharacters = blocks.reduce((n, block) => n + block.text.length, 0);
+            const inputRequest = { ...request, sourceIds: [input.materialId], difficulty: 'mixed' as const, questionTypes: ['single_select', 'true_false'] as const };
+            const regions = regionsFromBlocks(input.materialId, input.title, blocks);
+            const livePlan = makeQuizPlan(regions, inputRequest);
+            summary.plannedSlots = livePlan.allocation.length;
+            summary.plannedDifficulties = livePlan.allocation.map(slot => slot.difficulty);
+            if (process.env.B25_3_3_PLAN_ONLY === '1') { summary.outcome = 'PLAN_ONLY'; return; }
+            const provider = createServerOpenAIProvider();
+            const diagnostics: unknown[] = [];
+            const generated = await generateQuiz({ async generate<T>(generationRequest: import('@stay-focused/engine').GenerationRequest<T>): Promise<T> {
+                const field = generationRequest.schema.name === 'quiz_verification' ? 'verifierCalls' : 'authorCalls';
+                summary[field] = Number(summary[field]) + 1;
+                return provider.generate(generationRequest);
+            } }, livePlan, undefined, [], (diagnostic: QuizGenerationDiagnostic) => {
+                diagnostics.push(JSON.parse(serializeQuizDiagnostic(runId, diagnostic)));
+                summary.diagnostics = diagnostics;
+            });
+            if (generated.length !== 5) throw new Error('live_exact_count_failed');
+            summary.acceptedCount = generated.length;
+            summary.difficulties = generated.map(question => question.difficulty);
+            summary.evidenceOwnerCount = new Set(generated.flatMap(question => question.sourceRefs.map(ref => ref.regionId))).size;
+            await db.exec('begin');
+            try {
+                const job = (await db.query<{ id: string }>('select id from create_quiz_processing_job($1,$2,$3,$4,$5)', [A, course, reviewer, `b2533-${runId}`, JSON.stringify(inputRequest)])).rows[0]!;
+                summary.jobId = job.id;
+                await db.query("update processing_jobs set status='running',lease_owner='worker',lease_expires_at=now()+interval '5 minutes' where id=$1", [job.id]);
+                await db.query('select * from complete_quiz_processing_job($1,$2,$3,$4)', [job.id, 'worker', 'quiz_generation', JSON.stringify({
+                    ...payload, materialIds: inputRequest.sourceIds, questions: generated, provenance: { policy: 'b25.3.3-fresh', sourceBlocksSha256: summary.sourceBlocksSha256 },
+                })]);
+                const stored = (await db.query<QuizRow>('select * from quizzes where generation_id=$1', [job.id])).rows[0]!;
+                const publicQuiz = quizView(stored);
+                if (publicQuiz.questions.length !== 5 || /"(?:correctOptionIds|correctPairs|sourceEvidence|explanation)":/.test(JSON.stringify(publicQuiz)))
+                    throw new Error('live_public_projection_failed');
+                const attempt = (await db.query<AttemptRow>('select * from start_quiz_attempt($1,$2,$3)', [A, stored.id, `b2533-attempt-${runId}`])).rows[0]!;
+                if (attemptView(attempt, generated).feedback.length !== 0) throw new Error('live_prefinal_secrecy_failed');
+                // This run requests choice types; the existing Matching fixture
+                // and SQL suites exercise explicit pair submissions separately.
+                for (const question of generated) {
+                    if (question.type === 'matching') throw new Error('live_unexpected_question_type');
+                    await answer(attempt.id, question.id, [...question.correctOptionIds]);
+                }
+                const completed = await complete(attempt.id);
+                const reopened = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [attempt.id])).rows[0]!;
+                const result = resultView(attemptView(reopened, generated), generated);
+                if (Number(completed.percentage) !== 100 || result.percentage !== 100) throw new Error('live_score_failed');
+                await db.exec(`savepoint live_owner_denial;set local role authenticated;select set_config('request.jwt.claim.sub','${B}',true);`);
+                const foreign = await db.query('select id from quizzes where id=$1', [stored.id]);
+                await db.exec('rollback to savepoint live_owner_denial;release savepoint live_owner_denial');
+                if (foreign.rows.length !== 0) throw new Error('live_owner_denial_failed');
+                summary.quizId = stored.id; summary.attemptId = attempt.id; summary.expectedScore = 100; summary.actualScore = result.percentage;
+                summary.localPersistence = 'PASS'; summary.localReopen = 'PASS'; summary.localOwnerDenial = 'PASS';
+            } finally { await db.exec('rollback'); }
+            summary.outcome = 'PASS';
+        } catch (error) {
+            summary.outcome = 'FAIL';
+            summary.failureClass = error instanceof QuizGenerationFailure ? error.failureClass : 'acceptance_failure';
+            summary.findings = error instanceof QuizGenerationFailure ? error.findings : ['fresh_acceptance_failed'];
+            throw new Error('b25_3_3_fresh_acceptance_failed');
+        } finally {
+            summary.durationMs = Date.now() - startedAt;
+            // Safe symbolic summaries only; the generated questions and source
+            // stay in memory/private input and never enter validation artifacts.
+            if (process.env.B25_3_3_SAFE_REPORT) writeFileSync(process.env.B25_3_3_SAFE_REPORT, JSON.stringify(summary, null, 2));
+            console.info('b25_3_3_fresh_acceptance', JSON.stringify(summary));
+        }
+    }, 300000);
+    it('matches actual checkpoint RPC bodies and access metadata, and blocks production-style named-argument drift', async () => {
+        const expected = checkpointQuizRpcFingerprints([migration('20260912110000_quiz_maker.sql'), migration('20261007155114_quiz_matching.sql')]);
+        const inspection = (await db.query<{ inspection: { version: number; functions: Record<string, unknown>[]; tables: Record<string, unknown>[] } }>(quizDeploymentInspectionSql)).rows[0]!.inspection;
+        expect(assessQuizDeployment(inspection, expected)).toEqual({ verdict: 'MATCH', issues: [] });
+        const drift = structuredClone(inspection);
+        const create = drift.functions.find(row => row.name === 'create_quiz_processing_job')!;
+        create.arguments = String(create.arguments).replace('p_reviewer_id', 'p_reviewer_artifact_id');
+        const completion = drift.functions.find(row => row.name === 'complete_quiz_attempt')!;
+        completion.body_md5 = '5df61db706a030b9992bbb35a3da0b28';
+        expect(assessQuizDeployment(drift, expected)).toMatchObject({ verdict: 'BLOCKED', issues: [
+            { surface: 'create_quiz_processing_job', code: 'named_arguments_differ' },
+            { surface: 'complete_quiz_attempt', code: 'rpc_body_requires_review' },
+        ] });
+    });
+    it('blocks missing metadata, exposed private keys and unsafe RPC access without echoing input', async () => {
+        const expected = checkpointQuizRpcFingerprints([migration('20260912110000_quiz_maker.sql'), migration('20261007155114_quiz_matching.sql')]);
+        const inspection = (await db.query<{ inspection: { version: number; functions: Record<string, unknown>[]; tables: Record<string, unknown>[] } }>(quizDeploymentInspectionSql)).rows[0]!.inspection;
+        expect(assessQuizDeployment({}, expected).verdict).toBe('BLOCKED');
+        const keys = inspection.tables.find(row => row.name === 'quiz_keys')!;
+        keys.authenticated_select = true;
+        const save = inspection.functions.find(row => row.name === 'save_quiz_answer')!;
+        save.authenticated_execute = true;
+        save.privateSource = 'private-lecture-sentinel';
+        const result = assessQuizDeployment(inspection, expected);
+        expect(result).toMatchObject({ verdict: 'BLOCKED', issues: expect.arrayContaining([
+            { surface: 'quiz_keys', code: 'table_access_requires_review' },
+            { surface: 'save_quiz_answer', code: 'rpc_access_requires_review' },
+        ]) });
+        expect(JSON.stringify(result)).not.toContain('private-lecture-sentinel');
+    });
+    it('demonstrates that a saved block-format Matching quiz cannot be transparently read or answered by this checkpoint', async () => {
+        const legacyBlock = { ...questions[0]!, type: 'matching', matchingPairs: [
+            { id: 'l1', text: 'First term' }, { id: 'l2', text: 'Second term' }, { id: 'l3', text: 'Third term' },
+        ], correctOptionIds: ['l1:a', 'l2:b', 'l3:c'] };
+        const savedQuiz = (await db.query<QuizRow>('select * from quizzes where id=$1', [quizId])).rows[0]!;
+        expect(() => quizView({ ...savedQuiz, questions: [legacyBlock] as unknown as QuizRow['questions'] })).toThrow('unavailable');
+        await db.exec('begin');
+        try {
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify([legacyBlock, ...questions.slice(1)]), quizId]);
+            const inspection = (await db.query<{ inspection: unknown }>(quizDeploymentInspectionSql)).rows[0]!.inspection;
+            const expected = checkpointQuizRpcFingerprints([migration('20260912110000_quiz_maker.sql'), migration('20261007155114_quiz_matching.sql')]);
+            expect(assessQuizDeployment(inspection, expected)).toMatchObject({ verdict: 'BLOCKED', issues: [
+                { surface: 'legacy_matching_questions', code: 'saved_behavior_requires_preservation_boundary' },
+            ] });
+            const attempt = await start('legacy-block-contract');
+            await db.exec('savepoint legacy_reject');
+            await expect(answer(attempt.id, legacyBlock.id, ['l1:a'], false)).rejects.toThrow('quiz_answer_invalid');
+            await db.exec('rollback to savepoint legacy_reject');
+        } finally { await db.exec('rollback'); }
+    });
     it('reopens and completes choice-only data created before the Matching migration', async () => {
         const persisted = (await db.query<AttemptRow>('select * from quiz_attempts where id=$1', [legacyAttemptId])).rows[0]!;
         expect(attemptView(persisted, questions).answers[0]).toMatchObject({ type: 'choice', selectedOptionIds: ['b'], finalizedAt: null });
