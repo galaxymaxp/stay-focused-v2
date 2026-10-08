@@ -18,6 +18,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CourseMark } from "../components/course";
 import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
 import {
@@ -25,7 +26,6 @@ import {
   Heading,
   Icon,
   Notice,
-  RowLink,
   State,
 } from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
@@ -47,40 +47,53 @@ export function GenerateScreen() {
         subtitle="Study tools from your Canvas materials."
       />
       <div className="stack">
-        <label>
-          Search courses
-          <input
-            type="search"
-            placeholder="Search courses"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <RowLink
-          href="/generate/new"
-          title="Your own material"
-          detail="Paste notes, or upload a PDF or photo"
-          icon="file-text"
-        />
-        <div className="row between">
-          <span className="kicker">Canvas</span>
-          <Link href="/canvas">Connection and sync</Link>
+        <div className="row wrap generate-tools">
+          <label className="grow">
+            <span className="sr-only">Search courses</span>
+            <input
+              type="search"
+              aria-label="Search courses"
+              placeholder="Search courses"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <Link className="button subtle" href="/canvas">
+            <Icon name="globe" />
+            Connection and sync
+          </Link>
         </div>
         <State resource={courses} />
-        <p className="kicker">Current courses</p>
-        <div className="cards">
+        <div className="course-grid">
+          <Link href="/generate/new" className="course-card own">
+            <span className="content-icon">
+              <Icon name="file-text" />
+            </span>
+            <span className="grow">
+              <strong>Your own material</strong>
+              <span className="meta">Paste notes, or upload a PDF or photo</span>
+            </span>
+            <Icon name="chevron-right" />
+          </Link>
           {filtered.map((c) => (
-            <RowLink
-              key={c.id}
-              href={`/generate/${c.id}`}
-              title={c.name}
-              tag={c.code ?? undefined}
-              detail={
-                c.materialCount === null
-                  ? "Open course materials"
-                  : `${c.materialCount} materials`
-              }
-            />
+            <Link key={c.id} href={`/generate/${c.id}`} className="course-card">
+              <CourseMark course={c} size={44} />
+              <span className="grow">
+                <strong>{c.name}</strong>
+                <span className="meta">
+                  {[
+                    c.code,
+                    c.materialCount === null
+                      ? "Open course materials"
+                      : `${c.materialCount} ${c.materialCount === 1 ? "material" : "materials"}`,
+                    c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </span>
+              <Icon name="chevron-right" />
+            </Link>
           ))}
         </div>
         {courses.data && !filtered.length && (

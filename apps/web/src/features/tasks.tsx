@@ -64,83 +64,129 @@ export function TasksScreen() {
         item.status !== "submitted" &&
         item.urgency === group,
   );
+  const groups = ["now", "next", "later", "completed"] as const;
+  const countOf = (value: string) =>
+    rows.filter((item) =>
+      value === "completed"
+        ? item.status === "completed" || item.status === "submitted"
+        : item.status !== "completed" && item.status !== "submitted" && item.urgency === value,
+    ).length;
+  const loaded = !!tasks.data && !!activities.data;
+  function toggle(item: ActivitySummary) {
+    void action.run(async () => {
+      await api(`/api/tasks/${item.taskId}`, {
+        method: "PATCH",
+        body: { status: item.status === "completed" ? "pending" : "completed" },
+      });
+      tasks.refresh();
+      activities.refresh();
+    });
+  }
   return (
     <>
       <Heading
         title="Tasks"
+        subtitle={loaded ? `${rows.length - countOf("completed")} open` : undefined}
         action={
           <button
-            className="icon-button"
+            className={form ? "subtle" : "primary"}
             onClick={() => setForm(!form)}
             aria-label={form ? "Close new task" : "Add task"}
+            aria-expanded={form}
           >
-            {form ? "−" : "+"}
+            <Icon name={form ? "x" : "plus"} />
+            <span className="desktop-only">{form ? "Close" : "Add task"}</span>
           </button>
         }
       />
       <div className="stack">
         {form && (
-          <TaskForm
-            busy={action.busy}
-            onSave={(body) =>
-              void action.run(async () => {
-                await api("/api/tasks", { method: "POST", body });
-                setForm(false);
-                tasks.refresh();
-                activities.refresh();
-              })
-            }
-          />
+          <section className="surface stack task-form-card">
+            <h2>New task</h2>
+            <TaskForm
+              busy={action.busy}
+              onSave={(body) =>
+                void action.run(async () => {
+                  await api("/api/tasks", { method: "POST", body });
+                  setForm(false);
+                  tasks.refresh();
+                  activities.refresh();
+                })
+              }
+            />
+          </section>
         )}
-        <div className="segments" aria-label="Task groups">
-          {["now", "next", "later", "completed"].map((value) => (
+        <div className="segments task-groups" aria-label="Task groups">
+          {groups.map((value) => (
             <button
               key={value}
               aria-pressed={value === group}
+              aria-label={value[0].toUpperCase() + value.slice(1)}
               onClick={() => setGroup(value)}
             >
               {value[0].toUpperCase() + value.slice(1)}
+              {loaded && <span className="segment-count count-up">{countOf(value)}</span>}
             </button>
           ))}
         </div>
         <State resource={tasks} />
         <State resource={activities} />
-        {filtered.map((item) => (
-          <div className="row" key={item.id}>
-            <div className="grow">
-              <RowLink
-                href={`/tasks/${encodeURIComponent(item.id)}`}
-                title={item.title}
-                icon="square-check-big"
-                tag={item.course?.name}
-                detail={`${dateLabel(item.dueAt)}${item.estimatedMinutes ? ` · ${item.estimatedMinutes} min` : ""}`}
-              />
+        {filtered.length > 0 && (
+          <div className="list-card task-table" role="list" aria-label="Tasks">
+            <div className="task-table-head" aria-hidden="true">
+              <span />
+              <span>Task</span>
+              <span>Course</span>
+              <span>Due</span>
+              <span>Time</span>
             </div>
-            {item.taskId && (
-              <button
-                className="icon-button"
-                aria-label={`${item.status === "completed" ? "Reopen" : "Complete"} ${item.title}`}
-                disabled={action.busy}
-                onClick={() =>
-                  void action.run(async () => {
-                    await api(`/api/tasks/${item.taskId}`, {
-                      method: "PATCH",
-                      body: {
-                        status:
-                          item.status === "completed" ? "pending" : "completed",
-                      },
-                    });
-                    tasks.refresh();
-                    activities.refresh();
-                  })
-                }
-              >
-                {item.status === "completed" ? "✓" : "○"}
-              </button>
-            )}
+            {filtered.map((item) => {
+              const done = item.status === "completed" || item.status === "submitted";
+              return (
+                <div className={`task-line${done ? " done" : ""}`} role="listitem" key={item.id}>
+                  {item.taskId ? (
+                    <button
+                      className={`task-check${done ? " on" : ""}`}
+                      aria-label={`${item.status === "completed" ? "Reopen" : "Complete"} ${item.title}`}
+                      aria-pressed={item.status === "completed"}
+                      disabled={action.busy}
+                      onClick={() => toggle(item)}
+                    >
+                      <Icon name="check" />
+                    </button>
+                  ) : (
+                    <span className="task-check canvas" title="Canvas assignment">
+                      <Icon name="globe" />
+                    </span>
+                  )}
+                  <Link className="task-line-open" href={`/tasks/${encodeURIComponent(item.id)}`}>
+                    <strong>{item.title}</strong>
+                    <span className="meta task-line-meta">
+                      {[item.course?.code ?? item.course?.name, dateLabel(item.dueAt)].filter(Boolean).join(" · ")}
+                    </span>
+                  </Link>
+                  <span className="task-cell course-cell">
+                    {item.course ? (
+                      <>
+                        <CourseMark course={item.course} size={22} />
+                        <span>{item.course.code ?? item.course.name}</span>
+                      </>
+                    ) : (
+                      <span className="muted">Personal</span>
+                    )}
+                  </span>
+                  <span className={`task-cell due ${item.isOverdue && !done ? "overdue" : ""}`}>
+                    {item.dueAt ? dateLabel(item.dueAt) : "No due date"}
+                  </span>
+                  <span className="task-cell muted">
+                    {item.estimatedMinutes ? `${item.estimatedMinutes} min` : "—"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        ))}
-        {tasks.data && activities.data && !filtered.length && (
+        )}
+        {loaded && !filtered.length && (
           <Empty
             title={
               group === "completed"
@@ -154,6 +200,7 @@ export function TasksScreen() {
         )}
         {cursor && (
           <button
+            className="subtle"
             disabled={action.busy}
             onClick={() =>
               void action.run(async () => {

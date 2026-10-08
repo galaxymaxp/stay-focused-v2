@@ -7,7 +7,7 @@ import type {
 import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "../components/providers";
-import { Empty, Heading, Notice, State } from "../components/ui";
+import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel, localDate, timeLabel } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
 export function ScheduleScreen() {
@@ -34,30 +34,71 @@ export function ScheduleScreen() {
   function clear() {
     setPreview(null);
   }
+  function shiftWeek(daysBy: number) {
+    const next = new Date(start);
+    next.setDate(next.getDate() + daysBy);
+    setDate(localDate(next));
+    clear();
+  }
+  function setStatus(id: string, status: "planned" | "completed" | "skipped") {
+    void action.run(async () => {
+      await api(`/api/study-sessions/${id}`, { method: "PATCH", body: { status } });
+      sessions.refresh();
+    });
+  }
+  const today = localDate();
+  const planned = sessions.data?.sessions.filter((s) => s.status === "planned").length ?? 0;
   return (
     <>
       <Heading
         title="Schedule"
-        subtitle="Make room for what matters."
+        subtitle={
+          sessions.data
+            ? `${planned} planned ${planned === 1 ? "block" : "blocks"} this week`
+            : "Make room for what matters."
+        }
         back="/today"
       />
       <div className="stack">
-        <div className="row wrap between">
-          <label>
-            Week starting
-            <input
-              type="date"
-              required
-              value={date}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setDate(e.target.value);
+        <div className="row wrap week-tools">
+          <div className="row week-nav">
+            <button className="icon-button subtle" aria-label="Previous week" onClick={() => shiftWeek(-7)}>
+              <Icon name="chevron-left" />
+            </button>
+            <label>
+              <span className="sr-only">Week starting</span>
+              <input
+                type="date"
+                required
+                aria-label="Week starting"
+                value={date}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setDate(e.target.value);
+                    clear();
+                  }
+                }}
+              />
+            </label>
+            <button className="icon-button subtle" aria-label="Next week" onClick={() => shiftWeek(7)}>
+              <Icon name="chevron-right" />
+            </button>
+            {date !== today && (
+              <button
+                className="subtle"
+                onClick={() => {
+                  setDate(today);
                   clear();
-                }
-              }}
-            />
-          </label>
-          <button onClick={sessions.refresh}>Refresh schedule</button>
+                }}
+              >
+                This week
+              </button>
+            )}
+          </div>
+          <button className="subtle" onClick={sessions.refresh}>
+            <Icon name="refresh-cw" />
+            <span className="desktop-only">Refresh schedule</span>
+          </button>
         </div>
         <State resource={sessions} />
         {sessions.data && (
@@ -75,65 +116,60 @@ export function ScheduleScreen() {
                         ).getTime() && Date.parse(s.endsAt) > day.getTime(),
                   );
                   return (
-                    <section key={day.toISOString()} className="calendar-day">
+                    <section
+                      key={day.toISOString()}
+                      className={`calendar-day${localDate(day) === today ? " today" : ""}`}
+                    >
                       <h2>
                         {day.toLocaleDateString([], { weekday: "short" })}
+                        <span className="calendar-date">
+                          {day.toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
                       </h2>
-                      <p className="meta">
-                        {day.toLocaleDateString([], {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </p>
-                      {rows.map((s) => (
-                        <div className="session stack" key={s.id}>
-                          <Link
-                            href={`/tasks/${encodeURIComponent(`task:${s.taskId}`)}`}
-                          >
-                            {s.task?.title ?? "Study session"}
-                          </Link>
-                          <p>
-                            {timeLabel(s.startsAt)} – {timeLabel(s.endsAt)}
-                          </p>
-                          <span className="meta">{s.status}</span>
-                          <button
-                            disabled={action.busy}
-                            onClick={() =>
-                              void action.run(async () => {
-                                await api(`/api/study-sessions/${s.id}`, {
-                                  method: "PATCH",
-                                  body: {
-                                    status:
-                                      s.status === "completed"
-                                        ? "planned"
-                                        : "completed",
-                                  },
-                                });
-                                sessions.refresh();
-                              })
-                            }
-                          >
-                            {s.status === "completed" ? "Reopen" : "Complete"}
-                          </button>
-                          <button
-                            className="subtle"
-                            disabled={action.busy}
-                            onClick={() =>
-                              void action.run(async () => {
-                                await api(`/api/study-sessions/${s.id}`, {
-                                  method: "PATCH",
-                                  body: { status: "skipped" },
-                                });
-                                sessions.refresh();
-                              })
-                            }
-                          >
-                            Skip session
-                          </button>
-                        </div>
-                      ))}
+                      {rows.map((s) => {
+                        const title = s.task?.title ?? "Study session";
+                        return (
+                          <div className={`session ${s.status}`} key={s.id}>
+                            <Link
+                              className="session-open"
+                              href={`/schedule/session/${encodeURIComponent(s.id)}?date=${localDate(day)}`}
+                            >
+                              {title}
+                            </Link>
+                            <span className="meta">
+                              {timeLabel(s.startsAt)} – {timeLabel(s.endsAt)}
+                              {s.status !== "planned" && ` · ${s.status === "completed" ? "Done" : "Skipped"}`}
+                            </span>
+                            <span className="session-actions">
+                              <button
+                                className="icon-button subtle"
+                                disabled={action.busy}
+                                aria-label={`${s.status === "completed" ? "Reopen" : "Complete"} ${title}`}
+                                title={s.status === "completed" ? "Reopen" : "Mark done"}
+                                aria-pressed={s.status === "completed"}
+                                onClick={() => setStatus(s.id, s.status === "completed" ? "planned" : "completed")}
+                              >
+                                <Icon name="check" />
+                              </button>
+                              <button
+                                className="icon-button subtle"
+                                disabled={action.busy}
+                                aria-label={`${s.status === "skipped" ? "Restore" : "Skip"} ${title}`}
+                                title={s.status === "skipped" ? "Keep it planned" : "Skip this block"}
+                                aria-pressed={s.status === "skipped"}
+                                onClick={() => setStatus(s.id, s.status === "skipped" ? "planned" : "skipped")}
+                              >
+                                <Icon name="x" />
+                              </button>
+                            </span>
+                          </div>
+                        );
+                      })}
                       {!rows.length && (
-                        <p className="meta">No study sessions.</p>
+                        <p className="meta calendar-free">Free</p>
                       )}
                     </section>
                   );
@@ -153,12 +189,14 @@ export function ScheduleScreen() {
             )}
           </>
         )}
-        <section className="surface stack">
-          <h2>Plan available time</h2>
-          <p className="muted">
-            Preview a plan from your pending tasks before saving it.
-          </p>
-          <div className="row wrap">
+        <section className="surface stack planner-card">
+          <div>
+            <h2>Plan available time</h2>
+            <p className="muted">
+              Preview a plan from your pending tasks before saving it.
+            </p>
+          </div>
+          <div className="row wrap planner-fields">
             <label>
               From
               <input
@@ -183,8 +221,8 @@ export function ScheduleScreen() {
                 }}
               />
             </label>
-          </div>
           <button
+            className="primary"
             disabled={action.busy || !from || !to || from >= to}
             onClick={() =>
               void action.run(async () => {
@@ -205,14 +243,15 @@ export function ScheduleScreen() {
           >
             Preview study plan
           </button>
+          </div>
           {from >= to && (
             <p className="meta">Choose an end time after the start.</p>
           )}
           {preview && (
-            <div className="stack">
+            <div className="stack plan-proposal">
               {preview.plan.sessions.map((s) => (
-                <p key={s.proposalId}>
-                  {s.taskTitle}
+                <p key={s.proposalId} className="proposal-row">
+                  <strong>{s.taskTitle}</strong>
                   <span className="meta">
                     {dateLabel(s.startsAt)} – {timeLabel(s.endsAt)}
                     {s.scheduledAfterDeadline ? " · After deadline" : ""}

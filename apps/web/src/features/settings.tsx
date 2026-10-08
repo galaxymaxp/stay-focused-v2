@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { useAuth } from "../components/providers";
 import { Heading, Notice, RowLink } from "../components/ui";
 import { useAction } from "../lib/hooks";
@@ -9,10 +8,15 @@ export function SettingsScreen() {
   return (
     <>
       <Heading title="Settings" back="/today" />
-      <div className="stack reader">
+      <div className="settings-grid">
         <section className="surface stack">
           <h2>Account</h2>
-          <p>{session?.user.email ?? "Signed-in account"}</p>
+          <div className="row">
+            <span className="account-avatar" aria-hidden="true">
+              {(session?.user.email ?? "S")[0].toUpperCase()}
+            </span>
+            <p className="grow account-email">{session?.user.email ?? "Signed-in account"}</p>
+          </div>
           <button
             disabled={action.busy}
             onClick={() =>
@@ -41,17 +45,21 @@ export function SettingsScreen() {
             ))}
           </div>
         </section>
-        <RowLink
-          href="/canvas"
-          title="Canvas connection and sync"
-          icon="globe"
-        />
-        <RowLink href="/queue" title="Generation Queue" icon="layers" />
-        <p className="meta">
-          Accepted generations continue on the server when you leave the page.
-          Reopen Queue to check progress.
-        </p>
-        <Link href="/today">Return to Today</Link>
+        <section className="stack settings-links">
+          <h2>Connections and work</h2>
+          <RowLink
+            href="/canvas"
+            title="Canvas connection and sync"
+            detail="Courses, materials, grades and announcements"
+            icon="globe"
+          />
+          <RowLink
+            href="/queue"
+            title="Generation Queue"
+            detail="Accepted generations continue on the server when you leave the page."
+            icon="layers"
+          />
+        </section>
         {action.message && <Notice error>{action.message}</Notice>}
       </div>
     </>

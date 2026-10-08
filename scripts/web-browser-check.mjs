@@ -609,7 +609,9 @@ try {
         await page
           .getByRole("heading", { name: heading, exact: true })
           .waitFor();
-        await page.waitForFunction(() => !document.querySelector(".skeleton"));
+        await page.waitForFunction(
+          () => !document.querySelector(".skeleton, .book-loader"),
+        );
         assert(
           await page.evaluate(
             () => document.documentElement.scrollWidth <= window.innerWidth,
