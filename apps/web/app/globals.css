@@ -1581,3 +1581,25 @@ details[open] > :not(summary) {
     flex: 1 1 100%;
   }
 }
+
+/* ---------- Sign-in providers ---------- */
+.oauth-buttons {
+  gap: 10px;
+}
+.oauth-buttons button {
+  width: 100%;
+  gap: 10px;
+}
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
