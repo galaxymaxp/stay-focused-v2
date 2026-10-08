@@ -203,3 +203,12 @@ acceptance remains PARTIAL/BLOCKED by the non-production account/environment,
 Canvas test access and separate generation allowance listed above. No deployment,
 push, migration, production data modification or PR #1 change occurred.
 B25.3.3 remains paused and PARTIAL/BLOCKED, not complete.
+
+## Website V1.1 orb parity investigation — 2026-10-08
+
+See [website-orb-parity.md](website-orb-parity.md). The currently routed mobile
+orb uses React Native Animated plus layered SVG; the requested authoritative
+mobile WebGL renderer/shaders were not located in the inspected local sources.
+V1.1 is BLOCKED pending that source or resolution of the rendering requirement.
+The existing website SVG remains unchanged and is not WebGL parity evidence.
+Historical V1 findings above remain intact; B25.3.3 remains paused.

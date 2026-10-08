@@ -1,5 +1,18 @@
 # Current Sprint
 
+## Website V1.1 orb parity (2026-10-08)
+
+Owner-authorized scope: port the authoritative mobile WebGL orb, verify visual
+and behavioral parity, preserve the functional website and commit scoped work
+on `website/functional-v1`. Investigation at `6a8032a` found that the actual
+mobile Generation route uses Animated plus layered SVG, with no WebGL renderer
+or shaders in the inspected local sources. **BLOCKED** pending the actual
+WebGL source location or owner resolution of that rendering requirement. No
+replacement orb or runtime change was made. See [orb parity report](acceptance/website-orb-parity.md)
+for source mapping, baseline verification and remaining differences. Existing
+V1 historical findings remain below; B25.3.3 stays paused and incomplete. No
+production deployment, provider call, schema or generation-engine change.
+
 ## Website V1 owner-approved scope (2026-10-08)
 
 The owner prioritizes functional website implementation immediately. B25.3.3
