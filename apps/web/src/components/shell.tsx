@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { Breadcrumbs, CrumbProvider, trailFor, useCrumbState } from "./crumbs";
 import { useAuth } from "./providers";
 import { Icon, Notice } from "./ui";
 const tabs = [
@@ -10,15 +11,23 @@ const tabs = [
   { href: "/tasks", label: "Tasks", icon: "square-check-big" },
   { href: "/library", label: "Library", icon: "book-open" },
 ];
+const tools = [
+  { href: "/schedule", label: "Schedule", icon: "calendar" },
+  { href: "/canvas", label: "Canvas", icon: "globe" },
+];
 export function Shell({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),
     router = useRouter(),
-    pathname = usePathname();
+    pathname = usePathname(),
+    { page, setPage } = useCrumbState();
   const active = (href: string) =>
     pathname.startsWith(href) ||
     (href === "/library" && pathname.startsWith("/quiz")) ||
     (href === "/generate" && pathname.startsWith("/generation"));
-  const detail = !tabs.some((tab) => pathname === tab.href);
+  const detail = !tabs.some((tab) => pathname === tab.href),
+    // A course and its materials are one screen, so choosing a material
+    // keeps the list mounted instead of replaying the page entrance.
+    screen = pathname.replace(/^(\/generate\/[^/]+)\/.+$/, "$1");
   useEffect(() => {
     if (!loading && !session) router.replace("/sign-in");
   }, [loading, session, router]);
@@ -31,6 +40,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {error && <Notice error>{error}</Notice>}
       </main>
     );
+  const email = session.user.email ?? "Signed in";
   return (
     <div
       className={`app-shell${detail ? " detail-page" : ""}`}
@@ -39,15 +49,13 @@ export function Shell({ children }: { children: ReactNode }) {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <aside className="sidebar glass">
+      <aside className="sidebar">
         <Link href="/today" className="brand">
           <Icon name="layers" />
-          <span>
-            Stay Focused<span className="meta">Your day, with purpose.</span>
-          </span>
+          <span>Stay Focused</span>
         </Link>
         <nav aria-label="Primary navigation">
-          {tabs.map((tab) => (
+          {[...tabs, ...tools].map((tab) => (
             <Link
               key={tab.href}
               href={tab.href}
@@ -58,52 +66,53 @@ export function Shell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <nav aria-label="More" className="secondary-nav">
-          <Link
-            href="/schedule"
-            aria-current={pathname === "/schedule" ? "page" : undefined}
-          >
-            <Icon name="calendar" />
-            Schedule
-          </Link>
-          <Link
-            href="/canvas"
-            aria-current={pathname === "/canvas" ? "page" : undefined}
-          >
-            <Icon name="globe" />
-            Canvas
-          </Link>
-          <Link
-            href="/settings"
-            aria-current={pathname === "/settings" ? "page" : undefined}
-          >
-            <Icon name="settings" />
-            Settings
-          </Link>
-        </nav>
+        <div className="sidebar-foot">
+          <nav aria-label="Account">
+            <Link
+              href="/settings"
+              aria-current={active("/settings") ? "page" : undefined}
+            >
+              <Icon name="settings" />
+              Settings
+            </Link>
+          </nav>
+          <div className="account" title={email}>
+            <span className="avatar" aria-hidden="true">
+              {email.charAt(0).toUpperCase()}
+            </span>
+            <span className="account-email">{email}</span>
+          </div>
+        </div>
       </aside>
       <div className="workspace">
-        <div className="topbar">
+        <header className="topbar">
           <Link href="/today" className="mobile-brand">
             Stay Focused
           </Link>
-          <div className="row">
-            <Link href="/queue" className="button subtle">
+          <Breadcrumbs trail={trailFor(pathname, page)} />
+          <div className="row topbar-actions">
+            <Link
+              href="/queue"
+              className="button subtle"
+              aria-current={active("/queue") ? "page" : undefined}
+            >
               <Icon name="layers" />
               Queue
             </Link>
             <Link
               href="/settings"
-              className="icon-button"
+              className="icon-button mobile-only"
               aria-label="Settings"
             >
               <Icon name="settings" />
             </Link>
           </div>
-        </div>
-        <main id="main" tabIndex={-1} className="main" key={pathname}>
-          {children}
-        </main>
+        </header>
+        <CrumbProvider onChange={setPage}>
+          <main id="main" tabIndex={-1} className="main" key={screen}>
+            {children}
+          </main>
+        </CrumbProvider>
       </div>
       <nav className="bottom-nav glass" aria-label="Mobile navigation">
         {tabs.map((tab) => (

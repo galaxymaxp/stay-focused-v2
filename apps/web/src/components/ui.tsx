@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PageCrumb, type Crumb } from "./crumbs";
 export function Icon({ name }: { name: string }) {
   return (
     <span
@@ -17,17 +18,32 @@ export function Heading({
   subtitle,
   action,
   back,
+  crumb,
+  parent,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  /** Mobile back target; desktop uses the top-bar breadcrumb instead. */
   back?: string;
+  /** Breadcrumb label when it should differ from the title; null when a
+   * nested view reports the trail instead. */
+  crumb?: string | null;
+  /** Breadcrumb level between the section and this page. */
+  parent?: Crumb;
 }) {
   return (
     <header className="page-heading">
+      {crumb !== null && (
+        <PageCrumb parent={parent} current={crumb ?? (title || undefined)} />
+      )}
       <div className="row">
         {back && (
-          <Link href={back} className="icon-button" aria-label="Go back">
+          <Link
+            href={back}
+            className="icon-button back-button"
+            aria-label="Go back"
+          >
             <Icon name="arrow-left" />
           </Link>
         )}

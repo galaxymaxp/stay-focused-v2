@@ -2,6 +2,7 @@
 import type { TodayItem } from "@stay-focused/shared";
 import { useEffect, useRef, useState } from "react";
 import { timeLabel } from "../lib/api";
+import { useSpringNumber } from "../lib/motion";
 const point = (minutes: number, radius = 126) => ({
   x: 160 + radius * Math.cos((minutes / 1440) * Math.PI * 2 + Math.PI / 2),
   y: 160 + radius * Math.sin((minutes / 1440) * Math.PI * 2 + Math.PI / 2),
@@ -25,7 +26,11 @@ export function DayRing({
   onChange: (start: number, end: number) => void;
 }) {
   const [now, setNow] = useState(new Date()),
-    dragging = useRef<"start" | "end" | null>(null);
+    dragging = useRef<"start" | "end" | null>(null),
+    // On first appearance the whole dial springs out from 12:00 AM: the clock
+    // counts up and every arc, handle and marker travels to its real time.
+    reveal = useSpringNumber(1),
+    fromMidnight = (m: number) => m * reveal;
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
@@ -58,7 +63,15 @@ export function DayRing({
     );
   }
   const minutes = now.getHours() * 60 + now.getMinutes(),
-    marker = point(minutes, 105);
+    shownMinutes = fromMidnight(minutes),
+    marker = point(shownMinutes, 105),
+    clock =
+      reveal === 1
+        ? now
+        : new Date(
+            new Date(`${date}T00:00:00`).getTime() +
+              Math.min(1439, Math.max(0, shownMinutes)) * 60000,
+          );
   return (
     <div>
       <div className="ring-container">
@@ -98,7 +111,7 @@ export function DayRing({
             strokeWidth="22"
           />
           <path
-            d={arc(start, end)}
+            d={arc(fromMidnight(start), fromMidnight(end))}
             stroke="#91CDB2"
             strokeWidth="22"
             fill="none"
@@ -106,7 +119,7 @@ export function DayRing({
           {segments.map((s) => (
             <path
               key={s.id}
-              d={arc(s.from, s.to)}
+              d={arc(fromMidnight(s.from), fromMidnight(s.to))}
               stroke={s.color}
               strokeWidth="22"
               fill="none"
@@ -130,7 +143,7 @@ export function DayRing({
           })}
           <circle cx={marker.x} cy={marker.y} r="3" fill="#E5BC76" />
           {(["start", "end"] as const).map((handle) => {
-            const p = point(handle === "start" ? start : end);
+            const p = point(fromMidnight(handle === "start" ? start : end));
             return (
               <g
                 key={handle}
@@ -176,7 +189,9 @@ export function DayRing({
           })}
         </svg>
         <div className="ring-center">
-          <span className="clock-label">{timeLabel(now.toISOString())}</span>
+          <span className="clock-label count-up">
+            {timeLabel(clock.toISOString())}
+          </span>
           <span className="meta">
             {new Date(`${date}T12:00:00`).toLocaleDateString([], {
               weekday: "short",

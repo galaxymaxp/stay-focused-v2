@@ -9,6 +9,7 @@ import type {
 } from "@stay-focused/shared";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { CountUp, SpringProgress } from "../components/count-up";
 import { useAuth } from "../components/providers";
 import { Empty, Heading, Notice, State } from "../components/ui";
 import { dateLabel, requestKey } from "../lib/api";
@@ -157,9 +158,9 @@ export function QuizScreen({ id }: { id: string }) {
               <div className="surface row between" key={item.id}>
                 <div>
                   <strong>
-                    {item.status === "completed"
-                      ? `${item.percentage ?? 0}%`
-                      : item.status === "in_progress"
+                    {item.status === "completed" ? (
+                      <CountUp value={item.percentage ?? 0} suffix="%" />
+                    ) : item.status === "in_progress"
                         ? "In progress"
                         : "Abandoned"}
                   </strong>
@@ -187,8 +188,8 @@ export function QuizScreen({ id }: { id: string }) {
             <p className="meta">
               {checked} checked · {quiz.data!.questionCount - checked} remaining
             </p>
-            <progress
-              aria-label="Checked questions"
+            <SpringProgress
+              label="Checked questions"
               max={quiz.data!.questionCount}
               value={checked}
             />
@@ -343,9 +344,12 @@ export function QuizScreen({ id }: { id: string }) {
         {valid && result && (
           <>
             <h2>{quiz.data!.title}</h2>
-            <p className="score">{result.percentage}%</p>
+            <p className="score">
+              <CountUp value={result.percentage} suffix="%" />
+            </p>
             <p>
-              {result.correctCount} of {result.totalQuestions} correct
+              <CountUp value={result.correctCount} /> of{" "}
+              {result.totalQuestions} correct
             </p>
             <h2>Keep building on these ideas</h2>
             {result.weakAreas.length ? (

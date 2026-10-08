@@ -7,6 +7,7 @@ import type {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CountUp } from "../components/count-up";
 import { useAuth } from "../components/providers";
 import { Empty, Heading, Notice, RowLink, State } from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
@@ -175,7 +176,7 @@ export function GenerationScreen({ id }: { id: string }) {
           {job.data.progress.completedUnits !== null &&
             job.data.progress.totalUnits !== null && (
               <p className="meta">
-                {job.data.progress.completedUnits} of{" "}
+                <CountUp value={job.data.progress.completedUnits} /> of{" "}
                 {job.data.progress.totalUnits} {job.data.progress.unitLabel}
               </p>
             )}

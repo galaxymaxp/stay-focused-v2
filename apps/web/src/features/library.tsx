@@ -178,6 +178,7 @@ export function ArtifactScreen({ id }: { id: string }) {
         }
         subtitle={reader?.title}
         back="/library"
+        crumb={reader?.title}
         action={
           reader && (
             <button className="subtle" onClick={saveText}>

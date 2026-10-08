@@ -4,17 +4,33 @@ import type {
   CourseMaterials,
   LearningMaterial,
   CourseLearningWorkspace,
+  FeatureCapability,
   GenerationView,
   QuizGenerationRequest,
   QuizQuestionType,
 } from "@stay-focused/shared";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSelectedLayoutSegment } from "next/navigation";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
-import { Empty, Heading, Notice, RowLink, State } from "../components/ui";
+import {
+  Empty,
+  Heading,
+  Icon,
+  Notice,
+  RowLink,
+  State,
+} from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
+type Resource<T> = ReturnType<typeof useResource<T>>;
 export function GenerateScreen() {
   const courses = useResource<{ items: CourseSummary[] }>(
       "/api/experience/courses",
@@ -70,93 +86,222 @@ export function GenerateScreen() {
     </>
   );
 }
-export function CourseScreen({ id }: { id: string }) {
+const kindLabels: Record<LearningMaterial["kind"], string> = {
+  pdf: "PDF",
+  document: "Document",
+  slides: "Slides",
+  page: "Canvas page",
+  module: "Module",
+  announcement: "Announcement",
+  assignment: "Assignment",
+  image: "Image",
+  text: "Text",
+};
+const readinessLabels: Record<LearningMaterial["readiness"], string> = {
+  ready: "Ready",
+  needs_preparation: "Needs preparation",
+  empty: "No readable text",
+  unsupported: "Unsupported",
+  unavailable: "Unavailable",
+};
+const reasonLabels: Record<string, string> = {
+  source_not_ready: "Prepare this material first.",
+  unsupported_material: "This material type is not supported yet.",
+  service_unavailable: "Temporarily unavailable. Try again shortly.",
+  not_implemented: "Not available yet.",
+};
+function capabilityLabel(capability: FeatureCapability | undefined) {
+  if (capability?.status === "available") return "Available";
+  return reasonLabels[capability?.reasonCode ?? ""] ?? "Unavailable";
+}
+const materialIcon = (m: LearningMaterial) =>
+  m.kind === "slides"
+    ? "presentation"
+    : m.kind === "page" || m.kind === "text"
+      ? "text-align-start"
+      : "file-text";
+const CourseContext = createContext<{
+  courseId: string;
+  course: Resource<CourseLearningWorkspace>;
+} | null>(null);
+function useCourse() {
+  const value = useContext(CourseContext);
+  if (!value) throw new Error("Course workspace is missing.");
+  return value;
+}
+/**
+ * Course materials on the left, the selected material on the right. The
+ * layout stays mounted while the selection changes, so the list keeps its
+ * scroll position and loaded pages. On phones it is two screens.
+ */
+export function CourseWorkspace({
+  courseId,
+  children,
+}: {
+  courseId: string;
+  children: ReactNode;
+}) {
   const { api } = useAuth(),
     course = useResource<CourseLearningWorkspace>(
-      `/api/experience/courses/${id}`,
+      `/api/experience/courses/${courseId}`,
     ),
+    segment = useSelectedLayoutSegment(),
+    selectedId = segment ? decodeURIComponent(segment) : null,
     [extra, setExtra] = useState<LearningMaterial[]>([]),
     [offset, setOffset] = useState<number | null>(null),
+    [filter, setFilter] = useState(""),
     action = useAction();
   useEffect(() => {
     setExtra([]);
     setOffset(course.data?.materials.nextOffset ?? null);
   }, [course.data]);
   const materials = [...(course.data?.materials.items ?? []), ...extra],
+    visible = materials.filter((m) =>
+      m.title.toLowerCase().includes(filter.trim().toLowerCase()),
+    ),
     groups = new Map<string, LearningMaterial[]>();
-  for (const m of materials) {
+  for (const m of visible) {
     const key = m.moduleTitle ?? "Course materials";
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
+  const name = course.data?.course.name ?? "Course materials",
+    code = course.data?.course.code;
   return (
-    <>
-      <Heading
-        title={course.data?.course.name ?? "Course materials"}
-        subtitle={course.data?.course.code ?? undefined}
-        back="/generate"
-      />
-      <div className="stack">
-        <RowLink
-          href="/tasks"
-          title="Assignments and tasks"
-          detail="Deadline-bearing work stays in Tasks."
-          icon="clipboard-list"
-        />
-        <State resource={course} />
-        {Array.from(groups).map(([name, items]) => (
-          <details key={name} className="module" open>
-            <summary>
-              {name} <span className="meta">{items.length} materials</span>
-            </summary>
-            {items.map((m) => (
-              <RowLink
-                key={m.id}
-                href={`/generate/${id}/${encodeURIComponent(m.id)}`}
-                title={m.title}
-                detail={`${m.kind.toUpperCase()} · ${m.readiness.replaceAll("_", " ")}`}
-                icon={m.kind === "slides" ? "presentation" : "file-text"}
-              />
-            ))}
-          </details>
-        ))}
-        {course.data && !materials.length && (
-          <Empty title="No study materials yet.">
-            <Link href="/canvas">Sync this course in Canvas settings.</Link>
-          </Empty>
-        )}
-        {offset !== null && (
-          <button
-            disabled={action.busy}
-            onClick={() =>
-              void action.run(async () => {
-                const page = await api<CourseMaterials>(
-                  `/api/experience/courses/${id}/materials?offset=${offset}`,
-                );
-                setExtra((old) => [...old, ...page.items]);
-                setOffset(page.nextOffset);
-              })
+    <CourseContext.Provider value={{ courseId, course }}>
+      <div
+        className={`course-workspace${selectedId ? " has-selection" : ""}`}
+      >
+        <div className="course-heading">
+          <Heading
+            title={name}
+            subtitle={
+              course.data
+                ? [
+                    code,
+                    `${course.data.materials.totalKnown} ${course.data.materials.totalKnown === 1 ? "material" : "materials"}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : undefined
             }
-          >
-            Load more materials
-          </button>
+            back="/generate"
+            crumb={selectedId ? null : undefined}
+            action={
+              <Link
+                href="/tasks"
+                className="button"
+                aria-label="Assignments and tasks"
+              >
+                <Icon name="clipboard-list" />
+                <span className="desktop-only">Assignments and tasks</span>
+              </Link>
+            }
+          />
+        </div>
+        <State resource={course} />
+        {course.data && (
+          <div className="course-split">
+            <section className="pane-list" aria-label="Course materials">
+              <div className="pane-tools">
+                <input
+                  type="search"
+                  aria-label="Filter materials"
+                  placeholder="Filter materials"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                />
+              </div>
+              <div className="pane-scroll">
+                {Array.from(groups).map(([group, items]) => (
+                  <div key={group} className="pane-group">
+                    <h2 className="pane-group-title">
+                      <span>{group}</span>
+                      <span className="count-up">{items.length}</span>
+                    </h2>
+                    {items.map((m) => (
+                      <Link
+                        key={m.id}
+                        className="material-link"
+                        href={`/generate/${courseId}/${encodeURIComponent(m.id)}`}
+                        aria-current={m.id === selectedId ? "page" : undefined}
+                      >
+                        <span className="content-icon">
+                          <Icon name={materialIcon(m)} />
+                        </span>
+                        <span className="grow">
+                          <strong>{m.title}</strong>
+                          <span className="meta">
+                            {kindLabels[m.kind]} ·{" "}
+                            {readinessLabels[m.readiness]}
+                          </span>
+                        </span>
+                        <span
+                          className={`status-dot ${m.readiness}`}
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    ))}
+                  </div>
+                ))}
+                {!materials.length && (
+                  <Empty title="No study materials yet.">
+                    <Link href="/canvas">
+                      Sync this course in Canvas settings.
+                    </Link>
+                  </Empty>
+                )}
+                {materials.length > 0 && !visible.length && (
+                  <p className="muted pane-note">No materials match.</p>
+                )}
+                {offset !== null && (
+                  <div className="pane-note">
+                    <button
+                      disabled={action.busy}
+                      onClick={() =>
+                        void action.run(async () => {
+                          const page = await api<CourseMaterials>(
+                            `/api/experience/courses/${courseId}/materials?offset=${offset}`,
+                          );
+                          setExtra((old) => [...old, ...page.items]);
+                          setOffset(page.nextOffset);
+                        })
+                      }
+                    >
+                      Load more materials
+                    </button>
+                  </div>
+                )}
+                {action.message && <Notice error>{action.message}</Notice>}
+              </div>
+            </section>
+            <section className="pane-detail" aria-label="Selected material">
+              {children}
+            </section>
+          </div>
         )}
-        {action.message && <Notice error>{action.message}</Notice>}
       </div>
-    </>
+    </CourseContext.Provider>
   );
 }
-export function MaterialScreen({
-  courseId,
-  id,
-}: {
-  courseId: string;
-  id: string;
-}) {
+/** Right pane before a material is chosen. Hidden on phones. */
+export function CourseOverview() {
+  const { course } = useCourse();
+  if (!course.data) return null;
+  return (
+    <div className="pane-placeholder">
+      <Icon name="sparkles" />
+      <h2>Choose a material</h2>
+      <p className="muted">
+        Pick something from {course.data.course.name} to create a Reviewer or a
+        practice Quiz from it.
+      </p>
+    </div>
+  );
+}
+export function MaterialScreen({ id }: { id: string }) {
   const { api, session } = useAuth(),
+    { courseId, course } = useCourse(),
     router = useRouter(),
-    course = useResource<CourseLearningWorkspace>(
-      `/api/experience/courses/${courseId}`,
-    ),
     action = useAction();
   const [material, setMaterial] = useState<LearningMaterial | null>(null),
     [searched, setSearched] = useState(false),
@@ -223,14 +368,17 @@ export function MaterialScreen({
       router.push(`/generation/${job.id}`);
     });
   }
+  const courseName = course.data?.course.name;
   return (
-    <>
-      <Heading
-        title={material?.title ?? "Study material"}
-        subtitle={course.data?.course.name}
-        back={`/generate/${courseId}`}
+    <div className="material-panel">
+      <PageCrumb
+        parent={
+          courseName
+            ? { label: courseName, href: `/generate/${courseId}` }
+            : undefined
+        }
+        current={material?.title}
       />
-      <State resource={course} />
       {!searched && course.data && <p role="status">Finding your material…</p>}
       {lookupError && (
         <div>
@@ -244,67 +392,110 @@ export function MaterialScreen({
         </Empty>
       )}
       {material && (
-        <div className="stack reader">
-          <p className="muted">
-            {material.kind.toUpperCase()} ·{" "}
-            {material.readiness.replaceAll("_", " ")}
-          </p>
-          {material.readiness === "needs_preparation" && (
-            <button
-              disabled={action.busy}
-              onClick={() =>
-                void action.run(async () => {
-                  const result = await api<{ items: LearningMaterial[] }>(
-                    "/api/experience/materials/prepare",
-                    { method: "POST", body: { courseId, materialId: id } },
-                  );
-                  setMaterial(
-                    result.items.find((m) => m.id === id) ?? material,
-                  );
-                  action.setMessage("Your material has been checked.");
-                })
-              }
+        <>
+          <header className="detail-head">
+            <Link
+              href={`/generate/${courseId}`}
+              className="icon-button back-button"
+              aria-label={`Back to ${courseName ?? "course"}`}
             >
-              Prepare material
-            </button>
-          )}
-          <div className="surface stack">
-            <h2>Create study tools</h2>
+              <Icon name="arrow-left" />
+            </Link>
+            <div className="detail-meta">
+              <span className="badge">{kindLabels[material.kind]}</span>
+              <span className={`status ${material.readiness}`}>
+                {readinessLabels[material.readiness]}
+              </span>
+            </div>
+            <h2>{material.title}</h2>
             <p className="muted">
-              Use this course material to create a Reviewer or practice Quiz.
+              {[material.moduleTitle, courseName].filter(Boolean).join(" · ")}
             </p>
-            <button
-              className="primary"
-              disabled={
-                action.busy ||
-                !generationEnabled ||
-                material.generation.reviewer.status !== "available"
-              }
-              onClick={generate}
-            >
-              Generate Reviewer
-            </button>
-            <button
-              disabled={
-                !generationEnabled ||
-                material.generation.quiz.status !== "available"
-              }
-              onClick={() => setQuiz(!quiz)}
-            >
-              Generate Quiz
-            </button>
+            <div className="detail-actions">
+              {material.readiness === "needs_preparation" && (
+                <button
+                  disabled={action.busy}
+                  onClick={() =>
+                    void action.run(async () => {
+                      const result = await api<{ items: LearningMaterial[] }>(
+                        "/api/experience/materials/prepare",
+                        { method: "POST", body: { courseId, materialId: id } },
+                      );
+                      setMaterial(
+                        result.items.find((m) => m.id === id) ?? material,
+                      );
+                      action.setMessage("Your material has been checked.");
+                    })
+                  }
+                >
+                  Prepare material
+                </button>
+              )}
+              <button
+                className="primary"
+                disabled={
+                  action.busy ||
+                  !generationEnabled ||
+                  material.generation.reviewer.status !== "available"
+                }
+                onClick={generate}
+              >
+                Generate Reviewer
+              </button>
+              <button
+                aria-expanded={quiz}
+                disabled={
+                  !generationEnabled ||
+                  material.generation.quiz.status !== "available"
+                }
+                onClick={() => setQuiz(!quiz)}
+              >
+                Generate Quiz
+              </button>
+            </div>
             {!generationEnabled && (
               <p className="meta">
                 Generation is unavailable in this environment. You can still
                 study saved materials in your Library.
               </p>
             )}
+            {action.message && <Notice error>{action.message}</Notice>}
+          </header>
+          <div className="detail-body">
+            <div className="stack">
+              {quiz ? (
+                <QuizSetup sourceType="material" sourceId={id} />
+              ) : (
+                <div className="detail-hint">
+                  <h3>Create study tools</h3>
+                  <p className="muted">
+                    A Reviewer turns this material into key ideas you can
+                    search. A Quiz turns it into practice questions. Both are
+                    saved to your Library, and you can leave while they
+                    generate.
+                  </p>
+                </div>
+              )}
+            </div>
+            <aside className="detail-side">
+              <h3>Source</h3>
+              <dl className="facts">
+                <dt>Type</dt>
+                <dd>{kindLabels[material.kind]}</dd>
+                <dt>Module</dt>
+                <dd>{material.moduleTitle ?? "Course materials"}</dd>
+                <dt>Status</dt>
+                <dd>{readinessLabels[material.readiness]}</dd>
+                <dt>Reviewer</dt>
+                <dd>{capabilityLabel(material.generation.reviewer)}</dd>
+                <dt>Quiz</dt>
+                <dd>{capabilityLabel(material.generation.quiz)}</dd>
+              </dl>
+            </aside>
           </div>
-          {quiz && <QuizSetup sourceType="material" sourceId={id} />}
-          {action.message && <Notice error>{action.message}</Notice>}
-        </div>
+        </>
       )}
-    </>
+    </div>
   );
 }
 export function QuizSetup({

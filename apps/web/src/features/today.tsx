@@ -6,6 +6,7 @@ import type {
 } from "@stay-focused/shared/task-planning";
 import Link from "next/link";
 import { useState } from "react";
+import { CountUp } from "../components/count-up";
 import { DayRing } from "../components/day-ring";
 import { useAuth } from "../components/providers";
 import { Empty, Heading, Icon, Notice, RowLink, State } from "../components/ui";
@@ -58,90 +59,176 @@ export function TodayScreen() {
     });
   }
   const next = today.data?.current ?? today.data?.next ?? today.data?.urgent[0];
+  const planned =
+    today.data?.timeline.filter((item) => item.startAt && item.endAt) ?? [];
+  const at = (minutes: number) =>
+    timeLabel(
+      new Date(
+        new Date(`${date}T00:00:00`).getTime() + minutes * 60000,
+      ).toISOString(),
+    );
   return (
     <>
       <Heading
         title={`${new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"}${name ? `, ${name}` : ""}`}
         subtitle={new Date().toLocaleDateString([], {
-          weekday: "short",
-          month: "short",
+          weekday: "long",
+          month: "long",
           day: "numeric",
         })}
         action={
-          <Link
-            href="/schedule"
-            className="icon-button"
-            aria-label="Open schedule"
-          >
+          <Link href="/schedule" className="button" aria-label="Open schedule">
             <Icon name="calendar" />
+            <span className="desktop-only">Open schedule</span>
           </Link>
         }
       />
       <State resource={today} />
       {today.data && (
-        <div className="two-column">
+        <div className="today-layout">
           <div className="stack">
-            <DayRing
-              date={date}
-              timeline={today.data.timeline}
-              start={start}
-              end={end}
-              onChange={change}
-            />
-            <button onClick={plan} disabled={action.busy}>
-              Plan this study time
-            </button>
-            {preview && (
-              <div className="surface stack">
-                <h2>Your study plan</h2>
-                {preview.plan.sessions.length === 0 ? (
-                  <p className="muted">
-                    No pending work fits this time. Add a task or adjust your
-                    availability.
-                  </p>
-                ) : (
-                  preview.plan.sessions.map((s) => (
-                    <p key={s.proposalId}>
-                      {s.taskTitle}
-                      <span className="meta">
-                        {timeLabel(s.startsAt)} – {timeLabel(s.endsAt)}
-                      </span>
-                    </p>
-                  ))
-                )}
-                {preview.plan.unscheduledWork.length > 0 && (
-                  <Notice>
-                    {preview.plan.unscheduledWork.length} tasks need more
-                    available time.
-                  </Notice>
-                )}
-                <button
-                  className="primary"
-                  disabled={action.busy || preview.plan.sessions.length === 0}
-                  onClick={() =>
-                    void action.run(async () => {
-                      await api("/api/study-plan/apply", {
-                        method: "POST",
-                        body: preview.request,
-                      });
-                      setPreview(null);
-                      today.refresh();
-                      action.setMessage("Your study schedule is saved.");
-                    })
-                  }
-                >
-                  Save schedule
-                </button>
+            <section className="surface study-window">
+              <div className="row between section-head">
+                <h2>Study window</h2>
+                <p className="meta">
+                  <CountUp value={today.data.progress.completed} /> of{" "}
+                  <CountUp value={today.data.progress.total} /> items completed
+                  · <CountUp value={today.data.progress.scheduledMinutes} />{" "}
+                  minutes scheduled
+                </p>
               </div>
+              <div className="study-window-body">
+                <DayRing
+                  date={date}
+                  timeline={today.data.timeline}
+                  start={start}
+                  end={end}
+                  onChange={change}
+                />
+                <div className="stack study-window-plan">
+                  <div>
+                    <p className="window-range count-up">
+                      {at(start)} – {at(end)}
+                    </p>
+                    <p className="muted">
+                      <CountUp value={end - start} />{" "}
+                      minutes available
+                    </p>
+                  </div>
+                  {preview ? (
+                    <div className="stack plan-preview">
+                      <h3>Your study plan</h3>
+                      {preview.plan.sessions.length === 0 ? (
+                        <p className="muted">
+                          No pending work fits this time. Add a task or adjust
+                          your availability.
+                        </p>
+                      ) : (
+                        <ol className="time-blocks">
+                          {preview.plan.sessions.map((s) => (
+                            <li key={s.proposalId}>
+                              <span className="meta">
+                                {timeLabel(s.startsAt)} – {timeLabel(s.endsAt)}
+                              </span>
+                              <strong>{s.taskTitle}</strong>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      {preview.plan.unscheduledWork.length > 0 && (
+                        <Notice>
+                          {preview.plan.unscheduledWork.length} tasks need more
+                          available time.
+                        </Notice>
+                      )}
+                      <div className="row wrap">
+                        <button
+                          className="primary"
+                          disabled={
+                            action.busy || preview.plan.sessions.length === 0
+                          }
+                          onClick={() =>
+                            void action.run(async () => {
+                              await api("/api/study-plan/apply", {
+                                method: "POST",
+                                body: preview.request,
+                              });
+                              setPreview(null);
+                              today.refresh();
+                              action.setMessage(
+                                "Your study schedule is saved.",
+                              );
+                            })
+                          }
+                        >
+                          Save schedule
+                        </button>
+                        <button
+                          className="subtle"
+                          onClick={() => setPreview(null)}
+                        >
+                          Discard
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {planned.length > 0 ? (
+                        <ol className="time-blocks">
+                          {planned.map((item) => (
+                            <li key={item.id}>
+                              <span className="meta">
+                                {timeLabel(item.startAt!)} –{" "}
+                                {timeLabel(item.endAt!)}
+                              </span>
+                              <strong>{item.title}</strong>
+                              {item.course && (
+                                <span className="meta">
+                                  {item.course.name}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="muted">
+                          Nothing is planned yet. Set the time you have, then
+                          let Stay Focused fit your tasks into it.
+                        </p>
+                      )}
+                      <div>
+                        <button
+                          className="primary"
+                          onClick={plan}
+                          disabled={action.busy}
+                        >
+                          Plan this study time
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {action.message && <Notice>{action.message}</Notice>}
+                </div>
+              </div>
+            </section>
+            {today.data.overdue.length > 0 && (
+              <section className="stack">
+                <h2>Needs attention</h2>
+                {today.data.overdue.map((item) => (
+                  <TodayRow key={item.id} item={item} />
+                ))}
+              </section>
             )}
-            {action.message && <Notice>{action.message}</Notice>}
-            <p className="meta">
-              {today.data.progress.completed} of {today.data.progress.total}{" "}
-              items completed · {today.data.progress.scheduledMinutes} minutes
-              scheduled
-            </p>
+            {today.data.upcomingDeadlines.length > 0 && (
+              <section className="stack">
+                <h2>Upcoming deadlines</h2>
+                {today.data.upcomingDeadlines.map((item) => (
+                  <TodayRow key={item.id} item={item} />
+                ))}
+              </section>
+            )}
           </div>
-          <div className="stack">
+          <aside className="stack today-rail">
             <h2>Up Next</h2>
             {next ? (
               <TodayRow item={next} />
@@ -161,23 +248,7 @@ export function TodayScreen() {
             ) : (
               <p className="muted">Nothing else scheduled today.</p>
             )}
-            {today.data.overdue.length > 0 && (
-              <>
-                <h2>Needs attention</h2>
-                {today.data.overdue.map((item) => (
-                  <TodayRow key={item.id} item={item} />
-                ))}
-              </>
-            )}
-            {today.data.upcomingDeadlines.length > 0 && (
-              <>
-                <h2>Upcoming deadlines</h2>
-                {today.data.upcomingDeadlines.map((item) => (
-                  <TodayRow key={item.id} item={item} />
-                ))}
-              </>
-            )}
-          </div>
+          </aside>
         </div>
       )}
     </>
