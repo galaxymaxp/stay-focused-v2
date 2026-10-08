@@ -1,5 +1,24 @@
 # Current Sprint
 
+## Website production deployment (2026-10-08)
+
+Owner-authorized: the V2 website replaces retired V1 on
+`https://stay-focused-ten.vercel.app` (Vercel project `stay-focused`). The
+project now builds `galaxymaxp/stay-focused-v2` from `apps/web`, and pushes to
+`website/functional-v1` deploy production automatically. It uses the shared V2
+Supabase project and the existing API (`stay-focused-v2-prototype`) through the
+same-origin rewrite. Owner enabled web generation and Google/Microsoft sign-in;
+V1 server secrets were removed from the project.
+
+Shipped with it: V1-style desktop shell (sidebar, breadcrumbs, full-width
+layout), Today with a right rail, side-by-side course materials, and motion
+mirroring the mobile tokens. FRESH: web typecheck/lint/tests, both isolated
+browser runs, production build, and live checks (API proxy 200/401, anon key
+for the V2 project). NOT RUN: authenticated live use by the owner, live
+generation and OAuth round trips. Preview deployments have no Supabase key
+(`NEXT_SUPABASE_ANON_KEY` is production-only), and `main` has no `apps/web`
+yet, so its preview builds fail until the website is merged.
+
 ## Website V1.1 orb parity (2026-10-08)
 
 Owner-authorized scope: port the authoritative mobile WebGL orb, verify visual
