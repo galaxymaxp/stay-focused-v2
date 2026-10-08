@@ -1,5 +1,67 @@
 # B25.3.3 source-context and generation convergence
 
+## Cloud continuation checkpoint — 2026-10-08
+
+**PARTIAL / BLOCKED.** This section supersedes the historical environment,
+verification and access status below; it does not close the approved scope.
+Recovery branch `recovery/b25.3.3` resolves to `de09b9c`, including approval
+`b8967f3` and implementation `f336d26`. All three histories were fetched and
+verified. The cloud implementation branch is
+`codex/b25.3.3-cloud-compatibility`; its recovered baseline was clean. The 127
+unrelated local dirty files were absent here, not deleted or reconstructed.
+
+Commit `f0e40f2` adds a conservative read-only deployment preflight, three
+database/projection compatibility regressions, and an opt-in fresh-source
+generator/disposable Postgres harness. A subsequent scoped diagnostic change
+records only whitelisted provider failure classifications/status. No production
+contract, applied migration, saved Quiz/attempt, model or strict gate was changed.
+
+**Direct production rollout is INCOMPATIBLE.** Fresh Supabase inspection shows
+different named RPC arguments, canonical source completion, legacy encoded
+Matching submissions, pair-weighted scoring and assisted-attempt behavior.
+Aggregate inventory includes 48 legacy Matching questions, 66 question types
+outside the checkpoint union and two assisted attempts. A payload-only adapter
+cannot preserve these contracts. The preflight correctly rejects this target;
+port convergence onto the actual deployed lineage or implement a reviewed
+version boundary with coordinated API/worker/client release before any rollout.
+Actual deployed source refs/builds remain unavailable, so no adapter is claimed.
+
+The exact mandatory criteria remain those in the sprint matrix. Fresh cloud
+evidence for each row follows; detailed provenance, run identifiers, retained
+failures and rollout/device procedure are in the
+[cloud compatibility assessment](cloud-matching-compatibility.md).
+
+| Mandatory requirement | Cloud result |
+| --- | --- |
+| 1. Source context and exact evidence ownership | FRESH PASS automated: bounded context, exact owners and cross-block rejection regressions |
+| 2. Evidence strength and reserve selection | FRESH PASS automated: weak fragments excluded and substantive distinct reserves selected |
+| 3. Complete-set feasibility before immutable acceptance | FRESH PASS automated: five-/20-slot plans, reserve feasibility, truthful mixed allocation and explicit zero-call insufficiency |
+| 4. Cross-support failure exclusions | FRESH PASS automated: pattern/intent exclusions and durable legacy resume retain counters |
+| 5. Nested diagnostic serialization | FRESH PASS automated: nested whitelist and actual reporter; no private text/key leakage |
+| 6. Existing invariants and durable bounds | FRESH PASS checkpoint automation; production legacy/supported-client preservation BLOCKED pending compatible lineage. Strict model, gates, bounds, immutable acceptance, choice/Matching and owner/secrecy tests retained |
+| 7. Local verification | FRESH PASS: focused Quiz 222 passed / 4 skipped; API 999 / 5 skipped; mobile 467, shared 26; Workflow 1, provider contract 18. Forced root typecheck/lint/build each 7/7, zero cached; four existing lint warnings. Initial stale Expo-route typecheck failure retained and repaired by ignored-type regeneration |
+| 8. Fresh real-source generation acceptance | ATTEMPTED / BLOCKED: three fresh owned-source engine runs fail before generation/persistence, 0/5; HTTP 401 confirmed. No old output or synthetic proof substituted |
+| 9. Persisted production/physical Quiz acceptance | BLOCKED / NOT RUN: incompatible target, no usable/allowed HTTPS API or authenticated learner/denial sessions, no controllable physical Android/build capability. No production Quiz or device success path produced |
+| 10. Closure | PARTIAL / BLOCKED: scoped reviewable changes and records prepared; mandatory rows 8/9 and production preservation remain outstanding |
+
+The owned instructional input was recovered through the original job's
+owner-joined accepted-source snapshot, not through generated output. Planning
+five slots succeeds with zero provider calls. The owner authorized **10
+generation attempts for today**; three generation runs plus one minimal
+Responses authorization probe conservatively consume **4/10**, leaving at most
+six for this date. Stop paid retries until `STAY_FOCUSED_OPENAI_API_KEY` is
+corrected in cloud secret configuration: readiness reports ready, but actual
+Responses requests return `401 invalid_api_key`. No monetary cap is inferred.
+
+Other smallest unlocks: actual deployed producer/API/client refs and release
+IDs; usable/allowed HTTPS target plus two authenticated owner test sessions;
+authenticated APK build access and an actual controllable Android device. The
+assessment specifies staging preservation proof, release ordering/rollback,
+exact build metadata and physical Library/secrecy/answer/score/history/reopen/
+owner-denial evidence. No migration, deployment, merge, main push or Goal
+lifecycle change is claimed. Finish Anyway, B26 and broader website work remain
+excluded. Historical checkpoint evidence follows unchanged.
+
 Date: 2026-10-08, Asia/Manila. Branch: main. Starting HEAD: 93a8eb833086d7a13f3fce773453c7cbb27a80e8 (Autopilot installation). Explicit owner approval selects this finite scope; Finish Anyway and B26 are excluded.
 
 ## Acceptance contract

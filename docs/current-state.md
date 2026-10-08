@@ -1,5 +1,60 @@
 # Current State
 
+## B25.3.3 cloud continuation checkpoint (2026-10-08)
+
+**PARTIAL / BLOCKED; scope remains generation convergence only.** Recovery
+history is resolved: `de09b9c` includes approval `b8967f3` and implementation
+`f336d26`. Branch `codex/b25.3.3-cloud-compatibility` began clean; the
+127 unrelated Windows dirty paths are absent here and were not recreated.
+Commit `f0e40f2` adds an offline read-only deployment preflight, three
+compatibility regressions and an opt-in fresh-owned-source/disposable Postgres
+harness; the follow-up checkpoint records sanitized failure status and evidence.
+
+**Direct production rollout is INCOMPATIBLE.** Live named RPC arguments,
+canonical source links, encoded Matching submissions, pair-weighted scoring
+and assisted state differ from this checkpoint. Aggregate saved-format counts:
+48 legacy Matching questions, 66 unsupported question types, two assisted
+attempts. Do not replace live RPCs with the pending Matching migration.
+Port convergence onto the actual deployed source or prepare a reviewed version
+boundary/coordinated release that preserves saved quizzes, attempts, scores,
+owner isolation and supported clients. No production contract/data was changed.
+
+FRESH cloud verification: focused Quiz **222 passed / 4 opt-in skipped**,
+API **999 / 5 skipped**, mobile **467**, shared **26**, Workflow **1**,
+provider contract **18**. Forced root typecheck/lint/build each **7/7, zero
+cached**; four existing mobile lint warnings. Initial typecheck failed on
+23 stale ignored Expo route errors from the old cloud branch; regenerated
+typed routes without changing app routes or weakening checks, then passed.
+Historical local counts below are not cloud proof.
+
+Fresh owned instructional source was recovered from the original
+owner-joined accepted-source snapshot. Zero-call five-slot planning passes;
+three fresh engine generation attempts fail before generation/persistence,
+with Responses **401 invalid_api_key** confirmed. Today's owner allowance is
+**10 generation attempts**; conservatively **4/10 used** including the minimal
+authorization probe, at most six remaining. Do not reset the ledger or retry
+without a corrected `STAY_FOCUSED_OPENAI_API_KEY` cloud binding.
+
+Mandatory rows 1–7 have fresh checkpoint automation; row 6's live preservation
+remains blocked. Rows **8 (fresh complete generation)** and **9 (persisted
+production/physical success path)** remain unaccepted; row 10 cannot close.
+No authenticated browser/emulator/physical flow, APK, production job/Quiz,
+migration or deployment is claimed. Root Android export is not a device build.
+The exact existing mandatory criteria below remain in force.
+
+Next eligible actions require: valid Responses credential binding; actual
+deployed producer/API/client refs and release IDs; usable/allowed HTTPS API
+and two authenticated owner test sessions; authenticated APK build capability
+and a controllable physical Android device. The report supplies the gated
+rollout/rollback and exact build/device evidence procedure. Scope approval
+does not need renewal. Finish Anyway, B26 and broader website work remain
+excluded; no active/resumed Goal lifecycle is asserted.
+
+Records: [updated acceptance matrix](ai/acceptance/b25.3.3/quiz-context-convergence.md)
+and [compatibility, fresh evidence and handoff](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+This section supersedes historical environment/access/verification statements
+below without rewriting their history.
+
 ## B25.3.3 approved finite scope (2026-10-08)
 
 **Owner-approved; local repair verified, mandatory acceptance blocked.** The owner explicitly selected B25.3.3 generation convergence after installation commit `93a8eb8`; the installation checkpoint's pending scope decision and historical recommendation-only wording no longer block this run. This section supersedes those scope-selection statements, without rewriting their history. **Finish Anyway semantics, B26–B28, web migration and other roadmap recommendations are excluded.** Existing all-question finalization, choice/Matching support and learning-progress contracts remain intact.

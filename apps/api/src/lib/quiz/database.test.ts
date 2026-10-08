@@ -103,7 +103,16 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
             const generated = await generateQuiz({ async generate<T>(generationRequest: import('@stay-focused/engine').GenerationRequest<T>): Promise<T> {
                 const field = generationRequest.schema.name === 'quiz_verification' ? 'verifierCalls' : 'authorCalls';
                 summary[field] = Number(summary[field]) + 1;
-                return provider.generate(generationRequest);
+                try { return await provider.generate(generationRequest); }
+                catch (error) {
+                    const message = error instanceof Error ? error.message : '';
+                    const status = message.match(/:\s*(400|401|403|404|408|429|500|502|503|504)\b/)?.[1];
+                    summary.providerFailure = { httpStatus: status ? Number(status) : null,
+                        reason: /identical first|first keys|discriminator/i.test(message) ? 'schema_discriminator_collision'
+                            : /invalid schema|response_format|json_schema/i.test(message) ? 'provider_schema_rejected'
+                            : /connection|fetch failed|timeout/i.test(message) ? 'provider_transport_failed' : 'provider_error_redacted' };
+                    throw error;
+                }
             } }, livePlan, undefined, [], (diagnostic: QuizGenerationDiagnostic) => {
                 diagnostics.push(JSON.parse(serializeQuizDiagnostic(runId, diagnostic)));
                 summary.diagnostics = diagnostics;
