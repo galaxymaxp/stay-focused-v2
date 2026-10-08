@@ -1,5 +1,26 @@
 # Current Sprint
 
+## B25.3.3 fresh environment verification (2026-10-08)
+
+**PARTIAL / BLOCKED.** Continued clean at `fb8c25a` on the existing scoped
+branch. Fresh cloud provisioning adopts configuration version
+`cecfgver_6ac6ee1c8dc081939d7e0e7afe70cc2f`, different from the previous
+record. Secret availability is `true`, initial standard alias availability is
+`false`, and the probe's command-local alias matches (`true`). Runtime readiness
+still reports `unknown`. One minimal Responses POST returns **401
+`invalid_api_key`**; no instructional generation or persistence was attempted.
+The effective credential is rejected; saved-key versus proxy-substitution
+root cause remains unproven. No further calls after the 401.
+
+Today's ledger is now **7/10 consumed, at most 3 remaining**, including this
+authorization probe; earlier totals below are historical. Direct production
+rollout remains INCOMPATIBLE; live preservation and mandatory rows 8/9/10 remain
+blocked. Next: correct/verify the existing cloud network-secret Authorization
+binding, resolve unknown readiness, then charge one minimal auth probe before
+one bounded original-source generation. Preserve all lineage, two-owner and
+physical gates. No migration, merge, deployment or product change; documentation
+checks only. [Fresh evidence](acceptance/b25.3.3/cloud-matching-compatibility.md).
+
 ## B25.3.3 published-key follow-up (2026-10-08)
 
 **PARTIAL / BLOCKED.** The owner published a new OpenAI key and authorized

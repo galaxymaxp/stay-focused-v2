@@ -6,6 +6,104 @@ production rollout, and physical success-path acceptance**.
 
 ## Restored baseline and changes
 
+### Fresh republished-environment verification — 2026-10-08
+
+**PARTIAL / BLOCKED.** This continuation began with a newly provisioning
+attached cloud instance, observed pending/offline and then running/connected.
+It fetched the existing scoped branch and resumed clean at
+`fb8c25a125b2acb3b0cc67e213852bf166d72557`; implementation was not restarted.
+The task-creation timestamp is not exposed by the runtime tools, so the fresh
+provisioning/configuration observations are the evidence for freshness.
+
+| FRESH configuration observation | Result |
+| --- | --- |
+| Attached environment | `ccarenv_b64_Y2NhcmVudl9iMjUzMDgxZWVlMGM4MTkxYTk5YWQxYTRmODAzZmVkYQ` |
+| Attached source configuration | `9a643b2b-a145-4422-85fe-57ab135c6ccf~cecfg_6ac6d9f161888193a02e893fa46a7656` |
+| Attached configuration version | `9a643b2b-a145-4422-85fe-57ab135c6ccf~cecfgver_6ac6ee1c8dc081939d7e0e7afe70cc2f` |
+| Previous recorded version | `cecfgver_6ac6ddc6309c81938cafc7edc32c2e7f`; DIFFERENT |
+| Desired / observed spec revision | `2` / `2`; `observations_current: true` |
+| Network configuration | Restricted; custom allowed host `api.openai.com`; executor policy v1 agrees, VPN false, no TCP grants |
+| Readiness limitation | Runtime secret and network-policy states remain `unknown` after startup and after the probe; readiness/enforcement is not claimed |
+| `STAY_FOCUSED_OPENAI_API_KEY` available | `true` |
+| `OPENAI_API_KEY` initially available | `false` |
+| Probe's command-local alias matches configured binding | `true` |
+| Inherited HTTPS proxy available | `true`; retained with TLS verification |
+
+The new saved configuration is attached. Adoption of a valid underlying secret
+value is **not proven** by its presence or the version change. No credential
+value, digest, fragment, raw provider error or secret file was inspected,
+printed or committed. The alias exists only within the probe process.
+
+After reading the retained ledger and provenance, one minimal, non-instructional
+Python `POST /v1/responses` was sent through the inherited proxy, with pinned
+model `gpt-5.4-2026-03-05`, input `Reply OK.`, `max_output_tokens: 16`,
+`store: false`, a 40-second timeout and **zero retries**. Authentication
+**FAILS: HTTP 401, `invalid_api_key`, 271 ms**. Run
+`728a0011-1a34-448f-b110-4f231c2b4d47`, at
+`2026-10-08T01:36:27.769462+00:00` (09:36:27 Asia/Manila).
+Safe ephemeral evidence: `/tmp/b2533-fresh-authorization-attempt-7-safe.json`.
+This report preserves its durable, non-secret summary; prior tasks' `/tmp`
+files are historical references, not assumed present in this fresh instance.
+
+**Exact observed configuration failure:** the effective Authorization credential
+from the named binding, correctly aliased, is rejected by Responses on the new
+attached configuration. An old environment-version reference and missing alias
+are no longer explanations for this probe. Unknown runtime readiness prevents
+distinguishing a saved-credential problem from proxy credential substitution.
+No definitive root cause beyond that boundary is claimed. No key was generated,
+configuration changed, alternate credential substituted, or further API probe
+sent after the 401.
+
+| 2026-10-08 Asia/Manila daily ledger | Conservatively charged |
+| --- | --- |
+| Carried forward, unchanged | 6: four instructional runs and two authorization probes |
+| Attempt 7, this continuation | One minimal authorization probe; HTTP 401 `invalid_api_key` |
+| Total consumed / daily allowance | **7 / 10** |
+| Remaining | **At most 3**; reserved for subsequent acceptance, no reset |
+| Instructional generation in this continuation | **NOT RUN / BLOCKED**, zero engine attempts |
+| Quiz completeness / persistence in this continuation | **NOT RUN / BLOCKED**; no new Quiz or persistence claim |
+
+Generation stopped at the authentication gate. The existing four instructional
+failures remain **0/5**; no author/verifier validation ran in this continuation.
+Original owner-joined snapshot, source hashes, 23-block provenance and strict
+generation/persistence workflow below remain unchanged. No private source was
+recovered again while authentication was blocked.
+
+**Compatibility remains INCOMPATIBLE for direct production rollout**, based on
+the retained inspection, not a new database inspection. Preserve the live
+Matching format, pair-weighted/assisted scoring, canonical source relationships
+and saved history. Existing argument/body drift and aggregate format findings
+still require deployed producer/API/client lineage and a preservation boundary.
+No database writes, migrations, merge or deployment occurred.
+
+Mandatory row 8 remains attempted/BLOCKED overall and NOT RUN here; row 6's live
+preservation, row 9's persisted production/physical success path and row 10's
+closure remain outstanding. FRESH presence checks still find no usable HTTPS
+API origin, learner/test-denial credentials or deployment/EAS credentials.
+No adb/emulator binary or controllable physical device is established.
+
+FRESH checks for this documentation-only continuation: scoped whitespace and
+new local-link checks PASS; historical-text preservation and unchanged
+non-documentation bytes against `fb8c25a` PASS. Implementation suites and root
+typecheck/lint/build are **NOT APPLICABLE / NOT RERUN**; prior results below
+remain retained checkpoint evidence. The initial narrow main-only Git fetch
+did not create a remote-tracking ref and tracking setup failed; explicit ref
+fetch plus non-tracking branch checkout recovered the exact clean checkpoint.
+There was no product edit or rebuild.
+
+**Exact next action:** inspect/correct the existing
+`STAY_FOCUSED_OPENAI_API_KEY` network-secret binding for `api.openai.com` in the
+cloud configuration, confirming the intended existing active OpenAI credential
+and Authorization substitution without exposing its value; republish if changed.
+Require current `ready` secret and `enforced` policy observations, or resolve
+their unknown-state reporting. Then charge one minimal Responses authorization
+probe against the remaining three attempts. Only after successful authorization
+may one bounded original-source engine run proceed through unchanged strict
+author/verifier gates and authorized disposable persistence. Compatible
+production/two-owner and physical acceptance still require the lineage, target,
+sessions, build and device prerequisites below. PR #1 remains open/draft;
+do not merge or deploy it.
+
 ### Published-key follow-up — 2026-10-08
 
 The owner replaced/published the OpenAI key and authorized continuation. This

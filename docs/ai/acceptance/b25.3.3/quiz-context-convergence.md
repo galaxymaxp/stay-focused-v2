@@ -1,5 +1,23 @@
 # B25.3.3 source-context and generation convergence
 
+## Fresh republished-environment verification — 2026-10-08
+
+**PARTIAL / BLOCKED.** Resumed clean at `fb8c25a` in a newly provisioning
+cloud instance. Attached version `cecfgver_6ac6ee1c8dc081939d7e0e7afe70cc2f`
+differs from the previous version. Secret availability is `true`; the
+command-local standard alias matches (`true`). Readiness remains `unknown`.
+The one minimal Responses authorization probe returns **401 `invalid_api_key`**
+in 271 ms; instructional generation and persistence are NOT RUN / BLOCKED.
+No further API call follows the 401. Daily ledger: **7/10 conservatively used,
+at most 3 remaining**, superseding prior totals without resetting them.
+
+Direct rollout remains INCOMPATIBLE; rows 6 (live preservation), 8, 9 and 10
+remain unaccepted. Verify/correct the existing network-secret Authorization
+binding and readiness before another charged auth probe or original-source
+generation. No product/migration/deployment change or rebuild; only scoped
+documentation checks. Earlier acceptance evidence remains unchanged.
+See [fresh configuration, probe and exact next action](cloud-matching-compatibility.md).
+
 ## Published-key follow-up — 2026-10-08
 
 **PARTIAL / BLOCKED.** Resumed at clean `29aa524` after the owner published
