@@ -24,7 +24,7 @@ block hash match the provenance below; no generated output was reused.
 
 | Today's ledger position | FRESH result at `29aa524` | Evidence |
 | --- | --- | --- |
-| 5 — fourth real-source engine run | FAIL: 0/5, 417 ms, one author invocation, zero verifier invocations, HTTP 401 | Run `0c2ed547-41ab-40d4-8e35-65fe126dc254`; strict five-slot plan, same model/gates/bounds; `provider_failure` / `authoring_provider_failed`; `/tmp/b2533-live-attempt-5-safe.json` and corresponding `.log` |
+| 5 — fourth real-source engine run | FAIL: 0/5, 417 ms, one author invocation, zero verifier invocations, HTTP 401 | Run `0c2ed547-41ab-40d4-8e35-65fe126dc254`; strict five-slot plan, same model/gates/bounds; `provider_failure` / `authoring_provider_failed`; selected Vitest run: one failed / 29 filtered skips, 9.92 s; `/tmp/b2533-live-attempt-5-safe.json` and corresponding `.log` |
 | 6 — independent minimal Python Responses authorization probe | FAIL: HTTP 401, `invalid_api_key`, 500 ms; no private/instructional input, no generation acceptance | Run `1f6dfca1-101e-4b9e-b6cf-2b4e7a572353`; `/tmp/b2533-authorization-attempt-6-safe.json`; preserved HTTPS proxy and CA trust, no retries |
 
 Ledger now **6/10 conservatively consumed; at most four remain for 2026-10-08**:
@@ -68,6 +68,22 @@ acceptance. No task creation or environment reattachment capability is exposed
 to this agent. If fresh adoption still returns 401, correct the environment's
 requested network-secret binding/Responses credential through configuration,
 without putting credential values in chat.
+
+Portable delivery: the scoped branch `codex/b25.3.3-cloud-compatibility` is
+published to origin, with implementation `f0e40f2`, initial cloud checkpoint
+`29aa524` and this follow-up `7476cde`. Fresh remote verification confirms
+`7476cde09d90666a1468158650cf0015b8a90424`; the recovered base remains
+`de09b9c`. [Draft PR #1](https://github.com/galaxymaxp/stay-focused-v2/pull/1)
+targets `recovery/b25.3.3` and is attached to this task. This handoff record
+may add a documentation-only commit to that branch. No main push, merge,
+deployment or production migration is performed.
+
+In a fresh task, inspect its repository/dirty state first, fetch the scoped
+branch explicitly (the current remote configuration tracks only main), then
+continue from its checkpoint. Read this report and the exact mandatory sprint
+matrix. Carry forward **6/10 used for 2026-10-08**, verify the new instance's
+binding and Responses authorization, and retain the compatibility/physical
+blockers. Review this draft; do not merge or deploy it as accepted work.
 
 Repository `galaxymaxp/stay-focused-v2`, initial recovered checkpoint
 `de09b9ce510ecce3a8ff3ae630234a7dfc546c9b`. FRESH remote inspection resolves
