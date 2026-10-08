@@ -73,3 +73,20 @@ and retry reuse existing API safeguards and idempotency contracts.
 Figma Generate, Course, Generation and Queue frames were inspected. The orb is
 the supplied local SVG. Desktop arrangements derive from that same design
 language under the owner's explicit approval; no new desktop design is invented.
+
+## W4 Library, Reviewer, Quiz and settings checkpoint
+
+FRESH: web unit tests 10/10; web TypeScript and lint pass. Browser checks pass
+saved Reviewer reload/search/text export, revision-checked activity draft
+edit/save/reload, Quiz saved-selection recovery, single/multiple/true-false and
+Matching answers, finalize/check feedback, all-question completion guard,
+finish confirmation, score/history/reopen and updated Library learning progress.
+Settings changes the persisted theme and signs out. Public answer labels are
+shown; opaque option IDs and private diagnostics are not displayed.
+
+The inspected Quiz frame's Reveal Answer and incomplete Finish controls are not
+implemented because the existing backend deliberately withholds answer keys
+before finalization and requires all questions checked. Existing safeguards win;
+no security or grading contract changed. Plain-text Reviewer export uses the
+saved artifact and does not call generation. Exact paginated API reads are used
+for Library and course material lists, with bounded material-deep-link recovery.
