@@ -1,5 +1,24 @@
 # Roadmap
 
+## Website V1 owner-approved scope (2026-10-08)
+
+The owner prioritizes functional website implementation immediately. B25.3.3
+production compatibility investigation is paused; its PARTIAL/BLOCKED verdict,
+reports, repairs, and blockers remain preserved and it is not complete. This
+instruction supersedes earlier web exclusions for the finite website scope only.
+
+Endpoint: implement and locally verify the nine requested browser surfaces in
+`apps/web` over existing Supabase identity and shared API/workflows, record exact
+blockers, and commit scoped changes on `website/functional-v1`. No production
+deployments, migrations/data writes, PR #1 edits, or paid generation requests.
+See `docs/ai/acceptance/website-v1.md` and ADR-019 for the acceptance matrix.
+
+Task order: W1 auth/shell/Today; W2 tasks/calendar; W3 Canvas/generation/queue;
+W4 Library/Reviewer/Quiz/settings; W5 browser, regression and root verification.
+Continue independent work when live acceptance is blocked. Current result:
+IN PROGRESS; W1 implementation started. Historical sections below are retained.
+
+
 ## B25.3.3 approved finite scope (2026-10-08)
 
 **Owner-approved; local repair verified, mandatory acceptance blocked.** The owner explicitly selected B25.3.3 generation convergence after installation commit `93a8eb8`; the installation checkpoint's pending scope decision and historical recommendation-only wording no longer block this run. This section supersedes those scope-selection statements, without rewriting their history. **Finish Anyway semantics, B26–B28, web migration and other roadmap recommendations are excluded.** Existing all-question finalization, choice/Matching support and learning-progress contracts remain intact.
