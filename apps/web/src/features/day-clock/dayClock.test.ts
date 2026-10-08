@@ -1,0 +1,158 @@
+// Clock geometry tests mirrored from apps/mobile/src/features/redesign/dayClock.test.ts.
+import { describe, expect, it } from "vitest";
+
+import {
+  CLOCK,
+  angleMinutes,
+  celestialBody,
+  dayStateAt,
+  dayOrbTones,
+  dragEdge,
+  followMinutes,
+  hitTest,
+  HORIZON_Y,
+  luminance,
+  moveRange,
+  ringPoint,
+  snapRange,
+} from "./dayClock";
+
+const at = (minutes: number, radius: number = CLOCK.ring) => ringPoint(minutes, radius);
+
+describe("glass clock ring input", () => {
+  it("reads like a wall clock: midnight at the top, 6 AM right, noon bottom, 6 PM left", () => {
+    for (const minutes of [0, 360, 720, 1080]) {
+      const p = at(minutes);
+      expect(angleMinutes(p.x - CLOCK.center, p.y - CLOCK.center)).toBeCloseTo(minutes % 1440, 5);
+    }
+    expect(at(0).y).toBeLessThan(CLOCK.center - 100);
+    expect(at(360).x).toBeGreaterThan(CLOCK.center + 100);
+    expect(at(720).y).toBeGreaterThan(CLOCK.center + 100);
+    expect(at(1080).x).toBeLessThan(CLOCK.center - 100);
+  });
+
+  it("keeps a middle to hold on even a short block", () => {
+    const middle = at(615);
+    expect(hitTest(middle.x, middle.y, 600, 630)).toBe("move");
+    const nearStart = at(603);
+    expect(hitTest(nearStart.x, nearStart.y, 600, 630)).toBe("start");
+  });
+
+  it("follows the finger continuously, with no snapping while held", () => {
+    expect(followMinutes(600, 607.3)).toBeCloseTo(607.3);
+    expect(followMinutes(600, 611.9)).toBeCloseTo(611.9);
+    // Near midnight the nearest reading wins, so a range never flips inside out.
+    expect(followMinutes(1430, 5)).toBe(1440);
+    expect(followMinutes(10, 1435)).toBe(0);
+  });
+
+  it("snaps only on release, keeping a moved block's duration", () => {
+    expect(snapRange(607.3, 731.9, "start")).toEqual({ start: 600, end: 735 });
+    expect(snapRange(601, 721, "move")).toEqual({ start: 600, end: 720 });
+    expect(snapRange(1330, 1450, "move").end).toBeLessThanOrEqual(1440);
+    // A resize can never collapse the range below one step.
+    expect(snapRange(700, 704, "end")).toEqual({ start: 705, end: 720 });
+  });
+
+  it("moves a whole block without changing its length or leaving the day", () => {
+    expect(moveRange(600, 720, 45)).toEqual({ start: 645, end: 765 });
+    expect(moveRange(600, 720, -900)).toEqual({ start: 0, end: 120 });
+    expect(moveRange(600, 720, 2000)).toEqual({ start: 1320, end: 1440 });
+  });
+
+  it("keeps a dragged edge from crossing the other", () => {
+    expect(dragEdge("start", 800, 600, 720)).toEqual({ start: 705, end: 720 });
+    expect(dragEdge("end", 500, 600, 720)).toEqual({ start: 600, end: 615 });
+  });
+
+  it("gives handles and the middle of the block generous touch areas", () => {
+    // Exactly on a handle, and well off the visible ring but still near it.
+    expect(hitTest(at(600).x, at(600).y, 600, 900)).toBe("start");
+    const nearEnd = at(912, CLOCK.ring + 26);
+    expect(hitTest(nearEnd.x, nearEnd.y, 600, 900)).toBe("end");
+    const inside = at(900, CLOCK.ring - 38);
+    expect(hitTest(inside.x, inside.y, 600, 900)).toBe("end");
+    // The middle of the arc drags the whole block.
+    const middle = at(750, CLOCK.ring + 10);
+    expect(hitTest(middle.x, middle.y, 600, 900)).toBe("move");
+    // Away from the block, and inside the glass, the page keeps the touch.
+    const away = at(200);
+    expect(hitTest(away.x, away.y, 600, 900)).toBeNull();
+    expect(hitTest(CLOCK.center, CLOCK.center + 40, 600, 900)).toBeNull();
+  });
+});
+
+describe("day state inside the glass", () => {
+  it("moves the sun from the left horizon, over the top at noon, to the right at 6 PM", () => {
+    const rise = celestialBody(360);
+    const noon = celestialBody(720);
+    const set = celestialBody(1079);
+    expect(rise).toMatchObject({ kind: "sun" });
+    expect(rise.x).toBeLessThan(-0.7);
+    expect(rise.y).toBeCloseTo(HORIZON_Y, 2);
+    expect(noon.x).toBeCloseTo(0, 5);
+    expect(noon.y).toBeLessThan(-0.6);
+    expect(set.x).toBeGreaterThan(0.7);
+    expect(celestialBody(1380).kind).toBe("moon");
+    expect(celestialBody(180).kind).toBe("moon");
+  });
+
+  it("keeps the sun and moon inside the glass all day", () => {
+    for (let minutes = 0; minutes < 1440; minutes += 5) {
+      const body = celestialBody(minutes);
+      expect(Math.hypot(body.x, body.y)).toBeLessThan(0.92);
+    }
+  });
+
+  it("blends continuously, with no hard switch between phases", () => {
+    const channel = (value: string) => value.match(/\d+/g)!.map(Number);
+    for (let minutes = 0; minutes < 1440; minutes += 1) {
+      const a = channel(dayStateAt(minutes).top);
+      const b = channel(dayStateAt(minutes + 1).top);
+      const jump = Math.max(...a.map((value, index) => Math.abs(value - b[index]!)));
+      expect(jump, `minute ${minutes}`).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("shows night with stars at midnight, none at noon, and warm light at sunset", () => {
+    expect(dayStateAt(0).night).toBe(1);
+    expect(dayStateAt(720).night).toBe(0);
+    expect(dayStateAt(1060).warmth).toBeGreaterThan(0.3);
+    expect(dayStateAt(720).warmth).toBe(0);
+  });
+
+  it("keeps daylight deep enough for white time text", () => {
+    for (let minutes = 0; minutes < 1440; minutes += 10) {
+      const mid = dayStateAt(minutes).mid.match(/\d+/g)!.map(Number) as [number, number, number];
+      // White on the sky reaches large-text contrast (3:1) before any scrim.
+      expect(1.05 / (luminance(mid) + 0.05)).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
+
+describe("day orb", () => {
+  it("lights the orb with the sun by day and a cool moon by night, inside the ball", () => {
+    const noon = dayOrbTones(720);
+    const night = dayOrbTones(60);
+    expect(noon.position.y).toBeGreaterThan(0.3);
+    expect(night.light.toLowerCase()).toBe("#c8d6ff");
+    expect(noon.strength).toBeGreaterThan(night.strength);
+    for (let minutes = 0; minutes < 1440; minutes += 30) {
+      const { position } = dayOrbTones(minutes);
+      expect(Math.hypot(position.x, position.y, position.z)).toBeLessThan(0.7);
+    }
+  });
+});
+
+describe("clock blocks", () => {
+  it("finds the scheduled block under a touch on the inner lane, but leaves handles to the handles", async () => {
+    const { segmentAt } = await import("./dayClock");
+    const blocks = [{ id: "b1", from: 900, to: 960 }];
+    const onLane = ringPoint(930, CLOCK.lane);
+    expect(segmentAt(onLane.x, onLane.y, blocks, [600, 720])?.id).toBe("b1");
+    const outside = ringPoint(930, CLOCK.ring + 20);
+    expect(segmentAt(outside.x, outside.y, blocks, [600, 720])).toBeNull();
+    const nearHandle = ringPoint(930, CLOCK.lane);
+    expect(segmentAt(nearHandle.x, nearHandle.y, blocks, [930])).toBeNull();
+  });
+});

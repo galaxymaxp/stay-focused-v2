@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from "react";
 
 /** Same values as the mobile app's `motion` tokens (apps/mobile/src/design/themeTokens.ts). */
 export const motion = {
-  small: 220,
-  normal: 320,
-  spatial: 480,
-  spring: { damping: 18, stiffness: 180, mass: 0.8 },
+  press: 140,
+  small: 180,
+  normal: 240,
+  spatial: 320,
+  spring: { damping: 22, stiffness: 260, mass: 0.8 },
 } as const;
 
 export interface SpringState {

@@ -16,12 +16,12 @@ it("springs from zero to the value with the mobile app's small overshoot", () =>
   const peak = Math.max(...trace);
   expect(peak).toBeGreaterThan(100);
   expect(peak).toBeLessThan(104);
-  // Settles close to the ~516ms the CSS easing curve is built from.
+  // Settles close to the ~434ms the CSS easing curve is built from.
   const settledAt = trace.findIndex((v, i) =>
     trace.slice(i).every((w) => Math.abs(w - 100) < 0.5),
   );
-  expect(settledAt / 60).toBeGreaterThan(0.4);
-  expect(settledAt / 60).toBeLessThan(0.65);
+  expect(settledAt / 60).toBeGreaterThan(0.3);
+  expect(settledAt / 60).toBeLessThan(0.55);
 });
 
 it("counts down as well as up", () => {

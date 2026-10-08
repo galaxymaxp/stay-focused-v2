@@ -419,7 +419,40 @@ export function createFixture() {
       send(sessions[0]);
       return;
     }
-    if (path.startsWith("/api/study-plan/")) {
+    if (path === "/api/experience/capabilities") {
+      send({
+        reviewerGeneration: capability,
+        quizGeneration: capability,
+        activityMaker: capability,
+        planner: capability,
+        calendar: capability,
+      });
+      return;
+    }
+    if (path === "/api/experience/announcements") {
+      send({
+        items: [
+          {
+            id: "announcement-1",
+            course,
+            title: "Week 3 reading is posted",
+            body: "Read the planning chapter before Friday.",
+            preview: "Read the planning chapter before Friday.",
+            postedAt: now(),
+            authorName: "Course instructor",
+            htmlUrl: null,
+            attachments: [],
+            links: [],
+          },
+        ],
+        nextOffset: null,
+      });
+      return;
+    }
+    if (
+      path.startsWith("/api/study-plan/") ||
+      path.startsWith("/api/experience/planner/")
+    ) {
       const task = [...tasks.values()].find((t) => t.status === "pending"),
         plan = {
           algorithmVersion: "deterministic-v1",
@@ -431,8 +464,13 @@ export function createFixture() {
                   proposalId: "proposal-1",
                   taskId: task.id,
                   taskTitle: task.title,
-                  startsAt: body.planningRange.startsAt,
-                  endsAt: body.planningRange.endsAt,
+                  startsAt:
+                    body.availability?.[0]?.startsAt ?? body.planningRange.startsAt,
+                  endsAt: new Date(
+                    Date.parse(
+                      body.availability?.[0]?.startsAt ?? body.planningRange.startsAt,
+                    ) + 30 * 60000,
+                  ).toISOString(),
                   durationMinutes: 30,
                   scheduledAfterDeadline: false,
                 },
@@ -440,7 +478,7 @@ export function createFixture() {
             : [],
           unscheduledWork: [],
         };
-      if (path.endsWith("apply")) {
+      if (path.endsWith("apply") || path.endsWith("replan")) {
         sessions = plan.sessions.map((s) => ({
           ...s,
           id: crypto.randomUUID(),
