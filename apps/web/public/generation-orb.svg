@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" fill="none">
-<title>generation orb</title>
-<desc>Static vector approximation of the captured animated orb.</desc>
-<g id="Generation-orb-vector-approximation-321" transform="translate(0 0)"><defs><radialGradient id="Orb-gradient-320" cx="32%" cy="18%" r="85%"><stop offset="0" stop-color="#9B9DA1"/><stop offset=".35" stop-color="#53565B"/><stop offset=".64" stop-color="#08090A"/><stop offset=".85" stop-color="#1B1C1F"/><stop offset="1" stop-color="#696C72"/></radialGradient></defs><circle cx="100.0" cy="100.0" r="100.0" fill="url(#Orb-gradient-320)"/></g>
-</svg>

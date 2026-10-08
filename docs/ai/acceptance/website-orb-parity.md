@@ -1,5 +1,22 @@
 # Website V1.1 orb parity investigation — 2026-10-08
 
+> **Resolved 2026-10-08.** The authoritative WebGL orb was found outside the
+> inspected checkouts, in `Documents/Projects/b25-3-3-work` (branch
+> `b25-3-3-ai-first`, HEAD `dace312`): the expo-gl + three.js Knowledge Core
+> (`apps/mobile/src/features/generation-core/` — `KnowledgeCore.tsx`,
+> `orbBody.ts`, `orbAura.ts`, `coreModel.ts`; mounted by
+> `redesign/GenerationCore.tsx`). It is the orb shown in the showcase clips.
+> The website now uses it: `apps/web/src/features/knowledge-core/` carries
+> `orbBody.ts`, `orbAura.ts` and `coreModel.ts` (plus their tests) verbatim
+> from mobile, and `KnowledgeCore.tsx` ports the scene, camera and per-frame
+> model to a canvas, mapping AppState/focus to page visibility and the mobile
+> Reduced Motion setting to `prefers-reduced-motion`. three.js is pinned to
+> mobile's 0.166.1 and loads only with the Generation screen. Job statuses map
+> to core states as mobile `generationCoreState` does. Verified in Chromium:
+> renders and animates in both themes at phone and desktop sizes, keeps slow
+> motion when complete, rebuilds after navigation, falls back to a static
+> sphere without WebGL. The original investigation below is kept as history.
+
 **BLOCKED — Authoritative mobile WebGL source or required verification is unavailable.**
 
 The currently routed mobile orb was located and inspected. It is React Native

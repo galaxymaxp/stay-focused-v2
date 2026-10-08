@@ -4,13 +4,19 @@ import type {
   ProcessingJobListPage,
   ProcessingJobStatusView,
 } from "@stay-focused/shared";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "../components/providers";
 import { Empty, Heading, Notice, RowLink, State } from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
+import { jobCoreState } from "./knowledge-core/coreModel";
+// three.js loads only with the Generation screen, not the Queue list.
+const KnowledgeCore = dynamic(
+  () => import("./knowledge-core/KnowledgeCore").then((m) => m.KnowledgeCore),
+  { ssr: false, loading: () => <div className="knowledge-core" /> },
+);
 const labels: Record<ProcessingJobStatusView["status"], string> = {
   queued: "Queued",
   running: "Generating",
@@ -156,16 +162,7 @@ export function GenerationScreen({ id }: { id: string }) {
                     : "Bringing the important ideas together…"
                 : labels[job.data.status]}
           </h1>
-          {active && (
-            <Image
-              unoptimized
-              className="orb"
-              src="/generation-orb.svg"
-              alt=""
-              width={200}
-              height={200}
-            />
-          )}
+          <KnowledgeCore state={jobCoreState(job.data.status)} />
           <p className="muted" role="status">
             {active
               ? "You can leave this screen. We’ll keep working."
