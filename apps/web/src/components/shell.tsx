@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { BookLoader, LogoMark } from "./brand";
 import { Breadcrumbs, CrumbProvider, trailFor, useCrumbState } from "./crumbs";
 import { useAuth } from "./providers";
+import { QueueButton } from "./queue-button";
 import { Icon, Notice } from "./ui";
 const tabs = [
   { href: "/today", label: "Today", icon: "clock" },
@@ -105,14 +106,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </Link>
           <Breadcrumbs trail={trailFor(pathname, page)} />
           <div className="row topbar-actions">
-            <Link
-              href="/queue"
-              className="button subtle"
-              aria-current={active("/queue") ? "page" : undefined}
-            >
-              <Icon name="layers" />
-              Queue
-            </Link>
+            <QueueButton current={active("/queue")} />
             <Link
               href="/settings"
               className="icon-button mobile-only"

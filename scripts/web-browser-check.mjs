@@ -307,10 +307,8 @@ try {
     );
   await capture("material-functional-mobile");
   await page.goto(`${origin}/queue`);
-  await page.getByRole("link", { name: /Planning Reviewer/ }).click();
-  await page
-    .getByRole("link", { name: "Open saved output", exact: true })
-    .click();
+  // Finished work opens straight in the Library, as in the app.
+  await page.getByRole("button", { name: /Planning Reviewer/ }).click();
   await page
     .getByRole("heading", { name: "Planning study time", exact: true })
     .waitFor();

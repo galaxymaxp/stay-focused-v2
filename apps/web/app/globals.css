@@ -2472,3 +2472,211 @@ details[open] > :not(summary) {
     transform: none;
   }
 }
+
+/* ---------- Queue button (the app's mini Knowledge Core) ---------- */
+.queue-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-control);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 550;
+  font-size: 14px;
+}
+.queue-button:hover,
+.queue-button[aria-current="page"] {
+  background: var(--hover);
+}
+.queue-button:active {
+  opacity: 0.6;
+  transition-duration: var(--motion-press);
+}
+.queue-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--motion-small) var(--ease-standard),
+    transform var(--spring-duration) var(--ease-spring);
+}
+.queue-count:not(.shown) {
+  display: none;
+}
+.queue-count.shown {
+  opacity: 1;
+  transform: none;
+  animation: queue-count-in var(--spring-duration) var(--ease-spring);
+}
+@keyframes queue-count-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.queue-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+}
+.queue-orb-frame {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  background: url("/queue/orb-light.png") center / contain no-repeat;
+}
+:root[data-theme="dark"] .queue-orb-frame {
+  background-image: url("/queue/orb-dark.png");
+}
+.queue-glow {
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity var(--motion-spatial) var(--ease-out),
+    transform var(--motion-spatial) var(--ease-out);
+}
+.queue-button.working .queue-glow {
+  opacity: 0.16;
+  transform: none;
+}
+:root[data-theme="dark"] .queue-button.working .queue-glow {
+  opacity: 0.22;
+}
+.queue-button.working .queue-orb-frame {
+  animation: queue-turn 9s linear infinite;
+}
+@keyframes queue-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 760px) {
+  .queue-label {
+    display: none;
+  }
+}
+
+/* ---------- Queue and Generation (mirrors the app) ---------- */
+.queue-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  align-items: start;
+  max-width: 1200px;
+}
+.queue-layout h2 {
+  font-size: 16px;
+}
+.queue-empty {
+  max-width: 560px;
+  align-items: flex-start;
+}
+.queue-card + .queue-card {
+  border-top: 1px solid var(--line);
+}
+.queue-open {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 66px;
+  padding: 10px 14px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-weight: 400;
+}
+.queue-open:hover {
+  background: var(--hover);
+}
+.queue-open strong {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.queue-open .meta {
+  margin: 0;
+}
+.queue-status.ok {
+  color: var(--success);
+}
+.queue-status.warn {
+  color: var(--warning);
+}
+.queue-state {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+}
+.queue-state.ok {
+  border-color: var(--success);
+  background: radial-gradient(circle, var(--success) 38%, transparent 42%);
+}
+.queue-state.run {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: queue-turn 0.9s linear infinite;
+}
+.queue-state.warn {
+  border-color: var(--warning);
+}
+.queue-card-actions {
+  padding: 0 14px 10px 60px;
+  gap: 6px;
+}
+.queue-idle {
+  padding: 4px 0;
+}
+.generation-status {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1.25;
+  animation: status-swap var(--motion-normal) var(--ease-out);
+}
+@keyframes status-swap {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+.generation-note {
+  max-width: 300px;
+  min-height: 44px;
+}
+.generation-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 240px;
+}
+@media (max-width: 900px) {
+  .queue-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

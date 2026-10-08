@@ -313,15 +313,17 @@ export function createFixture() {
       admittedJobs.has(path.split("/").at(-1))
     ) {
       const id = path.split("/").at(-1);
+      const done = admittedJobs.get(id).status === "succeeded";
       send({
         id,
-        state: "completed",
+        state: done ? "completed" : "generating",
         updatedAt: now(),
-        progress: { completed: 1, total: 1, unit: "outputs" },
-        artifactId:
-          admittedJobs.get(id).jobType === "quiz_generation"
+        progress: { completed: done ? 1 : 0, total: 1, unit: "sections" },
+        artifactId: done
+          ? admittedJobs.get(id).jobType === "quiz_generation"
             ? `quiz:${ids.quiz}`
-            : `reviewer:${ids.reviewer}`,
+            : `reviewer:${ids.reviewer}`
+          : null,
         error: null,
       });
       return;
