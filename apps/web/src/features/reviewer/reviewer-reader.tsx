@@ -314,7 +314,7 @@ export function ReviewerReader({
           </div>
         }
       />
-      <div className={`reviewer-layout${passage ? " with-panel" : ""}`}>
+      <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>
         <nav className="reviewer-toc" aria-label="Topics">
           <label className="reviewer-search">
             <span className="sr-only">Search topics, terms, definitions</span>

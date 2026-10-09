@@ -8,6 +8,13 @@ import {
   type RefreshProgress,
 } from "./canvas-refresh-core";
 
+/**
+ * Scopes refreshed in this page load. Opening or reloading Generate (or a
+ * course in it) asks Canvas for the latest once, the web's pull-to-refresh;
+ * moving around inside the app does not repeat it.
+ */
+const refreshedThisLoad = new Set<string>();
+
 export function useCanvasRefresh(scope: string, onSynced: () => void) {
   const { api, session } = useAuth();
   const owner = session?.user.id ?? "";
@@ -62,6 +69,20 @@ export function useCanvasRefresh(scope: string, onSynced: () => void) {
       if (active.current === controller) active.current = null;
     }
   }, [api, identity, owner, scope]);
+  useEffect(() => {
+    if (!owner) return;
+    // A course needs no second request when the whole account just refreshed.
+    if (refreshedThisLoad.has(identity) || refreshedThisLoad.has(`${owner}:all`)) return;
+    refreshedThisLoad.add(identity);
+    let settled = false;
+    void sync().finally(() => {
+      settled = true;
+    });
+    // A refresh cut short (navigation, or React's development remount) may run again.
+    return () => {
+      if (!settled) refreshedThisLoad.delete(identity);
+    };
+  }, [identity, owner, sync]);
   return {
     ...(state.identity === identity
       ? state

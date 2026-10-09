@@ -591,6 +591,16 @@ try {
   await page.getByText("Grade sync complete", { exact: true }).waitFor();
   assert.equal(domain.counts.canvasWrites, canvasWritesBeforeGrades + 1);
   console.log("PASS Canvas grades summary, assignment detail and grade sync");
+  // Opening (or reloading) Generate asks Canvas for the latest, once per load.
+  const canvasWritesBeforeRefresh = domain.counts.canvasWrites;
+  await page.goto(`${origin}/generate`);
+  await page.getByText("Up to date with Canvas", { exact: true }).waitFor({ timeout: 20000 });
+  assert(domain.counts.canvasWrites > canvasWritesBeforeRefresh, "Generate did not refresh Canvas on load");
+  const canvasWritesAfterRefresh = domain.counts.canvasWrites;
+  await page.getByRole("link", { name: /Study foundations/ }).click();
+  await page.getByRole("heading", { name: "Study foundations", exact: true }).waitFor();
+  assert.equal(domain.counts.canvasWrites, canvasWritesAfterRefresh, "In-app navigation repeated the Canvas refresh");
+  console.log("PASS Generate refreshes Canvas once per page load");
   const screens = [
     ["today", "Up Next"],
     ["schedule", "Plan available time"],

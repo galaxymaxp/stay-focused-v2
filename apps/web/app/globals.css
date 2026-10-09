@@ -4692,3 +4692,12 @@ mark.find-active {
 .account-popover > button {
   justify-content: flex-start;
 }
+/* The floating key-point bar never hides the points it acts on. */
+.reviewer-layout.picking {
+  padding-bottom: 120px;
+}
+@media (max-width: 760px) {
+  .reviewer-layout.picking {
+    padding-bottom: 240px;
+  }
+}
