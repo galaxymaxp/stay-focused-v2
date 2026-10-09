@@ -600,6 +600,11 @@ try {
   await page.getByRole("link", { name: /Study foundations/ }).click();
   await page.getByRole("heading", { name: "Study foundations", exact: true }).waitFor();
   assert.equal(domain.counts.canvasWrites, canvasWritesAfterRefresh, "In-app navigation repeated the Canvas refresh");
+  await page.goto(`${origin}/generate`);
+  await page.getByRole("heading", { name: "Current courses", exact: true }).waitFor();
+  assert.equal(await page.getByRole("link", { name: /Elective archive/ }).count(), 0, "An unsynced course opened like a synced one");
+  await page.getByRole("button", { name: /Not synced · 1 course/ }).click();
+  await page.getByRole("button", { name: "Sync Elective archive", exact: true }).waitFor();
   console.log("PASS Generate refreshes Canvas once per page load");
   const screens = [
     ["today", "Up Next"],
