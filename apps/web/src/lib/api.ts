@@ -117,7 +117,7 @@ export function localDate(value = new Date()) {
 export function timeLabel(value: string | null) {
   return value
     ? new Date(value).toLocaleTimeString([], {
-        hour: "numeric",
+        hour: "numeric", hour12: true,
         minute: "2-digit",
       })
     : "Unscheduled";
@@ -127,7 +127,7 @@ export function dateLabel(value: string | null) {
     ? new Date(value).toLocaleString([], {
         month: "short",
         day: "numeric",
-        hour: "numeric",
+        hour: "numeric", hour12: true,
         minute: "2-digit",
       })
     : "No deadline";

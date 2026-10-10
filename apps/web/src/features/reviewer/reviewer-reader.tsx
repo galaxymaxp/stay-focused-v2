@@ -268,7 +268,7 @@ export function ReviewerReader({
       if (range.start < from) return;
       if (range.start > from) runs.push(text.slice(from, range.start));
       const content = text.slice(range.start, range.start + range.text.length);
-      runs.push(range.style === "highlight" ? <mark key={i} className="find-match">{content}</mark> : range.style === "underline" ? <u key={i}>{content}</u> : <strong key={i}>{content}</strong>);
+      runs.push(range.style === "highlight" ? <mark key={i} className="author-highlight">{content}</mark> : range.style === "underline" ? <u key={i}>{content}</u> : <strong key={i}>{content}</strong>);
       from = range.start + range.text.length;
     });
     if (from < text.length) runs.push(text.slice(from));
@@ -314,7 +314,7 @@ export function ReviewerReader({
           </div>
         }
       />
-      <div className={`reviewer-layout${passage ? " with-panel" : ""}`}>
+      <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>
         <nav className="reviewer-toc" aria-label="Topics">
           <label className="reviewer-search">
             <span className="sr-only">Search topics, terms, definitions</span>

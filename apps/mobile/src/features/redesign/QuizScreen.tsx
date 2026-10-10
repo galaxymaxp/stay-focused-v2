@@ -28,7 +28,7 @@ function compatibleAttempt(value: QuizAttempt): QuizAttempt {
     skippedQuestionIds: value.skippedQuestionIds ?? [], revealedQuestionIds: value.revealedQuestionIds ?? [],
     assistedQuestionIds: value.assistedQuestionIds ?? [], updatedAt: value.updatedAt ?? value.startedAt };
 }
-function answerText(question: QuizQuestion | undefined, values: readonly string[]): string {
+function answerText(question: QuizQuestion | undefined, values: readonly string[], acceptedAnswerText?: string): string {
   if (!values.length) return 'No answer';
   return values.map(value => {
     const [leftId, rightId] = value.split(':');
@@ -36,7 +36,7 @@ function answerText(question: QuizQuestion | undefined, values: readonly string[
       const left = question.matchingPairs.find(pair => pair.id === leftId)?.leftItem ?? leftId;
       return `${left} → ${question.options.find(option => option.id === rightId)?.text ?? rightId}`;
     }
-    return question?.options.find(option => option.id === value)?.text ?? value;
+    return question?.options.find(option => option.id === value)?.text ?? acceptedAnswerText ?? value;
   }).join('; ');
 }
 export function QuizScreen() {
@@ -62,6 +62,7 @@ export function QuizScreen() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [key, setKey] = useState(newRequestKey);
+  const [checking, setChecking] = useState(false);
   const [matchingReady, setMatchingReady] = useState(false);
   const [matchingLeft, setMatchingLeft] = useState<string | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -286,6 +287,10 @@ export function QuizScreen() {
             {savedQuiz.questions[index]!.leftItem ? <Copy>{savedQuiz.questions[index]!.leftItem}</Copy> : null}
             {savedQuiz.questions[index]!.options.map((option) => <Copy key={option.id} muted>• {option.text}</Copy>)}
           </Surface> : null}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <Action secondary disabled={busy || index === 0} onPress={() => setIndex(index - 1)}>Previous</Action>
+            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => setIndex(index + 1)}>Next</Action>
+          </View>
           <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} onDragActiveChange={setSliderDragging} />
           {localReady && <Action onPress={() => {
             const value = newOfflineAttempt(savedQuiz.id, newRequestKey());
@@ -366,44 +371,53 @@ export function QuizScreen() {
                 {option.text}
               </Action>
             ))}
-            {question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) ? <TextInput accessibilityLabel="Correct the wrong term or phrase" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected.find(id => !question.options.some(option => option.id === id)) ?? ""} onChangeText={value => { const falseId = question.options.find(option => option.text.toLowerCase() === "false")?.id; selectDraft(() => falseId ? [falseId, value] : []); }} placeholder="Type the correction" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
+            {question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.trim().toLowerCase() === "false")) ? <TextInput accessibilityLabel="Correct the wrong term or phrase" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected.find(id => !question.options.some(option => option.id === id)) ?? ""} onChangeText={value => { const falseId = question.options.find(option => option.text.trim().toLowerCase() === "false")?.id; selectDraft(() => falseId ? [falseId, value] : []); }} placeholder="Type the correction" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
           </Surface>
           {feedback ? (
             <Surface>
               <Copy size="h2">{feedback.assisted ? 'Revealed · no recall credit' : feedback.correct ? 'Correct' : 'Keep learning'}</Copy>
+              {question.type !== "identification" && question.type !== "modified_true_false" ? <>
               <Copy muted>Your answer: {answerText(question, feedback.selectedOptionIds)}</Copy>
-              <Copy>Correct answer: {answerText(question, feedback.correctOptionIds)}</Copy>
+              <Copy>Correct answer: {answerText(question, feedback.correctOptionIds, feedback.correctAnswerText)}</Copy>
               {feedback.pairCount ? <Copy>{feedback.pairCorrectCount} / {feedback.pairCount} pairs correct</Copy> : null}
               <Copy>{feedback.explanation}</Copy>
+              </> : null}
             </Surface>
           ) : (
             <Action
-              disabled={busy || offline || (question.matchingPairs?.length ? selected.length !== question.matchingPairs.length : selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim()))}
+              disabled={busy || offline || (question.matchingPairs?.length ? selected.length !== question.matchingPairs.length : selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.trim().toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim()))}
               onPress={() =>
                 void run(async () => {
-                  const value = await experienceRequest<QuizAttempt>(
-                    client,
-                    `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
-                    {
-                      method: "PATCH",
-                      body: { selectedOptionIds: selected, finalize: true },
-                    },
-                  );
-                  setAttempt(compatibleAttempt(value));
-                  setDirty(false);
-                  const checked = value.feedback.find((item) => item.questionId === question.id);
-                  if (checked) {
-                    if (checked.correct) haptic.success();
-                    else haptic.error();
-                    void playFeedbackSound(checked.correct ? "correct" : "wrong");
-                  }
+                  setChecking(true);
+                  try {
+                    const value = await experienceRequest<QuizAttempt>(
+                      client,
+                      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
+                      {
+                        method: "PATCH",
+                        body: { selectedOptionIds: selected, finalize: true },
+                      },
+                    );
+                    setAttempt(compatibleAttempt(value));
+                    setDirty(false);
+                    const checked = value.feedback.find((item) => item.questionId === question.id);
+                    if (checked) {
+                      if (checked.correct) haptic.success();
+                      else haptic.error();
+                      void playFeedbackSound(checked.correct ? "correct" : "wrong");
+                    }
+                  } finally { setChecking(false); }
                 })
               }
             >
-              Check answer
+              {checking ? "Checking\u2026" : "Check answer"}
             </Action>
           )}
-          {!attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline} onPress={() => void run(() => revealAnswer())}>Reveal Answer</Action>}
+          {question.type !== "identification" && question.type !== "modified_true_false" && !attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline} onPress={() => void run(() => revealAnswer())}>Reveal Answer</Action>}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
+            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
+          </View>
           <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} onDragActiveChange={setSliderDragging} />
           <Action
               disabled={busy || offline}
@@ -443,12 +457,12 @@ export function QuizScreen() {
           <Copy>{result.correctCount} correct · {result.incorrectCount} incorrect · {result.skippedCount} skipped · {result.revealedCount ?? 0} revealed before answer</Copy>
           <Action secondary onPress={() => setReviewing(value => !value)}>{reviewing ? 'Hide answers' : 'Review answers'}</Action>
           {reviewing && result.questions.map((entry, position) => {
-            const item = quizData?.questions[position];
+            const item = quizData?.questions.find(q => q.id === entry.questionId);
             return <Surface key={entry.questionId}>
               <Copy size="h3">{position + 1}. {item?.prompt ?? entry.questionId}</Copy>
               <Copy muted>{entry.assisted ? 'Revealed' : entry.skipped ? 'Skipped' : entry.correct ? 'Correct' : 'Incorrect'}</Copy>
               <Copy>Your answer: {answerText(item, entry.selectedOptionIds)}</Copy>
-              <Copy>Correct answer: {answerText(item, entry.correctOptionIds)}</Copy>
+              <Copy>Correct answer: {answerText(item, entry.correctOptionIds, entry.correctAnswerText)}</Copy>
               {entry.pairCount ? <Copy>{entry.pairCorrectCount} / {entry.pairCount} pairs correct</Copy> : null}
               <Copy muted>{entry.explanation}</Copy>
             </Surface>;

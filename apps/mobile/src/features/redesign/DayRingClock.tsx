@@ -38,7 +38,7 @@ export function formatFreeTime(minutes: number) {
 function clockLabel(minutes: number) {
   const date = new Date(2000, 0, 1, 0, 0);
   date.setMinutes(Math.round(minutes));
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" });
 }
 function arc(from: number, to: number, radius: number) {
   const a = ringPoint(from, radius),
@@ -518,7 +518,7 @@ function CenterReadout({ mode, range, now }: { mode: Mode | null; range: Range; 
   return (
     <>
       <Copy color="#FFFFFF" size="display" style={{ ...shadow, fontSize: 32, lineHeight: 39, fontVariant: ["tabular-nums"] }}>
-        {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+        {now.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" })}
       </Copy>
       <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow, fontWeight: "500" }}>
         {now.toLocaleDateString([], { weekday: "long" })}

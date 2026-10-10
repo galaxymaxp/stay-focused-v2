@@ -206,6 +206,24 @@ describe('Smart Selection learning sheet', () => {
     await press(tab('Test Me'));
     expect(nodes('Notice').map(node => node.props.children).join()).toContain('enough course material');
   });
+  it('asks about the concept and a key point without selecting text', async () => {
+    await open({ selection }, null);
+    expect(network).not.toHaveBeenCalled();
+    await press(action('Ask about this concept or key point'));
+    expect(network).not.toHaveBeenCalled();
+    const field = () => nodes('TextInput').find(node => String(node.props.accessibilityLabel).startsWith('Ask'))!;
+    network.mockResolvedValueOnce(ok({ action: 'ask' }));
+    await act(async () => field().props.onChangeText('How does this work?'));
+    await press(action('Ask'));
+    expect(requests()[0]).toMatchObject({ action: 'ask', selection: block.explanation, question: 'How does this work?' });
+    await act(async () => rendered!.unmount());
+    await open({ selection, pointIndex: 0 }, null);
+    await press(action('Ask about this concept or key point'));
+    network.mockResolvedValueOnce(ok({ action: 'ask' }));
+    await act(async () => field().props.onChangeText('Why?'));
+    await press(action('Ask'));
+    expect(requests()[1]).toMatchObject({ selection: block.keyPoints[0], question: 'Why?' });
+  });
   it('limits Ask questions on the device and bounds the follow-up thread', async () => {
     await open();
     await press(tab('Ask'));

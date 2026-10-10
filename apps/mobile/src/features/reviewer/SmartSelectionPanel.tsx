@@ -29,7 +29,7 @@ const stop = (event: GestureResponderEvent) => event.stopPropagation();
  * exact range, then Define, Explain, Example, Test Me or Ask run on it here.
  * Refinements generate only when tapped; repeats reuse this session's results.
  */
-export function SmartSelectionPanel({ selection, onActiveChange, scrollRef }: { selection: AssistSelection; onActiveChange?: (active: boolean) => void; scrollRef?: RefObject<ScrollView | null> }) {
+export function SmartSelectionPanel({ selection, askText, onActiveChange, scrollRef }: { selection: AssistSelection; askText?: string; onActiveChange?: (active: boolean) => void; scrollRef?: RefObject<ScrollView | null> }) {
   const { session } = useAuth();
   const { colors, reducedMotion } = useTheme();
   const { height: windowHeight } = useWindowDimensions();
@@ -96,9 +96,9 @@ export function SmartSelectionPanel({ selection, onActiveChange, scrollRef }: { 
       if (mounted.current) apply({ status: 'error', message: error instanceof StudyToolsError ? error.message : 'The learning tool is temporarily unavailable. Try again shortly.' });
     });
   }
-  function choose(next: StudyAction) {
-    const text = action ? subject : picked;
-    if (!action && !check.ok) return;
+  function choose(next: StudyAction, contextText?: string) {
+    const text = contextText ?? (action ? subject : picked);
+    if (!contextText && !action && !check.ok) return;
     haptic.tap();
     setAction(next);
     setSubject(text);
@@ -194,6 +194,7 @@ export function SmartSelectionPanel({ selection, onActiveChange, scrollRef }: { 
         </Pressable>;
       })}
     </View> : null}
+    {!selecting && askText ? <Action secondary onPress={() => choose('ask', askText)}>Ask about this concept or key point</Action> : null}
     {action && action !== 'test' && action !== 'ask' ? <View style={{ gap: spacing[3] }}>
       <Copy size="h3" style={{ fontWeight: '600' }}>{shown?.modifier ? `${STUDY_ACTION_TITLES[action]} · ${STUDY_MODIFIER_LABELS[shown.modifier]}` : STUDY_ACTION_TITLES[action]}</Copy>
       {shown ? <RunView run={shown.run} retry={() => shown.modifier ? refine(shown.modifier) : choose(action)}>

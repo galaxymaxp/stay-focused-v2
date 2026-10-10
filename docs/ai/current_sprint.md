@@ -1,5 +1,24 @@
 # Current Sprint
 
+## Study Reviewer and Quiz polish (2026-10-10)
+
+Implemented locally on `claude/slack-session-m1o1ea` from main `d9490fb` in an
+isolated clone, preserving the original dirty workspace. Web Check no longer
+races eager draft saves and shows loading. Web/mobile identification feedback
+is verdict-only until final review; accepted labels and mobile review-by-ID are
+fixed. Optional suggested Quiz titles, concept/key-point Ask, visible accessible
+loader motion, fading assist highlights, mobile Previous/Next and twelve-hour
+time are implemented. A forward migration aligns two-pair matching save and
+completion scoring while preserving owner isolation and service-only grants.
+
+FRESH: API 1264 passed / 3 skipped, mobile 791, web 68, shared 52; root typecheck
+and lint 8/8 with no cache; comprehensive fictional localhost browser acceptance
+passed. Root build passed 8/8 (API/web/mobile FRESH; 5 package tasks CACHED). BLOCKED: workflow
+suite has no test files in this main revision. NOT RUN: physical native mobile
+end-to-end flow, live migration/provider/deployment. Next: apply the forward
+migration with rollout and finish physical mobile acceptance. No remote push or
+production change in this slice. See [acceptance evidence](acceptance/study-reviewer-quiz-polish-20261010.md).
+
 ## Website completion and main integration (2026-10-08)
 
 Owner-authorized finite scope: finish Claude's pending web changes, verify the

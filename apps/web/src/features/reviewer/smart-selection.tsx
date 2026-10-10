@@ -95,6 +95,7 @@ export function SmartSelectionPanel({
   selection,
   initialText,
   initialAction,
+  askText,
   onActiveChange,
 }: {
   selection: AssistSelection;
@@ -102,6 +103,7 @@ export function SmartSelectionPanel({
   initialText?: string;
   /** Action chosen with that text in the reader; runs once on open. */
   initialAction?: StudyAction;
+  askText?: string;
   onActiveChange?: (active: boolean) => void;
 }) {
   const { api } = useAuth();
@@ -166,8 +168,8 @@ export function SmartSelectionPanel({
         }),
     );
   }
-  function choose(next: StudyAction) {
-    const text = action ? subject : check.ok ? check.text : "";
+  function choose(next: StudyAction, contextText?: string) {
+    const text = contextText ?? (action ? subject : check.ok ? check.text : "");
     if (!text) return;
     setAction(next);
     setSubject(text);
@@ -274,6 +276,9 @@ export function SmartSelectionPanel({
             </button>
           ))}
         </div>
+      )}
+      {!selecting && askText && (
+        <button className="subtle" onClick={() => choose("ask", askText)}>Ask about this concept or key point</button>
       )}
       {action && action !== "test" && action !== "ask" && (
         <div className="stack">

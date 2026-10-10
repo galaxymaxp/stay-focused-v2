@@ -1,5 +1,5 @@
 import type { AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
-import { quizCountOptions, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
+import { suggestedQuizTitle, quizCountOptions, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
 import { CheckCircle2, ChevronDown, ChevronUp, Circle, Sparkles } from "lucide-react-native";
@@ -254,7 +254,7 @@ export function ReviewerReaderScreen({
     ranges.forEach((range, index) => {
       if (range.start < from) return;
       if (range.start > from) runs.push(text.slice(from, range.start));
-      runs.push(<Text key={index} style={range.style === 'highlight' ? { backgroundColor: colors.findMatch, color: colors.textPrimary } :
+      runs.push(<Text key={index} style={range.style === 'highlight' ? { backgroundColor: colors.orangeSoft, color: colors.textPrimary } :
         range.style === 'underline' ? { textDecorationLine: 'underline', textDecorationColor: colors.textPrimary } : { fontWeight: '700' }}>{range.text}</Text>);
       from = range.start + range.text.length;
     });
@@ -481,6 +481,8 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
   const countOptions = useMemo(() => quizCountOptions(capacity.maximum), [capacity.maximum]);
   const questionSegments = countOptions.length ? [...countOptions.map(value => ({ value: String(value), label: value === capacity.maximum && value !== 100 ? `${value} max` : String(value) })), { value: "custom", label: "Custom" }] : [];
   const questionCount = Number(count === "custom" ? customCount : count);
+  const [customTitle, setCustomTitle] = useState<string | null>(null);
+  const quizTitle = customTitle ?? suggestedQuizTitle(artifact.title, reviewer.sections.filter(s => selectedTopics.includes(s.id)).map(s => s.title), questionCount);
   const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= capacity.maximum;
   useEffect(() => {
     if (count !== "custom" && Number(count) > capacity.maximum && countOptions.length) setCount(String(countOptions.at(-1)));
@@ -496,7 +498,7 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
     try {
       const intent = await createGenerationIntent(
         session.user.id,
-        quizIntentInput({ title: artifact.title, reviewerArtifactId, questionCount, difficulty, selectedTopicIds: selectedTopics, ...(format === "mixed" ? {} : { questionTypes: [format] }) }),
+        quizIntentInput({ title: quizTitle, reviewerArtifactId, questionCount, difficulty, selectedTopicIds: selectedTopics, ...(format === "mixed" ? {} : { questionTypes: [format] }) }),
       );
       onClose();
       router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
@@ -518,6 +520,8 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
         {artifact.course ? <Copy muted size="caption">{courseIdentity(artifact.course).title}</Copy> : null}
       </View>
       <View style={{ gap: spacing[2] }}>
+        <Copy muted size="caption">Quiz title (optional)</Copy>
+        <TextInput accessibilityLabel="Quiz title" value={quizTitle} onChangeText={setCustomTitle} maxLength={200} editable={!busy} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} />
         <Copy muted size="caption">Questions</Copy>
         {questionSegments.length ? <SegmentedControl segments={questionSegments} value={count} onChange={setCount} /> : null}
         {capacity.maximum >= 5 ? <Copy muted size="caption">{capacity.maximum}-question maximum. Based on the topics and key points in this material.</Copy> : null}

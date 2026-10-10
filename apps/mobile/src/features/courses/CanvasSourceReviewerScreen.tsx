@@ -2437,7 +2437,7 @@ function CanvasReviewerJobCard({
         <Text style={styles.errorText}>{job.safeErrorMessage}</Text>
       ) : null}
       <Text style={styles.characterCount}>
-        Latest update: {new Date(job.updatedAt).toLocaleString()}
+        Latest update: {new Date(job.updatedAt).toLocaleString([], { hour12: true })}
       </Text>
       {job.status === "queued" || job.status === "running" ? (
         <Button fullWidth onPress={onCancel} variant="secondary">

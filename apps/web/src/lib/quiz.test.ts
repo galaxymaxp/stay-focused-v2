@@ -44,6 +44,13 @@ it("accepts identification questions without options", () => {
     }),
   ).toBe(true);
 });
+it("requires visible identification text and renders an accepted answer rather than its key", () => {
+  const q = { ...base, id: "id", type: "identification" as const, prompt: "Name it", options: [] };
+  expect(canCheck(q, ["   "])).toBe(false);
+  expect(canCheck(q, ["Photosynthesis"])).toBe(true);
+  expect(answerText(q, ["canonical-key"], "Photosynthesis")).toBe("Photosynthesis");
+  expect(answerText(q, ["My own answer"])).toBe("My own answer");
+});
 it("changing a matching answer releases the term's and meaning's prior pairs", () => {
   expect(pairDraft(["l1:r1", "l2:r2"], "l1", "r2")).toEqual(["l1:r2"]);
 });
@@ -71,7 +78,7 @@ it("needs every term matched and a correction for modified false answers", () =>
     prompt: "Statement",
     options: [
       { id: "t", text: "True" },
-      { id: "f", text: "False" },
+      { id: "f", text: " False " },
     ],
   };
   expect(canCheck(modified, ["t"])).toBe(true);
