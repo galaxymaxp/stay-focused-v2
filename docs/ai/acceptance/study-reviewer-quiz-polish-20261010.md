@@ -1,5 +1,46 @@
 # Study Reviewer and Quiz polish (2026-10-10)
 
+## Follow-up review and release gates
+
+The original local commit `3c129c2` was amended with `--reset-author` to
+`145e505d576cac397d7a337f8e3c17a48b1830a1`. Both author and committer are verified
+as `galaxymaxp <omgraythekid@gmail.com>`. Origin/main was fetched again and remains
+`d9490fb5333804f70887f8905fb15aaf4e36804c`.
+
+- **BLOCKED — Supabase dev branch:** authenticated CLI 2.120.0 can see the
+  `stay-focused-v2` project. Creating the data-less
+  `study-reviewer-quiz-polish-20261010` preview returned HTTP 402,
+  `entitlement_required`: branching requires Pro or above. Only the default
+  main branch is listed afterward. No dev project was created, no migration
+  was applied and no app smoke test against a dev branch ran. An accessible
+  non-production project or branching entitlement is required.
+- **NOT RUN — physical phone:** `adb devices -l` lists no devices. Previous
+  mobile evidence is native renderer tests and successful Expo export; it is
+  not simulator or physical gesture/keyboard/animation acceptance. Connect an
+  authorized device before those checks.
+- **Workflow gate decision — NOT APPLICABLE for this slice:** quiz checking and
+  completion use existing HTTP handlers and PostgreSQL RPCs, not Vercel Workflow
+  execution. Generation changes only thread bounded title metadata through the
+  existing request/result, covered by generation parser and checkpoint tests.
+  No workflow definition, step, dispatch, retry or lease behavior changed.
+  The attempted workflow command remains BLOCKED (no files), not a pass; it is
+  removed from this slice's required gate. This does not waive future workflow
+  runtime tests when execution behavior changes.
+- **Existing automated coverage:** the browser harness checks typing/Check,
+  loading, finalization, completion and per-question review with fictional HTTP
+  responses. API tests execute save/completion SQL and compare result/history
+  scoring through PGlite; mobile renderer tests cover review-by-ID. Thus this
+  path has automated checks, but no single browser-to-live-Supabase run has
+  passed. Dev integration acceptance remains required.
+- **Migration compatibility:** the migration replaces the bodies of
+  `save_quiz_answer` and `complete_quiz_attempt` using their existing signatures
+  and grants. It creates, renames and drops no table or column, and performs no
+  data rewrite. Existing clients can use the updated functions. Apply it before
+  code rollout to avoid the old two-pair validation/scoring defect; deploying
+  code first does not introduce a missing-schema query error. Production rollout
+  remains pending successful dev and physical acceptance. Do not auto-merge or
+  deploy the draft PR while those gates are unresolved.
+
 Implemented locally on `claude/slack-session-m1o1ea`, based on main
 `d9490fb5333804f70887f8905fb15aaf4e36804c`. Work used an isolated clone at
 `../study-reviewer-quiz-polish`; the original dirty `stay-focused-v2` tree was
