@@ -68,12 +68,12 @@ export function compareActivities(a: ActivitySummary, b: ActivitySummary): numbe
 }
 export function composeActivities(input: {
   userId: string; assignments: readonly CanvasAssignmentRow[]; tasks: readonly TaskRow[];
-  courses: readonly CanvasCourseRow[]; submittedAssignmentIds?: ReadonlySet<string>; now: number; dayEnd: number;
+  courses: readonly CanvasCourseRow[]; selectedCourseIds?: ReadonlySet<string>; includeArchivedCourses?: boolean; submittedAssignmentIds?: ReadonlySet<string>; now: number; dayEnd: number;
 }): ActivitySummary[] {
-  const courses = new Map(input.courses.filter(r => r.user_id === input.userId).map(r => [r.id, courseSummary(r)]));
+  const courses = new Map(input.courses.filter(r => r.user_id === input.userId && (input.includeArchivedCourses || isActiveTaskCourse(r, input.now)) && (!input.selectedCourseIds || input.selectedCourseIds.has(r.id))).map(r => [r.id, courseSummary(r)]));
   const tasks = input.tasks.filter(r => r.user_id === input.userId);
   const imported = new Map(tasks.filter(t => t.canvas_assignment_row_id).map(t => [t.canvas_assignment_row_id!, t]));
-  const ownedAssignments = input.assignments.filter(r => r.user_id === input.userId && courses.has(r.course_id));
+  const ownedAssignments = input.assignments.filter(r => r.user_id === input.userId && courses.has(r.course_id) && input.courses.some(c => c.id === r.course_id && c.canvas_connection_id === r.canvas_connection_id));
   const assignments = ownedAssignments.filter(isActionableCanvasAssignment);
   function finish(item: Omit<ActivitySummary, 'isOverdue' | 'urgency' | 'hasGeneratedDraft'>): ActivitySummary {
     const active = item.status !== 'completed' && item.status !== 'submitted';
@@ -87,17 +87,25 @@ export function composeActivities(input: {
       title: row.name, dueAt: row.due_at, status: task?.status === 'completed' ? 'completed' : input.submittedAssignmentIds?.has(row.id) ? 'submitted' : task?.status ?? 'unknown',
       priority: task?.priority ?? 'medium', estimatedMinutes: task?.estimated_minutes ?? null, submissionTypes: [...row.submission_types], source: 'canvas' });
   });
-  const assignmentIds = new Set(ownedAssignments.map(a => a.id));
   for (const task of tasks) {
-    if (task.canvas_assignment_row_id && assignmentIds.has(task.canvas_assignment_row_id)) continue;
-    result.push(finish({ id: `task:${task.id}`, taskId: task.id, course: null, title: task.title, dueAt: task.due_at, status: task.status, priority: task.priority, estimatedMinutes: task.estimated_minutes, submissionTypes: [], source: task.source_type === 'canvas' ? 'canvas' : 'local' }));
+    // Imported/orphaned Canvas rows must never reappear as personal tasks after
+    // a course is deselected or its canonical assignment becomes unavailable.
+    if (task.source_type === 'canvas' || task.canvas_assignment_row_id) continue;
+    result.push(finish({ id: `task:${task.id}`, taskId: task.id, course: null, title: task.title, dueAt: task.due_at, status: task.status, priority: task.priority, estimatedMinutes: task.estimated_minutes, submissionTypes: [], source: 'local' }));
   }
   return result.sort(compareActivities);
 }
 
+export function isActiveTaskCourse(course: Pick<CanvasCourseRow, 'workflow_state' | 'end_at'>, now: number): boolean {
+  const state = course.workflow_state?.trim().toLowerCase();
+  return !['completed', 'concluded', 'deleted', 'unpublished'].includes(state ?? '') && !(course.end_at && Date.parse(course.end_at) <= now);
+}
+
 /** Canvas already counts this submission as handed in (or excused), so no work remains. */
 export function isSubmittedCanvasSubmission(submission: Pick<CanvasAssignmentSubmissionRow, 'submitted_at' | 'excused' | 'workflow_state' | 'missing'>): boolean {
-  return Boolean(submission.submitted_at || submission.excused || submission.workflow_state === 'submitted' || submission.workflow_state === 'pending_review' || (submission.workflow_state === 'graded' && !submission.missing));
+  if (submission.excused) return true;
+  if (submission.workflow_state === 'unsubmitted') return false;
+  return Boolean(submission.submitted_at || submission.workflow_state === 'submitted' || submission.workflow_state === 'pending_review' || (submission.workflow_state === 'graded' && !submission.missing));
 }
 export function isActionableCanvasAssignment(assignment: Pick<CanvasAssignmentRow, 'due_at' | 'submission_types'>): boolean {
   if (assignment.due_at !== null) return true;
@@ -115,11 +123,11 @@ export function composeToday(input: {
   const tasks = input.tasks.filter(t => t.user_id === input.userId);
   const byTask = new Map(input.activities.filter(a => a.taskId).map(a => [a.taskId!, a]));
   const activityItems: TodayItem[] = input.activities.map(a => ({ id: a.id, kind: a.source === 'canvas' ? 'canvas_activity' : 'personal_task', title: a.title, course: a.course, startAt: null, endAt: null, dueAt: a.dueAt, estimatedMinutes: a.estimatedMinutes, priority: a.priority, status: a.status, source: a.source, deepLinkTarget: { surface: 'activity', id: a.id } }));
-  const timeline: TodayItem[] = input.sessions.filter(s => s.user_id === input.userId && Date.parse(s.starts_at) < end && Date.parse(s.ends_at) > start).map((s): TodayItem => {
+  const timeline: TodayItem[] = input.sessions.filter(s => s.user_id === input.userId && Date.parse(s.starts_at) < end && Date.parse(s.ends_at) > start && !(tasks.some(t => t.id === s.task_id && (t.source_type === 'canvas' || t.canvas_assignment_row_id)) && !byTask.has(s.task_id))).map((s): TodayItem => {
     const task = tasks.find(t => t.id === s.task_id);
     const activity = byTask.get(s.task_id);
     return { id: `session:${s.id}`, kind: 'study_session', title: activity?.title ?? task?.title ?? 'Study session', course: activity?.course ?? null, startAt: s.starts_at, endAt: s.ends_at, dueAt: activity?.dueAt ?? task?.due_at ?? null,
-      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), priority: task?.priority ?? 'medium', status: s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id } };
+      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), priority: task?.priority ?? 'medium', status: s.status === 'planned' && (activity?.status === 'submitted' || activity?.status === 'completed' || task?.status === 'completed') ? activity?.status === 'submitted' ? 'submitted' : 'completed' : s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id } };
   }).sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!) || a.id.localeCompare(b.id));
   const active = (item: TodayItem) => !['completed', 'submitted', 'skipped'].includes(item.status);
   const todayTasks = activityItems.filter(i => i.dueAt && Date.parse(i.dueAt) >= start && Date.parse(i.dueAt) < end);

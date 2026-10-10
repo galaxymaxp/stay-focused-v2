@@ -616,8 +616,26 @@ export function createFixture() {
             materialCount: 1,
             reviewerCount: 1,
             lastActivityAt: null,
+            syncState: "synced",
+            period: "current",
+            termName: "First Semester",
+            lastSuccessfulSyncAt: now(),
+          },
+          {
+            id: "88888888-8888-4888-8888-888888888888",
+            code: "OLD200",
+            name: "Elective archive",
+            status: "active",
+            materialCount: null,
+            reviewerCount: null,
+            lastActivityAt: null,
+            syncState: "not_synced",
+            period: "previous",
+            termName: null,
+            lastSuccessfulSyncAt: null,
           },
         ],
+        classificationSource: "canvas",
       });
       return;
     }

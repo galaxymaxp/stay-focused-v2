@@ -17,14 +17,15 @@ import type {
 } from "@stay-focused/shared/task-planning";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { schedulableCanvasAssignmentIds } from "@/lib/canvas-task-scheduling";
+import { experienceRepository } from "@/lib/experience/repository";
+import { readActivityContext } from "@/lib/experience/task-state";
 
 const TASK_COLUMNS =
   "id,user_id,title,notes,status,priority,due_at,estimated_minutes,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
 const SESSION_COLUMNS =
   "id,user_id,study_plan_id,task_id,starts_at,ends_at,status,created_at,updated_at";
 const SESSION_TASK_SUMMARY_COLUMNS =
-  "id,title,status,priority,due_at,canvas_course_id";
+  "id,title,status,priority,due_at,canvas_course_id,source_type,canvas_assignment_row_id";
 
 // The embedded task summary is resolved through the composite owner foreign key
 // so PostgREST applies the caller's own `tasks` RLS policy to the joined rows.
@@ -36,7 +37,7 @@ const SESSION_WITH_TASK_COLUMNS: string =
 
 type StudySessionTaskSummaryRow = Pick<
   TaskRow,
-  "id" | "title" | "status" | "priority" | "due_at" | "canvas_course_id"
+  "id" | "title" | "status" | "priority" | "due_at" | "canvas_course_id" | "source_type" | "canvas_assignment_row_id"
 >;
 
 export interface StudySessionWithTaskRow extends StudySessionRow {
@@ -190,47 +191,17 @@ const CANVAS_IMPORT_BATCH = 100;
  * Makes synchronized Canvas work schedulable before planning, so the student
  * never has to add an ordinary assignment to Tasks first. The import RPC is
  * idempotent (existing tasks are left untouched, including their status and
- * estimate); only the eligible IDs from `schedulableCanvasAssignmentIds` are
- * sent. Returns how many assignments were considered new.
+ * estimate); only eligible IDs from the canonical activity model are sent. Returns how many assignments were considered new.
  */
 export async function importSchedulableCanvasAssignments(
   client: SupabaseClient<Database>,
   userId: string,
   now: number,
 ): Promise<number> {
-  const [assignments, submissions, preferences, imported] = await Promise.all([
-    client
-      .from("canvas_assignments")
-      .select("id,course_id,due_at,submission_types")
-      .eq("user_id", userId)
-      .gt("due_at", new Date(now).toISOString()),
-    client
-      .from("canvas_assignment_submissions")
-      .select("assignment_id,submitted_at,excused,workflow_state,missing")
-      .eq("user_id", userId),
-    client
-      .from("canvas_course_sync_preferences")
-      .select("course_id")
-      .eq("user_id", userId)
-      .eq("selected", true),
-    client
-      .from("tasks")
-      .select("canvas_assignment_row_id")
-      .eq("user_id", userId)
-      .eq("source_type", "canvas"),
-  ]);
-  if (assignments.error || submissions.error || preferences.error || imported.error) {
-    throw storageFailure("Canvas activities could not be prepared for planning.");
-  }
-  const ids = schedulableCanvasAssignmentIds({
-    assignments: assignments.data ?? [],
-    submissions: submissions.data ?? [],
-    selectedCourseIds: new Set((preferences.data ?? []).map((row) => row.course_id)),
-    importedAssignmentIds: new Set(
-      (imported.data ?? []).flatMap((row) => (row.canvas_assignment_row_id ? [row.canvas_assignment_row_id] : [])),
-    ),
-    now,
-  });
+  const { activities } = await readActivityContext(experienceRepository(client), userId, now, now + 86_400_000);
+  const ids = activities.filter(activity => activity.source === "canvas" && !activity.taskId &&
+    activity.status !== "submitted" && activity.status !== "completed" &&
+    activity.dueAt && Date.parse(activity.dueAt) > now).map(activity => activity.id.slice("canvas:".length)).sort();
   for (let index = 0; index < ids.length; index += CANVAS_IMPORT_BATCH) {
     await importOwnedCanvasAssignments(client, userId, ids.slice(index, index + CANVAS_IMPORT_BATCH));
   }
@@ -243,24 +214,12 @@ export async function loadOwnedPlannerTasks(
   taskIds?: readonly string[],
 ): Promise<readonly PlannerTask[]> {
   if (taskIds?.length === 0) return [];
-  let query = client
-    .from("tasks")
-    .select("id,title,due_at,estimated_minutes,priority,created_at")
-    .eq("user_id", userId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true });
-  if (taskIds) query = query.in("id", [...taskIds]);
-  const { data, error } = await query;
-  if (error || !data) throw storageFailure("Tasks could not be prepared for planning.");
-  return data.map((row) => ({
-    id: row.id,
-    title: row.title,
-    dueAt: row.due_at,
-    estimatedMinutes: row.estimated_minutes,
-    priority: row.priority,
-    createdAt: row.created_at,
-  }));
+  const now = Date.now();
+  const { activities, tasks } = await readActivityContext(experienceRepository(client), userId, now, now + 86_400_000);
+  const eligible = new Map(activities.filter(activity => activity.status !== "submitted" && activity.status !== "completed").map(activity => [activity.taskId, activity]));
+  const requested = taskIds ? new Set(taskIds) : null;
+  return tasks.filter(row => row.status === "pending" && eligible.has(row.id) && (!requested || requested.has(row.id)))
+    .map(row => ({ id: row.id, title: eligible.get(row.id)!.title, dueAt: eligible.get(row.id)!.dueAt, estimatedMinutes: row.estimated_minutes, priority: row.priority, createdAt: row.created_at }));
 }
 
 export async function persistOwnedStudyPlan(
@@ -317,7 +276,7 @@ export async function listOwnedStudySessions(
       SESSION_WITH_TASK_COLUMNS,
     );
     if (!embedded.error) {
-      return (embedded.data ?? []) as unknown as StudySessionWithTaskRow[];
+      return reconcileCanvasSessions(client, userId, (embedded.data ?? []) as unknown as StudySessionWithTaskRow[]);
     }
     if (!isUnresolvedEmbedError(embedded.error)) {
       throw storageFailure("Study sessions could not be loaded.");
@@ -329,11 +288,23 @@ export async function listOwnedStudySessions(
   if (plain.error || !plain.data) {
     throw storageFailure("Study sessions could not be loaded.");
   }
-  return attachOwnedTaskSummaries(
-    client,
-    userId,
-    plain.data as unknown as StudySessionRow[],
-  );
+  return reconcileCanvasSessions(client, userId, await attachOwnedTaskSummaries(client, userId, plain.data as unknown as StudySessionRow[]));
+}
+
+/** Reconcile the display without overwriting the student's saved task/session state. */
+async function reconcileCanvasSessions(client: SupabaseClient<Database>, userId: string, sessions: readonly StudySessionWithTaskRow[]): Promise<readonly StudySessionWithTaskRow[]> {
+  if (!sessions.some(session => session.task?.source_type === "canvas" || session.task?.canvas_assignment_row_id)) return sessions;
+  const now = Date.now();
+  const { activities } = await readActivityContext(experienceRepository(client), userId, now, now + 86_400_000);
+  const byTask = new Map(activities.filter(activity => activity.taskId).map(activity => [activity.taskId, activity]));
+  return sessions.flatMap(session => {
+    if (session.task?.source_type !== "canvas" && !session.task?.canvas_assignment_row_id) return [session];
+    const activity = byTask.get(session.task_id);
+    if (!activity) return [];
+    const done = activity.status === "submitted" || activity.status === "completed";
+    return [{ ...session, status: session.status === "planned" && done ? "completed" as const : session.status,
+      task: session.task ? { ...session.task, title: activity.title, due_at: activity.dueAt, status: done ? "completed" as const : session.task.status } : null }];
+  });
 }
 
 function selectOwnedStudySessions(
@@ -461,7 +432,7 @@ export function toStudySessionView(row: StudySessionWithTaskRow): StudySessionVi
     taskId: row.task_id,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
-    status: row.status,
+    status: row.status === "planned" && row.task?.status === "completed" ? "completed" : row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     task: row.task ? toStudySessionTaskSummary(row.task) : null,

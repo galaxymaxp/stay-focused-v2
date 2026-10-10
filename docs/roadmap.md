@@ -1,5 +1,35 @@
 # Roadmap
 
+## Task and planner sync reliability (2026-10-10)
+
+Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
+merge immediately, and publish the existing API, website and Android preview.
+
+The canonical activity model now checks course selection, stored course end/state,
+assignment availability and submission evidence for both clients and the planner.
+Imported Canvas tasks retain their course identity and current assignment deadline.
+Submitted work moves to Completed, is never overdue, and is excluded from planning;
+planned sessions reflect the linked activity state. Deselected/ended courses and
+orphaned imports do not return as personal tasks. Saved work is preserved.
+
+Website Tasks consumes the complete canonical activity list; Tasks, Today and
+Schedule expose explicit content+grades Sync now and poll persisted data every
+minute. Per-course website sync now includes grades. Partial sync outcomes remain
+partial. Android refresh admissions are bounded to one content/grades pair.
+Opening Tasks/Today/Schedule does not create Canvas jobs; the existing once-per-load Generate refresh is preserved. Automatic five-minute Canvas polling
+is still the separate, pending notification activation scope.
+
+FRESH PASS: API 1,275 tests (3 skipped), focused final activity/planning regression
+162 tests, web 69 tests, mobile sync/screens 68 tests, root production builds 8/8,
+root lint 8/8 (four existing mobile warnings), root typecheck 8/8 (changed apps fresh;
+unmodified packages cached). Read-only live database checks passed and found four
+pending local imports with submitted Canvas evidence. Android preview OTA
+25edeaae-9365-4ffa-acb2-f84123430983 is published for runtime 2.0.1.
+
+API/website publication and main integration are being completed. Physical device
+acceptance is NOT RUN: no ADB device or browser surface is exposed. See
+[acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+
 ## Website completion and main integration (2026-10-08)
 
 Owner-authorized finite scope: finish Claude's pending web changes, verify the
