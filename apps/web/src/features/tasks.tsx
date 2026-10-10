@@ -23,7 +23,7 @@ export function TasksScreen() {
   const [group, setGroup] = useState("now"),
     [form, setForm] = useState(false),
     action = useAction();
-  const canvasRefresh = useCanvasRefresh("all", activities.refresh);
+  const canvasRefresh = useCanvasRefresh("all", activities.refresh, false);
   const rows = activities.data?.items ?? [];
   const filtered = rows.filter((item) =>
     group === "completed"

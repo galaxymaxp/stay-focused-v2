@@ -16,7 +16,7 @@ Website Tasks consumes the complete canonical activity list; Tasks, Today and
 Schedule expose explicit content+grades Sync now and poll persisted data every
 minute. Per-course website sync now includes grades. Partial sync outcomes remain
 partial. Android refresh admissions are bounded to one content/grades pair.
-Opening a screen does not create Canvas jobs. Automatic five-minute Canvas polling
+Opening Tasks/Today/Schedule does not create Canvas jobs; the existing once-per-load Generate refresh is preserved. Automatic five-minute Canvas polling
 is still the separate, pending notification activation scope.
 
 FRESH PASS: API 1,275 tests (3 skipped), focused final activity/planning regression

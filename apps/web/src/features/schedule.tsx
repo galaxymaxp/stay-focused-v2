@@ -31,7 +31,7 @@ export function ScheduleScreen() {
     60000,
   );
   const refreshSchedule = () => { sessions.refresh(); activities.refresh(); };
-  const canvasRefresh = useCanvasRefresh("all", refreshSchedule);
+  const canvasRefresh = useCanvasRefresh("all", refreshSchedule, false);
   const dueOn = (day: Date) =>
     (activities.data?.items ?? [])
       .filter(

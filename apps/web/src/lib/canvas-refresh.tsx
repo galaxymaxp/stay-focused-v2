@@ -15,7 +15,7 @@ import {
  */
 const refreshedThisLoad = new Set<string>();
 
-export function useCanvasRefresh(scope: string, onSynced: () => void) {
+export function useCanvasRefresh(scope: string, onSynced: () => void, auto = true) {
   const { api, session } = useAuth();
   const owner = session?.user.id ?? "";
   const identity = `${owner}:${scope}`;
@@ -73,7 +73,7 @@ export function useCanvasRefresh(scope: string, onSynced: () => void) {
     }
   }, [api, identity, owner, scope]);
   useEffect(() => {
-    if (!owner) return;
+    if (!auto || !owner) return;
     // A course needs no second request when the whole account just refreshed.
     if (refreshedThisLoad.has(identity) || refreshedThisLoad.has(`${owner}:all`)) return;
     refreshedThisLoad.add(identity);
@@ -85,7 +85,7 @@ export function useCanvasRefresh(scope: string, onSynced: () => void) {
     return () => {
       if (!settled) refreshedThisLoad.delete(identity);
     };
-  }, [identity, owner, sync]);
+  }, [auto, identity, owner, sync]);
   return {
     ...(state.identity === identity
       ? state

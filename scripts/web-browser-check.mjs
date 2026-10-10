@@ -313,9 +313,11 @@ try {
   );
   if (taskSyncOnly) {
     await page.goto(`${origin}/canvas`);
+    const beforeSync = domain.counts.canvasWrites;
+    assert.equal(beforeSync, 0, "Opening Tasks/Today/Schedule silently created Canvas jobs");
     await page.getByRole("button", { name: "Sync now", exact: true }).click();
     await page.getByText("Up to date with Canvas", { exact: true }).waitFor();
-    assert(domain.counts.canvasWrites >= 1);
+    assert.equal(domain.counts.canvasWrites, beforeSync + 2, "Canvas refresh did not sync both content and grades");
     for (const surface of ["today", "tasks", "schedule"]) {
       await page.goto(`${origin}/${surface}`);
       await page.getByRole("button", { name: "Sync now", exact: true }).waitFor();

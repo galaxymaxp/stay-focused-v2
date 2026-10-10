@@ -2,7 +2,7 @@
 
 Owner request: fix submitted assignments and unselected/finished course work
 appearing in Tasks and Today/Schedule on both clients; merge immediately.
-Baseline: remote main d9490fb. Implementation uses a fresh checkout; unrelated
+Baseline: remote main d9490fb. Preserve production website commits 636db72 and 8942c3c, which were ahead of main. Implementation uses a fresh checkout; unrelated
 existing working trees are untouched. No migrations or direct task/status writes.
 
 ## Causes and repairs
@@ -26,7 +26,7 @@ existing working trees are untouched. No migrations or direct task/status writes
   outcomes are not reported as up to date. Mobile admissions are bounded to one
   pair at a time and thrown admission errors remain part of the outcome.
 - Visible task views reload persisted data every minute and after local changes.
-  Sync remains explicit; this does not activate the separately pending cron/email
+  Task/Today/Schedule sync remains explicit; the existing Generate auto refresh is preserved; this does not activate the separately pending cron/email
   migration or reintroduce automatic batches on app launch/navigation.
 
 ## Verification

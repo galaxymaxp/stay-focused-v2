@@ -276,6 +276,6 @@ export function CanvasScreen() {
 }
 
 function CourseSync({ courseId, onSynced }: { courseId: string; onSynced: () => void }) {
-  const refresh = useCanvasRefresh(courseId, onSynced);
+  const refresh = useCanvasRefresh(courseId, onSynced, false);
   return <CanvasRefreshStatus refresh={refresh} />;
 }

@@ -88,7 +88,7 @@ export function TodayScreen() {
     `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
     60000,
   );
-  const canvasRefresh = useCanvasRefresh("all", () => { today.refresh(); activities.refresh(); announcements.refresh(); });
+  const canvasRefresh = useCanvasRefresh("all", () => { today.refresh(); activities.refresh(); announcements.refresh(); }, false);
   const { prefs, pin, hide, read } = useListPreferences();
   const meta = session?.user.user_metadata ?? {};
   const displayName = [meta.full_name, meta.name].find(
