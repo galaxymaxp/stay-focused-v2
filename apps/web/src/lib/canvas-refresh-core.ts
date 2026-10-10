@@ -31,7 +31,7 @@ function pause(signal: AbortSignal): Promise<void> {
   });
 }
 
-/** Starts only on an explicit Sync action. Failed admissions are part of the result. */
+/** One Canvas refresh: content and grades per course. Failed admissions are part of the result. */
 export async function performCanvasRefresh(
   api: Api,
   scope: string,
