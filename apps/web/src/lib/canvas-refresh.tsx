@@ -53,7 +53,10 @@ export function useCanvasRefresh(scope: string, onSynced: () => void) {
       );
       if (!controller.signal.aborted) {
         setState((old) => ({ ...old, phase }));
-        if (phase === "synced" || phase === "partial") synced.current();
+        if (phase === "synced" || phase === "partial" || phase === "unconfirmed") {
+          synced.current();
+          window.dispatchEvent(new Event("sf:task-state-changed"));
+        }
       }
     } catch {
       if (!controller.signal.aborted)

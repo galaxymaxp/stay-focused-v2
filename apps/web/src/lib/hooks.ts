@@ -59,6 +59,10 @@ export function useResource<T>(
     window.addEventListener("focus", focus);
     window.addEventListener("online", focus);
     document.addEventListener("visibilitychange", focus);
+    const taskStateChanged = () => {
+      if (/^\/api\/(tasks|today|study-sessions|experience\/(activities|courses))/.test(path)) void load();
+    };
+    window.addEventListener("sf:task-state-changed", taskStateChanged);
     return () => {
       alive = false;
       controller.abort();
@@ -66,6 +70,7 @@ export function useResource<T>(
       window.removeEventListener("focus", focus);
       window.removeEventListener("online", focus);
       document.removeEventListener("visibilitychange", focus);
+      window.removeEventListener("sf:task-state-changed", taskStateChanged);
     };
   }, [api, session?.user.id, path, poll, envelope, revision, identity]);
   return {
@@ -93,6 +98,7 @@ export function useAction() {
     setMessage(null);
     try {
       await action();
+      window.dispatchEvent(new Event("sf:task-state-changed"));
     } catch (error) {
       if (mounted.current)
         setMessage(

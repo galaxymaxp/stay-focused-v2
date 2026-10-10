@@ -5,7 +5,7 @@ import type {
   TaskPriority,
 } from "@stay-focused/shared/task-planning";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../components/providers";
 import { CourseMark } from "../components/course";
@@ -14,49 +14,17 @@ import { available, capabilityNote, urgencyOf } from "../app-model/presentation"
 import { generationEnabled, generationKey } from "../lib/generation";
 import { dateLabel, safeUrl } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
-type TaskPage = { tasks: TaskView[]; nextCursor: string | null };
+import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
 export function TasksScreen() {
   const { api } = useAuth(),
-    tasks = useResource<TaskPage>("/api/tasks?limit=50"),
     activities = useResource<{ items: ActivitySummary[] }>(
-      `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+      `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`, 60000,
     );
   const [group, setGroup] = useState("now"),
     [form, setForm] = useState(false),
-    [extra, setExtra] = useState<TaskView[]>([]),
-    [cursor, setCursor] = useState<string | null>(null),
     action = useAction();
-  useEffect(() => {
-    setExtra([]);
-    setCursor(tasks.data?.nextCursor ?? null);
-  }, [tasks.data]);
-  const all = [...(tasks.data?.tasks ?? []), ...extra];
-  const rows: ActivitySummary[] = [
-    ...all.map((task) => ({
-      id: `task:${task.id}`,
-      taskId: task.id,
-      course: null,
-      title: task.title,
-      dueAt: task.dueAt,
-      status: task.status,
-      priority: task.priority,
-      estimatedMinutes: task.estimatedMinutes,
-      submissionTypes: [],
-      source:
-        task.sourceType === "canvas" ? ("canvas" as const) : ("local" as const),
-      isOverdue: !!task.dueAt && Date.parse(task.dueAt) < Date.now(),
-      urgency:
-        task.dueAt && Date.parse(task.dueAt) < Date.now() + 86400000
-          ? ("now" as const)
-          : task.dueAt && Date.parse(task.dueAt) < Date.now() + 3 * 86400000
-            ? ("next" as const)
-            : ("later" as const),
-      hasGeneratedDraft: false,
-    })),
-    ...(activities.data?.items.filter(
-      (a) => a.source === "canvas" && !a.taskId,
-    ) ?? []),
-  ];
+  const canvasRefresh = useCanvasRefresh("all", activities.refresh);
+  const rows = activities.data?.items ?? [];
   const filtered = rows.filter((item) =>
     group === "completed"
       ? item.status === "completed" || item.status === "submitted"
@@ -71,14 +39,13 @@ export function TasksScreen() {
         ? item.status === "completed" || item.status === "submitted"
         : item.status !== "completed" && item.status !== "submitted" && item.urgency === value,
     ).length;
-  const loaded = !!tasks.data && !!activities.data;
+  const loaded = !!activities.data;
   function toggle(item: ActivitySummary) {
     void action.run(async () => {
       await api(`/api/tasks/${item.taskId}`, {
         method: "PATCH",
         body: { status: item.status === "completed" ? "pending" : "completed" },
       });
-      tasks.refresh();
       activities.refresh();
     });
   }
@@ -109,8 +76,7 @@ export function TasksScreen() {
                 void action.run(async () => {
                   await api("/api/tasks", { method: "POST", body });
                   setForm(false);
-                  tasks.refresh();
-                  activities.refresh();
+                              activities.refresh();
                 })
               }
             />
@@ -129,7 +95,8 @@ export function TasksScreen() {
             </button>
           ))}
         </div>
-        <State resource={[tasks, activities]} />
+        <CanvasRefreshStatus refresh={canvasRefresh} />
+        <State resource={[activities]} />
         {filtered.length > 0 && (
           <div className="list-card task-table" role="list" aria-label="Tasks">
             <div className="task-table-head" aria-hidden="true">
@@ -148,7 +115,7 @@ export function TasksScreen() {
                       className={`task-check${done ? " on" : ""}`}
                       aria-label={`${item.status === "completed" ? "Reopen" : "Complete"} ${item.title}`}
                       aria-pressed={item.status === "completed"}
-                      disabled={action.busy}
+                      disabled={action.busy || item.status === "submitted"}
                       onClick={() => toggle(item)}
                     >
                       <Icon name="check" />
@@ -196,23 +163,6 @@ export function TasksScreen() {
             Add a task or{" "}
             <Link href="/canvas">sync your Canvas deadlines.</Link>
           </Empty>
-        )}
-        {cursor && (
-          <button
-            className="subtle"
-            disabled={action.busy}
-            onClick={() =>
-              void action.run(async () => {
-                const page = await api<TaskPage>(
-                  `/api/tasks?limit=50&cursor=${encodeURIComponent(cursor)}`,
-                );
-                setExtra((old) => [...old, ...page.tasks]);
-                setCursor(page.nextCursor);
-              })
-            }
-          >
-            Load more tasks
-          </button>
         )}
         {action.message && <Notice error>{action.message}</Notice>}
       </div>

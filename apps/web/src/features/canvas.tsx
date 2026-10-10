@@ -5,7 +5,7 @@ import { useAuth } from "../components/providers";
 import { CourseMark } from "../components/course";
 import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel } from "../lib/api";
-import { generationKey } from "../lib/generation";
+import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
 import { useAction, useResource } from "../lib/hooks";
 // Narrow public projections of the existing Canvas routes, which use top-level envelopes.
 interface Connection {
@@ -28,14 +28,8 @@ interface Inventory {
   }[];
   selectedCourseIds: string[];
 }
-interface SyncJob {
-  id: string;
-  status: string;
-  course: { displayName: string };
-  progress: { completedUnits: number | null; totalUnits: number | null };
-}
 export function CanvasScreen() {
-  const { api, session } = useAuth(),
+  const { api } = useAuth(),
     connection = useResource<{ connection: Connection | null }>(
       "/api/canvas/connection",
       0,
@@ -51,35 +45,10 @@ export function CanvasScreen() {
     [token, setToken] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
     [dirty, setDirty] = useState(false),
-    [disconnect, setDisconnect] = useState(false),
-    [jobId, setJobId] = useState<string | null>(null);
-  const job = useResource<SyncJob>(
-    jobId ? `/api/canvas/sync-jobs/${jobId}` : null,
-    5000,
-  );
+    [disconnect, setDisconnect] = useState(false);
   useEffect(() => {
     if (!dirty && inventory.data) setSelected(inventory.data.selectedCourseIds);
   }, [inventory.data, dirty]);
-  const refreshInventory = inventory.refresh;
-  useEffect(() => {
-    if (
-      ["succeeded", "failed", "cancelled", "expired"].includes(
-        job.data?.status ?? "",
-      )
-    )
-      refreshInventory();
-  }, [job.data?.status, refreshInventory]);
-  useEffect(() => {
-    try {
-      setJobId(
-        sessionStorage.getItem(
-          `stay-focused-web-canvas-sync:${session?.user.id}`,
-        ),
-      );
-    } catch {
-      /* No persisted sync shortcut available. */
-    }
-  }, [session?.user.id]);
   function connect(e: FormEvent) {
     e.preventDefault();
     void action.run(async () => {
@@ -99,23 +68,6 @@ export function CanvasScreen() {
     });
   }
   const connected = connection.data?.connection ?? null;
-  function syncCourse(courseId: string) {
-    void action.run(async () => {
-      const submission = generationKey(session!.user.id, `canvas-sync:${courseId}`, {}),
-        accepted = await api<SyncJob>(`/api/canvas/courses/${courseId}/sync`, {
-          method: "POST",
-          key: submission.key,
-        });
-      submission.accepted();
-      setJobId(accepted.id);
-      try {
-        sessionStorage.setItem(`stay-focused-web-canvas-sync:${session!.user.id}`, accepted.id);
-      } catch {
-        /* Sync persists on the server. */
-      }
-      action.setMessage("Course sync accepted. You can leave this page.");
-    });
-  }
   return (
     <>
       <Heading
@@ -205,16 +157,7 @@ export function CanvasScreen() {
               </div>
             </section>
           )}
-          {job.data && (
-            <Notice>
-              {job.data.course.displayName}:{" "}
-              {job.data.status.replaceAll("_", " ")}
-              {job.data.progress.totalUnits !== null
-                ? ` · ${job.data.progress.completedUnits ?? 0} of ${job.data.progress.totalUnits} operations`
-                : ""}
-            </Notice>
-          )}
-          {jobId && job.error && <Notice error>{job.error}</Notice>}
+
           {disconnect && (
             <div className="surface stack" role="alert">
               <p>Disconnect Canvas? Future course sync will stop.</p>
@@ -232,7 +175,6 @@ export function CanvasScreen() {
                         envelope: "root",
                       });
                       setDisconnect(false);
-                      setJobId(null);
                       connection.refresh();
                     })
                   }
@@ -312,9 +254,9 @@ export function CanvasScreen() {
                         <Link className="button subtle" href={`/canvas/${course.id}/grades`}>
                           Grades
                         </Link>
-                        <button disabled={action.busy || dirty} onClick={() => syncCourse(course.id)}>
-                          Sync course content
-                        </button>
+                        {!dirty && course.classification !== "past_or_concluded" && (
+                          <CourseSync courseId={course.id} onSynced={inventory.refresh} />
+                        )}
                       </div>
                     )}
                   </div>
@@ -331,4 +273,9 @@ export function CanvasScreen() {
       </div>
     </>
   );
+}
+
+function CourseSync({ courseId, onSynced }: { courseId: string; onSynced: () => void }) {
+  const refresh = useCanvasRefresh(courseId, onSynced);
+  return <CanvasRefreshStatus refresh={refresh} />;
 }

@@ -44,7 +44,7 @@ export function selectedSyncCourses(
 ): readonly AccountSyncCourse[] {
   const selected = new Set(payload.selectedCourseIds);
   return payload.courses
-    .filter((course) => selected.has(course.id) && course.selectable)
+    .filter((course) => selected.has(course.id) && course.selectable && course.classification !== "past_or_concluded")
     .map((course) => ({ id: course.id, displayName: course.displayName }));
 }
 
@@ -198,11 +198,15 @@ export async function startAccountCanvasSync(
   if (courses.length === 0) {
     return { phase: "needs_setup", lastSyncedAt, jobs: [], rejected: [] };
   }
-  const results = await Promise.all(
-    courses.flatMap((course) =>
-      ACCOUNT_SYNC_JOB_TYPES.map(async (jobType) => ({ course, result: await dependencies.startCourse(course, jobType) })),
-    ),
-  );
+  const results: { course: AccountSyncCourse; result: CanvasApiResult<CanvasSyncJobStatusView> }[] = [];
+  // Bound admissions to one content/grade pair at a time, including failures.
+  for (const course of courses) {
+    const pair = await Promise.all(ACCOUNT_SYNC_JOB_TYPES.map(async jobType => ({
+      course,
+      result: await dependencies.startCourse(course, jobType).catch((): CanvasApiResult<CanvasSyncJobStatusView> => ({ ok: false, error: { code: "network_error", message: "Canvas could not be refreshed." } })),
+    })));
+    results.push(...pair);
+  }
   const jobs = results.flatMap(({ result }) => (result.ok ? [result.data] : []));
   const rejected = results.flatMap(({ course, result }) =>
     result.ok ? [] : [{ courseId: course.id, code: result.error.code }],

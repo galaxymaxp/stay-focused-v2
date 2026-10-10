@@ -12,6 +12,7 @@ import { useAuth } from "../components/providers";
 import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel, localDate, timeLabel } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
+import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
 export function ScheduleScreen() {
   const { api } = useAuth(),
     [date, setDate] = useState(localDate()),
@@ -22,11 +23,15 @@ export function ScheduleScreen() {
   end.setDate(end.getDate() + 7);
   const sessions = useResource<{ sessions: StudySessionView[] }>(
     `/api/study-sessions?startsAt=${encodeURIComponent(start.toISOString())}&endsAt=${encodeURIComponent(end.toISOString())}&limit=200`,
+    60000,
   );
   // Deadlines in this week, so planned time sits next to what is due.
   const activities = useResource<{ items: ActivitySummary[] }>(
     `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+    60000,
   );
+  const refreshSchedule = () => { sessions.refresh(); activities.refresh(); };
+  const canvasRefresh = useCanvasRefresh("all", refreshSchedule);
   const dueOn = (day: Date) =>
     (activities.data?.items ?? [])
       .filter(
@@ -119,11 +124,12 @@ export function ScheduleScreen() {
               </button>
             )}
           </div>
-          <button className="subtle" onClick={sessions.refresh}>
+          <button className="subtle" onClick={refreshSchedule}>
             <Icon name="refresh-cw" />
             <span className="desktop-only">Refresh schedule</span>
           </button>
         </div>
+        <CanvasRefreshStatus refresh={canvasRefresh} />
         <State resource={[sessions, activities]} />
         {sessions.data && (
           <>

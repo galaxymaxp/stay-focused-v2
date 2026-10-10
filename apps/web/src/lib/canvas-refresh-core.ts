@@ -1,8 +1,8 @@
 import { requestKey, type Api } from "./api";
 
-type Job = { id: string; status: string };
+type Job = { id: string; status: string; outcome?: string | null };
 type Inventory = {
-  courses: { id: string; selectable: boolean }[];
+  courses: { id: string; selectable: boolean; classification?: string }[];
   selectedCourseIds: string[];
 };
 export type RefreshPhase =
@@ -55,7 +55,7 @@ export async function performCanvasRefresh(
     courseIds = [
       ...new Set(
         inventory.courses
-          .filter((c) => selected.has(c.id) && c.selectable)
+          .filter((c) => selected.has(c.id) && c.selectable && c.classification !== "past_or_concluded")
           .map((c) => c.id),
       ),
     ];
@@ -91,7 +91,7 @@ export async function performCanvasRefresh(
     onProgress({ finished, total });
     if (finished === total) {
       const successes = jobs.filter((job) => job.status === "succeeded").length;
-      return successes === total ? "synced" : successes ? "partial" : "failed";
+      return successes === total && !jobs.some(job => job.outcome === "partial") ? "synced" : successes ? "partial" : "failed";
     }
     await wait(signal);
     const pending = jobs.filter((job) => !terminal.has(job.status));
@@ -106,7 +106,7 @@ export async function performCanvasRefresh(
     results.forEach((result, index) => {
       if (result.status === "fulfilled") {
         const job = jobs.find((entry) => entry.id === pending[index]!.id);
-        if (job) job.status = result.value.status;
+        if (job) { job.status = result.value.status; job.outcome = result.value.outcome; }
       }
     });
     pollingFailures = results.some((result) => result.status === "rejected")
