@@ -75,6 +75,36 @@ beforeEach(() => {
 afterEach(async () => { if (tree) await act(async () => tree.unmount()); });
 
 describe('minimal Quiz navigation', () => {
+  it.each(['identification', 'modified_true_false'] as const)('keeps checked %s feedback to the verdict until final review', async type => {
+    mocks.quiz = { ...mocks.quiz!, questions: mocks.quiz!.questions.map((q, index) => index === 9 ? { ...q, type } : q) };
+    const feedback = { questionId: 'q10', selectedOptionIds: ['a'], correctOptionIds: ['secret-key'], correctAnswerText: 'Accepted term',
+      correct: false, explanation: 'Secret explanation', topicId: 't', topic: 'Topic', sourceRefs: [], reviewerSectionIds: [] };
+    mocks.practice = { ...mocks.practice!, attempt: { ...mocks.remote!, feedback: [feedback] } };
+    await mount();
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain('Keep learning');
+    for (const hidden of ['Correct answer:', 'Accepted term', 'Secret explanation', 'Reveal Answer']) expect(rendered).not.toContain(hidden);
+  });
+  it('moves with explicit Previous/Next and keeps the slider in sync', async () => {
+    await mount();
+    await act(async () => action('Next').props.onPress());
+    expect(track().props.accessibilityValue.now).toBe(11);
+    await act(async () => action('Previous').props.onPress());
+    expect(track().props.accessibilityValue.now).toBe(10);
+  });
+  it('reviews questions by identity when result order differs from quiz order', async () => {
+    const entry = (questionId: string) => ({ questionId, selectedOptionIds: ['a'], correctOptionIds: ['b'], correct: false,
+      explanation: 'Review', topicId: 't', topic: 'Topic', sourceRefs: [], reviewerSectionIds: [] });
+    mocks.practice = { ...mocks.practice!, attempt: null, result: { attemptId: 'one', quizId: 'quiz-one', correctCount: 0, incorrectCount: 2,
+      skippedCount: 28, revealedCount: 0, totalQuestions: 30, earnedPoints: 0, possiblePoints: 30, percentage: 0,
+      questions: [entry('q20'), entry('q3')], topicPerformance: [], weakAreas: [] } };
+    await mount();
+    await act(async () => action('Review answers').props.onPress());
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain('Prompt 20');
+    expect(rendered).toContain('Prompt 3');
+    expect(rendered).not.toContain('Prompt 1');
+  });
   it('moves 10 → 11 → 12 → 11 → 10 freely and leaves the question unanswered', async () => {
     await mount();
     for (const [direction, index] of [['right', 10], ['right', 11], ['left', 10], ['left', 9]] as const) {
@@ -85,7 +115,7 @@ describe('minimal Quiz navigation', () => {
     expect(mocks.practice!.attempt!.skippedQuestionIds).toEqual([]);
     expect(tree.root.findAllByType('Action' as ElementType).some(node => node.props.disabled === false && node.children.includes('Choice A'))).toBe(true);
     const labels = tree.root.findAllByType('Action' as ElementType).flatMap(node => node.children);
-    expect(labels).not.toContain('Skip'); expect(labels).not.toContain('Previous'); expect(labels).not.toContain('Next');
+    expect(labels).not.toContain('Skip'); expect(labels).toContain('Previous'); expect(labels).toContain('Next');
     expect(labels).toContain('Reveal Answer');
     expect(mocks.request.mock.calls.every(([, , options]) => options.body.action === 'navigate')).toBe(true);
   });
@@ -94,10 +124,12 @@ describe('minimal Quiz navigation', () => {
     mocks.practice = { ...mocks.practice!, attempt: { ...mocks.practice!.attempt!, currentQuestion: 0 } };
     await mount();
     expect(arrow('left').props.disabled).toBe(true);
+    expect(action('Previous').props.disabled).toBe(true);
     expect(arrow('right').props.disabled).toBe(false);
     await act(async () => tree.root.findByType(QuestionSlider).props.onSettle(29));
     expect(arrow('left').props.disabled).toBe(false);
     expect(arrow('right').props.disabled).toBe(true);
+    expect(action('Next').props.disabled).toBe(true);
   });
 
   it('shows the destination immediately on release while the online position save is pending', async () => {

@@ -126,7 +126,7 @@ export async function processQuizJob(client: Client, job: ProcessingJobDatabaseR
     if (owned.courseId !== metadata.courseId || owned.reviewerArtifactId !== metadata.reviewerArtifactId || owned.sourceVersionId !== metadata.sourceVersionId || [...owned.materialIds].sort().join('|') !== [...materialIds].sort().join('|'))
         throw new ExperienceFailure(409, 'quiz_source_unavailable');
     await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'storing_result', statusMessage: 'Saving quiz' });
-    return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, sourceVersionId: metadata.sourceVersionId, materialIds, title: `${questions.length}-question quiz`, questions,
+    return { payload: { courseId: metadata.courseId, reviewerArtifactId: metadata.reviewerArtifactId, sourceVersionId: metadata.sourceVersionId, materialIds, title: input.title ?? `${questions.length}-question quiz`, questions,
             provenance: { policy: 'quiz-ai-first', provider: `openai:${AI_FIRST_QUIZ_MODEL}`, sourceSha256: createHash('sha256').update(JSON.stringify(regions)).digest('hex') } }, metrics: { questionCount: questions.length, topicCount: regions.length } };
 }
 /** Exact stems and highly overlapping long stems are duplicate study items. */
@@ -168,6 +168,7 @@ export function evaluateAnswer(question: StoredQuestion, answer: QuizAttemptAnsw
     const pairCorrectCount = pairCount ? submitted.filter(value => question.correctOptionIds.includes(value)).length : 0;
     const correct = pairCount ? pairCorrectCount === pairCount && submitted.length === pairCount : [...submitted].sort().join('|') === [...question.correctOptionIds].sort().join('|');
     return { questionId: question.id, selectedOptionIds: [...answer.selectedOptionIds], correctOptionIds: [...question.correctOptionIds], correct,
+      ...(question.acceptedAnswers?.length ? { correctAnswerText: question.acceptedAnswers[0] } : {}),
       ...(pairCount ? { pairCount, pairCorrectCount } : {}), explanation: question.explanation, topicId: question.topicId, topic: question.topic, sourceRefs: question.sourceRefs.map(r => ({ materialId: r.materialId, regionId: r.regionId, page: r.page, slide: r.slide })), reviewerSectionIds: [...question.reviewerSectionIds] };
 }
 export function normalizeSubmittedAnswer(question: StoredQuestion, selected: readonly string[]): string[] {

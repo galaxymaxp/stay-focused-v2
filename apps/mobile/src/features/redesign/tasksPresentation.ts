@@ -112,7 +112,7 @@ export function relativeDue(dueAt: string | null, now: number): string {
   const due = Date.parse(dueAt);
   if (!Number.isFinite(due)) return "No deadline";
   const date = new Date(due);
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" });
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const dayDiff = Math.floor((due - startOfToday.getTime()) / 86_400_000);

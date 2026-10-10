@@ -42,6 +42,8 @@ function publicSupabaseKey() {
 }
 const supabaseKey = publicSupabaseKey();
 const config: NextConfig = {
+  // Browser acceptance uses its own output so it cannot disturb a production build.
+  distDir: process.env.STAY_FOCUSED_QA_BUILD ? '.next-qa' : '.next',
   devIndicators: false,
   env: supabaseKey ? { NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseKey } : {},
   transpilePackages: ["@stay-focused/shared"],

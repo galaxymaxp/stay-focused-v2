@@ -793,10 +793,11 @@ function useSharedShimmer(enabled: boolean) {
     if (!enabled) return;
     shimmerUsers += 1;
     if (!shimmerLoop) {
+      shimmer.setValue(0);
       shimmerLoop = Animated.loop(
         Animated.sequence([
-          Animated.timing(shimmer, { toValue: 1, duration: 650, useNativeDriver: true, isInteraction: false }),
-          Animated.timing(shimmer, { toValue: 0, duration: 650, useNativeDriver: true, isInteraction: false }),
+          Animated.timing(shimmer, { toValue: 1, duration: 800, useNativeDriver: true, isInteraction: false }),
+          Animated.timing(shimmer, { toValue: 0, duration: 800, useNativeDriver: true, isInteraction: false }),
         ]),
       );
       shimmerLoop.start();
@@ -819,7 +820,7 @@ export function SkeletonBlock({ width, height, radius: corner = 8, style }: { wi
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[{ width, height, borderRadius: corner, backgroundColor: colors.surfaceSecondary, opacity: reducedMotion ? 0.8 : shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }, style]}
+      style={[{ width, height, borderRadius: corner, backgroundColor: colors.textMuted, opacity: reducedMotion ? 0.16 : shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.28] }) }, style]}
     />
   );
 }

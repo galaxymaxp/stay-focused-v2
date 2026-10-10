@@ -840,7 +840,7 @@ function formatOutboxStatus(intent: OfflineProcessingIntent): string {
 function formatTime(value: string): string {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp)
-    ? new Date(timestamp).toLocaleString()
+    ? new Date(timestamp).toLocaleString([], { hour12: true })
     : "at an unknown time";
 }
 

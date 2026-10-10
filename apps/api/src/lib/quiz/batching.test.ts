@@ -92,6 +92,13 @@ beforeEach(() => {
 });
 
 describe('Quiz batching, budget and repair', () => {
+    it('persists a custom title through generation and keeps the legacy default when omitted', async () => {
+        useRequest({ title: 'My Biology Quiz', questionCount: 5, questionTypes: ['single_select'] });
+        scriptedModel();
+        expect((await processQuizJob({} as SupabaseClient<Database>, job, 'worker')).payload.title).toBe('My Biology Quiz');
+        useRequest({ questionCount: 5, questionTypes: ['single_select'] });
+        expect((await processQuizJob({} as SupabaseClient<Database>, job, 'worker')).payload.title).toBe('5-question quiz');
+    });
     it('scales the provider budget per batch and caps it at ten', () => {
         expect([5, 20, 21, 30, 41, 50, 81, 100].map(quizProviderCallBudget)).toEqual([2, 2, 4, 4, 6, 6, 10, 10]);
     });

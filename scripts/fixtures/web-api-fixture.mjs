@@ -60,8 +60,9 @@ export function createFixture() {
     },
     q("q3", "multi_select"),
     q("q4", "true_false"),
-    q("q5"),
+    { ...q("q5", "identification"), prompt: "Name the study process", options: [] },
   ];
+  let quizTitle = "Study practice";
   let attempt = null,
     connection = {
       id: ids.course,
@@ -113,7 +114,7 @@ export function createFixture() {
   const now = () => new Date().toISOString();
   const quiz = () => ({
     id: ids.quiz,
-    title: "Study practice",
+    title: quizTitle,
     courseId: ids.course,
     reviewerArtifactId: ids.reviewer,
     sourceId: ids.material,
@@ -325,6 +326,10 @@ export function createFixture() {
         if (key !== admittedJobs.get("retry-key")) return fail("conflict");
         if (body.courseId !== ids.course || body.materialId !== ids.material)
           return fail("invalid_request", 400);
+      } else if (body.sourceType === "reviewer") {
+        if (body.sourceIds?.[0] !== ids.reviewer || !body.title?.trim()) return fail("invalid_request", 400);
+        quizTitle = body.title;
+        counts.quizTitle = body.title;
       } else if (
         body.questionCount !== 10 ||
         body.difficulty !== "medium" ||
@@ -498,6 +503,7 @@ export function createFixture() {
       return;
     }
     if (path === "/api/experience/study-assist" && method === "POST") {
+      await new Promise(resolve => setTimeout(resolve, 800));
       counts.assistCalls++;
       send({
         ...body,
@@ -507,6 +513,7 @@ export function createFixture() {
       return;
     }
     if (path === "/api/experience/study-tools" && method === "POST") {
+      await new Promise(resolve => setTimeout(resolve, 400));
       counts.assistCalls++;
       const asking = body.action === "test" && !body.modifier;
       send({
@@ -756,6 +763,7 @@ export function createFixture() {
         return;
       }
       if (path.includes("/answers/")) {
+        await new Promise(resolve => setTimeout(resolve, 350));
         const qid = path.split("/").at(-1);
         attempt.answers = attempt.answers.filter((a) => a.questionId !== qid);
         const answer = {
@@ -773,7 +781,7 @@ export function createFixture() {
                 )
               : qid === "q3"
                 ? body.selectedOptionIds?.length === 2
-                : body.selectedOptionIds?.[0] === (qid === "q5" ? "o2" : "o1");
+                : body.selectedOptionIds?.[0] === (qid === "q5" ? "Planning" : "o1");
           attempt.feedback.push({
             ...answer,
             correct,
@@ -787,7 +795,8 @@ export function createFixture() {
                 ? ["l1:r1", "l2:r2"]
                 : qid === "q3"
                   ? ["o1", "o2"]
-                  : [qid === "q5" ? "o2" : "o1"],
+                  : [qid === "q5" ? "opaque-planning-key" : "o1"],
+            ...(qid === "q5" ? { correctAnswerText: "Planning" } : {}),
             ...(qid === "q2" ? { pairCount: 2, pairCorrectCount: correct ? 2 : 0 } : {}),
           });
         }

@@ -47,24 +47,29 @@ export function PassageMark({ mark, selected = false, quiet = false, onPress, ch
   const { colors, reducedMotion } = useTheme();
   const pending = mark === "pending";
   useSharedPulse(pending && !reducedMotion);
-  const fill = selected ? colors.blueSoft : pending ? colors.blueSoft : mark === "fresh" ? colors.greenSoft : null;
+  const blue = useRef(new Animated.Value(selected || pending ? 1 : 0)).current;
+  const green = useRef(new Animated.Value(mark === "fresh" ? 0.85 : 0)).current;
+  useEffect(() => {
+    const blueTarget = selected ? 1 : pending ? 0.6 : 0;
+    const greenTarget = mark === "fresh" && !selected ? 0.85 : 0;
+    if (reducedMotion) {
+      blue.setValue(blueTarget);
+      green.setValue(greenTarget);
+      return;
+    }
+    const fade = Animated.parallel([
+      Animated.timing(blue, { toValue: blueTarget, duration: 360, useNativeDriver: true, isInteraction: false }),
+      Animated.timing(green, { toValue: greenTarget, duration: 360, useNativeDriver: true, isInteraction: false }),
+    ]);
+    fade.start();
+    return () => fade.stop();
+  }, [blue, green, mark, pending, reducedMotion, selected]);
+  const overlay = { position: "absolute" as const, top: -4, bottom: -4, left: quiet ? -8 : -10, right: quiet ? -8 : -10, borderRadius: 10 };
   return (
     <View style={{ position: "relative" }}>
-      {fill ? (
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: -4,
-            bottom: -4,
-            left: quiet ? -8 : -10,
-            right: quiet ? -8 : -10,
-            borderRadius: 10,
-            backgroundColor: fill,
-            opacity: pending && !reducedMotion ? pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }) : 1,
-          }}
-        />
-      ) : null}
+      <Animated.View pointerEvents="none" style={{ ...overlay, backgroundColor: colors.blueSoft,
+        opacity: pending && !selected && !reducedMotion ? Animated.multiply(blue, pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] })) : blue }} />
+      <Animated.View pointerEvents="none" style={{ ...overlay, backgroundColor: colors.greenSoft, opacity: green }} />
       {children}
       {!quiet && mark ? (
         <Pressable accessibilityLiveRegion="polite" disabled={!onPress} onPress={onPress} hitSlop={6} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingTop: spacing[2], alignSelf: "flex-start" }}>

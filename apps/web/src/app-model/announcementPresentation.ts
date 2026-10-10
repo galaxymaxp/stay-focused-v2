@@ -13,7 +13,7 @@ export function formatAnnouncementDate(
   const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const today = new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime();
   const days = Math.round((today - day) / 86_400_000);
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" });
   if (days === 0) return `Today, ${time}`;
   if (days === 1) return `Yesterday, ${time}`;
   return date.toLocaleDateString([], {

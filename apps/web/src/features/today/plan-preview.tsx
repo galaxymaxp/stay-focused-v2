@@ -16,7 +16,7 @@ function hourLabel(minutes: number) {
   const date = new Date(2000, 0, 1, 0, 0);
   date.setMinutes(Math.round(minutes));
   return date.toLocaleTimeString([], {
-    hour: "numeric",
+    hour: "numeric", hour12: true,
     minute: minutes % 60 ? "2-digit" : undefined,
   });
 }

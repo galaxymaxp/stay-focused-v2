@@ -2,7 +2,8 @@
 // Never reads .env files, connects to production, or invokes a provider.
 import assert from "node:assert/strict";
 import http from "node:http";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { createFixture, ids } from "./fixtures/web-api-fixture.mjs";
@@ -124,6 +125,7 @@ const server = spawn(
       STAY_FOCUSED_API_ORIGIN: backend,
       NEXT_PUBLIC_GENERATION_ENABLED: generationFixture ? "true" : "false",
       NEXT_TELEMETRY_DISABLED: "1",
+      STAY_FOCUSED_QA_BUILD: "1",
     },
   },
 );
@@ -139,7 +141,7 @@ try {
   let ready = false;
   for (let i = 0; i < 90; i++) {
     try {
-      if ((await fetch(`${origin}/sign-in`)).ok) {
+      if ((await fetch(`${origin}/sign-in`, { signal: AbortSignal.timeout(5000) })).ok) {
         ready = true;
         break;
       }
@@ -151,6 +153,7 @@ try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     timezoneId: "Asia/Manila",
+    locale: "en-GB",
     reducedMotion: "reduce",
   });
   await context.route("**/*", (route) => {
@@ -166,10 +169,7 @@ try {
   await page.waitForURL("**/sign-in");
   assert.equal(counts.api, 0, "Protected data requested while signed out");
   await page.screenshot({
-    path: new URL("auth-light-mobile.png", output).pathname.replace(
-      /^\/(.:)/,
-      "$1",
-    ),
+    path: fileURLToPath(new URL("auth-light-mobile.png", output)),
     fullPage: true,
   });
   await page.getByLabel("Email", { exact: true }).fill(user.email);
@@ -179,10 +179,7 @@ try {
   await page.getByRole("heading", { name: "Up Next" }).waitFor();
   assert(counts.api > 0, "Shared API rewrite did not forward bearer auth");
   await page.screenshot({
-    path: new URL("today-light-mobile.png", output).pathname.replace(
-      /^\/(.:)/,
-      "$1",
-    ),
+    path: fileURLToPath(new URL("today-light-mobile.png", output)),
     fullPage: true,
   });
   await page.reload();
@@ -190,7 +187,7 @@ try {
   assert.equal(counts.auth, 1, "Session recovery unexpectedly signed in again");
   const capture = async (name) => {
     await page.screenshot({
-      path: new URL(`${name}.png`, output).pathname.replace(/^\/(.:)/, "$1"),
+      path: fileURLToPath(new URL(`${name}.png`, output)),
       fullPage: true,
     });
   };
@@ -373,7 +370,15 @@ try {
     .getByText("Choose a time to study, then review your understanding.", { exact: true })
     .click();
   await page.getByRole("complementary", { name: "Study Assist" }).waitFor();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.getByRole("button", { name: /^Summarize,/ }).click();
+  await page.locator(".shimmer-line").first().waitFor();
+  const shimmerBefore = await page.locator(".shimmer-line").first().evaluate(el => getComputedStyle(el).backgroundPosition);
+  await page.waitForTimeout(120);
+  const shimmerAfter = await page.locator(".shimmer-line").first().evaluate(el => getComputedStyle(el).backgroundPosition);
+  assert.notEqual(shimmerBefore, shimmerAfter, "Skeleton keyframes did not move");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(await page.locator(".shimmer-line").first().evaluate(el => getComputedStyle(el).animationName), "none", "Reduced motion did not stop shimmer");
   await page.getByText("Fictional summarize for this passage.", { exact: true }).waitFor();
   const assistBefore = domain.counts.assistCalls;
   await page.getByRole("button", { name: "Close Study Assist", exact: true }).click();
@@ -382,6 +387,11 @@ try {
     .click();
   await page.getByText("Fictional summarize for this passage.", { exact: true }).waitFor();
   assert.equal(domain.counts.assistCalls, assistBefore, "A saved explanation was requested again");
+  await page.getByRole("button", { name: "Ask about this concept or key point", exact: true }).click();
+  await page.getByLabel("Ask about the selected text", { exact: true }).fill("How can I apply this concept?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByText(/Fictional ask result/).waitFor();
+  await page.getByRole("button", { name: "Change selection", exact: true }).click();
   await page.evaluate(() => {
     const surface = document.querySelector('[data-testid="smart-selection-surface"]');
     const text = surface.firstChild;
@@ -409,6 +419,7 @@ try {
   await page.getByRole("button", { name: "Close Study Assist", exact: true }).click();
   // Pick two key points and explain both.
   await page.getByRole("checkbox", { name: "Start with your pending tasks." }).click();
+  await page.mouse.wheel(0, 250);
   await page.getByRole("checkbox", { name: "Plan time before a deadline." }).click();
   await page.getByRole("toolbar", { name: "Selected key points" }).getByRole("button", { name: "Explain simply", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll(".key-point .icon").length >= 2);
@@ -416,7 +427,11 @@ try {
   if (generationFixture) {
     await quizButton.click();
     await page.getByRole("dialog", { name: "New Quiz" }).waitFor();
-    await page.keyboard.press("Escape");
+    assert((await page.getByLabel("Quiz title", { exact: true }).inputValue()).includes("questions"));
+    await page.getByLabel("Quiz title", { exact: true }).fill("My custom Biology Quiz");
+    await page.getByRole("button", { name: "Create Quiz", exact: true }).click();
+    await page.waitForURL("**/generation/**");
+    assert.equal(domain.counts.quizTitle, "My custom Biology Quiz", "Custom title missing from request");
   } else assert(await quizButton.isDisabled(), "Quiz generation was not disabled by default");
   await page.goto(`${origin}/library/activity%3A${ids.draft}`);
   await page
@@ -483,6 +498,10 @@ try {
   await page
     .getByRole("button", { name: "Check answer", exact: true })
     .waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("heading", { name: "Match each study action", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Previous", exact: true }).click();
+  await page.getByRole("heading", { name: "Practice question 1", exact: true }).waitFor();
   await page.reload();
   await page
     .getByRole("button", { name: "Resume attempt", exact: true })
@@ -523,11 +542,14 @@ try {
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await page.getByRole("heading", { name: "Correct", exact: true }).waitFor();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Review your progress", exact: true })
-    .click();
+  await page.getByLabel("Type your answer", { exact: true }).fill("Planning");
+  assert.equal(await page.getByText("Correct answer", { exact: true }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Reveal answer", exact: true }).count(), 0);
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
+  await page.getByRole("button", { name: "Checking\u2026", exact: true }).waitFor();
   await page.getByRole("heading", { name: "Correct", exact: true }).waitFor();
+  assert.equal(await page.getByText("Correct answer", { exact: true }).count(), 0, "Identification leaked its key during practice");
+  assert.equal(await page.getByText("Planning and review support your learning.", { exact: true }).count(), 0, "Identification explanation leaked during practice");
   await page.getByRole("button", { name: "Finish quiz", exact: true }).click();
   await page
     .getByRole("button", { name: "Continue Quiz", exact: true })
@@ -535,6 +557,10 @@ try {
   await page.getByRole("button", { name: "Finish quiz", exact: true }).click();
   await page.getByRole("button", { name: "Finish Quiz", exact: true }).click();
   await page.getByText("100%", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Review answers", exact: true }).click();
+  await page.getByRole("heading", { name: "5. Name the study process", exact: true }).waitFor();
+  assert.equal(await page.getByText("Correct answer", { exact: true }).count(), 5, "Missing per-question final breakdown");
+  assert.equal(await page.getByText("opaque-planning-key", { exact: true }).count(), 0, "Final review exposed a key instead of accepted text");
   await capture("quiz-result-mobile");
   await captureExperience("quiz-result");
   await page.reload();
@@ -689,9 +715,9 @@ try {
   await page.waitForURL("**/sign-in");
   assert.equal(
     domain.counts.generationCalls,
-    // Reviewer retry pair + Quiz, own material (one file read and two
-    // Reviewers), then a task's Create Draft.
-    generationFixture ? 7 : 0,
+    // Reviewer retry pair + material Quiz + custom-title Reviewer Quiz,
+    // own material (one file read and two Reviewers), then a task's Create Draft.
+    generationFixture ? 8 : 0,
     "Unexpected generation admission",
   );
   console.log(
@@ -715,7 +741,12 @@ try {
         : "course/material browsing and default generation block",
       "Queue and persisted Reviewer reopen without generation",
       "Reviewer search/export and draft editing/reload",
-      "five-question choice/Matching practice with saved drafts",
+      "animated Study Assist shimmer and Reduced Motion",
+      "concept-level Ask without text selection",
+      "custom Quiz title in generation request",
+      "five-question choice/Matching/Identification practice with navigation-saved drafts",
+      "identification Check loading state and verdict-only feedback",
+      "final per-question breakdown and accepted answer text",
       "completion guard, confirmation, score/history/reopen",
       "Canvas connect/disconnect, token privacy and accepted sync",
       "ten major screens, two themes, two viewport sizes",
@@ -747,13 +778,15 @@ try {
       await activePage.locator("body").innerText(),
     );
     await activePage.screenshot({
-      path: new URL("failure.png", output).pathname.replace(/^\/(.:)/, "$1"),
+      path: fileURLToPath(new URL("failure.png", output)),
       fullPage: true,
     });
   }
   throw error;
 } finally {
   await browser?.close();
-  server.kill();
+  if (process.platform === "win32" && server.pid) {
+    try { execFileSync("taskkill", ["/PID", String(server.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }); } catch {}
+  } else server.kill();
   fixture.close();
 }

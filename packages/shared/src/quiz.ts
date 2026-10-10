@@ -3,6 +3,7 @@ export type QuizQuestionType = 'single_select' | 'multi_select' | 'true_false' |
 export type QuizDifficulty = 'easy' | 'medium' | 'hard';
 export type QuizGenerationState = GenerationState;
 export interface QuizGenerationRequest {
+    readonly title?: string;
     readonly sourceType: 'material' | 'reviewer';
     readonly sourceIds: readonly string[];
     readonly reviewerArtifactId?: string;
@@ -59,6 +60,8 @@ export interface QuizAttemptAnswer {
     readonly finalizedAt: string | null;
 }
 export interface QuizQuestionResult {
+    /** Human-readable accepted text, exposed only with checked/reviewed answers. */
+    readonly correctAnswerText?: string;
     readonly questionId: string;
     readonly selectedOptionIds: readonly string[];
     readonly correctOptionIds: readonly string[];
