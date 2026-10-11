@@ -1,5 +1,145 @@
 # Current State
 
+## B25.3.3 direct variable recovery (2026-10-08)
+
+**OPENAI AUTHENTICATION RECOVERED; overall PARTIAL / BLOCKED.** Resumed clean
+at `05928ad` on `codex/b25.3.3-cloud-compatibility` in the fresh environment.
+Direct raw-key injection and SDK/header verification PASS, no configured Network
+Secret conflicts; one minimal SDK Responses request returns **HTTP 200** with
+zero retries and no sanitized error. Runtime readiness remains `unknown`;
+effective runtime injection and Responses access are independently proven.
+
+One original-source engine invocation on the retained 23-block/hash-matched
+snapshot accepts **5/5** under unchanged strict gates, with two author/two
+verifier calls, all HTTP 200, in 91,527 ms. Compatible disposable SQL persistence,
+pre-finalization secrecy, score/reopen (100%) and foreign-owner denial PASS.
+Selected harness **1 passed / 29 filtered skips**; its generated transaction was
+rolled back. Initial missing-PGlite preparation failure sent no provider request;
+committed-lockfile `npm ci` resolved it without dependency/product changes.
+
+Ledger **9/10 consumed, at most 1 remaining** on October 8 Asia/Manila; this
+task's **2/2** additional attempts are used. Earlier failures/allowances below
+are historical and preserved. Row 8 passes at original-source engine/disposable
+SQL level; row 6's live preservation, row 9's production/physical success path
+and row 10 closure remain blocked. Direct rollout stays **INCOMPATIBLE**; the
+local SQL result does not establish production intake, persisted Library or
+physical acceptance.
+
+Next: obtain deployed producer/API/worker/client refs/releases and prove a
+compatible convergence/preservation repair in staging/disposable infrastructure;
+then establish the allowed target, two owners, APK build access and physical
+device for the existing acceptance procedure. Reserve the last daily attempt;
+do not repeat auth probes. PR #1 stays draft. No merge, deployment, production
+migration/write or unrelated code change. Documentation checks are fresh;
+root gates are NOT APPLICABLE / NOT RERUN. [Recovery evidence](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+
+## B25.3.3 fresh environment verification (2026-10-08)
+
+**PARTIAL / BLOCKED.** Continued clean at `fb8c25a` on the existing scoped
+branch. Fresh cloud provisioning adopts configuration version
+`cecfgver_6ac6ee1c8dc081939d7e0e7afe70cc2f`, different from the previous
+record. Secret availability is `true`, initial standard alias availability is
+`false`, and the probe's command-local alias matches (`true`). Runtime readiness
+still reports `unknown`. One minimal Responses POST returns **401
+`invalid_api_key`**; no instructional generation or persistence was attempted.
+The effective credential is rejected; saved-key versus proxy-substitution
+root cause remains unproven. No further calls after the 401.
+
+Today's ledger is now **7/10 consumed, at most 3 remaining**, including this
+authorization probe; earlier totals below are historical. Direct production
+rollout remains INCOMPATIBLE; live preservation and mandatory rows 8/9/10 remain
+blocked. Next: correct/verify the existing cloud network-secret Authorization
+binding, resolve unknown readiness, then charge one minimal auth probe before
+one bounded original-source generation. Preserve all lineage, two-owner and
+physical gates. No migration, merge, deployment or product change; documentation
+checks only. [Fresh evidence](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+
+## B25.3.3 published-key follow-up (2026-10-08)
+
+**PARTIAL / BLOCKED.** The owner published a new OpenAI key and authorized
+continuation from clean `29aa524`. FRESH runtime observes spec 16 ready/
+current and enforced policy; this task still references the same saved
+environment-version ID as before publication. New secret adoption is unknown.
+
+The fourth fresh owned instructional engine run fails 0/5 before persistence
+(one author, zero verifier, HTTP 401, 417 ms). An independent Python Responses
+POST also returns `401 invalid_api_key`. Read-only GET/transport checks
+pass; they are not generation or POST authorization proof. No key values,
+raw errors or source text are exposed. No product/contract/validation change
+was made; previous cloud suites/gates are retained evidence, not rerun here.
+
+Today's generation ledger is **6/10 conservatively used, at most four left**:
+four instructional attempts plus two minimal authorization probes. Do not
+reset it or repeat paid failures. Row 8 remains attempted/BLOCKED; live
+preservation/row 9 and closure remain outstanding. Remote-head inspection
+still lacks deployed API/worker/client source; usable/allowed HTTPS and two
+authenticated sessions, build credentials and physical device remain absent.
+
+Next credential action: start a fresh task from the republished environment,
+continue from the scoped branch/patch without recreating the scaffold, and
+verify updated binding plus a bounded Responses request. This agent cannot
+reattach the running task; existing tasks retain their saved state. All
+compatibility/version-boundary and physical criteria remain unchanged.
+See [updated acceptance](ai/acceptance/b25.3.3/quiz-context-convergence.md)
+and [follow-up provenance, failures and handoff](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+Earlier allowance/access status below is superseded; B26, Finish Anyway and
+broader website work remain excluded. No Goal lifecycle change is asserted.
+
+## B25.3.3 cloud continuation checkpoint (2026-10-08)
+
+**PARTIAL / BLOCKED; scope remains generation convergence only.** Recovery
+history is resolved: `de09b9c` includes approval `b8967f3` and implementation
+`f336d26`. Branch `codex/b25.3.3-cloud-compatibility` began clean; the
+127 unrelated Windows dirty paths are absent here and were not recreated.
+Commit `f0e40f2` adds an offline read-only deployment preflight, three
+compatibility regressions and an opt-in fresh-owned-source/disposable Postgres
+harness; the follow-up checkpoint records sanitized failure status and evidence.
+
+**Direct production rollout is INCOMPATIBLE.** Live named RPC arguments,
+canonical source links, encoded Matching submissions, pair-weighted scoring
+and assisted state differ from this checkpoint. Aggregate saved-format counts:
+48 legacy Matching questions, 66 unsupported question types, two assisted
+attempts. Do not replace live RPCs with the pending Matching migration.
+Port convergence onto the actual deployed source or prepare a reviewed version
+boundary/coordinated release that preserves saved quizzes, attempts, scores,
+owner isolation and supported clients. No production contract/data was changed.
+
+FRESH cloud verification: focused Quiz **222 passed / 4 opt-in skipped**,
+API **999 / 5 skipped**, mobile **467**, shared **26**, Workflow **1**,
+provider contract **18**. Forced root typecheck/lint/build each **7/7, zero
+cached**; four existing mobile lint warnings. Initial typecheck failed on
+23 stale ignored Expo route errors from the old cloud branch; regenerated
+typed routes without changing app routes or weakening checks, then passed.
+Historical local counts below are not cloud proof.
+
+Fresh owned instructional source was recovered from the original
+owner-joined accepted-source snapshot. Zero-call five-slot planning passes;
+three fresh engine generation attempts fail before generation/persistence,
+with Responses **401 invalid_api_key** confirmed. Today's owner allowance is
+**10 generation attempts**; conservatively **4/10 used** including the minimal
+authorization probe, at most six remaining. Do not reset the ledger or retry
+without a corrected `STAY_FOCUSED_OPENAI_API_KEY` cloud binding.
+
+Mandatory rows 1–7 have fresh checkpoint automation; row 6's live preservation
+remains blocked. Rows **8 (fresh complete generation)** and **9 (persisted
+production/physical success path)** remain unaccepted; row 10 cannot close.
+No authenticated browser/emulator/physical flow, APK, production job/Quiz,
+migration or deployment is claimed. Root Android export is not a device build.
+The exact existing mandatory criteria below remain in force.
+
+Next eligible actions require: valid Responses credential binding; actual
+deployed producer/API/client refs and release IDs; usable/allowed HTTPS API
+and two authenticated owner test sessions; authenticated APK build capability
+and a controllable physical Android device. The report supplies the gated
+rollout/rollback and exact build/device evidence procedure. Scope approval
+does not need renewal. Finish Anyway, B26 and broader website work remain
+excluded; no active/resumed Goal lifecycle is asserted.
+
+Records: [updated acceptance matrix](ai/acceptance/b25.3.3/quiz-context-convergence.md)
+and [compatibility, fresh evidence and handoff](ai/acceptance/b25.3.3/cloud-matching-compatibility.md).
+This section supersedes historical environment/access/verification statements
+below without rewriting their history.
+
 ## B25.3.3 approved finite scope (2026-10-08)
 
 **Owner-approved; local repair verified, mandatory acceptance blocked.** The owner explicitly selected B25.3.3 generation convergence after installation commit `93a8eb8`; the installation checkpoint's pending scope decision and historical recommendation-only wording no longer block this run. This section supersedes those scope-selection statements, without rewriting their history. **Finish Anyway semantics, B26–B28, web migration and other roadmap recommendations are excluded.** Existing all-question finalization, choice/Matching support and learning-progress contracts remain intact.

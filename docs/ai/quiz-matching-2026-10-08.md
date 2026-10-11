@@ -1,5 +1,17 @@
 # Matching Quiz implementation and acceptance
 
+## Cloud rollout restriction — 2026-10-08
+
+Fresh production inspection establishes a different legacy Matching,
+canonical-source and pair-weighted/assisted scoring contract. **Do not apply
+this checkpoint's Matching replacement or deploy its API directly to that
+target.** The historical migration ordering below is not authorization to
+replace those live RPCs. Existing saved quizzes, attempts, scores and supported
+clients require a reviewed preservation/version boundary and coordinated
+rollout on the actual deployed lineage. See the
+[compatibility assessment and handoff](acceptance/b25.3.3/cloud-matching-compatibility.md).
+No production migration or adapter was applied in this cloud run.
+
 Completed: 2026-10-08 (Asia/Manila); started 2026-10-07. Checkout: C:\Projects\stay-focused-v2. Branch: main.
 Starting HEAD: e11c2d21d91ba0eec8c10fd0e5cd007f0179c799, the verified shared Quiz learning-progress commit.
 

@@ -1,5 +1,146 @@
 # B25.3.3 source-context and generation convergence
 
+## Direct environment-variable recovery — 2026-10-08
+
+**OPENAI AUTHENTICATION RECOVERED.** Resumed clean at `05928ad` in a newly
+provisioned cloud environment. Direct variable/runtime/SDK/header checks PASS;
+no configured Network Secret conflicts. One minimal SDK Responses probe returns
+**HTTP 200**, model available, no sanitized error, zero retries. Runtime service
+readiness remains `unknown`; effective injection and Responses access are proven
+independently. No credential value was exposed or configuration changed.
+
+One fresh invocation on the same original 23-block source produces **5/5**,
+with strict gates unchanged: two author/two verifier calls, all HTTP 200,
+91,527 ms. Run `e1bb868a-5e63-41ce-ab39-e7b0bc291770`: first round 4/5,
+direct correction 5/5; final set three medium/two easy. Compatible disposable
+PGlite persistence, public/pre-finalization secrecy, expected/stored/reopened
+100% score and foreign-owner denial PASS; generated transaction rolled back.
+Selected test **1 passed / 29 filtered skips**. The initial dependency-import
+failure sent no provider request; branch-lockfile `npm ci` resolved it.
+
+Daily ledger **9/10 consumed, at most 1 remaining**; this task's maximum two
+additional attempts are used. Historical failures and ledger are preserved.
+Row 8 passes at original-source engine/disposable SQL level; row 6's production
+preservation, row 9's production/physical acceptance and row 10 closure remain
+blocked. **Overall PARTIAL / BLOCKED; direct rollout INCOMPATIBLE.** No product,
+migration, production data, deployment or merge change. Obtain the deployed
+lineage and verify a compatible preservation repair before the production/device
+procedure; no new authentication probe is needed. PR #1 stays draft.
+See [full recovery evidence, allowance and next action](cloud-matching-compatibility.md).
+Earlier credential/access/allowance statements below are historical.
+
+## Fresh republished-environment verification — 2026-10-08
+
+**PARTIAL / BLOCKED.** Resumed clean at `fb8c25a` in a newly provisioning
+cloud instance. Attached version `cecfgver_6ac6ee1c8dc081939d7e0e7afe70cc2f`
+differs from the previous version. Secret availability is `true`; the
+command-local standard alias matches (`true`). Readiness remains `unknown`.
+The one minimal Responses authorization probe returns **401 `invalid_api_key`**
+in 271 ms; instructional generation and persistence are NOT RUN / BLOCKED.
+No further API call follows the 401. Daily ledger: **7/10 conservatively used,
+at most 3 remaining**, superseding prior totals without resetting them.
+
+Direct rollout remains INCOMPATIBLE; rows 6 (live preservation), 8, 9 and 10
+remain unaccepted. Verify/correct the existing network-secret Authorization
+binding and readiness before another charged auth probe or original-source
+generation. No product/migration/deployment change or rebuild; only scoped
+documentation checks. Earlier acceptance evidence remains unchanged.
+See [fresh configuration, probe and exact next action](cloud-matching-compatibility.md).
+
+## Published-key follow-up — 2026-10-08
+
+**PARTIAL / BLOCKED.** Resumed at clean `29aa524` after the owner published
+the new OpenAI key. FRESH runtime observations are current/ready at spec 16,
+but this task's saved environment-version ID is unchanged from before
+publication. Adoption of the newly published key cannot be confirmed.
+
+One more fresh owned instructional generator run
+`0c2ed547-41ab-40d4-8e35-65fe126dc254` fails before persistence: 0/5,
+one author/zero verifier, HTTP 401, 417 ms. An independent minimal Python
+Responses POST also returns `401 invalid_api_key` (500 ms). Read-only GETs
+and the proxy-aware Vitest transport check pass; they do not establish POST
+authorization. No schema, strict gate, model, production contract or product
+code changed. Earlier passing cloud suites/gates are retained at unchanged
+product bytes, not rerun in this documentation follow-up.
+
+Today's ledger is now **6/10 used conservatively, at most four remaining**:
+four real-source attempts and two minimal authorization probes. No allowance
+reset or further paid retry while this failure persists. Mandatory row 8
+remains attempted/BLOCKED; production preservation and row 9 remain blocked,
+and row 10 cannot close. New remote-head inspection still does not supply
+the deployed source lineage; usable/authenticated API/build/device access
+remains unavailable.
+
+Next: use a fresh task from the republished environment, carry forward this
+scoped branch/patch and ledger, and verify updated binding/Responses access.
+Existing tasks retain saved state; this agent has no reattachment capability.
+Do not recreate the scaffold. See the
+[follow-up evidence and handoff](cloud-matching-compatibility.md).
+The prior checkpoint below is retained as history and superseded for allowance
+and current credential status.
+
+## Cloud continuation checkpoint — 2026-10-08
+
+**PARTIAL / BLOCKED.** This section supersedes the historical environment,
+verification and access status below; it does not close the approved scope.
+Recovery branch `recovery/b25.3.3` resolves to `de09b9c`, including approval
+`b8967f3` and implementation `f336d26`. All three histories were fetched and
+verified. The cloud implementation branch is
+`codex/b25.3.3-cloud-compatibility`; its recovered baseline was clean. The 127
+unrelated local dirty files were absent here, not deleted or reconstructed.
+
+Commit `f0e40f2` adds a conservative read-only deployment preflight, three
+database/projection compatibility regressions, and an opt-in fresh-source
+generator/disposable Postgres harness. A subsequent scoped diagnostic change
+records only whitelisted provider failure classifications/status. No production
+contract, applied migration, saved Quiz/attempt, model or strict gate was changed.
+
+**Direct production rollout is INCOMPATIBLE.** Fresh Supabase inspection shows
+different named RPC arguments, canonical source completion, legacy encoded
+Matching submissions, pair-weighted scoring and assisted-attempt behavior.
+Aggregate inventory includes 48 legacy Matching questions, 66 question types
+outside the checkpoint union and two assisted attempts. A payload-only adapter
+cannot preserve these contracts. The preflight correctly rejects this target;
+port convergence onto the actual deployed lineage or implement a reviewed
+version boundary with coordinated API/worker/client release before any rollout.
+Actual deployed source refs/builds remain unavailable, so no adapter is claimed.
+
+The exact mandatory criteria remain those in the sprint matrix. Fresh cloud
+evidence for each row follows; detailed provenance, run identifiers, retained
+failures and rollout/device procedure are in the
+[cloud compatibility assessment](cloud-matching-compatibility.md).
+
+| Mandatory requirement | Cloud result |
+| --- | --- |
+| 1. Source context and exact evidence ownership | FRESH PASS automated: bounded context, exact owners and cross-block rejection regressions |
+| 2. Evidence strength and reserve selection | FRESH PASS automated: weak fragments excluded and substantive distinct reserves selected |
+| 3. Complete-set feasibility before immutable acceptance | FRESH PASS automated: five-/20-slot plans, reserve feasibility, truthful mixed allocation and explicit zero-call insufficiency |
+| 4. Cross-support failure exclusions | FRESH PASS automated: pattern/intent exclusions and durable legacy resume retain counters |
+| 5. Nested diagnostic serialization | FRESH PASS automated: nested whitelist and actual reporter; no private text/key leakage |
+| 6. Existing invariants and durable bounds | FRESH PASS checkpoint automation; production legacy/supported-client preservation BLOCKED pending compatible lineage. Strict model, gates, bounds, immutable acceptance, choice/Matching and owner/secrecy tests retained |
+| 7. Local verification | FRESH PASS: focused Quiz 222 passed / 4 skipped; API 999 / 5 skipped; mobile 467, shared 26; Workflow 1, provider contract 18. Forced root typecheck/lint/build each 7/7, zero cached; four existing lint warnings. Initial stale Expo-route typecheck failure retained and repaired by ignored-type regeneration |
+| 8. Fresh real-source generation acceptance | ATTEMPTED / BLOCKED: three fresh owned-source engine runs fail before generation/persistence, 0/5; HTTP 401 confirmed. No old output or synthetic proof substituted |
+| 9. Persisted production/physical Quiz acceptance | BLOCKED / NOT RUN: incompatible target, no usable/allowed HTTPS API or authenticated learner/denial sessions, no controllable physical Android/build capability. No production Quiz or device success path produced |
+| 10. Closure | PARTIAL / BLOCKED: scoped reviewable changes and records prepared; mandatory rows 8/9 and production preservation remain outstanding |
+
+The owned instructional input was recovered through the original job's
+owner-joined accepted-source snapshot, not through generated output. Planning
+five slots succeeds with zero provider calls. The owner authorized **10
+generation attempts for today**; three generation runs plus one minimal
+Responses authorization probe conservatively consume **4/10**, leaving at most
+six for this date. Stop paid retries until `STAY_FOCUSED_OPENAI_API_KEY` is
+corrected in cloud secret configuration: readiness reports ready, but actual
+Responses requests return `401 invalid_api_key`. No monetary cap is inferred.
+
+Other smallest unlocks: actual deployed producer/API/client refs and release
+IDs; usable/allowed HTTPS target plus two authenticated owner test sessions;
+authenticated APK build access and an actual controllable Android device. The
+assessment specifies staging preservation proof, release ordering/rollback,
+exact build metadata and physical Library/secrecy/answer/score/history/reopen/
+owner-denial evidence. No migration, deployment, merge, main push or Goal
+lifecycle change is claimed. Finish Anyway, B26 and broader website work remain
+excluded. Historical checkpoint evidence follows unchanged.
+
 Date: 2026-10-08, Asia/Manila. Branch: main. Starting HEAD: 93a8eb833086d7a13f3fce773453c7cbb27a80e8 (Autopilot installation). Explicit owner approval selects this finite scope; Finish Anyway and B26 are excluded.
 
 ## Acceptance contract
