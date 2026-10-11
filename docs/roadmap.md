@@ -1,5 +1,17 @@
 # Roadmap
 
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally and in all six signed-in real-account checks.** Shared planner
+submission filtering, Done actions including unlinked paper activities,
+date-specific shared free time, unsaved-plan labels and overdue separation are
+implemented on `website/functional-v1` (`de3e99c`, `9d2ef46`, `1343428`). Fresh
+API typecheck/32 task-planning tests and web typecheck/lint/79 tests pass.
+Test sessions, plan metadata and preferences were restored; The 5 Why Analysis
+stays completed. No push/deployment. Next requires a separate W2 scope:
+website desktop/16:9 layout, Library grid, Canvas course search, draft editor.
+Estimator, generation-on-sync and inactivity-gating exclusions remain intact.
+
 ## Website completion and main integration (2026-10-08)
 
 Owner-authorized finite scope: finish Claude's pending web changes, verify the

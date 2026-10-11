@@ -1,5 +1,22 @@
 # Current State
 
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally, including all six real-account checks.** Branch
+`website/functional-v1` now filters handed-in Canvas work from the shared
+planner, completes unlinked Canvas/paper activities through one import-and-mark
+helper, separates Overdue from today's schedule, shares date-specific free
+time, and labels previews as unsaved with Save to schedule. Fresh API
+typecheck/task-planning tests (32) and web typecheck/lint/tests (79) pass.
+Two saved real-account blocks matched Today's preview and Schedule at
+9:30–10:30 PM and 10:30–11:30 PM. Temporary sessions/plan metadata and local
+preferences were restored; The 5 Why Analysis remains completed as instructed.
+Implementation commits: `de3e99c`, `9d2ef46`, `1343428`. No push or deployment;
+the production website still requires these changes to be released. Full
+details and adaptations are appended to `docs/ai/handoff.md`. W2 layout,
+Library/search/draft work and all excluded estimator/sync/gating work remain
+outside this slice.
+
 ## Website completion and main integration (2026-10-08)
 
 Owner-authorized finite scope: finish Claude's pending web changes, verify the

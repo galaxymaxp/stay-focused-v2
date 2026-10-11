@@ -2376,3 +2376,131 @@ Commit `79e54dd` adds source-compatible blueprints, two-candidate pools, determi
 The single authenticated production attempt on the unchanged real lecture failed: job `d038e85b-ae03-4853-aa2a-f663037415b0`, Workflow `wrun_01M2J4TSMPMWB6SPQXW8F0CTH0`, 4/5 accepted, q3 pending, `repair_exhausted` / `bounded_repair_attempts_exhausted` / `quiz_generation_failed`. Eighteen candidates and four author/four verifier batches; no Quiz persisted and no retry submitted. q1/q4 accepted second alternatives; q5 converged after a new intent; q3 failed even with alternate support. The realme showed the Generation failure and opened Queue; Library/attempt/secrecy/score/result/reopen remain unaccepted.
 
 B25.3.3 should preserve source context and precise evidence ownership, select supports with enough evidence for meaningful distractors, and plan full-set concept/difficulty feasibility before immutable acceptance. **PARTIAL — Quiz semantic convergence remains incomplete.** B26 may not begin. See [B25.3.2 report](acceptance/b25.3.2/quiz-candidate-convergence.md).
+
+
+## W1 — Today/Schedule alignment + submitted-work filtering (website) — 2026-10-11
+
+**Status:** PASS (local implementation and all six real-account checks; unreleased)
+**Commits:**
+- de3e99c fix(api): keep handed-in Canvas work out of the study planner
+- 9d2ef46 feat(web): mark work done from Today, Schedule and Tasks, including paper submissions
+- 1343428 fix(web): share free time between Today and Schedule and label unsaved plans
+
+**Changed files:**
+- apps/api/src/lib/task-planning-repository.ts
+- apps/api/src/lib/task-planning-repository.planner-tasks.test.ts
+- apps/web/src/lib/complete-work.ts
+- apps/web/src/lib/complete-work.test.ts
+- apps/web/src/features/tasks.tsx
+- apps/web/src/features/today/today-screen.tsx
+- apps/web/src/features/today/plan-preview.tsx
+- apps/web/src/features/schedule.tsx
+- apps/web/src/features/day-clock/free-time-store.ts
+- apps/web/src/features/day-clock/free-time-store.test.ts
+- docs/ai/handoff.md
+- docs/current-state.md
+- docs/ai/current_sprint.md
+- docs/roadmap.md
+
+**Adaptations from prompt:**
+- STEP 0 stopped because C:/Projects/stay-focused-v2 was on dirty main at de09b9c.
+  After owner authorization for isolation, used the existing separate
+  C:/Projects/stay-focused-v2-website worktree on website/functional-v1 at the
+  required 8942c3c tip. Its only dirty paths were untracked
+  docs/ai/desktop-layout-mockup/ and docs/ai/website-screenshots/; both are
+  untouched. The original dirty main checkout was not edited or switched.
+- Reused isSubmittedCanvasSubmission from mappers: no runtime import cycle.
+  Deduplicated linked assignment IDs before the owner-scoped read. No task
+  statuses change during planner loading. Regression includes the requested
+  four cases, graded-but-missing work, query ownership and safe storage failure.
+- Api is already exported by apps/web/src/lib/api.ts and used by useAuth;
+  imported that type. The import endpoint accepts exactly assignmentIds and
+  returns TaskView[], which does not contain canvasAssignmentRowId. Used its
+  existing response contract rather than inventing that field.
+- Tasks rendered an icon instead of a button for unlinked Canvas activities.
+  Replaced that conditional with a check button for all rows, disabled for
+  submitted work. Matched linked rows to canonical activity summaries so
+  Canvas submission status and course context survive the Tasks list mapping.
+- Today's upcomingDeadlines begins tomorrow. Removing overdue alone would
+  lose today's unscheduled deadlines, so today's active deadlines come from
+  the existing urgent feed filtered to the local date, alongside today's
+  timeline/current block. Prior-date overdue deadlines are separate.
+- Today's Done action uses the existing busyRef guard, reports unavailable
+  activity resolution, and invalidates a stale preview after completion.
+  Schedule also invalidates its preview after completing a deadline.
+- Schedule due chips were Link elements. Made each chip a div with a linked
+  title and a sibling check button, avoiding nested interactive elements while
+  retaining the existing classes and visual pattern.
+- Free-time storage retains sf.today.free-time.<date>. Added bounds/integer
+  checks and ignored invalid input so malformed data cannot seed clock state.
+  Schedule treats Until 00:00 as the next midnight (1440 minutes), preserving
+  Today's supported midnight-ending windows.
+- Schedule previously planned/replaced only its narrow availability range;
+  reused Today's existing planningRequest for the full-day replacement range
+  and the same availability. Both still call the same server planner.
+- Proposed plan was already the heading; added the unsaved line and placed
+  Save to schedule/Discard directly below it, before the plan bar. Verified
+  that the primary button needs no scrolling inside the card.
+- Reconciled docs/roadmap.md as required by AGENTS.md, in addition to the two
+  current-state documents requested in the prompt.
+
+**Gates (FRESH/CACHED/NOT RUN):**
+Baseline before edits, all FRESH:
+- api typecheck: PASS
+- web typecheck: PASS
+- api tests (task-planning): PASS, 29 tests / 4 files
+- web tests: PASS, 66 tests / 10 files
+
+Final implementation, all FRESH:
+- api typecheck: PASS
+- api tests (task-planning): PASS, 32 tests / 5 files
+- web typecheck: PASS
+- web lint: PASS, zero reported warnings/errors
+- web tests: PASS, 79 tests / 12 files
+- git diff --check / staged diff check: PASS
+- Root builds/gates: NOT RUN; this slice uses the explicitly requested API/web gates.
+
+**Real-account verification (STEP 6):** FRESH, actual signed-in account,
+local API http://127.0.0.1:3000 and website http://127.0.0.1:3100,
+Asia/Manila, implementation HEAD 1343428. No mock backend was used.
+1. PASS — The 5 Why Analysis appeared under Overdue, not Today's schedule.
+2. PASS — Done removed it from Overdue; Tasks showed it under Completed.
+3. PASS — Real pointer drags set Today to 9:30—11:30 PM; Schedule showed
+   From 21:30 / Until 23:30 and Same free time as Today.
+4. PASS — The real Today preview excluded The 5 Why Analysis.
+5. PASS — Not saved yet and the zero planned blocks/Plans from Today hint
+   were visible before saving. Save created two blocks at 9:30—10:30 PM and
+   10:30—11:30 PM. Preview, saved API sessions, Today's timeline and
+   Schedule's today column agreed on the work and times.
+6. PASS — Reopen from Tasks restored the assignment to Overdue. It was
+   completed again afterward because the owner had already handed it in.
+
+Cleanup PASS: removed only the two session IDs and the new plan ID returned
+by the test save; verified original session/plan sets and task fields against
+snapshots. Restored local free-time and clock-lock preferences. No new task
+imports occurred. The sole intended account change is The 5 Why Analysis
+remaining completed. No Canvas synchronization or generation was started.
+Private snapshots/screenshots/results are ignored under .local/w1/.
+
+**Failed attempts and recovery:** API startup from the monorepo root initially
+failed Workflow app-directory discovery; starting with the API package as cwd
+resolved it. The launcher initially misread the first environment key due to a
+UTF-8 BOM; stripping it restored browser configuration before sign-in. The
+owner's first inability to sign in was superseded by successful sign-in after
+that repair. A scripted drag initially set From past the old Until and was
+correctly clamped; setting Until first passed. A browser assertion initially
+compared equivalent ISO strings literally (+00:00 versus .000Z); comparing
+parsed instants confirmed equal persisted times. None required application
+changes, gate weakening, or mocked real-account results.
+
+**Known limits:** Paper (on_paper) work stays unsubmitted in Canvas until
+it is graded; students clear it with Done. Submitted filtering affects planner
+candidates and does not automatically delete historical saved sessions.
+
+**Next:** W2 — website desktop/16:9 layout, Library grid, Canvas course search,
+draft editor (separate scope; not started).
+
+**Risks/blockers:** No implementation/STEP 6 blockers remain. Commits are local;
+no push or deployment was requested, so production has not received this W1
+release. Content time estimates, grade estimator, generation on sync and
+inactivity gating remain excluded.

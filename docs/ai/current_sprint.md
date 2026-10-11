@@ -1,5 +1,20 @@
 # Current Sprint
 
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally and against the signed-in real account.** Finite owner scope:
+shared planner submission filtering, Done from Tasks/Overdue/Schedule, shared
+free time, unsaved-plan labels, and today's schedule alignment. Implementation
+commits `de3e99c`, `9d2ef46`, `1343428`; fresh API typecheck and 32 task-planning
+tests, web typecheck/lint and 79 tests pass. All six STEP 6 checks passed;
+temporary saved sessions/plan metadata and free-time/lock settings were
+restored. The 5 Why Analysis is intentionally completed. Original unrelated
+dirty files and website evidence directories are untouched. No push or
+deployment. See the appended W1 handoff for evidence and prompt adaptations.
+Next separately scoped work: W2 website desktop/16:9 layout, Library grid,
+Canvas course search, draft editor. Estimates, grade estimator, generation on
+sync and inactivity gating were not started.
+
 ## Website completion and main integration (2026-10-08)
 
 Owner-authorized finite scope: finish Claude's pending web changes, verify the
