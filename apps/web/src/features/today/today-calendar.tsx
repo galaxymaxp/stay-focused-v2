@@ -16,6 +16,7 @@ import {
 import { courseIdentity } from "../../app-model/courseIdentity";
 import { localDate, timeLabel } from "../../app-model/presentation";
 import { CourseDot, CourseMark } from "../../components/course";
+import { ClearDay } from "../../components/clear-day";
 import { Icon } from "../../components/ui";
 
 // Web port of apps/mobile/src/features/redesign/TodayCalendar.tsx.
@@ -156,7 +157,7 @@ export function TodayCalendar({ items }: { items: readonly ActivitySummary[] }) 
             <span className="meta">{due.length ? `${due.length} due` : ""}</span>
           </div>
           {due.length === 0 ? (
-            <p className="muted">Nothing due.</p>
+            <ClearDay compact title="Nothing due." detail="Enjoy the breathing room." />
           ) : (
             due.map((item) => <AgendaRow key={item.id} item={item} />)
           )}

@@ -30,6 +30,7 @@ import {
 } from "../../app-model/presentation";
 import { BookLoader } from "../../components/brand";
 import { CourseDot } from "../../components/course";
+import { ClearDay } from "../../components/clear-day";
 import { useAuth } from "../../components/providers";
 import { ContentIcon, Heading, Icon, Notice } from "../../components/ui";
 import { useResource } from "../../lib/hooks";
@@ -452,7 +453,7 @@ export function TodayScreen() {
                   {arranged.later.length ? (
                     <div className="list-card">{arranged.later.map((item) => row(item))}</div>
                   ) : (
-                    <p className="muted">Your day is clear. Make room for what matters.</p>
+                    <ClearDay action={<Link className="button subtle" href="/schedule">Plan your free time</Link>} />
                   )}
                 </section>
                 {arranged.dueSoon.length > 0 && (
