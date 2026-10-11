@@ -504,8 +504,10 @@ h3 {
   display: none;
 }
 .main {
-  max-width: 1440px;
-  padding: 28px 32px 64px;
+  width: 100%;
+  max-width: 1760px;
+  margin-inline: auto;
+  padding: clamp(20px, 2vw, 36px) clamp(20px, 2.6vw, 56px) 64px;
   outline: none;
 }
 .two-column {
@@ -1983,7 +1985,7 @@ details[open] > :not(summary) {
 /* ---------- Today (mirrors the app's TodayScreen) ---------- */
 .today-v2 {
   display: grid;
-  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  grid-template-columns: clamp(340px, 26vw, 460px) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
@@ -1996,6 +1998,19 @@ details[open] > :not(summary) {
   align-items: stretch;
   gap: 10px;
   padding: 22px 20px 16px;
+}
+@media (min-width: 761px) {
+  .today-clock-card .day-clock {
+    width: min(100%, 52vh, 420px);
+    height: auto;
+    aspect-ratio: 1;
+    margin-inline: auto;
+  }
+}
+@media (min-width: 1600px) {
+  .today-v2 {
+    gap: 40px;
+  }
 }
 .free-time-line {
   display: flex;
@@ -4740,4 +4755,32 @@ mark.find-active {
 .course-card.unsynced button {
   min-height: 36px;
   padding: 6px 14px;
+}
+
+/* Keep reading measures and capped workspaces centered within the wide shell. */
+.reader,
+.quiz-content,
+.quiz-overview,
+.quiz-result,
+.quiz-layout,
+.queue-layout,
+.reviewer-layout,
+.own-material,
+.settings-grid,
+.announcement-article,
+.grade-article,
+.session-card,
+.task-form-card {
+  margin-inline: auto;
+}
+
+/* Phone shell spacing remains the final override. */
+@media (max-width: 760px) {
+  .main {
+    padding: 16px 20px 120px;
+  }
+  .detail-page .main {
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
 }
