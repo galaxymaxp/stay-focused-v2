@@ -4002,6 +4002,16 @@ mark.find-active {
 .canvas-courses-head {
   align-items: center;
 }
+.canvas-other-spaces > summary {
+  padding: 8px 0;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.canvas-other-spaces[open] > summary {
+  margin-bottom: 8px;
+}
 .canvas-course {
   display: flex;
   align-items: center;

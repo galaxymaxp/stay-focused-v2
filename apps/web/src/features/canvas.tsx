@@ -34,6 +34,38 @@ interface SyncJob {
   course: { displayName: string };
   progress: { completedUnits: number | null; totalUnits: number | null };
 }
+function CourseRow({ course, selected, dirty, busy, onSelectionChange, onSync }: {
+  course: Inventory["courses"][number];
+  selected: boolean;
+  dirty: boolean;
+  busy: boolean;
+  onSelectionChange: (id: string, checked: boolean) => void;
+  onSync: (id: string) => void;
+}) {
+  return (
+    <div className={`canvas-course${course.selected ? " selected" : ""}`}>
+      <label className="check-row">
+        <input type="checkbox" disabled={!course.selectable || busy}
+          checked={selected} onChange={(e) => onSelectionChange(course.id, e.target.checked)} />
+        <CourseMark course={{ id: course.id, code: course.courseCode, name: course.displayName }} size={30} />
+        <span className="grow">
+          <strong>{course.displayName}</strong>
+          <span className="meta">
+            {[course.courseCode, course.syncHealth?.overallHealth.replaceAll("_", " ") ?? "Not synced"]
+              .filter(Boolean).join(" · ")}
+          </span>
+        </span>
+      </label>
+      {course.selected && (
+        <div className="row wrap canvas-course-actions">
+          <Link className="button subtle" href={`/generate/${course.id}`}>Open materials</Link>
+          <Link className="button subtle" href={`/canvas/${course.id}/grades`}>Grades</Link>
+          <button disabled={busy || dirty} onClick={() => onSync(course.id)}>Sync course content</button>
+        </div>
+      )}
+    </div>
+  );
+}
 export function CanvasScreen() {
   const { api, session } = useAuth(),
     connection = useResource<{ connection: Connection | null }>(
@@ -53,6 +85,24 @@ export function CanvasScreen() {
     [dirty, setDirty] = useState(false),
     [disconnect, setDisconnect] = useState(false),
     [jobId, setJobId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const courses = inventory.data?.courses ?? [];
+  const matches = courses.filter((course) =>
+    !needle || `${course.displayName} ${course.courseCode ?? ""}`.toLowerCase().includes(needle),
+  );
+  const isMain = (course: Inventory["courses"][number]) =>
+    course.selected || course.classification === "likely_current" || course.classification === "past_or_concluded";
+  const mainCourses = matches.filter(isMain);
+  const otherSpaces = matches.filter((course) => !isMain(course));
+  const courseRow = (course: Inventory["courses"][number]) => (
+    <CourseRow key={course.id} course={course} selected={selected.includes(course.id)}
+      dirty={dirty} busy={action.busy} onSync={(id) => void syncCourse(id)}
+      onSelectionChange={(id, checked) => {
+        setDirty(true);
+        setSelected((old) => checked ? [...old, id] : old.filter((value) => value !== id));
+      }} />
+  );
   const job = useResource<SyncJob>(
     jobId ? `/api/canvas/sync-jobs/${jobId}` : null,
     5000,
@@ -269,57 +319,19 @@ export function CanvasScreen() {
                 </button>
               )}
             </div>
+            <input type="search" aria-label="Search Canvas courses" placeholder="Search courses"
+              value={query} onChange={(e) => setQuery(e.target.value)} />
+            {needle && inventory.data && <p className="meta">{matches.length} of {courses.length} courses</p>}
             <State resource={inventory} />
-            {inventory.data && inventory.data.courses.length > 0 && (
-              <div className="list-card">
-                {inventory.data.courses.map((course) => (
-                  <div className={`canvas-course${course.selected ? " selected" : ""}`} key={course.id}>
-                    <label className="check-row">
-                      <input
-                        type="checkbox"
-                        disabled={!course.selectable || action.busy}
-                        checked={selected.includes(course.id)}
-                        onChange={(e) => {
-                          setDirty(true);
-                          setSelected((old) =>
-                            e.target.checked
-                              ? [...old, course.id]
-                              : old.filter((id) => id !== course.id),
-                          );
-                        }}
-                      />
-                      <CourseMark
-                        course={{ id: course.id, code: course.courseCode, name: course.displayName }}
-                        size={30}
-                      />
-                      <span className="grow">
-                        <strong>{course.displayName}</strong>
-                        <span className="meta">
-                          {[
-                            course.courseCode,
-                            course.syncHealth?.overallHealth.replaceAll("_", " ") ?? "Not synced",
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      </span>
-                    </label>
-                    {course.selected && (
-                      <div className="row wrap canvas-course-actions">
-                        <Link className="button subtle" href={`/generate/${course.id}`}>
-                          Open materials
-                        </Link>
-                        <Link className="button subtle" href={`/canvas/${course.id}/grades`}>
-                          Grades
-                        </Link>
-                        <button disabled={action.busy || dirty} onClick={() => syncCourse(course.id)}>
-                          Sync course content
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+            {mainCourses.length > 0 && <div className="list-card">{mainCourses.map(courseRow)}</div>}
+            {otherSpaces.length > 0 && (
+              <details className="canvas-other-spaces" open={!!needle}>
+                <summary>Other Canvas spaces ({otherSpaces.length})</summary>
+                <div className="list-card">{otherSpaces.map(courseRow)}</div>
+              </details>
+            )}
+            {needle && inventory.data && matches.length === 0 && (
+              <p className="muted">No courses match &ldquo;{query.trim()}&rdquo;.</p>
             )}
             {inventory.data?.courses.length === 0 && (
               <p className="muted">
