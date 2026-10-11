@@ -2040,7 +2040,7 @@ details[open] > :not(summary) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
 }
 .list-card {
   background: var(--surface);
@@ -2706,6 +2706,7 @@ details[open] > :not(summary) {
   grid-template-columns: 240px minmax(0, 720px);
   gap: 40px;
   align-items: start;
+  justify-content: center;
 }
 .reviewer-layout.with-panel {
   grid-template-columns: 220px minmax(0, 680px) minmax(320px, 380px);
@@ -4806,12 +4807,12 @@ mark.find-active {
   margin-inline: auto;
 }
 
-/* Phone shell spacing remains the final override. */
+/* Draft fields use the available width beside their outline. */
 .draft-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 32px;
-  align-items: stretch;
+  align-items: start;
 }
 .today-split > section {
   display: flex;
@@ -4843,10 +4844,11 @@ mark.find-active {
   stroke-width: 2;
 }
 .cd-horizon { stroke: var(--line); }
-.cd-sun, .cd-rays { stroke: var(--amber); }
-.cd-rays { opacity: 0.5; }
+.cd-sun { stroke: var(--amber); stroke-width: 3; }
+.cd-rays { stroke: var(--amber); stroke-width: 2.5; opacity: 0.55; }
 .cd-calendar { fill: var(--surface); stroke: var(--muted); }
-.cd-check { stroke: var(--text); }
+.cd-check { stroke: var(--text); stroke-width: 3; }
+.clear-day strong { font-size: 16px; }
 .clear-day.compact { min-height: 140px; }
 .clear-day.compact .clear-day-art { width: 96px; }
 @media (prefers-reduced-motion: no-preference) {

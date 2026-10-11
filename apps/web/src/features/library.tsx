@@ -576,57 +576,57 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
   return (
     <div className="draft-layout">
       <div className="draft-body stack">
-      <label id="draft-title">
-        Draft title
-        <input
-          disabled={action.busy}
-          value={content.title}
-          onChange={(e) => {
-            setDirty(true);
-            setContent((old) => ({ ...old, title: e.target.value }));
-          }}
-        />
-      </label>
-      {content.sections.map((section, index) => (
-        <label key={section.id} id={`draft-section-${index}`}>
-          {section.heading ?? `Section ${index + 1}`}
-          <DraftTextarea
-            aria-label={section.heading ?? `Section ${index + 1}`}
+        <label id="draft-title">
+          Draft title
+          <input
             disabled={action.busy}
-            value={section.content}
+            value={content.title}
             onChange={(e) => {
               setDirty(true);
-              setContent((old) => ({
-                ...old,
-                sections: old.sections.map((s) =>
-                  s.id === section.id ? { ...s, content: e.target.value } : s,
-                ),
-              }));
+              setContent((old) => ({ ...old, title: e.target.value }));
             }}
           />
         </label>
-      ))}
-      {content.slides.map((slide) => (
-        <label key={slide.number} id={`draft-slide-${slide.number}`}>
-          {slide.title}
-          <DraftTextarea
-            aria-label={slide.title}
-            disabled={action.busy}
-            value={slide.body}
-            onChange={(e) => {
-              setDirty(true);
-              setContent((old) => ({
-                ...old,
-                slides: old.slides.map((s) =>
-                  s.number === slide.number
-                    ? { ...s, body: e.target.value }
-                    : s,
-                ),
-              }));
-            }}
-          />
-        </label>
-      ))}
+        {content.sections.map((section, index) => (
+          <label key={section.id} id={`draft-section-${index}`}>
+            {section.heading ?? `Section ${index + 1}`}
+            <DraftTextarea
+              aria-label={section.heading ?? `Section ${index + 1}`}
+              disabled={action.busy}
+              value={section.content}
+              onChange={(e) => {
+                setDirty(true);
+                setContent((old) => ({
+                  ...old,
+                  sections: old.sections.map((s) =>
+                    s.id === section.id ? { ...s, content: e.target.value } : s,
+                  ),
+                }));
+              }}
+            />
+          </label>
+        ))}
+        {content.slides.map((slide) => (
+          <label key={slide.number} id={`draft-slide-${slide.number}`}>
+            {slide.title}
+            <DraftTextarea
+              aria-label={slide.title}
+              disabled={action.busy}
+              value={slide.body}
+              onChange={(e) => {
+                setDirty(true);
+                setContent((old) => ({
+                  ...old,
+                  slides: old.slides.map((s) =>
+                    s.number === slide.number
+                      ? { ...s, body: e.target.value }
+                      : s,
+                  ),
+                }));
+              }}
+            />
+          </label>
+        ))}
       </div>
       <aside className="draft-aside stack">
         <nav className="stack" aria-label="Draft outline">
@@ -642,30 +642,30 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
           ))}
         </nav>
         <p className="meta" role="status">{dirty ? "Unsaved changes" : "Saved draft"}</p>
-      {draft.warnings.length > 0 && (
-        <Notice>
-          Some sections need information from you. Check this draft against your
-          assignment before using it.
-        </Notice>
-      )}
-      <button
-        className="primary"
-        disabled={action.busy || !dirty}
-        onClick={() =>
-          void action.run(async () => {
-            const updated = await api<ActivityDraft>(
-              `/api/experience/activity-drafts/${draft.id}`,
-              { method: "PATCH", body: { revision, content } },
-            );
-            setRevision(updated.revision);
-            setDirty(false);
-            action.setMessage("Draft saved.");
-          })
-        }
-      >
-        Save draft
-      </button>
-      {action.message && <Notice>{action.message}</Notice>}
+        {draft.warnings.length > 0 && (
+          <Notice>
+            Some sections need information from you. Check this draft against your
+            assignment before using it.
+          </Notice>
+        )}
+        <button
+          className="primary"
+          disabled={action.busy || !dirty}
+          onClick={() =>
+            void action.run(async () => {
+              const updated = await api<ActivityDraft>(
+                `/api/experience/activity-drafts/${draft.id}`,
+                { method: "PATCH", body: { revision, content } },
+              );
+              setRevision(updated.revision);
+              setDirty(false);
+              action.setMessage("Draft saved.");
+            })
+          }
+        >
+          Save draft
+        </button>
+        {action.message && <Notice>{action.message}</Notice>}
       </aside>
     </div>
   );
