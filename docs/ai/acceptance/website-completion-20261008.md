@@ -18,7 +18,9 @@ No API, engine, database migration, or mobile implementation was edited.
   Whole-paragraph selection sends the exact selected text to Study Assist.
 - Content icons, the account/appearance menu, combined loading/error states,
   and Schedule deadlines complete the existing desktop presentation changes.
-- Canvas sync starts only from Sync now. Admission failures remain part of
+- Canvas sync runs once when Generate or a course in it is opened or reloaded
+  (owner request, restored 2026-10-09; in-app navigation does not repeat it),
+  and again from Sync now. Admission failures remain part of
   the result; lost polling connectivity is unconfirmed rather than a fabricated
   server failure or success. Work stops polling on navigation/account change;
   requests are bounded and duplicate clicks are single-flight.
@@ -78,3 +80,14 @@ modified. This documentation follow-up records the completed release.
 Remaining limitations: OAuth round trips, live paid generation, physical mobile
 acceptance, and the wider historical roadmap are not established by this web
 completion slice. They are not claimed complete.
+
+## Follow-up — 2026-10-09
+
+- Restored the owner-requested Canvas refresh on Generate/course page load,
+  kept the bounded refresh core. A refresh cut short by navigation or React's
+  development remount may run again; a finished one does not repeat in-app.
+- Fixed the key-point bar covering the last key points on phones (the
+  Playwright harness, not rerun in the completion slice, caught it).
+- FRESH PASS: web typecheck, lint, 66 unit tests, production build, and both
+  `scripts/web-browser-check.mjs` runs (default and `--generation-fixture`),
+  now including "Generate refreshes Canvas once per page load".

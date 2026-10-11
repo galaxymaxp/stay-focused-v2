@@ -1,4 +1,4 @@
-# Thesis Overview
+# Capstone Overview
 
 ## Project Title
 
@@ -68,7 +68,7 @@ coverage and source grounding through the engine, and preview the reviewer in
 the app. This proves the engine-to-mobile loop locally, but it is still a
 paste-first reviewer flow.
 
-## Thesis Deliverables
+## Capstone Deliverables
 
 - A working mobile application integrated with Canvas LMS.
 - A documented and testable AI generation pipeline.
@@ -77,4 +77,4 @@ paste-first reviewer flow.
 
 Canvas LMS integration, OCR ingestion, Study Library persistence, task
 generation, study scheduling, deployment validation, and production readiness
-remain future thesis/product work.
+remain future capstone/product work.

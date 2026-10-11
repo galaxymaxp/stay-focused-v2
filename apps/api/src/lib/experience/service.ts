@@ -8,7 +8,8 @@ import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
 import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
-import { composeActivities, composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, isSubmittedCanvasSubmission, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
+import { composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
+import { readActivityContext } from './task-state';
 import { activityGenerationState, draftView } from '../activity-maker/service';
 import type { ActivityDraft } from '@stay-focused/shared';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
@@ -92,15 +93,11 @@ export class ExperienceService {
     const materials = await this.getCourseMaterials(userId, courseId);
     return { course: { ...course, materialCount: materials.totalKnown }, materials, capabilities: experienceCapabilities() };
   }
-  private async activityContext(userId: string, date?: string, offset = 0) {
+  private async activityContext(userId: string, date?: string, offset = 0, includeArchivedCourses = false) {
     const now = this.now;
     const requestedDate = date ?? new Date(now + offset * 60_000).toISOString().slice(0, 10);
     const { end } = dayWindow(requestedDate, offset);
-    const [assignments, tasks, courses, submissions] = await Promise.all([
-      this.rows('canvas_assignments', userId), this.rows('tasks', userId), this.rows('canvas_courses', userId), this.rows('canvas_assignment_submissions', userId),
-    ]);
-    const submittedAssignmentIds = new Set(submissions.filter(isSubmittedCanvasSubmission).map(s => s.assignment_id));
-    return { activities: composeActivities({ userId, assignments, tasks, courses, submittedAssignmentIds, now, dayEnd: end }), assignments, tasks, now, date: requestedDate };
+    return { ...await readActivityContext(this.dependencies.repository, userId, now, end, includeArchivedCourses), now, date: requestedDate };
   }
   async getActivityList(userId: string, filters: { courseId?: string; status?: ActivitySummary['status']; offsetMinutes?: number } = {}): Promise<readonly ActivitySummary[]> {
     const { activities } = await this.activityContext(userId, undefined, filters.offsetMinutes);
@@ -108,7 +105,7 @@ export class ExperienceService {
     return activities.map(a=>({...a,hasGeneratedDraft:drafts.some(d=>d.summary.activityId===a.id)})).filter(a => (!filters.courseId || a.course?.id === filters.courseId) && (!filters.status || a.status === filters.status));
   }
   async getActivityDetail(userId: string, activityId: string): Promise<ActivityDetail> {
-    const context = await this.activityContext(userId);
+    const context = await this.activityContext(userId, undefined, 0, true);
     const activity = requireFound(context.activities.find(a => a.id === activityId));
     const assignment = context.assignments.find(a => `canvas:${a.id}` === activityId);
     const task = context.tasks.find(t => t.id === activity.taskId);
@@ -126,7 +123,7 @@ export class ExperienceService {
   }
   /** Re-resolve an attachment against owner-scoped synced assignment/file rows before download. */
   async getActivityAttachmentDownload(userId: string, activityId: string, key: string) {
-    const context = await this.activityContext(userId);
+    const context = await this.activityContext(userId, undefined, 0, true);
     const activity = requireFound(context.activities.find(item => item.id === activityId));
     const assignment = context.assignments.find(row => `canvas:${row.id}` === activity.id);
     if (!assignment || !activity.course) throw new ExperienceFailure(404, 'not_found');

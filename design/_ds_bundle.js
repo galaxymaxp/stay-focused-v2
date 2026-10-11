@@ -1164,7 +1164,7 @@ function FreeGap({
 }
 const NOW_TASK = {
   title: "Draft Chapter 3 — Methodology",
-  course: "CS 198 · Thesis",
+  course: "CIT 6 · Capstone",
   timeLabel: "2:00 – 3:30 PM",
   timeLeft: "1h 12m left",
   progress: 0.32,
@@ -1191,8 +1191,8 @@ const LATER = [{
   time: "7:30",
   endTime: "8:00",
   tone: "accent",
-  course: "CS 198",
-  title: "Office hours — thesis adviser",
+  course: "CIT 6",
+  title: "Office hours — capstone adviser",
   meta: "Zoom"
 }];
 const DONE = [{

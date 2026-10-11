@@ -33,6 +33,22 @@ const run = (api: Api, scope = "all", signal = new AbortController().signal) =>
   performCanvasRefresh(api, scope, signal, () => {}, tick);
 
 describe("explicit Canvas refresh", () => {
+  it("excludes concluded courses even when they remain selected and selectable", async () => {
+    const { api, calls } = fixture(path => path.endsWith('/courses') ? {
+      courses: [{ id: 'old', selectable: true, classification: 'past_or_concluded' }, { id: 'course-1', selectable: true, classification: 'likely_current' }],
+      selectedCourseIds: ['old', 'course-1'],
+    } : undefined);
+    expect(await run(api)).toBe('synced');
+    expect(calls.filter(call => call.options?.method === 'POST').map(call => call.path)).toEqual(['/api/canvas/courses/course-1/sync', '/api/canvas/courses/course-1/grades/sync']);
+  });
+  it("never labels a partial Canvas snapshot as up to date", async () => {
+    const { api } = fixture((path, options) => options?.method === 'POST' ? { id: path, status: 'succeeded', outcome: 'partial' } : undefined);
+    expect(await run(api)).toBe('partial');
+  });
+  it("retains partial outcomes returned during polling", async () => {
+    const { api } = fixture((path, options) => options?.method === 'POST' ? { id: path.endsWith('grades/sync') ? 'grades' : 'content', status: 'queued' } : path.includes('/sync-jobs/') ? { id: path.split('/').at(-1), status: 'succeeded', outcome: 'partial' } : undefined);
+    expect(await run(api)).toBe('partial');
+  });
   it("syncs only selected, selectable courses and reports both successful jobs", async () => {
     const { api, calls } = fixture();
     expect(calls).toHaveLength(0);

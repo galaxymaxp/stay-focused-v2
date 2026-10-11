@@ -46,6 +46,25 @@ function job(
 const input = { apiBaseUrl: "https://api.example", accessToken: "token" };
 
 describe("account Canvas sync", () => {
+  it("skips concluded courses that remain selected for saved study materials", () => {
+    expect(selectedSyncCourses(inventory([course('old', { classification: 'past_or_concluded' }), course('current')], ['old', 'current']))).toEqual([{ id: 'current', displayName: 'Course current' }]);
+  });
+  it("bounds account admissions to one content/grade pair and preserves rejected requests", async () => {
+    let active = 0;
+    let maximum = 0;
+    const startCourse = vi.fn(async (course: { id: string }, type: 'course_content' | 'course_grades') => {
+      active++; maximum = Math.max(maximum, active);
+      await Promise.resolve();
+      active--;
+      if (course.id === 'b' && type === 'course_grades') throw new Error('offline');
+      return { ok: true as const, data: job(`${course.id}:${type}`, 'succeeded', 'success', course.id, type) };
+    });
+    const result = await startAccountCanvasSync(input, { listCourses: async () => ({ ok: true, data: inventory([course('a'), course('b')], ['a', 'b']) }), startCourse });
+    expect(maximum).toBe(2);
+    expect(result.phase).toBe('partial');
+    expect(result.jobs).toHaveLength(3);
+    expect(result.rejected).toEqual([{ courseId: 'b', code: 'network_error' }]);
+  });
   it("refreshes only selected, selectable courses and never changes the selection", async () => {
     const payload = inventory([course("a"), course("b", { selectable: false }), course("c")], ["a", "b"]);
     expect(selectedSyncCourses(payload).map((item) => item.id)).toEqual(["a"]);

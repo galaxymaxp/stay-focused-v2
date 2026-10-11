@@ -794,7 +794,7 @@ is the section above.
 - Added an implementation-focused engine contract covering public types, stage
   boundaries, provider requests, schema family, verification, retries, and
   current limitations.
-- Updated the repository README, thesis overview, and eval README with the
+- Updated the repository README, capstone overview, and eval README with the
   completed pipeline status and capstone context.
 
 ### OpenAI Provider Adapter Boundary
@@ -1435,7 +1435,7 @@ Latest full verification through pipeline integration on 2026-06-15:
 ### 2026-07-04 Documentation status and roadmap refresh
 
 - Refreshed `README.md`, `docs/current-state.md`, `docs/roadmap.md`,
-  `docs/ai/current_sprint.md`, supporting architecture/eval docs, thesis
+  `docs/ai/current_sprint.md`, supporting architecture/eval docs, capstone
   overview, and this handoff so they match local HEAD at baseline `ebb79d8`.
 - Canonical current state is now `docs/current-state.md`; canonical roadmap is
   `docs/roadmap.md`; canonical current sprint is `docs/ai/current_sprint.md`.
@@ -1551,7 +1551,7 @@ Latest full verification through pipeline integration on 2026-06-15:
 
 - Added engine contract documentation.
 - Added ADR-004 for the completed Stage 0 through Stage 6 pipeline.
-- Updated the repository README, thesis overview, and eval README.
+- Updated the repository README, capstone overview, and eval README.
 - Current eval total: 176 passed, 0 failed.
 - Direct TypeScript 5.8.3 source/eval typechecks and builds passed.
 - npm remains unavailable on `PATH`; `npm install`, `npm run typecheck`, and
@@ -2133,10 +2133,10 @@ Current route status:
 - P1 work covers remote preservation, safe reconciliation of four linked
   migration version aliases before new schema, coherent cached-reviewer
   offline access, final physical-device acceptance, deployment-to-commit
-  provenance, canonical/thesis reconciliation, and live-artifact privacy review.
+  provenance, canonical/capstone reconciliation, and live-artifact privacy review.
 - Final sequence: R5 task/study-plan domain foundation; R6 mobile task/schedule
   experience; R7 limited offline study access; R8 navigation/accessibility
-  hardening; R9 final hosted/device acceptance; R10 thesis/privacy/demo
+  hardening; R9 final hosted/device acceptance; R10 capstone/privacy/demo
   hardening; R11 final release baseline.
 - R4 fresh verification: clean starting Git state, preservation refs retained,
   `git fetch --prune`, `git diff --check`, and `git fsck --full` passed; hosted

@@ -80,7 +80,7 @@ export function TodayScreen() {
     "/api/experience/announcements?limit=20",
     60000,
   );
-  const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 60000);
   const focused = useIsFocused();
   const client = useExperienceClient();
   // No pull-to-refresh on Today: coming back to it is the refresh.

@@ -20,7 +20,8 @@ const sourceList: CanvasReviewerSourceList = { courseId: course.id, courseName: 
 const payload = { reviewer: { title: 'Cells', metadata: { provider_id: 'private', prompt: 'private' }, sections: [{ id: 's1', title: 'Cells', plannedSectionId: 'private', items: [{ id: 'i1', title: 'Cell', sourceCore: { explanation: 'Cells contain genetic material.', keyPoints: ['Cells are living units.'], evidence: [{ kind: 'formula', text: 'a + b' }, { kind: 'table', text: '| a | b |' }] }, enrichment: { note: 'private' } }] }] }, sourceSnapshotId: 'snapshot' };
 type TestData = Partial<{ [T in ExperienceTable]: readonly Partial<ExperienceRow<T>>[] }>;
 function service(data: TestData = {}, materials = vi.fn(async () => ({ ok: true as const, value: sourceList }))) {
-  const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T) { return (data[table] ?? []) as unknown as readonly ExperienceRow<T>[]; } };
+  const selectedData: TestData = { canvas_course_sync_preferences: (data.canvas_courses ?? []).map(c => ({ id: `preference:${c.id}`, user_id: c.user_id, canvas_connection_id: c.canvas_connection_id, course_id: c.id, selected: true })), ...data };
+  const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T) { return (selectedData[table] ?? []) as unknown as readonly ExperienceRow<T>[]; } };
   return { api: new ExperienceService({ repository, materials, now: () => now }), materials };
 }
 function activities(tasks: readonly TaskRow[] = [task], assignments: readonly CanvasAssignmentRow[] = [assignment]) {

@@ -22,6 +22,36 @@ Commit author was reset and verified as galaxymaxp; implementation commit is
 `145e505`. Proceed with draft PR review; keep production rollout pending dev and
 physical acceptance. No production schema or code deployment in this slice. See [acceptance evidence](ai/acceptance/study-reviewer-quiz-polish-20261010.md).
 
+## Task and planner sync reliability (2026-10-10)
+
+Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
+merge immediately, and publish the existing API, website and Android preview.
+
+The canonical activity model now checks course selection, stored course end/state,
+assignment availability and submission evidence for both clients and the planner.
+Imported Canvas tasks retain their course identity and current assignment deadline.
+Submitted work moves to Completed, is never overdue, and is excluded from planning;
+planned sessions reflect the linked activity state. Deselected/ended courses and
+orphaned imports do not return as personal tasks. Saved work is preserved.
+
+Website Tasks consumes the complete canonical activity list; Tasks, Today and
+Schedule expose explicit content+grades Sync now and poll persisted data every
+minute. Per-course website sync now includes grades. Partial sync outcomes remain
+partial. Android refresh admissions are bounded to one content/grades pair.
+Opening Tasks/Today/Schedule does not create Canvas jobs; the existing once-per-load Generate refresh is preserved. Automatic five-minute Canvas polling
+is still the separate, pending notification activation scope.
+
+FRESH PASS: API 1,275 tests (3 skipped), focused final activity/planning regression
+162 tests, web 69 tests, mobile sync/screens 68 tests, root production builds 8/8,
+root lint 8/8 (four existing mobile warnings), root typecheck 8/8 (changed apps fresh;
+unmodified packages cached). Read-only live database checks passed and found four
+pending local imports with submitted Canvas evidence. Android preview OTA
+25edeaae-9365-4ffa-acb2-f84123430983 is published for runtime 2.0.1.
+
+API/website publication and main integration are being completed. Physical device
+acceptance is NOT RUN: no ADB device or browser surface is exposed. See
+[acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+
 ## Website completion and main integration (2026-10-08)
 
 Owner-authorized finite scope: finish Claude's pending web changes, verify the
@@ -2300,7 +2330,7 @@ Exit criteria:
 
 Immediate dependency: Phase 5 Canvas integration and Phase 4 saved content.
 
-## Phase 7 - Polish, Deployment, And Thesis Validation
+## Phase 7 - Polish, Deployment, And Capstone Validation
 
 Status: Pending
 
@@ -2315,7 +2345,7 @@ Major deliverables:
 - Navigation and UI polish
 - Performance testing
 - User testing
-- Thesis evidence
+- Capstone evidence
 - Production readiness
 
 Exit criteria:
@@ -2323,7 +2353,7 @@ Exit criteria:
 - Production deployment is validated with safe environment separation.
 - Mobile auth flows are complete, including OAuth redirects if kept in scope.
 - Accessibility, performance, and user-testing evidence are documented.
-- Thesis evidence reflects the implemented product accurately.
+- Capstone evidence reflects the implemented product accurately.
 
 Immediate dependency: Phases 3 through 6 complete enough to validate an end-to-end
 student workflow.

@@ -1,4 +1,5 @@
 "use client";
+import { CanvasRefreshStatus, useCanvasRefresh } from "../../lib/canvas-refresh";
 import type {
   ActivitySummary,
   ExperienceCapabilities,
@@ -85,7 +86,9 @@ export function TodayScreen() {
   );
   const activities = useResource<{ items: ActivitySummary[] }>(
     `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+    60000,
   );
+  const canvasRefresh = useCanvasRefresh("all", () => { today.refresh(); activities.refresh(); announcements.refresh(); }, false);
   const { prefs, pin, hide, read } = useListPreferences();
   const meta = session?.user.user_metadata ?? {};
   const displayName = [meta.full_name, meta.name].find(
@@ -262,6 +265,7 @@ export function TodayScreen() {
           </Link>
         }
       />
+      <CanvasRefreshStatus refresh={canvasRefresh} />
       <div className="today-v2">
         <div className="stack today-clock-column">
           <section className="surface stack today-clock-card">

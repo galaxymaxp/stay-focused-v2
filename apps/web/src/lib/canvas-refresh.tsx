@@ -8,7 +8,14 @@ import {
   type RefreshProgress,
 } from "./canvas-refresh-core";
 
-export function useCanvasRefresh(scope: string, onSynced: () => void) {
+/**
+ * Scopes refreshed in this page load. Opening or reloading Generate (or a
+ * course in it) asks Canvas for the latest once, the web's pull-to-refresh;
+ * moving around inside the app does not repeat it.
+ */
+const refreshedThisLoad = new Set<string>();
+
+export function useCanvasRefresh(scope: string, onSynced: () => void, auto = true) {
   const { api, session } = useAuth();
   const owner = session?.user.id ?? "";
   const identity = `${owner}:${scope}`;
@@ -53,7 +60,10 @@ export function useCanvasRefresh(scope: string, onSynced: () => void) {
       );
       if (!controller.signal.aborted) {
         setState((old) => ({ ...old, phase }));
-        if (phase === "synced" || phase === "partial") synced.current();
+        if (phase === "synced" || phase === "partial" || phase === "unconfirmed") {
+          synced.current();
+          window.dispatchEvent(new Event("sf:task-state-changed"));
+        }
       }
     } catch {
       if (!controller.signal.aborted)
@@ -62,6 +72,20 @@ export function useCanvasRefresh(scope: string, onSynced: () => void) {
       if (active.current === controller) active.current = null;
     }
   }, [api, identity, owner, scope]);
+  useEffect(() => {
+    if (!auto || !owner) return;
+    // A course needs no second request when the whole account just refreshed.
+    if (refreshedThisLoad.has(identity) || refreshedThisLoad.has(`${owner}:all`)) return;
+    refreshedThisLoad.add(identity);
+    let settled = false;
+    void sync().finally(() => {
+      settled = true;
+    });
+    // A refresh cut short (navigation, or React's development remount) may run again.
+    return () => {
+      if (!settled) refreshedThisLoad.delete(identity);
+    };
+  }, [auto, identity, owner, sync]);
   return {
     ...(state.identity === identity
       ? state

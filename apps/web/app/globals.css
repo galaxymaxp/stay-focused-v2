@@ -2984,9 +2984,6 @@ mark.find-active {
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
   animation: bar-rise var(--spring-duration) var(--ease-spring);
 }
-.reviewer-layout.picking {
-  padding-bottom: 200px;
-}
 .pick-count {
   padding: 0 8px;
   font-weight: 650;
@@ -4722,3 +4719,53 @@ mark.find-active {
 }
 
 .primary .tile-spinner { border-color: currentColor; border-top-color: transparent; }
+
+/* The floating key-point bar never hides the points it acts on. */
+.reviewer-layout.picking {
+  padding-bottom: 120px;
+}
+@media (max-width: 760px) {
+  .reviewer-layout.picking {
+    padding-bottom: 240px;
+  }
+}
+/* ---------- Generate course groups ---------- */
+.course-group {
+  gap: 10px;
+}
+.course-group > .kicker {
+  margin: 8px 0 0;
+}
+.course-sync-line {
+  color: var(--muted);
+}
+.unsynced-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 10px;
+  color: var(--secondary);
+  font-weight: 550;
+}
+.unsynced-toggle .icon {
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+  transition: transform var(--spring-duration) var(--ease-spring);
+}
+.unsynced-toggle[aria-expanded="true"] .icon {
+  transform: none;
+}
+.course-card.unsynced {
+  background: transparent;
+  border-style: dashed;
+}
+.course-card.unsynced:hover {
+  box-shadow: none;
+}
+.course-card.unsynced button {
+  min-height: 36px;
+  padding: 6px 14px;
+}

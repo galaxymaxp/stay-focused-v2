@@ -1,7 +1,8 @@
 "use client";
 import type {
-  CourseSummary,
   CourseMaterials,
+  GenerateCourseList,
+  GenerateCourseSummary,
   LearningMaterial,
   CourseLearningWorkspace,
   FeatureCapability,
@@ -18,6 +19,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { courseIdentity } from "../app-model/courseIdentity";
+import {
+  generateCourseDestination,
+  generateCourseGroups,
+  generateCourseStatus,
+} from "../app-model/presentation";
 import { CourseMark } from "../components/course";
 import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
@@ -30,25 +37,77 @@ import {
   State,
 } from "../components/ui";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
+import { performCanvasRefresh } from "../lib/canvas-refresh-core";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 type Resource<T> = ReturnType<typeof useResource<T>>;
+type CourseSyncRun = "syncing" | "synced" | "partial" | "failed";
+/**
+ * Synced courses open their materials, grouped by term as in the app. Courses
+ * that are not synced (or whose last sync did not finish) never open an empty
+ * workspace: they wait in their own section with a Sync button.
+ */
 export function GenerateScreen() {
-  const courses = useResource<{ items: CourseSummary[] }>(
-      "/api/experience/courses",
-    ),
-    [search, setSearch] = useState("");
+  const { api } = useAuth();
+  const courses = useResource<GenerateCourseList>("/api/experience/courses"),
+    [search, setSearch] = useState(""),
+    [runs, setRuns] = useState<Record<string, CourseSyncRun>>({}),
+    [showUnsynced, setShowUnsynced] = useState(false);
   const canvas = useCanvasRefresh("all", courses.refresh);
-  const filtered =
-    courses.data?.items.filter((c) =>
-      `${c.name} ${c.code ?? ""}`.toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
+  const query = search.trim().toLowerCase();
+  const all = courses.data?.items ?? [];
+  const filtered = query
+    ? all.filter((c) => {
+        const identity = courseIdentity(c);
+        return [c.name, c.code, identity.title, identity.subtitle, identity.monogram]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(query));
+      })
+    : all;
+  const synced = filtered.filter((c) => generateCourseDestination(c) === "generate");
+  const unsynced = filtered.filter((c) => generateCourseDestination(c) === "sync");
+  const groups = generateCourseGroups(synced);
+
+  async function syncCourse(id: string) {
+    setRuns((old) => ({ ...old, [id]: "syncing" }));
+    try {
+      // Syncing a course selects it in Canvas first, as in the app.
+      const inventory = await api<{ selectedCourseIds: string[] }>("/api/canvas/courses", { envelope: "root" });
+      if (!inventory.selectedCourseIds.includes(id))
+        await api("/api/canvas/course-preferences", {
+          method: "PUT",
+          body: { selectedCourseIds: [...inventory.selectedCourseIds, id] },
+          envelope: "root",
+        });
+      const phase = await performCanvasRefresh(api, id, new AbortController().signal, () => undefined);
+      setRuns((old) => ({ ...old, [id]: phase === "synced" ? "synced" : phase === "partial" ? "partial" : "failed" }));
+    } catch {
+      setRuns((old) => ({ ...old, [id]: "failed" }));
+    }
+    courses.refresh();
+  }
+
+  const card = (c: GenerateCourseSummary) => {
+    const identity = courseIdentity(c);
+    const counts = [
+      c.materialCount === null ? null : `${c.materialCount} ${c.materialCount === 1 ? "material" : "materials"}`,
+      c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
+    ].filter(Boolean);
+    return (
+      <Link key={c.id} href={`/generate/${c.id}`} className="course-card" title={c.name}>
+        <CourseMark course={c} identity={identity} size={44} />
+        <span className="grow">
+          <strong>{identity.title}</strong>
+          <span className="meta">{[identity.subtitle, ...counts].filter(Boolean).join(" · ")}</span>
+          <span className="meta course-sync-line">{generateCourseStatus(c)}</span>
+        </span>
+        <Icon name="chevron-right" />
+      </Link>
+    );
+  };
   return (
     <>
-      <Heading
-        title="Generate"
-        subtitle="Study tools from your Canvas materials."
-      />
+      <Heading title="Generate" subtitle="Canvas material or your own notes." />
       <div className="stack">
         <div className="row wrap generate-tools">
           <label className="grow">
@@ -79,31 +138,70 @@ export function GenerateScreen() {
             </span>
             <Icon name="chevron-right" />
           </Link>
-          {filtered.map((c) => (
-            <Link key={c.id} href={`/generate/${c.id}`} className="course-card">
-              <CourseMark course={c} size={44} />
-              <span className="grow">
-                <strong>{c.name}</strong>
-                <span className="meta">
-                  {[
-                    c.code,
-                    c.materialCount === null
-                      ? "Open course materials"
-                      : `${c.materialCount} ${c.materialCount === 1 ? "material" : "materials"}`,
-                    c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </span>
-              <Icon name="chevron-right" />
-            </Link>
-          ))}
         </div>
-        {courses.data && !filtered.length && (
-          <Empty title={search ? "No matching courses." : "No courses yet."}>
-            <Link href="/canvas">Connect Canvas and select your courses.</Link>
+        {groups.map((group) => (
+          <section key={group.key} className="stack course-group" aria-label={group.title}>
+            <h2 className="kicker">{group.title}</h2>
+            <div className="course-grid">{group.items.map(card)}</div>
+          </section>
+        ))}
+        {unsynced.length > 0 && (
+          <section className="stack course-group unsynced-group" aria-label="Not synced">
+            <button
+              className="subtle unsynced-toggle"
+              aria-expanded={showUnsynced || !!query}
+              onClick={() => setShowUnsynced((v) => !v)}
+            >
+              <Icon name="chevron-down" />
+              Not synced · {unsynced.length} {unsynced.length === 1 ? "course" : "courses"}
+            </button>
+            {(showUnsynced || !!query) && (
+              <div className="course-grid">
+                {unsynced.map((c) => {
+                  const identity = courseIdentity(c);
+                  const run = runs[c.id];
+                  return (
+                    <div key={c.id} className="course-card unsynced" title={c.name}>
+                      <CourseMark course={c} identity={identity} size={44} />
+                      <span className="grow">
+                        <strong>{identity.title}</strong>
+                        <span className="meta">
+                          {[identity.subtitle, c.termName].filter(Boolean).join(" · ") || "Canvas course"}
+                        </span>
+                        <span className="meta course-sync-line">
+                          {run === "syncing"
+                            ? "Syncing from Canvas…"
+                            : run === "failed"
+                              ? "Sync didn’t finish. Try again."
+                              : run === "partial"
+                                ? "Synced, with some parts still missing."
+                                : c.syncState === "sync_incomplete"
+                                  ? "Last sync didn’t finish"
+                                  : "Not synced yet"}
+                        </span>
+                      </span>
+                      <button
+                        className="primary"
+                        disabled={run === "syncing"}
+                        aria-label={`Sync ${identity.title}`}
+                        onClick={() => void syncCourse(c.id)}
+                      >
+                        {run === "syncing" ? "Syncing…" : c.syncState === "sync_incomplete" ? "Retry" : "Sync"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+        {courses.data && !synced.length && !unsynced.length && (
+          <Empty title={search ? "No matching courses." : "Sync Canvas to begin."}>
+            <Link href="/canvas">Connect Canvas, then sync a course to generate study tools from it.</Link>
           </Empty>
+        )}
+        {courses.data && !query && !synced.length && unsynced.length > 0 && (
+          <Notice>No course is synced yet. Sync one below to generate study tools from its materials.</Notice>
         )}
       </div>
     </>

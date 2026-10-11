@@ -5,10 +5,12 @@ import http from "node:http";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mkdir, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { createFixture, ids } from "./fixtures/web-api-fixture.mjs";
 const domain = createFixture();
 const generationFixture = process.argv.includes("--generation-fixture");
+const taskSyncOnly = process.argv.includes("--task-sync-only");
 const origin = "http://127.0.0.1:3410",
   backend = "http://127.0.0.1:3402",
   output = new URL("../.local/website-qa/", import.meta.url);
@@ -138,6 +140,7 @@ server.stderr.on("data", (chunk) => {
 let browser;
 let activePage;
 try {
+  checks: {
   let ready = false;
   for (let i = 0; i < 90; i++) {
     try {
@@ -241,6 +244,31 @@ try {
   await page.getByRole("button", { name: "Save task", exact: true }).click();
   await page.getByRole("link", { name: /Read study chapter/ }).waitFor();
   await capture("tasks-functional-mobile");
+  // An imported Canvas task's local row can still be pending. Tasks must use
+  // the canonical activity status/course instead of reconstructing that row.
+  const activityRoute = "**/api/experience/activities?**";
+  await page.route(activityRoute, async route => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.data.items.push({ id: "canvas:submitted-fixture", taskId: "imported-local-pending", title: "Submitted Canvas worksheet", course: { id: ids.course, code: "BIO", name: "Biology" }, dueAt: new Date(Date.now() - 86400000).toISOString(), status: "submitted", priority: "medium", estimatedMinutes: 60, submissionTypes: ["online_upload"], source: "canvas", isOverdue: false, urgency: "later", hasGeneratedDraft: false });
+    body.data.items.push({ ...body.data.items.at(-1), id: "canvas:pending-fixture", taskId: "imported-pending", title: "Open Canvas worksheet", status: "pending", urgency: "now", isOverdue: true });
+    await route.fulfill({ response, json: body });
+  });
+  await page.reload();
+  await page.getByRole("link", { name: /Open Canvas worksheet/ }).waitFor();
+  assert.equal(await page.getByRole("link", { name: /Submitted Canvas worksheet/ }).count(), 0);
+  assert((await page.locator(".task-line").filter({ hasText: "Open Canvas worksheet" }).locator(".course-cell").innerText()).includes("BIO"));
+  await page.getByRole("button", { name: "Completed", exact: true }).click();
+  await page.getByRole("link", { name: /Submitted Canvas worksheet/ }).waitFor();
+  assert(await page.locator(".task-line").filter({ hasText: "Submitted Canvas worksheet" }).getByRole("button").isDisabled());
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await capture("task-sync-canonical-desktop");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await capture("task-sync-canonical-mobile");
+  await page.unroute(activityRoute);
+  await page.getByRole("button", { name: "Now", exact: true }).click();
+  console.log("PASS canonical imported Canvas course/status on desktop and mobile web");
+
   await page.getByRole("link", { name: /Read study chapter/ }).click();
   await page.getByRole("button", { name: "Edit task", exact: true }).click();
   await page.getByLabel("Notes", { exact: true }).fill("Read and reflect.");
@@ -286,6 +314,23 @@ try {
   console.log(
     "PASS task create/edit/deadline and schedule preview/persistence",
   );
+  if (taskSyncOnly) {
+    await page.goto(`${origin}/canvas`);
+    const beforeSync = domain.counts.canvasWrites;
+    assert.equal(beforeSync, 0, "Opening Tasks/Today/Schedule silently created Canvas jobs");
+    await page.getByRole("button", { name: "Sync now", exact: true }).click();
+    await page.getByText("Up to date with Canvas", { exact: true }).waitFor();
+    assert.equal(domain.counts.canvasWrites, beforeSync + 2, "Canvas refresh did not sync both content and grades");
+    for (const surface of ["today", "tasks", "schedule"]) {
+      await page.goto(`${origin}/${surface}`);
+      await page.getByRole("button", { name: "Sync now", exact: true }).waitFor();
+    }
+    assert.equal(counts.paid, 0);
+    assert.deepEqual(errors, []);
+    await writeFile(new URL("task-sync-summary.json", output), JSON.stringify({ status: "PASS", checks: ["protected auth/bearer proxy", "canonical imported Canvas status and course", "submitted work in Completed only", "desktop/mobile web layout", "personal task create/edit", "schedule planning", "paired Canvas content/grades sync", "Sync now on Tasks/Today/Schedule"], counts: { ...counts, ...domain.counts } }, null, 2));
+    console.log("PASS task sync browser acceptance (desktop and mobile, zero paid requests)");
+    break checks;
+  }
   await page.goto(`${origin}/generate`);
   await page.getByRole("link", { name: /Study foundations/ }).click();
   await page.getByRole("link", { name: /Planning your study/ }).click();
@@ -591,9 +636,9 @@ try {
     .getByRole("button", { name: "Connect Canvas", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Sync course content", exact: true })
+    .getByRole("button", { name: "Sync now", exact: true })
     .click();
-  await page.getByText(/Study foundations: succeeded/).waitFor();
+  await page.getByText("Up to date with Canvas", { exact: true }).waitFor();
   const stored = await page.evaluate(() =>
     JSON.stringify({ ...localStorage, ...sessionStorage }),
   );
@@ -617,6 +662,21 @@ try {
   await page.getByText("Grade sync complete", { exact: true }).waitFor();
   assert.equal(domain.counts.canvasWrites, canvasWritesBeforeGrades + 1);
   console.log("PASS Canvas grades summary, assignment detail and grade sync");
+  // Opening (or reloading) Generate asks Canvas for the latest, once per load.
+  const canvasWritesBeforeRefresh = domain.counts.canvasWrites;
+  await page.goto(`${origin}/generate`);
+  await page.getByText("Up to date with Canvas", { exact: true }).waitFor({ timeout: 20000 });
+  assert(domain.counts.canvasWrites > canvasWritesBeforeRefresh, "Generate did not refresh Canvas on load");
+  const canvasWritesAfterRefresh = domain.counts.canvasWrites;
+  await page.getByRole("link", { name: /Study foundations/ }).click();
+  await page.getByRole("heading", { name: "Study foundations", exact: true }).waitFor();
+  assert.equal(domain.counts.canvasWrites, canvasWritesAfterRefresh, "In-app navigation repeated the Canvas refresh");
+  await page.goto(`${origin}/generate`);
+  await page.getByRole("heading", { name: "Current courses", exact: true }).waitFor();
+  assert.equal(await page.getByRole("link", { name: /Elective archive/ }).count(), 0, "An unsynced course opened like a synced one");
+  await page.getByRole("button", { name: /Not synced · 1 course/ }).click();
+  await page.getByRole("button", { name: "Sync Elective archive", exact: true }).waitFor();
+  console.log("PASS Generate refreshes Canvas once per page load");
   const screens = [
     ["today", "Up Next"],
     ["schedule", "Plan available time"],
@@ -770,6 +830,7 @@ try {
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report));
+  }
 } catch (error) {
   await writeFile(new URL("preview.log", output), log);
   if (activePage) {
