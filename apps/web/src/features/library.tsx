@@ -11,7 +11,7 @@ import type {
 } from "@stay-focused/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { courseIdentity } from "../app-model/courseIdentity";
 import {
   PERSONAL_LIBRARY_KEY,
@@ -508,6 +508,36 @@ export function ArtifactScreen({ id }: { id: string }) {
     </>
   );
 }
+function autoSize(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+}
+
+function DraftTextarea(props: ComponentPropsWithoutRef<"textarea">) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    if (ref.current) autoSize(ref.current);
+  }, [props.value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      autoSize(el);
+    });
+    observer.observe(el);
+    let alive = true;
+    void document.fonts.ready.then(() => { if (alive) autoSize(el); });
+    return () => { alive = false; observer.disconnect(); };
+  }, []);
+  return <textarea {...props} ref={ref} onChange={(event) => {
+    autoSize(event.currentTarget);
+    props.onChange?.(event);
+  }} />;
+}
+
 function DraftEditor({ draft }: { draft: ActivityDraft }) {
   const { api } = useAuth(),
     [content, setContent] = useState<ActivityDraftContent>({
@@ -544,9 +574,9 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
     };
   }, [dirty]);
   return (
-    <div className="reader stack">
-      <p className="meta">{dirty ? "Unsaved changes" : "Saved draft"}</p>
-      <label>
+    <div className="draft-layout">
+      <div className="draft-body stack">
+      <label id="draft-title">
         Draft title
         <input
           disabled={action.busy}
@@ -558,9 +588,9 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
         />
       </label>
       {content.sections.map((section, index) => (
-        <label key={section.id}>
+        <label key={section.id} id={`draft-section-${index}`}>
           {section.heading ?? `Section ${index + 1}`}
-          <textarea
+          <DraftTextarea
             aria-label={section.heading ?? `Section ${index + 1}`}
             disabled={action.busy}
             value={section.content}
@@ -577,9 +607,9 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
         </label>
       ))}
       {content.slides.map((slide) => (
-        <label key={slide.number}>
+        <label key={slide.number} id={`draft-slide-${slide.number}`}>
           {slide.title}
-          <textarea
+          <DraftTextarea
             aria-label={slide.title}
             disabled={action.busy}
             value={slide.body}
@@ -597,6 +627,21 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
           />
         </label>
       ))}
+      </div>
+      <aside className="draft-aside stack">
+        <nav className="stack" aria-label="Draft outline">
+          <h2>Outline</h2>
+          <a href="#draft-title">Draft title</a>
+          {content.sections.map((section, index) => (
+            <a key={section.id} href={`#draft-section-${index}`}>
+              {section.heading ?? `Section ${index + 1}`}
+            </a>
+          ))}
+          {content.slides.map((slide) => (
+            <a key={slide.number} href={`#draft-slide-${slide.number}`}>{slide.title}</a>
+          ))}
+        </nav>
+        <p className="meta" role="status">{dirty ? "Unsaved changes" : "Saved draft"}</p>
       {draft.warnings.length > 0 && (
         <Notice>
           Some sections need information from you. Check this draft against your
@@ -621,6 +666,7 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
         Save draft
       </button>
       {action.message && <Notice>{action.message}</Notice>}
+      </aside>
     </div>
   );
 }

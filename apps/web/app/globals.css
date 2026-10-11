@@ -4807,6 +4807,46 @@ mark.find-active {
 }
 
 /* Phone shell spacing remains the final override. */
+.draft-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 32px;
+  align-items: start;
+}
+.draft-body {
+  min-width: 0;
+}
+.draft-body label {
+  scroll-margin-top: 76px;
+}
+.draft-body textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: none;
+  overflow: hidden;
+}
+.draft-aside {
+  position: sticky;
+  top: 76px;
+  min-width: 0;
+}
+.draft-aside h2 {
+  font-size: 16px;
+}
+.draft-aside a {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1099px) {
+  .draft-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .draft-aside {
+    position: static;
+    order: -1;
+  }
+}
+
+/* Phone shell spacing remains the final override. */
 @media (max-width: 760px) {
   .main {
     padding: 16px 20px 120px;
