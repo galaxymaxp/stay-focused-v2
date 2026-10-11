@@ -18,6 +18,7 @@ import type {
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { schedulableCanvasAssignmentIds } from "@/lib/canvas-task-scheduling";
+import { isSubmittedCanvasSubmission } from "@/lib/experience/mappers";
 
 const TASK_COLUMNS =
   "id,user_id,title,notes,status,priority,due_at,estimated_minutes,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
@@ -245,7 +246,7 @@ export async function loadOwnedPlannerTasks(
   if (taskIds?.length === 0) return [];
   let query = client
     .from("tasks")
-    .select("id,title,due_at,estimated_minutes,priority,created_at")
+    .select("id,title,due_at,estimated_minutes,priority,created_at,canvas_assignment_row_id")
     .eq("user_id", userId)
     .eq("status", "pending")
     .order("created_at", { ascending: true })
@@ -253,7 +254,28 @@ export async function loadOwnedPlannerTasks(
   if (taskIds) query = query.in("id", [...taskIds]);
   const { data, error } = await query;
   if (error || !data) throw storageFailure("Tasks could not be prepared for planning.");
-  return data.map((row) => ({
+  // Imported tasks can remain pending after a later Canvas submission.
+  // Planning reads submission evidence without changing the task's status.
+  const linked = [...new Set(data.flatMap((row) =>
+    row.canvas_assignment_row_id ? [row.canvas_assignment_row_id] : [],
+  ))];
+  let handedIn = new Set<string>();
+  if (linked.length > 0) {
+    const submissions = await client
+      .from("canvas_assignment_submissions")
+      .select("assignment_id,submitted_at,excused,workflow_state,missing")
+      .eq("user_id", userId)
+      .in("assignment_id", linked);
+    if (submissions.error) throw storageFailure("Tasks could not be prepared for planning.");
+    handedIn = new Set(
+      (submissions.data ?? [])
+        .filter(isSubmittedCanvasSubmission)
+        .map((submission) => submission.assignment_id),
+    );
+  }
+  return data
+    .filter((row) => !row.canvas_assignment_row_id || !handedIn.has(row.canvas_assignment_row_id))
+    .map((row) => ({
     id: row.id,
     title: row.title,
     dueAt: row.due_at,
