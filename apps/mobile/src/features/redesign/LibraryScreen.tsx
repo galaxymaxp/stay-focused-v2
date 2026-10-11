@@ -8,7 +8,7 @@ import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Platform, TextInput, View, useWindowDimensions } from "react-native";
+import { Alert, Platform, View, useWindowDimensions } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
 import { useAuth } from "../../auth";
@@ -40,6 +40,7 @@ import { arrangeList } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
 import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
 import { ExportSheet } from '../export/ExportSheet';
+import { DraftInput } from "./DraftInput";
 
 const LOCAL_PAGE_SIZE = 50;
 const GRID_GAP = 12;
@@ -473,9 +474,9 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
   useEffect(() => { if (!dirty || busy) return; const timer = setTimeout(() => void save(), 700); return () => clearTimeout(timer); }, [content, dirty, busy]);
   return (
     <View style={{ gap: 16 }}>
-      <TextInput
+      <DraftInput
         accessibilityLabel="Draft title"
-        multiline
+        minHeight={52}
         value={content.title}
         editable={!busy}
         style={[inputStyle, { fontSize: 26, lineHeight: 33, textAlignVertical: "top" }]}
@@ -488,12 +489,12 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
       {content.sections.map((section, index) => (
         <View key={section.id} style={{ gap: 8 }}>
           <Copy size="h3">{section.heading}</Copy>
-          <TextInput
+          <DraftInput
             accessibilityLabel={section.heading ?? `Section ${index + 1}`}
             multiline
             editable={!busy}
             value={section.content}
-            style={[inputStyle, { minHeight: 160, textAlignVertical: "top" }]}
+            style={inputStyle}
             onChangeText={(text) => {
               setDirty(true);
               setContent((old) => ({
@@ -509,7 +510,7 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
       {content.slides.map((slide, index) => (
         <View key={slide.number} style={{ gap: 8 }}>
           <Copy size="h3">{slide.title}</Copy>
-          <TextInput
+          <DraftInput
             accessibilityLabel={`Slide ${slide.number}`}
             multiline
             editable={!busy}
