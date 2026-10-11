@@ -6,18 +6,40 @@ import type {
   StudyPlanningRequest,
 } from "@stay-focused/shared/task-planning";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CourseDot } from "../components/course";
 import { useAuth } from "../components/providers";
 import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel, localDate, timeLabel } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
 import { setWorkDone } from "../lib/complete-work";
+import { fromTimeInput, readFreeTime, toTimeInput, writeFreeTime } from "./day-clock/free-time-store";
+import { planningRequest } from "./day-clock/timeline";
 export function ScheduleScreen() {
   const { api } = useAuth(),
     [date, setDate] = useState(localDate()),
     [from, setFrom] = useState("09:00"),
     [to, setTo] = useState("11:00");
+  const [sharedWindow, setSharedWindow] = useState(false);
+  useEffect(() => {
+    const saved = readFreeTime(date);
+    setFrom(saved ? toTimeInput(saved.start) : "09:00");
+    setTo(saved ? toTimeInput(saved.end) : "11:00");
+    setSharedWindow(!!saved);
+  }, [date]);
+  const fromMinutes = fromTimeInput(from);
+  // Today's clock allows the window to end at the next local midnight.
+  const toMinutes = to === "00:00" ? 1440 : fromTimeInput(to);
+  const validWindow = Number.isFinite(fromMinutes) && Number.isFinite(toMinutes) && toMinutes > fromMinutes;
+  function changeWindow(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom);
+    setTo(nextTo);
+    clear();
+    const value = { start: fromTimeInput(nextFrom), end: nextTo === "00:00" ? 1440 : fromTimeInput(nextTo) };
+    writeFreeTime(date, value);
+    const saved = readFreeTime(date);
+    setSharedWindow(saved?.start === value.start && saved?.end === value.end);
+  }
   const start = new Date(`${date}T00:00:00`),
     end = new Date(start);
   end.setDate(end.getDate() + 7);
@@ -79,7 +101,7 @@ export function ScheduleScreen() {
         title="Schedule"
         subtitle={
           sessions.data
-            ? `${planned} planned ${planned === 1 ? "block" : "blocks"}${activities.data ? ` · ${dueThisWeek} due this week` : activities.error ? " · Deadlines unavailable" : " · Loading deadlines…"}`
+            ? `${planned} planned ${planned === 1 ? "block" : "blocks"}${activities.data ? ` · ${dueThisWeek} due this week` : activities.error ? " · Deadlines unavailable" : " · Loading deadlines…"}${planned === 0 ? " · Plans from Today show here after you save them" : ""}`
             : "Make room for what matters."
         }
         back="/today"
@@ -258,8 +280,7 @@ export function ScheduleScreen() {
                 required
                 value={from}
                 onChange={(e) => {
-                  setFrom(e.target.value);
-                  clear();
+                  changeWindow(e.target.value, to);
                 }}
               />
             </label>
@@ -270,21 +291,16 @@ export function ScheduleScreen() {
                 required
                 value={to}
                 onChange={(e) => {
-                  setTo(e.target.value);
-                  clear();
+                  changeWindow(from, e.target.value);
                 }}
               />
             </label>
           <button
             className="primary"
-            disabled={action.busy || !from || !to || from >= to}
+            disabled={action.busy || !validWindow}
             onClick={() =>
               void action.run(async () => {
-                const range = {
-                  startsAt: new Date(`${date}T${from}`).toISOString(),
-                  endsAt: new Date(`${date}T${to}`).toISOString(),
-                };
-                const request = { planningRange: range, availability: [range] };
+                const request = planningRequest(date, fromMinutes, toMinutes);
                 setPreview({
                   plan: await api<DeterministicStudyPlan>(
                     "/api/study-plan/preview",
@@ -298,7 +314,8 @@ export function ScheduleScreen() {
             Preview study plan
           </button>
           </div>
-          {from >= to && (
+          {sharedWindow && <p className="meta">Same free time as Today.</p>}
+          {!validWindow && (
             <p className="meta">Choose an end time after the start.</p>
           )}
           {preview && (
@@ -335,7 +352,7 @@ export function ScheduleScreen() {
                   })
                 }
               >
-                Save schedule
+                Save to schedule
               </button>
             </div>
           )}

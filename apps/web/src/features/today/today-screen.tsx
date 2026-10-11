@@ -36,6 +36,7 @@ import { useResource } from "../../lib/hooks";
 import { setWorkDone } from "../../lib/complete-work";
 import { useListPreferences } from "../../lib/list-preferences";
 import { DayRingClock } from "../day-clock/DayRingClock";
+import { readFreeTime, writeFreeTime } from "../day-clock/free-time-store";
 import {
   clockLabel,
   formatFreeTime,
@@ -95,7 +96,6 @@ export function TodayScreen() {
   const firstName = displayName?.trim().split(/\s+/)[0];
 
   // Free time: remembered per day, otherwise wrapped around today's planned blocks.
-  const windowKey = `sf.today.free-time.${date}`;
   const [start, setStart] = useState(() =>
     Math.min(1410, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) * 15),
   );
@@ -104,20 +104,13 @@ export function TodayScreen() {
   const [locked, setLocked] = useState(false);
   useEffect(() => {
     setLocked(store.get(CLOCK_LOCK_KEY) === "1");
-    try {
-      const saved = JSON.parse(store.get(windowKey) ?? "null") as {
-        start?: unknown;
-        end?: unknown;
-      } | null;
-      if (saved && typeof saved.start === "number" && typeof saved.end === "number" && saved.end > saved.start) {
-        setStart(saved.start);
-        setEnd(saved.end);
-        setWindowKnown(true);
-      }
-    } catch {
-      /* Unreadable: fall back to the day's planned blocks below. */
+    const saved = readFreeTime(date);
+    setWindowKnown(!!saved);
+    if (saved) {
+      setStart(saved.start);
+      setEnd(saved.end);
     }
-  }, [windowKey]);
+  }, [date]);
   const planned = today.data?.timeline;
   useEffect(() => {
     if (windowKnown || !planned) return;
@@ -146,7 +139,7 @@ export function TodayScreen() {
     setPreview(null);
     setPreviewRequest(null);
     setWindowKnown(true);
-    store.set(windowKey, JSON.stringify({ start: from, end: to }));
+    writeFreeTime(date, { start: from, end: to });
   };
   async function plan(from: number, to: number) {
     if (busyRef.current || !plannerReady) return;
@@ -179,7 +172,7 @@ export function TodayScreen() {
       await api("/api/experience/planner/replan", { method: "POST", body: previewRequest });
       setPreview(null);
       setPreviewRequest(null);
-      setNote("Your schedule is updated.");
+      setNote("Saved. These blocks are on your Schedule.");
       today.refresh();
     } catch (error) {
       setNote(error instanceof Error ? error.message : "Could not update your schedule.");

@@ -24,7 +24,7 @@ function hourLabel(minutes: number) {
 /**
  * The planner's proposal drawn to scale across the free window: one block per
  * session, colored per task (matching the clock ring), empty space left empty.
- * Nothing changes until Apply.
+ * Nothing changes until Save to schedule.
  */
 export function PlanPreview({
   plan,
@@ -57,6 +57,15 @@ export function PlanPreview({
       <div className="row between">
         <h3>Proposed plan</h3>
         <span className="meta count-up">{formatFreeTime(planned)} planned</span>
+      </div>
+      <p className="meta">Not saved yet — save it to add these blocks to Schedule.</p>
+      <div className="row wrap">
+        <button className="primary" disabled={busy || plan.sessions.length === 0} onClick={onApply}>
+          Save to schedule
+        </button>
+        <button className="subtle" disabled={busy} onClick={onDiscard}>
+          Discard
+        </button>
       </div>
       <div
         className="plan-bar"
@@ -115,18 +124,6 @@ export function PlanPreview({
           {formatFreeTime(unscheduled)} more didn&apos;t fit
         </p>
       )}
-      <div className="row wrap">
-        <button className="subtle" disabled={busy} onClick={onDiscard}>
-          Discard
-        </button>
-        <button
-          className="primary"
-          disabled={busy || plan.sessions.length === 0}
-          onClick={onApply}
-        >
-          Apply plan
-        </button>
-      </div>
     </section>
   );
 }
