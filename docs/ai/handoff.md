@@ -2504,3 +2504,55 @@ draft editor (separate scope; not started).
 no push or deployment was requested, so production has not received this W1
 release. Content time estimates, grade estimator, generation on sync and
 inactivity gating remain excluded.
+
+
+## W2 - Website desktop layout (16:9, Library grid, Canvas search, draft editor, clear-day state) - 2026-10-11
+
+**Status:** PASS locally. All mandatory W2 gates and requested viewport checks passed. No push or deployment.
+
+**Commits:**
+
+- e833536 style(web): full-width shell that fits 16:9 fullscreen and short laptop screens
+- 3642654 style(web): equal-height Library course and item cards
+- 2abe801 feat(web): search Canvas courses and separate other Canvas spaces
+- 5ae9b6b feat(web): desktop draft editor with outline and auto-growing sections
+- 7a520ba feat(web): clear-day illustration for empty Today sections
+- 14b12c4 fix(web): stretch clear-day panels and center reading layouts
+
+**Changed files:** apps/web/app/globals.css; apps/web/src/components/clear-day.tsx; apps/web/src/features/canvas.tsx; apps/web/src/features/library.tsx; apps/web/src/features/today/today-screen.tsx; apps/web/src/features/today/today-calendar.tsx. Documentation: this appended handoff plus docs/current-state.md, docs/roadmap.md and docs/ai/current_sprint.md. Runtime changes are confined to apps/web; no API changes.
+
+**Adaptations from prompt:**
+
+- Continued in the existing owner-authorized isolated checkout C:/Projects/stay-focused-v2-website, branch website/functional-v1. W1's commits were present at 0a1590a. The dirty main checkout and two unrelated untracked website evidence directories were preserved.
+- DayRingClock uses .day-clock, already measured by ResizeObserver. Its desktop width is min(100%, 52vh, 420px), with the existing mobile clock rule preserved. No numeric-size hook or geometry change was needed. Mobile shell rules are repeated at the end so they win.
+- Centered capped reading/work surfaces and Settings without widening their readable measures. Reviewer grid tracks use justify-content: center because margin alone cannot center fixed-size tracks inside a full-width grid.
+- Library title tooltips use the full course name, while existing courseIdentity presentation remains unchanged.
+- Canvas inventory already projected classification as string. Main grouping uses persisted course.selected plus likely_current/past_or_concluded, retaining selected uncertain/unavailable spaces in the main list. Pending checkbox edits and saved-only material/grade/sync actions remain unchanged. Groups move after saving, not while ticking a checkbox. Search includes names and codes across both groups; the N of M count includes other spaces, and those spaces open during a nonempty search.
+- ArtifactScreen already rendered DraftEditor directly. Removed the editor's own .reader class, used stable section-index/slide-number anchors, and made the outline a sticky 300px aside at 1100px and above (single column through 1099px). Auto-sizing accounts for borders, content changes, width changes and loaded fonts; save/revision and leave guards are retained.
+- ClearDay uses existing theme color tokens, root radius/easing tokens, a compact calendar variant and reduced-motion-safe ray animation. Up Next remains the existing actionable row. Existing mobile shell/column behavior is retained with the requested new search, outline and empty-state additions.
+
+**Gates (FRESH):**
+
+- Baseline at 0a1590a: npm run typecheck --workspace apps/web PASS (exit 0); npm run lint --workspace apps/web PASS (exit 0, no warnings); npm run test --workspace apps/web PASS, 79 tests in 12 files.
+- Final implementation tree committed as 14b12c4: the same web typecheck and lint PASS (exit 0); web tests PASS, 79/79 across 12/12 files. No skipped or failing tests. git diff --check and staged diff hygiene PASS.
+- Browser acceptance PASS on the final implementation tree: isolated localhost Next preview at 3411 and fictional API/Auth at 3403, existing Playwright Chromium. No Playwright installation. External requests were blocked; zero browser exceptions and zero paid/generation calls. Fictional task/selection/draft writes never touched the real account.
+- Browser flows: name/code/case/whitespace search and zero matches, collapsed other spaces, selected uncertain space retained in main list, checkbox changes saved across search and reload, course sync; draft sections and slides resize without internal scrolling, long typing grows and shortening shrinks fields, outline anchors bypass the leave guard, cancelled navigation retains dirty content, two saves update revisions, and reload recovers saved text. Reduced motion disables the rays, normal motion enables cd-glow.
+- React review: row and textarea components are declared outside their parents; hooks are unconditional; resize/font callbacks clean up; strict types, accessible labels, keyboard links and existing authentication boundaries are retained.
+
+**Viewport check (FRESH):** Every cell includes no horizontal page scrolling. Desktop shells are centered at 1920/2560; screenshots are full-page captures.
+
+| Page | 1366x768 | 1536x864 | 1920x1080 | 2560x1440 | 390x844 | Note |
+| --- | --- | --- | --- | --- | --- | --- |
+| Today | PASS | PASS | PASS | PASS | PASS | Clock and proposed-plan heading visible together on small laptop; empty Later fills its desktop row beside Due soon. |
+| Schedule | PASS | PASS | PASS | PASS | PASS | Week view remains usable; narrow view keeps the existing internal week scroller without page overflow. |
+| Library | PASS | PASS | PASS | PASS | PASS | Mixed one/two-line course names and personal cards fill equal-height rows; searched item cards also match row heights. |
+| Library draft | PASS | PASS | PASS | PASS | PASS | Outline beside fields on desktop, above on mobile; existing long sections and slides have no textarea scrollbars. |
+| Canvas | PASS | PASS | PASS | PASS | PASS | Search filters both groups; other spaces collapsed when search is clear; selection/actions retained. |
+
+Light and dark Today were also captured and checked at all five sizes (10 additional captures). Tasks, Settings, Generate and Announcements passed the 1920x1080 sweep; Settings' capped grid is centered. Screenshot/report output is ignored under tmp/w2-screens/ via the local Git exclude. Do not commit those files. Reproduction scripts are ignored .local/w2-layout.mjs, .local/w2-body.mjs and .local/w2-fixture.mjs, derived from scripts/web-browser-check.mjs and its existing fixture.
+
+**Failed attempts and recovery:** The first local harness startup had a CRLF-sensitive assembly error; repaired before browser checks. Its first browser attempt lacked the Due soon fixture needed for a two-column assertion; added fictional deadlines. The next run caught the stretch rule applied to the draft grid instead of .today-split: corrected the selector and restored draft align-items: start. The final complete run passed without weakening checks. These failures were local setup/layout issues, not flaky gate results.
+
+**Known limits / follow-ups:** Visual acceptance uses Chromium and fictional local data, not a physical laptop or production deployment. Browser data is intentionally not real-account evidence. On 1366x768 the plan heading is above the fold; the entire plan can still extend below it. Very long drafts intentionally increase page height, with no textarea scroll. This work does not change backend estimates, grades, sync admission/automation or inactivity rules. The owner's real-account localhost preview was restored at port 3100 after the isolated checks; signed-in browser storage was not modified.
+
+**Next:** Owner review on laptop + fullscreen; then feature prompts (content-based estimates, grade estimator, sync automation) when scheduled. No remaining W2 implementation blockers.

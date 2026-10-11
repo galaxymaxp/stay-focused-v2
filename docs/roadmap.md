@@ -1,5 +1,17 @@
 # Roadmap
 
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally.** The website now supports the requested laptop/fullscreen
+layouts, uniform Library grids, searchable/grouped Canvas courses, a desktop
+draft editor with auto-growing fields, and theme-aware clear-day states.
+Fresh web typecheck/lint/79 tests and all 25 page/viewport checks pass, with
+additional light/dark, Canvas selection and draft persistence checks.
+Implementation tip `14b12c4`; evidence/adaptations are in the W2 handoff.
+No push/deployment. Next: owner review on laptop and fullscreen; content-based
+estimates, grade estimator, sync automation and inactivity gating await their
+separately scheduled scopes.
+
 ## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
 
 **PASS locally and in all six signed-in real-account checks.** Shared planner

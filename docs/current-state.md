@@ -1,5 +1,19 @@
 # Current State
 
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally.** On `website/functional-v1`, the centered 1760px shell and
+viewport-capped Today clock support laptop and fullscreen layouts. Library
+cards fill equal-height rows; Canvas has course search and collapsible other
+spaces; drafts have an outline and fields that grow with content; Today has
+theme-aware clear-day illustrations. Fresh web typecheck/lint and 79 tests
+pass. Isolated Playwright acceptance passed all 25 page/viewport checks,
+light/dark Today checks, draft save/resize/guard flows and Canvas filtering
+and selection persistence. Implementation: `e833536`, `3642654`, `2abe801`,
+`5ae9b6b`, `7a520ba`, `14b12c4`. Evidence is in the appended W2 handoff and
+ignored `tmp/w2-screens/`. No push/deployment. Next: owner review on laptop
+and fullscreen; separately scheduled feature prompts remain outside W2.
+
 ## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
 
 **PASS locally, including all six real-account checks.** Branch

@@ -1,5 +1,18 @@
 # Current Sprint
 
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally; finite W2 scope complete.** W1 commits are retained in the
+isolated website checkout. Shell/clock sizing, uniform Library cards, Canvas
+search/grouping, desktop draft outline/auto-growing textareas and clear-day
+illustrations are implemented. Fresh web typecheck/lint and 79/79 tests pass;
+25 requested page/viewport checks, both Today themes and browser interaction
+flows pass using isolated fictional API/Auth fixtures. Final implementation
+tip: `14b12c4`; per-step commits and adaptations are in the appended W2
+handoff. Screenshots/report: ignored `tmp/w2-screens/`. Unrelated files remain
+untouched. No push or deployment. Next: owner laptop/fullscreen review, then
+content-based estimates, grade estimator and sync automation when scheduled.
+
 ## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
 
 **PASS locally and against the signed-in real account.** Finite owner scope:
