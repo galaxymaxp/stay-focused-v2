@@ -3,7 +3,7 @@ The Today screen's focus card — the iOS-style answer to "what should I do righ
 ```jsx
 <NowHero
   title="Draft Chapter 3 — Methodology"
-  course="CS 198 · Thesis"
+  course="CIT 6 · Capstone"
   timeLabel="2:00 – 3:30 PM"
   timeLeft="1h 12m left"
   progress={0.32}

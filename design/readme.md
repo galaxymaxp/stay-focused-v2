@@ -2,7 +2,7 @@
 
 A design system for **Stay Focused V2**, an AI-powered, Canvas-integrated study
 productivity app. V2 is a **schedule-first, mobile-native rebuild** (Expo / React
-Native) with an outline-aware generation engine. CS thesis project by Fely Max
+Native) with an outline-aware generation engine. Capstone project by Fely Max
 Dilinila.
 
 The product exists to answer one question for a student: **"What should I do

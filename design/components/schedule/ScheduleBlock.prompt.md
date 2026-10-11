@@ -3,7 +3,7 @@ iOS grouped-list rows for the Today schedule. `ScheduleBlock` is a cell; wrap a 
 ```jsx
 <ScheduleGroup header="Later today" right="3 blocks">
   <ScheduleBlock time="3:30" endTime="4:00" tone="blue" course="MATH 211" title="Review series & sequences" meta="quiz Thu" onClick={open} />
-  <ScheduleBlock time="Now" tone="accent" state="now" course="CS 198" title="Draft thesis chapter 3" onClick={open} />
+  <ScheduleBlock time="Now" tone="accent" state="now" course="CIT 6" title="Draft capstone chapter 3" onClick={open} />
   <ScheduleBlock time="9:00" tone="green" state="done" title="Morning review" last />
 </ScheduleGroup>
 ```
