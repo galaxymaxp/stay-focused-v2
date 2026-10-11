@@ -48,7 +48,7 @@ Git integrity; and confirmed the hosted V2 `/api/health` endpoint.
 - `docs/current-state.md` and `docs/ai/current_sprint.md` still identify
   `codex/hosted-processing-prototype` at `1848805` as authoritative. R3
   superseded that statement: `main` at `cd070eb` is authoritative.
-- `docs/thesis/overview.md` describes OCR, Study Library, Canvas, scheduling,
+- `docs/capstone/overview.md` describes OCR, Study Library, Canvas, scheduling,
   and deployment as future work and still cites 266 engine cases. Actual code
   and the R3 baseline prove OCR, Study Library, Canvas, deployment, and 290
   deterministic cases; only task/study scheduling remains absent from that
@@ -60,7 +60,7 @@ Git integrity; and confirmed the hosted V2 `/api/health` endpoint.
   superseded by Vercel Workflow implementation and hosted acceptance.
 
 These contradictions do not invalidate the implementation, but canonical and
-thesis documentation must be corrected before defense.
+capstone documentation must be corrected before defense.
 
 ## 2. Git and remote preservation
 
@@ -360,7 +360,7 @@ a recorded physical-device matrix.
 | Hosted API | Available | R4 HTTP 200; Workflow code/deployment | Yes | Deploy final main and record revision/env separation |
 | Student-facing web UI | Missing by design | API root only; Expo Web is tooling | No | Post-capstone only if product scope changes |
 | RLS/owner authorization | Strong implemented baseline | 41 migrations, route guards, contract/live tests | Yes | Migration alias gate; final cross-user regression |
-| Thesis/demo evidence | Partial/outdated | Thesis/current-state documents contradict code/R3 | Yes | Reconcile narrative, privacy, demo script, results |
+| Capstone/demo evidence | Partial/outdated | Capstone/current-state documents contradict code/R3 | Yes | Reconcile narrative, privacy, demo script, results |
 
 ## 12. Real remaining gaps
 
@@ -439,11 +439,11 @@ a recorded physical-device matrix.
 - Acceptance: deployment evidence maps URL to commit, secrets remain
   server-only, health passes, Workflow completes, and rollback is documented.
 
-#### P1.6 Reconcile canonical/thesis/demo documentation
+#### P1.6 Reconcile canonical/capstone/demo documentation
 
 - Evidence: branch, commit, feature status, and engine-count contradictions in
-  current-state, current sprint, roadmap, thesis, and ADR history.
-- Minimum: update canonical current state/roadmap/sprint and thesis claims to
+  current-state, current sprint, roadmap, capstone, and ADR history.
+- Minimum: update canonical current state/roadmap/sprint and capstone claims to
   match the final code and explicitly bound offline, Canvas PAT, and mobile-only
   scope.
 - Acceptance: no document calls the old feature branch authoritative; the
@@ -616,10 +616,10 @@ rewrite:
 - Live/provider/device testing: required. Reuse R2 AI evidence unless final
   behavior changes require one controlled provider run.
 
-### R10 — Thesis, privacy, and demo hardening
+### R10 — Capstone, privacy, and demo hardening
 
 - Objective: make claims and evidence match the accepted product.
-- Scope: canonical state/roadmap/sprint, thesis chapters, architecture delta,
+- Scope: canonical state/roadmap/sprint, capstone chapters, architecture delta,
   artifact privacy manifest, demo script, failure fallback, evaluation tables,
   and user/performance observations appropriate to the defense.
 - Non-goals: product expansion.
@@ -627,7 +627,7 @@ rewrite:
 - Likely areas: `docs/`, approved evidence assets.
 - Verification: link/claim audit, evidence-to-commit mapping, privacy/secret
   scan, rehearsed bounded demo.
-- Acceptance: no stale branch/status claims and every thesis claim maps to
+- Acceptance: no stale branch/status claims and every capstone claim maps to
   code plus deterministic/live/device evidence.
 - Commit boundary: documentation/evidence only.
 - Live/provider/device testing: demo rehearsal required; no new paid AI run by

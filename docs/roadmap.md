@@ -2308,7 +2308,7 @@ Exit criteria:
 
 Immediate dependency: Phase 5 Canvas integration and Phase 4 saved content.
 
-## Phase 7 - Polish, Deployment, And Thesis Validation
+## Phase 7 - Polish, Deployment, And Capstone Validation
 
 Status: Pending
 
@@ -2323,7 +2323,7 @@ Major deliverables:
 - Navigation and UI polish
 - Performance testing
 - User testing
-- Thesis evidence
+- Capstone evidence
 - Production readiness
 
 Exit criteria:
@@ -2331,7 +2331,7 @@ Exit criteria:
 - Production deployment is validated with safe environment separation.
 - Mobile auth flows are complete, including OAuth redirects if kept in scope.
 - Accessibility, performance, and user-testing evidence are documented.
-- Thesis evidence reflects the implemented product accurately.
+- Capstone evidence reflects the implemented product accurately.
 
 Immediate dependency: Phases 3 through 6 complete enough to validate an end-to-end
 student workflow.
