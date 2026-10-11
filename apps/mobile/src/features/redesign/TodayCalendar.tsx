@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { PanResponder, Pressable, View } from "react-native";
 
 import { courseAccent, courseIdentity } from "../../design/courseIdentity";
+import { ClearDay } from "../../design/ClearDay";
 import { CourseMark } from "../../design/CourseViews";
 import { haptic } from "../../design/haptics";
 import { Copy, RowLink, Surface } from "../../design/primitives";
@@ -160,7 +161,7 @@ export function TodayCalendar({ items, onOpen }: { items: readonly ActivitySumma
             <Copy muted size="caption">{due.length ? `${due.length} due` : ""}</Copy>
           </View>
           {due.length === 0 ? (
-            <Copy muted size="bodySmall" style={{ paddingVertical: spacing[2] }}>Nothing due.</Copy>
+            <ClearDay compact title="Nothing due." detail="Enjoy the breathing room." />
           ) : (
             due.map((item) => <AgendaRow key={item.id} item={item} onPress={() => onOpen(item)} />)
           )}

@@ -116,6 +116,7 @@ vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () =>
 vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642, dayOrbTouch: { active: false } }));
 vi.mock("react-native", () => ({
   View: "View",
+  StyleSheet: { absoluteFillObject: { position: "absolute" } },
   ScrollView: "ScrollView",
   Pressable: "Pressable",
   TextInput: "TextInput",
@@ -151,6 +152,8 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-svg", () => ({
   default: "Svg",
+  Rect: "Rect",
+  G: "G",
   Circle: "Circle",
   Path: "Path",
   Line: "Line",
@@ -768,6 +771,19 @@ describe("B25 screen interactions", () => {
     expect(text).not.toMatch(/ free\b/);
     expect(text).not.toContain("Drag an end");
     expect(text).not.toContain("schedule has been updated");
+  });
+
+  it("fills a clear day with the illustration and brings its planning action back to the clock", async () => {
+    const root = await render(createElement(TodayScreen));
+    expect(copyText(root)).toContain("Your day is clear.");
+    expect(copyText(root)).toContain("Nothing due.");
+    const page = root.findAll((node) => String(node.type) === "Page")[0]!;
+    const scrollTo = vi.fn();
+    page.props.scrollRef.current = { scrollTo };
+    const action = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Plan your free time")!;
+    await act(async () => action.props.onPress());
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+    expect(mocks.request).not.toHaveBeenCalled();
   });
 
   it("locks the clock so the free time cannot be dragged, while blocks stay tappable", async () => {

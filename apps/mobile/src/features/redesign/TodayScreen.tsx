@@ -10,9 +10,10 @@ import { router } from "expo-router";
 import { EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, type ScrollView } from "react-native";
 
 import { haptic } from "../../design/haptics";
+import { ClearDay } from "../../design/ClearDay";
 import { courseAccent, courseIdentity } from "../../design/courseIdentity";
 
 import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
@@ -65,6 +66,7 @@ const orbTouchPause = {
 };
 
 export function TodayScreen() {
+  const scrollRef = useRef<ScrollView>(null);
   const { session } = useAuth();
   const displayName = [session?.user.userMetadata?.full_name, session?.user.userMetadata?.name].find(value => typeof value === "string" && value.trim()) as string | undefined;
   const firstName = displayName?.trim().split(/\s+/)[0];
@@ -304,6 +306,7 @@ export function TodayScreen() {
         day: "numeric",
       })}
       scrollEnabled={!ringActive}
+      scrollRef={scrollRef}
       scrollTouch={orbTouchPause}
     >
       <DayRingClock
@@ -390,7 +393,7 @@ export function TodayScreen() {
           {arranged.later.length ? (
             arranged.later.map((item) => swipeItem(item, { fill: colors.backgroundPrimary }))
           ) : (
-            <Copy muted size="bodySmall">Your day is clear. Make room for what matters.</Copy>
+            <ClearDay action={<Action secondary pill onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion })}>Plan your free time</Action>} />
           )}
           </View>
           {arranged.dueSoon.length > 0 && (
