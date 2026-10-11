@@ -71,6 +71,17 @@ export function matchesCourseQuery(course: CanvasCourseInventoryItem, query: str
     compactHaystack.includes(compact(query));
 }
 
+/** Selected spaces stay with the courses the student has chosen to sync. */
+export function splitSyncCourses(items: readonly CanvasCourseInventoryItem[]) {
+  const courses: CanvasCourseInventoryItem[] = [];
+  const otherSpaces: CanvasCourseInventoryItem[] = [];
+  for (const course of items) {
+    const isCourse = course.selected || course.classification === "likely_current" || course.classification === "past_or_concluded";
+    (isCourse ? courses : otherSpaces).push(course);
+  }
+  return { courses, otherSpaces };
+}
+
 /**
  * Search shows every match immediately. Without a search, only the first few
  * courses show until the student asks for the rest.

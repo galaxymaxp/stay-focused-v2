@@ -24,7 +24,7 @@ import {
   type CanvasCourseInventoryItem,
 } from "../../services/canvasApi";
 import { useCanvasSync } from "./CanvasSyncProvider";
-import { orderSyncCourses, syncRowState, visibleSyncCourses, type SyncRowState } from "./canvasSyncPresentation";
+import { matchesCourseQuery, orderSyncCourses, splitSyncCourses, syncRowState, visibleSyncCourses, type SyncRowState } from "./canvasSyncPresentation";
 
 type Load =
   | { readonly state: "loading" }
@@ -71,6 +71,7 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [otherSpacesExpanded, setOtherSpacesExpanded] = useState(false);
   const [options, setOptions] = useState<CanvasCourseInventoryItem | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const request = useCallback(() => {
@@ -126,8 +127,10 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
     () => (load.state === "connected" ? orderSyncCourses(load.courses, focusCourseId) : []),
     [focusCourseId, load],
   );
-  const visible = visibleSyncCourses(ordered, query, expanded);
-  const hasFailedCourse = visible.items.some((course) => courseStates[course.id] === "failed");
+  const matches = ordered.filter((course) => matchesCourseQuery(course, query));
+  const groups = splitSyncCourses(matches);
+  const visible = visibleSyncCourses(groups.courses, query, expanded);
+  const hasFailedCourse = [...visible.items, ...(otherSpacesExpanded ? groups.otherSpaces : [])].some((course) => courseStates[course.id] === "failed");
 
   async function sync(course: CanvasCourseInventoryItem) {
     setNote(null);
@@ -163,7 +166,10 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
       actions={connected || load.state === "reconnect" ? [{ label: "Replace access token", onPress: () => {
         if (load.state === "connected") setLoad({ state: "reconnect", connection: load.connection });
       } }, { label: "Disconnect Canvas", onPress: disconnect }] : []}
-      headerBelow={connected ? <CourseSearch value={query} onChange={setQuery} /> : undefined}
+      headerBelow={connected ? <CourseSearch value={query} onChange={(value) => {
+        setQuery(value);
+        setOtherSpacesExpanded(Boolean(value.trim()));
+      }} /> : undefined}
     >
       {load.state === "loading" ? <SyncSkeleton /> : null}
       {load.state === "error" ? (
@@ -197,20 +203,48 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
                 />
               ))}
             </Surface>
-          ) : (
+          ) : matches.length === 0 ? (
             <Copy muted style={{ textAlign: "center", paddingVertical: spacing[4] }}>
               {query.trim() ? `No courses match “${query.trim()}”.` : "Canvas didn’t list any courses for this account."}
             </Copy>
-          )}
-          {!query.trim() && (visible.hiddenCount > 0 || expanded) && ordered.length > 3 ? (
+          ) : null}
+          {!query.trim() && (visible.hiddenCount > 0 || expanded) && groups.courses.length > 3 ? (
             <Disclosure
               expanded={expanded}
-              label={expanded ? "Show fewer" : `Show all ${ordered.length} courses`}
+              label={expanded ? "Show fewer" : `Show all ${groups.courses.length} courses`}
               onPress={() => {
                 animateNextLayout(reducedMotion);
                 setExpanded((value) => !value);
               }}
             />
+          ) : null}
+          {groups.otherSpaces.length > 0 ? (
+            <View style={{ gap: spacing[2] }}>
+              <Disclosure
+                expanded={otherSpacesExpanded}
+                label={`Other Canvas spaces (${groups.otherSpaces.length})`}
+                testID="canvas-other-spaces-disclosure"
+                onPress={() => {
+                  animateNextLayout(reducedMotion);
+                  setOtherSpacesExpanded((value) => !value);
+                }}
+              />
+              {otherSpacesExpanded ? (
+                <Surface style={{ padding: 0, gap: 0, overflow: "hidden" }}>
+                  {groups.otherSpaces.map((course, index) => (
+                    <SyncCourseRow
+                      key={course.id}
+                      course={course}
+                      first={index === 0}
+                      revealDelay={query.trim() ? null : Math.min(index, 8) * 28}
+                      state={syncRowState(course, courseStates[course.id])}
+                      onSync={() => void sync(course)}
+                      onOptions={() => setOptions(course)}
+                    />
+                  ))}
+                </Surface>
+              ) : null}
+            </View>
           ) : null}
         </>
       ) : null}
@@ -378,7 +412,7 @@ function SyncControl({ state }: { state: SyncRowState }) {
   );
 }
 
-function Disclosure({ expanded, label, onPress }: { expanded: boolean; label: string; onPress: () => void }) {
+function Disclosure({ expanded, label, onPress, testID = "canvas-course-disclosure" }: { expanded: boolean; label: string; onPress: () => void; testID?: string }) {
   const { colors, reducedMotion } = useTheme();
   const turn = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   useEffect(() => {
@@ -390,7 +424,7 @@ function Disclosure({ expanded, label, onPress }: { expanded: boolean; label: st
       accessibilityRole="button"
       accessibilityState={{ expanded }}
       accessibilityLabel={label}
-      testID="canvas-course-disclosure"
+      testID={testID}
       onPress={onPress}
       style={({ pressed }) => ({ minHeight: hitTarget.min, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, opacity: pressed ? 0.6 : 1 })}
     >

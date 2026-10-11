@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CanvasCourseInventoryItem } from "../../services/canvasApi";
-import { matchesCourseQuery, orderSyncCourses, syncRowState, visibleSyncCourses } from "./canvasSyncPresentation";
+import { matchesCourseQuery, orderSyncCourses, splitSyncCourses, syncRowState, visibleSyncCourses } from "./canvasSyncPresentation";
 
 function course(id: string, overrides: Partial<CanvasCourseInventoryItem> = {}): CanvasCourseInventoryItem {
   return {
@@ -23,6 +23,32 @@ function course(id: string, overrides: Partial<CanvasCourseInventoryItem> = {}):
 const synced = { status: "success" as const, startedAt: null, completedAt: "2026-09-25T00:00:00.000Z", lastCheckedAt: null, lastSuccessfulSyncAt: "2026-09-25T00:00:00.000Z", failureCode: null };
 
 describe("Canvas sync presentation", () => {
+  it("separates uncertain and unavailable spaces while keeping selected spaces in the main list", () => {
+    const items = [
+      course("current"),
+      course("career", { classification: "other_or_uncertain" }),
+      course("past", { classification: "past_or_concluded" }),
+      course("selected-career", { classification: "other_or_uncertain", selected: true }),
+      course("bulletin", { classification: "unavailable", selectable: false }),
+      course("selected-unavailable", { classification: "unavailable", selectable: false, selected: true }),
+    ];
+    const groups = splitSyncCourses(items);
+    expect(groups.courses.map((item) => item.id)).toEqual(["current", "past", "selected-career", "selected-unavailable"]);
+    expect(groups.otherSpaces.map((item) => item.id)).toEqual(["career", "bulletin"]);
+    expect(items.map((item) => item.id)).toEqual(["current", "career", "past", "selected-career", "bulletin", "selected-unavailable"]);
+  });
+
+  it("searches both groups before the main course disclosure limits the list", () => {
+    const items = ["a", "b", "c", "d"].map((id) => course(id));
+    items.push(course("career", { displayName: "Career Center", classification: "other_or_uncertain" }));
+    const groups = splitSyncCourses(items);
+    expect(visibleSyncCourses(groups.courses, "", false).items).toHaveLength(3);
+    expect(groups.otherSpaces).toHaveLength(1);
+    const matches = splitSyncCourses(items.filter((item) => matchesCourseQuery(item, " career ")));
+    expect(matches.courses).toEqual([]);
+    expect(matches.otherSpaces.map((item) => item.id)).toEqual(["career"]);
+    expect(splitSyncCourses(items.filter((item) => matchesCourseQuery(item, "no-match")))).toEqual({ courses: [], otherSpaces: [] });
+  });
   it("finds a course by code however it is typed, or by part of its name", () => {
     const web = course("web", { displayName: "CIT17 | CITCS 3F Group A | Web Information Systems", courseCode: "CIT17 | CITCS 3F Group A" });
     for (const query of ["CIT17", "cit 17", "cit-17", "web info", "information systems"]) {
