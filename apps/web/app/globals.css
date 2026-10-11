@@ -4413,8 +4413,26 @@ mark.find-active {
 }
 
 /* ---------- Library (course tiles, then saved work) ---------- */
+.library-courses {
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
 .library-course {
   position: relative;
+  display: flex;
+  min-width: 0;
+}
+.library-course > .course-card {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 104px;
+}
+.library-course .course-card strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .library-course .course-card {
   padding-right: 52px;
@@ -4451,7 +4469,11 @@ mark.find-active {
 .library-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  grid-auto-rows: 1fr;
   gap: 12px;
+}
+.library-grid > .library-card {
+  height: 100%;
 }
 .library-card {
   position: relative;

@@ -243,7 +243,7 @@ export function LibraryScreen() {
                   <Link href={`/library/course/${encodeURIComponent(group.key)}`} className="course-card">
                     <CourseMark course={group.course ?? { id: PERSONAL_LIBRARY_KEY, name: "Personal & other" }} identity={identity} size={44} />
                     <span className="grow">
-                      <strong>{identity.title}</strong>
+                      <strong title={group.course?.name ?? identity.title}>{identity.title}</strong>
                       {identity.subtitle && <span className="meta">{identity.subtitle}</span>}
                       <span className="meta library-counts">{describeLibraryCounts(group.counts)}</span>
                     </span>
