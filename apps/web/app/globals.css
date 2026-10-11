@@ -504,8 +504,10 @@ h3 {
   display: none;
 }
 .main {
-  max-width: 1440px;
-  padding: 28px 32px 64px;
+  width: 100%;
+  max-width: 1760px;
+  margin-inline: auto;
+  padding: clamp(20px, 2vw, 36px) clamp(20px, 2.6vw, 56px) 64px;
   outline: none;
 }
 .two-column {
@@ -1983,7 +1985,7 @@ details[open] > :not(summary) {
 /* ---------- Today (mirrors the app's TodayScreen) ---------- */
 .today-v2 {
   display: grid;
-  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  grid-template-columns: clamp(340px, 26vw, 460px) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
@@ -1996,6 +1998,19 @@ details[open] > :not(summary) {
   align-items: stretch;
   gap: 10px;
   padding: 22px 20px 16px;
+}
+@media (min-width: 761px) {
+  .today-clock-card .day-clock {
+    width: min(100%, 52vh, 420px);
+    height: auto;
+    aspect-ratio: 1;
+    margin-inline: auto;
+  }
+}
+@media (min-width: 1600px) {
+  .today-v2 {
+    gap: 40px;
+  }
 }
 .free-time-line {
   display: flex;
@@ -2025,7 +2040,7 @@ details[open] > :not(summary) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
 }
 .list-card {
   background: var(--surface);
@@ -2691,6 +2706,7 @@ details[open] > :not(summary) {
   grid-template-columns: 240px minmax(0, 720px);
   gap: 40px;
   align-items: start;
+  justify-content: center;
 }
 .reviewer-layout.with-panel {
   grid-template-columns: 220px minmax(0, 680px) minmax(320px, 380px);
@@ -3987,6 +4003,16 @@ mark.find-active {
 .canvas-courses-head {
   align-items: center;
 }
+.canvas-other-spaces > summary {
+  padding: 8px 0;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.canvas-other-spaces[open] > summary {
+  margin-bottom: 8px;
+}
 .canvas-course {
   display: flex;
   align-items: center;
@@ -4398,8 +4424,26 @@ mark.find-active {
 }
 
 /* ---------- Library (course tiles, then saved work) ---------- */
+.library-courses {
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
 .library-course {
   position: relative;
+  display: flex;
+  min-width: 0;
+}
+.library-course > .course-card {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 104px;
+}
+.library-course .course-card strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .library-course .course-card {
   padding-right: 52px;
@@ -4436,7 +4480,11 @@ mark.find-active {
 .library-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  grid-auto-rows: 1fr;
   gap: 12px;
+}
+.library-grid > .library-card {
+  height: 100%;
 }
 .library-card {
   position: relative;
@@ -4740,4 +4788,118 @@ mark.find-active {
 .course-card.unsynced button {
   min-height: 36px;
   padding: 6px 14px;
+}
+
+/* Keep reading measures and capped workspaces centered within the wide shell. */
+.reader,
+.quiz-content,
+.quiz-overview,
+.quiz-result,
+.quiz-layout,
+.queue-layout,
+.reviewer-layout,
+.own-material,
+.settings-grid,
+.announcement-article,
+.grade-article,
+.session-card,
+.task-form-card {
+  margin-inline: auto;
+}
+
+/* Draft fields use the available width beside their outline. */
+.draft-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 32px;
+  align-items: start;
+}
+.today-split > section {
+  display: flex;
+  flex-direction: column;
+}
+.today-split > section > .clear-day {
+  flex: 1;
+}
+.clear-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 220px;
+  height: 100%;
+  padding: 24px 16px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+}
+.clear-day-art {
+  width: 132px;
+  height: auto;
+  margin-bottom: 8px;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+.cd-horizon { stroke: var(--line); }
+.cd-sun { stroke: var(--amber); stroke-width: 3; }
+.cd-rays { stroke: var(--amber); stroke-width: 2.5; opacity: 0.55; }
+.cd-calendar { fill: var(--surface); stroke: var(--muted); }
+.cd-check { stroke: var(--text); stroke-width: 3; }
+.clear-day strong { font-size: 16px; }
+.clear-day.compact { min-height: 140px; }
+.clear-day.compact .clear-day-art { width: 96px; }
+@media (prefers-reduced-motion: no-preference) {
+  .cd-rays {
+    animation: cd-glow 3.2s var(--ease-standard) infinite alternate;
+  }
+}
+@keyframes cd-glow {
+  from { opacity: 0.35; }
+  to { opacity: 0.7; }
+}
+.draft-body {
+  min-width: 0;
+}
+.draft-body label {
+  scroll-margin-top: 76px;
+}
+.draft-body textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: none;
+  overflow: hidden;
+}
+.draft-aside {
+  position: sticky;
+  top: 76px;
+  min-width: 0;
+}
+.draft-aside h2 {
+  font-size: 16px;
+}
+.draft-aside a {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1099px) {
+  .draft-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .draft-aside {
+    position: static;
+    order: -1;
+  }
+}
+
+/* Phone shell spacing remains the final override. */
+@media (max-width: 760px) {
+  .main {
+    padding: 16px 20px 120px;
+  }
+  .detail-page .main {
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
 }

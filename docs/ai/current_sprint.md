@@ -1,5 +1,48 @@
 # Current Sprint
 
+## W1/W2 main integration (2026-10-11)
+
+Finite owner instruction: `push to main w1 w2`. W1/W2 tip `c05634f` is merged
+with main `6319376` in `integration/w1-w2-main-20261011`. Conflicts preserve
+main's canonical planner/Tasks data, content+grades refresh and capstone
+terminology, adding W1 Done/shared free time and W2 layouts/search/editor.
+FRESH PASS: web 82/82 tests, focused API 171/171 tests, root typecheck and
+lint/build 8/8 each, zero cached. Browser acceptance
+passes 25 page/viewport checks, 10 theme captures, four desktop pages,
+Canvas selection/sync and draft guards/persistence, plus unlinked paper Done.
+Evidence is fictional and ignored under the integration checkout's
+`tmp/w2-screens/`; earlier signed-in W1 evidence remains historical. The
+dirty main checkout and unrelated website files are preserved. The earlier
+local-only W1/W2 checkpoints below are superseded by this integration.
+
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally; finite W2 scope complete.** W1 commits are retained in the
+isolated website checkout. Shell/clock sizing, uniform Library cards, Canvas
+search/grouping, desktop draft outline/auto-growing textareas and clear-day
+illustrations are implemented. Fresh web typecheck/lint and 79/79 tests pass;
+25 requested page/viewport checks, both Today themes and browser interaction
+flows pass using isolated fictional API/Auth fixtures. Final implementation
+tip: `14b12c4`; per-step commits and adaptations are in the appended W2
+handoff. Screenshots/report: ignored `tmp/w2-screens/`. Unrelated files remain
+untouched. No push or deployment. Next: owner laptop/fullscreen review, then
+content-based estimates, grade estimator and sync automation when scheduled.
+
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally and against the signed-in real account.** Finite owner scope:
+shared planner submission filtering, Done from Tasks/Overdue/Schedule, shared
+free time, unsaved-plan labels, and today's schedule alignment. Implementation
+commits `de3e99c`, `9d2ef46`, `1343428`; fresh API typecheck and 32 task-planning
+tests, web typecheck/lint and 79 tests pass. All six STEP 6 checks passed;
+temporary saved sessions/plan metadata and free-time/lock settings were
+restored. The 5 Why Analysis is intentionally completed. Original unrelated
+dirty files and website evidence directories are untouched. No push or
+deployment. See the appended W1 handoff for evidence and prompt adaptations.
+Next separately scoped work: W2 website desktop/16:9 layout, Library grid,
+Canvas course search, draft editor. Estimates, grade estimator, generation on
+sync and inactivity gating were not started.
+
 ## Task and planner sync reliability (2026-10-10)
 
 Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
@@ -29,6 +72,7 @@ pending local imports with submitted Canvas evidence. Android preview OTA
 API/website publication and main integration are being completed. Physical device
 acceptance is NOT RUN: no ADB device or browser surface is exposed. See
 [acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+
 
 ## Website completion and main integration (2026-10-08)
 

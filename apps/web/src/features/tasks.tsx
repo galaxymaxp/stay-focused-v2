@@ -15,6 +15,8 @@ import { generationEnabled, generationKey } from "../lib/generation";
 import { dateLabel, safeUrl } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
+import { setWorkDone } from "../lib/complete-work";
+
 export function TasksScreen() {
   const { api } = useAuth(),
     activities = useResource<{ items: ActivitySummary[] }>(
@@ -25,6 +27,7 @@ export function TasksScreen() {
     action = useAction();
   const canvasRefresh = useCanvasRefresh("all", activities.refresh, false);
   const rows = activities.data?.items ?? [];
+
   const filtered = rows.filter((item) =>
     group === "completed"
       ? item.status === "completed" || item.status === "submitted"
@@ -41,11 +44,10 @@ export function TasksScreen() {
     ).length;
   const loaded = !!activities.data;
   function toggle(item: ActivitySummary) {
+    if (item.status === "submitted") return;
     void action.run(async () => {
-      await api(`/api/tasks/${item.taskId}`, {
-        method: "PATCH",
-        body: { status: item.status === "completed" ? "pending" : "completed" },
-      });
+      await setWorkDone(api, item, item.status !== "completed");
+
       activities.refresh();
     });
   }
@@ -76,7 +78,7 @@ export function TasksScreen() {
                 void action.run(async () => {
                   await api("/api/tasks", { method: "POST", body });
                   setForm(false);
-                              activities.refresh();
+                  activities.refresh();
                 })
               }
             />
@@ -110,21 +112,16 @@ export function TasksScreen() {
               const done = item.status === "completed" || item.status === "submitted";
               return (
                 <div className={`task-line${done ? " done" : ""}`} role="listitem" key={item.id}>
-                  {item.taskId ? (
                     <button
                       className={`task-check${done ? " on" : ""}`}
                       aria-label={`${item.status === "completed" ? "Reopen" : "Complete"} ${item.title}`}
-                      aria-pressed={item.status === "completed"}
+                      aria-pressed={done}
+
                       disabled={action.busy || item.status === "submitted"}
                       onClick={() => toggle(item)}
                     >
                       <Icon name="check" />
                     </button>
-                  ) : (
-                    <span className="task-check canvas" title="Canvas assignment">
-                      <Icon name="globe" />
-                    </span>
-                  )}
                   <Link className="task-line-open" href={`/tasks/${encodeURIComponent(item.id)}`}>
                     <strong>{item.title}</strong>
                     <span className="meta task-line-meta">

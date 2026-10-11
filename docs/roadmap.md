@@ -1,5 +1,42 @@
 # Roadmap
 
+## W1/W2 main integration (2026-10-11)
+
+Owner-authorized release: merge W1/W2 `c05634f` with main `6319376` and push
+normally to main. The integration retains the newer canonical activity model
+and explicit content+grades refresh while delivering W1 completion/free-time
+alignment and W2 desktop, Library, Canvas search and draft editor improvements.
+FRESH PASS: 82 web tests, 171 focused API planning/experience tests, root
+typecheck/lint/build 8/8 each with zero cached. The
+25 page/viewport checks, both Today themes, Canvas/draft flows and unlinked
+paper completion pass in isolated browser fixtures. Earlier W1/W2 entries
+below are local checkpoints superseded by this release. Separate estimator,
+notification automation and inactivity-gating scopes remain pending.
+
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally.** The website now supports the requested laptop/fullscreen
+layouts, uniform Library grids, searchable/grouped Canvas courses, a desktop
+draft editor with auto-growing fields, and theme-aware clear-day states.
+Fresh web typecheck/lint/79 tests and all 25 page/viewport checks pass, with
+additional light/dark, Canvas selection and draft persistence checks.
+Implementation tip `14b12c4`; evidence/adaptations are in the W2 handoff.
+No push/deployment. Next: owner review on laptop and fullscreen; content-based
+estimates, grade estimator, sync automation and inactivity gating await their
+separately scheduled scopes.
+
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally and in all six signed-in real-account checks.** Shared planner
+submission filtering, Done actions including unlinked paper activities,
+date-specific shared free time, unsaved-plan labels and overdue separation are
+implemented on `website/functional-v1` (`de3e99c`, `9d2ef46`, `1343428`). Fresh
+API typecheck/32 task-planning tests and web typecheck/lint/79 tests pass.
+Test sessions, plan metadata and preferences were restored; The 5 Why Analysis
+stays completed. No push/deployment. Next requires a separate W2 scope:
+website desktop/16:9 layout, Library grid, Canvas course search, draft editor.
+Estimator, generation-on-sync and inactivity-gating exclusions remain intact.
+
 ## Task and planner sync reliability (2026-10-10)
 
 Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
@@ -29,6 +66,7 @@ pending local imports with submitted Canvas evidence. Android preview OTA
 API/website publication and main integration are being completed. Physical device
 acceptance is NOT RUN: no ADB device or browser surface is exposed. See
 [acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+
 
 ## Website completion and main integration (2026-10-08)
 

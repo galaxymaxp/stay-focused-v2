@@ -1,5 +1,57 @@
 # Current State
 
+## W1/W2 main integration (2026-10-11)
+
+Owner explicitly requested `push to main w1 w2`. The release merges W1/W2
+tip `c05634f` with current main `6319376` in an isolated integration checkout.
+It preserves main's canonical task/planner state, bounded content+grades sync,
+minute resource refresh and capstone terminology while adding W1 completion,
+shared free time and saved-plan clarity, plus all W2 layout/editor changes.
+The planner regression now follows the canonical repository, including work
+explicitly reopened in Canvas despite an old submission timestamp.
+
+FRESH PASS: web 82 tests/12 files; focused API planning/experience 171 tests/9
+files; root typecheck and lint 8/8 each, zero cached (four existing mobile
+lint warnings). Root build also passes 8/8, zero cached. Browser acceptance
+passes all 25 page/viewport checks, 10 light/dark Today captures, the four-page
+desktop sweep, Canvas search/selection/bounded sync, draft persistence/guards,
+and importing/completing an unlinked paper task in the canonical Tasks list.
+Browser evidence uses isolated fictional data, not a new real-account run.
+Unrelated dirty work and local evidence remain outside the release. This
+entry supersedes the earlier local-only W1/W2 publication checkpoints below;
+manual deployment and production acceptance are not part of this push.
+
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally.** On `website/functional-v1`, the centered 1760px shell and
+viewport-capped Today clock support laptop and fullscreen layouts. Library
+cards fill equal-height rows; Canvas has course search and collapsible other
+spaces; drafts have an outline and fields that grow with content; Today has
+theme-aware clear-day illustrations. Fresh web typecheck/lint and 79 tests
+pass. Isolated Playwright acceptance passed all 25 page/viewport checks,
+light/dark Today checks, draft save/resize/guard flows and Canvas filtering
+and selection persistence. Implementation: `e833536`, `3642654`, `2abe801`,
+`5ae9b6b`, `7a520ba`, `14b12c4`. Evidence is in the appended W2 handoff and
+ignored `tmp/w2-screens/`. No push/deployment. Next: owner review on laptop
+and fullscreen; separately scheduled feature prompts remain outside W2.
+
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally, including all six real-account checks.** Branch
+`website/functional-v1` now filters handed-in Canvas work from the shared
+planner, completes unlinked Canvas/paper activities through one import-and-mark
+helper, separates Overdue from today's schedule, shares date-specific free
+time, and labels previews as unsaved with Save to schedule. Fresh API
+typecheck/task-planning tests (32) and web typecheck/lint/tests (79) pass.
+Two saved real-account blocks matched Today's preview and Schedule at
+9:30–10:30 PM and 10:30–11:30 PM. Temporary sessions/plan metadata and local
+preferences were restored; The 5 Why Analysis remains completed as instructed.
+Implementation commits: `de3e99c`, `9d2ef46`, `1343428`. No push or deployment;
+the production website still requires these changes to be released. Full
+details and adaptations are appended to `docs/ai/handoff.md`. W2 layout,
+Library/search/draft work and all excluded estimator/sync/gating work remain
+outside this slice.
+
 ## Task and planner sync reliability (2026-10-10)
 
 Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
@@ -29,6 +81,7 @@ pending local imports with submitted Canvas evidence. Android preview OTA
 API/website publication and main integration are being completed. Physical device
 acceptance is NOT RUN: no ADB device or browser surface is exposed. See
 [acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+
 
 ## Website completion and main integration (2026-10-08)
 

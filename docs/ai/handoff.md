@@ -2376,3 +2376,247 @@ Commit `79e54dd` adds source-compatible blueprints, two-candidate pools, determi
 The single authenticated production attempt on the unchanged real lecture failed: job `d038e85b-ae03-4853-aa2a-f663037415b0`, Workflow `wrun_01M2J4TSMPMWB6SPQXW8F0CTH0`, 4/5 accepted, q3 pending, `repair_exhausted` / `bounded_repair_attempts_exhausted` / `quiz_generation_failed`. Eighteen candidates and four author/four verifier batches; no Quiz persisted and no retry submitted. q1/q4 accepted second alternatives; q5 converged after a new intent; q3 failed even with alternate support. The realme showed the Generation failure and opened Queue; Library/attempt/secrecy/score/result/reopen remain unaccepted.
 
 B25.3.3 should preserve source context and precise evidence ownership, select supports with enough evidence for meaningful distractors, and plan full-set concept/difficulty feasibility before immutable acceptance. **PARTIAL — Quiz semantic convergence remains incomplete.** B26 may not begin. See [B25.3.2 report](acceptance/b25.3.2/quiz-candidate-convergence.md).
+
+
+## W1 — Today/Schedule alignment + submitted-work filtering (website) — 2026-10-11
+
+**Status:** PASS (local implementation and all six real-account checks; unreleased)
+**Commits:**
+- de3e99c fix(api): keep handed-in Canvas work out of the study planner
+- 9d2ef46 feat(web): mark work done from Today, Schedule and Tasks, including paper submissions
+- 1343428 fix(web): share free time between Today and Schedule and label unsaved plans
+
+**Changed files:**
+- apps/api/src/lib/task-planning-repository.ts
+- apps/api/src/lib/task-planning-repository.planner-tasks.test.ts
+- apps/web/src/lib/complete-work.ts
+- apps/web/src/lib/complete-work.test.ts
+- apps/web/src/features/tasks.tsx
+- apps/web/src/features/today/today-screen.tsx
+- apps/web/src/features/today/plan-preview.tsx
+- apps/web/src/features/schedule.tsx
+- apps/web/src/features/day-clock/free-time-store.ts
+- apps/web/src/features/day-clock/free-time-store.test.ts
+- docs/ai/handoff.md
+- docs/current-state.md
+- docs/ai/current_sprint.md
+- docs/roadmap.md
+
+**Adaptations from prompt:**
+- STEP 0 stopped because C:/Projects/stay-focused-v2 was on dirty main at de09b9c.
+  After owner authorization for isolation, used the existing separate
+  C:/Projects/stay-focused-v2-website worktree on website/functional-v1 at the
+  required 8942c3c tip. Its only dirty paths were untracked
+  docs/ai/desktop-layout-mockup/ and docs/ai/website-screenshots/; both are
+  untouched. The original dirty main checkout was not edited or switched.
+- Reused isSubmittedCanvasSubmission from mappers: no runtime import cycle.
+  Deduplicated linked assignment IDs before the owner-scoped read. No task
+  statuses change during planner loading. Regression includes the requested
+  four cases, graded-but-missing work, query ownership and safe storage failure.
+- Api is already exported by apps/web/src/lib/api.ts and used by useAuth;
+  imported that type. The import endpoint accepts exactly assignmentIds and
+  returns TaskView[], which does not contain canvasAssignmentRowId. Used its
+  existing response contract rather than inventing that field.
+- Tasks rendered an icon instead of a button for unlinked Canvas activities.
+  Replaced that conditional with a check button for all rows, disabled for
+  submitted work. Matched linked rows to canonical activity summaries so
+  Canvas submission status and course context survive the Tasks list mapping.
+- Today's upcomingDeadlines begins tomorrow. Removing overdue alone would
+  lose today's unscheduled deadlines, so today's active deadlines come from
+  the existing urgent feed filtered to the local date, alongside today's
+  timeline/current block. Prior-date overdue deadlines are separate.
+- Today's Done action uses the existing busyRef guard, reports unavailable
+  activity resolution, and invalidates a stale preview after completion.
+  Schedule also invalidates its preview after completing a deadline.
+- Schedule due chips were Link elements. Made each chip a div with a linked
+  title and a sibling check button, avoiding nested interactive elements while
+  retaining the existing classes and visual pattern.
+- Free-time storage retains sf.today.free-time.<date>. Added bounds/integer
+  checks and ignored invalid input so malformed data cannot seed clock state.
+  Schedule treats Until 00:00 as the next midnight (1440 minutes), preserving
+  Today's supported midnight-ending windows.
+- Schedule previously planned/replaced only its narrow availability range;
+  reused Today's existing planningRequest for the full-day replacement range
+  and the same availability. Both still call the same server planner.
+- Proposed plan was already the heading; added the unsaved line and placed
+  Save to schedule/Discard directly below it, before the plan bar. Verified
+  that the primary button needs no scrolling inside the card.
+- Reconciled docs/roadmap.md as required by AGENTS.md, in addition to the two
+  current-state documents requested in the prompt.
+
+**Gates (FRESH/CACHED/NOT RUN):**
+Baseline before edits, all FRESH:
+- api typecheck: PASS
+- web typecheck: PASS
+- api tests (task-planning): PASS, 29 tests / 4 files
+- web tests: PASS, 66 tests / 10 files
+
+Final implementation, all FRESH:
+- api typecheck: PASS
+- api tests (task-planning): PASS, 32 tests / 5 files
+- web typecheck: PASS
+- web lint: PASS, zero reported warnings/errors
+- web tests: PASS, 79 tests / 12 files
+- git diff --check / staged diff check: PASS
+- Root builds/gates: NOT RUN; this slice uses the explicitly requested API/web gates.
+
+**Real-account verification (STEP 6):** FRESH, actual signed-in account,
+local API http://127.0.0.1:3000 and website http://127.0.0.1:3100,
+Asia/Manila, implementation HEAD 1343428. No mock backend was used.
+1. PASS — The 5 Why Analysis appeared under Overdue, not Today's schedule.
+2. PASS — Done removed it from Overdue; Tasks showed it under Completed.
+3. PASS — Real pointer drags set Today to 9:30—11:30 PM; Schedule showed
+   From 21:30 / Until 23:30 and Same free time as Today.
+4. PASS — The real Today preview excluded The 5 Why Analysis.
+5. PASS — Not saved yet and the zero planned blocks/Plans from Today hint
+   were visible before saving. Save created two blocks at 9:30—10:30 PM and
+   10:30—11:30 PM. Preview, saved API sessions, Today's timeline and
+   Schedule's today column agreed on the work and times.
+6. PASS — Reopen from Tasks restored the assignment to Overdue. It was
+   completed again afterward because the owner had already handed it in.
+
+Cleanup PASS: removed only the two session IDs and the new plan ID returned
+by the test save; verified original session/plan sets and task fields against
+snapshots. Restored local free-time and clock-lock preferences. No new task
+imports occurred. The sole intended account change is The 5 Why Analysis
+remaining completed. No Canvas synchronization or generation was started.
+Private snapshots/screenshots/results are ignored under .local/w1/.
+
+**Failed attempts and recovery:** API startup from the monorepo root initially
+failed Workflow app-directory discovery; starting with the API package as cwd
+resolved it. The launcher initially misread the first environment key due to a
+UTF-8 BOM; stripping it restored browser configuration before sign-in. The
+owner's first inability to sign in was superseded by successful sign-in after
+that repair. A scripted drag initially set From past the old Until and was
+correctly clamped; setting Until first passed. A browser assertion initially
+compared equivalent ISO strings literally (+00:00 versus .000Z); comparing
+parsed instants confirmed equal persisted times. None required application
+changes, gate weakening, or mocked real-account results.
+
+**Known limits:** Paper (on_paper) work stays unsubmitted in Canvas until
+it is graded; students clear it with Done. Submitted filtering affects planner
+candidates and does not automatically delete historical saved sessions.
+
+**Next:** W2 — website desktop/16:9 layout, Library grid, Canvas course search,
+draft editor (separate scope; not started).
+
+**Risks/blockers:** No implementation/STEP 6 blockers remain. Commits are local;
+no push or deployment was requested, so production has not received this W1
+release. Content time estimates, grade estimator, generation on sync and
+inactivity gating remain excluded.
+
+
+## W2 - Website desktop layout (16:9, Library grid, Canvas search, draft editor, clear-day state) - 2026-10-11
+
+**Status:** PASS locally. All mandatory W2 gates and requested viewport checks passed. No push or deployment.
+
+**Commits:**
+
+- e833536 style(web): full-width shell that fits 16:9 fullscreen and short laptop screens
+- 3642654 style(web): equal-height Library course and item cards
+- 2abe801 feat(web): search Canvas courses and separate other Canvas spaces
+- 5ae9b6b feat(web): desktop draft editor with outline and auto-growing sections
+- 7a520ba feat(web): clear-day illustration for empty Today sections
+- 14b12c4 fix(web): stretch clear-day panels and center reading layouts
+
+**Changed files:** apps/web/app/globals.css; apps/web/src/components/clear-day.tsx; apps/web/src/features/canvas.tsx; apps/web/src/features/library.tsx; apps/web/src/features/today/today-screen.tsx; apps/web/src/features/today/today-calendar.tsx. Documentation: this appended handoff plus docs/current-state.md, docs/roadmap.md and docs/ai/current_sprint.md. Runtime changes are confined to apps/web; no API changes.
+
+**Adaptations from prompt:**
+
+- Continued in the existing owner-authorized isolated checkout C:/Projects/stay-focused-v2-website, branch website/functional-v1. W1's commits were present at 0a1590a. The dirty main checkout and two unrelated untracked website evidence directories were preserved.
+- DayRingClock uses .day-clock, already measured by ResizeObserver. Its desktop width is min(100%, 52vh, 420px), with the existing mobile clock rule preserved. No numeric-size hook or geometry change was needed. Mobile shell rules are repeated at the end so they win.
+- Centered capped reading/work surfaces and Settings without widening their readable measures. Reviewer grid tracks use justify-content: center because margin alone cannot center fixed-size tracks inside a full-width grid.
+- Library title tooltips use the full course name, while existing courseIdentity presentation remains unchanged.
+- Canvas inventory already projected classification as string. Main grouping uses persisted course.selected plus likely_current/past_or_concluded, retaining selected uncertain/unavailable spaces in the main list. Pending checkbox edits and saved-only material/grade/sync actions remain unchanged. Groups move after saving, not while ticking a checkbox. Search includes names and codes across both groups; the N of M count includes other spaces, and those spaces open during a nonempty search.
+- ArtifactScreen already rendered DraftEditor directly. Removed the editor's own .reader class, used stable section-index/slide-number anchors, and made the outline a sticky 300px aside at 1100px and above (single column through 1099px). Auto-sizing accounts for borders, content changes, width changes and loaded fonts; save/revision and leave guards are retained.
+- ClearDay uses existing theme color tokens, root radius/easing tokens, a compact calendar variant and reduced-motion-safe ray animation. Up Next remains the existing actionable row. Existing mobile shell/column behavior is retained with the requested new search, outline and empty-state additions.
+
+**Gates (FRESH):**
+
+- Baseline at 0a1590a: npm run typecheck --workspace apps/web PASS (exit 0); npm run lint --workspace apps/web PASS (exit 0, no warnings); npm run test --workspace apps/web PASS, 79 tests in 12 files.
+- Final implementation tree committed as 14b12c4: the same web typecheck and lint PASS (exit 0); web tests PASS, 79/79 across 12/12 files. No skipped or failing tests. git diff --check and staged diff hygiene PASS.
+- Browser acceptance PASS on the final implementation tree: isolated localhost Next preview at 3411 and fictional API/Auth at 3403, existing Playwright Chromium. No Playwright installation. External requests were blocked; zero browser exceptions and zero paid/generation calls. Fictional task/selection/draft writes never touched the real account.
+- Browser flows: name/code/case/whitespace search and zero matches, collapsed other spaces, selected uncertain space retained in main list, checkbox changes saved across search and reload, course sync; draft sections and slides resize without internal scrolling, long typing grows and shortening shrinks fields, outline anchors bypass the leave guard, cancelled navigation retains dirty content, two saves update revisions, and reload recovers saved text. Reduced motion disables the rays, normal motion enables cd-glow.
+- React review: row and textarea components are declared outside their parents; hooks are unconditional; resize/font callbacks clean up; strict types, accessible labels, keyboard links and existing authentication boundaries are retained.
+
+**Viewport check (FRESH):** Every cell includes no horizontal page scrolling. Desktop shells are centered at 1920/2560; screenshots are full-page captures.
+
+| Page | 1366x768 | 1536x864 | 1920x1080 | 2560x1440 | 390x844 | Note |
+| --- | --- | --- | --- | --- | --- | --- |
+| Today | PASS | PASS | PASS | PASS | PASS | Clock and proposed-plan heading visible together on small laptop; empty Later fills its desktop row beside Due soon. |
+| Schedule | PASS | PASS | PASS | PASS | PASS | Week view remains usable; narrow view keeps the existing internal week scroller without page overflow. |
+| Library | PASS | PASS | PASS | PASS | PASS | Mixed one/two-line course names and personal cards fill equal-height rows; searched item cards also match row heights. |
+| Library draft | PASS | PASS | PASS | PASS | PASS | Outline beside fields on desktop, above on mobile; existing long sections and slides have no textarea scrollbars. |
+| Canvas | PASS | PASS | PASS | PASS | PASS | Search filters both groups; other spaces collapsed when search is clear; selection/actions retained. |
+
+Light and dark Today were also captured and checked at all five sizes (10 additional captures). Tasks, Settings, Generate and Announcements passed the 1920x1080 sweep; Settings' capped grid is centered. Screenshot/report output is ignored under tmp/w2-screens/ via the local Git exclude. Do not commit those files. Reproduction scripts are ignored .local/w2-layout.mjs, .local/w2-body.mjs and .local/w2-fixture.mjs, derived from scripts/web-browser-check.mjs and its existing fixture.
+
+**Failed attempts and recovery:** The first local harness startup had a CRLF-sensitive assembly error; repaired before browser checks. Its first browser attempt lacked the Due soon fixture needed for a two-column assertion; added fictional deadlines. The next run caught the stretch rule applied to the draft grid instead of .today-split: corrected the selector and restored draft align-items: start. The final complete run passed without weakening checks. These failures were local setup/layout issues, not flaky gate results.
+
+**Known limits / follow-ups:** Visual acceptance uses Chromium and fictional local data, not a physical laptop or production deployment. Browser data is intentionally not real-account evidence. On 1366x768 the plan heading is above the fold; the entire plan can still extend below it. Very long drafts intentionally increase page height, with no textarea scroll. This work does not change backend estimates, grades, sync admission/automation or inactivity rules. The owner's real-account localhost preview was restored at port 3100 after the isolated checks; signed-in browser storage was not modified.
+
+**Next:** Owner review on laptop + fullscreen; then feature prompts (content-based estimates, grade estimator, sync automation) when scheduled. No remaining W2 implementation blockers.
+
+## W1/W2 - Owner-authorized main integration - 2026-10-11
+
+**Scope:** The owner explicitly requested `push to main w1 w2`. Integration
+starts from remote main `6319376` and merges W1/W2 tip `c05634f`, preserving
+both histories. Worktree: `C:/Projects/stay-focused-v2-w1-w2-main`; branch:
+`integration/w1-w2-main-20261011`. The original dirty main checkout and
+unrelated website evidence directories are untouched. Normal main publication
+follows the verified integration commit; no force push or manual deployment.
+
+**Conflict decisions:** Retained main's canonical planner repository exactly:
+it already filters submitted/completed work and deselected/ended/unavailable
+courses through the shared activity model. Adapted W1's planner regression to
+that model and added coverage for an explicitly reopened Canvas assignment
+with an old submission timestamp. Tasks retains main's complete canonical
+activity list and minute polling, adding W1's import-and-complete helper for
+paper work. Today/Schedule preserve explicit content+grades refresh alongside
+W1's Done actions, date-specific free time and unsaved-plan labels. Canvas
+uses W2 search/grouping/extracted rows with main's bounded content+grades
+CourseSync. Documentation combines both release records and the intervening
+task-sync reliability/capstone changes.
+
+**FRESH verification:**
+
+- `npm run test --workspace apps/web`: PASS, 82 tests in 12 files.
+- `npm run test --workspace apps/api -- src/lib/task-planning src/lib/experience`:
+  PASS, 171 tests in 9 files.
+- `npm run typecheck -- --force`: PASS, 8/8 packages, zero cached.
+- `npm run lint -- --force`: PASS, 8/8 packages, zero cached; four existing
+  mobile import-order warnings, no errors.
+- Final `npm run build -- --force`: PASS, 8/8 packages, zero cached,
+  including Next API/web production builds and Expo web/Android/iOS exports.
+- Isolated browser suite: PASS, all 25 requested page/viewport checks, 10
+  light/dark Today captures, four-page desktop sweep, Canvas search/selection
+  persistence and content+grades Sync now, section/slide textarea growth,
+  draft save/reload/dirty-navigation guards and reduced motion. Added an
+  unlinked paper activity to the canonical Tasks fixture, clicked Complete,
+  verified its import then completed-status PATCH, and verified it moved to
+  Completed with Reopen available. Zero browser exceptions/paid calls.
+  Screenshots of small-laptop Today and desktop Canvas were also inspected.
+
+**Browser evidence:** Ignored `.local/w2-layout.mjs`, `.local/w2-fixture.mjs`
+and `tmp/w2-screens/result.json` in the integration checkout. Fictional API/Auth
+run on 3405/3413 with external requests blocked; this is not new real-account
+or production acceptance. Temporary browser/server processes closed after
+the suite. The signed-in owner preview and earlier W1 account state were not
+used or modified during this integration.
+
+**Failed setup attempts and recovery:** This new worktree initially lacked
+nested Expo Router and Workflow installations for root typechecking; local
+dependency links restored them, and the fresh complete rerun passed. The first
+root build could not crawl the mobile dependency junction; copied only the
+small existing nested mobile dependencies into the ignored worktree install.
+The second build then found workspace links pointing outside Metro's watch
+roots; added ignored mobile-local links to this checkout's unchanged packages.
+No source/configuration changes, dependency upgrades or weakened checks were
+used for these repairs. Next-generated API `next-env.d.ts` changes are excluded
+from the release, as are dependency installs, build outputs and test evidence.
+
+**Current-state reconciliation:** Updated `docs/current-state.md`,
+`docs/roadmap.md` and `docs/ai/current_sprint.md` with this integration. Their
+earlier W1/W2 local-only entries are historical checkpoints superseded by
+the owner's main-release instruction. Estimators, sync automation and
+inactivity gating remain separate future scopes.
