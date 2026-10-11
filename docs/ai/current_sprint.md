@@ -1,5 +1,20 @@
 # Current Sprint
 
+## W2 mobile parity and fresh acceptance (2026-10-11)
+
+**PASS locally; revised W2 scope including STEP 7 complete.** Reused and
+freshly verified the existing website commits: web typecheck/lint, 79 tests,
+25 page/viewport checks and browser interaction/theme checks pass. Mobile
+commits `b87fe54`, `e1f5f3d`, `f42c43f`, `9ec9fa1` add Canvas grouping,
+growing draft inputs plus keyboard avoidance, and both clear-day variants.
+Fresh mobile typecheck/lint and 791 tests pass (four existing lint warnings).
+Realme RMX3151 local-debug checks pass with isolated fictional data, including
+the real keyboard and system Reduce Motion on/off in both themes. Original
+device settings restored; unrelated mobile docs/design changes preserved.
+See the appended W2 mobile parity handoff for limits, files and evidence.
+No API change, push or deployment. Next: owner laptop/fullscreen review;
+separately scheduled estimator/sync-automation prompts remain outside W2.
+
 ## W1/W2 main integration (2026-10-11)
 
 Finite owner instruction: `push to main w1 w2`. W1/W2 tip `c05634f` is merged

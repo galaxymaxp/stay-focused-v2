@@ -1,5 +1,22 @@
 # Current State
 
+## W2 mobile parity and fresh acceptance (2026-10-11)
+
+**PASS locally, including physical RMX3151 checks.** The existing W2 website
+implementation was rechecked in `C:/Projects/stay-focused-v2-website` on
+`website/functional-v1`: fresh web typecheck/lint, 79 tests and all 25 requested
+page/viewport checks pass. Mobile parity is committed on `b25-3-3-ai-first`
+in `b25-3-3-work`: Canvas other-space grouping, growing draft fields with
+keyboard avoidance, and theme-aware/reduced-motion-safe clear-day states
+(`b87fe54`, `e1f5f3d`, `f42c43f`, `9ec9fa1`). Fresh mobile typecheck/lint and
+791 tests pass; lint retains four pre-existing test-file import warnings.
+Physical local-debug acceptance used actual screens with isolated fictional
+data: Canvas search/disclosure, draft growth/keyboard, light/dark Today with
+system Reduce Motion on/off, and planning action pass. Device settings were
+restored. Existing mobile docs/design edits remain untouched; evidence and
+cross-repository state are recorded in the appended W2 handoff here. No API
+change, push or deployment. Next: owner laptop/fullscreen review.
+
 ## W1/W2 main integration (2026-10-11)
 
 Owner explicitly requested `push to main w1 w2`. The release merges W1/W2

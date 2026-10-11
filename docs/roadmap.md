@@ -1,5 +1,19 @@
 # Roadmap
 
+## W2 mobile parity and fresh acceptance (2026-10-11)
+
+**PASS locally, including physical Android acceptance.** Website W2 remains
+verified (fresh typecheck/lint, 79 tests, 25 page/viewport checks). STEP 7 is
+complete on `b25-3-3-ai-first`: grouped Canvas spaces, growing/keyboard-aware
+draft fields, and light/dark clear-day illustrations with reduced-motion
+handling. Mobile implementation tip `9ec9fa1`; fresh typecheck/lint and 791
+tests pass, with four existing lint warnings. Physical RMX3151 checks used an
+isolated local debug package and fictional fixtures; production/real-account
+mobile flows were not tested. Original device settings restored. The appended
+W2 handoff records evidence and adaptations; dirty mobile docs/design files
+were preserved. No push/deployment. Next: owner laptop/fullscreen review,
+then separately scheduled content-estimate, grade-estimator and sync work.
+
 ## W1/W2 main integration (2026-10-11)
 
 Owner-authorized release: merge W1/W2 `c05634f` with main `6319376` and push

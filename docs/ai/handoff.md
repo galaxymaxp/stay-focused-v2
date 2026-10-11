@@ -2620,3 +2620,159 @@ from the release, as are dependency installs, build outputs and test evidence.
 earlier W1/W2 local-only entries are historical checkpoints superseded by
 the owner's main-release instruction. Estimators, sync automation and
 inactivity gating remain separate future scopes.
+
+
+## W2 - Website desktop layout and mobile parity (STEP 7) - 2026-10-11
+
+**Status:** PASS locally, including physical Android acceptance. This supplements
+the earlier website-only W2 entry with the revised prompt's mobile scope and
+fresh website verification. No API changes, push or deployment.
+
+**Commits:** Existing website implementation retained: `e833536`, `3642654`,
+`2abe801`, `5ae9b6b`, `7a520ba`, `14b12c4`; previous website report `c05634f`.
+New mobile commits on `b25-3-3-ai-first`, all authored by
+`galaxymaxp <omgraythekid@gmail.com>`:
+
+- `b87fe54` feat(mobile): group other Canvas spaces under course search
+- `e1f5f3d` fix(mobile): let draft fields grow instead of scrolling inside
+- `f42c43f` feat(mobile): clear-day illustration for empty Today sections
+- `9ec9fa1` fix(mobile): keep growing draft fields above the keyboard
+
+**Changed files:** New runtime/test changes are confined to mobile:
+`src/features/sync/CanvasSyncScreen.tsx`, `canvasSyncPresentation.ts` and its
+test; `src/features/redesign/DraftInput.tsx` and its test; `LibraryScreen.tsx`,
+`TodayScreen.tsx`, `TodayCalendar.tsx`, `screens.test.ts`; `src/design/ClearDay.tsx`
+and its test (all below `apps/mobile`). This website checkout records the
+cross-repository result in `docs/ai/handoff.md`, `docs/current-state.md`,
+`docs/ai/current_sprint.md` and `docs/roadmap.md`. No new website runtime edits
+were necessary because its W2 implementation was already committed.
+
+**Adaptations from prompt:**
+
+- The named `C:/Projects/stay-focused-v2` checkout is dirty `main`. Continued
+  website verification/docs in the existing `C:/Projects/stay-focused-v2-website`
+  worktree on `website/functional-v1`, where W1 and all website W2 commits
+  already exist. Preserved both unrelated website evidence directories.
+- Mobile starts at `dace312` on `b25-3-3-ai-first`. All initial dirty
+  README/docs/design paths, the deleted thesis overview and untracked paths
+  remain untouched and unstaged. Its planning docs are dirty, so the required
+  reconciliation is recorded here instead of overwriting mobile owner edits.
+- Mobile course types already carry classification. Split after the existing
+  search using selected/current/past as main and all others as other spaces.
+  Preserve the main list's existing three-course disclosure, row controls,
+  saved selection and sync behavior. Reuse the existing disclosure and motion
+  helper; searching opens other spaces, clearing closes them, and manual
+  toggling remains available. No API contract change.
+- Current mobile Library is a two-column compact grid, rather than the
+  prompt's older horizontal pager. No layout rewrite: physical CC17 title
+  wraps completely over three lines; a longer Enterprise Architecture title
+  retains the existing three-line ellipsis with its full accessible label.
+- A shared top-level DraftInput owns each field's content-size height,
+  including title, sections and slides. Minimum heights are 52 for title and
+  96 for content; wrapped content uses ceil(height) + 16 and scrollEnabled=false.
+  The outer Page remains the only scroller with handled keyboard taps. Native
+  acceptance found Android edge-to-edge adjustResize insufficient, so added
+  draft-only KeyboardAvoidingView (Android height / iOS padding). Existing
+  save/autosave, revisions and leave guards are retained.
+- ClearDay lives beside the shared design primitives. Theme aliases are
+  separator/surfacePrimary/textMuted/textPrimary/amber; the rays use a separate
+  SVG layer in an Animated.View for native opacity animation. Existing ambient
+  motion duration is 3200ms per leg, opacity 0.35 to 0.7. Reduced motion,
+  background and lost focus stop the loop; cleanup stops it on unmount.
+  The optional planning action scrolls to the actual clock through Page's
+  existing scrollRef. Compact calendar state uses the same drawing.
+
+**Gates (FRESH):**
+
+- Website at `c05634f`: typecheck PASS; lint PASS, zero warnings/errors;
+  tests PASS, 79/79 in 12/12 files. This is both the current baseline and final
+  runtime tree; no implementation changes were needed this turn.
+- Mobile baseline `dace312`: typecheck PASS; lint PASS with four pre-existing
+  import/first warnings; tests PASS, 784/784 in 76/76 files.
+- Mobile final `9ec9fa1`: typecheck PASS; lint PASS, same four existing warnings
+  in activeProcessingJobStore.test.ts, completedArtifactCache.test.ts,
+  processingJobsApi.test.ts and processingOutboxStore.test.ts; tests PASS,
+  791/791 in 78/78 files. Added grouping, growth/shrink/edit forwarding,
+  ClearDay theme/motion lifecycle and Today action/keyboard wrapper coverage.
+- Native arm64 local debug APK build PASS using the existing Android project,
+  JDK 17 and installed SDK: 412 Gradle tasks (367 executed, 45 up-to-date).
+  No Playwright installation, API edits, root builds or provider calls.
+  Root suites/builds: NOT RUN; the prompt's scoped web/mobile gates passed.
+- React review PASS: top-level components, unconditional hooks, cleaned-up
+  animation, strict types, accessible disclosures/labels and decorative SVG.
+
+**Viewport check (FRESH):** Re-ran ignored `.local/w2-layout.mjs` with installed
+Playwright Chromium against isolated localhost web/API/Auth fixtures. Every
+cell includes no horizontal page scroll; desktop shell centers at 1920/2560.
+
+| Page | 1366x768 | 1536x864 | 1920x1080 | 2560x1440 | 390x844 | Note |
+| --- | --- | --- | --- | --- | --- | --- |
+| Today | PASS | PASS | PASS | PASS | PASS | Clock and top of proposed plan visible on laptop; clear state fills desktop row. |
+| Schedule | PASS | PASS | PASS | PASS | PASS | Existing narrow week scroller stays inside the page. |
+| Library | PASS | PASS | PASS | PASS | PASS | Long/short/personal course cards and item cards match row heights. |
+| Library draft | PASS | PASS | PASS | PASS | PASS | Desktop outline beside fields; narrow outline above; fields have no inner scrollbars. |
+| Canvas | PASS | PASS | PASS | PASS | PASS | Search filters names/codes and both groups; other spaces collapse with clear query. |
+
+Ten additional light/dark Today captures and Tasks/Settings/Generate/Announcements
+1920x1080 sweep PASS. Interaction checks PASS: Canvas selection persistence and
+sync; no-match search; selected uncertain main group; draft loaded growth,
+typing/shrink, anchor navigation, leave guard, two saved revisions/reload;
+normal/reduced-motion rays. Zero browser exceptions and zero paid calls.
+Report and screenshots remain ignored under `tmp/w2-screens/`.
+
+**Mobile parity (STEP 7):** Full-width desktop shell is NOT APPLICABLE.
+Library layout rewrite is NOT APPLICABLE; actual long titles checked as above.
+Canvas grouping, growing draft fields/keyboard awareness, and normal/compact
+clear-day states are applied. Physical check FRESH PASS on realme RMX3151,
+Android 13, using a separate native local debug package
+`com.galaxymaxp.stayfocusedv2.w2verification`, not Expo Go. The ignored Metro
+harness mounts actual current screens, ThemeProvider, native navigation,
+TextInputs and react-native-svg with isolated fictional auth/API/library/course
+data; it does not authenticate or write to the real account.
+
+| Physical check | Result | Evidence |
+| --- | --- | --- |
+| Canvas | PASS | Other spaces collapsed initially, selected uncertain in main; Career search opens matching group; clear collapses; disclosure opens. |
+| Draft | PASS | Loaded long field has no inner native scroll; outer page reaches Next steps; real keyboard leaves focused field visible; additional typing grows it with scrollEnabled=false. |
+| Today light/dark | PASS | Normal and compact sun/calendar/check drawings and text readable in both themes. |
+| System Reduce Motion | PASS | Off/on checked in both themes through Android Accessibility Remove animations; actual ThemeProvider follows system state. Animation stop/start lifecycle also verified by tests. |
+| Planning action | PASS | Plan your free time returns the outer page to the actual day clock. |
+| Library titles | PASS | CC17 wraps fully; longer title uses existing ellipsis, without vertical clipping/overlap. |
+
+Ignored native evidence: mobile `.local/w2-native/` screenshots, UI XML,
+`device.cjs`, `device-more.cjs`, `result.json`, fixture/resolver files; build
+log `.local/w2-native-build.log`, Metro log `.local/w2-native-metro-2.log`.
+No screenshots, fixture configuration or APKs committed.
+
+**Failed attempts and recovery:** New render-test type selectors initially
+failed strict typing; changed to typed predicates. Existing screen mocks lacked
+the new SVG Rect/G and absolute-fill style; added those mocks and reran the
+full suite successfully. Native fixture startup initially omitted its Metro
+watch folder, and an old launcher held a log file; fixed only ignored harness
+setup. The physical keyboard overlap was a real defect, repaired in `9ec9fa1`
+and rechecked. A post-autosave assertion looked for an offscreen field; scrolling
+the outer page found the retained text. ADB WRITE_SECURE_SETTINGS was denied
+for animation toggles, so used the actual Accessibility UI. Device briefly
+disconnected during final checks; owner reconnected it, and remaining checks
+and restoration passed. Early screenshots captured before a navigation/theme
+update were replaced with captures after UI settles; final named reduce-true/
+reduce-false and Library captures are the acceptance evidence. No gates were
+weakened and no passing physical result is inferred from a unit test alone.
+
+**Cleanup:** Original Remove animations Off / transition_animation_scale=1
+restored and read back. Only the isolated W2 debug package was uninstalled;
+existing signed app retained. Own remote screenshot/XML removed. The 8082
+reverse was already absent after device reconnect; Metro stopped. Expo's
+generated expo-env.d.ts comment was restored to its pre-check content.
+Original web preview on port 3100 remained available; no real-account state
+was changed by these fixture checks.
+
+**Known limits / follow-ups:** Local Chromium and physical Android checks use
+fictional data; they establish layout/native behavior, not production or
+real-account API integration. iOS keyboard behavior is NOT RUN physically.
+Long drafts intentionally increase outer page height. Existing mobile tile
+truncation is retained. No backend estimate, grade, sync-automation/admission,
+inactivity rule or generation-engine work is included. Commits are local.
+
+**Next:** Owner review on laptop + fullscreen; then feature prompts
+(content-based estimates, grade estimator, sync automation) when scheduled.
