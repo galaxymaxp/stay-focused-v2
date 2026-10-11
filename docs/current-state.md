@@ -1,5 +1,18 @@
 # Current State
 
+## W2 mobile parity main integration (2026-10-11)
+
+Owner requested `push to main`. Remote main already contains W1/W2 website
+integration `7ef5a61`. The four scoped mobile commits are integrated as
+`f308faf`, `55b7cd0`, `815631d`, `dc018c8`; the parity report is `2c022f4`.
+**FRESH PASS** on the combined tree: web typecheck/lint and 82 tests;
+mobile typecheck/lint and 793 tests (four existing lint warnings).
+Main's newer task refresh is preserved. Documentation conflicts retain both
+histories. Normal publication targets `origin/main`; no force push or manual
+deployment. Original dirty website/main/mobile checkouts remain untouched.
+Prior physical RMX3151 and viewport evidence is retained; neither was rerun
+for this Git integration. Next: owner laptop/fullscreen review.
+
 ## W2 mobile parity and fresh acceptance (2026-10-11)
 
 **PASS locally, including physical RMX3151 checks.** The existing W2 website

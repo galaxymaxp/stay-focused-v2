@@ -1,5 +1,16 @@
 # Roadmap
 
+## W2 mobile parity main integration (2026-10-11)
+
+Owner requested main publication. W1/W2 website already exists on remote
+main `7ef5a61`; W2 mobile patches now integrate as `f308faf`, `55b7cd0`,
+`815631d`, `dc018c8`, retaining main's newer task refresh. **FRESH PASS:**
+web typecheck/lint/82 tests and mobile typecheck/lint/793 tests, with four
+existing lint warnings. Existing integration and parity documentation both
+survive conflict resolution. Normal push targets `origin/main`; no manual
+deployment or force push. Unrelated dirty work remains intact. Next: owner
+laptop/fullscreen review; other feature scopes remain separately scheduled.
+
 ## W2 mobile parity and fresh acceptance (2026-10-11)
 
 **PASS locally, including physical Android acceptance.** Website W2 remains

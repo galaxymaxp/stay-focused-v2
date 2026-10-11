@@ -2776,3 +2776,31 @@ inactivity rule or generation-engine work is included. Commits are local.
 
 **Next:** Owner review on laptop + fullscreen; then feature prompts
 (content-based estimates, grade estimator, sync automation) when scheduled.
+
+## W2 mobile parity main publication - 2026-10-11
+
+**Scope:** Owner requested `push to main`. Fresh fetch found W1/W2 website
+already on remote main at `7ef5a61`. Used the clean existing integration
+worktree, preserving all original dirty checkouts. Imported the mobile branch
+locally and cherry-picked only the four W2 commits; its older unrelated branch
+history is excluded.
+
+**Mainline commits:** `b87fe54` -> `f308faf` (Canvas grouping), `e1f5f3d` ->
+`55b7cd0` (growing fields), `f42c43f` -> `815631d` (clear-day), `9ec9fa1` ->
+`dc018c8` (keyboard avoidance). Report `3a59d3a` -> `2c022f4`. Runtime patches
+applied cleanly; Today retains main's newer 60000ms task-refresh interval.
+The four report files conflicted at their new sections: retained both existing
+main integration and mobile-parity sections, without discarding history.
+
+**FRESH gates at `2c022f4`:** web typecheck PASS, lint PASS, tests 82/82 in
+12/12 files; mobile typecheck PASS, lint PASS (same four pre-existing import
+warnings), tests 793/793 in 78/78 files. Diff hygiene PASS. No API, dependency,
+schema or website runtime changes in this integration. Root build, new browser
+and physical-device checks NOT RUN for this Git-only integration; previous
+viewport/physical results remain historical evidence for the source patches.
+
+**Publication:** Owner-authorized normal push of this verified integration to
+`origin/main`, followed by a remote HEAD comparison. No force push, source
+branch push, manual deployment, paid calls, private fixtures or environment
+files. Original dirty mobile docs/design and website evidence directories
+remain untouched. Next: owner laptop/fullscreen review.

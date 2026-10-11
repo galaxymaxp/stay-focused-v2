@@ -1,5 +1,17 @@
 # Current Sprint
 
+## W2 mobile parity main integration (2026-10-11)
+
+Owner-authorized scope: `push to main`. W1/W2 website is already on remote
+main at `7ef5a61`; integrated only the four W2 mobile patches and their docs.
+Mobile mainline commits: `f308faf`, `55b7cd0`, `815631d`, `dc018c8`.
+**FRESH PASS:** web typecheck/lint, 82 tests; mobile typecheck/lint, 793 tests
+with the four existing warnings. Main's task-refresh interval and unrelated
+changes are preserved. Documentation conflicts combine existing integration
+history and the parity report. Normal push targets `origin/main`, with remote
+HEAD verification; no force push or manual deployment. All original dirty
+checkouts remain untouched. Previous physical/viewport checks were not rerun.
+
 ## W2 mobile parity and fresh acceptance (2026-10-11)
 
 **PASS locally; revised W2 scope including STEP 7 complete.** Reused and
