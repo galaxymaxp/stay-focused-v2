@@ -8,7 +8,7 @@ import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Platform, View, useWindowDimensions } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, View, useWindowDimensions } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
 import { useAuth } from "../../auth";
@@ -347,6 +347,11 @@ export function ArtifactScreen() {
     return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} />;
   }
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      enabled={!!detail && "draft" in detail}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
     <Page
       title={detail && "draft" in detail ? "Draft" : detail && "quiz" in detail ? "Quiz" : "Library"}
       back
@@ -401,6 +406,7 @@ export function ArtifactScreen() {
         </>
       )}
     </Page>
+    </KeyboardAvoidingView>
   );
 }
 function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft: ActivityDraft) => void }) {

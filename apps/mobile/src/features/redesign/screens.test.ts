@@ -120,6 +120,8 @@ vi.mock("react-native", () => ({
   ScrollView: "ScrollView",
   Pressable: "Pressable",
   TextInput: "TextInput",
+  KeyboardAvoidingView: "KeyboardAvoidingView",
+  Platform: { OS: "android" },
   StatusBar: "StatusBar",
   Linking: { openURL: mocks.openURL },
   BackHandler: { addEventListener: () => ({ remove() {} }) },
@@ -1060,6 +1062,7 @@ describe("B38 saved assignment Draft", () => {
     mocks.artifact = { artifact, draft };
     const root = await render(createElement(ArtifactScreen));
     expect(root.findAll(node => String(node.type) === "Page")[0]!.props.title).toBe("Draft");
+    expect(root.findAll(node => String(node.type) === "KeyboardAvoidingView")[0]!.props).toMatchObject({ enabled: true, behavior: "height" });
     const copy = root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ");
     expect(copy).toContain("Saved draft");
     expect(copy).not.toMatch(/Study activity|Questions \/ Tasks|My work|Mark as completed/);
