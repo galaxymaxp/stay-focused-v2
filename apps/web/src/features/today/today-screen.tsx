@@ -33,6 +33,7 @@ import { CourseDot } from "../../components/course";
 import { useAuth } from "../../components/providers";
 import { ContentIcon, Heading, Icon, Notice } from "../../components/ui";
 import { useResource } from "../../lib/hooks";
+import { setWorkDone } from "../../lib/complete-work";
 import { useListPreferences } from "../../lib/list-preferences";
 import { DayRingClock } from "../day-clock/DayRingClock";
 import {
@@ -182,6 +183,30 @@ export function TodayScreen() {
       today.refresh();
     } catch (error) {
       setNote(error instanceof Error ? error.message : "Could not update your schedule.");
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function complete(item: TodayItem) {
+    if (busyRef.current) return;
+    const activity = activityFor(item, activities.data?.items ?? []);
+    if (!activity) {
+      setNote("This item is still loading. Try again in a moment.");
+      return;
+    }
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await setWorkDone(api, activity, true);
+      setPreview(null);
+      setPreviewRequest(null);
+      today.refresh();
+      activities.refresh();
+      setNote(`“${item.title}” is marked done.`);
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : "Could not mark it done.");
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -388,11 +413,31 @@ export function TodayScreen() {
                       </Link>
                     )}
               </section>
+              {!!today.data?.overdue.length && (
+                <section className="stack">
+                  <h2>Overdue</h2>
+                  <p className="meta">Handed in on paper? Mark it done — Canvas can&apos;t see paper submissions until they&apos;re graded.</p>
+                  <div className="list-card schedule-list">
+                    {today.data.overdue.map((item) => (
+                      <div key={item.id} className="schedule-row overdue">
+                        <span className="grow">
+                          <span className="meta">{item.course?.code ?? item.course?.name ?? "Personal"}</span>
+                          <strong>{item.title}</strong>
+                          <span className="meta">Due {deadline(item.dueAt)}</span>
+                        </span>
+                        <button className="subtle" disabled={busy || activities.loading} onClick={() => void complete(item)} aria-label={`Mark ${item.title} done`}>
+                          Done
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
               <TodayTimeline
                 items={todaySchedule([
-                  ...(today.data?.overdue ?? []),
                   ...(today.data?.timeline ?? []),
                   ...(today.data?.current ? [today.data.current] : []),
+                  ...(today.data?.urgent ?? []).filter((item) => item.dueAt && localDate(new Date(item.dueAt)) === date),
                   ...upcoming.filter((item) => item.dueAt && localDate(new Date(item.dueAt)) === date),
                 ])}
                 onOpen={openItem}

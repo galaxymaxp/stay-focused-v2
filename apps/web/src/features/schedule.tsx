@@ -12,6 +12,7 @@ import { useAuth } from "../components/providers";
 import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel, localDate, timeLabel } from "../lib/api";
 import { useAction, useResource } from "../lib/hooks";
+import { setWorkDone } from "../lib/complete-work";
 export function ScheduleScreen() {
   const { api } = useAuth(),
     [date, setDate] = useState(localDate()),
@@ -154,21 +155,33 @@ export function ScheduleScreen() {
                         </span>
                       </h2>
                       {dueOn(day).map((a) => (
-                        <Link
+                        <div
                           key={a.id}
                           className={`due-chip${a.isOverdue ? " overdue" : ""}`}
-                          href={`/tasks/${encodeURIComponent(a.id)}`}
                           title={a.title}
                         >
                           {a.course ? <CourseDot course={a.course} /> : <span className="due-dot" aria-hidden="true" />}
-                          <span className="grow">
+                          <Link className="grow" href={`/tasks/${encodeURIComponent(a.id)}`}>
                             <strong>{a.title}</strong>
                             <span className="meta">
                               Due {timeLabel(a.dueAt)}
                               {a.course?.code ? ` · ${a.course.code.split("|")[0]!.trim()}` : ""}
                             </span>
-                          </span>
-                        </Link>
+                          </Link>
+                          <button
+                            className="icon-button subtle"
+                            disabled={action.busy}
+                            aria-label={`Mark ${a.title} done`}
+                            onClick={() => void action.run(async () => {
+                              await setWorkDone(api, a, true);
+                              setPreview(null);
+                              activities.refresh();
+                              sessions.refresh();
+                            })}
+                          >
+                            <Icon name="check" />
+                          </button>
+                        </div>
                       ))}
                       {rows.map((s) => {
                         const title = s.task?.title ?? "Study session";
