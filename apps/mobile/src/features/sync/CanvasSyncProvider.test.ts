@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasSyncJobStatusView } from "../../services/canvasApi";
 
 const mocks = vi.hoisted(() => ({
+  catchUp: vi.fn(async () => undefined),
   listCourses: vi.fn(),
   getConnection: vi.fn(),
   getJob: vi.fn(),
@@ -35,6 +36,8 @@ vi.mock("../../services/activeCanvasSyncJobStore", () => ({
   readActiveCanvasSyncJobs: mocks.readActive,
   upsertActiveCanvasSyncJob: mocks.upsert,
 }));
+
+vi.mock("../../services/localLibrary/offlineCatchUp", () => ({ runOfflineCatchUp: mocks.catchUp }));
 
 const { CanvasSyncProvider, useCanvasSync } = await import("./CanvasSyncProvider");
 
@@ -97,6 +100,7 @@ describe("CanvasSyncProvider", () => {
     mocks.listCourses.mockResolvedValue(inventory(fresh));
     await mount();
     expect(latest!.snapshot.phase).toBe("idle");
+    expect(mocks.catchUp).not.toHaveBeenCalled();
 
     mocks.start.mockImplementation(async ({ courseId, jobType }: { courseId: string; jobType: string }) => ({ ok: true, data: { ...job(`job-${courseId}-${jobType}`, "running"), course: { id: courseId, displayName: courseId, courseCode: null } } }));
     // Reconciliation sees nothing (references lost); direct polling must still converge.
@@ -109,6 +113,7 @@ describe("CanvasSyncProvider", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
     expect(mocks.getJob).toHaveBeenCalledTimes(4);
     expect(latest!.snapshot).toMatchObject({ phase: "limited", total: 2, finished: 2 });
+    expect(mocks.catchUp).toHaveBeenCalledWith("owner", { baseUrl: "https://api.example", accessToken: "token" }, { force: true });
     expect(latest!.dataVersion).toBe(before + 1);
   });
 

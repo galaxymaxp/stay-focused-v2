@@ -21,7 +21,7 @@ import { experienceRepository } from "@/lib/experience/repository";
 import { readActivityContext } from "@/lib/experience/task-state";
 
 const TASK_COLUMNS =
-  "id,user_id,title,notes,status,priority,due_at,estimated_minutes,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
+  "id,user_id,title,notes,status,priority,due_at,estimated_minutes,estimate_source,estimate_note,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
 const SESSION_COLUMNS =
   "id,user_id,study_plan_id,task_id,starts_at,ends_at,status,created_at,updated_at";
 const SESSION_TASK_SUMMARY_COLUMNS =
@@ -415,6 +415,8 @@ export function toTaskView(row: TaskRow): TaskView {
     priority: row.priority,
     dueAt: row.due_at,
     estimatedMinutes: row.estimated_minutes,
+    estimateSource: row.estimate_source,
+    estimateNote: row.estimate_note,
     sourceType: row.source_type,
     canvasConnectionId: row.canvas_connection_id,
     canvasCourseId: row.canvas_course_id,

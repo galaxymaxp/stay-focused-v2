@@ -711,7 +711,9 @@ async function readSnapshotItems({
   if (error || !data) {
     return { ok: false };
   }
-  return { ok: true, value: data as readonly ReviewerSourceSnapshotItemRow[] };
+  // Status uses the existing projection; Office rendering evidence is read only
+  // by the exact-source snapshot path, not exposed by this status response.
+  return { ok: true, value: data.map(item => ({ ...item, office_revision_fingerprint: null })) };
 }
 
 async function readCurrentSourceRows({

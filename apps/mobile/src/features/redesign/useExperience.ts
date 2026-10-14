@@ -1,4 +1,4 @@
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../../auth";
@@ -26,6 +26,7 @@ export function useExperience<T>(
     read(ownerUserId: string, path: string): Promise<T | null>;
     write(ownerUserId: string, data: T): Promise<void>;
   },
+  maxPolls = Number.POSITIVE_INFINITY,
 ) {
   const { session } = useAuth();
   const ownerUserId = session?.user.id ?? null;
@@ -56,7 +57,9 @@ export function useExperience<T>(
     let live = true;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let polls = 0;
     async function load() {
+      polls += 1;
       try {
         const data = await experienceRequest<T>(client, path!, {
           signal: controller.signal,
@@ -93,9 +96,9 @@ export function useExperience<T>(
               ? error.code
               : error instanceof ExperienceApiError ? error.code : null,
           }));
-        if (error instanceof ApiConfigurationError) return;
+        if (error instanceof ApiConfigurationError || (pollCondition.current && error instanceof ExperienceApiError && error.code === 'connection')) return;
       }
-      if (live && pollMs) timer = setTimeout(() => void load(), pollMs);
+      if (live && pollMs && polls < maxPolls) timer = setTimeout(() => void load(), pollMs);
     }
     void load();
     return () => {
@@ -103,6 +106,6 @@ export function useExperience<T>(
       controller.abort();
       clearTimeout(timer);
     };
-  }, [client, ownerUserId, path, focused, active, version, dataVersion, pollMs]);
+  }, [client, ownerUserId, path, focused, active, version, dataVersion, pollMs, maxPolls]);
   return { ...state, refresh };
 }

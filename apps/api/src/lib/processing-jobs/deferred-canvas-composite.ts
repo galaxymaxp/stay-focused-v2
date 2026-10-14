@@ -13,6 +13,7 @@ import { record } from '@/lib/experience/mappers';
 import { DEFERRED_CANVAS_REVIEWER_VERSION } from './deferred-canvas-reviewer-contract';
 import { findProcessingJobSource } from './repository';
 import { updateProcessingJobProgress } from './worker-repository';
+import { canonicalCanvasSourceBlocks } from './canvas-canonical-source-blocks';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -34,6 +35,11 @@ export async function prepareDeferredCanvasCompositeSource(
     ids.slice(1).some(id => typeof id !== 'string' || !/^file:[0-9a-f-]{36}$/i.test(id)) ||
     new Set(ids).size !== ids.length) throw new ExperienceFailure(409, 'not_ready');
   const sourceIds = ids as string[];
+  const {readPreparation,readPreparedResult}=await import('@/lib/canvas-preparation/repository');
+  const preparation=typeof metadata.canvasPreparationJobId==='string'?await readPreparation(client,metadata.canvasPreparationJobId):null;
+  const prepared=preparation && preparation.user_id===job.user_id && preparation.course_id===courseId?await readPreparedResult(client,preparation):null;
+  if(!prepared || JSON.stringify(prepared.components.map(item=>`${item.type}:${item.id}`))!==JSON.stringify(sourceIds))
+    throw new ExperienceFailure(409,'not_ready');
   const pageId = sourceIds[0]!.slice(5);
   const { data: page, error: pageError } = await client.from('canvas_pages').select('id,title,canvas_connection_id')
     .eq('id', pageId).eq('user_id', job.user_id).eq('course_id', courseId).maybeSingle();
@@ -76,18 +82,7 @@ export async function prepareDeferredCanvasCompositeSource(
     sourceTitle: page.title });
   if (!snapshot.ok) throw new ExperienceFailure(503, 'unavailable');
 
-  const blocks = Array.isArray(accepted.value.row.selected_block_manifest)
-    ? accepted.value.row.selected_block_manifest.map((value, index) => {
-      const block = record(value);
-      return {
-        id: `canvas-${block.source_ordinal}-${block.block_ordinal}`,
-        kind: typeof block.block_kind === 'string' ? block.block_kind : 'unknown',
-        order: index,
-        ...(typeof block.page_number === 'number' ? { pageNumber: block.page_number } : {}),
-        text: block.block_text,
-      };
-    }).filter(block => typeof block.text === 'string' && block.text.trim())
-    : [];
+  const blocks = canonicalCanvasSourceBlocks(accepted.value.row.selected_block_manifest);
   const resolvedMetadata = JSON.parse(JSON.stringify({
     canvasCourseId: courseId,
     canvasItemIds: sourceIds,

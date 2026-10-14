@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import type {
   CanvasCapability,
   CanvasCapabilityProbeResult,
@@ -583,11 +584,11 @@ async function readBoundedTextBody(
   | { readonly ok: true; readonly value: string }
   | { readonly ok: false }
 > {
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_CONNECT_BODY_BYTES) {
+  const body = await readBoundedText(request, MAX_CONNECT_BODY_BYTES);
+  if (!body.ok && body.reason === "too_large") {
     return { ok: false };
   }
-  return { ok: true, value: text };
+  return { ok: true, value: body.ok ? body.text : "" };
 }
 
 function invalidConnectRequest(message: string): {

@@ -6,6 +6,48 @@ export type Json =
   | { readonly [key: string]: Json | undefined }
   | readonly Json[];
 
+export type SectionExternalVisualRow = {
+  user_id: string; artifact_id: string; version_id: string; section_id: string;
+  status: 'found' | 'none'; source_url: string | null; image_url: string | null;
+  title: string | null; credit: string | null; license: string | null; license_url: string | null;
+  width: number | null; height: number | null; query: string; verdict: string;
+  attempt_count: number; excluded_titles: string[]; created_at: string; updated_at: string;
+};
+
+export type OfficePdfConversionRow = {
+  id: string; user_id: string; source_file_id: string; canvas_connection_id: string; course_id: string;
+  revision_fingerprint: string; original_sha256: string; pdf_sha256: string; byte_size: number;
+  page_count: number; storage_path: string; created_at: string;
+};
+
+export type SourceFigureRow = {
+  id: string; user_id: string; source_kind: 'canvas_file' | 'local_pdf'; source_row_id: string;
+  original_sha256: string; page_number: number | null; slide_number: number | null; block_id: string | null;
+  position: number; width: number; height: number; byte_size: number; sha256: string;
+  storage_path: string; created_at: string;
+};
+
+export type SourcePageSnapshotRow = {
+  id: string;
+  user_id: string;
+  source_version_id: string;
+  source_snapshot_id: string | null;
+  source_snapshot_item_id: string | null;
+  page_number: number;
+  origin: 'student' | 'system';
+  status: 'pending' | 'ready' | 'failed';
+  storage_path: string | null;
+  width: number | null;
+  height: number | null;
+  error_code: 'render_failed' | 'source_revision_unavailable' | 'render_limit_reached' | null;
+  dispatch_id: string;
+  dispatched_at: string | null;
+  lease_token: string | null;
+  lease_expires_at: string | null;
+  attempt_count: number;
+  created_at: string;
+};
+
 export type SavedReviewerSourceMode =
   | "paste"
   | "gallery"
@@ -527,9 +569,87 @@ type NotificationPollRow = {
   course_id: string; last_polled_at: string | null; next_poll_at: string; lease_owner: string | null;
   lease_expires_at: string | null; last_error: string | null; fingerprints: Json;
 }
+export type CanvasAutoReviewerPreferenceRow = { user_id: string; enabled: boolean; updated_at: string };
+export type CanvasAutoReviewerCourseStateRow = { user_id: string; course_id: string; baseline_at: string };
+export type CanvasAutoReviewerCandidateRow = {
+  id: string; user_id: string; course_id: string; material_id: string; material_revision: string;
+  status: 'baseline' | 'pending' | 'admitted' | 'skipped_existing' | 'deferred_quota' | 'failed';
+  processing_job_id: string | null; failure_code: string | null; attempt_count: number; created_at: string; updated_at: string;
+};
+export type CanvasMaterialPreparationRow = {
+  id: string; user_id: string; course_id: string; canvas_connection_id: string; material_id: string;
+  source_type: 'file' | 'page' | 'page-attachment'; revision_fingerprint: string;
+  state: 'pending' | 'running' | 'prepared' | 'failed' | 'cancelled'; cycle_key: string;
+  cycle_attempts: number; lifetime_attempts: number; dispatch_id: string; dispatched_at: string | null;
+  worker_id: string | null; lease_token: string | null; lease_expires_at: string | null;
+  prepared_dispatch_id:string|null;
+  deadline_at: string; available_at: string; reason_code: string | null;
+  original_sha256: string | null; original_byte_size: number | null; result_id: string | null;
+  created_at: string; updated_at: string;
+};
+export type CanvasPreparationSyncRow = {
+  id: string; user_id: string; course_id: string; sync_id: string | null; cycle_key: string;
+  enqueued_count: number; batch_index: number; prepared_total: number; failed_total: number;
+  last_terminal_total: number; deferred_count: number; guard_state: 'running' | 'completed' | 'deferred' | 'tripped';
+  signal: 'repeat' | 'no_progress' | null; created_at: string; updated_at: string;inventory_complete:boolean;batch_evaluated:boolean;
+};
+export type CanvasPreparationBackfillCourseRow = {
+  course_id:string;user_id:string;last_visited_at:string;lease_owner:string|null;lease_expires_at:string|null;
+};
 export interface Database {
   public: {
     Tables: {
+      canvas_preparation_backfill_courses: {Row:CanvasPreparationBackfillCourseRow;Insert:Pick<CanvasPreparationBackfillCourseRow,'course_id'|'user_id'> & Partial<CanvasPreparationBackfillCourseRow>;Update:Partial<CanvasPreparationBackfillCourseRow>;Relationships:[]};
+      canvas_preparation_discoveries: {Row:{user_id:string;course_id:string;material_id:string;cycle_key:string;available_at:string;reason_code:string|null;state:'pending'|'failed'};Insert:{user_id:string;course_id:string;material_id:string;cycle_key:string;available_at?:string;reason_code?:string|null;state?:'pending'|'failed'};Update:{cycle_key?:string;available_at?:string;reason_code?:string|null;state?:'pending'|'failed'};Relationships:[]};
+      canvas_material_preparations: { Row: CanvasMaterialPreparationRow; Insert: Partial<CanvasMaterialPreparationRow> & Pick<CanvasMaterialPreparationRow,'user_id'|'course_id'|'canvas_connection_id'|'material_id'|'source_type'|'revision_fingerprint'|'cycle_key'>; Update: Partial<CanvasMaterialPreparationRow>; Relationships: [] };
+      canvas_material_preparation_controls: { Row: {user_id:string;course_id:string;material_id:string;automatic_attempts:number;suppressed:boolean}; Insert: {user_id:string;course_id:string;material_id:string;automatic_attempts?:number;suppressed?:boolean}; Update: {automatic_attempts?:number;suppressed?:boolean}; Relationships: [] };
+      canvas_material_preparation_evidence: { Row: {job_id:string;evidence:Json}; Insert: {job_id:string;evidence:Json}; Update: {evidence?:Json}; Relationships: [] };
+      canvas_material_preparation_results: { Row: {id:string;job_id:string;payload:Json;created_at:string}; Insert: {id?:string;job_id:string;payload:Json;created_at?:string}; Update: Record<string,never>; Relationships: [] };
+      canvas_preparation_syncs: { Row: CanvasPreparationSyncRow; Insert: Partial<CanvasPreparationSyncRow> & Pick<CanvasPreparationSyncRow,'user_id'|'course_id'|'cycle_key'>; Update: Partial<CanvasPreparationSyncRow>; Relationships: [] };
+      canvas_preparation_sync_items: { Row: {sync_id:string;job_id:string;receipt_id:string;batch_index:number|null;outcome:'prepared'|'failed'|'stalled'|'cancelled'|null}; Insert: {sync_id:string;job_id:string;receipt_id?:string;batch_index?:number|null;outcome?:'prepared'|'failed'|'stalled'|'cancelled'|null}; Update: {batch_index?:number|null;outcome?:'prepared'|'failed'|'stalled'|'cancelled'|null}; Relationships: [] };
+      office_pdf_conversions: {
+        Row: OfficePdfConversionRow;
+        Insert: Omit<OfficePdfConversionRow, 'id' | 'created_at'> & Partial<Pick<OfficePdfConversionRow, 'id' | 'created_at'>>;
+        Update: never;
+        Relationships: [];
+      };
+      source_figure_extractions: {
+        Row: { user_id: string; source_kind: 'canvas_file' | 'local_pdf'; source_row_id: string; revision_fingerprint: string; original_sha256: string; figure_count: number; created_at: string };
+        Insert: { user_id: string; source_kind: 'canvas_file' | 'local_pdf'; source_row_id: string; revision_fingerprint: string; original_sha256: string; figure_count: number; created_at?: string };
+        Update: never;
+        Relationships: [];
+      };
+      section_external_visuals: {
+        Row: SectionExternalVisualRow;
+        Insert: SectionExternalVisualRow;
+        Update: Partial<SectionExternalVisualRow>;
+        Relationships: [];
+      };
+      source_figures: {
+        Row: SourceFigureRow;
+        Insert: Omit<SourceFigureRow, 'id' | 'created_at'> & Partial<Pick<SourceFigureRow, 'id' | 'created_at'>>;
+        Update: never;
+        Relationships: [];
+      };
+      source_page_snapshots: {
+        Row: SourcePageSnapshotRow;
+        Insert: Pick<SourcePageSnapshotRow, 'user_id' | 'source_version_id' | 'source_snapshot_id' | 'source_snapshot_item_id' | 'page_number'> & Partial<SourcePageSnapshotRow>;
+        Update: Partial<SourcePageSnapshotRow>;
+        Relationships: [];
+      };
+      source_page_snapshot_render_attempts: {
+        Row: { id: string; user_id: string; snapshot_id: string; created_at: string };
+        Insert: { id?: string; user_id: string; snapshot_id: string; created_at?: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      canvas_auto_reviewer_activity: { Row: { user_id: string; last_active_at: string }; Insert: { user_id: string; last_active_at: string }; Update: { last_active_at?: string }; Relationships: [] };
+      canvas_auto_reviewer_poll_marks: { Row: { course_id: string; last_seen_module_item_ids: Json; updated_at: string }; Insert: { course_id: string; last_seen_module_item_ids: Json; updated_at?: string }; Update: { last_seen_module_item_ids?: Json; updated_at?: string }; Relationships: [] };
+      canvas_auto_reviewer_poll_requests: { Row: { user_id: string; course_id: string; bucket: number; reserved_at: string }; Insert: { user_id: string; course_id: string; bucket: number; reserved_at?: string }; Update: { reserved_at?: string }; Relationships: [] };
+      canvas_auto_reviewer_admission_leases: { Row: { user_id: string; run_id: string; expires_at: string }; Insert: { user_id: string; run_id: string; expires_at: string }; Update: { run_id?: string; expires_at?: string }; Relationships: [] };
+      canvas_auto_reviewer_preferences: { Row: CanvasAutoReviewerPreferenceRow; Insert: Partial<CanvasAutoReviewerPreferenceRow> & { user_id: string }; Update: Partial<CanvasAutoReviewerPreferenceRow>; Relationships: [] };
+      canvas_auto_reviewer_course_state: { Row: CanvasAutoReviewerCourseStateRow; Insert: Partial<CanvasAutoReviewerCourseStateRow> & Pick<CanvasAutoReviewerCourseStateRow, 'user_id' | 'course_id'>; Update: Partial<CanvasAutoReviewerCourseStateRow>; Relationships: [] };
+      canvas_auto_reviewer_candidates: { Row: CanvasAutoReviewerCandidateRow; Insert: Partial<CanvasAutoReviewerCandidateRow> & Pick<CanvasAutoReviewerCandidateRow, 'user_id' | 'course_id' | 'material_id' | 'material_revision' | 'status'>; Update: Partial<CanvasAutoReviewerCandidateRow>; Relationships: [] };
       notification_preferences: { Row: NotificationPreferenceRow; Insert: Partial<NotificationPreferenceRow> & { user_id: string }; Update: Partial<NotificationPreferenceRow>; Relationships: [] };
       notification_outbox: { Row: CanvasEmailOutboxRow; Insert: Partial<CanvasEmailOutboxRow> & Pick<CanvasEmailOutboxRow, "user_id" | "course_id" | "type" | "dedupe_key" | "payload">; Update: Partial<CanvasEmailOutboxRow>; Relationships: [] };
       canvas_notification_poll_state: { Row: NotificationPollRow; Insert: Partial<NotificationPollRow> & { course_id: string }; Update: Partial<NotificationPollRow>; Relationships: [] };
@@ -544,6 +664,10 @@ export interface Database {
           priority: TaskDatabasePriority;
           due_at: string | null;
           estimated_minutes: number;
+          estimate_source: "default" | "heuristic" | "ai" | "user";
+          estimate_note: string | null;
+          estimate_fingerprint: string | null;
+          estimated_at: string | null;
           source_type: TaskDatabaseSourceType;
           canvas_connection_id: string | null;
           canvas_course_id: string | null;
@@ -562,6 +686,10 @@ export interface Database {
           priority?: TaskDatabasePriority;
           due_at?: string | null;
           estimated_minutes?: number;
+          estimate_source?: "default" | "heuristic" | "ai" | "user";
+          estimate_note?: string | null;
+          estimate_fingerprint?: string | null;
+          estimated_at?: string | null;
           source_type?: TaskDatabaseSourceType;
           canvas_connection_id?: string | null;
           canvas_course_id?: string | null;
@@ -580,6 +708,10 @@ export interface Database {
           priority?: TaskDatabasePriority;
           due_at?: string | null;
           estimated_minutes?: number;
+          estimate_source?: "default" | "heuristic" | "ai" | "user";
+          estimate_note?: string | null;
+          estimate_fingerprint?: string | null;
+          estimated_at?: string | null;
           source_type?: TaskDatabaseSourceType;
           canvas_connection_id?: string | null;
           canvas_course_id?: string | null;
@@ -1117,6 +1249,12 @@ export interface Database {
         Row: { id:string;user_id:string;activity_id:string;course_id:string;canvas_connection_id:string;generation_id:string;activity_type:string;content:Json;specification:Json;sources:Json;warnings:Json;status:string;revision:number;created_at:string;updated_at:string };
         Insert: { id?:string;user_id:string;activity_id:string;course_id:string;canvas_connection_id:string;generation_id:string;activity_type:string;content:Json;specification:Json;sources:Json;warnings?:Json;status?:string;revision?:number;created_at?:string;updated_at?:string };
         Update: { content?:Json;revision?:number;status?:string };
+        Relationships: [];
+      };
+      activity_draft_copies: {
+        Row: { id:string; user_id:string; draft_id:string; content:Json; revision:number; reason:string; created_at:string };
+        Insert: { id?:string; user_id:string; draft_id:string; content:Json; revision:number; reason:string; created_at?:string };
+        Update: { content?:Json };
         Relationships: [];
       };
       canvas_module_items: {
@@ -3135,6 +3273,7 @@ export interface Database {
           local_synced_at: string | null;
           normalized_content_sha256: string;
           stored_content_sha256: string | null;
+          office_revision_fingerprint: string | null;
           parser_version: string | null;
           ocr_version: string | null;
           created_at: string;
@@ -3161,6 +3300,7 @@ export interface Database {
           local_synced_at?: string | null;
           normalized_content_sha256: string;
           stored_content_sha256?: string | null;
+          office_revision_fingerprint?: string | null;
           parser_version?: string | null;
           ocr_version?: string | null;
           created_at?: string;
@@ -3187,6 +3327,7 @@ export interface Database {
           local_synced_at?: string | null;
           normalized_content_sha256?: string;
           stored_content_sha256?: string | null;
+          office_revision_fingerprint?: string | null;
           parser_version?: string | null;
           ocr_version?: string | null;
           created_at?: string;
@@ -4176,6 +4317,35 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      reserve_section_external_visual_v1: { Args: {p_user_id:string;p_artifact_id:string;p_version_id:string;p_section_id:string;p_find_another:boolean}; Returns:string|null };
+      finish_section_external_visual_v1: { Args: {p_token:string;p_result:Json|null}; Returns:boolean };
+      claim_canvas_preparation_backfill_courses_v1:{Args:{p_worker_id:string;p_limit:number};Returns:CanvasPreparationBackfillCourseRow[]};
+      prepare_canvas_material_preparation_dispatch_v1:{Args:{p_job_id:string;p_dispatch_id:string};Returns:CanvasMaterialPreparationRow[]};
+      invalidate_canvas_preparation_binding_v1:{Args:{p_job_id:string;p_user_id:string};Returns:undefined};
+      record_canvas_preparation_discovery_failure_v1: {Args:{p_user_id:string;p_course_id:string;p_material_id:string;p_cycle_key:string;p_delay_seconds:number};Returns:undefined};
+      read_canvas_prepared_file_component_v1: {Args:{p_user_id:string;p_course_id:string;p_file_id:string;p_revision:string};Returns:Json|null};
+      register_canvas_preparation_sync_v1: {Args:{p_user_id:string;p_course_id:string;p_sync_id:string|null;p_cycle_key:string;p_job_ids:string[]};Returns:string};
+      advance_canvas_preparation_sync_v1: {Args:{p_sync_id:string};Returns:CanvasMaterialPreparationRow[]};
+      reenqueue_canvas_preparation_sync_item_v1: {Args:{p_sync_id:string;p_job_id:string;p_receipt_id:string};Returns:boolean};
+      drain_canvas_preparation_sync_v1: {Args:{p_sync_id:string;p_cycle_key:string};Returns:string|null};
+      canvas_preparation_evidence_current_v1: { Args: {p_user_id:string;p_course_id:string;p_evidence:Json}; Returns:boolean };
+      admit_canvas_material_preparation_v1: { Args: {p_user_id:string;p_course_id:string;p_material_id:string;p_source_type:string;p_revision:string;p_evidence:Json;p_cycle_key:string;p_manual_retry?:boolean}; Returns:CanvasMaterialPreparationRow[] };
+      claim_canvas_material_preparation_v1: { Args: {p_job_id:string;p_dispatch_id:string;p_worker_id:string;p_lease_token:string}; Returns:CanvasMaterialPreparationRow[] };
+      heartbeat_canvas_material_preparation_v1: { Args: {p_job_id:string;p_lease_token:string}; Returns:boolean };
+      finish_canvas_material_preparation_v1: { Args: {p_job_id:string;p_lease_token:string;p_payload:Json|null;p_reason:string|null;p_retryable:boolean;p_retry_after_seconds?:number}; Returns:boolean };
+      save_offline_activity_draft: { Args: { p_draft_id:string; p_base_revision:number; p_content:Json; p_client_edit_id:string }; Returns: Json };
+      reserve_source_page_snapshot_v1: { Args: { p_user_id: string; p_source_version_id: string; p_snapshot_item_id: string | null; p_page_number: number }; Returns: SourcePageSnapshotRow[] };
+      reserve_source_page_snapshot_system_v1: { Args: { p_user_id: string; p_source_version_id: string; p_snapshot_item_id: string | null; p_page_number: number }; Returns: SourcePageSnapshotRow[] };
+      reserve_source_page_snapshot_origin_v1: { Args: { p_user_id: string; p_source_version_id: string; p_snapshot_item_id: string | null; p_page_number: number; p_origin: 'student' | 'system' }; Returns: SourcePageSnapshotRow[] };
+      claim_source_page_snapshot_v1: { Args: { p_id: string; p_dispatch_id: string; p_lease_token: string }; Returns: SourcePageSnapshotRow[] };
+      finish_source_page_snapshot_v1: { Args: { p_id: string; p_lease_token: string; p_storage_path: string | null; p_width: number | null; p_height: number | null; p_error_code: string | null }; Returns: boolean };
+      claim_canvas_object_cleanup_v1: { Args: { p_bucket: string; p_key: string }; Returns: boolean };
+      finish_canvas_object_cleanup_v1: { Args: { p_bucket: string; p_key: string }; Returns: boolean };
+      skip_stale_canvas_email_events_v1: { Args: { p_older_than?: string }; Returns: number };
+      record_canvas_api_activity_v1: { Args: { p_user_id: string }; Returns: undefined };
+      reserve_canvas_poll_sync_v1: { Args: { p_user_id: string; p_course_id: string }; Returns: boolean };
+      claim_canvas_auto_reviewer_admission_v1: { Args: { p_user_id: string; p_run_id: string }; Returns: boolean };
+      release_canvas_auto_reviewer_admission_v1: { Args: { p_user_id: string; p_run_id: string }; Returns: undefined };
       notification_email_enabled_v1: { Args: { p_user_id: string; p_type: string }; Returns: boolean };
       canvas_notification_timezone_v1: { Args: { p_user_id: string; p_course_id: string }; Returns: string };
       count_canvas_notification_poll_backlog_v1: { Args: Record<string, never>; Returns: number };

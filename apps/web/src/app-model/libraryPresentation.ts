@@ -1,4 +1,3 @@
-// Mirrors apps/mobile/src/features/redesign/libraryPresentation.ts so web and app present data identically.
 import type { CourseReference, LibraryArtifactSummary, LibraryArtifactType } from "@stay-focused/shared";
 
 /** Route key for saved work that belongs to no course (text, camera, local files). */
@@ -45,11 +44,11 @@ export function groupLibraryByCourse(items: readonly LibraryArtifactSummary[]): 
     });
 }
 
-export function filterCourseLibrary(
-  items: readonly LibraryArtifactSummary[],
+export function filterCourseLibrary<T extends LibraryArtifactSummary>(
+  items: readonly T[],
   courseKey: string,
   filter: LibraryFilter,
-): LibraryArtifactSummary[] {
+): T[] {
   return items.filter((item) => libraryCourseKey(item) === courseKey && (filter === "all" || item.type === filter));
 }
 
@@ -60,4 +59,13 @@ export function describeLibraryCounts(counts: Readonly<Record<LibraryArtifactTyp
   if (counts.quiz) parts.push(`${counts.quiz} quiz${counts.quiz === 1 ? "" : "zes"}`);
   if (counts.activity_output) parts.push(`${counts.activity_output} draft${counts.activity_output === 1 ? "" : "s"}`);
   return parts.join(" · ");
+}
+
+
+export const OFFLINE_LIBRARY_NOTICE = "You're offline. Items marked Saved offline still open.";
+export const OFFLINE_MISSING_NOTICE = "This one isn't saved on your device yet. Connect once and it will be saved for offline use.";
+export function offlineLibraryCaption(stats: { readonly total: number; readonly current: number } | null, saving: boolean): string | null {
+  if (!stats?.total) return null;
+  if (stats.current === stats.total) return 'All ' + stats.total + ' items are saved for offline use.';
+  return stats.current + ' of ' + stats.total + ' saved for offline use.' + (saving ? ' Saving the rest…' : '');
 }

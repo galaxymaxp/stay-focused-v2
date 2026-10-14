@@ -29,6 +29,7 @@ export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 export const TASK_EDITOR_PATHNAME = "/task" as const;
 export const COURSE_REVIEWER_PATHNAME = "/courses/[courseId]/reviewer" as const;
 export const COURSE_GRADES_PATHNAME = "/courses/[courseId]/grades" as const;
+export const TASK_COURSE_GRADES_PATHNAME = "/work/[courseKey]/grades" as const;
 
 /** Authenticated sessions land on the implemented day-planning surface. */
 export const POST_SIGN_IN_ROUTE: AppRoute = APP_ROUTES.today;

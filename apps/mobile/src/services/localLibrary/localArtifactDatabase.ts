@@ -31,6 +31,10 @@ export function getLocalArtifactStore(): Promise<LocalArtifactStore | null> {
 /** Explicit sign-out removes that account's device copies. Never throws. */
 export async function purgeLocalLibraryForOwner(ownerUserId: string): Promise<void> {
   try {
+    const { stopOfflineCatchUp } = await import("./offlineCatchUp");
+    await stopOfflineCatchUp(ownerUserId);
+    const { stopPendingDraftSync } = await import('./pendingDraftSync');
+    await stopPendingDraftSync(ownerUserId);
     await (await getLocalArtifactStore())?.purgeOwner(ownerUserId);
   } catch {
     // Rows stay owner-scoped even if the purge fails; sign-out must not block.

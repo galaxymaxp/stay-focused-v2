@@ -133,6 +133,34 @@ describe("durable processing job creation", () => {
     expect(repositoryMocks.create).toHaveBeenCalledTimes(2);
   });
 
+  it("classifies new plain text reviewer sources for the existing Quiz source contract", async () => {
+    repositoryMocks.find.mockResolvedValue(null);
+    repositoryMocks.create.mockResolvedValue(makeJob());
+    await createReviewerProcessingJob({
+      client: {} as never,
+      idempotencyKey: "reviewer:native-plain-text:1",
+      source: { sourceText: "Cell notes", sourceKind: "plain-text" },
+      userId: "user-a",
+    });
+    expect(repositoryMocks.create).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      sourcePrivateMetadata: expect.objectContaining({ sourceType: "text", reviewerSourceKind: "plain-text" }),
+    }));
+  });
+
+  it("preserves an explicit server source classification", async () => {
+    repositoryMocks.find.mockResolvedValue(null);
+    repositoryMocks.create.mockResolvedValue(makeJob());
+    await createReviewerProcessingJob({
+      client: {} as never,
+      idempotencyKey: "reviewer:explicit-source:1",
+      source: { sourceText: "Extracted camera text", sourceKind: "plain-text", sourcePrivateMetadata: { sourceType: "camera" } },
+      userId: "user-a",
+    });
+    expect(repositoryMocks.create).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      sourcePrivateMetadata: expect.objectContaining({ sourceType: "camera" }),
+    }));
+  });
+
   it("stores generic reviewer page blocks in private job metadata", async () => {
     repositoryMocks.find.mockResolvedValue(null);
     repositoryMocks.create.mockResolvedValue(makeJob());

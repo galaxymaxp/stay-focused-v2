@@ -96,4 +96,11 @@ describe('original source provenance', () => {
     payload.reviewer.sections[0]!.items[0]!.sourceBlockIds = ['missing'];
     await expect(assistSourceExcerpt(missing, assistRequest(selection, 'example'))).rejects.toMatchObject({ code: 'not_ready' });
   });
+  it.each([undefined, 'edited', 'unavailable'])('keeps old/uncited local page references unavailable (%s)', async pageProvenance => {
+    const missing = structuredClone(saved);
+    missing.source.metadata = { sourceType: 'local_file', ...(pageProvenance ? { pageProvenance } : {}) };
+    const payload = missing.version.payload as { reviewer: { sections: { items: { sourceBlockIds: string[] }[] }[] } };
+    payload.reviewer.sections[0]!.items[0]!.sourceBlockIds = ['page-1'];
+    await expect(assistSourceExcerpt(missing, assistRequest(selection, 'example'))).rejects.toMatchObject({ code: 'not_ready' });
+  });
 });

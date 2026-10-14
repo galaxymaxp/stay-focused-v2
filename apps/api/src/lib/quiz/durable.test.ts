@@ -2,7 +2,7 @@ import type { Database,Json,ProcessingJobDatabaseRow } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeEach,describe,expect,it,vi } from 'vitest';
 import { acceptingProvider,fixturePlan,fixtureRegions,request } from './fixtures';
-import { processQuizJob,startQuizGeneration } from './service';
+import { processQuizJob,quizRetryCapacity,startQuizGeneration } from './service';
 const mocks = vi.hoisted(() => ({ resolve: vi.fn(), assemble: vi.fn(), source: vi.fn(), read: vi.fn(), write: vi.fn(), progress: vi.fn(), dispatch: vi.fn(), provider: vi.fn() }));
 vi.mock('./sources', async (original) => ({ ...await original<typeof import('./sources')>(), resolveQuizSources: mocks.resolve, assembleQuizSources: mocks.assemble }));
 vi.mock('../processing-jobs/repository', () => ({ findProcessingJobSource: mocks.source }));
@@ -46,6 +46,36 @@ describe('Quiz existing durable job integration', () => {
         mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions(), capacity: { maximum: 12 } });
         await expect(startQuizGeneration(client, 'owner', { ...request, questionCount: 30 }, 'request-key')).rejects.toThrow('quiz_source_capacity_exceeded');
         expect(rpc).not.toHaveBeenCalled();
+        expect(mocks.provider).not.toHaveBeenCalled();
+    });
+    it('rejects Matching-only above its term budget before admission, while Mixed keeps its capacity', async () => {
+        const rpc = vi.fn().mockResolvedValue({ data: [job], error: null }), client = { rpc } as unknown as SupabaseClient<Database>;
+        mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions(), capacity: { maximum: 30, matchingTermCount: 15, matchingMaximum: 5 } });
+        await expect(startQuizGeneration(client, 'owner', { ...request, questionCount: 10, questionTypes: ['matching'] }, 'request-key'))
+            .rejects.toMatchObject({ status: 422, code: 'quiz_source_capacity_exceeded', supportedMaximum: 5 });
+        expect(rpc).not.toHaveBeenCalled();
+        expect(mocks.dispatch).not.toHaveBeenCalled();
+        expect(mocks.provider).not.toHaveBeenCalled();
+        mocks.dispatch.mockResolvedValue(job);
+        await expect(startQuizGeneration(client, 'owner', { ...request, questionCount: 5, questionTypes: ['matching'] }, 'at-cap-key')).resolves.toBe(job);
+        await expect(startQuizGeneration(client, 'owner', { ...request, questionCount: 10 }, 'mixed-key')).resolves.toBe(job);
+    });
+    it('rechecks the Matching budget before retrying an older admitted job', async () => {
+        const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data: job, error: null }) };
+        query.select.mockReturnValue(query); query.eq.mockReturnValue(query);
+        const client = { from: vi.fn(() => query) } as unknown as SupabaseClient<Database>;
+        mocks.source.mockResolvedValue({ user_id: 'owner', metadata: { quizInput: { ...request, questionCount: 10, questionTypes: ['matching'] } } });
+        mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions(), capacity: { maximum: 30, matchingTermCount: 15, matchingMaximum: 5 } });
+        expect(await quizRetryCapacity(client, 'owner', job.id)).toBe(5);
+        expect(query.eq).toHaveBeenCalledWith('user_id', 'owner');
+    });
+    it.each([false, true])('blocks oversized Matching work before provider calls (legacy checkpoint: %s)', async legacy => {
+        mocks.source.mockResolvedValue({ user_id: 'owner', metadata: { ...resolved, quizInput: { ...request, questionCount: 10, questionTypes: ['matching'] } } });
+        mocks.assemble.mockResolvedValue({ ...resolved, regions: fixtureRegions(), capacity: { maximum: 30, matchingTermCount: 15, matchingMaximum: 5 } });
+        if (legacy) checkpoints.set('quiz:source:ai-first', JSON.parse(JSON.stringify({ regions: fixtureRegions(), materialIds: resolved.materialIds, capacity: 30 })) as Json);
+        await expect(processQuizJob({} as SupabaseClient<Database>, job, 'worker'))
+            .rejects.toMatchObject({ status: 422, code: 'quiz_source_capacity_exceeded', supportedMaximum: 5 });
+        expect(checkpoints.has('quiz:complete:ai-first')).toBe(false);
         expect(mocks.provider).not.toHaveBeenCalled();
     });
     it('checkpoints source plan and verified questions, and resumes without provider calls', async () => {

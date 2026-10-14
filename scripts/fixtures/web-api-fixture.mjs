@@ -9,6 +9,8 @@ export const ids = {
   draft: "77777777-7777-4777-8777-777777777777",
 };
 export function createFixture() {
+  let notificationPreferences = { email_enabled: true, announcement_email: true, new_assignment_email: true, due_date_change_email: true, deadline_7_day: true, deadline_3_day: true, deadline_due_today: true, reminder_time: "08:00", timezone: "Asia/Manila" };
+  let autoReviewerEnabled = true;
   const course = { id: ids.course, code: "TEST101", name: "Study foundations" };
   const capability = { status: "available" };
   const material = {
@@ -60,8 +62,9 @@ export function createFixture() {
     },
     q("q3", "multi_select"),
     q("q4", "true_false"),
-    q("q5"),
+    { ...q("q5", "identification"), prompt: "Name the study process", options: [] },
   ];
+  let quizTitle = "Study practice";
   let attempt = null,
     connection = {
       id: ids.course,
@@ -113,7 +116,7 @@ export function createFixture() {
   const now = () => new Date().toISOString();
   const quiz = () => ({
     id: ids.quiz,
-    title: "Study practice",
+    title: quizTitle,
     courseId: ids.course,
     reviewerArtifactId: ids.reviewer,
     sourceId: ids.material,
@@ -254,6 +257,26 @@ export function createFixture() {
         }),
       );
     };
+    if (path === "/api/notification-preferences") {
+      if (method === "PATCH") notificationPreferences = { ...notificationPreferences, ...body };
+      send({ preferences: notificationPreferences }); return;
+    }
+    if (path === "/api/auto-reviewer-preferences") {
+      if (method === "PATCH") autoReviewerEnabled = body.enabled;
+      send({ enabled: autoReviewerEnabled }); return;
+    }
+    if (path === `/api/reviewers/${ids.reviewer}/figures`) {
+      send({ sections: [{ sectionId: "s1", hasFigures: false }] }); return;
+    }
+    if (path === `/api/reviewers/${ids.reviewer}/sections/s1/snapshot`) {
+      send({ available: false, reason: "no_page_source" }); return;
+    }
+    if (path === `/api/reviewers/${ids.reviewer}/sections/s1/external-visual`) {
+      send({ status: "none", message: "No reliable visual found", attemptCount: body.findAnother ? 2 : 1 }); return;
+    }
+    if (path === `/api/canvas/courses/${ids.course}/grades/estimate`) {
+      send({ estimate: { mode: "points", status: "reachable", targetPercent: Number(url.searchParams.get("target")), currentPercent: 80, minimumFinalPercent: 40, maximumFinalPercent: 90, requiredPercent: 90, needs: [{ assignmentId: "a1", title: "Final reflection", neededPoints: 90, pointsPossible: 100, dueAt: null }], warnings: { hasDropRules: false, hiddenGradeCount: 0, differsFromCanvas: false } } }, 200, true); return;
+    }
     // Your own material: canonical sources, uploads, extraction and Reviewer jobs.
     if (path === "/api/sources" && method === "POST") {
       if (!req.headers["idempotency-key"]) return fail("invalid_request", 400);
@@ -325,6 +348,10 @@ export function createFixture() {
         if (key !== admittedJobs.get("retry-key")) return fail("conflict");
         if (body.courseId !== ids.course || body.materialId !== ids.material)
           return fail("invalid_request", 400);
+      } else if (body.sourceType === "reviewer") {
+        if (body.sourceIds?.[0] !== ids.reviewer || !body.title?.trim()) return fail("invalid_request", 400);
+        quizTitle = body.title;
+        counts.quizTitle = body.title;
       } else if (
         body.questionCount !== 10 ||
         body.difficulty !== "medium" ||
@@ -498,6 +525,7 @@ export function createFixture() {
       return;
     }
     if (path === "/api/experience/study-assist" && method === "POST") {
+      await new Promise(resolve => setTimeout(resolve, 800));
       counts.assistCalls++;
       send({
         ...body,
@@ -507,6 +535,7 @@ export function createFixture() {
       return;
     }
     if (path === "/api/experience/study-tools" && method === "POST") {
+      await new Promise(resolve => setTimeout(resolve, 400));
       counts.assistCalls++;
       const asking = body.action === "test" && !body.modifier;
       send({
@@ -774,6 +803,7 @@ export function createFixture() {
         return;
       }
       if (path.includes("/answers/")) {
+        await new Promise(resolve => setTimeout(resolve, 350));
         const qid = path.split("/").at(-1);
         attempt.answers = attempt.answers.filter((a) => a.questionId !== qid);
         const answer = {
@@ -791,7 +821,7 @@ export function createFixture() {
                 )
               : qid === "q3"
                 ? body.selectedOptionIds?.length === 2
-                : body.selectedOptionIds?.[0] === (qid === "q5" ? "o2" : "o1");
+                : body.selectedOptionIds?.[0] === (qid === "q5" ? "Planning" : "o1");
           attempt.feedback.push({
             ...answer,
             correct,
@@ -805,7 +835,8 @@ export function createFixture() {
                 ? ["l1:r1", "l2:r2"]
                 : qid === "q3"
                   ? ["o1", "o2"]
-                  : [qid === "q5" ? "o2" : "o1"],
+                  : [qid === "q5" ? "opaque-planning-key" : "o1"],
+            ...(qid === "q5" ? { correctAnswerText: "Planning" } : {}),
             ...(qid === "q2" ? { pairCount: 2, pairCorrectCount: correct ? 2 : 0 } : {}),
           });
         }

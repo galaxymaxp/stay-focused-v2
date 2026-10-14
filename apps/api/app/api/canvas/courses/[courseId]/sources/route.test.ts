@@ -117,6 +117,17 @@ describe("GET /api/canvas/courses/[courseId]/sources", () => {
     expect(text).not.toContain("Synthetic body text");
   });
 
+  it('opts into safe status only for new clients, preserving the legacy shape', async () => {
+    mocks.listCanvasReviewerSources.mockImplementation(async input => ({ok:true,value:{...sourceList(),
+      sources:sourceList().sources.map(source=>({...source,...(input.includeClientPreparationStatus
+        ?{preparation:{status:'preparing',reasonCode:null}}:{})})),
+    }}));
+    const legacy=await (await route.GET(createRequest(),createContext('course-1'))).json();
+    expect(legacy.sources[0]).not.toHaveProperty('preparation');
+    const modern=await (await route.GET(createRequest('?preparationStatus=1'),createContext('course-1'))).json();
+    expect(modern.sources[0].preparation).toEqual({status:'preparing',reasonCode:null});
+    expect(JSON.stringify(modern)).not.toMatch(/lease_token|dispatch_id|storage_object_key|evidence|result_id/);
+  });
   it("propagates selected-course authorization failures safely", async () => {
     mocks.listCanvasReviewerSources.mockResolvedValue({
       ok: false,

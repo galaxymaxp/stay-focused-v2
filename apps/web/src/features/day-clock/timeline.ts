@@ -72,7 +72,7 @@ export function formatFreeTime(minutes: number) {
 export function clockLabel(minutes: number) {
   const date = new Date(2000, 0, 1, 0, 0);
   date.setMinutes(Math.round(minutes));
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" });
 }
 
 export const PLAN_TONES = ["blue", "violet", "green", "orange"] as const;

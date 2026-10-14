@@ -4,6 +4,14 @@ import { countActiveJobs } from "../../design/appActivity";
 import { EMPTY_LIST_PREFERENCES, arrangeList, parseListPreferences, setHidden, setPinned } from "./listPreferences";
 import { generationCoreState, queueSections, todayItemDetail } from "./presentation";
 
+it("labels automatic estimates in Today tasks and sessions", () => {
+  const item = { startAt: null, dueAt: null, estimatedMinutes: 45, status: "pending" as const };
+  expect(todayItemDetail({ ...item, estimateSource: "ai" })).toBe("~45 min");
+  expect(todayItemDetail({ ...item, estimateSource: "heuristic" })).toBe("~45 min");
+  expect(todayItemDetail({ ...item, estimateSource: "user" })).toBe("45 min");
+  expect(todayItemDetail({ ...item, estimateSource: "ai", startAt: "2026-10-12T09:00:00Z" })).toMatch(/~45 min$/);
+});
+
 describe("pin and hide preferences", () => {
   it("surfaces the newest pin first and keeps hidden items recoverable, never deleted", () => {
     let prefs = setPinned(EMPTY_LIST_PREFERENCES, "course", "a", true);

@@ -5,8 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 const mocks = vi.hoisted(() => ({
   source: vi.fn(), progress: vi.fn(), structure: vi.fn(), preview: vi.fn(),
   validate: vi.fn(), gate: vi.fn(), snapshot: vi.fn(),
+  preparation:vi.fn(),result:vi.fn(),
 }));
 vi.mock('./repository', () => ({ findProcessingJobSource: mocks.source }));
+vi.mock('@/lib/canvas-preparation/repository',()=>({readPreparation:mocks.preparation,readPreparedResult:mocks.result}));
 vi.mock('./worker-repository', () => ({ updateProcessingJobProgress: mocks.progress }));
 vi.mock('@/lib/canvas-reviewer-sources', () => ({
   structureCanvasReviewerSources: mocks.structure,
@@ -39,9 +41,11 @@ const client = { from, rpc } as unknown as SupabaseClient<Database>;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.source.mockResolvedValue({ source_kind: 'text', metadata: {
-    canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: courseId, canvasItemIds: ids,
+    canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: courseId, canvasItemIds: ids,canvasPreparationJobId:'preparation',
   } });
   pageQuery.maybeSingle.mockResolvedValue({ data: { id: pageId, title: 'Power Point Slides', canvas_connection_id: 'connection' }, error: null });
+  mocks.preparation.mockResolvedValue({user_id:job.user_id,course_id:courseId});
+  mocks.result.mockResolvedValue({components:[{type:'page',id:pageId},{type:'file',id:fileA},{type:'file',id:fileB}]});
   referenceQuery.maybeSingle.mockResolvedValue({ data: { id: 'reference' }, error: null });
   mocks.structure.mockResolvedValue({ ok: true, value: { structureSessionId: 'structure', sources: ids.map((id, index) => ({
     id, blocks: [{ id: `block-${index}`, selectable: true, selectedByDefault: index !== 2 }],
@@ -59,6 +63,11 @@ beforeEach(() => {
 });
 
 describe('deferred composite Canvas Page preparation', () => {
+  it('rejects a Page revision changed since its preparation receipt',async()=>{
+    mocks.result.mockResolvedValue(null);
+    await expect(prepareDeferredCanvasCompositeSource(client,job,'worker')).rejects.toMatchObject({code:'not_ready'});
+    expect(mocks.structure).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();
+  });
   it('resolves all Page attachments as one ordered source with per-block provenance', async () => {
     await expect(prepareDeferredCanvasCompositeSource(client, job, 'worker')).resolves.toBe(true);
     expect(from.mock.calls.filter(([table]) => table === 'canvas_file_references')).toHaveLength(2);

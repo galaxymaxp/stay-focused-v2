@@ -14,6 +14,22 @@ import type {
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type ProcessingJobServiceClient = SupabaseClient<Database>;
+export type ProcessingJobWithOrigin = ProcessingJobDatabaseRow & { readonly origin?: "automatic" | "manual" };
+
+/** Candidate receipts are the source of truth, never request-supplied metadata.
+ * Origin is optional when the label lookup is unavailable. */
+export async function withOwnedJobOrigins(client: ProcessingJobServiceClient, userId: string,
+  jobs: readonly ProcessingJobDatabaseRow[]): Promise<readonly ProcessingJobWithOrigin[]> {
+  if (!jobs.length) return [];
+  const result = await client.from("canvas_auto_reviewer_candidates")
+    .select("user_id,processing_job_id").eq("user_id", userId).in("processing_job_id", jobs.map(job => job.id));
+  if (result.error) {
+    console.error("auto_reviewers.origin_unavailable", { count: jobs.length });
+    return jobs;
+  }
+  const automatic = new Set((result.data ?? []).filter(row => row.user_id === userId).map(row => row.processing_job_id));
+  return jobs.map(job => ({ ...job, origin: job.user_id === userId && automatic.has(job.id) ? "automatic" : "manual" }));
+}
 
 export interface CreateProcessingJobRecordInput {
   readonly userId: string;
@@ -109,7 +125,7 @@ export async function findOwnedProcessingJob(
   client: ProcessingJobServiceClient,
   userId: string,
   jobId: string,
-): Promise<ProcessingJobDatabaseRow | null> {
+): Promise<ProcessingJobWithOrigin | null> {
   const { data, error } = await client
     .from("processing_jobs")
     .select("*")
@@ -120,13 +136,13 @@ export async function findOwnedProcessingJob(
   if (error) {
     throw new ProcessingJobRepositoryError("processing_job_read_failed");
   }
-  return data;
+  return data ? (await withOwnedJobOrigins(client, userId, [data]))[0] ?? null : null;
 }
 
 export async function listOwnedActiveProcessingJobs(
   client: ProcessingJobServiceClient,
   userId: string,
-): Promise<readonly ProcessingJobDatabaseRow[]> {
+): Promise<readonly ProcessingJobWithOrigin[]> {
   const { data, error } = await client
     .from("processing_jobs")
     .select("*")
@@ -138,7 +154,7 @@ export async function listOwnedActiveProcessingJobs(
   if (error) {
     throw new ProcessingJobRepositoryError("processing_job_read_failed");
   }
-  return data ?? [];
+  return await withOwnedJobOrigins(client, userId, data ?? []);
 }
 
 export interface ProcessingJobListOptions {
@@ -154,7 +170,7 @@ export async function listOwnedProcessingJobs(
   client: ProcessingJobServiceClient,
   userId: string,
   options: ProcessingJobListOptions,
-): Promise<readonly ProcessingJobDatabaseRow[]> {
+): Promise<readonly ProcessingJobWithOrigin[]> {
   let query = client
     .from("processing_jobs")
     .select("*")
@@ -176,7 +192,7 @@ export async function listOwnedProcessingJobs(
   if (error) {
     throw new ProcessingJobRepositoryError("processing_job_read_failed");
   }
-  return data ?? [];
+  return await withOwnedJobOrigins(client, userId, data ?? []);
 }
 
 export async function findOwnedProcessingJobResult(
@@ -271,10 +287,11 @@ export async function retryProcessingJob(
 }
 
 export function toProcessingJobStatusView(
-  job: ProcessingJobDatabaseRow,
+  job: ProcessingJobWithOrigin,
 ): ProcessingJobStatusView {
   const source = readSourceMetadata(job.source_metadata);
   return {
+    ...(job.origin ? { origin: job.origin } : {}),
     id: job.id,
     jobType: job.job_type,
     status: job.status,

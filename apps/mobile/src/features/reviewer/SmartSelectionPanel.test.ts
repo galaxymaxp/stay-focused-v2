@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STUDY_GROUNDING_DETAILS, STUDY_LIMITS, STUDY_OFFLINE, STUDY_QUESTION_TOO_LONG, STUDY_SELECTION_TOO_LARGE, selectAssistBlock, studySurface, type ReviewerReaderModel, type StudyToolRequest } from '@stay-focused/shared';
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 
+vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
+vi.mock('./SourceFigures',()=>({SourceFigures:()=>null,useFigureAvailability:()=>new Set()}));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),
@@ -205,6 +207,24 @@ describe('Smart Selection learning sheet', () => {
     network.mockResolvedValueOnce({ action: 'test', outcome: 'insufficient', grounding: 'source', text: 'There isn’t enough course material around this selection to create a reliable question.', createdAt: '2026-10-01T00:00:00Z' });
     await press(tab('Test Me'));
     expect(nodes('Notice').map(node => node.props.children).join()).toContain('enough course material');
+  });
+  it('asks about the concept and a key point without selecting text', async () => {
+    await open({ selection }, null);
+    expect(network).not.toHaveBeenCalled();
+    await press(action('Ask about this concept or key point'));
+    expect(network).not.toHaveBeenCalled();
+    const field = () => nodes('TextInput').find(node => String(node.props.accessibilityLabel).startsWith('Ask'))!;
+    network.mockResolvedValueOnce(ok({ action: 'ask' }));
+    await act(async () => field().props.onChangeText('How does this work?'));
+    await press(action('Ask'));
+    expect(requests()[0]).toMatchObject({ action: 'ask', selection: block.explanation, question: 'How does this work?' });
+    await act(async () => rendered!.unmount());
+    await open({ selection, pointIndex: 0 }, null);
+    await press(action('Ask about this concept or key point'));
+    network.mockResolvedValueOnce(ok({ action: 'ask' }));
+    await act(async () => field().props.onChangeText('Why?'));
+    await press(action('Ask'));
+    expect(requests()[1]).toMatchObject({ selection: block.keyPoints[0], question: 'Why?' });
   });
   it('limits Ask questions on the device and bounds the follow-up thread', async () => {
     await open();

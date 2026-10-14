@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from "expo-router/react-navigation";
 import { Stack } from "expo-router";
 import { useMemo, type ReactNode } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";

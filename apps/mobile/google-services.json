@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "167076683333",
+    "project_id": "stay-focus-492811",
+    "storage_bucket": "stay-focus-492811.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:167076683333:android:a84c0b694266b5edaecd2c",
+        "android_client_info": {
+          "package_name": "com.galaxymaxp.stayfocusedv2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "167076683333-2tcqo5s2uk1d2vvd5tkuai9cmdc0kp05.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD08CQD-HrofvPWoO52EVEg_ATfYwxtOz0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "167076683333-2tcqo5s2uk1d2vvd5tkuai9cmdc0kp05.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

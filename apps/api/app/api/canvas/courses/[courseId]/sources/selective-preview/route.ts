@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import {
   jsonResponse,
   optionsResponse,
@@ -112,11 +113,8 @@ async function readSelectivePreviewRequest(request: Request): Promise<
     };
   }
 
-  const rawBody = await request.text();
-  if (
-    new TextEncoder().encode(rawBody).byteLength >
-    MAX_SELECTIVE_PREVIEW_BODY_BYTES
-  ) {
+  const boundedBody = await readBoundedText(request, MAX_SELECTIVE_PREVIEW_BODY_BYTES);
+  if (!boundedBody.ok && boundedBody.reason === "too_large") {
     return {
       ok: false,
       status: 413,
@@ -124,6 +122,7 @@ async function readSelectivePreviewRequest(request: Request): Promise<
       message: `Request body must be at most ${MAX_SELECTIVE_PREVIEW_BODY_BYTES} bytes.`,
     };
   }
+  const rawBody = boundedBody.ok ? boundedBody.text : "";
 
   let parsed: unknown;
   try {

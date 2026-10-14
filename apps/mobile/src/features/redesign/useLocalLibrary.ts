@@ -3,19 +3,24 @@ import type {
   LibraryArtifactSummary,
   LibraryOverview,
 } from "@stay-focused/shared";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "../../auth";
 import { ApiConfigurationError } from "../../config/apiBaseUrlResolution";
 import { useTheme } from "../../design/theme";
 import { libraryRemote, storeLocalArtifactDetail } from "../../services/localLibrary/deviceLibrary";
-import { reconcileLibrary, refreshArtifactDetail } from "../../services/localLibrary/librarySync";
+import type { OfflineStats } from "../../services/localLibrary/artifactStore";
+import { runOfflineCatchUp, subscribeOfflineLibrary, offlineCatchUpRunning } from "../../services/localLibrary/offlineCatchUp";
+import { refreshArtifactDetail } from "../../services/localLibrary/librarySync";
 import { getLocalArtifactStore } from "../../services/localLibrary/localArtifactDatabase";
 import { useExperienceClient } from "./useExperience";
+import { syncPendingDraftEdits, subscribeDraftEdits } from '../../services/localLibrary/pendingDraftSync';
 
 interface LibraryState {
-  readonly items: readonly LibraryArtifactSummary[];
+  readonly items: readonly (LibraryArtifactSummary & { readonly offlineReady?: boolean })[];
+  readonly offlineStats: OfflineStats | null;
+  readonly errorCode: string | null;
   readonly categories: LibraryOverview["categories"] | null;
   /** True once the device copy has been read (or found unavailable). */
   readonly localReady: boolean;
@@ -26,6 +31,8 @@ interface LibraryState {
 }
 const initialLibrary: LibraryState = {
   items: [],
+  offlineStats: null,
+  errorCode: null,
   categories: null,
   localReady: false,
   refreshing: false,
@@ -53,37 +60,42 @@ export function useLocalLibrary() {
     let live = true;
     const controller = new AbortController();
     const remote = libraryRemote(client, controller.signal);
+    let unsubscribe: (() => void) | undefined;
     void (async () => {
       const store = await getLocalArtifactStore();
       if (!live) return;
       if (!store) {
-        setState((old) => ({ ...old, localReady: true, refreshing: true, error: null }));
+        setState((old) => ({ ...old, localReady: true, refreshing: true, error: null, errorCode: null }));
         try {
           const page = await remote.fetchPage(0, 100);
-          if (live) setState({ items: page.items, categories: page.categories, localReady: true, refreshing: false, error: null, supersededReviewerIds: page.supersededReviewerIds ?? [] });
+          if (live) setState({ items: page.items, categories: page.categories, localReady: true, refreshing: false, error: null, offlineStats: null, errorCode: null, supersededReviewerIds: page.supersededReviewerIds ?? [] });
         } catch (error) {
-          if (live) setState((old) => ({ ...old, refreshing: false, error: message(error) }));
+          if (live) setState((old) => ({ ...old, refreshing: false, error: message(error), errorCode: codeOf(error) }));
         }
         return;
       }
       const readLocal = async () => {
-        const items = await store.listSummaries(ownerUserId);
-        if (live) setState((old) => ({ ...old, items: items.filter(item => !old.supersededReviewerIds.includes(item.id)), localReady: true }));
+        const [items, offlineStats] = await Promise.all([store.listSummaries(ownerUserId), store.offlineStats(ownerUserId)]);
+        if (live) setState((old) => ({ ...old, items: items.filter(item => !old.supersededReviewerIds.includes(item.id)), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) }));
       };
+      unsubscribe = subscribeOfflineLibrary(ownerUserId, () => { void readLocal().catch(() => undefined); });
       await readLocal().catch(() => {
         if (live) setState((old) => ({ ...old, localReady: true }));
       });
       if (!live) return;
       setState((old) => ({ ...old, refreshing: true, error: null }));
       try {
-        const result = await reconcileLibrary({
-          store,
-          ownerUserId,
-          remote,
-          onListReconciled: readLocal,
-          isCancelled: () => !live,
-        });
-        if (live) setState((old) => ({ ...old, items: old.items.filter(item => !result.supersededReviewerIds.includes(item.id)), supersededReviewerIds: result.supersededReviewerIds, categories: result.categories ?? old.categories, refreshing: false }));
+        await syncPendingDraftEdits(ownerUserId, client);
+        const outcome = await runOfflineCatchUp(ownerUserId, client, { force: true });
+        await readLocal();
+        const result = outcome.result;
+        if (live) setState((old) => ({ ...old,
+          items: result ? old.items.filter(item => !result.supersededReviewerIds.includes(item.id)) : old.items,
+          supersededReviewerIds: result?.supersededReviewerIds ?? old.supersededReviewerIds,
+          categories: result?.categories ?? old.categories, refreshing: false,
+          error: outcome.errorCode === "connection" ? "connection" : outcome.errorCode ? "Could not refresh your Library. Try again." : null,
+          errorCode: outcome.errorCode,
+        }));
       } catch (error) {
         await readLocal().catch(() => undefined);
         if (live) setState((old) => ({ ...old, refreshing: false, error: message(error) }));
@@ -92,6 +104,7 @@ export function useLocalLibrary() {
     return () => {
       live = false;
       controller.abort();
+      unsubscribe?.();
     };
   }, [ownerUserId, client, focused, active, version]);
 
@@ -104,8 +117,9 @@ interface ArtifactState {
   readonly error: string | null;
   /** The cloud could not be reached; the visible copy is from this device. */
   readonly deviceCopy: boolean;
+  readonly offlineMissing: boolean;
 }
-const initialArtifact: ArtifactState = { data: null, loading: true, error: null, deviceCopy: false };
+const initialArtifact: ArtifactState = { data: null, loading: true, error: null, deviceCopy: false, offlineMissing: false };
 
 /**
  * Opens a saved artifact from the device first. When `refreshRemote` is set,
@@ -124,13 +138,24 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
   useEffect(() => {
     if (!ownerUserId || !artifactId) return;
     let live = true;
+    const unsubscribe = subscribeDraftEdits(ownerUserId, () => {
+      void getLocalArtifactStore().then(async store => {
+        const local = await store?.readDetail(ownerUserId, artifactId);
+        if (live && local) setState(old => ({ ...old, data: local.detail, loading: false }));
+      }).catch(() => undefined);
+    });
+    return () => { live = false; unsubscribe(); };
+  }, [ownerUserId, artifactId]);
+  useEffect(() => {
+    if (!ownerUserId || !artifactId) return;
+    let live = true;
     const controller = new AbortController();
     const remote = libraryRemote(client, controller.signal);
     void (async () => {
       const store = await getLocalArtifactStore();
       const local = store ? await store.readDetail(ownerUserId, artifactId).catch(() => null) : null;
       if (!live) return;
-      if (local) setState({ data: local.detail, loading: false, error: null, deviceCopy: false });
+      if (local) setState({ data: local.detail, loading: false, error: null, deviceCopy: false, offlineMissing: false });
       if (!refreshRemote) {
         if (!local) setState((old) => ({ ...old, loading: false }));
         return;
@@ -138,20 +163,20 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
       try {
         let detail: LibraryArtifactDetail;
         if (store) {
-          const refreshed = await refreshArtifactDetail({ store, ownerUserId, remote, artifactId });
+          const refreshed = await refreshArtifactDetail({ store, ownerUserId, remote, artifactId, isCancelled: () => !live });
           // Display what the store kept, which never regresses to an older copy.
           detail = (await store.readDetail(ownerUserId, artifactId))?.detail ?? refreshed.detail;
         } else {
           detail = await remote.fetchDetail(artifactId);
         }
-        if (live) setState({ data: detail, loading: false, error: null, deviceCopy: false });
+        if (live) setState({ data: detail, loading: false, error: null, deviceCopy: false, offlineMissing: false });
       } catch (error) {
         if (!live) return;
         const gone = codeOf(error) === "not_found";
         setState((old) =>
           old.data && !gone
             ? { ...old, loading: false, deviceCopy: true }
-            : { data: null, loading: false, error: message(error), deviceCopy: false },
+            : { data: null, loading: false, error: message(error), deviceCopy: false, offlineMissing: !!store && codeOf(error) === "connection" },
         );
       }
     })();
@@ -181,5 +206,5 @@ function message(error: unknown) {
   return error instanceof Error ? error.message : "Please try again.";
 }
 function codeOf(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error ? error.code : null;
+  return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : null;
 }

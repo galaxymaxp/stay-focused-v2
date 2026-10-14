@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./grade-estimator": "./src/grade-estimator.ts",
     "./task-planning": "./src/task-planning.ts",
     "./notification-preferences": "./src/notification-preferences.ts"
   },

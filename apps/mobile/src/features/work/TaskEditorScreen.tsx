@@ -10,6 +10,7 @@ import { Screen } from "../../components/Screen";
 
 import { createTask, deleteTask, listTasks, updateTask } from "../../services/taskApi";
 import { TaskEditor, type TaskDraft } from "./TaskEditor";
+import { taskPatchFromDraft } from "./taskEditorInput";
 
 interface TaskEditorScreenProps {
   /** Null creates a new task; a task id loads that task for editing. */
@@ -69,7 +70,7 @@ export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenP
       }
       setSaving(true);
       const result = taskId
-        ? await updateTask({ accessToken: token, apiBaseUrl, taskId, ...draft })
+        ? await updateTask({ accessToken: token, apiBaseUrl, taskId, ...taskPatchFromDraft(draft, task) })
         : await createTask({ accessToken: token, apiBaseUrl, ...draft });
       setSaving(false);
       if (!result.ok) {
@@ -78,7 +79,7 @@ export function TaskEditorScreen({ taskId, onDone, onCancel }: TaskEditorScreenP
       }
       onDone();
     },
-    [accessToken, onDone, taskId],
+    [accessToken, onDone, taskId, task],
   );
 
   const handleDelete = useCallback(async () => {

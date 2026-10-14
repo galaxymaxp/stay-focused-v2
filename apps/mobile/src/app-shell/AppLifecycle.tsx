@@ -3,6 +3,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth";
+import { useTheme } from "../design/theme";
+import { runOfflineCatchUp, stopOfflineCatchUp } from "../services/localLibrary/offlineCatchUp";
+import { syncPendingDraftEdits, stopPendingDraftSync } from '../services/localLibrary/pendingDraftSync';
 import { getApiBaseUrl } from "../config/apiBaseUrl";
 import { readNotificationDestination } from "../navigation/notificationRoutes";
 import {
@@ -30,6 +33,17 @@ export function AppLifecycle() {
   const accessToken = session?.accessToken;
   const ownerUserId = session?.user.id;
   const pathname = usePathname();
+  const { active } = useTheme();
+  useEffect(() => {
+    const baseUrl = getApiBaseUrl();
+    if (ownerUserId && accessToken && baseUrl && active) {
+      void runOfflineCatchUp(ownerUserId, { baseUrl, accessToken });
+      void syncPendingDraftEdits(ownerUserId, { baseUrl, accessToken });
+    }
+  }, [ownerUserId, accessToken, active]);
+  useEffect(() => () => {
+    if (ownerUserId) { void stopOfflineCatchUp(ownerUserId); void stopPendingDraftSync(ownerUserId); }
+  }, [ownerUserId]);
   const routedRecoveryKeyRef = useRef<string | null>(null);
 
   const reconcileOutbox = useCallback(async () => {

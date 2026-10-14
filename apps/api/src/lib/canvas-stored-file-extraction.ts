@@ -30,13 +30,14 @@ import {
 } from "@/lib/ocr/upload-policy";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
-import { OFFICE_MIME, extractOfficeText } from "./activity-maker/office-extraction";
+import { OFFICE_MIME, extractOfficeStructure } from "./activity-maker/office-extraction";
 export type CanvasStoredFileKind = "pdf" | "image" | "text" | "docx" | "pptx" | "unsupported";
 
 export interface CanvasStoredFileExtraction {
   readonly text: string;
   readonly fileKind: Exclude<CanvasStoredFileKind, "unsupported">;
   readonly pageCount?: number;
+  readonly officeDrafts?: readonly import("./canvas-structured-blocks").CanvasStructuredBlockDraft[];
   readonly ocrResult?: OcrResult;
 }
 
@@ -79,6 +80,7 @@ export function isPreparedCanvasFileReadyForOcr(file: CanvasFileRow): boolean {
 
   return (
     file.availability_status === "available" &&
+    Boolean(file.content_version_fingerprint?.trim()) &&
     (file.ingestion_status === "stored" || file.ingestion_status === "unchanged") &&
     file.ingestion_eligibility === fileEligibilityForKind(fileKind) &&
     file.storage_bucket === CANVAS_SOURCE_FILE_BUCKET &&
@@ -190,7 +192,7 @@ export async function extractPreparedCanvasFileText({
   }
 
   if (fileKind === "docx" || fileKind === "pptx") {
-    try { return { ok: true, value: { fileKind, text: extractOfficeText(bytes, fileKind) } }; }
+    try { const office=extractOfficeStructure(bytes,fileKind); return { ok: true, value: { fileKind, text: office.text, officeDrafts: office.drafts } }; }
     catch { return { ok: false, status: 422, code: "canvas_source_unsupported_file_type", message: "The document could not be read safely." }; }
   }
   if (fileKind === "text") {

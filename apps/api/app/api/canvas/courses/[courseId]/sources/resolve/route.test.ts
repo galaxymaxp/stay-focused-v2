@@ -28,6 +28,15 @@ describe("POST Canvas usable-content resolution", () => {
     });
   });
 
+  it.each([undefined, "1"])("stream-caps oversized bytes with Content-Length %s", async contentLength => {
+    const response = await (await import("./route")).POST(new Request("https://example.test", {
+      method: "POST", headers: { authorization: "Bearer session", "content-type": "application/json", ...(contentLength ? { "content-length": contentLength } : {}) },
+      body: " ".repeat(4 * 1024 + 1),
+    }), { params: Promise.resolve({ courseId: "00000000-0000-4000-8000-000000000001" }) });
+    expect(response.status).toBe(413);
+    expect((await response.json()).error).toEqual({ code: "payload_too_large", message: "Request body must be at most 4096 bytes." });
+  });
+
   it("returns content only for a usable owned synchronized source", async () => {
     mocks.resolveStoredCanvasUsableContent.mockResolvedValue({
       ok: true,

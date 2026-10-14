@@ -1,4 +1,3 @@
-// Mirrors apps/mobile/src/features/redesign/presentation.ts so web and app present data identically.
 import type {
   FeatureCapability,
   GenerateCoursePeriod,
@@ -119,7 +118,7 @@ export function ringDragMinutes(previous: number, angleMinutes: number) {
 export function timeLabel(value: string | null) {
   return value
     ? new Date(value).toLocaleTimeString([], {
-        hour: "numeric",
+        hour: "numeric", hour12: true,
         minute: "2-digit",
       })
     : "";
@@ -128,10 +127,11 @@ export function timeLabel(value: string | null) {
  * The line under a Today item: when it happens and whether it is finished.
  * Internal states such as "pending" or "unknown" are never shown.
  */
-export function todayItemDetail(item: Pick<TodayItem, "startAt" | "dueAt" | "estimatedMinutes" | "status">, now = Date.now()): string {
+export function todayItemDetail(item: Pick<TodayItem, "startAt" | "dueAt" | "estimatedMinutes" | "status"> & Partial<Pick<TodayItem, "estimateSource">>, now = Date.now()): string {
+  const estimate = item.estimatedMinutes ? `${item.estimateSource === "ai" || item.estimateSource === "heuristic" ? "~" : ""}${item.estimatedMinutes} min` : "";
   const when = item.startAt
-    ? [timeLabel(item.startAt), item.estimatedMinutes ? `${item.estimatedMinutes} min` : ""]
-    : [item.dueAt ? dueLabel(item.dueAt, now) : ""];
+    ? [timeLabel(item.startAt), estimate]
+    : [item.dueAt ? dueLabel(item.dueAt, now) : "", estimate];
   const state = item.status === "submitted" ? "Submitted" : item.status === "completed" ? "Done" : item.status === "skipped" ? "Skipped" : "";
   return [...when, state].filter(Boolean).join(" · ");
 }
@@ -178,7 +178,7 @@ export function deadline(value: string | null) {
     ? new Date(value).toLocaleString([], {
         month: "short",
         day: "numeric",
-        hour: "numeric",
+        hour: "numeric", hour12: true,
         minute: "2-digit",
       })
     : "No deadline";

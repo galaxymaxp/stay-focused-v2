@@ -43,6 +43,15 @@ describe("POST /api/canvas/courses/[courseId]/sources/preview", () => {
     });
   });
 
+  it.each([undefined, "1"])("stream-caps oversized bytes with Content-Length %s", async contentLength => {
+    const response = await (await import("./route")).POST(new Request("https://example.test", {
+      method: "POST", headers: { authorization: "Bearer session", "content-type": "application/json", ...(contentLength ? { "content-length": contentLength } : {}) },
+      body: " ".repeat(32 * 1024 + 1),
+    }), { params: Promise.resolve({ courseId: "00000000-0000-4000-8000-000000000001" }) });
+    expect(response.status).toBe(413);
+    expect((await response.json()).error).toEqual({ code: "payload_too_large", message: "Request body must be at most 32768 bytes." });
+  });
+
   it("requires Canvas API authentication before parsing source IDs", async () => {
     const authResponse = Response.json(
       { ok: false, error: { code: "unauthorized" } },

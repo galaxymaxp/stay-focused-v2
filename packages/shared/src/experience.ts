@@ -1,4 +1,27 @@
-import type { TaskPriority, TaskStatus, StudySessionStatus } from './task-planning';
+import type { TaskPriority, TaskStatus, StudySessionStatus, TaskEstimateSource } from './task-planning';
+import type { ActivityDraft, ActivityDraftContent } from './activity-maker';
+
+export interface OfflineDraftSaveInput {
+  readonly baseRevision: number;
+  readonly content: ActivityDraftContent;
+  readonly clientEditId: string;
+}
+export interface OfflineDraftSaveResult {
+  readonly draft: ActivityDraft;
+  readonly conflict: boolean;
+  readonly copyId: string | null;
+  readonly replayed: boolean;
+}
+export interface ActivityDraftCopySummary {
+  readonly id: string;
+  readonly revision: number;
+  readonly createdAt: string;
+  readonly title: string;
+}
+export interface ActivityDraftCopy extends ActivityDraftCopySummary {
+  readonly content: ActivityDraftContent;
+}
+export interface ActivityDraftCopies { readonly copies: readonly ActivityDraftCopySummary[] }
 
 export interface FeatureCapability {
   readonly status: 'available' | 'unavailable' | 'temporarily_unavailable';
@@ -45,12 +68,20 @@ export interface GenerateCourseList {
   /** 'stored' means Canvas was unreachable and periods come from saved course dates only. */
   readonly classificationSource: 'canvas' | 'stored';
 }
+/** Server-derived state of the current material revision. No worker details. */
+export interface MaterialPreparation {
+  readonly status: 'ready' | 'preparing' | 'failed' | 'unsupported' | 'empty' | 'unavailable';
+  readonly reasonCode: 'preparation_failed' | 'preparation_cancelled' | 'attempt_limit' | 'preparation_paused' | null;
+}
 export interface LearningMaterial {
   readonly id: string;
   readonly courseId: string;
   readonly title: string;
   readonly kind: 'pdf' | 'document' | 'slides' | 'page' | 'module' | 'announcement' | 'assignment' | 'image' | 'text';
+  /** @deprecated Use preparation; retained for one release of older mobile builds. */
   readonly readiness: 'ready' | 'needs_preparation' | 'empty' | 'unsupported' | 'unavailable';
+  /** Absent only on older API builds. */
+  readonly preparation?: MaterialPreparation;
   readonly count: number | null;
   readonly sourceId: string;
   /** Latest owner-persisted Reviewer grounded in this exact Canvas material. */
@@ -77,6 +108,7 @@ export interface ActivitySummary {
   readonly status: TaskStatus | 'submitted' | 'unknown';
   readonly priority: TaskPriority;
   readonly estimatedMinutes: number | null;
+  readonly estimateSource: TaskEstimateSource | null;
   readonly submissionTypes: readonly string[];
   readonly source: 'canvas' | 'local';
   readonly isOverdue: boolean;
@@ -111,6 +143,7 @@ export interface TodayItem {
   readonly endAt: string | null;
   readonly dueAt: string | null;
   readonly estimatedMinutes: number | null;
+  readonly estimateSource: TaskEstimateSource | null;
   readonly priority: TaskPriority;
   readonly status: ActivitySummary['status'] | StudySessionStatus;
   readonly source: 'canvas' | 'local';
@@ -163,6 +196,9 @@ export interface StudentAnnouncementList {
 export type LibraryArtifactType = 'reviewer' | 'quiz' | 'activity_output';
 export type GenerationState = 'queued' | 'preparing' | 'generating' | 'finalizing' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
 export interface LibraryArtifactSummary {
+  /** Deterministic estimate from saved reviewer content; absent on older clients. */
+  readonly reviewMinutes?: number | null;
+  readonly origin?: "automatic" | "manual";
   readonly quiz?: import('./quiz').QuizSummary;
   /** Device-local editable worksheet state; absent on historical artifacts. */
   readonly activityStudyStatus?: 'not_started' | 'in_progress' | 'completed';
@@ -195,6 +231,8 @@ export type LibraryArtifactDetail =
   | { readonly artifact: LibraryArtifactSummary; readonly quiz: import('./quiz').Quiz }
   | { readonly artifact: LibraryArtifactSummary; readonly draft: import('./activity-maker').ActivityDraft };
 export interface ReviewerReaderModel {
+  /** Deterministic estimate from this version's saved content. */
+  readonly reviewMinutes?: number | null;
   readonly id: string;
   readonly title: string;
   readonly course: CourseReference | null;

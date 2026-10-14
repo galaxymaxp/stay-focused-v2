@@ -154,6 +154,13 @@ describe("/api/canvas", () => {
     mocks.verifyBearerToken.mockResolvedValue({ id: "user-1" });
   });
 
+  it.each([undefined, "1"])("stream-caps connection bytes with Content-Length %s", async contentLength => {
+    const response = await (await import("./route")).PUT(new Request("https://example.test", { method: "PUT", headers: { authorization: "Bearer session", "content-type": "application/json", ...(contentLength ? { "content-length": contentLength } : {}) }, body: " ".repeat(16385) }));
+    expect(response.status).toBe(413);
+    expect((await response.json()).error).toEqual({ code: "payload_too_large", message: "Request body must be at most 16384 bytes." });
+    expect(mocks.constructorCalls).toHaveLength(0);
+  });
+
   it("requires JWT auth before reading Canvas connection state", async () => {
     mocks.verifyBearerToken.mockResolvedValue(null);
     const db = createDbClient();

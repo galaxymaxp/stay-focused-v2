@@ -172,6 +172,11 @@ export function TaskEditor({
             testID="task-estimate-input"
             value={estimate}
           />
+          {task?.estimateSource === "ai" ? (
+            <Text style={styles.provenance}>Estimated by Stay Focused: {task.estimateNote}</Text>
+          ) : task?.estimateSource === "heuristic" ? (
+            <Text style={styles.provenance}>Estimated from the assignment type</Text>
+          ) : null}
 
           <TextField
             label="Notes (optional)"

@@ -25,6 +25,8 @@ import { GenerationCore } from "./GenerationCore";
 import { generationCoreState, generationMessages, queueSections, stalledInQueue } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { useListPreferences } from "./useListPreferences";
+import { automaticQueueLabel } from "./automationPresentation";
+import { radius, spacing } from "../../design/tokens";
 
 export function GenerationScreen() {
   const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string; quiz?: string }>();
@@ -468,6 +470,7 @@ function QueueCard({
     <Surface>
       <RowLink inset disabled={busy} label={job.status === "succeeded" ? `${job.jobType === "activity_generation" ? "Open Draft" : "Open saved output"}: ${job.source.displayName || type}` : `View generation: ${job.source.displayName || type}`} onPress={() => void open()} icon={<ContentIcon kind={job.jobType === "quiz_generation" ? "quiz" : job.jobType === "activity_generation" ? "activity_output" : "reviewer"} />} trailing={job.status === "succeeded" ? <CheckCircle2 size={19} color={colors.success} /> : job.status === "running" ? <CircleDashed size={19} color={colors.accent} /> : job.status === "queued" ? <Clock3 size={19} color={colors.textMuted} /> : <AlertCircle size={19} color={colors.warning} />}>
       <Copy muted size="caption">{type}</Copy>
+      {automaticQueueLabel(job) ? <View style={{ alignSelf: "flex-start", backgroundColor: colors.blueSoft, borderRadius: radius.pill, paddingHorizontal: spacing[2], paddingVertical: spacing[1] }}><Copy size="caption" color={colors.textPrimary}>{automaticQueueLabel(job)}</Copy></View> : null}
       <Copy size="h3">{job.source.displayName || type}</Copy>
       <Copy muted size="caption">
         {job.status === "succeeded"

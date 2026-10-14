@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { GenerationContractError, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
 import type { Json } from '@stay-focused/db';
 import { createServerOpenAIProvider } from '@/providers';
+import { ProviderCallError, PROVIDER_OUTCOME_UNKNOWN, type ProviderFailureKind } from '@/providers/openai-provider';
 import { ExperienceFailure } from '../experience/errors';
 import { readProcessingJobCheckpoint, writeProcessingJobCheckpoint } from './workflow-repository';
 import type { ProcessingJobServiceClient } from './repository';
@@ -29,12 +30,17 @@ export function durableGenerationProvider(client: ProcessingJobServiceClient, jo
       : null;
     if (googleKey) {
       const saved = await readProcessingJobCheckpoint(client, jobId, googleKey);
-      const response = saved?.payload as { state?: string; value?: Json } | undefined;
+      const response = saved?.payload as { state?: string; value?: Json; kind?: ProviderFailureKind } | undefined;
       if (response?.state === 'completed') {
         console.info('ai_generation.saved_response_reused', { jobId, schema: request.schema.name, ...(options.callIdentity ? { callIdentity: options.callIdentity } : {}) });
         return response.value as T;
       }
-      if (response) throw new GenerationContractError(['provider_outcome_uncertain']);
+      if (response?.state === 'failed' && response.kind === 'incomplete') {
+        throw new GenerationContractError(['provider_output_incomplete']);
+      }
+      if (response?.state === 'failed' && response.kind && definiteFailureKinds.has(response.kind)) {
+        console.info('ai_generation.retrying_after_definite_failure', { jobId, schema: request.schema.name, kind: response.kind });
+      } else if (response) throw new GenerationContractError(['provider_outcome_uncertain']);
     }
     const condensation = request.schema.name === 'source_context_notes';
     const suffix = condensation ? createHash('sha256').update(request.prompt).digest('hex') : request.schema.name;
@@ -53,7 +59,23 @@ export function durableGenerationProvider(client: ProcessingJobServiceClient, jo
         payload: { state: 'completed', value: JSON.parse(JSON.stringify(result)) as Json } });
       return result;
     }
-    catch { throw new ExperienceFailure(503, 'generation_failed'); }
+    catch (error) {
+      const kind = error instanceof ProviderCallError ? error.kind : 'network';
+      const details = error instanceof ProviderCallError ? error.details : undefined;
+      console.info('ai_generation.request_failed', {
+        jobId, schema: request.schema.name, kind,
+        ...(details?.httpStatus ? { httpStatus: details.httpStatus } : {}),
+        ...(details?.incompleteReason ? { incompleteReason: details.incompleteReason } : {}),
+        durationMs: Date.now() - started,
+      });
+      if (googleKey && !PROVIDER_OUTCOME_UNKNOWN.has(kind)) {
+        await writeProcessingJobCheckpoint(client, { jobId, checkpointKey: googleKey, payload: { state: 'failed', kind } });
+      }
+      throw new ExperienceFailure(503, 'generation_failed');
+    }
     finally { console.info('ai_generation.request_finished', { jobId, schema: request.schema.name, durationMs: Date.now() - started }); }
   } };
 }
+
+// Invalid or legacy checkpoint payloads must never authorize another paid call.
+const definiteFailureKinds: ReadonlySet<ProviderFailureKind> = new Set(['http_error', 'rate_limited', 'empty', 'invalid_json', 'not_object']);

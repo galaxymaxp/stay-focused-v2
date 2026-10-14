@@ -82,6 +82,8 @@ export class CanvasClientError extends Error {
   public readonly code: CanvasClientErrorCode;
   public readonly status: number | null;
   public readonly retryAfterMs: number | null;
+  /** Full provider cooldown for durable scheduling; the short synchronous delay stays capped. */
+  public readonly providerRetryAfterMs: number | null;
   public readonly attemptCount: number;
 
   public constructor(
@@ -90,6 +92,7 @@ export class CanvasClientError extends Error {
     options: {
       readonly status?: number;
       readonly retryAfterMs?: number | null;
+      readonly providerRetryAfterMs?: number | null;
       readonly attemptCount?: number;
     } = {},
   ) {
@@ -98,6 +101,7 @@ export class CanvasClientError extends Error {
     this.code = code;
     this.status = options.status ?? null;
     this.retryAfterMs = options.retryAfterMs ?? null;
+    this.providerRetryAfterMs = options.providerRetryAfterMs ?? this.retryAfterMs;
     this.attemptCount = options.attemptCount ?? 1;
   }
 }
@@ -914,7 +918,9 @@ async function downloadCanvasFile({
         throw new CanvasClientError(
           "canvas_file_download_failed",
           "Canvas file download returned an unsuccessful response.",
-          { status: response.status },
+          { status: response.status,
+            retryAfterMs: parseRetryAfterMs(response.headers.get('retry-after'), new Date()),
+            providerRetryAfterMs: parseRetryAfterMs(response.headers.get('retry-after'), new Date(), Number.MAX_SAFE_INTEGER) },
         );
       }
 
@@ -2483,14 +2489,14 @@ function mapHttpError(
     return new CanvasClientError(
       "canvas_rate_limited",
       "Canvas rate limited the request.",
-      { retryAfterMs: parseRetryAfterMs(headers.get("retry-after"), now), status },
+      { retryAfterMs: parseRetryAfterMs(headers.get("retry-after"), now), providerRetryAfterMs: parseRetryAfterMs(headers.get('retry-after'), now, Number.MAX_SAFE_INTEGER), status },
     );
   }
   if (status >= 500) {
     return new CanvasClientError(
       "canvas_unavailable",
       "Canvas is temporarily unavailable.",
-      { retryAfterMs: parseRetryAfterMs(headers.get("retry-after"), now), status },
+      { retryAfterMs: parseRetryAfterMs(headers.get("retry-after"), now), providerRetryAfterMs: parseRetryAfterMs(headers.get('retry-after'), now, Number.MAX_SAFE_INTEGER), status },
     );
   }
   return new CanvasClientError(
@@ -2504,7 +2510,7 @@ function isRedirectStatus(status: number): boolean {
   return status >= 300 && status < 400;
 }
 
-function parseRetryAfterMs(value: string | null, now: Date): number | null {
+function parseRetryAfterMs(value: string | null, now: Date, maximumMs = MAX_RETRY_AFTER_MS): number | null {
   if (!value) {
     return null;
   }
@@ -2516,7 +2522,7 @@ function parseRetryAfterMs(value: string | null, now: Date): number | null {
 
   const seconds = Number(trimmed);
   if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.min(Math.round(seconds * 1000), MAX_RETRY_AFTER_MS);
+    return Math.min(Math.round(seconds * 1000), maximumMs);
   }
 
   const retryAt = Date.parse(trimmed);
@@ -2524,7 +2530,7 @@ function parseRetryAfterMs(value: string | null, now: Date): number | null {
     return null;
   }
 
-  return Math.min(Math.max(0, retryAt - now.getTime()), MAX_RETRY_AFTER_MS);
+  return Math.min(Math.max(0, retryAt - now.getTime()), maximumMs);
 }
 
 function statusForProbeError(error: unknown): CanvasCapabilityStatus {

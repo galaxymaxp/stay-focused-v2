@@ -18,7 +18,7 @@ import {
 } from "@/lib/canvas-file-policy";
 import { DOCUMENT_MAX_PDF_PAGES } from "@/lib/ocr/upload-policy";
 
-import { extractPreparedCanvasFileText } from "./canvas-stored-file-extraction";
+import { extractPreparedCanvasFileText, isPreparedCanvasFileReadyForOcr } from "./canvas-stored-file-extraction";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const CONNECTION_ID = "00000000-0000-4000-8000-000000000002";
@@ -31,6 +31,15 @@ const PNG_BYTES = new Uint8Array([
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x66, 0x69, 0x78]);
 
 describe("Canvas stored file extraction", () => {
+  it.each(['not_requested', 'failed', 'unavailable'])('rejects retained historical bytes after inventory invalidates their binding (%s)', async ingestion_status => {
+    const file = { ...makeReadyFile({bytes: PNG_BYTES, contentType: 'image/png', filename: 'lesson.png', displayName: 'lesson.png'}),
+      content_version_fingerprint: 'new-revision', ingestion_status };
+    const storage = createStorageClient([[file.storage_object_key!, PNG_BYTES]]);
+    expect(isPreparedCanvasFileReadyForOcr(file)).toBe(false);
+    expect(await extract(file, storage.client)).toMatchObject({ok: false, code: 'canvas_source_file_preparation_required'});
+    expect(storage.calls).toHaveLength(0);
+  });
+
   it.each(['native PDF','scanned PDF','PNG','JPEG'])('%s instructions survive private extraction into exact task requirements',async kind=>{
     const instructions='Provide exactly three reasons. No conclusion required. Use only the supplied biology reading. Explain diffusion using source evidence and keep each requested reason distinct.';
     let bytes:Uint8Array;

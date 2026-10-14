@@ -1,12 +1,16 @@
 import type { Database, StudySessionRow } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { estimateStore } from "./task-estimates.fixtures";
 
 const mocks = vi.hoisted(() => ({
   importSchedulableCanvasAssignments: vi.fn(),
   loadOwnedPlannerTasks: vi.fn(),
   persistOwnedStudyPlan: vi.fn(),
+  createServerOpenAIProvider: vi.fn(),
 }));
+
+vi.mock("@/providers", () => ({ createServerOpenAIProvider: mocks.createServerOpenAIProvider }));
 
 vi.mock("@/lib/task-planning-repository", () => ({
   importSchedulableCanvasAssignments: mocks.importSchedulableCanvasAssignments,
@@ -44,6 +48,7 @@ const request = {
 describe("owned study planning service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.createServerOpenAIProvider.mockImplementation(() => { throw new Error("missing key"); });
     mocks.loadOwnedPlannerTasks.mockResolvedValue([
       {
         id: request.taskIds[0],
@@ -70,22 +75,41 @@ describe("owned study planning service", () => {
   });
 
   it("plans an explicit task selection without importing Canvas work", async () => {
-    await service.previewOwnedStudyPlan(client, "user-a", request);
+    const provider = { generate: vi.fn() };
+    await service.previewOwnedStudyPlan(client, "user-a", request, undefined, provider);
 
     expect(mocks.importSchedulableCanvasAssignments).not.toHaveBeenCalled();
+    expect(provider.generate).not.toHaveBeenCalled();
+    expect(mocks.createServerOpenAIProvider).not.toHaveBeenCalled();
   });
 
   it("makes synced Canvas work schedulable before planning the whole day", async () => {
+    const store = estimateStore(0);
     const wholeDay = { planningRange: request.planningRange, availability: request.availability };
     const order: string[] = [];
     mocks.importSchedulableCanvasAssignments.mockImplementation(async () => { order.push("import"); return 2; });
     mocks.loadOwnedPlannerTasks.mockImplementation(async () => { order.push("load"); return []; });
 
-    await service.previewOwnedStudyPlan(client, "user-a", wholeDay, Date.parse("2026-09-01T08:00:00.000Z"));
+    await service.previewOwnedStudyPlan(store.client, "user-a", wholeDay, Date.parse("2026-09-01T08:00:00.000Z"));
 
-    expect(mocks.importSchedulableCanvasAssignments).toHaveBeenCalledWith(client, "user-a", Date.parse("2026-09-01T08:00:00.000Z"));
-    expect(mocks.loadOwnedPlannerTasks).toHaveBeenCalledWith(client, "user-a", undefined);
+    expect(mocks.importSchedulableCanvasAssignments).toHaveBeenCalledWith(store.client, "user-a", Date.parse("2026-09-01T08:00:00.000Z"));
+    expect(mocks.loadOwnedPlannerTasks).toHaveBeenCalledWith(store.client, "user-a", undefined);
     expect(order).toEqual(["import", "load"]);
+    expect(mocks.createServerOpenAIProvider).toHaveBeenCalledWith({ timeoutMs: 15000, maxRetries: 0 });
+  });
+
+  it.each(["ai", "throw", "missing"])("plans with refreshed minutes when provider is %s", async mode => {
+    const store = estimateStore();
+    const task = store.tasks[0]!;
+    const provider = mode === "missing" ? undefined : { generate: mode === "throw"
+      ? vi.fn().mockRejectedValue(new Error("unavailable"))
+      : vi.fn().mockResolvedValue({ estimates: [{ taskId: task.id, minutes: 43, reason: "Short quiz" }] }) };
+    mocks.loadOwnedPlannerTasks.mockImplementation(async () => [{ id: task.id, title: "Quiz", dueAt: null,
+      estimatedMinutes: task.estimated_minutes, priority: "medium", createdAt: "2026-08-30T00:00:00.000Z" }]);
+    const wholeDay = { planningRange: request.planningRange, availability: request.availability };
+    const plan = await service.previewOwnedStudyPlan(store.client, "owner", wholeDay, Date.parse("2026-09-01T08:00:00Z"), provider);
+    expect(plan.sessions[0]?.durationMinutes).toBe(mode === "ai" ? 45 : 30);
+    expect(task.estimate_source).toBe(mode === "ai" ? "ai" : "heuristic");
   });
 
   it("rejects explicit foreign or completed task IDs safely", async () => {

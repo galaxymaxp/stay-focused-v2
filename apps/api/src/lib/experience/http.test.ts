@@ -23,6 +23,8 @@ import { GET as todayGet } from '@/../app/api/today/route';
 import { GET, POST, OPTIONS } from '@/../app/api/experience/[...path]/route';
 import { experienceRepository } from './repository';
 import { ExperienceService } from './service';
+import { experienceRoute } from './http';
+import { ExperienceFailure } from './errors';
 const id = '11111111-1111-4111-8111-111111111111';
 const originalServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 function request(path: string, method = 'GET', body?: string) { return new Request(`https://app.example/api/experience/${path}`, { method, headers: { authorization: 'Bearer token', 'content-type': 'application/json' }, ...(body ? { body } : {}) }); }
@@ -41,6 +43,32 @@ afterEach(() => {
   else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
 });
 describe('authenticated student routes', () => {
+  it.each([undefined, "1"])("stream-caps experience bodies with Content-Length %s", async contentLength => {
+    const response = await POST(new Request("https://example.test", { method: "POST", headers: { authorization: "Bearer session", ...(contentLength ? { "content-length": contentLength } : {}) }, body: " ".repeat(64 * 1024 + 1) }), context("planner/preview"));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe("invalid_request");
+  });
+
+  it.each(['error', 'experience', 'object'])('keeps private exception fields out of failure logs for %s', async kind => {
+    const privateText = 'Cookie=session-private student@example.invalid owner/private.pdf academic-private';
+    const failure = kind === 'experience' ? new ExperienceFailure(409, 'not_ready') : new Error(privateText);
+    failure.name = privateText;
+    failure.stack = privateText;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await experienceRoute(request('courses'), async () => {
+        throw kind === 'object' ? { message: privateText, toString: () => privateText } : failure;
+      });
+      expect(response.status).toBe(kind === 'experience' ? 409 : 503);
+      expect(log).toHaveBeenCalledWith('experience.request.failed', {
+        code: kind === 'experience' ? 'not_ready' : 'unavailable',
+        status: kind === 'experience' ? 409 : 503,
+        errorType: kind === 'experience' ? 'ExperienceFailure' : kind === 'error' ? 'Error' : 'unknown',
+      });
+      expect(JSON.stringify(log.mock.calls)).not.toContain(privateText);
+      expect(await response.text()).not.toContain(privateText);
+    } finally { log.mockRestore(); }
+  });
   it.each(['quiz', 'activity'])('opens persisted %s aliases through the Library service', async prefix => {
     const artifactId = `${prefix}:${id}`;
     const open = vi.spyOn(ExperienceService.prototype, 'getLibraryArtifact').mockResolvedValue({

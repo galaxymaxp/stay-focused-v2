@@ -1,4 +1,4 @@
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useId, useRef } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop } from "react-native-svg";
@@ -118,6 +118,6 @@ export function GenerationVisual({ running, completed }: { running: boolean; com
 const styles = StyleSheet.create({
   frame: { height: 300, alignItems: "center", justifyContent: "center" },
   visual: { width: SIZE, height: SIZE, alignItems: "center", justifyContent: "center" },
-  fill: { ...StyleSheet.absoluteFillObject },
+  fill: { ...StyleSheet.absoluteFill },
   core: { width: 124, height: 124, borderRadius: 38, borderWidth: 1, alignItems: "center", justifyContent: "center", shadowColor: "#2A2118", shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
 });

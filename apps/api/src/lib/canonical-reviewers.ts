@@ -44,7 +44,22 @@ export async function readCanonicalReviewerRecord(
   userId: string,
   artifactId: string,
 ): Promise<{ readonly ok: true; readonly value: CanonicalReviewerRecord | null } | { readonly ok: false }> {
-  const records = await listCanonicalReviewerRecords(client, userId);
-  if (!records.ok) return records;
-  return { ok: true, value: records.value.find(record => record.artifact.id === artifactId) ?? null };
+  // Topic snapshot discovery must not reload every owner's artifact payload.
+  const artifactResult = await client.from('generated_artifacts').select('*')
+    .eq('id', artifactId).eq('user_id', userId).eq('artifact_type', 'reviewer').is('deleted_at', null).maybeSingle();
+  if (artifactResult.error) return { ok: false };
+  const artifact = artifactResult.data;
+  if (!artifact || artifact.id !== artifactId || artifact.user_id !== userId || artifact.artifact_type !== 'reviewer' ||
+      artifact.deleted_at !== null || !artifact.latest_version_id) return { ok: true, value: null };
+  const versionResult = await client.from('generated_artifact_versions').select('*').eq('id', artifact.latest_version_id)
+    .eq('artifact_id', artifact.id).eq('user_id', userId).eq('artifact_type', 'reviewer').maybeSingle();
+  if (versionResult.error) return { ok: false };
+  const version = versionResult.data;
+  if (!version || version.id !== artifact.latest_version_id || version.artifact_id !== artifact.id ||
+      version.user_id !== userId || version.artifact_type !== 'reviewer') return { ok: true, value: null };
+  const sourceResult = await client.from('source_versions').select('*').eq('id', version.source_version_id).eq('user_id', userId).maybeSingle();
+  if (sourceResult.error) return { ok: false };
+  const source = sourceResult.data;
+  if (!source || source.id !== version.source_version_id || source.user_id !== userId) return { ok: true, value: null };
+  return { ok: true, value: { artifact, version, source } };
 }

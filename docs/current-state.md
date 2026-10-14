@@ -1,188 +1,892 @@
 # Current State
 
-## W2 mobile parity main integration (2026-10-11)
+## Consolidated showcase release in progress (2026-10-15)
 
-Owner requested `push to main`. Remote main already contains W1/W2 website
-integration `7ef5a61`. The four scoped mobile commits are integrated as
-`f308faf`, `55b7cd0`, `815631d`, `dc018c8`; the parity report is `2c022f4`.
-**FRESH PASS** on the combined tree: web typecheck/lint and 82 tests;
-mobile typecheck/lint and 793 tests (four existing lint warnings).
-Main's newer task refresh is preserved. Documentation conflicts retain both
-histories. Normal publication targets `origin/main`; no force push or manual
-deployment. Original dirty website/main/mobile checkouts remain untouched.
-Prior physical RMX3151 and viewport evidence is retained; neither was rerun
-for this Git integration. Next: owner laptop/fullscreen review.
+VL3 guard review is owner-approved. Eleven production migrations are applied
+with RLS and private-bucket verification. SDK 57 implementation and automated
+gates pass; native build, production deployments and physical acceptance remain
+open. Resend has no verified domain; broad student email remains inactive.
+See [consolidated release evidence](ai/acceptance/release-20261014.md). Older entries below are historical milestones.
 
-## W2 mobile parity and fresh acceptance (2026-10-11)
+## VL3 Find a visual completed locally; rollout pending (2026-10-14)
 
-**PASS locally, including physical RMX3151 checks.** The existing W2 website
-implementation was rechecked in `C:/Projects/stay-focused-v2-website` on
-`website/functional-v1`: fresh web typecheck/lint, 79 tests and all 25 requested
-page/viewport checks pass. Mobile parity is committed on `b25-3-3-ai-first`
-in `b25-3-3-work`: Canvas other-space grouping, growing draft fields with
-keyboard avoidance, and theme-aware/reduced-motion-safe clear-day states
-(`b87fe54`, `e1f5f3d`, `f42c43f`, `9ec9fa1`). Fresh mobile typecheck/lint and
-791 tests pass; lint retains four pre-existing test-file import warnings.
-Physical local-debug acceptance used actual screens with isolated fictional
-data: Canvas search/disclosure, draft growth/keyboard, light/dark Today with
-system Reduce Motion on/off, and planning action pass. Device settings were
-restored. Existing mobile docs/design edits remain untouched; evidence and
-cross-repository state are recorded in the appended W2 handoff here. No API
-change, push or deployment. Next: owner laptop/fullscreen review.
+**Code complete; unattended run FAILED on the validation-temp guard.** Initial
+full API regressions cleaned only their own newly created synthetic Office
+directories in Windows Temp before TEMP/TMP were redirected into the repository.
+Final validation uses repo-local temp; the deviation cannot be retroactively
+undone. Feature gates are green; exact counts and the incident are in the handoff.
+Sections without an available source snapshot
+or extracted figure can explicitly request a Wikimedia Commons reference while
+online. Five bounded, freely licensed candidates are filtered with plain credit,
+then at most three existing OpenAI vision calls require a direct match at 0.90
+confidence. Weak/empty results say **No reliable visual found**; provider failures
+remain retryable and never cache that outcome. No automatic search trigger.
 
-## W1/W2 main integration (2026-10-11)
+The separate card and zoom sheet always say **External reference — not from your
+course material.** Credit/license link to Commons; legal license details have a
+separate link. Existing tokens and zoom viewer are reused. Positive read-only
+reachability and completed source discovery gate the action; offline/source-image
+transitions hide the card. Canonical prose/source evidence and offline copies
+receive no external content. Find another is offered once, then cache is reused.
 
-Owner explicitly requested `push to main w1 w2`. The release merges W1/W2
-tip `c05634f` with current main `6319376` in an isolated integration checkout.
-It preserves main's canonical task/planner state, bounded content+grades sync,
-minute resource refresh and capstone terminology while adding W1 completion,
-shared free time and saved-plan clarity, plus all W2 layout/editor changes.
-The planner regression now follows the canonical repository, including work
-explicitly reopened in Canvas despite an old submission timestamp.
+Forward-only `20261014000700_section_external_visuals.sql` is written, **not
+applied**. Owner/version/section cache, safe-column RLS/grants, artifact/account
+cascades, a service-only 120-second lease and serialized rolling-day reservations
+cap all external searches at 20/owner/day including failed attempts. Found/none
+results persist before response; expired/deleted/replaced work cannot publish.
+The existing provider gains typed image URL input without a new key/env/SDK.
 
-FRESH PASS: web 82 tests/12 files; focused API planning/experience 171 tests/9
-files; root typecheck and lint 8/8 each, zero cached (four existing mobile
-lint warnings). Root build also passes 8/8, zero cached. Browser acceptance
-passes all 25 page/viewport checks, 10 light/dark Today captures, the four-page
-desktop sweep, Canvas search/selection/bounded sync, draft persistence/guards,
-and importing/completing an unlinked paper task in the canonical Tasks list.
-Browser evidence uses isolated fictional data, not a new real-account run.
-Unrelated dirty work and local evidence remain outside the release. This
-entry supersedes the earlier local-only W1/W2 publication checkpoints below;
-manual deployment and production acceptance are not part of this push.
-
-## W2 website desktop layout (2026-10-11)
-
-**PASS locally.** On `website/functional-v1`, the centered 1760px shell and
-viewport-capped Today clock support laptop and fullscreen layouts. Library
-cards fill equal-height rows; Canvas has course search and collapsible other
-spaces; drafts have an outline and fields that grow with content; Today has
-theme-aware clear-day illustrations. Fresh web typecheck/lint and 79 tests
-pass. Isolated Playwright acceptance passed all 25 page/viewport checks,
-light/dark Today checks, draft save/resize/guard flows and Canvas filtering
-and selection persistence. Implementation: `e833536`, `3642654`, `2abe801`,
-`5ae9b6b`, `7a520ba`, `14b12c4`. Evidence is in the appended W2 handoff and
-ignored `tmp/w2-screens/`. No push/deployment. Next: owner review on laptop
-and fullscreen; separately scheduled feature prompts remain outside W2.
-
-## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
-
-**PASS locally, including all six real-account checks.** Branch
-`website/functional-v1` now filters handed-in Canvas work from the shared
-planner, completes unlinked Canvas/paper activities through one import-and-mark
-helper, separates Overdue from today's schedule, shares date-specific free
-time, and labels previews as unsaved with Save to schedule. Fresh API
-typecheck/task-planning tests (32) and web typecheck/lint/tests (79) pass.
-Two saved real-account blocks matched Today's preview and Schedule at
-9:30–10:30 PM and 10:30–11:30 PM. Temporary sessions/plan metadata and local
-preferences were restored; The 5 Why Analysis remains completed as instructed.
-Implementation commits: `de3e99c`, `9d2ef46`, `1343428`. No push or deployment;
-the production website still requires these changes to be released. Full
-details and adaptations are appended to `docs/ai/handoff.md`. W2 layout,
-Library/search/draft work and all excluded estimator/sync/gating work remain
-outside this slice.
-
-## Task and planner sync reliability (2026-10-10)
-
-Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
-merge immediately, and publish the existing API, website and Android preview.
-
-The canonical activity model now checks course selection, stored course end/state,
-assignment availability and submission evidence for both clients and the planner.
-Imported Canvas tasks retain their course identity and current assignment deadline.
-Submitted work moves to Completed, is never overdue, and is excluded from planning;
-planned sessions reflect the linked activity state. Deselected/ended courses and
-orphaned imports do not return as personal tasks. Saved work is preserved.
-
-Website Tasks consumes the complete canonical activity list; Tasks, Today and
-Schedule expose explicit content+grades Sync now and poll persisted data every
-minute. Per-course website sync now includes grades. Partial sync outcomes remain
-partial. Android refresh admissions are bounded to one content/grades pair.
-Opening Tasks/Today/Schedule does not create Canvas jobs; the existing once-per-load Generate refresh is preserved. Automatic five-minute Canvas polling
-is still the separate, pending notification activation scope.
-
-FRESH PASS: API 1,275 tests (3 skipped), focused final activity/planning regression
-162 tests, web 69 tests, mobile sync/screens 68 tests, root production builds 8/8,
-root lint 8/8 (four existing mobile warnings), root typecheck 8/8 (changed apps fresh;
-unmodified packages cached). Read-only live database checks passed and found four
-pending local imports with submitted Canvas evidence. Android preview OTA
-25edeaae-9365-4ffa-acb2-f84123430983 is published for runtime 2.0.1.
-
-API/website publication and main integration are being completed. Physical device
-acceptance is NOT RUN: no ADB device or browser surface is exposed. See
-[acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+Exact FRESH gates and failed draft attempts are in the
+[VL3 handoff](ai/handoff.md#vl3-unattended-find-a-visual-2026-10-14).
+[ADR-020](architecture/ADR-020-visual-learning.md#find-a-visual-vl3) records caps,
+licensing, source precedence, cache semantics and separation. Rollout and Device
+checks were entirely skipped. Owner steps: apply the migration through the
+Supabase connector (filename as name), deploy API, publish preview OTA, confirm
+runtime Wikimedia egress and perform RB2 realme label/no-result/offline/source
+checks. Live runtime/migrations/provider quality/concurrency/device behavior are
+**UNVERIFIED (owner to confirm)**. No production service call, environment edit,
+deployment, remote SQL, Scheduler change or push occurred.
 
 
-## Website completion and main integration (2026-10-08)
+## VL2.1 PPTX page snapshots completed locally; rollout pending (2026-10-14)
 
-Owner-authorized finite scope: finish Claude's pending web changes, verify the
-website, publish it, and push to main. Existing API/mobile/database architecture
-and unrelated working-tree changes are preserved.
+**PASS for unattended code scope.** PPTX now uses the existing page snapshot renderer and VL1.3 pre-render path.
+Preparation converts the accepted original with isolated headless LibreOffice,
+with a 60-second deadline, process kill, 20 MiB output / 100-page caps, safe PDF
+validation and temporary-file cleanup. Full archive bounds and linked-media
+rejection precede native execution. Conversion failure or missing local binary
+leaves material prepared and keeps VL2 extracted figures as the fallback.
 
-PUBLISHED AND INTEGRATED INTO MAIN. Course Library, reviewer management and
-selection tools, account menu, content identity and Schedule deadlines are
-complete. Canvas refresh is explicit, bounded, owner-cancelled and honest about
-partial admission or unknown polling outcomes. Fresh web tests 66/66, reviewer
-route regression 9/9, web typecheck/lint and root typecheck/lint/build 8/8 pass.
-Production deployment ca524a4 is READY. Live signed-in read, rename with reload,
-delete confirmation Cancel, and desktop/mobile layout checks passed. The normal
-main push was verified remotely; no force push. No paid generation or live
-Canvas sync was submitted. See
-[completion evidence](ai/acceptance/website-completion-20261008.md).
+Receipt identity is owner + Canvas file + exact metadata fingerprint + original
+SHA-256. The new forward-only migration
+`20261014000600_office_page_snapshots.sql` is written, **not applied**. It
+adds a private PDF bucket, immutable service-only receipts with RLS/grants and
+server-derived accepted-snapshot fingerprint binding. Changed revisions convert
+again, unchanged ones reuse, and historical conversions/originals remain retained.
+Old unbound/edited/composite Office sources fail closed; no provenance backfill.
 
-## Website production deployment (2026-10-08)
+PPTX blocks map pageNumber to slideNumber in presentation order, including blank
+and hidden slides. Canonical citations and exact accepted conversion evidence
+qualify snapshots. Missing original/converted bytes cannot be bypassed by cache.
+Original PDF/local checks, rendering budgets, system exemption, leases and
+completion remain shared. Mobile adds From slide n / Slide n labels to the
+existing viewer without changing polling, gestures, tokens or offline behavior.
+Canvas/synchronous original PDFs keep the 40-page limit; converted page counts
+live only in their own rendering receipt. DOCX pagination is not deterministic
+from existing blocks, so the permitted PPTX-only scope ships; DOCX snapshots
+remain a follow-up, and its VL2 extracted figures continue to work.
 
-Owner-authorized: the V2 website replaces retired V1 on
-`https://stay-focused-ten.vercel.app` (Vercel project `stay-focused`). The
-project now builds `galaxymaxp/stay-focused-v2` from `apps/web`, and pushes to
-`website/functional-v1` deploy production automatically. It uses the shared V2
-Supabase project and the existing API (`stay-focused-v2-prototype`) through the
-same-origin rewrite. Owner enabled web generation and Google/Microsoft sign-in;
-V1 server secrets were removed from the project.
+Worker image installs only the approved LibreOffice writer/impress components
+with --no-install-recommends, apt-list cleanup and writable non-root HOME.
+Estimated delta is 250-500 MiB uncompressed / 100-200 MiB compressed; estimated
+small-deck startup/conversion is 5-30 seconds. No repository-documented image or
+cold-start numeric limit was found. Actual image size, peak RSS, cold start and
+native conversion fidelity are **UNVERIFIED (owner to confirm)**; no image build
+was run. Exact fresh gates and draft failures are in [VL2.1 handoff](ai/handoff.md#vl21-unattended-office-page-snapshots-2026-10-14).
+See [ADR-020 Office page snapshots](architecture/ADR-020-visual-learning.md#office-page-snapshots-vl21).
 
-Shipped with it: V1-style desktop shell (sidebar, breadcrumbs, full-width
-layout), Today with a right rail, side-by-side course materials, and motion
-mirroring the mobile tokens. FRESH: web typecheck/lint/tests, both isolated
-browser runs, production build, and live checks (API proxy 200/401, anon key
-for the V2 project). NOT RUN: authenticated live use by the owner, live
-generation and OAuth round trips. Preview deployments have no Supabase key
-(`NEXT_SUPABASE_ANON_KEY` is production-only), and `main` now includes `apps/web`; preview authentication remains unconfigured.
+Final FRESH gates: forced typecheck 7/7 and lint 7/7 (0 cached, 0 errors,
+4 existing warnings); shared 133 passed; API 1,997 passed / 3 existing skips
+(169 files); mobile 984 passed (95 files); API build 34/34 pages; Android export
+1 bundle / 31 assets; whitespace 0 errors. No failed required gate; draft fixture
+and syntax failures are retained in the handoff.
 
-## Website V1.1 orb parity (2026-10-08)
+Owner steps remaining: review/apply the migration through the Supabase connector
+(filename as name, never db push), rebuild/deploy the worker and measure its
+real size/cold start/peak RSS, deploy API, publish preview OTA, then RB2 realme
+From slide n and conversion-failure figure-fallback checks. Rollout and Device
+checks were entirely skipped. Deployed state, prerequisites, migrations/buckets,
+queue/IAM/Scheduler, retained source rows and physical behavior are unverified.
+No deployment, production service call, remote SQL, environment-file edit, Scheduler
+change or push occurred. Next code work requires a separately prompted item.
 
-Owner-authorized scope: port the authoritative mobile WebGL orb, verify visual
-and behavioral parity, preserve the functional website and commit scoped work
-on `website/functional-v1`. Investigation at `6a8032a` found that the actual
-mobile Generation route uses Animated plus layered SVG, with no WebGL renderer
-or shaders in the inspected local sources. **BLOCKED** pending the actual
-WebGL source location or owner resolution of that rendering requirement. No
-replacement orb or runtime change was made. See [orb parity report](ai/acceptance/website-orb-parity.md)
-for source mapping, baseline verification and remaining differences. Existing
-V1 historical findings remain below; B25.3.3 stays paused and incomplete. No
-production deployment, provider call, schema or generation-engine change.
 
-## Website V1 owner-approved scope (2026-10-08)
+## VL2 extracted source figures completed locally; rollout pending (2026-10-14)
 
-The owner prioritizes functional website implementation immediately. B25.3.3
-production compatibility investigation is paused; its PARTIAL/BLOCKED verdict,
-reports, repairs, and blockers remain preserved and it is not complete. This
-instruction supersedes earlier web exclusions for the finite website scope only.
+**PASS for unattended code scope.** Preparation extracts the exact original's
+PDF raster figures and PPTX/DOCX media. Named size, area, repetition, count and
+time limits remove tiny/repeated decoration and bound work. PDF.js image objects
+and a pure JavaScript PNG encoder need no new dependency. Office preparation and
+accepted manifests share structural drafts; standalone and composite admission
+retain canonical cited IDs. No generated/external image or model caption.
 
-Endpoint: implement and locally verify the nine requested browser surfaces in
-`apps/web` over existing Supabase identity and shared API/workflows, record exact
-blockers, and commit scoped changes on `website/functional-v1`. No production
-deployments, migrations/data writes, PR #1 edits, or paid generation requests.
-See `docs/ai/acceptance/website-v1.md` and ADR-019 for the acceptance matrix.
+Figures run only after prepared/succeeded completion, outside its transaction.
+Failure is code/count-only and leaves preparation successful. Private immutable
+rows bind owner + file/asset + original SHA-256; revision receipts also preserve
+successful empty extraction. New revisions re-extract, unchanged ones reuse, and
+historical rows/originals remain retained under ADR-021. Both migration files
+`20261014000400_source_figures.sql` and
+`20261014000500_source_figure_extraction_receipts.sql` are written, **not applied**.
 
-Task order: W1 auth/shell/Today; W2 tasks/calendar; W3 Canvas/generation/queue;
-W4 Library/Reviewer/Quiz/settings; W5 browser, regression and root verification.
-Continue independent work when live acceptance is blocked. Current result:
-LOCALLY VERIFIED; W1-W4 functional client implementations and W5 browser,
-visual, regression and fresh root TypeScript/lint/build checks pass. Live
-acceptance remains PARTIAL/BLOCKED: dedicated non-production Supabase/API and
-Canvas test access, plus a separate paid-generation allowance, are not established.
-Generation is disabled by default. Run instructions are in `apps/web/README.md`.
-Historical sections below are retained.
+Owner-only bearer API routes use private no-store responses, strict canonical
+citations and exact accepted material/hash. Batched availability signs no images;
+only fully receipted extractions are visible. Opening a section returns at most
+12 short-lived signed images. Office requires
+the new structural parser, so old flattened snapshots are not guessed into
+alignment. Missing/deleted/edited or ambiguous evidence exposes no figures.
+
+Mobile shows the image action only where figures exist, hides it offline, and
+opens the existing bottom sheet with page/slide labels, one figure at a time and
+the existing bounded pinch/pan/double-tap viewer. Existing tokens, Reduce Motion
+and dismissal are retained. Eligible VL1 page snapshots remain the fallback.
+Office vector rendering belongs to VL2.1. Durable uploaded local PDFs are covered;
+legacy hashless assets and stateless synchronous OCR lack a retained exact
+original and receive no guessed figure binding or new asset backfill.
+
+Final FRESH gates: forced typecheck 7/7 and forced lint 7/7 (0 cached, 0 errors,
+4 existing warnings); shared 133 passed; API 1,947 passed / 3 existing skips
+(166 files); mobile 979 passed (95 files); API build 34/34 static pages;
+Android export 1 bundle; whitespace 0 errors. Draft failures, the initial
+PGlite timeout and exact validation details are retained in the
+[VL2 handoff](ai/handoff.md#vl2-unattended-extracted-figures-2026-10-14).
+See [ADR-020 Phase 2](architecture/ADR-020-visual-learning.md#phase-2-extracted-figures-vl2).
+
+Owner steps remaining: apply both migrations through the Supabase connector
+(filename as name, never db push), deploy worker and API, publish preview OTA,
+then RB2 realme figure/logo/no-icon, zoom, offline and snapshot-fallback checks.
+Rollout and Device checks were entirely skipped. Deployed state, applied
+migrations/buckets, retained originals, costs and device behavior are
+**UNVERIFIED (owner to confirm)**. No remote service call, environment-file edit,
+Scheduler change or push. VL2.1 is now completed locally above; DOCX pagination remains a follow-up.
+
+## VL1.3 cited page pre-render completed locally; rollout pending (2026-10-14)
+
+**PASS for unattended code scope.** Manual and automatic Reviewer completion share
+one post-commit hook that reserves and dispatches every distinct lowest cited
+section page, at most 100, sequentially. The exact accepted standalone Canvas PDF
+or unchanged accepted local PDF is resolved once. Edited, Office and multi-source
+materials are silent no-ops. Failures log fixed codes/counts and cannot change
+the committed Reviewer outcome; completion before a student opens is best effort.
+
+New forward-only migration `20261014000300_system_page_snapshot_prerender.sql`
+is written, not applied. Existing/default snapshot rows remain student-origin;
+service-only system reservations bypass the rolling 20-render student cap.
+Student reservation and claim count student work only; system attempts retain
+the three-claim bound, leases and deletion fences. Idempotent reuse never changes
+origin. Older reviewers keep their capped on-open fallback. Existing mobile
+header discovery shows ready images without a student reservation; no mobile
+or EP3 source change was needed.
+
+Final FRESH gates: forced typecheck 7/7, forced lint 7/7 (0 errors, four existing
+mobile warnings), shared 133 passed, API 1,896 passed / 3 existing skips (160 files),
+API build 34/34 static pages (16 steps / 1 workflow), whitespace 0 errors. Unchanged
+mobile snapshot discovery/viewer tests also pass 22/22. Full mobile/Android gates
+are NOT APPLICABLE because mobile is unchanged. Draft failures and exact counts
+are retained in the [VL1.3 handoff](ai/handoff.md#vl13-unattended-cited-page-pre-render-2026-10-14); see [ADR-020 Pre-render](architecture/ADR-020-visual-learning.md#pre-render-vl13).
+
+Owner steps remaining: apply the migration through the Supabase connector using
+the filename as name (never db push), deploy worker then API, and run RB2 realme
+new-PDF instant-image / older-reviewer on-open-fallback checks. Rollout and Device
+checks were entirely skipped. Deployed revisions, applied migrations, queue/IAM,
+Scheduler, retained bytes and physical behavior are UNVERIFIED (owner to confirm).
+No remote service call, environment-file edit, Scheduler change or push occurred.
+VL2 subsequently completed locally above; EP3 remains committed.
+
+## EP3 preparation status completed locally; rollout pending (2026-10-14)
+
+**PASS for unattended code scope.** EP3 STEPS 0-3, all required fresh gates,
+documentation and local commits are complete. The corrected owner roadmap is
+readable; the earlier missing-roadmap STOP is superseded. Each current Canvas
+revision exposes a fixed safe preparation status. Older prepared revisions never
+make newer work Ready; backlog/deferred work is Preparing, failed/cancelled/capped
+or guard-paused work is Couldn't prepare. Unsupported/empty/unavailable stay
+explicit. Legacy fields remain for one release; strict older Canvas clients keep
+their response shape unless they opt in with '?preparationStatus=1'.
+
+Mobile replaces normal Prepare actions with Ready / Preparing / Couldn't prepare.
+Only failures offer Retry, hidden on observed connection failure. Preparing has
+no animation (including Reduce Motion); Reviewer and Quiz wait for Ready. Focus
+refresh and serial ten-second polling are bounded to 18 reads/polls per refresh
+cycle and stop on terminal status, blur/background or offline evidence. Later
+loaded pages keep their pagination and refresh their own material statuses.
+Retry uses EP1's single admission/dispatch path, with accounting reset only in
+the serialized RPC, cumulative lifetime attempts retained, and double submission/
+Ready reconnection idempotent. Existing Reviewer Retry recovery remains intact.
+No migration or native dependency was added; owner RLS/private columns are intact.
+
+Final FRESH gates: forced typecheck 7/7, forced lint 7/7 (0 errors, four existing
+mobile warnings), shared 133 passed, API 1,856 passed / 3 existing skips, mobile
+959 passed, API build 34/34 pages (16 steps / 1 workflow), Android export one
+bundle / 31 assets, whitespace 0 errors. Draft failures and exact counts are in
+the [EP3 handoff](ai/handoff.md#ep3-corrected-prompt-continuation-2026-10-14); see [ADR-026 Client status](architecture/ADR-026-eager-preparation.md#client-status).
+
+Owner steps remaining: deploy API then preview OTA after EP1/EP2 prerequisites;
+RB2 realme checks new PDF Preparing -> Ready without a tap, forced failure plus
+Retry, airplane-mode Retry visibility, and Reduce Motion. Rollout and device
+checks were entirely skipped. Deployed revisions, applied migrations, job rows,
+queue/IAM, Scheduler and physical behavior are UNVERIFIED (owner to confirm).
+No remote service call, environment-file edit, Scheduler change or push occurred.
+
+## EP2 preparation backfill completed locally; rollout pending (2026-10-14)
+
+EP2 STEPS 0-3 are implemented locally. The corrected external roadmap was read;
+the earlier EP2 missing-path STOP is superseded. Active selected owned courses,
+including completed courses skipped by notification polling, now receive fair
+poll-owned preparation visits without another sync or student request. Inactive
+or unselected courses wait until their connection/selection permits preparation.
+
+Complete source eligibility and batched exact-revision/control reads seed only
+unprepared, unsuppressed, below-cap materials into the existing discovery backlog.
+EP1's admission, worker and 25/200 runaway guard remain the single preparation
+path. Stable five-material round-robin turns are bounded by 25 per course and
+50 globally per poll invocation; at most 20 courses are leased for 90 seconds.
+Live sync/discovery and student Retry recover before backfill. Worker completion
+cannot advance a backfill ledger outside the poll budget. Durable visits and
+idempotent discoveries/receipts recover seed/admission/registration crashes.
+
+New forward-only migration `20261014000200_canvas_preparation_backfill.sql` is
+written, not applied. It adds service-only fair course visits with safe owner
+RLS reads and explicit grants. The real discovery/PGlite proof prepares all
+230 old materials within budgets; the five-material course is fully admitted
+in the first round. Existing EP1 tests pass unchanged. Final FRESH gates:
+typecheck 7/7, lint 7/7 (four existing mobile warnings), shared 133/133,
+API 1,841 passed / 3 existing skips, API build 34/34 pages, whitespace 0 errors.
+First timeout/typecheck failures and exact results are retained in the
+[EP2 handoff](ai/handoff.md#ep2-corrected-prompt-continuation-2026-10-14).
+See [ADR-026](architecture/ADR-026-eager-preparation.md#backfill) for budgets, priority and resumability.
+
+Rollout and device checks were entirely skipped. Owner steps: apply the EP2
+migration after EP1's two migrations, deploy API and Google worker, observe
+per-course backfill counts and guard state not `tripped`, then RB2 checks an
+old never-opened material shows Ready on realme. Deployed revisions, migrations,
+credentials, Scheduler, production inventory, OCR/cost and retained bytes are
+UNVERIFIED (owner to confirm). No remote call, environment-file edit or push.
+
+## EP1e eager preparation completed locally; rollout pending (2026-10-14)
+
+**EP1 STEPS 0-4 are implemented locally.** The EP1d revision-byte binding STOP
+was answered by the owner and repaired in `0678d03`; the preparation store was
+committed in `310734f`. Additional complete-inventory and binding repairs are
+`0ad268b`, `2ac0ee3` and `501b28b`. Earlier cap/pagination repairs remain intact.
+The historical EP1/EP1b/EP1c/EP1d sections below are superseded by this section.
+
+Every eligible new/changed revision now enters durable preparation independently
+of automatic-reviewer preferences or baseline. The Google worker persists
+original identity, complete extraction/page evidence and canonical blocks before
+publishing `prepared`. Job-scoped broker leases, revision fences, cancellation,
+one cycle retry/three automatic attempts and explicit Retry protect publication.
+Manual/automatic/Activity Maker/preview consumers use this result path; pending
+material has no preview-text Reviewer fallback or second OCR. Mobile UI is
+unchanged and existing readiness/response shapes remain compatible.
+
+Durable batches contain 25 jobs, with 200 maximum per sync/poll cycle. Actual
+guard SQL fed by the real 230-file discovery fixture completes 200 and defers
+30, then drains 30 in the next poll cycle without a new item. Repeat/no-progress
+signals persist owner-readable guard state and suppression. Sync wakeups,
+discovery backlog and dispatch receipts recover interrupted work. Provider
+cooldowns are preserved in durable scheduling, including binary downloads.
+ADR-021 original retention and Canvas 40/local durable 100/40 limits remain.
+
+Both forward-only preparation migrations are **written, not applied**:
+`20261014000000` and `20261014000100`. See
+[ADR-026](architecture/ADR-026-eager-preparation.md) for the design and safe guard
+queries, and the [EP1e handoff](ai/handoff.md#ep1e-unattended-continuation-2026-10-14)
+for exact commits, final FRESH gate counts and failed-first-attempt evidence.
+EP2 backfill and EP3 preparation status are complete locally; owner rollout remains pending.
+
+Rollout/device checks were entirely skipped. The owner must apply both migrations,
+deploy API/Google worker, confirm Cloud Tasks queue/IAM, watch the first CIT17
+sync and run RB2's realme sync-to-Ready check. Live revisions, migrations,
+credentials, Scheduler, inventories, retained bytes and OCR/cost remain
+**UNVERIFIED (owner to confirm)**. No remote service call, deployment, environment
+file edit, notification/email or push occurred.
+
+## EP1d placement inventory repaired; revision-byte binding STOP (2026-10-14)
+
+**STEPS 0.7/0.8 done locally; EP1 STOPPED before STEPS 1-4.** `996574a`
+pages owned Modules/ModuleItems with the existing stable, bounded File/Page
+helper and fails closed before placement/admission. `e739cab` also completes
+file-reference and open automatic-candidate reads under the standing inventory
+authorization. The real 1,002-item placement case passes with a modeled
+1,000-row response cap; focused source/admission tests pass FRESH 78/78.
+Earlier Canvas 40-page and File/Page fixes remain intact.
+
+A new non-inventory surprise blocks safe reuse of ingestion: inventory SQL
+advances a file's content fingerprint to revision B and keeps revision A's
+original hash/key with `not_requested`. `ingestOneCanvasFile` then matches the
+new metadata fingerprint without checking the ingestion state or its binding
+to the stored bytes, marks `unchanged`, and never downloads B. A local test
+executes the actual inventory SQL and real ingester: 1 passed, 17 deliberately
+filtered; 0 downloads/uploads. This can associate A's bytes with B's revision.
+The unattended STOP rule requires a new owner answer; see the
+[EP1d handoff](ai/handoff.md#ep1d-unattended-continuation-2026-10-14).
+
+No preparation store/migration/types, worker/broker extension, guard, deferred
+drain or consumer changes were started. ADR-026 remains free; EP2/EP3 remain
+blocked. Rollout/device checks entirely skipped; live impact is
+**UNVERIFIED (owner to confirm)**. Earlier EP1c placement approval questions
+below are historical and superseded by the completed repair.
+
+Retained-repair gates FRESH PASS: forced typecheck/lint 7/7 each (0 cached;
+4 existing lint warnings), shared 133/133, API 1,766 passed / 3 existing skips,
+API build 34/34 pages, diff 0 errors. Final focused tests: 102/102. The first
+full API run failed one outdated query fixture; correction and rerun are
+recorded in the handoff. Mobile gates NOT APPLICABLE.
+
+## EP1c File/Page inventory repaired; placement completeness STOP (2026-10-14)
+
+**STEP 0.6 done locally; EP1 remains STOPPED before STEPS 1-4.** Owner-approved
+File/Page reads now use stable ID order and 200-row ranges, with a 50-page
+safety bound per owned course/type. Errors or an exhausted bound fail explicitly;
+AG1 records no candidate/baseline from that incomplete evidence. Real listing
+regressions discover all 230 Files and all 230 Pages with correct public
+pagination; mixed placement/exclusion and Page reference behavior is preserved.
+The earlier Canvas 40-page repair `23cb9d0` remains intact.
+
+A separate placement-evidence surprise requires continuation review:
+`readModules` / `readModuleItemsForReferences` still perform a single
+unpaginated read. Under a modeled 1,000-row server cap, the actual source-list
+path silently omits an independently placed instructional attachment and admits
+an administrative file whose excluded module placement was beyond the cap;
+`hasMore=false`. This is distinct from the repaired File/Page cap. Live row-limit
+configuration/impact is **UNVERIFIED (owner to confirm)**. See the exact evidence
+and continuation question in the [EP1c handoff](ai/handoff.md#ep1c-unattended-continuation-2026-10-14).
+
+Commit: `c5d537b`. Retained-repair gates FRESH PASS: forced typecheck/lint 7/7
+each (0 cached; 4 existing warnings), shared 133/133, API 1,756 passed / 3 skips,
+API build 34/34 pages, diff 0 errors. Mobile gates NOT APPLICABLE.
+
+No preparation migration/types, result store, worker/broker extension, guard,
+poll drain or consumer gating was added. ADR-026 remains free. EP2/EP3 remain
+blocked on EP1. Rollout and device checks entirely skipped.
+
+## EP1b eager preparation continuation (2026-10-14)
+
+**STOPPED on a new preflight finding; STEP 0.5 is committed locally.**
+`23cb9d0` restores deferred Canvas PDF validation to the existing 40-total-page
+limit before inspection/OCR, including reused page counts. Local durable PDFs
+retain 100 total / 40 OCR-required pages. Focused tests: FRESH 29/29 in 3 files.
+Retained-fix gates FRESH PASS: forced typecheck/lint 7/7 tasks each (0 cached,
+4 existing lint warnings), shared 133/133, API 1,749 passed / 3 existing skips,
+API build 34/34 pages and diff check 0 errors. Mobile gates NOT APPLICABLE.
+
+The source-list inventory is silently capped at 150 Files and 150 Pages.
+An offline reproduction with 230 eligible files returns 150, then
+`hasMore=false`; 80 are omitted. EP1's discovery cannot treat that as complete
+evidence for the required 200-prepared/30-deferred behavior. The unattended
+surprise rule requires an owner answer before repairing this additional boundary.
+The exact question and evidence are in the [EP1b handoff](ai/handoff.md#ep1b-unattended-continuation-2026-10-14).
+
+The unfinished preparation-store draft was removed; no new migration/types,
+worker task, broker extension, sync guard, deferred drain or consumer changes
+remain. ADR-026 remains free and the latest migration remains `20261013000500`.
+EP1 STEPS 1-4 remain incomplete; EP2/EP3 and visual phases still depend on them.
+Rollout/device checks were entirely skipped. Already-stored Canvas sources over
+40 pages and all live state are **UNVERIFIED (owner to confirm)**.
+
+## EP1 eager preparation preflight (2026-10-14)
+
+**STOPPED at STEP 0; no EP1 implementation or migration added.** The required
+code recheck found that deferred Canvas PDF extraction uses the local durable
+100-page limit, contradicting EP0's assumed 40-page Canvas extraction cap.
+The later Canvas snapshot constraint remains 40 pages; it does not prevent
+earlier inspection/OCR. This is a repository finding, not a live production claim.
+
+EP1's overriding unattended STOP rule requires owner review before continuation.
+The proposed continuation first enforces the existing 40-page Canvas rule before
+inspection/OCR, including stored page-count reuse, while preserving local durable
+PDFs at 100 total / 40 OCR-required pages. EP1 STEPS 1-4 and their gates remain
+NOT RUN. ADR-026 is still free; the latest migration remains `20261013000500`.
+EP0's completed audit is historical evidence, with the cap correction annotated.
+Rollout and device checks were entirely skipped; live state is UNVERIFIED
+(owner to confirm). See [EP1 handoff](ai/handoff.md#ep1-unattended-preflight-stop-2026-10-14).
+
+## EP0 eager preparation audit (2026-10-14)
+
+**PASS for docs-only local scope; EP0 done, EP1 next.** Fely decided to prepare
+every instructional Canvas material on sync, with cost accepted and no per-user
+preparation cost cap. Guard: 200/sync, checked every 25 for repeat/no progress;
+three attempts across syncs require student Retry. VL2.1 LibreOffice is approved
+for its later slice. The EP0 prompt records P0 confirmation at 12:48.
+
+The [preparation audit](architecture/ep0-preparation-audit.md) maps binary
+ingestion, later extraction/blocks, provenance, every trigger, eligibility,
+retention and worker context with file:line evidence. Today's Prepare means
+stored bytes, not completed extraction. A worker can run the existing path
+using brokered tokens and awaited dispatch; no request-context STOP was found.
+EP1 needs one durable job/result per owned material/revision, full prepared
+admission gates and a persisted batch guard/overflow drain. Use ADR-026 if still
+free; ADR-021 through ADR-025 are occupied.
+
+Historical read-only CIT17 evidence: five PDFs / 164 pages / 8,973,082 bytes;
+actual OCR share, full current inventory and dollar cost are UNVERIFIED (owner
+to confirm). No fresh service query or provider work. FRESH git diff --check
+PASS (0 whitespace errors); typecheck/lint/tests/builds NOT RUN (0), docs only.
+One local docs commit; no code, migration, deployment, remote SQL, Scheduler,
+email, environment edit or push. Rollout and device checks entirely skipped.
+RB1/N1 owner acceptance remains separately pending; this owner-authorized EP0
+slice supersedes the earlier blanket autopilot pause for this audit.
+See [EP0 handoff](ai/handoff.md#ep0-unattended-preparation-audit-2026-10-14).
+
+## RB1 rollout — device acceptance in progress (2026-10-13)
+
+**Production-deployed at exact commit `9d6f254`; device acceptance NOT RUN.**
+This section supersedes the rollout-pending statements in the earlier local
+slice records below. Autopilot remains paused until RB1 and the requested N1
+continuation are handled.
+
+API `dpl_D7XoTybcNT1ib9AMcEvXYU8tKB4P` is READY and healthy; worker
+`generation-worker-00024-p6n` is READY with 100% traffic and authenticated
+health 200. Preview OTA group `3b109b84-f28d-4557-b1ba-433a1a2e9145`
+is published on Android runtime `2.0.1`. Five forward-only migrations applied
+and passed object/RLS/grant/private-bucket verification. No RB1 env change.
+
+| Item | Deployment | RB1 device acceptance |
+| --- | --- | --- |
+| P1 hidden grades, Grades navigation, Matching cap | API + preview deployed | NOT RUN |
+| AG2 polling and labels | API + preview + migrations deployed; poll inactive | Queue Auto NOT RUN; Library/reviewer automatic labels BLOCKED (no successful automatic artifact) |
+| PV1c Canvas PDF provenance retention | API + worker + migration deployed | NOT RUN |
+| VL1.1b Canvas page snapshots | API + worker + preview + migration deployed | NOT RUN |
+| E2 review-time estimate | API + preview deployed | NOT RUN |
+| G1.1 drop rules | API + preview deployed | BLOCKED (no live drop-lowest fixture) |
+| H1b private logging | API + worker deployed | End-to-end generation NOT RUN |
+| VL0c/VL1.2 local PDF provenance/snapshots | API + worker + preview + migration deployed | NOT RUN |
+| O2c offline quiz scoring | API + preview deployed | NOT RUN |
+| H2/H2b dependency fixes | API + worker deployed | Dispatch/completion NOT RUN |
+| H3 private responses | API deployed; FRESH owner GET 200/private,no-store PASS | Live API check PASS |
+| H4 legacy review retirement | API deployed; FRESH POST /api/review 404 PASS | Canonical generation NOT RUN |
+
+STEP 5 is **DEFERRED to N1 notification activation (separate owner step;
+follows docs/architecture/canvas-email-notifications.md, including
+skip_stale_canvas_email_events_v1 before any send)**. No RB1 cron call,
+Scheduler operation or Resend activation. N1 starts after RB1 acceptance/docs;
+creating/resuming Scheduler requires its separate STEP 5 yes.
+
+FRESH pinned gates PASS: forced typecheck/lint 7/7 each (zero cached; four
+existing lint warnings), shared 108/108, API 1,735 passed/3 existing skips,
+mobile 928/928, API build, Android export and diff check. The first OTA command
+stopped before publication for a missing noninteractive message; the owner
+approved the explicit-message retry, which published one update group.
+
+See [RB1 rollout evidence and device matrix](ai/acceptance/rb1/rollout.md).
+
+
+## H4 legacy review route retirement (2026-10-13)
+
+**PASS for local code scope; owner rollout/device acceptance pending.**
+Security status: **H1-03 FIXED locally (retired)**. Fely selected option 1 on
+2026-10-13 at 18:27: retire the legacy /api/review route if unused. STEP 0 found
+no runtime, test-harness, script, CI or mobile/website consumer. Commit
+`eb2a4b5` removes its only POST module and adds a focused offline absence
+test. The canonical reviewer route, engine/provider exports and opt-in provider
+smoke script remain used and unchanged. No migration, dependency or mobile change.
+
+FRESH gates: forced typecheck and lint 7/7 tasks each, 0 cached;
+lint 0 errors / 4 existing mobile import warnings; shared 133/133 in 12 files;
+API 1,735 passed / 3 skipped / 0 failed in 146 files; API build 34/34 pages,
+16 steps / 1 workflow; diff check PASS (0 whitespace errors). The build route
+list and manifest omit /api/review and retain /api/reviewer/generate.
+Mobile tests and Android export are NOT APPLICABLE (mobile unchanged).
+The first typecheck failed on three stale generated Next route imports;
+a local rebuild refreshed them, and the forced rerun passed. No test flake.
+
+Owner steps remaining: ship H4 with the next API deploy, confirm POST /api/review
+returns 404 and canonical generation works, optionally remove the deployed API's
+RUN_OPENAI_SMOKE variable, and generate a reviewer from a Canvas module on device.
+Rollout and device checks were entirely skipped. Live deployed revisions, route
+behavior and environment state remain **UNVERIFIED (owner to confirm)**.
+See [H4 handoff](ai/handoff.md#h4-unattended-legacy-review-route-retirement-2026-10-13).
+
+## H3 private responses and bounded bodies (2026-10-13)
+
+**PASS for local code scope; owner rollout/device acceptance pending.**
+Security status: **H1-04 and H1-05 FIXED locally**. All 14 bounded text readers stream
+request bodies and cancel at their existing byte caps, including missing or
+misleading Content-Length. Fatal UTF-8 decoding maps to each caller's existing
+invalid-JSON/request denial; null/blank-body behavior is preserved. All 15
+previously uncovered owner-data route files return Cache-Control: private,
+no-store on success and error, including the four audited source/job routes.
+Existing no-store helpers and the separate experience streaming reader stay
+unchanged. Status codes, error codes/messages, bodies and authorization are preserved.
+
+Local code commits: `e2f2d1c` (shared reader), `ca6e48d` (14 bounded readers and regressions),
+`d2a2ba8` (15 owner-response route files and regressions). No dependency,
+migration, mobile, environment-file or legacy /api/review change.
+
+FRESH gates: forced typecheck 7/7 tasks, 0 cached; forced lint 7/7 tasks,
+0 cached, 0 errors / 4 existing mobile import warnings; shared 133/133 in 12
+files; API 1,734 passed / 3 skipped in 145 files; API build 35/35 pages,
+16 steps / 1 workflow; diff check PASS (0 whitespace errors). Mobile tests
+and Android export are NOT APPLICABLE (mobile unchanged).
+One new connection test first used POST instead of PUT (34 passed / 2 failed);
+corrected fixture rerun 36/36. No full-gate failure or flake.
+
+Owner steps remaining: include H3 in the next API deploy; spot-check source
+detail and job result response headers; sign in, sync Canvas and open a reviewer
+and task plan on device. Rollout and device checks were entirely skipped. Live
+deployed headers/revisions, database/applied state and Scheduler remain
+**UNVERIFIED (owner to confirm)**. See [ADR-024](architecture/ADR-024-private-responses-bounded-bodies.md) and
+[H3 handoff](ai/handoff.md#h3-unattended-private-responses-and-bounded-bodies-2026-10-13).
+
+## VL1.2 local PDF page snapshots (2026-10-13)
+
+**PASS for local code scope; owner rollout/device acceptance pending.** Accepted
+unchanged local PDFs with VL0c's extracted page blocks now use the existing
+lowest-cited-page snapshot cache, durable dispatch and 1400 px zoom viewer.
+Exact accepted source/parent/extraction/asset ownership is checked; stored size
+and hash verify downloaded bytes. Legacy null hashes retain asset/owner/size
+identity. Edited/unavailable/old sources and non-PDF imports remain ineligible.
+
+Fely's option 1 is implemented: **respect the delete**. Deleted/cleanup-pending
+assets or missing objects return source_revision_unavailable before download,
+reservation or dispatch, including for cached images. Page text remains with
+"Page preview unavailable"; offline controls stay hidden. Deletion/cleanup and
+preserve-artifacts retention are unchanged. Missing bytes during work become
+terminal unavailable; completion fences deletion against publication.
+
+Local commits: `4a7bb83` (API/migration) and `84bee38` (mobile). Forward-only
+`20261013000400_local_pdf_page_snapshots.sql` is **NOT APPLIED**. It permits paired
+null Canvas bindings for local rows, retaining owner/version/page identity,
+RLS/grants and shared 20/user/rolling-24h reservation/attempt budgets and leases.
+
+FRESH gates: forced typecheck/lint 7/7 each, 0 cached (0 errors / 4 existing lint
+warnings); shared 133/133 in 12 files; API 1,655 passed / 3 skipped in 141 files;
+mobile 928/928 in 90 files; API build 35/35 pages, 16 steps / 1 workflow; Android
+export 3,456 modules / 31 assets / 1 bundle / 1 metadata file; diff check PASS
+(0 whitespace errors). First mobile attempt: 927 passed / 1 failed, fixed by
+updating the old local-file header exclusion assertion. No full-suite flake.
+VL1.2 gates ran with the then-uncommitted H2 dependency group; H2b has since completed it.
+
+Live revisions, applied migration/bucket/IAM/queue state, local bytes and cleanup
+remain **UNVERIFIED (owner to confirm)**. Owner steps remaining: reviewed migration
+application, one API deploy, one worker deploy, one preview OTA, then fresh-PDF,
+edited-text, keep-reviewers deletion and airplane-mode device acceptance.
+Rollout and device checks were entirely skipped. See [ADR-020](architecture/ADR-020-visual-learning.md)
+and [VL1.2 handoff](ai/handoff.md#vl12-unattended-local-pdf-page-snapshots-2026-10-13).
+
+## H2 dependency upgrades (2026-10-13)
+
+**H2b PASS for local code scope; H2 code work is done. Rollout/device acceptance
+pending.**
+Dependency status: Next / eslint-config-next 15.5.27 (`bd39917`), Workflow 4.8.13 / test
+adapter 4.0.29 (`86cf90a`, accepted ADR-023), Google authentication/gRPC, sharp 0.35.5,
+undici 6.29.0 / 7.30.0 and compatible parsing/archive/mobile leaves are committed in
+separate groups. React/React DOM remain 19.1.0; all 110 frozen Expo/RN/tooling package
+names and existing majors pass the local scope check. No app/test/snapshot changes or
+new migration.
+
+CACHED before audit (reused from H2): **5 critical / 38 high / 33 moderate / 0 low / 0
+info / 76 total**. FRESH after audit: **0 critical / 24 high / 21 moderate / 0 low / 0
+info / 45 total** (valid JSON; exit 1 reports residual advisories). Remaining findings
+and every changed package are in the [H2b
+result](ai/audits/h1-release-hardening.md#h2-result-2026-10-13-h2b-pass). Original H2
+failures remain historical; O2c PASS and isolated HEAD mobile 928/928 cleared that
+blocker.
+
+All eight gates ran FRESH between each STEP 2 group. Final: forced typecheck/lint 7/7
+each, 0 cached, 0 errors / 4 existing lint warnings; shared 133/133 (12 files), API 1655
+passed / 3 skipped (141 files), mobile 928/928 (90 files), API build 35/35 pages with 16
+steps / 1 workflow, Android export 3459 modules / 31 assets / 1 bundle / 1 metadata
+file, whitespace check 0 errors. No full-suite H2b flake; failed preflight launcher and
+original H2 attempts are recorded in the
+[handoff](ai/handoff.md#h2b-unattended-dependency-upgrade-completion-2026-10-13).
+
+**Separate owner-planned item:** Expo SDK 54 -> 57 / React Native 0.81 -> 0.87, with
+coordinated native/Metro/Jest/router changes and device acceptance. Next's excluded
+PostCSS pin and unavailable compatible argparse/sprintf-js fixes remain reported. Live
+production state is **UNVERIFIED (owner to confirm)**. Rollout and device checks were
+entirely skipped. Owner steps remaining: review, one API deploy plus the coordinated
+mobile OTA, then sign-in/sync/reviewer smoke and app/Canvas/reviewer/quiz device checks.
+
+## H1/H1b release hardening audit (2026-10-13)
+
+**PASS for local scope; rollout and live verification pending.** H1 audit local:
+8 findings, 2 fixed, 5 reported for owner decisions, 1 live boundary UNVERIFIED.
+The report inventories all 75 migrations, 106 current security-definer functions,
+69 application tables, 100 policies including Storage, and 65 API routes.
+Source inspection found fixed definer paths, revoked PUBLIC/anon execution,
+owner-checked authenticated RPCs, application RLS and private bucket declarations.
+Applied state and inherited Storage permissions remain owner verification work.
+
+`aa58d87` removes private reviewer exception/diagnostic text from logs; H1b's
+`21bb836` replaces arbitrary experience exception names with fixed categories.
+HTTP, product, authentication and retention behavior are unchanged. H2b completed compatible dependency updates; residual advisories remain owner work.
+H4 retires the unused legacy review endpoint locally. H3 completed private response cache headers
+and bounded body allocation; see the current security status above. Fely's VL1.2 option 1 decision resolves
+local-PDF retention: respect deletion, with no retention change. FRESH registry audit: 5 critical / 38 high /
+33 moderate, 76 entries;
+no dependency update or new migration was made.
+
+FRESH final gates: forced typecheck/lint 7/7 each (0 cached; 0 lint errors / 4
+existing warnings); shared 108/108 in 11 files; API 1,558 passed / 3 skipped in
+140 files; mobile 898/898 in 89 files; API build 35/35 pages, 16 steps / 1 workflow;
+diff check PASS (0 whitespace errors). Android export NOT APPLICABLE (0; mobile
+unchanged). Reproduction failures, the earlier H1 fixture failure and corrected
+preload launches are recorded in the report and handoff; no full-suite flakes.
+
+Production is **UNVERIFIED (owner to confirm)**. Rollout and device checks were
+entirely skipped. See [audit](ai/audits/h1-release-hardening.md) and
+[handoff](ai/handoff.md#h1h1b-unattended-release-hardening-audit-2026-10-13).
+
+## O2 offline quiz reveal and scoring (2026-10-13)
+
+**O2c PASS for local code scope; rollout/device acceptance pending.** O2b's shared
+TypeScript grader (`4ad11b4`) and owner-only answer-key endpoint (`086e7ad`) are
+preserved. The owner's corrected decision keeps `complete_quiz_attempt` and
+persisted History/Library percentages SQL-authoritative; no database migration
+or SQL function was changed. Frozen TypeScript response parity and all 23
+SQL-rule fixtures pass against the unchanged function in local PGlite.
+
+Separate owner-scoped SQLite keys hydrate with O1 bodies, retry independently,
+refresh with the body revision and purge on sign-out/copy removal. Missing keys
+retain the existing connection-required behavior. Offline check, reveal and
+finish use the shared grader and persist provisional results with the caption
+"Scored offline · will sync". Replay persists the server attempt identity before
+mutations, preserves assisted-reveal ordering, tolerates interrupted completion,
+and replaces local results with the server's; mismatch logging is only
+`offline_score_mismatch`. No AI calls or jobs were added.
+
+O2c implementation commits: `f2ac5dd` (storage/hydration) and `3b05865`
+(offline practice/replay). FRESH final gates: forced typecheck/lint 7/7 each,
+0 cached (0 lint errors / 4 existing warnings); shared 133/133 in 12 files;
+API 1,608 passed / 3 skipped in 141 files; mobile 920/920 in 90 files;
+API build 35/35 pages, 16 steps / 1 workflow; Android export 3,456 modules /
+31 assets / 1 bundle / 1 metadata file; diff check PASS (0 whitespace errors).
+The failed first fixture/typecheck/mobile-request-count attempts are recorded
+in the handoff. Gates ran with the pre-existing uncommitted H2 dependency group;
+O2c neither changes nor commits those manifests, lockfile or ADR-023.
+
+Live revisions, deployed SQL and parity on real student data are
+**UNVERIFIED (owner to confirm)**. Owner steps remaining: one API deploy,
+one preview OTA, then airplane-mode/force-stop/reopen/reveal/finish/reconnect
+acceptance and score comparison. Rollout and device checks were entirely skipped.
+See [ADR-022](architecture/ADR-022-offline-quiz-answer-keys.md) and [O2c handoff](ai/handoff.md#o2c-unattended-offline-quiz-reveal-and-scoring-completion-2026-10-13).
+
+## VL0 local-upload PDF provenance (2026-10-13)
+
+**VL0c PASS for local code scope; rollout/device acceptance pending.** New
+accepted local PDF child revisions load the worker's existing extraction blocks
+by owner and exact `extraction_result_id`. Only an accepted trimmed-text SHA-256
+matching the normalized parent keeps page blocks and `pageProvenance: "extracted"`.
+Edited text has no blocks and `"edited"`; missing/invalid evidence or read errors
+have no blocks and `"unavailable"`, while acceptance still succeeds. No backfill,
+new migration, immutable-source update or second block builder is introduced.
+
+Existing Study Assist and page-mapping readers consume the canonical metadata.
+VL1.2 subsequently adds local snapshot rendering/mobile controls with the same
+renderer and no deletion/retention change. Owner answer 6 clears the historical
+VL0 STEP 0.5 stop: **accepted, deferred to VL1.2**. Provenance needs text, not
+retained PDF bytes; deletion/cleanup is unchanged and honors `preserve_artifacts`.
+
+FRESH forced typecheck/lint: 7/7 each (0 cached; 0 errors / 4 existing warnings).
+Shared 108/108 in 11 files; API 1,579 passed / 3 skipped in 140 files; mobile
+898/898 in 89 files; API build 35/35 pages, 16 steps / 1 workflow; diff check PASS
+(0 whitespace errors). Android export NOT APPLICABLE (mobile unchanged).
+Production revisions, applied migration state, retained bytes and old affected-row
+counts are **UNVERIFIED (owner to confirm)**. Rollout/device checks entirely skipped.
+See [VL0c handoff](ai/handoff.md#vl0c-unattended-local-upload-pdf-provenance-2026-10-13).
+
+## G1.1 grade estimator drop rules (2026-10-13)
+
+**PASS for local code scope; rollout/device acceptance pending.** Grade estimates
+now apply `drop_lowest`, `drop_highest` and `never_drop` within each group, using
+percentage ordering, stable assignment-ID ties and the one-graded-score guard.
+The API translates persisted Canvas IDs into owned stored assignment IDs;
+malformed rules retain an explicit warning. Hidden grades remain pending, and
+mode selection still chooses the current calculation nearest Canvas's visible
+score. No-rule output is pinned by the CIT17-like regression: 217/250 graded,
+350 remaining, target 90% gives 92.3%, with the same per-activity points.
+
+Uniform future scores are simulated at each candidate. Bounded binary searches
+within stable drop ranges find the minimum required score to 0.1%, including
+unequal-point order changes; dropped future activities do not contribute to the
+target or appear in retained activity advice. Mobile displays applied drop counts
+in existing secondary text. Protected-only rules have no misleading warning.
+
+Implementation commits: `378fb61`, `fae3bdc`, `f856de7`, `0ccc29e`.
+FRESH gates: forced typecheck/lint 7/7 each (0 cached; lint 0 errors / 4 existing
+warnings); shared 108/108 in 11 files; API 1,551 passed / 3 skipped in 140 files;
+mobile 898/898 in 89 files; API build 35/35 pages, 16 steps / 1 workflow;
+Android export 3,454 modules / 31 assets / 1 bundle / 1 metadata file;
+diff check PASS. Failed fixture/preload attempts are recorded in the handoff.
+
+Live production state and Canvas parity are **UNVERIFIED (owner to confirm)**.
+Owner next: one Vercel deploy, one preview OTA, then a drop-lowest course/device
+hand calculation. No migration, remote service call, Scheduler change,
+environment-file edit or push. Existing G1/R1 acceptance remains unchanged.
+See [G1.1 handoff](ai/handoff.md#g11-unattended-grade-estimator-drop-rules-2026-10-13).
+
+## E2 reviewer review-time estimate (2026-10-13)
+
+**PASS: estimate and display code, tests and local commits complete; rollout/device acceptance pending.**
+Reviewer estimates: E2 local. The reader and Library already load the exact saved
+version payload, so both compute the estimate on read without new queries, metadata
+writes or a migration. Saved explanations, key points and item/evidence text count
+at 200 words/minute, plus 15 seconds per nonblank key point and 1 minute per section;
+round up to 5-minute increments, minimum 5. Titles, metadata, emphasis copies and
+unsupported enrichment are excluded. Empty/invalid content returns null.
+Optional `reviewMinutes` fields keep older clients compatible; quizzes and activity
+outputs return null. Mobile shows `~N min review` in the existing secondary caption,
+joined to the automatic-origin label with ` · ` when present.
+
+Implementation commits: `80e8cd5`, `4c48804`, `f3d3b7b`.
+FRESH gates: forced typecheck 7/7 and lint 7/7 (0 cached; 0 lint errors,
+4 existing mobile warnings); shared 93/93 in 11 files; API 1,542 passed / 3 skipped
+in 140 files; mobile 890/890 in 89 files; API build 35 pages / 16 steps / 1 workflow;
+Android export 3,454 modules / 31 assets / 1 bundle / 1 metadata file; diff check PASS.
+The handoff records the corrected fixture failures and generated-type race.
+
+E3 is the next product decision: which reviewers become Today review blocks, when,
+and how often. Today and `task-planning.ts` are unchanged. E2 is independent of
+PV1c/VL1.1b. Live production state is **UNVERIFIED (owner to confirm)**. Rollout and
+device checks were entirely skipped under the unattended rules.
+
+## PV1 Canvas PDF provenance (2026-10-13)
+
+**PASS: code, migration file, tests and local commits complete; rollout pending.**
+Freshly prepared Canvas PDFs refresh the owned descriptor and use existing deferred
+admission for both manual and automatic generation. The worker remains the sole
+builder of cited page blocks; preparation failure remains `409 not_ready`.
+Snapshot-aware cleanup uses transaction advisory locks plus a durable exclusive
+claim to bridge the Storage HTTP deletion window. Snapshot insertion and new
+current-file references share that lock and fail safely during a claim. Rollback
+keeps any pre-existing or uncertain object and removes only a new unreferenced key.
+The unused server resolver returns only the accepted unedited Canvas PDF revision.
+
+Implementation commits: `2b0ce49`, `9b6ce4e`. Forward-only migration:
+`20261013000200_canvas_source_provenance_retention.sql` (NOT APPLIED).
+FRESH gates: typecheck 7/7 tasks; lint 7/7 tasks, 0 errors / 4 existing mobile
+warnings; API 134 files, 1,488 passed / 0 failed / 3 skipped; mobile 87 files,
+861 passed / 0 failed; API build 1/1, 35/35 static pages; diff check 0 errors.
+The first API gate had one existing database setup timeout (1,484 passed / 7
+skipped); both rerun and final run passed. A focused database fixture initially
+failed 7 cases and was repaired (final focused retention suite 37/37).
+No cached results claimed. PGlite tests deterministic transaction interleavings;
+physical multi-session blocking and deployed Storage remain UNVERIFIED.
+
+R1.4 admission evidence is NOT AVAILABLE (R1.4 preflight stop). Preview caps
+(20,000/source; 90,000 combined) reject rather than truncate; no partial-source
+quality finding is established. VL1.1b subsequently passed STEP 0 and completed Canvas-only snapshots locally;
+owner rollout remains pending. VL0 remains separate. No production calls, deployment,
+migration application, Scheduler changes, environment-file edits or push.
+See [PV1c completion handoff](ai/handoff.md#pv1c-canvas-pdf-provenance-completion-2026-10-13)
+and [ADR-021](architecture/ADR-021-canvas-source-provenance-retention.md).
+
+## R1.4 CIT17 acceptance (2026-10-13)
+
+**STOPPED at step 1; R1 remains 15/16, AG1 PARTIAL.** All five CIT17 baseline materials already have reviewers under the shared owner-scoped reviewer mapping. No eligible file, baseline edit, sync tap or generation; baseline remains exactly `2026-10-12T07:07:14.956768+00:00`. Production API `dpl_Hua1KbWEDGYphVB8xVexSdV3UBdQ` is READY and worker `generation-worker-00023-9hs` serves 100%. End counts: 622 sync jobs, 242 processing jobs, 113 reviewer jobs, 90 artifacts; 0 active sync/processing jobs. PV1 admission-path evidence NOT RUN because no new job exists. AG2 rollout/device acceptance remains pending. FRESH read-only checks; code gates NOT RUN (docs only). See [R1.4 stop evidence](ai/acceptance/r1/rollout-and-acceptance.md#r14--cit17-preflight-stop-2026-10-13).
+
+## VL1.1b Canvas PDF snapshots (2026-10-13)
+
+**PASS for local code scope; owner rollout/device acceptance pending.** Both
+manual and automatic standalone unedited Canvas PDFs preserve cited page blocks.
+The authenticated topic endpoint selects the lowest cited page, reuses an
+owner/source-version/page cache, and awaits durable Google task acceptance before
+HTTP 202. Header discovery does not render. The existing native worker renders
+one accepted PDF page at 1400 px, verifies its hash, uploads privately and fences
+publication with a lease. Reservations and actual attempts are capped at
+20/user/rolling 24 hours, including retries. Missing original revisions return
+source_revision_unavailable; VL1.1b excluded local/edited/Office/Page sources.
+VL1.2 above subsequently admits eligible local PDFs while respecting deletion.
+
+Mobile adds From page n, bounded five-check/15-second progress polling, and a
+full-screen pinch/pan/double-tap viewer using existing tokens and Reduce Motion.
+Offline device copies and failed reachability checks hide it; no offline image
+store or new native dependency. Coarse null source types are classified server-side.
+
+FRESH gates: forced typecheck and lint 7/7 each, 0 cached; lint 0 errors /
+4 existing warnings; API 140 files, 1,537 passed / 0 failed / 3 skipped; mobile
+89 files, 879 passed / 0 failed; API build 35/35 static pages, 16 steps/1 workflow;
+Android export 1 bundle / 3,452 modules / 31 assets; diff check 0 errors.
+Failed first attempts and the recurring PGlite bootstrap flake are recorded in
+the handoff; its setup timeout now matches the other database fixtures.
+
+Forward-only migration 20261013000300_source_page_snapshots.sql is NOT APPLIED.
+PV1 migration/rollout, live retained bytes, bucket/IAM/queue, deployed renderer
+and device checks remain UNVERIFIED (owner to confirm). No remote service calls,
+deployments, applied migrations, Scheduler changes, environment-file edits or push.
+VL0 local provenance remains separate. Embedded images and labeled external
+visuals on request remain later phases. See [ADR-020](architecture/ADR-020-visual-learning.md),
+[preflight](ai/acceptance/vl1/preflight.md), and
+[VL1.1b handoff](ai/handoff.md#vl11b-unattended-canvas-pdf-snapshots-2026-10-13).
+
+## VL1 source-page snapshots (2026-10-13)
+
+**STOPPED at STEP 0.1; no feature code or migration added.** Canonical reviewer
+payloads retain section `sourceBlockIds`, but local PDF extraction does not persist
+page-numbered blocks in `source_versions.metadata`. Reviewer admission keeps those
+blocks in `processing_job_sources.metadata` while reusing the existing source
+version; saved artifact reads therefore lack the required block-to-page mapping.
+The stored PDF document link survives. VL1's unattended stop rule requires owner
+direction before repairing this prerequisite or starting STEPS 1-5. FRESH:
+repository inspection and documentation diff check (0 errors); all six build/test
+gates NOT RUN. Live state UNVERIFIED (owner to confirm). No external calls,
+deployments, applied migrations, environment-file edits or push. See
+[VL1 handoff](ai/handoff.md#vl1-unattended-source-page-snapshots-2026-10-13).
+
+## P1 unattended polish (2026-10-13)
+
+**PASS for local code scope; rollout/device acceptance pending.** Singular hidden-grade
+copy is tested, Tasks opens the shared Grades screen inside its own `work` stack,
+and Matching-only quizzes use a deterministic verbatim-term budget in setup,
+admission, retry and worker processing. The strict validator and Mixed capacity
+are preserved. No migration, external service call, deployment, Scheduler change,
+environment-file edit or push. FRESH: forced typecheck/lint 7/7 (0 cached,
+4 existing lint warnings); shared 71/71; API 1,415 passed/3 skipped; mobile
+853/853; API build 35 pages/16 steps/1 workflow; diff check 0 errors.
+The original R1 Matching-only source/cause and live revisions are UNVERIFIED
+(owner to confirm); the historical fixture does not establish that root cause.
+Failed first attempts, evidence and Owner steps remaining are recorded in [P1 acceptance](ai/acceptance/p1/unattended-polish.md).
+
+## AG2 background automation (2026-10-13)
+
+**PASS (local code scope); rollout and device acceptance pending.** Complete
+metadata polls now detect newly observed File/Page module-item IDs and await the
+existing durable course-content admission and Google dispatch. The first complete
+inventory baselines existing IDs; changed items and failed scopes do not trigger.
+Service-only reservations serialize per-user checks: automation enabled, verified
+API activity within 7 days, at most 1 request/course/rolling 6 hours and 3/user/rolling
+24 hours. Auth records activity with an hourly conditional write. AG1's 3/run and
+5/24-hour reviewer limits remain unchanged. Queue shows Auto; Library and the
+reviewer header show Made automatically, derived from owned candidate/job/version
+receipts. A service-only, idempotent stale-email SQL guard and owner activation
+runbook are prepared. Migrations `20261013000000` and `20261013000100` are local only.
+
+FRESH: forced typecheck/lint 7/7 each (0 cached; 4 existing lint warnings), API
+1,450 passed/3 skipped in 132 files, mobile 861 passed in 87 files, API build
+35 static pages/16 workflow steps/1 workflow, Android export 1 bundle/3,450 modules/
+31 assets, and diff check 0 errors. The first typechecks failed on JSON narrowing
+and mobile fetch-mock types; both were fixed and rerun successfully. No test flakes.
+R1.4 pending. Cloud Scheduler, live revisions, environment/IAM and applied
+migration state are UNVERIFIED (owner to confirm). No remote service calls,
+deployments, migration application, emails, Scheduler changes, environment-file
+edits or push. Website parity is deferred. See the
+[execution contexts](architecture/ag2-execution-contexts.md) and [handoff](ai/handoff.md).
+
+## R1 coordinated rollout (2026-10-12)
+
+**PARTIAL — production rollout complete; 15/16 device lines PASS, line 7 FAIL (R1.3 reviewer generation), 0 pending.** R1 source `cc42361`; AG1.1 fix `b5adb7d`; AG1.2 token fix `4a2a2d0` and dispatch fix `b6ab830`. Owner-applied R1.1 migrations remain reconciled with no history repair. API `dpl_38faB6K3SfD38KeGE7TNuG6W6bgp` was later redeployed by the CC17 session as R1 + API quiz fixes, `dpl_7xLxnfVqY81QVCUyiiy6qQvsDDgF`. GR1 API **dpl_Hua1KbWEDGYphVB8xVexSdV3UBdQ** and worker **generation-worker-00023-9hs** (100%) deploy source fc3486b. Rollback: API dpl_7xLxnfVqY81QVCUyiiy6qQvsDDgF; worker generation-worker-00022-wzx. Preview OTA `ba5e6d56-d75a-4ef4-adb0-162518572c48` is unchanged. Scheduler/Resend inactive. See [R1 evidence](ai/acceptance/r1/rollout-and-acceptance.md).
+
+| Feature | Overall status | Device acceptance |
+|---|---|---|
+| O1 offline library | PASS | Lines 1–4 accepted: cold offline Reviewer/Quiz/Draft reopen, copy removal/recovery, practice kept, no sync jobs |
+| AG1 automatic reviewers | PARTIAL | R1.3 proved preparation/admission/dispatch/start but failed during generation. GR1 classification and bounded known-outcome retries are live. Fresh manual Unit 2 diagnosis succeeded on worker 00023, first delivery, 53,159 ms; saved reviewer opens in Library. Original failed job unchanged. Line 7 still needs one completing automatic run. |
+| E1 study-time estimates | PASS | Lines 10–12: varied estimates, student edit kept, no re-estimation |
+| G1 grade estimator | PASS | Lines 13–14: hand-checked CIT17 90% → 92.3% per remaining activity |
+
+Regression/sign-out-in line 15 and Mixed-quiz Matching line 16 PASS. Matching-only generation contract failure remains open. GR1 provider classification and bounded definite-outcome checkpoints are deployed from fc3486b. Unit 2 manual diagnosis PASS on worker 00023: fresh job ceaebf6d succeeded on delivery 1; provider duration 53,159 ms; saved reviewer opens from Library (18 topics). No request_failed or reviewer_generation.* failure events; kind/httpStatus/incompleteReason absent on success. Original d9de6cfe remains failed/generation_failed, attempt 2, retryable=false. No Queue Retry or direct data edits; no new deploy, cap change, migration, OTA or push. The earlier R1.3 failure cause remains unknown; this run does not establish output truncation. Line 7 remains FAIL, R1 15/16, AG1 PARTIAL; next automatic acceptance needs naturally new or known-fitting material. AG2 background-poll code is complete locally; rollout/device acceptance and website parity remain open. Prior GR1 code gates passed: forced typecheck/lint 7/7 (0 cached, 4 existing warnings), API 1,409 passed/3 skipped/128 files, build 35 pages/16 steps/1 workflow, provider contract 20/20. Code gates NOT RERUN for this device/docs continuation; documentation diff check FRESH PASS.
+
+## O1 explicit offline library (2026-10-12)
+
+**PASS (local) - physical acceptance pending.** O1 implemented locally: every saved artifact body hydrates in batches (foreground and completion catch-up, no new jobs), Saved offline markers and counts, calm offline states, Offline storage settings. Not physically accepted. O2c now supports offline Quiz reveal/scoring with separate owner-scoped device keys; offline Draft editing remains network-only. Device copies stay owner-scoped; only authenticated not_found removes an artifact, list absence retains it, sign-out purges the owner, and Quiz bodies remain learner questions without answer keys. Fely's 2026-10-13 option 1 decision is implemented by O2c (ADR-022): keys hydrate separately, purge with device copies and enable provisional scores until server-wins replay. Removing copies keeps summaries, aliases, Quiz practice, Activity responses and Task snapshots. O2c adds local API/shared and mobile changes; rollout remains pending. Historical O1 FRESH gates: root typecheck 7/7 (0 cached); root lint 7/7 (0 cached, 0 errors, 4 pre-existing mobile import-order warnings); mobile tests 843/843 in 85 files; Android export 1 bundle / 3,448 modules / 31 assets; git diff --check 0 whitespace errors.
+
+## G1 grade estimator (2026-10-12; historical local result before R1/G1.1)
+
+**PARTIAL - implemented locally; API/mobile rollout and physical acceptance pending.** Grade goal computes the same percentage needed on each remaining activity using a pure points/weighted model, choosing the mode nearest Canvas's visible current score. A read-only owner-selected-course API excludes non-gradable/excused work and treats hidden grades as pending; drop-rule and mismatch warnings keep the estimate qualified and Canvas authoritative. Mobile remembers the target by account/course and links course Tasks to Grades. No migration, AI, grade writes, website, deployment, OTA/EAS or push. FRESH: root typecheck 7/7 (0 cached); root lint 7/7 (0 cached, 0 errors, 4 pre-existing mobile warnings); shared 68 passed in 10 files; API 1,362 passed / 3 skipped in 126 files; mobile 817 passed in 82 files; API build passed (35 static pages, 16 workflow steps / 1 workflow); git diff --check passed. Live sanity check awaits account/course context; device acceptance remains pending.
+
+## E1 study-time estimates (2026-10-12)
+
+Reviewer estimates: E2 local; Today review blocks deferred to E3.
+
+**PARTIAL - implemented locally; production migration/API rollout/OTA and physical acceptance pending.** Canvas task time now uses one bounded structured AI call (10 tasks/request; snapshot limit 40 AI tasks/user/24 hours), with deterministic heuristic fallback and retry. Owner-scoped fingerprints avoid repeat calls and refresh changed assignments; student estimates win through guarded writes. Today/Tasks show approximate automatic time and TaskEditor explains the source. Migration `20261012000200` remains local. FRESH: root typecheck 7/7 (0 cached); root lint 7/7 (0 cached, 0 errors, 4 pre-existing mobile warnings); shared 57 passed in 9 files; API 1,336 passed / 3 skipped in 124 files; mobile 807 passed in 81 files; API build passed (35 static pages, 16 workflow steps / 1 workflow); git diff --check passed.
+
+## AG1 automatic reviewers after Canvas content sync (2026-10-12)
+
+**PARTIAL - implemented locally; production migration, API/worker rollout and physical acceptance pending.** Successful, unchanged and partial course-content syncs run owner-scoped automatic admission through the existing generation path. First sync baselines current eligible file/Page material; subsequent material/revisions use deterministic receipts, existing-reviewer skips, 3/run and 5/24-hour caps, a service-only per-user lease, quota deferral and bounded retries. API and mobile Settings provide a persistent off switch. Migrations `20261012000000` and `20261012000100` remain local. FRESH: root typecheck 7/7 (0 cached); root lint 7/7 (0 cached, 0 errors, 4 pre-existing mobile warnings); API 1,304 passed / 3 skipped in 123 files; mobile 800 passed in 80 files; API build passed (35 static pages, 16 workflow steps / 1 workflow); git diff --check passed. [ADR-019](architecture/ADR-019-automatic-reviewer-generation.md).
+
+## Product direction v1.4 — regular Canvas students and automatic reviewers (2026-10-10)
+
+**DIRECTION ONLY — no code changed.** The October 10 TBI assessment huddle changed the target users from CTE students and CTE Board Examiners to regular Canvas-using students of one institution (UC) across all departments. Automatic reviewer generation on Canvas sync is now the target workflow (editable, regenerable, can be turned off); the current build still generates reviewers manually, and the five-minute metadata poll does not trigger generation. Grade estimator, AI study-time estimate, and offline library are proposals. See [official direction v1.4](capstone/official-direction.md).
 
 ## Urgent Canvas sync and configurable email notifications (2026-10-03)
 
@@ -915,3 +1619,193 @@ Last refreshed: 2026-09-08, Asia/Manila.
 Use this file for the snapshot, `docs/roadmap.md` for verified phase status,
 `docs/ai/current_sprint.md` for the one active objective, and the relevant ADR
 for invariants. `docs/ai/handoff.md` is historical evidence only.
+
+
+
+## W2 mobile parity main integration (2026-10-11)
+
+Owner requested `push to main`. Remote main already contains W1/W2 website
+integration `7ef5a61`. The four scoped mobile commits are integrated as
+`f308faf`, `55b7cd0`, `815631d`, `dc018c8`; the parity report is `2c022f4`.
+**FRESH PASS** on the combined tree: web typecheck/lint and 82 tests;
+mobile typecheck/lint and 793 tests (four existing lint warnings).
+Main's newer task refresh is preserved. Documentation conflicts retain both
+histories. Normal publication targets `origin/main`; no force push or manual
+deployment. Original dirty website/main/mobile checkouts remain untouched.
+Prior physical RMX3151 and viewport evidence is retained; neither was rerun
+for this Git integration. Next: owner laptop/fullscreen review.
+
+## W2 mobile parity and fresh acceptance (2026-10-11)
+
+**PASS locally, including physical RMX3151 checks.** The existing W2 website
+implementation was rechecked in `C:/Projects/stay-focused-v2-website` on
+`website/functional-v1`: fresh web typecheck/lint, 79 tests and all 25 requested
+page/viewport checks pass. Mobile parity is committed on `b25-3-3-ai-first`
+in `b25-3-3-work`: Canvas other-space grouping, growing draft fields with
+keyboard avoidance, and theme-aware/reduced-motion-safe clear-day states
+(`b87fe54`, `e1f5f3d`, `f42c43f`, `9ec9fa1`). Fresh mobile typecheck/lint and
+791 tests pass; lint retains four pre-existing test-file import warnings.
+Physical local-debug acceptance used actual screens with isolated fictional
+data: Canvas search/disclosure, draft growth/keyboard, light/dark Today with
+system Reduce Motion on/off, and planning action pass. Device settings were
+restored. Existing mobile docs/design edits remain untouched; evidence and
+cross-repository state are recorded in the appended W2 handoff here. No API
+change, push or deployment. Next: owner laptop/fullscreen review.
+
+## W1/W2 main integration (2026-10-11)
+
+Owner explicitly requested `push to main w1 w2`. The release merges W1/W2
+tip `c05634f` with current main `6319376` in an isolated integration checkout.
+It preserves main's canonical task/planner state, bounded content+grades sync,
+minute resource refresh and capstone terminology while adding W1 completion,
+shared free time and saved-plan clarity, plus all W2 layout/editor changes.
+The planner regression now follows the canonical repository, including work
+explicitly reopened in Canvas despite an old submission timestamp.
+
+FRESH PASS: web 82 tests/12 files; focused API planning/experience 171 tests/9
+files; root typecheck and lint 8/8 each, zero cached (four existing mobile
+lint warnings). Root build also passes 8/8, zero cached. Browser acceptance
+passes all 25 page/viewport checks, 10 light/dark Today captures, the four-page
+desktop sweep, Canvas search/selection/bounded sync, draft persistence/guards,
+and importing/completing an unlinked paper task in the canonical Tasks list.
+Browser evidence uses isolated fictional data, not a new real-account run.
+Unrelated dirty work and local evidence remain outside the release. This
+entry supersedes the earlier local-only W1/W2 publication checkpoints below;
+manual deployment and production acceptance are not part of this push.
+
+## W2 website desktop layout (2026-10-11)
+
+**PASS locally.** On `website/functional-v1`, the centered 1760px shell and
+viewport-capped Today clock support laptop and fullscreen layouts. Library
+cards fill equal-height rows; Canvas has course search and collapsible other
+spaces; drafts have an outline and fields that grow with content; Today has
+theme-aware clear-day illustrations. Fresh web typecheck/lint and 79 tests
+pass. Isolated Playwright acceptance passed all 25 page/viewport checks,
+light/dark Today checks, draft save/resize/guard flows and Canvas filtering
+and selection persistence. Implementation: `e833536`, `3642654`, `2abe801`,
+`5ae9b6b`, `7a520ba`, `14b12c4`. Evidence is in the appended W2 handoff and
+ignored `tmp/w2-screens/`. No push/deployment. Next: owner review on laptop
+and fullscreen; separately scheduled feature prompts remain outside W2.
+
+## W1 Today/Schedule alignment and submitted-work filtering (2026-10-11)
+
+**PASS locally, including all six real-account checks.** Branch
+`website/functional-v1` now filters handed-in Canvas work from the shared
+planner, completes unlinked Canvas/paper activities through one import-and-mark
+helper, separates Overdue from today's schedule, shares date-specific free
+time, and labels previews as unsaved with Save to schedule. Fresh API
+typecheck/task-planning tests (32) and web typecheck/lint/tests (79) pass.
+Two saved real-account blocks matched Today's preview and Schedule at
+9:30–10:30 PM and 10:30–11:30 PM. Temporary sessions/plan metadata and local
+preferences were restored; The 5 Why Analysis remains completed as instructed.
+Implementation commits: `de3e99c`, `9d2ef46`, `1343428`. No push or deployment;
+the production website still requires these changes to be released. Full
+details and adaptations are appended to `docs/ai/handoff.md`. W2 layout,
+Library/search/draft work and all excluded estimator/sync/gating work remain
+outside this slice.
+
+## Task and planner sync reliability (2026-10-10)
+
+Owner-authorized scope: repair stale Tasks/Today/Schedule on website and mobile,
+merge immediately, and publish the existing API, website and Android preview.
+
+The canonical activity model now checks course selection, stored course end/state,
+assignment availability and submission evidence for both clients and the planner.
+Imported Canvas tasks retain their course identity and current assignment deadline.
+Submitted work moves to Completed, is never overdue, and is excluded from planning;
+planned sessions reflect the linked activity state. Deselected/ended courses and
+orphaned imports do not return as personal tasks. Saved work is preserved.
+
+Website Tasks consumes the complete canonical activity list; Tasks, Today and
+Schedule expose explicit content+grades Sync now and poll persisted data every
+minute. Per-course website sync now includes grades. Partial sync outcomes remain
+partial. Android refresh admissions are bounded to one content/grades pair.
+Opening Tasks/Today/Schedule does not create Canvas jobs; the existing once-per-load Generate refresh is preserved. Automatic five-minute Canvas polling
+is still the separate, pending notification activation scope.
+
+FRESH PASS: API 1,275 tests (3 skipped), focused final activity/planning regression
+162 tests, web 69 tests, mobile sync/screens 68 tests, root production builds 8/8,
+root lint 8/8 (four existing mobile warnings), root typecheck 8/8 (changed apps fresh;
+unmodified packages cached). Read-only live database checks passed and found four
+pending local imports with submitted Canvas evidence. Android preview OTA
+25edeaae-9365-4ffa-acb2-f84123430983 is published for runtime 2.0.1.
+
+API/website publication and main integration are being completed. Physical device
+acceptance is NOT RUN: no ADB device or browser surface is exposed. See
+[acceptance](ai/acceptance/task-sync-reliability-20261010.md).
+
+
+## Website completion and main integration (2026-10-08)
+
+Owner-authorized finite scope: finish Claude's pending web changes, verify the
+website, publish it, and push to main. Existing API/mobile/database architecture
+and unrelated working-tree changes are preserved.
+
+PUBLISHED AND INTEGRATED INTO MAIN. Course Library, reviewer management and
+selection tools, account menu, content identity and Schedule deadlines are
+complete. Canvas refresh is explicit, bounded, owner-cancelled and honest about
+partial admission or unknown polling outcomes. Fresh web tests 66/66, reviewer
+route regression 9/9, web typecheck/lint and root typecheck/lint/build 8/8 pass.
+Production deployment ca524a4 is READY. Live signed-in read, rename with reload,
+delete confirmation Cancel, and desktop/mobile layout checks passed. The normal
+main push was verified remotely; no force push. No paid generation or live
+Canvas sync was submitted. See
+[completion evidence](ai/acceptance/website-completion-20261008.md).
+
+## Website production deployment (2026-10-08)
+
+Owner-authorized: the V2 website replaces retired V1 on
+`https://stay-focused-ten.vercel.app` (Vercel project `stay-focused`). The
+project now builds `galaxymaxp/stay-focused-v2` from `apps/web`, and pushes to
+`website/functional-v1` deploy production automatically. It uses the shared V2
+Supabase project and the existing API (`stay-focused-v2-prototype`) through the
+same-origin rewrite. Owner enabled web generation and Google/Microsoft sign-in;
+V1 server secrets were removed from the project.
+
+Shipped with it: V1-style desktop shell (sidebar, breadcrumbs, full-width
+layout), Today with a right rail, side-by-side course materials, and motion
+mirroring the mobile tokens. FRESH: web typecheck/lint/tests, both isolated
+browser runs, production build, and live checks (API proxy 200/401, anon key
+for the V2 project). NOT RUN: authenticated live use by the owner, live
+generation and OAuth round trips. Preview deployments have no Supabase key
+(`NEXT_SUPABASE_ANON_KEY` is production-only), and `main` now includes `apps/web`; preview authentication remains unconfigured.
+
+## Website V1.1 orb parity (2026-10-08)
+
+Owner-authorized scope: port the authoritative mobile WebGL orb, verify visual
+and behavioral parity, preserve the functional website and commit scoped work
+on `website/functional-v1`. Investigation at `6a8032a` found that the actual
+mobile Generation route uses Animated plus layered SVG, with no WebGL renderer
+or shaders in the inspected local sources. **BLOCKED** pending the actual
+WebGL source location or owner resolution of that rendering requirement. No
+replacement orb or runtime change was made. See [orb parity report](ai/acceptance/website-orb-parity.md)
+for source mapping, baseline verification and remaining differences. Existing
+V1 historical findings remain below; B25.3.3 stays paused and incomplete. No
+production deployment, provider call, schema or generation-engine change.
+
+## Website V1 owner-approved scope (2026-10-08)
+
+The owner prioritizes functional website implementation immediately. B25.3.3
+production compatibility investigation is paused; its PARTIAL/BLOCKED verdict,
+reports, repairs, and blockers remain preserved and it is not complete. This
+instruction supersedes earlier web exclusions for the finite website scope only.
+
+Endpoint: implement and locally verify the nine requested browser surfaces in
+`apps/web` over existing Supabase identity and shared API/workflows, record exact
+blockers, and commit scoped changes on `website/functional-v1`. No production
+deployments, migrations/data writes, PR #1 edits, or paid generation requests.
+See `docs/ai/acceptance/website-v1.md` and ADR-019 for the acceptance matrix.
+
+Task order: W1 auth/shell/Today; W2 tasks/calendar; W3 Canvas/generation/queue;
+W4 Library/Reviewer/Quiz/settings; W5 browser, regression and root verification.
+Continue independent work when live acceptance is blocked. Current result:
+LOCALLY VERIFIED; W1-W4 functional client implementations and W5 browser,
+visual, regression and fresh root TypeScript/lint/build checks pass. Live
+acceptance remains PARTIAL/BLOCKED: dedicated non-production Supabase/API and
+Canvas test access, plus a separate paid-generation allowance, are not established.
+Generation is disabled by default. Run instructions are in `apps/web/README.md`.
+Historical sections below are retained.
+
+## Urgent Canvas sync and configurable email notifications (2026-10-03)
+
+**PARTIAL — local implementation complete; production activation pending.** A protected five-minute metadata poll reuses the Canvas client/normalizers and canonical tables, with bounded requests, independent scopes and safe partial-failure handling. Assignment/announcement changes queue transactional, deduplicated email events; deadline reminders use due-date revisions, reliable submission/completion evidence and local reminder time. Settings saves global and per-type switches, reminder time and timezone. The linked Vercel project is Hobby with Fluid Compute, so the documented external trigger is one Google Cloud Scheduler HTTP job; this work adds no Cloud Run service. Migration `20261003025905` and the missing cron/Resend environment variables, verified sender, API/Mobile rollout, controlled production/device acceptance, and workload/backlog check remain required. No production data or emails were changed. [Architecture and setup](architecture/canvas-email-notifications.md).

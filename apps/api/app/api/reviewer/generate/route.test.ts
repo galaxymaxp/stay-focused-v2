@@ -326,6 +326,39 @@ describe("POST /api/reviewer/generate", () => {
     expect(JSON.stringify(body)).not.toContain("engine stack trace");
   });
 
+  it.each(["error", "pipeline", "object", "canvas"])(
+    "keeps private error fields out of logs for %s failures",
+    async (kind) => {
+      const privateText = "Cookie=session-private student@example.invalid owner/private.pdf academic-private";
+      const failure = kind === "pipeline"
+        ? new mocks.PipelineAssemblyError(privateText)
+        : new Error(privateText);
+      failure.name = privateText;
+      failure.stack = privateText;
+      if (failure instanceof mocks.PipelineAssemblyError) {
+        failure.diagnostics.causeMessage = privateText;
+        failure.diagnostics.failingSections[0]!.title = privateText;
+      }
+      mocks.runPipeline.mockRejectedValue(kind === "object"
+        ? { toString: () => privateText, message: privateText }
+        : failure);
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      const response = await POST(createRequest(kind === "canvas" ? {
+        body: { sourceText: "Readable notes", canvasPreviewSessionId: "66666666-6666-4666-8666-666666666666", ...canvasGenerationBinding },
+      } : {}));
+
+      expect(response.status).toBe(kind === "pipeline" ? 422 : 500);
+      expect(log).toHaveBeenCalledWith("reviewer_generation.error", {
+        requestId: expect.any(String),
+        route: "/api/reviewer/generate",
+        errorName: kind === "pipeline" ? "PipelineAssemblyError" : kind === "object" ? "UnknownError" : "Error",
+        ...(kind === "canvas" ? { privacy: "canvas_source_redacted" } : {}),
+      });
+      expect(JSON.stringify(log.mock.calls)).not.toContain(privateText);
+    },
+  );
+
   it("returns 422 when reviewer validation fails after retries", async () => {
     mocks.runPipeline.mockRejectedValue(
       new mocks.PipelineAssemblyError(

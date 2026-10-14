@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ activity: { active: false, syncing: false, generating: 0, queued: 0, refresh: () => {} } }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => true }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => true }));
 vi.mock("../../assets/queue/orb-dark.png", () => ({ default: "orb-dark" }));
 vi.mock("../../assets/queue/orb-light.png", () => ({ default: "orb-light" }));
 vi.mock("./appActivity", () => ({ useAppActivity: () => state.activity }));

@@ -2,12 +2,13 @@ import type {
   CanvasReviewerSourceDescriptor,
   CanvasReviewerSourceType,
 } from "../../services/canvasApi";
+import { preparationPresentation } from './materialPreparationPresentation';
 
 export interface CanvasSourceCapabilityPresentation {
   readonly selectable: boolean;
   readonly statusLabel: string;
   readonly explanation: string;
-  readonly action: "preview" | "prepare" | "retry" | "none";
+  readonly action: "preview" | "retry" | "none";
 }
 
 export interface CanvasSourcePresentationGroup {
@@ -47,6 +48,12 @@ export function mergeCanvasSourceListPages(
 export function presentCanvasSourceCapability(
   source: CanvasReviewerSourceDescriptor,
 ): CanvasSourceCapabilityPresentation {
+  if (source.preparation) {
+    const presentation = preparationPresentation(source.preparation);
+    return { statusLabel: presentation.label, explanation: presentation.message,
+      selectable: ['ready', 'preparing', 'failed'].includes(source.preparation.status),
+      action: source.preparation.status === 'ready' ? 'preview' : source.preparation.status === 'failed' ? 'retry' : 'none' };
+  }
   switch (source.capability) {
     case "ready":
       return {
@@ -64,10 +71,10 @@ export function presentCanvasSourceCapability(
       };
     case "needs_preparation":
       return {
-        action: "prepare",
-        explanation: "Prepare this material before creating a reviewer.",
+        action: "none",
+        explanation: "Reviewer and Quiz will be available when this material is ready.",
         selectable: true,
-        statusLabel: "Prepare",
+        statusLabel: "Preparing",
       };
     case "unsupported":
       return {
@@ -88,7 +95,7 @@ export function presentCanvasSourceCapability(
         action: "retry",
         explanation: "Stay Focused could not prepare this item. You can try again.",
         selectable: true,
-        statusLabel: "Try preparation again",
+        statusLabel: "Couldn't prepare",
       };
   }
 }
@@ -162,10 +169,8 @@ export function sourceSelectionHelp(
   switch (presentation.action) {
     case "preview":
       return "Choose Reviewer to create study notes from this material.";
-    case "prepare":
-      return "Prepare this material, then choose Reviewer.";
     case "retry":
-      return "Try preparing this file again.";
+      return presentation.explanation;
     case "none":
       return presentation.explanation;
   }

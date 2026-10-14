@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { PGlite } from "@electric-sql/pglite";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const migration = readFileSync(
   resolve(
@@ -156,3 +157,40 @@ function sliceReplanningFunction(name: string): string {
   const end = replanningMigration.indexOf("\n$$;", start);
   return replanningMigration.slice(start, end);
 }
+
+describe("E1 task estimate migration in PostgreSQL", () => {
+  let db: PGlite;
+  const owner = "11111111-1111-4111-8111-111111111111";
+  beforeAll(async () => {
+    db = new PGlite();
+    await db.exec(`create schema auth; create role anon; create role authenticated; create role service_role;
+      create table auth.users(id uuid primary key); insert into auth.users values('${owner}');
+      create function auth.uid() returns uuid language sql as $$ select '${owner}'::uuid $$;
+      create table public.canvas_assignments(id uuid primary key);
+      grant usage on schema public,auth to authenticated;`);
+    await db.exec(migration.slice(0, migration.indexOf("create or replace function public.import_canvas_assignments")));
+    await db.exec(`insert into public.tasks(user_id,title) values('${owner}','Existing manual');
+      insert into public.tasks(user_id,title,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id)
+      values('${owner}','Existing Canvas','canvas','${owner}','course','assignment');`);
+    await db.exec(readFileSync(resolve("../../packages/db/migrations/20261012000200_task_estimate_source.sql"), "utf8"));
+  }, 30000);
+  afterAll(async () => { await db?.close(); });
+  it("backfills only existing non-Canvas tasks as user estimates", async () => {
+    expect((await db.query("select title,estimate_source from public.tasks order by title")).rows).toEqual([
+      { title: "Existing Canvas", estimate_source: "default" },
+      { title: "Existing manual", estimate_source: "user" },
+    ]);
+  });
+  it("defaults new rows and retains table grants for the new columns", async () => {
+    await db.exec("set role authenticated");
+    try {
+      expect((await db.query(`insert into public.tasks(user_id,title) values('${owner}','New task') returning estimate_source,estimate_note`)).rows)
+        .toEqual([{ estimate_source: "default", estimate_note: null }]);
+    } finally { await db.exec("reset role"); }
+  });
+  it("rejects invalid sources, oversized notes and malformed fingerprints", async () => {
+    for (const update of ["estimate_source='invalid'", "estimate_note=repeat('x',141)", "estimate_fingerprint='short'"]) {
+      await expect(db.exec(`update public.tasks set ${update}`)).rejects.toThrow();
+    }
+  });
+});

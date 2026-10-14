@@ -4,6 +4,7 @@ import {
   APP_ROUTES,
   COURSE_GRADES_PATHNAME,
   COURSE_REVIEWER_PATHNAME,
+  TASK_COURSE_GRADES_PATHNAME,
   POST_SIGN_IN_ROUTE,
   courseRouteParams,
   readCourseIdParam,
@@ -71,6 +72,10 @@ describe("course route params read back", () => {
 });
 
 describe("shell destinations", () => {
+  it("keeps Tasks Grades inside the Tasks stack", () => {
+    expect(TASK_COURSE_GRADES_PATHNAME).toBe("/work/[courseKey]/grades");
+    expect(TASK_COURSE_GRADES_PATHNAME.startsWith(APP_ROUTES.work)).toBe(true);
+  });
   it("lands an authenticated session on a working surface", () => {
     // The authenticated shell now opens the backend-connected Today surface.
     expect(POST_SIGN_IN_ROUTE).toBe(APP_ROUTES.today);

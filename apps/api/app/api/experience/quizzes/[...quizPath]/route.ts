@@ -1,7 +1,7 @@
 import { createCanvasServiceClient } from '@/lib/canvas-db';
 import { experienceJson, experienceOptions, experienceRoute, requireId } from '@/lib/experience/http';
 import { ExperienceFailure } from '@/lib/experience/errors';
-import { attemptHistoryRows, deleteQuiz, readQuiz, startAttempt } from '@/lib/quiz/service';
+import { attemptHistoryRows, deleteQuiz, readQuiz, readQuizAnswerKey, startAttempt } from '@/lib/quiz/service';
 export const runtime = 'nodejs';
 export const OPTIONS = experienceOptions;
 type Context = {
@@ -15,6 +15,8 @@ export async function GET(request: Request, context: Context) {
         const client = createCanvasServiceClient();
         if (path.length === 1)
             return experienceJson(await readQuiz(client, userId, id));
+        if (path.length === 2 && path[1] === 'answer-key')
+            return experienceJson(await readQuizAnswerKey(client, userId, id));
         if (path.length === 2 && path[1] === 'attempts') {
             await readQuiz(client, userId, id);
             const rows = await attemptHistoryRows(client, userId, id);

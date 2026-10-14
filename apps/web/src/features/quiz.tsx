@@ -43,6 +43,7 @@ export function QuizScreen({ id }: { id: string }) {
     [activeTerm, setActiveTerm] = useState<string | null>(null),
     [finishing, setFinishing] = useState(false),
     [reviewing, setReviewing] = useState(false),
+    [checking, setChecking] = useState(false),
     key = useRef<string | null>(null);
   const valid = quiz.data && readableQuiz(quiz.data),
     questions = valid ? quiz.data!.questions : [],
@@ -120,7 +121,6 @@ export function QuizScreen({ id }: { id: string }) {
   function choose(draft: string[]) {
     if (!attempt) return;
     setSelected(draft);
-    void action.run(async () => setAttempt(await saveDraft(attempt, draft)));
   }
   function moveTo(next: number) {
     if (!attempt || next < 0 || next >= questions.length || next === index)
@@ -142,17 +142,22 @@ export function QuizScreen({ id }: { id: string }) {
   function check() {
     if (!attempt || !question) return;
     void action.run(async () => {
-      setAttempt(
-        compatibleAttempt(
-          await api<QuizAttempt>(
-            `/api/experience/quiz-attempts/${attempt.id}/answers/${question.id}`,
-            {
-              method: "PATCH",
-              body: { selectedOptionIds: selected, finalize: true },
-            },
+      setChecking(true);
+      try {
+        setAttempt(
+          compatibleAttempt(
+            await api<QuizAttempt>(
+              `/api/experience/quiz-attempts/${attempt.id}/answers/${question.id}`,
+              {
+                method: "PATCH",
+                body: { selectedOptionIds: selected, finalize: true },
+              },
+            ),
           ),
-        ),
-      );
+        );
+      } finally {
+        setChecking(false);
+      }
     });
   }
   function reveal() {
@@ -241,9 +246,8 @@ export function QuizScreen({ id }: { id: string }) {
           <section className="surface stack">
             <h2>{inProgress ? "Pick up where you left off" : "Practice"}</h2>
             <p className="muted">
-              Answers are saved as you go, so you can leave and resume on any
-              device. Check each answer for instant feedback, or reveal it when
-              you are stuck.
+              Check answers or move between questions to save your progress,
+              then resume on any device. Check each answer for instant feedback.
             </p>
             <div className="row wrap">
               {inProgress ? (
@@ -326,7 +330,6 @@ export function QuizScreen({ id }: { id: string }) {
                   setActiveTerm(null);
                 }}
                 onType={setSelected}
-                onTyped={() => choose(selected)}
               />
             </section>
             {feedback ? (
@@ -336,11 +339,13 @@ export function QuizScreen({ id }: { id: string }) {
                 <button
                   className="primary"
                   disabled={action.busy || !canCheck(question, selected)}
+                  aria-busy={checking}
                   onClick={check}
                 >
-                  Check answer
+                  {checking && <span className="tile-spinner" aria-hidden="true" />}
+                  {checking ? "Checking…" : "Check answer"}
                 </button>
-                {!attempt.revealedQuestionIds.includes(question.id) && (
+                {question.type !== "identification" && question.type !== "modified_true_false" && !attempt.revealedQuestionIds.includes(question.id) && (
                   <button disabled={action.busy} onClick={reveal}>
                     Reveal answer
                   </button>
@@ -490,7 +495,7 @@ export function QuizScreen({ id }: { id: string }) {
                     <h3>
                       {position + 1}. {q.prompt}
                     </h3>
-                    <Feedback question={q} value={value} />
+                    <Feedback question={q} value={value} review />
                   </section>
                 ) : null;
               })}
@@ -513,7 +518,6 @@ function QuestionInput({
   onTerm,
   onChange,
   onType,
-  onTyped,
 }: {
   question: QuizQuestion;
   selected: string[];
@@ -522,7 +526,6 @@ function QuestionInput({
   onTerm: (id: string | null) => void;
   onChange: (draft: string[]) => void;
   onType: (draft: string[]) => void;
-  onTyped: () => void;
 }) {
   if (question.matchingPairs?.length) {
     const pairs = question.matchingPairs;
@@ -586,7 +589,6 @@ function QuestionInput({
           disabled={locked}
           value={selected[0] ?? ""}
           onChange={(e) => onType(e.target.value ? [e.target.value] : [])}
-          onBlur={onTyped}
         />
       </label>
     );
@@ -630,7 +632,6 @@ function QuestionInput({
             disabled={locked}
             value={selected[1] ?? ""}
             onChange={(e) => onType([falseId!, e.target.value])}
-            onBlur={onTyped}
           />
         </label>
       )}
@@ -641,10 +642,13 @@ function QuestionInput({
 function Feedback({
   question,
   value,
+  review = false,
 }: {
   question: QuizQuestion;
   value: QuizQuestionResult;
+  review?: boolean;
 }) {
+  const verdictOnly = !review && (question.type === "identification" || question.type === "modified_true_false");
   const heading = value.assisted
     ? "Revealed · no recall credit"
     : value.correct
@@ -653,22 +657,24 @@ function Feedback({
   return (
     <div className={`surface stack ${value.correct ? "success" : ""}`}>
       <h3>{heading}</h3>
-      <div>
-        <span className="meta">Your answer</span>
-        <p>{answerText(question, value.selectedOptionIds)}</p>
-      </div>
-      {(!value.correct || value.assisted) && (
-        <div>
-          <span className="meta">Correct answer</span>
-          <p>{answerText(question, value.correctOptionIds)}</p>
-        </div>
+      {!verdictOnly && (
+        <>
+          <div>
+            <span className="meta">Your answer</span>
+            <p>{answerText(question, value.selectedOptionIds)}</p>
+          </div>
+          {(review || !value.correct || value.assisted) && (
+            <div>
+              <span className="meta">Correct answer</span>
+              <p>{answerText(question, value.correctOptionIds, value.correctAnswerText)}</p>
+            </div>
+          )}
+          {value.pairCount ? (
+            <p className="meta">{value.pairCorrectCount ?? 0} of {value.pairCount} pairs correct</p>
+          ) : null}
+          <p>{value.explanation}</p>
+        </>
       )}
-      {value.pairCount ? (
-        <p className="meta">
-          {value.pairCorrectCount ?? 0} of {value.pairCount} pairs correct
-        </p>
-      ) : null}
-      <p>{value.explanation}</p>
     </div>
   );
 }

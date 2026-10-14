@@ -4,6 +4,7 @@ import { createCanvasServiceClient } from "@/lib/canvas-db";
 import { decryptConnectionToken } from "@/lib/canvas-routes";
 import { loadCanvasSyncCheckpointContext } from "@/lib/canvas-sync-jobs/checkpoints";
 import { CANVAS_WORKER_TOKEN_ENDPOINT, parseCanvasWorkerTokenRequest } from "@/lib/canvas-sync-jobs/worker-token-contract";
+import { preparationTokenContext } from '@/lib/canvas-preparation/repository';
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -41,6 +42,11 @@ export async function POST(request: Request): Promise<Response> {
   if (!input) return new Response(null, { status: 400, headers: NO_STORE });
 
   try {
+    if('jobType' in input && input.jobType==='preparation'){
+      const context=await preparationTokenContext(createCanvasServiceClient(),input);
+      if(!context)return new Response(null,{status:404,headers:NO_STORE});
+      return Response.json({accessToken:decryptConnectionToken(context.connection)},{headers:NO_STORE});
+    }
     const context = await loadCanvasSyncCheckpointContext(createCanvasServiceClient(), input.jobId);
     const job = context?.job;
     if (!job || job.status !== "running" || job.google_dispatch_id !== input.dispatchId ||

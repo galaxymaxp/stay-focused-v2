@@ -4,10 +4,10 @@ import type {
   LibraryArtifactDetail,
   LibraryArtifactSummary,
 } from "@stay-focused/shared";
-import { useNavigation, usePreventRemove } from "@react-navigation/native";
+import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, View, useWindowDimensions } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
@@ -27,6 +27,9 @@ import { reviewerArtifactIdFromLibraryId } from "./quizRequest";
 import { available } from "./presentation";
 import { useExperienceClient } from "./useExperience";
 import {
+  OFFLINE_LIBRARY_NOTICE,
+  OFFLINE_MISSING_NOTICE,
+  offlineLibraryCaption,
   PERSONAL_LIBRARY_KEY,
   describeLibraryCounts,
   filterCourseLibrary,
@@ -41,6 +44,10 @@ import { useListPreferences } from "./useListPreferences";
 import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
 import { ExportSheet } from '../export/ExportSheet';
 import { DraftInput } from "./DraftInput";
+import { useOfflineDraftEditor, DRAFT_ATTENTION_NOTICE } from './useOfflineDraftEditor';
+import { useDraftVersions, DraftVersionsNotice, DraftVersionsSheet } from './DraftVersions';
+import { automaticLibraryLabel } from "./automationPresentation";
+import { reviewerSecondaryLine } from '../reviewer/reviewerEstimatePresentation';
 
 const LOCAL_PAGE_SIZE = 50;
 const GRID_GAP = 12;
@@ -167,6 +174,8 @@ function useRemakeReviewer() {
 export function LibraryScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const library = useLocalLibrary();
+  const offline = library.offlineStats != null && library.errorCode === "connection";
+  const offlineCaption = offlineLibraryCaption(library.offlineStats, library.refreshing && !offline);
   const groups = useMemo(() => groupLibraryByCourse(library.items), [library.items]);
   const { prefs, pin } = useListPreferences();
   const { reducedMotion } = useTheme();
@@ -203,9 +212,11 @@ export function LibraryScreen() {
   const loading = !library.localReady || (!hasLocal && library.refreshing);
   return (
     <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh}>
+      {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
+      {offlineCaption ? <Copy muted size="caption">{offlineCaption}</Copy> : null}
       {loading ? <LibrarySkeleton /> : null}
-      {!hasLocal && library.error ? <Surface><Copy size="h3">{library.error.startsWith("App configuration error") ? "App configuration error" : "Library could not be loaded"}</Copy><Copy muted>{library.error.startsWith("App configuration error") ? library.error.split("\n").slice(1).join("\n") : library.error}</Copy><Action secondary onPress={library.refresh}>Try again</Action></Surface> : null}
-      {hasLocal && library.error ? <Notice>{library.error.startsWith("App configuration error") ? library.error : "Showing work saved on this device. Refresh when you are back online."}</Notice> : null}
+      {!hasLocal && library.error && !offline ? <Surface><Copy size="h3">{library.error.startsWith("App configuration error") ? "App configuration error" : "Library could not be loaded"}</Copy><Copy muted>{library.error.startsWith("App configuration error") ? library.error.split("\n").slice(1).join("\n") : library.error}</Copy><Action secondary onPress={library.refresh}>Try again</Action></Surface> : null}
+      {hasLocal && library.error && !offline ? <Notice>{library.error.startsWith("App configuration error") ? library.error : "Showing work saved on this device. Refresh when you are back online."}</Notice> : null}
       {hasLocal && library.refreshing ? <Copy muted size="caption">Checking for updates…</Copy> : null}
       {!loading && !library.error && groups.length === 0 ? (
         <Surface>
@@ -226,6 +237,8 @@ export function LibraryCourseScreen() {
   const { courseKey: rawKey } = useLocalSearchParams<{ courseKey?: string }>();
   const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? "";
   const library = useLocalLibrary();
+  const offline = library.offlineStats != null && library.errorCode === "connection";
+  const offlineCaption = offlineLibraryCaption(library.offlineStats, library.refreshing && !offline);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
   const courseItems = useMemo(() => filterCourseLibrary(library.items, courseKey, "all"), [courseKey, library.items]);
@@ -260,9 +273,11 @@ export function LibraryCourseScreen() {
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
           <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />
+          {offlineCaption ? <Copy muted size="caption" style={{ marginTop: spacing[2] }}>{offlineCaption}</Copy> : null}
         </View>
       }
     >
+      {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
       {deletion.note ? <Notice>{deletion.note}</Notice> : null}
@@ -298,8 +313,9 @@ export function LibraryCourseScreen() {
   );
 }
 
-function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArtifactSummary; pinned?: boolean; swipeActions: readonly SwipeAction[] }) {
+function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArtifactSummary & { readonly offlineReady?: boolean }; pinned?: boolean; swipeActions: readonly SwipeAction[] }) {
   const { colors } = useTheme();
+  const secondaryLine = reviewerSecondaryLine(automaticLibraryLabel(item), item.type === 'reviewer' ? item.reviewMinutes : null);
   const typeLabel = item.type === "activity_output" ? "Draft" : item.type === "quiz" ? "Quiz" : "Reviewer";
   const tone = item.type === "quiz" ? colors.violet : item.type === "activity_output" ? colors.green : colors.blue;
   const soft = item.type === "quiz" ? colors.violetSoft : item.type === "activity_output" ? colors.greenSoft : colors.blueSoft;
@@ -308,7 +324,7 @@ function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArti
       <RowLink
         inset
         icon={<ContentIcon kind={item.type} />}
-        label={`${typeLabel}: ${item.title}${pinned ? ", pinned" : ""}`}
+        label={`${typeLabel}: ${item.title}${pinned ? ", pinned" : ""}${item.offlineReady ? ", Saved offline" : ""}`}
         {...swipeAccessibility(swipeActions)}
         trailing={pinned ? <Pin size={14} color={colors.textMuted} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }] }} /> : undefined}
         onPress={() => router.push({ pathname: "/artifact", params: { id: item.id } })}>
@@ -316,6 +332,8 @@ function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArti
           <View style={{ backgroundColor: soft, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}><Copy size="caption" color={tone} style={{ fontWeight: "700" }}>{typeLabel}</Copy></View>
         </View>
         <Copy size="h3" style={{ lineHeight: 23 }}>{item.title}</Copy>
+        {secondaryLine ? <Copy muted size="caption">{secondaryLine}</Copy> : null}
+        {item.offlineReady ? <Copy muted size="caption">Saved offline</Copy> : null}
         {!item.course && item.sourceType ? <Copy muted size="caption">{sourceTypeLabel(item.sourceType)}{item.sourceTitle ? ` · ${item.sourceTitle}` : ""}</Copy> : null}
         <Copy muted size="caption">
           Updated {new Date(item.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
@@ -343,6 +361,12 @@ export function ArtifactScreen() {
   const result = useLocalArtifact(id ?? null);
   const detail = result.data;
   const [exportOpen, setExportOpen] = useState(false);
+  const saveConfirmedDraft = (draft: ActivityDraft) => {
+    if (detail && 'draft' in detail) result.storeConfirmed({
+      artifact: { ...detail.artifact, title: draft.title, updatedAt: draft.updatedAt }, draft,
+    });
+  };
+  const versions = useDraftVersions(detail && 'draft' in detail ? detail.draft : null, saveConfirmedDraft);
   if (detail && "reviewer" in detail) {
     return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} />;
   }
@@ -355,12 +379,18 @@ export function ArtifactScreen() {
     <Page
       title={detail && "draft" in detail ? "Draft" : detail && "quiz" in detail ? "Quiz" : "Library"}
       back
-      headerAction={detail && "draft" in detail ? <Action secondary onPress={() => setExportOpen(true)}>Export</Action> : undefined}
+      headerAction={detail && "draft" in detail ? <View style={{ gap: spacing[1] }}>
+        {versions.copies.length ? <Action secondary onPress={versions.show}>Online versions ({versions.copies.length})</Action> : null}
+        <Action secondary onPress={() => setExportOpen(true)}>Export</Action>
+      </View> : undefined}
     >
       {result.deviceCopy && (
-        <Notice>{detail && "draft" in detail ? "Showing the copy saved on this device. Saving changes needs a connection." : "Showing the copy saved on this device. Saving changes and practice need a connection."}</Notice>
+        <Notice>{detail && "draft" in detail ? "Showing the draft saved on this device. You can edit it here." : "Showing the copy saved on this device. Saving changes and practice need a connection."}</Notice>
       )}
-      {result.error && (
+      {result.offlineMissing ? (
+        <Surface><Copy>{OFFLINE_MISSING_NOTICE}</Copy><Action secondary onPress={() => router.back()}>Back</Action></Surface>
+      ) : null}
+      {result.error && !result.offlineMissing && (
         <>
           <Notice>{result.error}</Notice>
           <Action secondary onPress={result.refresh}>
@@ -391,10 +421,13 @@ export function ArtifactScreen() {
             </Surface>
           )}
           {exportOpen && 'draft' in detail ? <ExportSheet detail={detail} onClose={() => setExportOpen(false)} /> : null}
+          {'draft' in detail ? <DraftVersionsNotice versions={versions} /> : null}
+          {'draft' in detail ? <DraftVersionsSheet versions={versions} /> : null}
           {"draft" in detail && (
             <DraftEditor
-              key={`${detail.draft.id}-${detail.draft.revision}`}
+              key={detail.draft.id}
               draft={detail.draft}
+              deviceCopy={result.deviceCopy}
               onSaved={(draft) =>
                 result.storeConfirmed({
                   artifact: { ...detail.artifact, title: draft.title, updatedAt: draft.updatedAt },
@@ -409,19 +442,11 @@ export function ArtifactScreen() {
     </KeyboardAvoidingView>
   );
 }
-function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft: ActivityDraft) => void }) {
-  const navigation = useNavigation();
-  const client = useExperienceClient(),
-    { colors } = useTheme();
-  const [content, setContent] = useState<ActivityDraftContent>({
-    title: draft.title,
-    sections: draft.sections,
-    slides: draft.slides,
-  });
-  const [revision, setRevision] = useState(draft.revision),
-    [note, setNote] = useState<string | null>(null),
-    [busy, setBusy] = useState(false),
-    [dirty, setDirty] = useState(false);
+export function DraftEditor({ draft, onSaved, deviceCopy = false }: { draft: ActivityDraft; onSaved: (draft: ActivityDraft) => void; deviceCopy?: boolean }) {
+  const navigation = useNavigation(), { colors } = useTheme();
+  const editor = useOfflineDraftEditor(draft, onSaved, deviceCopy);
+  const { content, dirty, busy, note, save } = editor;
+  const setContent = (update: (old: ActivityDraftContent) => ActivityDraftContent) => editor.change(update(content));
   usePreventRemove(dirty, ({ data }) => {
     if (Platform.OS === "web") {
       if (window.confirm("Discard your unsaved draft edits?"))
@@ -451,33 +476,6 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
     lineHeight: 25,
     minHeight: 52,
   };
-  async function save() {
-    if (busy) return;
-    setBusy(true);
-    setNote(null);
-    try {
-      const updated = await experienceRequest<ActivityDraft>(
-        client,
-        `/api/experience/activity-drafts/${encodeURIComponent(draft.id)}`,
-        { method: "PATCH", body: { revision, content } },
-      );
-      setRevision(updated.revision);
-      setDirty(false);
-      onSaved(updated);
-      setNote("Draft saved.");
-    } catch (cause) {
-      setNote(
-        cause instanceof Error
-          ? cause.message
-          : "Could not save. Your edits remain here.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  // Keep the existing editable generated draft, now saved after a short pause.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!dirty || busy) return; const timer = setTimeout(() => void save(), 700); return () => clearTimeout(timer); }, [content, dirty, busy]);
   return (
     <View style={{ gap: 16 }}>
       <DraftInput
@@ -487,11 +485,10 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
         editable={!busy}
         style={[inputStyle, { fontSize: 26, lineHeight: 33, textAlignVertical: "top" }]}
         onChangeText={(title) => {
-          setDirty(true);
           setContent((old) => ({ ...old, title }));
         }}
       />
-      <Copy muted size="caption">{dirty ? "Unsaved changes" : "Saved draft"}</Copy>
+      <Copy muted size="caption">{editor.caption}</Copy>
       {content.sections.map((section, index) => (
         <View key={section.id} style={{ gap: 8 }}>
           <Copy size="h3">{section.heading}</Copy>
@@ -502,7 +499,6 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
             value={section.content}
             style={inputStyle}
             onChangeText={(text) => {
-              setDirty(true);
               setContent((old) => ({
                 ...old,
                 sections: old.sections.map((item, i) =>
@@ -523,7 +519,6 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
             value={slide.body}
             style={inputStyle}
             onChangeText={(text) => {
-              setDirty(true);
               setContent((old) => ({
                 ...old,
                 slides: old.slides.map((item, i) =>
@@ -543,6 +538,7 @@ function DraftEditor({ draft, onSaved }: { draft: ActivityDraft; onSaved: (draft
       <Action disabled={busy || !dirty} onPress={() => void save()}>
         Save draft
       </Action>
+      {editor.attention ? <View style={{ gap: spacing[2] }}><Notice>{DRAFT_ATTENTION_NOTICE}</Notice><Action secondary disabled={busy} onPress={() => void save(true)}>Try again</Action></View> : null}
       {note && <Notice>{note}</Notice>}
     </View>
   );

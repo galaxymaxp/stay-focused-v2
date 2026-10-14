@@ -23,7 +23,6 @@ ReviewerGenerateResponse,
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MAX_DIAGNOSTIC_TEXT_CHARS = 4_000;
 const REVIEWER_GENERATE_ROUTE = "/api/reviewer/generate";
 const REVIEWER_VALIDATION_FAILED_CODE = "reviewer_validation_failed";
 const REVIEWER_VALIDATION_FAILED_MESSAGE =
@@ -624,97 +623,13 @@ function logReviewerGenerationError(
   console.error("reviewer_generation.error", {
     requestId,
     route: REVIEWER_GENERATE_ROUTE,
-    ...(contentPrivate
-      ? {
-          errorName:
-            error instanceof Error
-              ? sanitizeDiagnosticText(error.name || "Error")
-              : "UnknownError",
-          privacy: "canvas_source_redacted",
-        }
-      : getSafeErrorDetails(error)),
+    // Error fields and pipeline diagnostics can contain credentials or academic
+    // content for any source kind. Log only fixed categories, never their text.
+    errorName: error instanceof PipelineAssemblyError
+      ? "PipelineAssemblyError"
+      : error instanceof Error ? "Error" : "UnknownError",
+    ...(contentPrivate ? { privacy: "canvas_source_redacted" } : {}),
   });
-}
-
-function getSafeErrorDetails(error: unknown): {
-  readonly errorName: string;
-  readonly errorMessage: string;
-  readonly stack?: string;
-  readonly diagnostics?: unknown;
-} {
-  if (error instanceof Error) {
-    return {
-      errorName: sanitizeDiagnosticText(error.name || "Error"),
-      errorMessage: sanitizeDiagnosticText(error.message || "(missing)"),
-      ...(error.stack ? { stack: sanitizeDiagnosticText(error.stack) } : {}),
-      ...(error instanceof PipelineAssemblyError
-        ? { diagnostics: sanitizeDiagnosticValue(error.diagnostics) }
-        : {}),
-    };
-  }
-
-  return {
-    errorName: "UnknownError",
-    errorMessage: sanitizeDiagnosticText(getDiagnosticString(error)),
-  };
-}
-
-function sanitizeDiagnosticValue(value: unknown, depth = 0): unknown {
-  if (depth > 6) {
-    return "[truncated]";
-  }
-  if (typeof value === "string") {
-    return sanitizeDiagnosticText(value);
-  }
-  if (
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    value === null ||
-    value === undefined
-  ) {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value
-      .slice(0, 25)
-      .map((entry) => sanitizeDiagnosticValue(entry, depth + 1));
-  }
-  if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .slice(0, 50)
-        .map(([key, entry]) => [
-          sanitizeDiagnosticText(key),
-          sanitizeDiagnosticValue(entry, depth + 1),
-        ]),
-    );
-  }
-
-  return sanitizeDiagnosticText(getDiagnosticString(value));
-}
-
-function sanitizeDiagnosticText(value: string): string {
-  const redacted = value
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
-    .replace(/\bsk-[A-Za-z0-9_-]{10,}\b/g, "[REDACTED]")
-    .replace(
-      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
-      "[REDACTED]",
-    );
-
-  if (redacted.length <= MAX_DIAGNOSTIC_TEXT_CHARS) {
-    return redacted;
-  }
-
-  return `${redacted.slice(0, MAX_DIAGNOSTIC_TEXT_CHARS)}...[truncated]`;
-}
-
-function getDiagnosticString(value: unknown): string {
-  try {
-    return String(value);
-  } catch {
-    return "Unknown error";
-  }
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

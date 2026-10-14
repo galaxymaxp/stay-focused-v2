@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import {
   jsonResponse,
   optionsResponse,
@@ -88,8 +89,9 @@ async function readResolveRequest(request: Request): Promise<
   if (Number.isFinite(declared) && declared > MAX_RESOLVE_BODY_BYTES) {
     return tooLarge();
   }
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_RESOLVE_BODY_BYTES) return tooLarge();
+  const boundedBody = await readBoundedText(request, MAX_RESOLVE_BODY_BYTES);
+  if (!boundedBody.ok && boundedBody.reason === "too_large") return tooLarge();
+  const text = boundedBody.ok ? boundedBody.text : "";
   let value: unknown;
   try {
     value = JSON.parse(text) as unknown;

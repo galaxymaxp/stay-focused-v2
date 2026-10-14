@@ -23,6 +23,7 @@ describe("canonical Reviewer lookup", () => {
   ])("excludes %s records defensively", async (_label, changes) => {
     const result = await listCanonicalReviewerRecords(client(changes), USER);
     expect(result).toEqual({ ok: true, value: [] });
+    expect(await readCanonicalReviewerRecord(client(changes), USER, ARTIFACT)).toEqual({ ok: true, value: null });
   });
 
   it("returns a safe failure when any canonical relation cannot be read", async () => {
@@ -47,6 +48,7 @@ function client(changes: {
       const builder: Record<string, unknown> = {};
       for (const method of ["select", "eq", "is", "order"]) builder[method] = vi.fn(() => builder);
       builder.then = (resolve: (value: unknown) => unknown) => Promise.resolve(response).then(resolve);
+      builder.maybeSingle = vi.fn(async () => ({ data: response.data[0] ?? null, error: response.error }));
       return builder;
     }),
   } as unknown as SupabaseClient<Database>;

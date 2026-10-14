@@ -37,8 +37,9 @@ import {
   type AssistReadyEvent,
   type AssistTarget,
 } from "./assist-store";
-import { QuizFromReviewerDialog } from "./quiz-from-reviewer";
+import { QuizFromReviewerDialog, reviewerArtifactIdFromLibraryId } from "./quiz-from-reviewer";
 import { StudyAssistPanel } from "./study-assist-panel";
+import { SectionVisual, useFigureAvailability } from "./section-visual";
 
 // Web counterpart of apps/mobile/src/features/reviewer/ReviewerReader.tsx:
 // topics and search on the left, the Reviewer in a reading column, and Study
@@ -63,6 +64,8 @@ export function ReviewerReader({
   reviewer: ReviewerReaderModel;
 }) {
   const { api, session } = useAuth();
+  const visualArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
+  const figureAvailability = useFigureAvailability(visualArtifactId);
   const owner = session?.user.id ?? "";
   const segments = useMemo(() => reviewerSegments(reviewer), [reviewer]);
   const [query, setQuery] = useState("");
@@ -268,7 +271,7 @@ export function ReviewerReader({
       if (range.start < from) return;
       if (range.start > from) runs.push(text.slice(from, range.start));
       const content = text.slice(range.start, range.start + range.text.length);
-      runs.push(range.style === "highlight" ? <mark key={i} className="find-match">{content}</mark> : range.style === "underline" ? <u key={i}>{content}</u> : <strong key={i}>{content}</strong>);
+      runs.push(range.style === "highlight" ? <mark key={i} className="author-highlight">{content}</mark> : range.style === "underline" ? <u key={i}>{content}</u> : <strong key={i}>{content}</strong>);
       from = range.start + range.text.length;
     });
     if (from < text.length) runs.push(text.slice(from));
@@ -303,7 +306,7 @@ export function ReviewerReader({
           label: artifact.course ? courseIdentity(artifact.course).title : "Personal & other",
           href: `/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`,
         }}
-        subtitle={[reviewer.course?.name, dateLabel(reviewer.generatedAt), `${reviewer.sections.length} topics`].filter(Boolean).join(" · ")}
+        subtitle={[reviewer.course?.name, dateLabel(reviewer.generatedAt), `${reviewer.sections.length} topics`, reviewer.reviewMinutes ? `~${reviewer.reviewMinutes} min review` : null].filter(Boolean).join(" · ")}
         back={`/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`}
         action={
           <div className="row">
@@ -392,6 +395,7 @@ export function ReviewerReader({
                 <span className="kicker">Topic {sectionIndex + 1}</span>
                 <h2 data-segment={segmentIds.sectionTitle(section.id)}>{render(segmentIds.sectionTitle(section.id), section.title)}</h2>
               </header>
+              {visualArtifactId && <SectionVisual artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} />}
               {section.blocks.map((block) => {
                 const pickingHere = picking?.block === block.id;
                 return (

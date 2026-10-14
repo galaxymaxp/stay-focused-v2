@@ -2,6 +2,7 @@ import type {
   GenerationView,
   LibraryArtifactDetail,
   LibraryOverview,
+  QuizAnswerKey,
 } from "@stay-focused/shared";
 
 import type { LocalArtifactStore, LocalUpsertOutcome } from "./artifactStore";
@@ -9,6 +10,7 @@ import type { LocalArtifactStore, LocalUpsertOutcome } from "./artifactStore";
 export interface LibraryRemote {
   fetchPage(offset: number, limit: number): Promise<LibraryOverview>;
   fetchDetail(artifactId: string): Promise<LibraryArtifactDetail>;
+  fetchQuizAnswerKey?(quizId: string): Promise<QuizAnswerKey>;
 }
 
 export interface ReconcileResult {
@@ -17,11 +19,15 @@ export interface ReconcileResult {
   readonly listComplete: boolean;
   readonly hydrated: number;
   readonly supersededReviewerIds: readonly string[];
+  readonly bodyStoppedBy: BodyStop;
 }
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10;
-const BODY_HYDRATION_LIMIT = 20;
+const BODY_BATCH = 20;
+const BODY_SESSION_LIMIT = 300;
+const BODY_TIME_BUDGET_MS = 60_000;
+export type BodyStop = 'done' | 'offline' | 'limit' | 'cancelled';
 
 /**
  * Cloud → device reconciliation for one owner.
@@ -36,6 +42,7 @@ export async function reconcileLibrary(input: {
   readonly ownerUserId: string;
   readonly remote: LibraryRemote;
   readonly onListReconciled?: () => void | Promise<void>;
+  readonly onProgress?: () => void | Promise<void>;
   readonly isCancelled?: () => boolean;
 }): Promise<ReconcileResult> {
   const { store, ownerUserId, remote } = input;
@@ -48,6 +55,7 @@ export async function reconcileLibrary(input: {
     const overview = await remote.fetchPage(offset, PAGE_SIZE);
     categories ??= overview.categories;
     supersededReviewerIds = overview.supersededReviewerIds ?? supersededReviewerIds;
+    if (cancelled()) break;
     await store.upsertSummaries(ownerUserId, overview.items);
     if (overview.nextOffset === null || overview.nextOffset <= offset) {
       listComplete = true;
@@ -55,44 +63,79 @@ export async function reconcileLibrary(input: {
     }
     offset = overview.nextOffset;
   }
-  if (cancelled()) return { categories, listComplete, hydrated: 0, supersededReviewerIds };
+  if (cancelled()) return { categories, listComplete, hydrated: 0, supersededReviewerIds, bodyStoppedBy: "cancelled" };
   await input.onListReconciled?.();
 
-  // Fetch missing or outdated bodies so saved work opens without a network.
+  const bodies = await hydrateLibraryBodies(input);
+  return { categories, listComplete, hydrated: bodies.hydrated, supersededReviewerIds, bodyStoppedBy: bodies.stoppedBy };
+}
+
+/** Body-only catch-up, bounded by requests and elapsed time; never starts jobs. */
+export async function hydrateLibraryBodies(input: {
+  readonly store: LocalArtifactStore;
+  readonly ownerUserId: string;
+  readonly remote: LibraryRemote;
+  readonly isCancelled?: () => boolean;
+  readonly now?: () => number;
+  readonly onProgress?: () => void | Promise<void>;
+}): Promise<{ readonly hydrated: number; readonly stoppedBy: BodyStop }> {
+  const cancelled = input.isCancelled ?? (() => false);
+  const now = input.now ?? Date.now;
+  const started = now();
+  const attempted = new Set<string>();
   let hydrated = 0;
-  for (const artifactId of await store.idsNeedingBody(ownerUserId, BODY_HYDRATION_LIMIT)) {
-    if (cancelled()) break;
-    try {
-      await refreshArtifactDetail({ store, ownerUserId, remote, artifactId });
-      hydrated += 1;
-    } catch (error) {
-      const code = errorCode(error);
-      // Offline or signed out: stop quietly and keep local copies. Any other
-      // failure is specific to that artifact, so continue with the rest.
-      if (code === "connection" || code === "sign_in_required") break;
+  while (attempted.size < BODY_SESSION_LIMIT) {
+    if (cancelled()) return { hydrated, stoppedBy: 'cancelled' };
+    if (now() - started > BODY_TIME_BUDGET_MS) return { hydrated, stoppedBy: 'limit' };
+    const batch = (await input.store.idsNeedingBody(input.ownerUserId, BODY_BATCH + attempted.size, !!input.remote.fetchQuizAnswerKey))
+      .filter(id => !attempted.has(id)).slice(0, Math.min(BODY_BATCH, BODY_SESSION_LIMIT - attempted.size));
+    if (!batch.length) return { hydrated, stoppedBy: 'done' };
+    for (const artifactId of batch) {
+      if (cancelled()) return { hydrated, stoppedBy: 'cancelled' };
+      if (now() - started > BODY_TIME_BUDGET_MS) return { hydrated, stoppedBy: 'limit' };
+      attempted.add(artifactId);
+      try {
+        await refreshArtifactDetail({ ...input, artifactId });
+        hydrated += 1;
+      } catch (error) {
+        const code = errorCode(error);
+        if (code === 'connection' || code === 'sign_in_required') return { hydrated, stoppedBy: 'offline' };
+        // Do not retry failed or non-advancing cloud copies in this run.
+      }
     }
+    await input.onProgress?.();
   }
-  return { categories, listComplete, hydrated, supersededReviewerIds };
+  return { hydrated, stoppedBy: 'limit' };
 }
 
 /** Fetches one artifact and stores it; removes it only on an explicit not_found. */
 export async function refreshArtifactDetail(input: {
   readonly store: LocalArtifactStore;
   readonly ownerUserId: string;
-  readonly remote: Pick<LibraryRemote, "fetchDetail">;
+  readonly remote: Pick<LibraryRemote, "fetchDetail" | "fetchQuizAnswerKey">;
   readonly artifactId: string;
+  readonly isCancelled?: () => boolean;
 }): Promise<{ detail: LibraryArtifactDetail; outcome: LocalUpsertOutcome }> {
   const { store, ownerUserId, remote, artifactId } = input;
   let detail: LibraryArtifactDetail;
   try {
     detail = await remote.fetchDetail(artifactId);
   } catch (error) {
-    if (errorCode(error) === "not_found") {
+    if (!input.isCancelled?.() && errorCode(error) === "not_found") {
       await store.removeArtifact(ownerUserId, artifactId);
     }
     throw error;
   }
+  if (input.isCancelled?.()) return { detail, outcome: "unchanged" };
   const outcome = await store.upsertDetail(ownerUserId, artifactId, detail);
+  if ('quiz' in detail && remote.fetchQuizAnswerKey && outcome !== 'ignored_older') {
+    try {
+      const key = await remote.fetchQuizAnswerKey(detail.quiz.id);
+      if (!input.isCancelled?.() && key.quizId === detail.quiz.id) {
+        await store.saveQuizAnswerKey(ownerUserId, key, detail.artifact.updatedAt);
+      }
+    } catch { /* Key failure never blocks saving the learner body; retry next catch-up. */ }
+  }
   return { detail, outcome };
 }
 
@@ -108,7 +151,7 @@ export function persistedArtifactId(view: GenerationView | null | undefined): st
 export async function persistCompletedGeneration(input: {
   readonly store: LocalArtifactStore;
   readonly ownerUserId: string;
-  readonly remote: Pick<LibraryRemote, "fetchDetail">;
+  readonly remote: Pick<LibraryRemote, "fetchDetail" | "fetchQuizAnswerKey">;
   readonly generation: GenerationView;
 }): Promise<LocalUpsertOutcome | null> {
   const artifactId = persistedArtifactId(input.generation);

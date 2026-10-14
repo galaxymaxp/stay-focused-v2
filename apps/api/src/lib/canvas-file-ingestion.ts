@@ -42,6 +42,8 @@ import type {
 type CanvasFileIngestionHttpStatus = 400 | 404 | 413 | 500;
 
 export interface IngestCanvasFilesInput {
+  /** Canvas token brokered for the current sync job. When absent, the stored connection is decrypted (Vercel path). */
+  readonly brokeredCanvasToken?: string;
   readonly client: SupabaseClient<Database>;
   /** Only the authenticated Page-link preparation path supplies this row ID. */
   readonly directlyLinkedFileId?: string;
@@ -61,6 +63,7 @@ export type IngestCanvasFilesResult =
 type ReserveBytes = (byteLength: number) => boolean;
 
 export async function ingestCanvasFiles({
+  brokeredCanvasToken,
   client,
   directlyLinkedFileId,
   fileIds,
@@ -92,17 +95,29 @@ export async function ingestCanvasFiles({
     };
   }
   const connectionRow = connection.row;
-
-  let token: string;
-  try {
-    token = decryptConnectionToken(connectionRow);
-  } catch {
+  if (connectionRow.user_id !== userId || connectionRow.status !== "active") {
     return {
       ok: false,
       status: 500,
       code: "canvas_connection_corrupt",
       message: "Canvas connection credentials could not be read.",
     };
+  }
+
+  let token: string;
+  if (brokeredCanvasToken) {
+    token = brokeredCanvasToken;
+  } else {
+    try {
+      token = decryptConnectionToken(connectionRow);
+    } catch {
+      return {
+        ok: false,
+        status: 500,
+        code: "canvas_connection_corrupt",
+        message: "Canvas connection credentials could not be read.",
+      };
+    }
   }
 
   const files = await readRequestedFiles({
@@ -222,7 +237,7 @@ async function ingestOneCanvasFile({
   try {
     freshFile = await canvas.getCourseFile(file.canvas_course_id, file.canvas_file_id);
   } catch (error) {
-    const result = canvasFetchFailureResult(file.id, error);
+    const result = withRetryAfter(canvasFetchFailureResult(file.id, error), error);
     if (result.status === "unavailable") {
       await updateFileRow(client, file, {
         availability_status: "unavailable",
@@ -284,6 +299,10 @@ async function ingestOneCanvasFile({
   }
 
   if (
+    // Inventory retains historical bytes on a revision change, but resets the
+    // state. Only a successful ingestion state proves their revision binding.
+    (file.ingestion_status === "stored" || file.ingestion_status === "unchanged") &&
+    Boolean(file.content_version_fingerprint) &&
     file.current_sha256 &&
     file.storage_bucket === CANVAS_SOURCE_FILE_BUCKET &&
     file.storage_object_key &&
@@ -327,7 +346,7 @@ async function ingestOneCanvasFile({
     return recordTerminalResult({
       client,
       connectionId,
-      result: canvasDownloadFailureResult(file.id, error),
+      result: withRetryAfter(canvasDownloadFailureResult(file.id, error), error),
       userId,
     });
   }
@@ -388,6 +407,19 @@ async function ingestOneCanvasFile({
     freshPayload.content_type ??
     "application/octet-stream";
 
+  // Unknown existence is treated as pre-existing: rollback must never erase
+  // accepted bytes when Storage cannot provide reliable evidence.
+  let objectExistedBeforeUpload = true;
+  try {
+    const existence = await client.storage.from(CANVAS_SOURCE_FILE_BUCKET).exists(objectKey);
+    if (existence.data === false && existence.error && 'status' in existence.error && existence.error.status === 404)
+      objectExistedBeforeUpload = false;
+    else if (!existence.error) objectExistedBeforeUpload = existence.data !== false;
+    else logCleanupFailure('canvas_object_existence_failed');
+  } catch {
+    logCleanupFailure('canvas_object_existence_failed');
+  }
+
   const upload = await client.storage
     .from(CANVAS_SOURCE_FILE_BUCKET)
     .upload(objectKey, downloaded.bytes, {
@@ -415,7 +447,7 @@ async function ingestOneCanvasFile({
     stored_content_type: storedContentType,
   });
   if (!updateOk) {
-    await removeObjectBestEffort(client, objectKey);
+    if (!objectExistedBeforeUpload) await cleanupCanvasObjectIfUnreferenced(client, objectKey);
     return recordTerminalResult({
       client,
       connectionId,
@@ -480,6 +512,7 @@ async function updateFileRow(
     .eq("id", file.id)
     .eq("user_id", file.user_id)
     .eq("canvas_connection_id", file.canvas_connection_id)
+    .eq("content_version_fingerprint", file.content_version_fingerprint)
     .select("id")
     .maybeSingle();
 
@@ -572,6 +605,11 @@ function safeCanvasFailureCode(error: CanvasClientError): string {
   return error.code;
 }
 
+function withRetryAfter(result:CanvasFileIngestionItemResult,error:unknown):CanvasFileIngestionItemResult {
+  return error instanceof CanvasClientError && typeof error.providerRetryAfterMs==='number' && Number.isFinite(error.providerRetryAfterMs)
+    ? {...result,retryAfterMs:Math.max(0,error.providerRetryAfterMs)} : result;
+}
+
 function isRetryableCanvasError(error: CanvasClientError): boolean {
   return (
     error.code === "canvas_rate_limited" ||
@@ -638,25 +676,29 @@ async function cleanupOldObjectIfUnreferenced(
     return;
   }
 
-  const { count, error } = await client
-    .from("canvas_files")
-    .select("id", { count: "exact", head: true })
-    .eq("storage_bucket", file.storage_bucket)
-    .eq("storage_object_key", file.storage_object_key);
-
-  if (!error && count === 0) {
-    await removeObjectBestEffort(client, file.storage_object_key);
-  }
+  await cleanupCanvasObjectIfUnreferenced(client, file.storage_object_key);
 }
 
-async function removeObjectBestEffort(
+async function cleanupCanvasObjectIfUnreferenced(
   client: SupabaseClient<Database>,
   objectKey: string,
 ): Promise<void> {
-  await client.storage
-    .from(CANVAS_SOURCE_FILE_BUCKET)
-    .remove([objectKey])
-    .then(() => undefined, () => undefined);
+  const args = { p_bucket: CANVAS_SOURCE_FILE_BUCKET, p_key: objectKey };
+  try {
+    const claim = await client.rpc('claim_canvas_object_cleanup_v1', args);
+    if (claim.error) { logCleanupFailure('canvas_object_cleanup_claim_failed'); return; }
+    if (claim.data !== true) return;
+    const removed = await client.storage.from(CANVAS_SOURCE_FILE_BUCKET).remove([objectKey]);
+    if (removed.error) { logCleanupFailure('canvas_object_cleanup_remove_failed'); return; }
+    const finished = await client.rpc('finish_canvas_object_cleanup_v1', args);
+    if (finished.error || finished.data !== true) logCleanupFailure('canvas_object_cleanup_finish_failed');
+  } catch {
+    logCleanupFailure('canvas_object_cleanup_failed');
+  }
+}
+
+function logCleanupFailure(code: string): void {
+  console.warn('canvas_file_ingestion.cleanup_failed', { code });
 }
 
 function summarizeIngestionResults(

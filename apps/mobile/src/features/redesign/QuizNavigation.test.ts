@@ -1,7 +1,7 @@
 import { createElement, type ElementType } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Quiz, QuizAttempt } from '@stay-focused/shared';
+import type { Quiz, QuizAnswerKey, QuizAttempt } from '@stay-focused/shared';
 import type { LocalQuizPractice } from '../../services/localLibrary/artifactStore';
 import { QuizScreen } from './QuizScreen';
 import { QuestionSlider } from './QuestionSlider';
@@ -10,6 +10,8 @@ import { newOfflineAttempt } from './localQuizPractice';
 const mocks = vi.hoisted(() => ({
   quiz: null as Quiz | null, practice: null as LocalQuizPractice | null,
   remote: null as QuizAttempt | null, request: vi.fn(),
+  offline: false, answerKey: null as QuizAnswerKey | null,
+  saved: null as { quiz: Quiz } | null, historyReady: false,
 }));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput' }));
 vi.mock('lucide-react-native', () => ({ ChevronLeft: 'ChevronLeft', ChevronRight: 'ChevronRight' }));
@@ -21,12 +23,13 @@ vi.mock('../../design/feedback', () => ({ playFeedbackSound: vi.fn() }));
 vi.mock('../../design/haptics', () => ({ haptic: { select: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../services/experienceApi', () => ({ experienceRequest: mocks.request, newRequestKey: () => 'key', ExperienceApiError: class extends Error {} }));
 vi.mock('./useExperience', () => ({
-  useExperience: (path: string) => path.endsWith('/attempts') ? { loading: true, data: [], refresh: vi.fn() } : { data: mocks.quiz },
+  useExperience: (path: string) => path.endsWith('/attempts') ? { loading: !mocks.historyReady, data: [], refresh: vi.fn() } : { data: mocks.offline ? null : mocks.quiz },
   useExperienceClient: () => ({ baseUrl: 'https://example.test', accessToken: 'test' }),
 }));
-vi.mock('./useLocalLibrary', () => ({ useLocalArtifact: () => ({ data: { quiz: mocks.quiz } }) }));
+vi.mock('./useLocalLibrary', () => ({ useLocalArtifact: () => ({ data: mocks.saved }) }));
 vi.mock('../../services/localLibrary/localArtifactDatabase', () => ({ getLocalArtifactStore: async () => ({
   readQuizPractice: async () => structuredClone(mocks.practice),
+  readQuizAnswerKey: async () => structuredClone(mocks.answerKey),
   saveQuizPractice: async (_owner: string, _id: string, value: LocalQuizPractice) => { mocks.practice = structuredClone(value); },
 }) }));
 
@@ -41,6 +44,7 @@ function action(text: string) {
   return tree.root.findAllByType('Action' as ElementType).find(node => node.children.includes(text))!;
 }
 async function mount() {
+  mocks.saved = { quiz: mocks.quiz! };
   await act(async () => { tree = create(createElement(QuizScreen), {
     createNodeMock: () => ({ measureInWindow: (callback: (x: number) => void) => callback(60) }),
   }); });
@@ -48,6 +52,7 @@ async function mount() {
 async function tap(direction: 'left' | 'right') { await act(async () => { arrow(direction).props.onPress(); }); }
 
 beforeEach(() => {
+  mocks.offline = false; mocks.answerKey = null; mocks.historyReady = false;
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   const questions: Quiz['questions'] = Array.from({ length: 30 }, (_, i) => ({
     id: `q${i + 1}`, type: 'single_select', prompt: `Prompt ${i + 1}`, difficulty: 'easy',
@@ -75,6 +80,36 @@ beforeEach(() => {
 afterEach(async () => { if (tree) await act(async () => tree.unmount()); });
 
 describe('minimal Quiz navigation', () => {
+  it.each(['identification', 'modified_true_false'] as const)('keeps checked %s feedback to the verdict until final review', async type => {
+    mocks.quiz = { ...mocks.quiz!, questions: mocks.quiz!.questions.map((q, index) => index === 9 ? { ...q, type } : q) };
+    const feedback = { questionId: 'q10', selectedOptionIds: ['a'], correctOptionIds: ['secret-key'], correctAnswerText: 'Accepted term',
+      correct: false, explanation: 'Secret explanation', topicId: 't', topic: 'Topic', sourceRefs: [], reviewerSectionIds: [] };
+    mocks.practice = { ...mocks.practice!, attempt: { ...mocks.remote!, feedback: [feedback] } };
+    await mount();
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain('Keep learning');
+    for (const hidden of ['Correct answer:', 'Accepted term', 'Secret explanation', 'Reveal Answer']) expect(rendered).not.toContain(hidden);
+  });
+  it('moves with explicit Previous/Next and keeps the slider in sync', async () => {
+    await mount();
+    await act(async () => action('Next').props.onPress());
+    expect(track().props.accessibilityValue.now).toBe(11);
+    await act(async () => action('Previous').props.onPress());
+    expect(track().props.accessibilityValue.now).toBe(10);
+  });
+  it('reviews questions by identity when result order differs from quiz order', async () => {
+    const entry = (questionId: string) => ({ questionId, selectedOptionIds: ['a'], correctOptionIds: ['b'], correct: false,
+      explanation: 'Review', topicId: 't', topic: 'Topic', sourceRefs: [], reviewerSectionIds: [] });
+    mocks.practice = { ...mocks.practice!, attempt: null, result: { attemptId: 'one', quizId: 'quiz-one', correctCount: 0, incorrectCount: 2,
+      skippedCount: 28, revealedCount: 0, totalQuestions: 30, earnedPoints: 0, possiblePoints: 30, percentage: 0,
+      questions: [entry('q20'), entry('q3')], topicPerformance: [], weakAreas: [] } };
+    await mount();
+    await act(async () => action('Review answers').props.onPress());
+    const rendered = JSON.stringify(tree.toJSON());
+    expect(rendered).toContain('Prompt 20');
+    expect(rendered).toContain('Prompt 3');
+    expect(rendered).not.toContain('Prompt 1');
+  });
   it('moves 10 → 11 → 12 → 11 → 10 freely and leaves the question unanswered', async () => {
     await mount();
     for (const [direction, index] of [['right', 10], ['right', 11], ['left', 10], ['left', 9]] as const) {
@@ -85,7 +120,7 @@ describe('minimal Quiz navigation', () => {
     expect(mocks.practice!.attempt!.skippedQuestionIds).toEqual([]);
     expect(tree.root.findAllByType('Action' as ElementType).some(node => node.props.disabled === false && node.children.includes('Choice A'))).toBe(true);
     const labels = tree.root.findAllByType('Action' as ElementType).flatMap(node => node.children);
-    expect(labels).not.toContain('Skip'); expect(labels).not.toContain('Previous'); expect(labels).not.toContain('Next');
+    expect(labels).not.toContain('Skip'); expect(labels).toContain('Previous'); expect(labels).toContain('Next');
     expect(labels).toContain('Reveal Answer');
     expect(mocks.request.mock.calls.every(([, , options]) => options.body.action === 'navigate')).toBe(true);
   });
@@ -94,10 +129,12 @@ describe('minimal Quiz navigation', () => {
     mocks.practice = { ...mocks.practice!, attempt: { ...mocks.practice!.attempt!, currentQuestion: 0 } };
     await mount();
     expect(arrow('left').props.disabled).toBe(true);
+    expect(action('Previous').props.disabled).toBe(true);
     expect(arrow('right').props.disabled).toBe(false);
     await act(async () => tree.root.findByType(QuestionSlider).props.onSettle(29));
     expect(arrow('left').props.disabled).toBe(false);
     expect(arrow('right').props.disabled).toBe(true);
+    expect(action('Next').props.disabled).toBe(true);
   });
 
   it('shows the destination immediately on release while the online position save is pending', async () => {
@@ -147,6 +184,78 @@ describe('minimal Quiz navigation', () => {
     expect(mocks.practice!.attempt!.answers).toContainEqual(answer);
     expect(mocks.practice!.attempt!.skippedQuestionIds).toEqual(['q8']);
     expect(tree.root.findAllByType('Action' as ElementType).flatMap(node => node.children)).not.toContain('Reveal Answer');
+  });
+});
+
+describe('saved quiz with offline answer keys', () => {
+  function enableKeys() {
+    mocks.offline = true;
+    mocks.answerKey = { quizId: mocks.quiz!.id, versionId: 'v1', questions: mocks.quiz!.questions.map(q => ({
+      id: q.id, correctOptionIds: ['a'], explanation: 'Synthetic local explanation' })) };
+  }
+  it('reveals and finishes from a stored key, then restores the scored result after restart', async () => {
+    enableKeys();
+    await mount();
+    expect(action('Reveal Answer').props.disabled).toBe(false);
+    await act(async () => action('Reveal Answer').props.onPress());
+    expect(mocks.practice!.attempt!.assistedQuestionIds).toContain('q10');
+    expect(tree.root.findAllByType('Copy' as ElementType).flatMap(node => node.children)).toContain('Synthetic local explanation');
+    await act(async () => action('Finish quiz').props.onPress());
+    expect(mocks.practice).toMatchObject({ dirty: true, attempt: { status: 'completed' }, result: { percentage: 0 } });
+    expect(tree.root.findAllByType('Copy' as ElementType).flatMap(node => node.children)).toContain('Scored offline · will sync');
+    await act(async () => tree.unmount()); await mount();
+    expect(tree.root.findAllByType('Copy' as ElementType).flatMap(node => node.children)).toContain('Scored offline · will sync');
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('checks an answer offline and scores it using the shared grader', async () => {
+    enableKeys(); mocks.practice = { ...mocks.practice!, selected: ['a'] };
+    await mount();
+    expect(action('Check answer').props.disabled).toBe(false);
+    await act(async () => action('Check answer').props.onPress());
+    await act(async () => action('Finish quiz').props.onPress());
+    expect(mocks.practice!.result).toMatchObject({ earnedPoints: 1, possiblePoints: 30, percentage: 3.33 });
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('keeps the existing connection-required controls when there is no key', async () => {
+    mocks.offline = true;
+    await mount();
+    expect(action('Reveal Answer').props.disabled).toBe(true);
+    expect(action('Finish quiz').props.disabled).toBe(true);
+    expect(tree.root.findAllByType('Notice' as ElementType).flatMap(node => node.children)).toContain('Offline practice is saved on this device. Connect to check or reveal answers and sync your progress.');
+  });
+  it('loads a key that finishes hydration after the first device read', async () => {
+    mocks.offline = true;
+    await mount();
+    expect(action('Reveal Answer').props.disabled).toBe(true);
+    enableKeys();
+    mocks.saved = { quiz: mocks.quiz! };
+    await act(async () => tree.update(createElement(QuizScreen)));
+    expect(action('Reveal Answer').props.disabled).toBe(false);
+  });
+  it('adopts and persists the completed server result after reconnect', async () => {
+    enableKeys(); mocks.practice = { ...mocks.practice!, selected: ['a'] };
+    await mount();
+    await act(async () => action('Check answer').props.onPress());
+    await act(async () => action('Finish quiz').props.onPress());
+    const serverResult = { ...mocks.practice!.result!, attemptId: 'server-one', percentage: 25 };
+    mocks.request.mockImplementation(async (_client, path: string) => path.endsWith('/result') ? serverResult : { ...mocks.practice!.attempt!, id: 'server-one', status: 'completed' });
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+    await act(async () => action('Sync progress').props.onPress());
+    expect(mocks.practice).toMatchObject({ dirty: false, result: { percentage: 25 } });
+    expect(tree.root.findAllByType('Copy' as ElementType).flatMap(node => node.children)).not.toContain('Scored offline · will sync');
+    expect(log).toHaveBeenCalledExactlyOnceWith('offline_score_mismatch');
+    log.mockRestore();
+  });
+  it('automatically adopts the completed server score when the online reads recover', async () => {
+    enableKeys();
+    await mount();
+    await act(async () => action('Finish quiz').props.onPress());
+    const serverResult = { ...mocks.practice!.result!, attemptId: 'server-one' };
+    mocks.request.mockImplementation(async (_client, path: string) => path.endsWith('/result') ? serverResult : { ...mocks.practice!.attempt!, id: 'server-one', status: 'completed' });
+    mocks.offline = false; mocks.historyReady = true;
+    await act(async () => tree.update(createElement(QuizScreen)));
+    expect(mocks.practice).toMatchObject({ dirty: false, result: { attemptId: 'server-one' } });
+    expect(tree.root.findAllByType('Copy' as ElementType).flatMap(node => node.children)).not.toContain('Scored offline · will sync');
   });
 });
 

@@ -34,13 +34,13 @@ beforeEach(() => {
   vi.resetAllMocks();
   from.mockReturnValue(query);
   query.select.mockReturnValue(query); query.eq.mockReturnValue(query);
-  mocks.source.mockResolvedValue({ source_kind: 'pdf', metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`file:${fileId}`] } });
+  mocks.source.mockResolvedValue(stagedSource([`file:${fileId}`]));
   mocks.checkpoint.mockResolvedValue(null);
   mocks.readFile.mockResolvedValue({ data: {
     id: fileId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_course_id: '101', canvas_file_id: '42',
     display_name: 'Scanned notes.pdf', content_type: 'application/pdf', stored_content_type: 'application/pdf', stored_byte_count: 100,
     storage_bucket: 'canvas-source-files', storage_object_key: 'private/source.pdf', current_sha256: 'a'.repeat(64),
-    availability_status: 'available', ingestion_status: 'stored', ingestion_eligibility: 'eligible_document', last_synced_at: '2026-09-19T00:00:00Z',
+    availability_status: 'available', content_version_fingerprint: 'revision-a', ingestion_status: 'stored', ingestion_eligibility: 'eligible_document', last_synced_at: '2026-09-19T00:00:00Z',
   }, error: null });
   mocks.preview.mockResolvedValue({ ok: true, value: { previewSessionId: 'preview', resolutionFingerprint: 'fingerprint' } });
   mocks.validate.mockResolvedValue({ ok: true, value: { row: { user_id: 'owner' } } });
@@ -50,6 +50,11 @@ beforeEach(() => {
 });
 
 describe('deferred Canvas reviewer source preparation', () => {
+  it('never relabels an earlier staged extraction with the current revision hash',async()=>{
+    mocks.source.mockResolvedValue({...stagedSource([`file:${fileId}`]),content_sha256:'b'.repeat(64)});
+    await expect(prepareDeferredCanvasReviewerSource({client,job,normalizedText:firstPage,pages,workerId:'worker'})).rejects.toMatchObject({code:'not_ready'});
+    expect(mocks.preview).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();
+  });
   it('preserves complete ordered page provenance and atomically attaches text before generation', async () => {
     await expect(prepareDeferredCanvasReviewerSource({ client, job, normalizedText: `${firstPage}\n\n${secondPage}`, pages, workerId: 'worker' })).resolves.toBe(true);
     expect(mocks.preview).toHaveBeenCalledWith(expect.objectContaining({
@@ -67,8 +72,8 @@ describe('deferred Canvas reviewer source preparation', () => {
         canvasCourseId: 'course', canvasItemIds: [`file:${fileId}`],
         canvasResolvedInWorkflowVersion: 'canvas-reviewer-source-v1', reviewerSourceSnapshotId: 'snapshot',
         reviewerSourceBlocks: [
-          expect.objectContaining({ pageNumber: 1, text: firstPage }),
-          expect.objectContaining({ pageNumber: 2, text: secondPage }),
+          expect.objectContaining({ id: 'page-1', pageNumber: 1, text: firstPage }),
+          expect.objectContaining({ id: 'page-2', pageNumber: 2, text: secondPage }),
         ],
       }),
     }));
@@ -97,7 +102,7 @@ describe('deferred Canvas reviewer source preparation', () => {
   });
 
   it('combines an instructional Page and its PDF in source order with both provenance records', async () => {
-    mocks.source.mockResolvedValue({ source_kind: 'pdf', metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`page:${linkedPageId}`, `file:${fileId}`] } });
+    mocks.source.mockResolvedValue(stagedSource([`page:${linkedPageId}`, `file:${fileId}`]));
     const fileResult = await mocks.readFile();
     mocks.readFile.mockResolvedValueOnce(fileResult).mockResolvedValueOnce({ data: {
       id: linkedPageId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection',
@@ -117,7 +122,7 @@ describe('deferred Canvas reviewer source preparation', () => {
   });
 
   it('uses only PDF lesson text when a linked Page contains only its filename', async () => {
-    mocks.source.mockResolvedValue({ source_kind: 'pdf', metadata: { canvasDeferredResolutionVersion: 'canvas-reviewer-source-v1', canvasCourseId: 'course', canvasItemIds: [`page:${linkedPageId}`, `file:${fileId}`] } });
+    mocks.source.mockResolvedValue(stagedSource([`page:${linkedPageId}`, `file:${fileId}`]));
     const fileResult = await mocks.readFile();
     mocks.readFile.mockResolvedValueOnce(fileResult).mockResolvedValueOnce({ data: {
       id: linkedPageId, user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection',
@@ -139,4 +144,8 @@ describe('deferred Canvas reviewer source preparation', () => {
 
 function page(pageNumber: number, text: string): OcrPage {
   return { pageNumber, text, status: 'text_extracted', method: 'ocr', blocks: [] };
+}
+function stagedSource(ids:readonly string[]) {
+  return {source_kind:'pdf',content_sha256:'a'.repeat(64),byte_size:100,storage_bucket:'canvas-source-files',storage_object_path:'private/source.pdf',
+    metadata:{canvasDeferredResolutionVersion:'canvas-reviewer-source-v1',canvasCourseId:'course',canvasItemIds:ids}};
 }

@@ -319,6 +319,11 @@ export interface CanvasCourseGradeSummaryDto {
   readonly sync: CanvasGradeSyncStatusDto;
 }
 
+export interface CanvasCourseGradeEstimateResponse {
+  readonly ok: true;
+  readonly estimate: import("@stay-focused/shared/grade-estimator").GradeEstimate;
+}
+
 export interface CanvasCourseGradeSummaryResponse {
   readonly ok: true;
   readonly summary: CanvasCourseGradeSummaryDto;
@@ -355,10 +360,11 @@ export type CanvasReviewerSourceType =
   | "announcement"
   | "file";
 
-export type CanvasReviewerFileKind = "pdf" | "image" | "text" | "unsupported";
+export type CanvasReviewerFileKind = "pdf" | "image" | "text" | "docx" | "pptx" | "unsupported";
 
 export type CanvasReviewerFilePreparationStatus =
   | "ready"
+  /** @deprecated Use descriptor.preparation; retained for older mobile builds. */
   | "not_prepared"
   | "failed"
   | "blocked"
@@ -381,6 +387,7 @@ export interface CanvasReviewerCourseSyncSummary {
 }
 
 export interface CanvasReviewerSourceDescriptor {
+  readonly preparation?: import('@stay-focused/shared').MaterialPreparation;
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
   readonly title: string;
@@ -550,6 +557,8 @@ export type CanvasFileIngestionResultStatus =
   | "unavailable";
 
 export interface CanvasFileIngestionItemResult {
+  /** Safe provider delay, retained for durable worker scheduling. */
+  readonly retryAfterMs?: number;
   readonly fileId: string;
   readonly status: CanvasFileIngestionResultStatus;
   readonly code: string;
@@ -680,6 +689,7 @@ export type CanvasApiResponse =
   | CanvasGradeAssignmentListResponse
   | CanvasGradeAssignmentDetailResponse
   | CanvasCourseGradeSummaryResponse
+  | CanvasCourseGradeEstimateResponse
   | CanvasGradeSyncStatusResponse
   | CanvasReviewerSourceListResponse
   | CanvasSourceStructureResponse

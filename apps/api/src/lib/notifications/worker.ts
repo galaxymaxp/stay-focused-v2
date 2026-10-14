@@ -145,6 +145,7 @@ export function createNotificationMessage(
   return {
     to: target.token,
     sound: "default",
+    channelId: "study-completions",
     title: "Stay Focused",
     body: content,
     data: {

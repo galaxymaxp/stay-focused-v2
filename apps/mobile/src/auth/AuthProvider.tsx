@@ -27,6 +27,8 @@ import {
 import { clearProcessingJobReferencesForOwner } from "../services/activeProcessingJobStore";
 import { clearCanvasReviewerRecoveryForOwner } from "../services/canvasReviewerRecoveryStore";
 import { purgeLocalLibraryForOwner } from "../services/localLibrary/localArtifactDatabase";
+import { getApiBaseUrl } from "../config/apiBaseUrl";
+import { disableCompletionNotifications } from "../services/completionNotifications";
 
 export type AuthStatus = "restoring" | "signedOut" | "signedIn";
 
@@ -181,6 +183,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       const ownerUserId = session?.user.id;
+      // Unbind this installation while its owner's bearer token is still valid.
+      // Offline notification-service failure must not prevent account logout.
+      const apiBaseUrl = getApiBaseUrl();
+      if (session && apiBaseUrl) {
+        await disableCompletionNotifications({ apiBaseUrl, accessToken: session.accessToken }).catch(() => undefined);
+      }
       const result = await signOutSession();
       if (result.ok) {
         applySession(null);
@@ -203,7 +211,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsSigningOut(false);
     }
-  }, [applySession, session?.user.id]);
+  }, [applySession, session]);
 
   const clearError = useCallback(() => {
     setError(null);

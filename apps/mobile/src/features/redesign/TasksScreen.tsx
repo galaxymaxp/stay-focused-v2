@@ -5,7 +5,8 @@ import { useMemo, useRef, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
-import { Action, Copy, Notice, Page, Surface, IconAction, SkeletonCards } from "../../design/primitives";
+import { Action, Copy, Notice, Page, Surface, IconAction, SkeletonCards, RowLink } from "../../design/primitives";
+import { TASK_COURSE_GRADES_PATHNAME, courseRouteParams } from "../../navigation/appRoutes";
 import { courseIdentity } from "../../design/courseIdentity";
 import { CourseCard, CourseMark } from "../../design/CourseViews";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
@@ -42,7 +43,7 @@ function identityFor(summary: Pick<TaskCourseSummary, "key" | "course">) {
 /** Level 1: one card per course, with real due/missing/completed counts. */
 export function TasksScreen() {
   const { colors } = useTheme();
-  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 60000, undefined, activitySummariesOfflineCache);
+  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 0, undefined, activitySummariesOfflineCache);
   const courses = useMemo(() => summarizeTaskCourses(tasks.data?.items ?? []), [tasks.data]);
   return (
     <Page
@@ -97,11 +98,12 @@ export function TasksCourseScreen() {
   const { colors } = useTheme();
   const { courseKey: rawKey } = useLocalSearchParams<{ courseKey?: string }>();
   const courseKey = (Array.isArray(rawKey) ? rawKey[0] : rawKey) ?? PERSONAL_COURSE_KEY;
-  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 60000, undefined, activitySummariesOfflineCache);
+  const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 0, undefined, activitySummariesOfflineCache);
   const [showCompleted, setShowCompleted] = useState(false);
   const now = Date.now();
   const items = useMemo(() => (tasks.data?.items ?? []).filter((item) => courseKeyOf(item) === courseKey), [courseKey, tasks.data]);
   const summary = summarizeTaskCourses(items)[0];
+  const gradeCourse = summary?.course ?? null;
   const identity = identityFor({ key: courseKey, course: summary?.course ?? null });
   // Pins are shared with Today: a task pinned here is pinned there too.
   const { prefs, pin } = useListPreferences();
@@ -117,6 +119,10 @@ export function TasksCourseScreen() {
   };
   return (
     <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
+      {gradeCourse ? <RowLink label="Grades" onPress={() => router.push({ pathname: TASK_COURSE_GRADES_PATHNAME,
+        params: { ...courseRouteParams({ courseId: gradeCourse.id, courseName: gradeCourse.name }), courseKey } })}>
+        <Copy>Grades</Copy>
+      </RowLink> : null}
       {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading tasks" /> : null}
       {tasks.error && !tasks.data ? (
         <Surface><Copy size="h3">{tasks.errorCode?.endsWith("api_base_url") ? "App configuration error" : "Tasks could not be loaded"}</Copy><Copy muted>{tasks.errorCode?.endsWith("api_base_url") ? tasks.error.split("\n").slice(1).join("\n") : tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>

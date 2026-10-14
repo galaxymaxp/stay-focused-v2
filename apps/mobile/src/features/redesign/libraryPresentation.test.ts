@@ -1,7 +1,7 @@
 import type { LibraryArtifactSummary } from "@stay-focused/shared";
 import { describe, expect, it } from "vitest";
 
-import { describeLibraryCounts, filterCourseLibrary, groupLibraryByCourse, librarySegments } from "./libraryPresentation";
+import { offlineLibraryCaption, OFFLINE_LIBRARY_NOTICE, OFFLINE_MISSING_NOTICE, describeLibraryCounts, filterCourseLibrary, groupLibraryByCourse, librarySegments } from "./libraryPresentation";
 
 const capstone = { id: "capstone", code: "CIT6", name: "Capstone Project 1" };
 const mobile = { id: "mobile", code: "CC17", name: "Mobile Application Design" };
@@ -39,5 +39,17 @@ describe("Library presentation", () => {
   it("describes only the kinds a course actually has", () => {
     expect(describeLibraryCounts({ reviewer: 3, quiz: 1, activity_output: 0 })).toBe("3 reviewers · 1 quiz");
     expect(describeLibraryCounts({ reviewer: 0, quiz: 2, activity_output: 1 })).toBe("2 quizzes · 1 draft");
+  });
+});
+
+describe("offline availability copy", () => {
+  it("describes current counts and saving progress without an empty header", () => {
+    expect(offlineLibraryCaption(null, false)).toBeNull();
+    expect(offlineLibraryCaption({ total: 0, current: 0 }, true)).toBeNull();
+    expect(offlineLibraryCaption({ total: 24, current: 24 }, true)).toBe("All 24 items are saved for offline use.");
+    expect(offlineLibraryCaption({ total: 24, current: 22 }, false)).toBe("22 of 24 saved for offline use.");
+    expect(offlineLibraryCaption({ total: 24, current: 22 }, true)).toBe("22 of 24 saved for offline use. Saving the rest…");
+    expect(OFFLINE_LIBRARY_NOTICE).toBe("You're offline. Items marked Saved offline still open.");
+    expect(OFFLINE_MISSING_NOTICE).toBe("This one isn't saved on your device yet. Connect once and it will be saved for offline use.");
   });
 });

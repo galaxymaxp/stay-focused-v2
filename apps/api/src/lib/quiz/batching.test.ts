@@ -86,12 +86,20 @@ beforeEach(() => {
     vi.resetAllMocks();
     checkpoints.clear(); serial = 0; matchingIndex = 0;
     mocks.resolve.mockResolvedValue(resolved);
-    mocks.assemble.mockResolvedValue({ ...resolved, regions, capacity: { maximum: 100 } });
+    // These tests isolate batching with permissive mocked capacity; real term admission is tested separately.
+    mocks.assemble.mockResolvedValue({ ...resolved, regions, capacity: { maximum: 100, matchingMaximum: 100 } });
     mocks.read.mockImplementation(async (_client, _job, key: string) => checkpoints.has(key) ? { payload: checkpoints.get(key) } : null);
     mocks.write.mockImplementation(async (_client, value: { checkpointKey: string; payload: Json }) => { checkpoints.set(value.checkpointKey, value.payload); });
 });
 
 describe('Quiz batching, budget and repair', () => {
+    it('persists a custom title through generation and keeps the legacy default when omitted', async () => {
+        useRequest({ title: 'My Biology Quiz', questionCount: 5, questionTypes: ['single_select'] });
+        scriptedModel();
+        expect((await processQuizJob({} as SupabaseClient<Database>, job, 'worker')).payload.title).toBe('My Biology Quiz');
+        useRequest({ questionCount: 5, questionTypes: ['single_select'] });
+        expect((await processQuizJob({} as SupabaseClient<Database>, job, 'worker')).payload.title).toBe('5-question quiz');
+    });
     it('scales the provider budget per batch and caps it at ten', () => {
         expect([5, 20, 21, 30, 41, 50, 81, 100].map(quizProviderCallBudget)).toEqual([2, 2, 4, 4, 6, 6, 10, 10]);
     });
@@ -178,7 +186,7 @@ describe('Quiz batching, budget and repair', () => {
     });
     it.each([...ALL, 'mixed'] as const)('blocks an oversized persisted %s request before any provider call', async type => {
         useRequest({ questionCount: 30, ...(type === 'mixed' ? {} : { questionTypes: [type] }) });
-        mocks.assemble.mockResolvedValue({ ...resolved, regions, capacity: { maximum: 20 } });
+        mocks.assemble.mockResolvedValue({ ...resolved, regions, capacity: { maximum: 20, matchingMaximum: 20 } });
         const calls = scriptedModel();
         await expect(run()).rejects.toThrow('quiz_source_capacity_exceeded');
         expect(quizCalls(calls)).toHaveLength(0);

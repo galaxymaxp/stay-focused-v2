@@ -61,7 +61,7 @@ describe("local artifact store", () => {
     const summary: ActivitySummary = {
       id: "canvas:assignment-1", taskId: null, course: { id: "course-1", code: "BIO 101", name: "Biology" },
       title: "Lab report", dueAt: "2026-10-04T00:00:00Z", status: "unknown", priority: "medium",
-      estimatedMinutes: null, submissionTypes: ["online_upload"], source: "canvas", isOverdue: false,
+      estimatedMinutes: 90, estimateSource: "ai", submissionTypes: ["online_upload"], source: "canvas", isOverdue: false,
       urgency: "next", hasGeneratedDraft: false,
     };
     const detail = {
@@ -133,7 +133,7 @@ describe("local artifact store", () => {
     first.close();
 
     const second = await freshStore(path);
-    await expect(second.store.listSummaries(OWNER_A)).resolves.toEqual([reviewerDetail().artifact]);
+    await expect(second.store.listSummaries(OWNER_A)).resolves.toEqual([{ ...reviewerDetail().artifact, offlineReady: true }]);
     await expect(second.store.readDetail(OWNER_A, reviewerDetail().artifact.id)).resolves.toMatchObject({
       detail: reviewerDetail(),
     });
@@ -158,7 +158,7 @@ describe("local artifact store", () => {
     await expect(store.upsertDetail(OWNER_A, newer.artifact.id, newer)).resolves.toBe("updated");
     const stored = await store.readDetail(OWNER_A, newer.artifact.id);
     expect(stored?.detail).toEqual(newer);
-    await expect(store.listSummaries(OWNER_A)).resolves.toEqual([newer.artifact]);
+    await expect(store.listSummaries(OWNER_A)).resolves.toEqual([{ ...newer.artifact, offlineReady: true }]);
   });
 
   it("never lets an older or equal cloud copy overwrite newer local state", async () => {
@@ -249,7 +249,7 @@ describe("local artifact store", () => {
     await store.upsertSummaries(OWNER_A, [{ ...reviewerDetail().artifact, id: generationId }]);
     // The server resolves the finished generation to its saved Reviewer.
     await store.upsertDetail(OWNER_A, generationId, reviewerDetail());
-    await expect(store.listSummaries(OWNER_A)).resolves.toEqual([reviewerDetail().artifact]);
+    await expect(store.listSummaries(OWNER_A)).resolves.toEqual([{ ...reviewerDetail().artifact, offlineReady: true }]);
     expect((await store.readDetail(OWNER_A, generationId))?.detail.artifact.id).toBe(`artifact:${REVIEWER_ROW_ID}`);
   });
 
@@ -283,5 +283,48 @@ describe("local artifact store", () => {
     expect((await reopened.store.readDetail(OWNER_A, detail.artifact.id))?.detail).toEqual(detail);
     expect((await reopened.store.listSummaries(OWNER_A))[0]?.activityStudyStatus).toBe('completed');
     expect(await reopened.store.readActivityResponse(OWNER_B, detail.artifact.id)).toBeNull();
+  });
+});
+
+
+describe('offline storage controls', () => {
+  it('counts current bodies, skips missing/stale/unknown-schema bodies and isolates owners', async () => {
+    const { store, raw } = await freshStore();
+    expect(await store.offlineStats(OWNER_A)).toEqual({ total: 0, current: 0, approximateBytes: 0 });
+    await store.upsertDetail(OWNER_A, 'r', reviewerDetail());
+    const bytes = (await store.offlineStats(OWNER_A)).approximateBytes;
+    expect(bytes).toBeGreaterThan(0);
+    await store.upsertDetail(OWNER_A, 'q', quizDetail());
+    expect((await store.offlineStats(OWNER_A)).approximateBytes).toBeGreaterThan(bytes);
+    await store.upsertSummaries(OWNER_A, [draftDetail().artifact,
+      { ...quizDetail().artifact, updatedAt: '2026-10-01T00:00:00.000Z' }]);
+    await store.upsertDetail(OWNER_B, 'r', reviewerDetail());
+    expect(await store.offlineStats(OWNER_A)).toMatchObject({ total: 3, current: 1 });
+    expect((await store.listSummaries(OWNER_A)).filter(item => item.offlineReady).map(item => item.id)).toEqual([reviewerDetail().artifact.id]);
+    raw.prepare('UPDATE library_artifacts SET payload_schema = 99 WHERE owner_user_id = ?').run(OWNER_A);
+    expect((await store.offlineStats(OWNER_A)).current).toBe(0);
+    expect(await store.offlineStats(OWNER_B)).toMatchObject({ total: 1, current: 1 });
+  });
+  it('clears bodies and assists, keeping aliases, snapshots and unsynced work', async () => {
+    const { store, raw } = await freshStore();
+    await store.upsertDetail(OWNER_A, 'generation:alias', reviewerDetail());
+    await store.upsertDetail(OWNER_B, 'r', reviewerDetail());
+    await store.saveQuizPractice(OWNER_A, 'q', { attempt: null, result: null, selected: ['answer'], dirty: true });
+    await store.saveActivityResponse(OWNER_A, 'draft', { response: 'my work' }, false);
+    raw.prepare("INSERT INTO experience_activity_snapshots VALUES (?, 'task', '{}', '{}', 'today')").run(OWNER_A);
+    for (const owner of [OWNER_A, OWNER_B]) raw.prepare("INSERT INTO study_assists VALUES (?, 'key', 'reviewer', 'content', '{}')").run(owner);
+    expect((await store.offlineStats(OWNER_A)).approximateBytes).toBeGreaterThan(0);
+    await store.clearBodies(OWNER_A);
+    expect(await store.offlineStats(OWNER_A)).toEqual({ total: 1, current: 0, approximateBytes: 0 });
+    expect(await store.listSummaries(OWNER_A)).toHaveLength(1);
+    expect(await store.readDetail(OWNER_A, 'generation:alias')).toBeNull();
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM library_artifact_aliases WHERE owner_user_id = ?').get(OWNER_A)).toEqual({ n: 1 });
+    expect(await store.readQuizPractice(OWNER_A, 'q')).toMatchObject({ selected: ['answer'], dirty: true });
+    expect(await store.readActivityResponse(OWNER_A, 'draft')).toMatchObject({ responses: { response: 'my work' } });
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM experience_activity_snapshots WHERE owner_user_id = ?').get(OWNER_A)).toEqual({ n: 1 });
+    expect(await store.readDetail(OWNER_B, reviewerDetail().artifact.id)).not.toBeNull();
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM study_assists WHERE owner_user_id = ?').get(OWNER_B)).toEqual({ n: 1 });
+    await store.upsertDetail(OWNER_A, reviewerDetail().artifact.id, reviewerDetail());
+    expect(await store.readDetail(OWNER_A, 'generation:alias')).not.toBeNull();
   });
 });

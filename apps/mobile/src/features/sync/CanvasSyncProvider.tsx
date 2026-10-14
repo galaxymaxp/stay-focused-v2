@@ -39,6 +39,8 @@ import {
   startDurableCanvasSync,
 } from "../../services/canvasSyncJobCoordinator";
 
+import { runOfflineCatchUp } from "../../services/localLibrary/offlineCatchUp";
+
 const POLL_MS = 4_000;
 
 interface CanvasSyncValue {
@@ -122,7 +124,9 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     if (!live.current) return;
     setSnapshot((current) => ({ ...current, ...summary, lastSyncedAt: lastSyncedAt ?? current.lastSyncedAt }));
     setDataVersion((value) => value + 1);
-  }, [refreshLastSynced]);
+    const input = request();
+    if (input) void runOfflineCatchUp(input.ownerUserId, { baseUrl: input.apiBaseUrl, accessToken: input.accessToken }, { force: true });
+  }, [refreshLastSynced, request]);
 
   // Poll the jobs this refresh started by id. The stored references are only
   // a recovery aid; a missing reference must never freeze the progress count.

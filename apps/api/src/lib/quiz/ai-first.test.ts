@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildGenerationContext, prepareGenerationContext, generateContract, GenerationContractError, runAIReviewer, createReviewerDocumentSchema, validateReviewerDocument, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
-import { generateQuizSet, validateQuizSet, quizSetSchema } from './ai-first';
+import { generateQuizSet, validateQuizSet, quizInstructions, quizSetSchema } from './ai-first';
 import { validateActivityDocument, generateActivityDocument } from '../activity-maker/ai-first';
 import { learnerQuestion, evaluateAnswer, hasRepeatedQuizQuestions, hasUnbalancedQuizMix, normalizeSubmittedAnswer, quizBatches } from './service';
 import type { QuizGenerationRequest, ActivitySource } from '@stay-focused/shared';
@@ -9,6 +9,11 @@ const regions = [{ id: 'page-1', label: 'Lecture', text: 'Complete lecture with 
 function quiz() { return { questions: Array.from({ length: 5 }, (_, i) => ({ id: `q${i + 1}`, type: 'single_select', prompt: `Question ${i + 1}?`, options: [{ id: 'a', text: 'First' }, { id: 'b', text: 'Second' }, { id: 'c', text: 'Third' }, { id: 'd', text: 'Fourth' }], correctOptionIds: ['a'], explanation: 'Explanation from the lecture.', difficulty: 'easy', concept: `Concept ${i + 1}`, sourceRefs: ['page-1'] })) }; }
 const provider = (response: unknown, capture?: GenerationRequest<unknown>[]): GenerationProvider => ({ generate: async <T>(r: GenerationRequest<T>) => { capture?.push(r); return response as T; } });
 describe('AI-first context and product contracts', () => {
+  it('uses the admitted three-pair budget only for Matching-only requests', () => {
+    expect(quizInstructions({ ...request, questionTypes: ['matching'] }, 5, false)).toContain('Use exactly 3 distinct verbatim source terms per item');
+    expect(quizInstructions({ ...request, questionTypes: ['matching'] }, 1, true)).toContain('Do not reuse left-side terms across items');
+    expect(quizInstructions(request, 5, false)).not.toContain('Use exactly 3');
+  });
   it('validates stable one-to-one matching blocks and scores pairs individually', () => {
     const raw = quiz();
     const source = [{ ...regions[0]!, text: 'Firewall controls traffic. Phishing steals information. Ransomware locks data. Spyware monitors activity.' }];

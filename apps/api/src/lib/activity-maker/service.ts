@@ -1,6 +1,6 @@
 import type { Database,Json,ProcessingJobDatabaseRow } from '@stay-focused/db';
 import { GenerationContractError } from '@stay-focused/engine';
-import type { ActivityDraft,ActivityDraftContent,ActivitySource,GenerationView } from '@stay-focused/shared';
+import type { ActivityDraft,ActivityDraftContent,ActivitySource,GenerationView,OfflineDraftSaveResult,ActivityDraftCopy,ActivityDraftCopies } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { sanitizeCanvasTitleText } from '../canvas-source-safety';
@@ -146,5 +146,46 @@ export async function deleteActivityDraft(client: Client, userId: string, id: st
     const { data, error } = await client.from('activity_drafts').delete().eq('id', id).eq('user_id', userId).select('id');
     if (error || !data?.length)
         throw new ExperienceFailure(404, 'activity_draft_not_found');
+    return { deleted: true };
+}
+
+export async function saveOfflineActivityDraft(client: Client, userId: string, id: string, value: unknown): Promise<OfflineDraftSaveResult> {
+    const input = object(value);
+    if (Object.keys(input).some(k => !['baseRevision', 'content', 'clientEditId'].includes(k)) ||
+        typeof input.baseRevision !== 'number' || !Number.isSafeInteger(input.baseRevision) || input.baseRevision < 1 || input.baseRevision > 2147483646 ||
+        typeof input.clientEditId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.clientEditId))
+        throw new ExperienceFailure(400, 'invalid_request');
+    const existing = await readActivityDraft(client, userId, id);
+    const content = validateEditableContent(input.content, existing.sources.map(s => s.id));
+    const { data, error } = await client.rpc('save_offline_activity_draft', {
+        p_draft_id: id, p_base_revision: input.baseRevision, p_client_edit_id: input.clientEditId,
+        p_content: JSON.parse(JSON.stringify(content)) as Json,
+    });
+    if (error) throw new ExperienceFailure(error.message.includes('activity_draft_not_found') ? 404 : error.message.includes('invalid_request') ? 400 : 503,
+        error.message.includes('activity_draft_not_found') ? 'activity_draft_not_found' : error.message.includes('invalid_request') ? 'invalid_request' : 'unavailable');
+    const result = object(data), row = object(result.draft);
+    if (row.user_id !== userId || row.id !== id || typeof result.conflict !== 'boolean' || typeof result.replayed !== 'boolean' ||
+        !(result.copyId === null || typeof result.copyId === 'string')) throw new ExperienceFailure(503, 'unavailable');
+    return { draft: draftView(row as unknown as Database['public']['Tables']['activity_drafts']['Row']), conflict: result.conflict, replayed: result.replayed, copyId: result.copyId };
+}
+
+export async function listActivityDraftCopies(client: Client, userId: string, id: string): Promise<ActivityDraftCopies> {
+    await readActivityDraft(client, userId, id);
+    const { data, error } = await client.from('activity_draft_copies').select('id,user_id,draft_id,revision,created_at,content').eq('user_id', userId).eq('draft_id', id).order('created_at', { ascending: false });
+    if (error) throw new ExperienceFailure(503, 'unavailable');
+    return { copies: (data ?? []).filter(row => row.user_id === userId && row.draft_id === id).map(row => ({ id: row.id, revision: row.revision, createdAt: row.created_at, title: String(object(row.content).title ?? '').slice(0, 220) })) };
+}
+export async function readActivityDraftCopy(client: Client, userId: string, id: string, copyId: string): Promise<ActivityDraftCopy> {
+    const draft = await readActivityDraft(client, userId, id);
+    const { data, error } = await client.from('activity_draft_copies').select('*').eq('user_id', userId).eq('draft_id', id).eq('id', copyId).maybeSingle();
+    if (error) throw new ExperienceFailure(503, 'unavailable');
+    if (!data || data.user_id !== userId || data.draft_id !== id) throw new ExperienceFailure(404, 'activity_draft_not_found');
+    const content = validateEditableContent(data.content, draft.sources.map(s => s.id));
+    return { id: data.id, revision: data.revision, createdAt: data.created_at, title: content.title, content };
+}
+export async function deleteActivityDraftCopy(client: Client, userId: string, id: string, copyId: string) {
+    await readActivityDraftCopy(client, userId, id, copyId);
+    const { data, error } = await client.from('activity_draft_copies').delete().eq('user_id', userId).eq('draft_id', id).eq('id', copyId).select('id');
+    if (error || !data?.length) throw new ExperienceFailure(404, 'activity_draft_not_found');
     return { deleted: true };
 }

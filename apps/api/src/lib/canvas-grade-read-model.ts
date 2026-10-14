@@ -11,6 +11,7 @@ import type {
   Database,
 } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { estimateGradeNeeds, type GradeEstimate, type GradeEstimateDropRules } from "@stay-focused/shared/grade-estimator";
 
 import type {
   CanvasApiErrorCode,
@@ -485,6 +486,77 @@ export async function getCanvasCourseGradeSummary({
       },
     };
   });
+}
+
+/** A projection over owner-visible synchronized data, separate from official grade DTOs. */
+export async function estimateCanvasCourseGrade({ client, courseId, userId, targetPercent }: {
+  readonly client: SupabaseClient<Database>;
+  readonly courseId: string;
+  readonly userId: string;
+  readonly targetPercent: number;
+}): Promise<CanvasGradeReadResult<GradeEstimate>> {
+  return withReadModelErrors<GradeEstimate>(async () => {
+    const authorized = await authorizeSelectedGradeCourse({ client, courseId, userId });
+    if (!authorized.ok) return authorized;
+    const course = authorized.value;
+    const [groups, assignments, submissions, summary] = await Promise.all([
+      readEstimateRows<Database["public"]["Tables"]["canvas_assignment_groups"]["Row"]>(client, course, "canvas_assignment_groups", "id,name,group_weight,rules"),
+      readEstimateRows<CanvasAssignmentRow>(client, course, "canvas_assignments", "id,canvas_assignment_id,assignment_group_id,name,points_possible,omit_from_final_grade,published,due_at"),
+      readEstimateRows<CanvasAssignmentSubmissionRow>(client, course, "canvas_assignment_submissions", "id,assignment_id,score,excused,score_visibility_state,normalized_status,absent_after_sync_at"),
+      readCourseGradeSummaryRow({ client, course }),
+    ]);
+    if (!summary.ok) return summary;
+    // A submission absent from the latest authoritative sync cannot supply a current score.
+    const byAssignment = new Map(submissions.filter(s => !s.absent_after_sync_at).map(s => [s.assignment_id, s]));
+    const assignmentIds = new Map(assignments.map(a => [a.canvas_assignment_id, a.id]));
+    return { ok: true, value: estimateGradeNeeds({ targetPercent,
+      canvasCurrentScore: summary.value?.current_score_visibility_state === "visible" ? nullableNumber(summary.value.current_score) : null,
+      groups: groups.map(g => ({ id: g.id, name: g.name, weight: nullableNumber(g.group_weight), hasRules: hasGradeDropRules(g.rules),
+        rules: parseGradeDropRules(g.rules, assignmentIds) })),
+      assignments: assignments.map(a => {
+        const submission = byAssignment.get(a.id);
+        const possible = nullableNumber(a.points_possible);
+        const score = submission?.score_visibility_state === "visible" ? nullableNumber(submission.score) : null;
+        const excluded = a.omit_from_final_grade === true || a.published === false || possible === null || possible <= 0 || submission?.excused === true;
+        return { id: a.id, title: a.name, groupId: a.assignment_group_id, pointsPossible: possible ?? 0, dueAt: safeTimestamp(a.due_at),
+          state: excluded ? "excluded" as const : score !== null ? "graded" as const : "pending" as const, score,
+          hiddenGrade: submission?.normalized_status === "graded_hidden" || submission?.score_visibility_state === "hidden" };
+      }),
+    }) };
+  });
+}
+
+async function readEstimateRows<T>(
+  client: SupabaseClient<Database>, course: CanvasGradeCourseContext,
+  table: "canvas_assignment_groups" | "canvas_assignments" | "canvas_assignment_submissions", columns: string,
+): Promise<readonly T[]> {
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += 200) {
+    const result = await client.from(table).select(columns)
+      .eq("user_id", course.userId).eq("canvas_connection_id", course.connectionId).eq("course_id", course.courseId)
+      .order("id", { ascending: true }).range(offset, offset + 199);
+    if (result.error || !result.data) throw new CanvasGradeReadModelError();
+    rows.push(...result.data as unknown as T[]);
+    if (result.data.length < 200) return rows;
+  }
+}
+
+function hasGradeDropRules(rules: unknown): boolean {
+  if (!rules || typeof rules !== "object" || Array.isArray(rules)) return false;
+  return Object.entries(rules).some(([key, value]) =>
+    ["drop_lowest", "drop_highest", "never_drop"].includes(key) &&
+    value !== 0 && !(Array.isArray(value) && value.length === 0));
+}
+
+function parseGradeDropRules(rules: unknown, assignmentIds: ReadonlyMap<string, string>): GradeEstimateDropRules | undefined {
+  if (!rules || typeof rules !== "object" || Array.isArray(rules)) return undefined;
+  const record = rules as Record<string, unknown>;
+  const lowest = record.drop_lowest ?? 0, highest = record.drop_highest ?? 0, never = record.never_drop ?? [];
+  if (typeof lowest !== "number" || !Number.isSafeInteger(lowest) || lowest < 0 ||
+    typeof highest !== "number" || !Number.isSafeInteger(highest) || highest < 0 || !Array.isArray(never) ||
+    !never.every(id => typeof id === "string" && /^[1-9]\d*$/.test(id) || typeof id === "number" && Number.isSafeInteger(id) && id > 0)) return undefined;
+  return { dropLowest: lowest, dropHighest: highest,
+    neverDrop: never.flatMap(id => { const stored = assignmentIds.get(String(id)); return stored ? [stored] : []; }) };
 }
 
 export async function getCanvasGradeSyncStatus({

@@ -103,6 +103,7 @@ function error(
 
 function corsHeaders(): HeadersInit {
   return {
+    "Cache-Control": "private, no-store",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",

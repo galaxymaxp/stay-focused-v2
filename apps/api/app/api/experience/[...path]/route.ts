@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import type { ActivitySummary, LibraryArtifactType } from '@stay-focused/shared';
 import { experienceJson, experienceOptions, experienceRoute, readInteger, requireId } from '@/lib/experience/http';
 import { ExperienceFailure } from '@/lib/experience/errors';
@@ -93,8 +94,9 @@ export async function POST(request: Request, context: Context): Promise<Response
     const { path } = await context.params;
     const route = path.join('/');
     if (!['generations', 'materials/prepare', 'planner/preview', 'planner/apply', 'planner/replan'].includes(route)) throw new ExperienceFailure(404, 'not_found');
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).length > 64 * 1024) throw new ExperienceFailure(400, 'invalid_request');
+    const boundedBody = await readBoundedText(request, 64 * 1024);
+    if (!boundedBody.ok) throw new ExperienceFailure(400, 'invalid_request');
+    const raw = boundedBody.text;
     let value: unknown;
     try { value = JSON.parse(raw); } catch { throw new ExperienceFailure(400, 'invalid_request'); }
     const body = record(value);
@@ -115,7 +117,12 @@ export async function POST(request: Request, context: Context): Promise<Response
     if (route === 'materials/prepare') {
       const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: body.courseId, sourceIds: [body.materialId] });
       if (!prepared.ok) throw new ExperienceFailure(prepared.status === 404 ? 404 : 409, prepared.status === 404 ? 'not_found' : 'not_ready');
-      return experienceJson({ items: prepared.value.sources.map(source => learningMaterial(source, body.courseId as string)) });
+      const { materialClientStatus } = await import('@/lib/canvas-preparation/client-status');
+      const courseId = body.courseId;
+      const items = await Promise.all(prepared.value.sources.map(async source => learningMaterial({ ...source,
+        preparation: await materialClientStatus(client, {userId,courseId,materialId:source.id}, source),
+      }, courseId)));
+      return experienceJson({ items },prepared.value.results.some(item=>item.code==='preparation_pending')?202:200);
     }
     const job = await startReviewerGeneration(client, userId, { courseId: body.courseId, materialId: body.materialId }, request.headers.get('idempotency-key'));
     const view = job.status === 'succeeded' ? await service.getGeneration(userId, job.id) : generationView(toProcessingJobStatusView(job), null);

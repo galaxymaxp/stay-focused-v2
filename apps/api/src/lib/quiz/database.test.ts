@@ -67,6 +67,7 @@ beforeAll(async () => {
     await db.exec('alter table processing_job_sources add column source_version_id uuid;alter table processing_jobs add column source_version_id uuid;');
     await db.exec(migration('20260928100000_canonical_non_canvas_sources.sql'));
     await db.exec(migration('20260928143546_quiz_matching_public_projection.sql'));
+    await db.exec(migration('20261009071002_quiz_two_pair_matching.sql'));
     jobId = await queue('quiz-generation-1');
     await finish(jobId);
     quizId = (await db.query<{
@@ -308,6 +309,30 @@ describe('Quiz real Postgres transactions, RLS and history', () => {
         const done = await complete(a.id);
         expect(Number(done.percentage)).toBe(0);
         expect(resultView(attemptView(done, questions), questions)).toMatchObject({ revealedCount: 1, skippedCount: 4, earnedPoints: 0 });
+    });
+    it.each([['p1:r1', 'p2:r2'], ['p1:r1', 'p2:r3']])('saves and scores a two-pair matching block %j consistently', async (first, second) => {
+        await db.exec('begin');
+        try {
+            const matching = { ...questions[4]!, type: 'matching' as const,
+                options: [{ id: 'r1', text: 'One' }, { id: 'r2', text: 'Two' }, { id: 'r3', text: 'Distractor' }],
+                matchingPairs: [{ id: 'p1', leftItem: 'A' }, { id: 'p2', leftItem: 'B' }],
+                correctOptionIds: ['p1:r1', 'p2:r2'] };
+            const modified = [...questions.slice(0, 4), matching];
+            await db.query('update quiz_keys set questions=$1 where quiz_id=$2', [JSON.stringify(modified), quizId]);
+            const a = await start('two-pair-attempt');
+            await answer(a.id, 'q5', ['p1:r1'], false);
+            await db.exec('savepoint invalid_pair');
+            await expect(answer(a.id, 'q5', ['p1:r1', 'p2:r1'])).rejects.toThrow('quiz_answer_invalid');
+            await db.exec('rollback to savepoint invalid_pair');
+            for (const q of modified.slice(0, 4)) await answer(a.id, q.id, q.correctOptionIds);
+            await answer(a.id, 'q5', [first, second]);
+            const done = await complete(a.id);
+            const result = resultView(attemptView(done, modified), modified);
+            expect(result.questions.find(q => q.questionId === 'q5')).toMatchObject({ pairCount: 2, pairCorrectCount: second === 'p2:r2' ? 2 : 1 });
+            expect(Number(done.percentage)).toBe(result.percentage);
+            expect(result.earnedPoints).toBe(second === 'p2:r2' ? 6 : 5);
+            expect(result.possiblePoints).toBe(6);
+        } finally { await db.exec('rollback'); }
     });
     it('scores a matching block by pairs while preserving one-to-one display IDs', async () => {
         await db.exec('begin');

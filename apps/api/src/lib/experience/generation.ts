@@ -1,7 +1,7 @@
-import type { CanvasCourseRow, CanvasPageRow, Database, ProcessingJobDatabaseRow } from '@stay-focused/db';
+import type { Database, ProcessingJobDatabaseRow } from '@stay-focused/db';
 import type { CanvasFileRow } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listCanvasReviewerSources, prepareCanvasReviewerSources, structureCanvasReviewerSources, previewSelectiveCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
+import { listCanvasReviewerSources, structureCanvasReviewerSources, previewSelectiveCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { classifyStoredCanvasFileKind, isPreparedCanvasFileReadyForOcr } from '@/lib/canvas-stored-file-extraction';
 import { validateCanvasReviewerGenerationGate } from '@/lib/canvas-reviewer-generation-gate';
 import { createOrReuseReviewerSourceSnapshot, sha256Utf8Hex, validateCanvasPreviewSessionForGeneration } from '@/lib/reviewer-source-provenance';
@@ -9,14 +9,17 @@ import { createDeferredCanvasReviewerProcessingJob, createReviewerProcessingJob,
 import { findProcessingJobByIdempotencyKey, findProcessingJobSource } from '@/lib/processing-jobs/repository';
 import { scheduleAcceptedProcessingJobDispatch } from '@/lib/processing-jobs/background-dispatch';
 import { DEFERRED_CANVAS_REVIEWER_VERSION } from '@/lib/processing-jobs/deferred-canvas-reviewer-contract';
-import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
-import { resolveInstructionalPageAttachments } from './canvas-page-attachments';
+import { canonicalCanvasSourceBlocks } from '@/lib/processing-jobs/canvas-canonical-source-blocks';
+
+
 import { ExperienceFailure } from './errors';
 import { record } from './mappers';
 
 export interface StartReviewerGeneration { readonly courseId: string; readonly materialId: string }
 export async function startReviewerGeneration(client: SupabaseClient<Database>, userId: string, input: StartReviewerGeneration, requestKey: string | null, dependencies: {
   readonly schedule?: typeof scheduleAcceptedProcessingJobDispatch;
+  /** Canvas token brokered for the current sync job. When absent, the stored connection is decrypted (Vercel path). */
+  readonly brokeredCanvasToken?: string;
 } = {}): Promise<ProcessingJobDatabaseRow> {
   const schedule = dependencies.schedule ?? scheduleAcceptedProcessingJobDispatch;
   logGenerationAdmissionMemory('request_started', { sourceCount: 1 });
@@ -34,40 +37,23 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     logGenerationAdmissionMemory('existing_job_dispatch_scheduled', { jobCount: 1 });
     return existing;
   }
-  let descriptor;
-  for (let offset = 0; offset <= 1000; offset += 100) {
-    const sources = await listCanvasReviewerSources({ client, userId, courseId: input.courseId, limit: 100, offset });
-    if (!sources.ok) throw new ExperienceFailure(sources.status === 404 ? 404 : 503, sources.status === 404 ? 'not_found' : 'unavailable');
-    descriptor = sources.value.sources.find(s => s.id === input.materialId);
-    if (descriptor || !sources.value.pagination.hasMore) break;
+  const inventory=await listCanvasReviewerSources({client,userId,courseId:input.courseId,completeInventory:true});
+  if(!inventory.ok)throw new ExperienceFailure(inventory.status===404?404:503,inventory.status===404?'not_found':'unavailable');
+  const descriptor=inventory.value.sources.find(source=>source.id===input.materialId);
+  if(!descriptor)throw new ExperienceFailure(404,'not_found');
+  const {lookupMaterialPreparation,admitMaterialPreparation}=await import('@/lib/canvas-preparation/admission');
+  const {readPreparedResult}=await import('@/lib/canvas-preparation/repository');
+  const identity={userId,courseId:input.courseId,materialId:input.materialId};
+  const preparation=await lookupMaterialPreparation(client,identity);
+  const evidence=preparation?await readPreparedResult(client,preparation):null;
+  if(!preparation || !evidence){
+    await admitMaterialPreparation(client,{...identity,cycleKey:`generation:${key}`,brokeredCanvasToken:dependencies.brokeredCanvasToken});
+    throw new ExperienceFailure(409,'not_ready');
   }
-  if (!descriptor) throw new ExperienceFailure(404, 'not_found');
-  const sourceIds = [input.materialId];
-  let attachedPdfId: string | null = null;
-  let hasAttachment = false;
-  if (descriptor.type === 'page') {
-    const { page, course } = await readOwnedPageAndCourse(client, userId, input.courseId, input.materialId);
-    const attachments = await resolveInstructionalPageAttachments({ client, course, page, userId });
-    if (attachments.length) {
-      hasAttachment = true;
-      for (const attachment of attachments) {
-        const fileId = `file:${attachment.id}`;
-        const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: input.courseId, pageAttachmentId: page.id, sourceIds: [fileId] });
-        if (!prepared.ok || !prepared.value.results.every(result => result.status === 'ready'))
-          throw new ExperienceFailure(409, 'source_attachment_unavailable');
-        sourceIds.push(fileId);
-        if (attachments.length === 1 && classifyStoredCanvasFileKind(attachment) === 'pdf') attachedPdfId = fileId;
-      }
-    } else if (!isSubstantivePageText(normalizeCanvasHtmlToText(page.body_html))) {
-      throw new ExperienceFailure(422, 'insufficient_source');
-    }
-  }
-  if (descriptor.capability === 'needs_preparation' && descriptor.file?.canPrepare) {
-    const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: input.courseId, sourceIds: [input.materialId] });
-    if (!prepared.ok || !prepared.value.results.every(r => r.status === 'ready')) throw new ExperienceFailure(409, 'not_ready');
-  } else if (descriptor.capability !== 'ready' || descriptor.availability !== 'available') {
-    throw new ExperienceFailure(409, 'not_ready');
-  }
+  const sourceIds=evidence.components.map(component=>`${component.type}:${component.id}`);
+  const files=evidence.components.filter(component=>component.type==='file');
+  const hasAttachment=descriptor.type==='page' && files.length>0;
+  const attachedPdfId=hasAttachment && files.length===1 && files[0]!.extraction?.fileKind==='pdf'?`file:${files[0]!.id}`:null;
   if ((descriptor.file?.kind === 'pdf' && descriptor.file.preparationStatus === 'ready') || attachedPdfId) {
     try {
       const fileRow = await readOwnedPreparedPdf(client, userId, input.courseId, attachedPdfId ?? input.materialId);
@@ -78,7 +64,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
         displayName: descriptor.title,
         sourcePrivateMetadata: {
           canvasCourseId: input.courseId,
-          canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
+          canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION, canvasPreparationJobId:preparation.id,
           canvasItemIds: sourceIds,
         },
       } });
@@ -104,7 +90,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
         sourceTitle: descriptor.title,
         sourcePrivateMetadata: {
           canvasCourseId: input.courseId,
-          canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION,
+          canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION, canvasPreparationJobId:preparation.id,
           canvasItemIds: sourceIds,
         },
       } });
@@ -157,6 +143,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
   try {
     const job = await createReviewerProcessingJob({ client, userId, idempotencyKey: key, source: {
       sourceText: preview.value.sourceText, sourceTitle: preview.value.suggestedTitle,
+      sourceBlocks: canonicalCanvasSourceBlocks(accepted.value.row.selected_block_manifest),
       sourcePrivateMetadata: { canvasPreviewSessionId: preview.value.previewSessionId, canvasCourseId: input.courseId, canvasItemIds: sourceIds, canvasResolutionFingerprint: preview.value.resolutionFingerprint, reviewerSourceSnapshotId: snapshot.value.sourceSnapshotId },
     } });
     // The canonical creator may return a concurrently admitted job. Check its
@@ -176,22 +163,6 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     }
     throw error;
   }
-}
-
-function isSubstantivePageText(text: string): boolean {
-  return !!text.trim() && !/^[\s\w.()\-]+\.(?:pdf|pptx|docx|png|jpe?g)$/i.test(text.trim());
-}
-
-async function readOwnedPageAndCourse(client: SupabaseClient<Database>, userId: string, courseId: string, materialId: string): Promise<{ page: CanvasPageRow; course: CanvasCourseRow }> {
-  const match = /^page:([0-9a-f-]{36})$/i.exec(materialId);
-  if (!match) throw new ExperienceFailure(404, 'not_found');
-  const [pageResult, courseResult] = await Promise.all([
-    client.from('canvas_pages').select('*').eq('id', match[1]!).eq('user_id', userId).eq('course_id', courseId).maybeSingle(),
-    client.from('canvas_courses').select('*').eq('id', courseId).eq('user_id', userId).maybeSingle(),
-  ]);
-  if (pageResult.error || courseResult.error) throw new ExperienceFailure(503, 'unavailable');
-  if (!pageResult.data || !courseResult.data) throw new ExperienceFailure(404, 'not_found');
-  return { page: pageResult.data as CanvasPageRow, course: courseResult.data as CanvasCourseRow };
 }
 
 async function readOwnedPreparedPdf(

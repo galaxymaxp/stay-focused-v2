@@ -5,6 +5,8 @@ import type {
   GenerateCourseSummary,
   LearningMaterial,
 } from "@stay-focused/shared";
+import { PREPARATION_REFRESH_MS, PREPARATION_REFRESH_LIMIT, usePreparationRefresh } from "../courses/usePreparationRefresh";
+import { preparationPresentation } from "../courses/materialPreparationPresentation";
 import { router, useLocalSearchParams } from "expo-router";
 import { BookOpen, ChevronDown, ChevronRight, ClipboardList, CloudOff, Eye, EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +20,7 @@ import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } fro
 import { spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { readCourseIdParam } from "../../navigation/appRoutes";
-import { experienceRequest } from "../../services/experienceApi";
+import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
 import { createGenerationIntent } from "../../services/generationRecovery";
 import { GenerationCore } from "./GenerationCore";
 import { SyncStatus } from "../sync/SyncStatus";
@@ -35,6 +37,7 @@ import { useListPreferences } from "./useListPreferences";
  * The screen still reloads the course workspace for fresh capabilities.
  */
 const openedMaterials = new Map<string, LearningMaterial>();
+const openedMaterialOffsets = new Map<string, number>();
 const pendingPreparations = new Map<string, Promise<LearningMaterial | null>>();
 
 function firstParam(value: string | string[] | undefined): string {
@@ -190,6 +193,7 @@ export function GenerateCourseScreen() {
   const courseId = readCourseIdParam(params.courseId);
   const workspace = useExperience<CourseLearningWorkspace>(
     courseId ? `/api/experience/courses/${encodeURIComponent(courseId)}` : null,
+    PREPARATION_REFRESH_MS, data => data.materials.items.some(item => materialStatus(item).status === 'preparing'), undefined, PREPARATION_REFRESH_LIMIT,
   );
   const client = useExperienceClient();
   const [extra, setExtra] = useState<LearningMaterial[]>([]);
@@ -206,8 +210,25 @@ export function GenerateCourseScreen() {
 
   useEffect(() => {
     setExtra([]);
+  }, [courseId]);
+  useEffect(() => {
+    if (extra.length) return;
     setNextOffset(workspace.data?.materials.nextOffset ?? null);
-  }, [workspace.data]);
+  }, [workspace.data, extra.length]);
+
+  usePreparationRefresh(courseId, extra.some(item => materialStatus(item).status === 'preparing'), async signal => {
+    const offsets = [...new Set(extra.map(item => openedMaterialOffsets.get(item.id)).filter((offset): offset is number => offset !== undefined))].sort((a,b)=>a-b);
+    const refreshed: LearningMaterial[] = [];
+    for (const offset of offsets) {
+      const page = await experienceRequest<CourseMaterials>(client, `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${offset}`, {signal});
+      if (signal.aborted) return false;
+      refreshed.push(...page.items);
+      for (const item of page.items) openedMaterialOffsets.set(item.id, offset);
+    }
+    if (signal.aborted) return false;
+    setExtra(refreshed);
+    return refreshed.some(item => materialStatus(item).status === 'preparing');
+  });
 
   async function loadMore() {
     if (nextOffset === null || !courseId || busy) return;
@@ -215,6 +236,7 @@ export function GenerateCourseScreen() {
     setError(null);
     try {
       const page = await experienceRequest<CourseMaterials>(client, `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${nextOffset}`);
+      for (const item of page.items) openedMaterialOffsets.set(item.id, nextOffset);
       setExtra((old) => [...old, ...page.items]);
       setNextOffset(page.nextOffset);
     } catch (cause) {
@@ -273,14 +295,19 @@ export function GenerateMaterialScreen() {
   const workspace = useExperience<CourseLearningWorkspace>(
     courseId ? `/api/experience/courses/${encodeURIComponent(courseId)}` : null,
   );
+  const materialPage = useExperience<CourseMaterials>(courseId && materialId
+    ? `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${openedMaterialOffsets.get(materialId) ?? 0}` : null,
+    PREPARATION_REFRESH_MS, data => data.items.some(item => item.id === materialId && materialStatus(item).status === 'preparing'), undefined, PREPARATION_REFRESH_LIMIT);
   const client = useExperienceClient();
   const { session } = useAuth();
   const { colors } = useTheme();
   const [prepared, setPrepared] = useState<LearningMaterial | null>(null);
   const [busy, setBusy] = useState(false);
-  const [activeAction, setActiveAction] = useState<"preparing" | "submitting" | null>(null);
+  const [activeAction, setActiveAction] = useState<"submitting" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
+  const retrying = useRef(false);
+  const [retryOffline, setRetryOffline] = useState(false);
   const material =
     prepared ??
     workspace.data?.materials.items.find((item) => item.id === materialId) ??
@@ -292,26 +319,37 @@ export function GenerateMaterialScreen() {
   );
   const preparationKey = session && material ? `${session.user.id}:${material.courseId}:${material.id}` : null;
   const refreshWorkspace = workspace.refresh;
+  const refreshMaterial = materialPage.refresh;
   useEffect(() => {
     if (!preparationKey) return;
     const pending = pendingPreparations.get(preparationKey);
     if (!pending) return;
     let live = true;
-    setActiveAction("preparing");
+    setBusy(true);
     void pending.then((next) => {
       if (!live) return;
       if (next) { openedMaterials.set(next.id, next); setPrepared(next); }
       refreshWorkspace();
+      refreshMaterial();
     }).catch((cause) => {
-      if (live) setError(cause instanceof Error ? cause.message : "Could not prepare this material.");
-    }).finally(() => { if (live) { setActiveAction(null); setBusy(false); } });
+      if (live) {
+        setRetryOffline(cause instanceof ExperienceApiError && cause.code === 'connection');
+        setError(cause instanceof Error ? cause.message : "Could not prepare this material.");
+      }
+    }).finally(() => { if (live) setBusy(false); });
     return () => { live = false; };
-  }, [preparationKey, refreshWorkspace]);
+  }, [preparationKey, refreshWorkspace, refreshMaterial]);
 
-  async function prepare() {
-    if (!material || !preparationKey || busy) return;
+  useEffect(() => {
+    const next = materialPage.data?.items.find(item => item.id === materialId) ?? workspace.data?.materials.items.find(item => item.id === materialId);
+    if (next) { setPrepared(next); openedMaterials.set(next.id, next); }
+    if (!workspace.errorCode && !materialPage.errorCode) setRetryOffline(false);
+  }, [materialPage.data, materialPage.errorCode, workspace.data, workspace.errorCode, materialId]);
+
+  async function retry() {
+    if (!material || !preparationKey || busy || retrying.current || workspace.errorCode === "connection" || materialPage.errorCode === 'connection' || retryOffline || materialStatus(material).status !== "failed") return;
+    retrying.current = true;
     setBusy(true);
-    setActiveAction("preparing");
     setError(null);
     try {
       let pending = pendingPreparations.get(preparationKey);
@@ -330,16 +368,18 @@ export function GenerateMaterialScreen() {
         setPrepared(next);
       }
       workspace.refresh();
+      materialPage.refresh();
     } catch (cause) {
+      setRetryOffline(cause instanceof ExperienceApiError && cause.code === "connection");
       setError(cause instanceof Error ? cause.message : "Could not prepare this material.");
     } finally {
+      retrying.current = false;
       setBusy(false);
-      setActiveAction(null);
     }
   }
 
   async function generate(type: "reviewer" | "quiz") {
-    if (!material || !session || submitting.current || !available(material.generation[type]) ||
+    if (!material || materialStatus(material).status !== "ready" || !session || submitting.current || !available(material.generation[type]) ||
       !available(type === "quiz" ? workspace.data?.capabilities.quizGeneration : workspace.data?.capabilities.reviewerGeneration)) return;
     if (type === "quiz" && !material.reviewerArtifactId) return;
 
@@ -367,10 +407,10 @@ export function GenerateMaterialScreen() {
   if (activeAction) return (
     <Page back title={material?.title ?? "Material"} subtitle={identity.title}>
       <View accessibilityLiveRegion="polite" style={{ alignItems: "center", paddingTop: spacing[8], gap: spacing[3] }}>
-        <Copy size="h2" style={{ textAlign: "center" }}>{activeAction === "preparing" ? "Preparing source…" : "Submitting generation…"}</Copy>
+        <Copy size="h2" style={{ textAlign: "center" }}>Submitting generation…</Copy>
         <GenerationCore state="reading" />
         <Copy muted size="bodySmall" style={{ textAlign: "center" }}>
-          {activeAction === "preparing" ? "Fetching and checking the Canvas file. Keep Stay Focused open until preparation finishes." : "Saving your request. The server will take over once it accepts the job."}
+          Saving your request. The server will take over once it accepts the job.
         </Copy>
       </View>
     </Page>
@@ -391,15 +431,16 @@ export function GenerateMaterialScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}>
             <ContentIcon kind={material.kind} />
             <View style={{ flex: 1 }}>
-              <Copy muted size="caption">{materialTypes[material.kind]} · {material.readiness.replaceAll("_", " ")}</Copy>
+              <Copy muted size="caption">{materialTypes[material.kind]} · {preparationPresentation(materialStatus(material)).label}</Copy>
               {material.moduleTitle ? <Copy muted size="caption">{material.moduleTitle}</Copy> : null}
             </View>
           </View>
           <Surface style={{ gap: spacing[3] }}>
             <Copy size="h3">Reviewer</Copy>
             <Copy muted size="bodySmall">A structured study guide written from this material.</Copy>
-            {material.readiness === "needs_preparation" ? <Action disabled={busy} onPress={() => void prepare()}>Prepare material</Action> : null}
-            <Action disabled={busy || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>
+            <Copy muted size="bodySmall">{preparationPresentation(materialStatus(material)).message}</Copy>
+            {materialStatus(material).status === "failed" && workspace.errorCode !== "connection" && materialPage.errorCode !== 'connection' && !retryOffline ? <Action disabled={busy} onPress={() => void retry()}>{busy ? "Retrying…" : "Retry"}</Action> : null}
+            <Action disabled={busy || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>
               Generate Reviewer
             </Action>
             {!available(material.generation.reviewer) ? <Copy muted size="caption">{capabilityNote(material.generation.reviewer)}</Copy> : null}
@@ -409,11 +450,11 @@ export function GenerateMaterialScreen() {
             <Copy muted size="bodySmall">
               {material.reviewerArtifactId ? "Build a study quiz from the saved Reviewer for this material." : "Generate and save a Reviewer first. Quizzes use that Reviewer as their study source."}
             </Copy>
-            <Action secondary disabled={busy || !material.reviewerArtifactId || !available(material.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")}>
+            <Action secondary disabled={busy || materialStatus(material).status !== "ready" || !material.reviewerArtifactId || !available(material.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")}>
               Generate Quiz
             </Action>
           </Surface>
-          <Action secondary onPress={() => router.push({ pathname: "/courses/[courseId]/reviewer", params: { courseId: material.courseId, courseName: workspace.data?.course.name ?? "Course" } })}>
+          <Action secondary disabled={materialStatus(material).status !== "ready"} onPress={() => router.push({ pathname: "/courses/[courseId]/reviewer", params: { courseId: material.courseId, courseName: workspace.data?.course.name ?? "Course" } })}>
             Choose source sections
           </Action>
         </>
@@ -457,11 +498,14 @@ function ModuleGroup({ title, items, onSelect }: {
           <ContentIcon kind={item.kind} small />
           <View style={{ flex: 1 }}>
             <Copy size="bodySmall" style={{ fontWeight: "600" }}>{item.title}</Copy>
-            <Copy muted size="caption">{materialTypes[item.kind]} · {item.readiness.replaceAll("_", " ")}{item.reviewerArtifactId ? " · Reviewer ready" : ""}</Copy>
+            <Copy muted size="caption">{materialTypes[item.kind]} · {preparationPresentation(materialStatus(item)).label}</Copy>
           </View>
           <ChevronRight color={colors.textMuted} size={18} />
         </Pressable>
       )) : null}
     </Surface>
   );
+}
+function materialStatus(material: LearningMaterial): import('@stay-focused/shared').MaterialPreparation {
+  return material.preparation ?? { status: material.readiness === 'needs_preparation' ? 'preparing' : material.readiness, reasonCode: null };
 }

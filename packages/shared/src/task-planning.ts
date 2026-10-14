@@ -25,6 +25,34 @@ const ISO_TIMESTAMP_PATTERN =
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export type TaskEstimateSource = "default" | "heuristic" | "ai" | "user";
+
+const SUBMISSION_BASE_MINUTES: Readonly<Record<string, number>> = {
+  online_quiz: 30,
+  discussion_topic: 30,
+  online_text_entry: 60,
+  online_url: 45,
+  media_recording: 45,
+  external_tool: 45,
+  online_upload: 90,
+  on_paper: 60,
+};
+
+/** Deterministic fallback when the AI estimate is unavailable. Always 15–240, multiple of 5. */
+export function heuristicTaskEstimateMinutes(input: {
+  readonly submissionTypes: readonly string[];
+  readonly pointsPossible: number | null;
+  readonly descriptionCharacters: number;
+}): number {
+  const bases = input.submissionTypes
+    .map((type) => SUBMISSION_BASE_MINUTES[type.trim().toLowerCase()])
+    .filter((value): value is number => value !== undefined);
+  let minutes = bases.length > 0 ? Math.max(...bases) : 60;
+  if (input.pointsPossible !== null && input.pointsPossible >= 50) minutes *= 1.5;
+  if (input.descriptionCharacters >= 1500) minutes *= 1.25;
+  return Math.min(240, Math.max(15, Math.round(minutes / 5) * 5));
+}
+
 export interface TaskView {
   readonly id: string;
   readonly title: string;
@@ -33,6 +61,8 @@ export interface TaskView {
   readonly priority: TaskPriority;
   readonly dueAt: string | null;
   readonly estimatedMinutes: number;
+  readonly estimateSource: TaskEstimateSource;
+  readonly estimateNote: string | null;
   readonly sourceType: TaskSourceType;
   readonly canvasConnectionId: string | null;
   readonly canvasCourseId: string | null;

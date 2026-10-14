@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 import { authorizedCanvasCron } from "@/lib/notifications/cron-auth";
-const fake = vi.hoisted(() => ({ client: { rpc: vi.fn(), from: vi.fn() }, poll: vi.fn(), email: vi.fn(), create: vi.fn() }));
+const fake = vi.hoisted(() => ({ client: { rpc: vi.fn(), from: vi.fn() }, poll: vi.fn(), email: vi.fn(), push: vi.fn(), create: vi.fn() }));
+vi.mock("@/lib/notifications/worker", () => ({ processNotificationWork: fake.push }));
 vi.mock("@/lib/canvas-db", () => ({ createCanvasServiceClient: fake.create }));
 vi.mock("@/lib/notifications/canvas-poll", () => ({ processCanvasMetadataPolls: fake.poll }));
 vi.mock("@/lib/notifications/canvas-email", () => ({ processCanvasEmailOutbox: fake.email }));
 beforeEach(() => {
   vi.stubEnv("CRON_SECRET", "private-test-secret");
+  vi.stubEnv("CANVAS_EMAIL_DELIVERY_ENABLED", "1");
   fake.create.mockReturnValue(fake.client);
   fake.client.rpc.mockResolvedValue({ data: 0, error: null });
   fake.client.from.mockReturnValue({ select: () => ({ lte: async () => ({ count: 0, error: null }) }) });
@@ -29,6 +31,7 @@ describe("protected Canvas cron", () => {
     expect(fake.poll).toHaveBeenCalledOnce();
     expect(fake.client.rpc).toHaveBeenCalledWith("queue_canvas_deadline_emails_v1", {});
     expect(fake.email).toHaveBeenCalledOnce();
+    expect(fake.push).toHaveBeenCalledOnce();
     expect(fake.poll.mock.invocationCallOrder[0]).toBeLessThan(fake.client.rpc.mock.invocationCallOrder[0]!);
     expect(fake.client.rpc.mock.invocationCallOrder[0]).toBeLessThan(fake.email.mock.invocationCallOrder[0]!);
   });
@@ -36,5 +39,13 @@ describe("protected Canvas cron", () => {
     fake.poll.mockRejectedValue(new Error("PRIVATE CANVAS TOKEN"));
     const response = await POST(new Request("https://app.example/api/cron/canvas-sync", { method: "POST", headers: { authorization: "Bearer private-test-secret" } }));
     expect(response.status).toBe(503); expect(await response.text()).not.toContain("PRIVATE");
+  });
+  it("keeps push and preparation polling active while broad email delivery is disabled", async () => {
+    vi.stubEnv("CANVAS_EMAIL_DELIVERY_ENABLED", "0");
+    const response = await POST(new Request("https://app.example/api/cron/canvas-sync", { method: "POST", headers: { authorization: "Bearer private-test-secret" } }));
+    expect(response.status).toBe(200);
+    expect(fake.push).toHaveBeenCalledOnce(); expect(fake.poll).toHaveBeenCalledOnce();
+    expect(fake.email).not.toHaveBeenCalled();
+    expect((await response.json()).email.enabled).toBe(false);
   });
 });
