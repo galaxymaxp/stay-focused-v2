@@ -82,11 +82,13 @@ export function ReviewerReaderScreen({
   reviewer,
   deviceCopy,
   openQuizInitially = false,
+  snapshotStatus,
 }: {
   artifact: LibraryArtifactSummary;
   reviewer: ReviewerReaderModel;
   deviceCopy: boolean;
   openQuizInitially?: boolean;
+  snapshotStatus?: ReactNode;
 }) {
   const { colors, reducedMotion } = useTheme();
   const secondaryLine = reviewerSecondaryLine(automaticReviewerLabel(artifact), reviewer.reviewMinutes);
@@ -309,7 +311,8 @@ export function ReviewerReaderScreen({
         onTouchEnd: () => scrubber.current.touch?.onTouchEnd(),
         onTouchCancel: () => scrubber.current.touch?.onTouchCancel(),
       }}
-      headerBelow={
+      headerBelow={<>
+        {snapshotStatus}
         <ReviewerSearchBar
           query={query}
           onChangeQuery={setQuery}
@@ -320,7 +323,7 @@ export function ReviewerReaderScreen({
           onPrevious={() => setActiveMatch((index) => (matches.length ? (index - 1 + matches.length) % matches.length : 0))}
           onNext={() => setActiveMatch((index) => (matches.length ? (index + 1) % matches.length : 0))}
         />
-      }
+      </>}
       overlay={
         <>
         <SectionScrubber

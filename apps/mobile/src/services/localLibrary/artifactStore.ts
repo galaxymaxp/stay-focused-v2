@@ -10,6 +10,7 @@ import type {
 } from "@stay-focused/shared";
 
 import type { LocalSqlDatabase, LocalSqlExecutor } from "./sqlDatabase";
+import { createScreenSnapshotStore, type ScreenSnapshotStore } from "./screenSnapshots";
 import { createAssistCache, type AssistCache } from "./assistCache";
 import { keyMatchesQuiz, parseQuizAnswerKey } from "./quizAnswerKeys";
 import { createPendingDraftStore, type PendingDraftStore } from './pendingDraftStore';
@@ -40,7 +41,7 @@ export interface OfflineStats {
 }
 export type LocalLibrarySummary = LibraryArtifactSummary & { readonly offlineReady: boolean };
 
-export interface LocalArtifactStore extends AssistCache, PendingDraftStore {
+export interface LocalArtifactStore extends AssistCache, PendingDraftStore, ScreenSnapshotStore {
   readQuizAnswerKey(ownerUserId: string, quizId: string, bodyUpdatedAt: string): Promise<QuizAnswerKey | null>;
   saveQuizAnswerKey(ownerUserId: string, key: QuizAnswerKey, bodyUpdatedAt: string): Promise<void>;
   offlineStats(ownerUserId: string): Promise<OfflineStats>;
@@ -94,6 +95,7 @@ export function createLocalArtifactStore(
   now: () => string = () => new Date().toISOString(),
 ): LocalArtifactStore {
   return {
+    ...createScreenSnapshotStore(db),
     ...createAssistCache(db),
     ...createPendingDraftStore(db, now),
     async readQuizAnswerKey(ownerUserId, quizId, bodyUpdatedAt) {
@@ -390,6 +392,7 @@ export function createLocalArtifactStore(
     async purgeOwner(ownerUserId) {
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
+        await transaction.runAsync('DELETE FROM screen_snapshots WHERE owner_user_id=?', [ownerUserId]);
         await transaction.runAsync('DELETE FROM pending_draft_edits WHERE owner_user_id=?', [ownerUserId]);
         await transaction.runAsync('DELETE FROM draft_sync_receipts WHERE owner_user_id=?', [ownerUserId]);
         await transaction.runAsync("DELETE FROM experience_activity_snapshots WHERE owner_user_id = ?", [ownerUserId]);

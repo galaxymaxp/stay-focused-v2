@@ -1,3 +1,5 @@
+import { mergeSavedData } from "@stay-focused/shared";
+import { readScreenSnapshot, writeScreenSnapshot, screenSnapshotEpoch } from "../../services/screenSnapshots";
 import type {
   LibraryArtifactDetail,
   LibraryArtifactSummary,
@@ -18,6 +20,8 @@ import { useExperienceClient } from "./useExperience";
 import { syncPendingDraftEdits, subscribeDraftEdits } from '../../services/localLibrary/pendingDraftSync';
 
 interface LibraryState {
+  readonly owner: string | null;
+  readonly savedAt: string | null;
   readonly items: readonly (LibraryArtifactSummary & { readonly offlineReady?: boolean })[];
   readonly offlineStats: OfflineStats | null;
   readonly errorCode: string | null;
@@ -30,6 +34,8 @@ interface LibraryState {
   readonly supersededReviewerIds: readonly string[];
 }
 const initialLibrary: LibraryState = {
+  owner: null,
+  savedAt: null,
   items: [],
   offlineStats: null,
   errorCode: null,
@@ -60,15 +66,19 @@ export function useLocalLibrary() {
     let live = true;
     const controller = new AbortController();
     const remote = libraryRemote(client, controller.signal);
+    const epoch = screenSnapshotEpoch(ownerUserId);
     let unsubscribe: (() => void) | undefined;
     void (async () => {
+      const snapshot = await readScreenSnapshot<LibraryOverview>(ownerUserId, "library");
+      if (live && snapshot) setState(old => ({ ...old, owner: ownerUserId, items: snapshot.data.items, categories: snapshot.data.categories, savedAt: snapshot.savedAt, localReady: true }));
       const store = await getLocalArtifactStore();
       if (!live) return;
       if (!store) {
-        setState((old) => ({ ...old, localReady: true, refreshing: true, error: null, errorCode: null }));
+        setState((old) => ({ ...old, owner: ownerUserId, localReady: true, refreshing: true, error: null, errorCode: null }));
         try {
           const page = await remote.fetchPage(0, 100);
-          if (live) setState({ items: page.items, categories: page.categories, localReady: true, refreshing: false, error: null, offlineStats: null, errorCode: null, supersededReviewerIds: page.supersededReviewerIds ?? [] });
+          if (live) await writeScreenSnapshot(ownerUserId, "library", page, epoch);
+          if (live) setState({ owner: ownerUserId, savedAt: new Date().toISOString(), items: page.items, categories: page.categories, localReady: true, refreshing: false, error: null, offlineStats: null, errorCode: null, supersededReviewerIds: page.supersededReviewerIds ?? [] });
         } catch (error) {
           if (live) setState((old) => ({ ...old, refreshing: false, error: message(error), errorCode: codeOf(error) }));
         }
@@ -76,7 +86,7 @@ export function useLocalLibrary() {
       }
       const readLocal = async () => {
         const [items, offlineStats] = await Promise.all([store.listSummaries(ownerUserId), store.offlineStats(ownerUserId)]);
-        if (live) setState((old) => ({ ...old, items: items.filter(item => !old.supersededReviewerIds.includes(item.id)), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) }));
+        if (live) setState((old) => ({ ...old, owner: ownerUserId, items: mergeSavedData(old.items, items.filter(item => !old.supersededReviewerIds.includes(item.id))), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) }));
       };
       unsubscribe = subscribeOfflineLibrary(ownerUserId, () => { void readLocal().catch(() => undefined); });
       await readLocal().catch(() => {
@@ -89,9 +99,15 @@ export function useLocalLibrary() {
         const outcome = await runOfflineCatchUp(ownerUserId, client, { force: true });
         await readLocal();
         const result = outcome.result;
+        if (live && !outcome.errorCode && result) {
+          const items = await store.listSummaries(ownerUserId);
+          await writeScreenSnapshot(ownerUserId, "library", { items, categories: result.categories, nextOffset: null, supersededReviewerIds: result.supersededReviewerIds }, epoch);
+        }
         if (live) setState((old) => ({ ...old,
           items: result ? old.items.filter(item => !result.supersededReviewerIds.includes(item.id)) : old.items,
           supersededReviewerIds: result?.supersededReviewerIds ?? old.supersededReviewerIds,
+          owner: ownerUserId,
+          savedAt: !outcome.errorCode ? new Date().toISOString() : old.savedAt,
           categories: result?.categories ?? old.categories, refreshing: false,
           error: outcome.errorCode === "connection" ? "connection" : outcome.errorCode ? "Could not refresh your Library. Try again." : null,
           errorCode: outcome.errorCode,
@@ -108,10 +124,15 @@ export function useLocalLibrary() {
     };
   }, [ownerUserId, client, focused, active, version]);
 
-  return { ...state, refresh };
+  return { ...(state.owner === ownerUserId ? state : initialLibrary), refresh };
 }
 
 interface ArtifactState {
+  readonly identity: string;
+  readonly savedAt: string | null;
+  readonly refreshing: boolean;
+  readonly refreshError: string | null;
+  readonly pending: LibraryArtifactDetail | null;
   readonly data: LibraryArtifactDetail | null;
   readonly loading: boolean;
   readonly error: string | null;
@@ -119,7 +140,7 @@ interface ArtifactState {
   readonly deviceCopy: boolean;
   readonly offlineMissing: boolean;
 }
-const initialArtifact: ArtifactState = { data: null, loading: true, error: null, deviceCopy: false, offlineMissing: false };
+const initialArtifact: ArtifactState = { identity: "", savedAt: null, refreshing: false, refreshError: null, pending: null, data: null, loading: true, error: null, deviceCopy: false, offlineMissing: false };
 
 /**
  * Opens a saved artifact from the device first. When `refreshRemote` is set,
@@ -130,11 +151,12 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
   const { session } = useAuth();
   const ownerUserId = session?.user.id ?? null;
   const client = useExperienceClient();
+  const identity = `${ownerUserId ?? ""}:${artifactId ?? ""}`;
   const [version, setVersion] = useState(0);
   const [state, setState] = useState<ArtifactState>(initialArtifact);
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
 
-  useEffect(() => setState({ ...initialArtifact, loading: !!artifactId }), [ownerUserId, artifactId]);
+  useEffect(() => setState({ ...initialArtifact, identity, loading: !!artifactId }), [ownerUserId, artifactId, identity]);
   useEffect(() => {
     if (!ownerUserId || !artifactId) return;
     let live = true;
@@ -155,7 +177,8 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
       const store = await getLocalArtifactStore();
       const local = store ? await store.readDetail(ownerUserId, artifactId).catch(() => null) : null;
       if (!live) return;
-      if (local) setState({ data: local.detail, loading: false, error: null, deviceCopy: false, offlineMissing: false });
+      if (local) setState(old => ({ ...old, identity, data: old.data ?? local.detail, savedAt: old.savedAt ?? local.detail.artifact.updatedAt, loading: false, refreshing: refreshRemote, error: null, refreshError: null, deviceCopy: false, offlineMissing: false }));
+      else setState(old => ({ ...old, identity, refreshing: refreshRemote }));
       if (!refreshRemote) {
         if (!local) setState((old) => ({ ...old, loading: false }));
         return;
@@ -169,14 +192,19 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
         } else {
           detail = await remote.fetchDetail(artifactId);
         }
-        if (live) setState({ data: detail, loading: false, error: null, deviceCopy: false, offlineMissing: false });
+        if (live) setState(old => {
+          const changedReader = old.data && "reviewer" in old.data && "reviewer" in detail && JSON.stringify(old.data) !== JSON.stringify(detail);
+          return { identity, data: changedReader ? old.data : detail, pending: changedReader ? detail : null,
+            savedAt: new Date().toISOString(), refreshing: false, refreshError: null,
+            loading: false, error: null, deviceCopy: false, offlineMissing: false };
+        });
       } catch (error) {
         if (!live) return;
         const gone = codeOf(error) === "not_found";
         setState((old) =>
           old.data && !gone
-            ? { ...old, loading: false, deviceCopy: true }
-            : { data: null, loading: false, error: message(error), deviceCopy: false, offlineMissing: !!store && codeOf(error) === "connection" },
+            ? { ...old, loading: false, refreshing: false, refreshError: message(error), deviceCopy: true }
+            : { ...initialArtifact, identity, data: null, loading: false, error: message(error), deviceCopy: false, offlineMissing: !!store && codeOf(error) === "connection" },
         );
       }
     })();
@@ -184,7 +212,7 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
       live = false;
       controller.abort();
     };
-  }, [ownerUserId, artifactId, client, refreshRemote, version]);
+  }, [ownerUserId, artifactId, client, refreshRemote, version, identity]);
 
   /** Records a server-confirmed change (for example a saved draft revision). */
   const storeConfirmed = useCallback(
@@ -198,7 +226,8 @@ export function useLocalArtifact(artifactId: string | null, options: { refreshRe
     },
     [ownerUserId],
   );
-  return { ...state, refresh, storeConfirmed };
+  const applyUpdate = useCallback(() => setState(old => old.pending ? { ...old, data: old.pending, pending: null } : old), []);
+  return { ...(state.identity === identity ? state : initialArtifact), refresh, storeConfirmed, updateAvailable: state.identity === identity && state.pending !== null, applyUpdate };
 }
 
 function message(error: unknown) {

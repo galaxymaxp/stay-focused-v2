@@ -1,3 +1,7 @@
+import { useSavedMaterialPages } from "./useSavedMaterialPages";
+import { SnapshotStatus } from "./SnapshotStatus";
+import { screenSnapshotEpoch } from "../../services/screenSnapshots";
+import { openedMaterials, openedMaterialOffsets, pendingPreparations } from "../../services/courseScreenMemory";
 import type {
   CourseLearningWorkspace,
   CourseMaterials,
@@ -9,7 +13,7 @@ import { PREPARATION_REFRESH_MS, PREPARATION_REFRESH_LIMIT, usePreparationRefres
 import { preparationPresentation } from "../courses/materialPreparationPresentation";
 import { router, useLocalSearchParams } from "expo-router";
 import { BookOpen, ChevronDown, ChevronRight, ClipboardList, CloudOff, Eye, EyeOff, Pin, PinOff } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
@@ -36,9 +40,6 @@ import { useListPreferences } from "./useListPreferences";
  * render immediately (including materials from later "More materials" pages).
  * The screen still reloads the course workspace for fresh capabilities.
  */
-const openedMaterials = new Map<string, LearningMaterial>();
-const openedMaterialOffsets = new Map<string, number>();
-const pendingPreparations = new Map<string, Promise<LearningMaterial | null>>();
 
 function firstParam(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
@@ -111,13 +112,14 @@ export function GenerateScreen() {
       title="Generate"
       subtitle="Canvas material or your own notes."
       onRefresh={courses.refresh}
-      headerBelow={
-        allCourses.length > 0 ? (
+      headerBelow={<>
+        <SnapshotStatus {...courses} />
+        {allCourses.length > 0 ? (
           <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
             <SearchField value={query} onChangeText={setQuery} placeholder="Search courses" label="Search courses" />
           </View>
-        ) : null
-      }
+        ) : null}
+      </>}
     >
       <Copy muted size="caption" style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>Canvas</Copy>
       <SyncStatus />
@@ -189,6 +191,8 @@ function GenerateCourseCard({ course, onPress, pinned = false, swipeActions }: {
 
 /** Level 2: one course's instructional materials, grouped by Canvas module. */
 export function GenerateCourseScreen() {
+  const { session } = useAuth();
+  const ownerKey = `${session?.user.id ?? ""}:`;
   const params = useLocalSearchParams<{ courseId?: string; courseName?: string; courseCode?: string }>();
   const courseId = readCourseIdParam(params.courseId);
   const workspace = useExperience<CourseLearningWorkspace>(
@@ -196,8 +200,9 @@ export function GenerateCourseScreen() {
     PREPARATION_REFRESH_MS, data => data.materials.items.some(item => materialStatus(item).status === 'preparing'), undefined, PREPARATION_REFRESH_LIMIT,
   );
   const client = useExperienceClient();
-  const [extra, setExtra] = useState<LearningMaterial[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const savedPages = useSavedMaterialPages(courseId, workspace.data?.materials.nextOffset ?? null, workspace.savedAt);
+  const extra = savedPages.items;
+  const nextOffset = savedPages.nextOffset;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { colors } = useTheme();
@@ -206,27 +211,20 @@ export function GenerateCourseScreen() {
     () => courseIdentity({ id: courseId, name: course?.name ?? (firstParam(params.courseName) || "Course"), code: course?.code ?? (firstParam(params.courseCode) || null) }),
     [course?.code, course?.name, courseId, params.courseCode, params.courseName],
   );
-  const groups = moduleGroups([...(workspace.data?.materials.items ?? []), ...extra]);
-
-  useEffect(() => {
-    setExtra([]);
-  }, [courseId]);
-  useEffect(() => {
-    if (extra.length) return;
-    setNextOffset(workspace.data?.materials.nextOffset ?? null);
-  }, [workspace.data, extra.length]);
+  const firstPage = workspace.data?.materials.items ?? [];
+  const firstIds = new Set(firstPage.map(item => item.id));
+  const groups = moduleGroups([...firstPage, ...extra.filter(item => !firstIds.has(item.id))]);
 
   usePreparationRefresh(courseId, extra.some(item => materialStatus(item).status === 'preparing'), async signal => {
-    const offsets = [...new Set(extra.map(item => openedMaterialOffsets.get(item.id)).filter((offset): offset is number => offset !== undefined))].sort((a,b)=>a-b);
+    const offsets = [...new Set(extra.map(item => openedMaterialOffsets.get(ownerKey + item.id)).filter((offset): offset is number => offset !== undefined))].sort((a,b)=>a-b);
     const refreshed: LearningMaterial[] = [];
     for (const offset of offsets) {
       const page = await experienceRequest<CourseMaterials>(client, `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${offset}`, {signal});
       if (signal.aborted) return false;
       refreshed.push(...page.items);
-      for (const item of page.items) openedMaterialOffsets.set(item.id, offset);
+      await savedPages.acceptPage(offset, page);
     }
     if (signal.aborted) return false;
-    setExtra(refreshed);
     return refreshed.some(item => materialStatus(item).status === 'preparing');
   });
 
@@ -236,9 +234,7 @@ export function GenerateCourseScreen() {
     setError(null);
     try {
       const page = await experienceRequest<CourseMaterials>(client, `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${nextOffset}`);
-      for (const item of page.items) openedMaterialOffsets.set(item.id, nextOffset);
-      setExtra((old) => [...old, ...page.items]);
-      setNextOffset(page.nextOffset);
+      await savedPages.acceptPage(nextOffset, page);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load more materials.");
     } finally {
@@ -247,14 +243,14 @@ export function GenerateCourseScreen() {
   }
 
   function openMaterial(item: LearningMaterial) {
-    openedMaterials.set(item.id, item);
+    openedMaterials.set(ownerKey + item.id, item);
     router.push({ pathname: "/courses/[courseId]/material", params: { courseId, materialId: item.id } });
   }
 
   return (
-    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={workspace.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
+    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={workspace.refresh} headerBelow={<SnapshotStatus {...workspace} error={workspace.error ?? savedPages.error} />} headerLeading={<CourseMark identity={identity} size={34} />}>
       {workspace.loading && !workspace.data ? <GenerateSkeleton rows={4} /> : null}
-      {workspace.error && workspace.errorCode === "course_not_synced" ? (
+      {workspace.error && !workspace.data && workspace.errorCode === "course_not_synced" ? (
         <Surface>
           <Copy size="h3">This course is not synced</Copy>
           <Copy muted>Synchronize it with Stay Focused to browse its study materials.</Copy>
@@ -289,6 +285,9 @@ export function GenerateCourseScreen() {
 
 /** Level 3: a single material and the study tools it can produce. */
 export function GenerateMaterialScreen() {
+  const { session } = useAuth();
+  const ownerKey = `${session?.user.id ?? ""}:`;
+  const memoryEpoch = screenSnapshotEpoch(session?.user.id ?? "");
   const params = useLocalSearchParams<{ courseId?: string; materialId?: string }>();
   const courseId = readCourseIdParam(params.courseId);
   const materialId = firstParam(params.materialId);
@@ -296,12 +295,14 @@ export function GenerateMaterialScreen() {
     courseId ? `/api/experience/courses/${encodeURIComponent(courseId)}` : null,
   );
   const materialPage = useExperience<CourseMaterials>(courseId && materialId
-    ? `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${openedMaterialOffsets.get(materialId) ?? 0}` : null,
+    ? `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=${openedMaterialOffsets.get(ownerKey + materialId) ?? 0}` : null,
     PREPARATION_REFRESH_MS, data => data.items.some(item => item.id === materialId && materialStatus(item).status === 'preparing'), undefined, PREPARATION_REFRESH_LIMIT);
   const client = useExperienceClient();
-  const { session } = useAuth();
   const { colors } = useTheme();
-  const [prepared, setPrepared] = useState<LearningMaterial | null>(null);
+  const preparedIdentity = `${ownerKey}${courseId}:${materialId}`;
+  const [preparedState, setPreparedState] = useState<{ identity: string; data: LearningMaterial | null }>({ identity: preparedIdentity, data: null });
+  const prepared = preparedState.identity === preparedIdentity ? preparedState.data : null;
+  const setPrepared = useCallback((data: LearningMaterial) => setPreparedState({ identity: preparedIdentity, data }), [preparedIdentity]);
   const [busy, setBusy] = useState(false);
   const [activeAction, setActiveAction] = useState<"submitting" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -311,7 +312,7 @@ export function GenerateMaterialScreen() {
   const material =
     prepared ??
     workspace.data?.materials.items.find((item) => item.id === materialId) ??
-    openedMaterials.get(materialId) ??
+    openedMaterials.get(ownerKey + materialId) ??
     null;
   const identity = useMemo(
     () => courseIdentity({ id: courseId, name: workspace.data?.course.name ?? "Course", code: workspace.data?.course.code ?? null }),
@@ -327,8 +328,8 @@ export function GenerateMaterialScreen() {
     let live = true;
     setBusy(true);
     void pending.then((next) => {
-      if (!live) return;
-      if (next) { openedMaterials.set(next.id, next); setPrepared(next); }
+      if (!live || screenSnapshotEpoch(session?.user.id ?? "") !== memoryEpoch) return;
+      if (next) { openedMaterials.set(ownerKey + next.id, next); setPrepared(next); }
       refreshWorkspace();
       refreshMaterial();
     }).catch((cause) => {
@@ -338,13 +339,13 @@ export function GenerateMaterialScreen() {
       }
     }).finally(() => { if (live) setBusy(false); });
     return () => { live = false; };
-  }, [preparationKey, refreshWorkspace, refreshMaterial]);
+  }, [preparationKey, refreshWorkspace, refreshMaterial, ownerKey, memoryEpoch, session?.user.id, setPrepared]);
 
   useEffect(() => {
     const next = materialPage.data?.items.find(item => item.id === materialId) ?? workspace.data?.materials.items.find(item => item.id === materialId);
-    if (next) { setPrepared(next); openedMaterials.set(next.id, next); }
+    if (next) { setPrepared(next); openedMaterials.set(ownerKey + next.id, next); }
     if (!workspace.errorCode && !materialPage.errorCode) setRetryOffline(false);
-  }, [materialPage.data, materialPage.errorCode, workspace.data, workspace.errorCode, materialId]);
+  }, [materialPage.data, materialPage.errorCode, workspace.data, workspace.errorCode, materialId, ownerKey, setPrepared]);
 
   async function retry() {
     if (!material || !preparationKey || busy || retrying.current || workspace.errorCode === "connection" || materialPage.errorCode === 'connection' || retryOffline || materialStatus(material).status !== "failed") return;
@@ -363,8 +364,9 @@ export function GenerateMaterialScreen() {
         void pending.finally(() => pendingPreparations.delete(preparationKey)).catch(() => {});
       }
       const next = await pending;
+      if (screenSnapshotEpoch(session?.user.id ?? "") !== memoryEpoch) return;
       if (next) {
-        openedMaterials.set(next.id, next);
+        openedMaterials.set(ownerKey + next.id, next);
         setPrepared(next);
       }
       workspace.refresh();

@@ -121,7 +121,8 @@ describe("useLocalLibrary", () => {
 
     page.resolve({ items: [reviewerDetail().artifact, quizDetail().artifact], categories, nextOffset: null });
     await flush();
-    expect(library.items.map((item) => item.id)).toEqual([quizDetail().artifact.id, reviewerDetail().artifact.id]);
+    // Existing rows keep their positions while newly discovered work appends.
+    expect(library.items.map((item) => item.id)).toEqual([reviewerDetail().artifact.id, quizDetail().artifact.id]);
     expect(library.refreshing).toBe(false);
     expect(library.error).toBeNull();
     expect(library.offlineStats).toMatchObject({ total: 2, current: 2 });
@@ -156,6 +157,20 @@ describe("useLocalLibrary", () => {
 });
 
 describe("useLocalArtifact", () => {
+  it("holds a changed reviewer until the student explicitly accepts it", async () => {
+    const original = reviewerDetail();
+    const fresh = reviewerDetail({ title: "Updated cells", updatedAt: "2026-10-15T00:00:00Z" });
+    await mocks.store!.upsertDetail(OWNER_A, "r", original);
+    mocks.request.mockResolvedValue(fresh);
+    await act(async () => { rendered = create(createElement(ArtifactProbe, { id: original.artifact.id })); });
+    await flush();
+    expect(artifact.data).toEqual(original);
+    expect(artifact.updateAvailable).toBe(true);
+    await act(async () => artifact.applyUpdate());
+    expect(artifact.data).toEqual(fresh);
+    expect(artifact.updateAvailable).toBe(false);
+    expect((await mocks.store!.readDetail(OWNER_A, original.artifact.id))?.detail).toEqual(fresh);
+  });
   it("identifies a missing device body on a connection failure", async () => {
     await mocks.store!.upsertSummaries(OWNER_A, [quizDetail().artifact]);
     mocks.request.mockRejectedValue(new RemoteError("connection"));

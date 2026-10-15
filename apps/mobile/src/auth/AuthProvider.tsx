@@ -27,6 +27,7 @@ import {
 import { clearProcessingJobReferencesForOwner } from "../services/activeProcessingJobStore";
 import { clearCanvasReviewerRecoveryForOwner } from "../services/canvasReviewerRecoveryStore";
 import { purgeLocalLibraryForOwner } from "../services/localLibrary/localArtifactDatabase";
+import { purgeScreenSnapshotsForOwner } from "../services/screenSnapshots";
 import { getApiBaseUrl } from "../config/apiBaseUrl";
 import { disableCompletionNotifications } from "../services/completionNotifications";
 
@@ -198,6 +199,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             clearProcessingJobReferencesForOwner(ownerUserId),
             clearCanvasReviewerRecoveryForOwner(ownerUserId),
             purgeLocalLibraryForOwner(ownerUserId),
+            purgeScreenSnapshotsForOwner(ownerUserId),
           ]);
           if (cleanup.some((entry) => entry.status === "rejected")) {
             setError({ code: "sign_out_failed", message: "Signed out. Some offline data could not be cleared; sign in again to retry cleanup." });

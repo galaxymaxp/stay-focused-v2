@@ -1,3 +1,4 @@
+import { SnapshotStatus } from "./SnapshotStatus";
 import type {
   ActivitySummary,
   ExperienceCapabilities,
@@ -305,6 +306,8 @@ export function TodayScreen() {
         month: "long",
         day: "numeric",
       })}
+      headerBelow={<SnapshotStatus {...today} refreshing={today.refreshing || announcements.refreshing || activities.refreshing}
+        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); announcements.refresh(); activities.refresh(); }} />}
       scrollEnabled={!ringActive}
       scrollRef={scrollRef}
       scrollTouch={orbTouchPause}
@@ -352,9 +355,9 @@ export function TodayScreen() {
           }}
         />
       )}
-      {today.error ? (
+      {today.error && !today.data ? (
         <Notice>{today.error}</Notice>
-      ) : today.loading ? (
+      ) : today.loading && !today.data ? (
         <SkeletonCards rows={3} label="Loading your day" />
       ) : (
         <>
@@ -430,9 +433,9 @@ export function TodayScreen() {
           <Copy size="h2">Announcements</Copy>
           <Action secondary onPress={() => router.push("/announcements")}>View all</Action>
         </View>
-        {announcements.loading ? (
+        {announcements.loading && !announcements.data ? (
           <SkeletonCards rows={2} label="Checking Canvas updates" />
-        ) : announcements.error ? (
+        ) : announcements.error && !announcements.data ? (
           <Surface>
             <RowLink inset label="Open announcements" onPress={() => router.push("/announcements")}>
               <Copy size="h3">Canvas updates</Copy>

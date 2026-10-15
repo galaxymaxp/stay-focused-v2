@@ -91,10 +91,16 @@ const MIGRATIONS: readonly string[] = [
      copy_id TEXT NOT NULL,
      PRIMARY KEY (owner_user_id, draft_id)
    );`,
+  `CREATE TABLE IF NOT EXISTS screen_snapshots (
+     owner_user_id TEXT NOT NULL,
+     cache_key TEXT NOT NULL,
+     snapshot_json TEXT NOT NULL,
+     PRIMARY KEY (owner_user_id, cache_key)
+   );`,
 ];
 
 export const LOCAL_LIBRARY_SCHEMA_VERSION = MIGRATIONS.length;
-const LOCAL_TABLES = ["pending_draft_edits", "draft_sync_receipts", "quiz_answer_keys", "experience_activity_snapshots", "quiz_practice", "activity_responses", "study_assists", "library_artifact_aliases", "library_artifacts"] as const;
+const LOCAL_TABLES = ["screen_snapshots", "pending_draft_edits", "draft_sync_receipts", "quiz_answer_keys", "experience_activity_snapshots", "quiz_practice", "activity_responses", "study_assists", "library_artifact_aliases", "library_artifacts"] as const;
 
 export async function migrateLocalLibrary(db: LocalSqlDatabase): Promise<number> {
   let version = await userVersion(db);

@@ -1,3 +1,4 @@
+import { SnapshotStatus } from "./SnapshotStatus";
 import type { ActivityAttachment, ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Plus, Circle, Pin, PinOff, Paperclip } from "lucide-react-native";
@@ -49,6 +50,7 @@ export function TasksScreen() {
     <Page
       title="Tasks"
       onRefresh={tasks.refresh}
+      headerBelow={<SnapshotStatus {...tasks} />}
       headerAction={<IconAction label="Add a task" onPress={() => router.push("/task")}><Plus size={18} color={colors.accent} /></IconAction>}
       actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >
@@ -118,7 +120,7 @@ export function TasksCourseScreen() {
     pin("today", item.id, on);
   };
   return (
-    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerLeading={<CourseMark identity={identity} size={34} />}>
+    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerBelow={<SnapshotStatus {...tasks} />} headerLeading={<CourseMark identity={identity} size={34} />}>
       {gradeCourse ? <RowLink label="Grades" onPress={() => router.push({ pathname: TASK_COURSE_GRADES_PATHNAME,
         params: { ...courseRouteParams({ courseId: gradeCourse.id, courseName: gradeCourse.name }), courseKey } })}>
         <Copy>Grades</Copy>

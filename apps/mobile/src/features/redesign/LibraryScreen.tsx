@@ -1,3 +1,4 @@
+import { SnapshotStatus } from "./SnapshotStatus";
 import type {
   ActivityDraft,
   ActivityDraftContent,
@@ -209,9 +210,9 @@ export function LibraryScreen() {
   // Saved work renders from the device; the skeleton appears only when nothing
   // is stored yet and the cloud is still answering.
   const hasLocal = library.items.length > 0;
-  const loading = !library.localReady || (!hasLocal && library.refreshing);
+  const loading = !library.localReady || (!hasLocal && !library.savedAt && library.refreshing);
   return (
-    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh}>
+    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh} headerBelow={<SnapshotStatus {...library} />}>
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {offlineCaption ? <Copy muted size="caption">{offlineCaption}</Copy> : null}
       {loading ? <LibrarySkeleton /> : null}
@@ -272,6 +273,7 @@ export function LibraryCourseScreen() {
       headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
+          <SnapshotStatus {...library} />
           <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />
           {offlineCaption ? <Copy muted size="caption" style={{ marginTop: spacing[2] }}>{offlineCaption}</Copy> : null}
         </View>
@@ -368,7 +370,7 @@ export function ArtifactScreen() {
   };
   const versions = useDraftVersions(detail && 'draft' in detail ? detail.draft : null, saveConfirmedDraft);
   if (detail && "reviewer" in detail) {
-    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} />;
+    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} snapshotStatus={<SnapshotStatus {...result} error={result.refreshError ?? result.error} />} />;
   }
   return (
     <KeyboardAvoidingView
