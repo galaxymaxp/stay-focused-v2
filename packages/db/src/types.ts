@@ -599,6 +599,12 @@ export type CanvasPreparationBackfillCourseRow = {
 export interface Database {
   public: {
     Tables: {
+      reviewer_shares: {
+        Row: { user_id: string; artifact_id: string; token: string; snapshot: Json; created_at: string; updated_at: string; revoked_at: string | null };
+        Insert: { user_id: string; artifact_id: string; token: string; snapshot: Json; created_at?: string; updated_at?: string; revoked_at?: string | null };
+        Update: { token?: string; snapshot?: Json; updated_at?: string; revoked_at?: string | null };
+        Relationships: [];
+      };
       section_external_visual_requests: {
         Row: { token: string; user_id: string; artifact_id: string; version_id: string; section_id: string; attempt: number; reserved_at: string; expires_at: string; released: boolean };
         Insert: { token?: string; user_id: string; artifact_id: string; version_id: string; section_id: string; attempt: number; reserved_at?: string; expires_at?: string; released?: boolean };
@@ -4355,6 +4361,10 @@ export interface Database {
       };
     };
     Functions: {
+      mutate_reviewer_share_v1: {
+        Args: { p_user_id: string; p_artifact_id: string; p_action: string; p_token: string; p_version_id: string | null; p_snapshot: Json };
+        Returns: Database['public']['Tables']['reviewer_shares']['Row'][];
+      };
       reserve_section_external_visual_v1: { Args: {p_user_id:string;p_artifact_id:string;p_version_id:string;p_section_id:string;p_find_another:boolean}; Returns:string|null };
       finish_section_external_visual_v1: { Args: {p_token:string;p_result:Json|null}; Returns:boolean };
       claim_canvas_preparation_backfill_courses_v1:{Args:{p_worker_id:string;p_limit:number};Returns:CanvasPreparationBackfillCourseRow[]};
