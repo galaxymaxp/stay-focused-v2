@@ -12,7 +12,7 @@ import { buildShareSnapshot } from './snapshot';
 
 type Client = SupabaseClient<Database>;
 function unavailable(): never { throw new ExperienceFailure(503, 'unavailable'); }
-const link = (row: Database['public']['Tables']['reviewer_shares']['Row'] | null): ReviewerShareLink | null =>
+const link = (row: Pick<Database['public']['Tables']['reviewer_shares']['Row'], 'token' | 'updated_at' | 'revoked_at'> | null): ReviewerShareLink | null =>
   row && row.revoked_at === null ? { token: row.token, updatedAt: row.updated_at } : null;
 
 async function ownedReviewer(client: Client, owner: string, artifactId: string) {
@@ -23,7 +23,7 @@ async function ownedReviewer(client: Client, owner: string, artifactId: string) 
 }
 export async function getOwnerShare(client: Client, owner: string, artifactId: string): Promise<ReviewerShareLink | null> {
   await ownedReviewer(client, owner, artifactId);
-  const result = await client.from('reviewer_shares').select('*').eq('user_id', owner).eq('artifact_id', artifactId).maybeSingle();
+  const result = await client.from('reviewer_shares').select('user_id,artifact_id,token,updated_at,revoked_at').eq('user_id', owner).eq('artifact_id', artifactId).maybeSingle();
   if (result.error) unavailable();
   return result.data?.user_id === owner && result.data.artifact_id === artifactId ? link(result.data) : null;
 }

@@ -28,6 +28,15 @@ it('rejects stale or cross-reviewer local assistance without exposing source con
   expect(() => buildShareSnapshot({ reviewer: { ...reviewer, title: 'Edited' }, citations: [], quizzes: [], assists: [result], visuals: [] })).toThrow('invalid_request');
   expect(() => buildShareSnapshot({ reviewer, citations: [], quizzes: [], assists: [{ ...result, reviewerId: 'other' }], visuals: [] })).toThrow();
 });
+it('includes browser scoring answers while removing quiz evidence, provenance, source and account fields', () => {
+  const quizzes = [{ title: 'Quiz', sourceId: 'PRIVATE_SOURCE', questions: [{ id: 'q1', type: 'single_select', prompt: 'What is a boundary?',
+    options: [{ id: 'a', text: 'Membrane', providerMetadata: 'PRIVATE_PROVIDER' }], selectionInstruction: 'Choose one.', difficulty: 'easy',
+    sourceEvidence: 'PRIVATE_SOURCE_TEXT', canvasUrl: 'PRIVATE_CANVAS' }], keys: [{ id: 'q1', correctOptionIds: ['a'], explanation: 'A membrane is a boundary.',
+      topicId: 'PRIVATE_TOPIC', sourceRefs: ['PRIVATE_SOURCE'], provenance: 'PRIVATE_METADATA' }] }];
+  const safe = projectShareSnapshot({ ...snapshot(), quizzes });
+  expect(safe.quizzes[0]?.keys[0]).toEqual({ id: 'q1', correctOptionIds: ['a'], explanation: 'A membrane is a boundary.' });
+  expect(JSON.stringify(safe)).not.toContain('PRIVATE_');
+});
 it('copies only attributed Commons images, never course URLs or arbitrary image hosts', () => {
   const visual = { section: 0, image: 'https://upload.wikimedia.org/cell.png', title: 'Cell', credit: 'Artist', license: 'CC BY',
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Cell.png' };
