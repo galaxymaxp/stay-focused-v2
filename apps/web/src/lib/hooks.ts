@@ -5,12 +5,14 @@ import { readScreenSnapshot, writeScreenSnapshot, removeScreenSnapshot, snapshot
 import { useAuth } from "../components/providers";
 import { ApiError, type RequestOptions } from "./api";
 
+export type ResourcePublisher<T> = (data: T, combine?: (previous: T | null, next: T) => T) => void;
+
 export function useResource<T>(
   path: string | null,
   poll = 0,
   envelope: RequestOptions["envelope"] = "data",
   holdReviewer = false,
-  loader?: (signal: AbortSignal, publish: (data: T) => void) => Promise<T>,
+  loader?: (signal: AbortSignal, publish: ResourcePublisher<T>) => Promise<T>,
 ) {
   const { api, session } = useAuth();
   const identity = `${session?.user.id ?? ""}:${path}:${envelope}`;
@@ -47,11 +49,11 @@ export function useResource<T>(
         loading: old.identity !== identity || old.data === null,
       }));
       try {
-        const publish = (data: T) => {
+        const publish: ResourcePublisher<T> = (data, combine = mergeSavedData) => {
           if (!alive || controller.signal.aborted || snapshotEpoch(owner) !== epoch) return;
           // A partial walk is visible immediately but never replaces the saved
           // complete snapshot or marks refresh finished.
-          setState(old => ({ ...old, identity, data: mergeSavedData(old.identity === identity ? old.data : null, data),
+          setState(old => ({ ...old, identity, data: combine(old.identity === identity ? old.data : null, data),
             loading: false, refreshing: true, error: null }));
         };
         const data = loader ? await loader(controller.signal, publish) : await api<T>(path, {

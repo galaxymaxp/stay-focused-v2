@@ -1,13 +1,14 @@
 "use client";
 import { useCallback } from 'react';
 import type { LibraryArtifactSummary, LibraryOverview } from '@stay-focused/shared';
+import { mergeSavedData } from '@stay-focused/shared';
 import { useAuth } from '../components/providers';
-import { useResource } from './hooks';
+import { useResource, type ResourcePublisher } from './hooks';
 
 /** Show accepted pages immediately; persist only a complete successful walk. */
 export function useSavedLibrary() {
   const { api } = useAuth();
-  const load = useCallback(async (signal: AbortSignal, publish: (data: LibraryOverview) => void): Promise<LibraryOverview> => {
+  const load = useCallback(async (signal: AbortSignal, publish: ResourcePublisher<LibraryOverview>): Promise<LibraryOverview> => {
     const items = new Map<string, LibraryArtifactSummary>();
     const superseded = new Set<string>();
     let result: LibraryOverview | null = null;
@@ -21,7 +22,14 @@ export function useSavedLibrary() {
       offset = result.nextOffset;
       if (offset !== null && offset <= previousOffset) throw new Error('Could not load the next Library page. Please try again.');
       const accepted = { ...result, items: [...items.values()].filter(item => item.status === 'completed' && !superseded.has(item.id)), supersededReviewerIds: [...superseded] };
-      publish(accepted);
+      publish(accepted, (previous, next) => {
+        if (!previous) return next;
+        const seen = new Set(next.items.map(item => item.id));
+        // Partial absence is not removal evidence. Retain saved cards until
+        // the complete walk succeeds, while honoring explicit supersession.
+        return mergeSavedData(previous, { ...next, items: [...next.items,
+          ...previous.items.filter(item => !seen.has(item.id) && !superseded.has(item.id))] });
+      });
       result = accepted;
     }
     if (offset !== null || !result) throw new Error('The Library is larger than this view can load. Please try again.');

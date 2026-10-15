@@ -33,6 +33,15 @@ describe('progressive website Library',()=>{
     expect(view.items.map(item=>item.id)).toEqual(['one']); expect(view.error).toBe('Later page unavailable');
     expect(view.loading).toBe(false);expect(view.refreshing).toBe(false);expect(mocks.write).not.toHaveBeenCalled();
   });
+  it('retains unseen saved cards on a partial refresh and reconciles them only after a complete walk',async()=>{
+    mocks.read.mockResolvedValueOnce(savedSnapshot('a','data:/api/experience/library?complete=1',page(['saved','one'],null)));
+    mocks.api.mockResolvedValueOnce(page(['one'],100)).mockRejectedValueOnce(new Error('Later page unavailable'));
+    await act(async()=>{tree=create(createElement(Probe));});await flush();
+    expect(view.items.map(item=>item.id)).toEqual(['saved','one']);expect(mocks.write).not.toHaveBeenCalled();
+    mocks.api.mockResolvedValueOnce(page(['one'],null));
+    await act(async()=>view.refresh());await flush();
+    expect(view.items.map(item=>item.id)).toEqual(['one']);expect(mocks.write).toHaveBeenCalledTimes(1);
+  });
   it('shows the SP1 snapshot before requests and never publishes an old owner response',async()=>{
     mocks.read.mockResolvedValueOnce(savedSnapshot('a','data:/api/experience/library?complete=1',page(['saved'],null)));
     let resolve!: (value:LibraryOverview)=>void;
