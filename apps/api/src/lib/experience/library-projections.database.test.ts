@@ -35,6 +35,7 @@ function localClient() {
     const query = {
       select(value: string) { columns = value === '*' ? '*' : value.split(',').map(field).join(','); return query; },
       eq(key: string, value: unknown) { values.push(value); predicates.push(`${field(key)} = $${values.length}`); return query; },
+      filter(key: string, operator: string, value: unknown) { if (operator !== 'eq') throw new Error('unsupported operator'); return query.eq(key, value); },
       in(key: string, input: readonly unknown[]) { values.push(input); predicates.push(`${field(key)} = any($${values.length})`); return query; },
       order(key: string, options?: { ascending?: boolean }) { ordering.push(`${field(key)} ${options?.ascending === false ? 'desc' : 'asc'}`); return query; },
       range(from: number, to: number) { start = from; limit = to - from + 1; return query; },
