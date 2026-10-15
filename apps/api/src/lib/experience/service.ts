@@ -53,7 +53,20 @@ export class ExperienceService {
     return { items: orderGenerateCourses(inventory.value.courses), classificationSource: inventory.value.classificationSource };
   }
   async getCourseMaterials(userId: string, courseId: string, offset = 0): Promise<CourseMaterials> {
-    requireFound((await this.rows('canvas_courses', userId)).find(c => c.id === courseId));
+    const courses = this.dependencies.repository.exactRows
+      ? await this.dependencies.repository.exactRows('canvas_courses', userId, 'id', courseId) : await this.rows('canvas_courses', userId);
+    requireFound(courses.find(c => c.id === courseId && c.user_id === userId));
+    return this.courseMaterialsForOwnedCourse(userId, courseId, offset);
+  }
+  /** The caller has already checked ownership; workspace must not reload courses. */
+  private async courseMaterialsForOwnedCourse(userId: string, courseId: string, offset = 0): Promise<CourseMaterials> {
+    if (this.dependencies.repository.materialReviewers) {
+      const result = await this.dependencies.materials(userId, courseId, offset);
+      if (!result.ok) this.materialsFailure(result);
+      const reviewers = await this.dependencies.repository.materialReviewers(userId, courseId, result.value.sources.map(row => row.id));
+      return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewers.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
+        nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
+    }
     const [result, artifacts, versions, sourceVersions, snapshots, snapshotItems] = await Promise.all([
       this.dependencies.materials(userId, courseId, offset),
       this.rows('generated_artifacts', userId),
@@ -62,20 +75,23 @@ export class ExperienceService {
       this.rows('reviewer_source_snapshots', userId),
       this.rows('reviewer_source_snapshot_items', userId),
     ]);
-    if (!result.ok) {
+    if (!result.ok) this.materialsFailure(result);
+    const reviewerByMaterial = mapReviewerArtifactsByMaterial({ courseId, artifacts, versions, sourceVersions, snapshots, snapshotItems });
+    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null)), totalKnown: result.value.pagination.totalKnown,
+      nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
+  }
+  private materialsFailure(result: Extract<CanvasReviewerSourceResult<CanvasReviewerSourceList>, { ok: false }>): never {
       // Unselected or disconnected courses are a sync state, not a server outage.
       if (result.code === 'canvas_course_not_selected' || result.code === 'canvas_connection_missing') throw new ExperienceFailure(409, 'course_not_synced');
       if (result.status === 404) throw new ExperienceFailure(404, 'not_found');
       console.error('experience.course_materials.failed', { code: result.code, status: result.status });
       throw new ExperienceFailure(503, 'unavailable');
-    }
-    const reviewerByMaterial = mapReviewerArtifactsByMaterial({ courseId, artifacts, versions, sourceVersions, snapshots, snapshotItems });
-    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null)), totalKnown: result.value.pagination.totalKnown,
-      nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
   }
   async getCourseLearningWorkspace(userId: string, courseId: string): Promise<CourseLearningWorkspace> {
-    const course = requireFound((await this.getCourses(userId)).find(c => c.id === courseId));
-    const materials = await this.getCourseMaterials(userId, courseId);
+    const rows = this.dependencies.repository.exactRows
+      ? await this.dependencies.repository.exactRows('canvas_courses', userId, 'id', courseId) : await this.rows('canvas_courses', userId);
+    const course = courseSummary(requireFound(rows.find(c => c.id === courseId && c.user_id === userId)));
+    const materials = await this.courseMaterialsForOwnedCourse(userId, courseId);
     return { course: { ...course, materialCount: materials.totalKnown }, materials, capabilities: experienceCapabilities() };
   }
   private async activityContext(userId: string, date?: string, offset = 0, includeArchivedCourses = false) {
@@ -236,7 +252,9 @@ export class ExperienceService {
   async getLibrary(userId: string, filters: { type?: LibraryArtifactType; courseId?: string; offset?: number; limit?: number } = {}): Promise<LibraryOverview> {
     const capabilities = experienceCapabilities();
     const categories = { reviewer: { status: 'available' as const }, quiz: capabilities.quizGeneration, activity_output: capabilities.activityMaker };
-    const records = [...(await this.artifactRecords(userId)),...(await this.activityDraftRecords(userId)),...(await this.quizRecords(userId))].filter(r => (!filters.type || r.summary.type===filters.type) && (!filters.courseId || r.summary.course?.id === filters.courseId)).sort((a,b)=>Date.parse(b.summary.updatedAt)-Date.parse(a.summary.updatedAt)||a.summary.id.localeCompare(b.summary.id));
+    if (this.dependencies.repository.libraryPage) return { ...await this.dependencies.repository.libraryPage(userId, filters), categories };
+    const groups = await Promise.all([this.artifactRecords(userId), this.activityDraftRecords(userId), this.quizRecords(userId)]);
+    const records = groups.flat().filter(r => (!filters.type || r.summary.type===filters.type) && (!filters.courseId || r.summary.course?.id === filters.courseId)).sort((a,b)=>Date.parse(b.summary.updatedAt)-Date.parse(a.summary.updatedAt)||a.summary.id.localeCompare(b.summary.id));
     // A new generation from the same single Canvas material supersedes its
     // prior Reviewer card. Older artifacts remain addressable by existing Quizzes.
     const visible = records.filter((record, index) => record.summary.type !== 'reviewer' || !records.slice(0, index).some(earlier => earlier.summary.type === 'reviewer' && earlier.summary.course?.id === record.summary.course?.id && (earlier.summary.sourceMaterialId ?? earlier.summary.sourceId) && (earlier.summary.sourceMaterialId ?? earlier.summary.sourceId) === (record.summary.sourceMaterialId ?? record.summary.sourceId)));
@@ -246,6 +264,23 @@ export class ExperienceService {
       supersededReviewerIds: records.filter(record => record.summary.type === 'reviewer' && !visibleIds.has(record.summary.id)).map(record => record.summary.id) };
   }
   async getLibraryArtifact(userId: string, artifactId: string): Promise<LibraryArtifactDetail> {
+    const repository = this.dependencies.repository;
+    if (repository.librarySummary && repository.exactRows && repository.reviewerDetail) {
+      if (artifactId.startsWith('quiz:') || artifactId.startsWith('activity:')) {
+        const summary = requireFound(await repository.librarySummary(userId, artifactId));
+        const id = artifactId.slice(artifactId.indexOf(':') + 1);
+        if (artifactId.startsWith('quiz:')) {
+          const [quizzes, attempts] = await Promise.all([repository.exactRows('quizzes', userId, 'id', id), repository.exactRows('quiz_attempts', userId, 'quiz_id', id)]);
+          const row = requireFound(quizzes.find(row => row.id === id && row.user_id === userId));
+          return { artifact: summary, quiz: quizView(row, attempts.filter(row => row.user_id === userId)) };
+        }
+        const drafts = await repository.exactRows('activity_drafts', userId, 'id', id);
+        return { artifact: summary, draft: draftView(requireFound(drafts.find(row => row.id === id && row.user_id === userId))) };
+      }
+      const entry = requireFound(await repository.reviewerDetail(userId, artifactId));
+      const freshness = this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.artifactId) : 'unknown';
+      return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
+    }
     if (artifactId.startsWith('quiz:')) { const entry=requireFound((await this.quizRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,quiz:entry.quiz}; }
     if (artifactId.startsWith('activity:')) { const entry=requireFound((await this.activityDraftRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,draft:entry.draft}; }
     const entry = requireFound((await this.artifactRecords(userId)).find(r => r.aliases.includes(artifactId)));

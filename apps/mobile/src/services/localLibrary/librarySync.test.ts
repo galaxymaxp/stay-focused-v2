@@ -76,7 +76,21 @@ describe("cloud reconciliation", () => {
     expect(remote.fetchPage).toHaveBeenCalledTimes(2);
     const again = await reconcileLibrary({ store, ownerUserId: OWNER_A, remote });
     expect(again.hydrated).toBe(0);
+    expect(remote.fetchDetail).toHaveBeenCalledTimes(3);
     await expect(store.listSummaries(OWNER_A)).resolves.toHaveLength(3);
+  });
+
+  it('downloads only a changed version during repeated background catch-up', async () => {
+    const store = await setup();
+    const original = reviewerDetail();
+    await reconcileLibrary({ store, ownerUserId: OWNER_A, remote: remoteWith([original]) });
+    const same = remoteWith([original]);
+    expect((await reconcileLibrary({ store, ownerUserId: OWNER_A, remote: same })).hydrated).toBe(0);
+    expect(same.fetchDetail).not.toHaveBeenCalled();
+    const changed = { ...original, artifact: { ...original.artifact, updatedAt: '2026-10-15T10:00:00.000Z' } };
+    const newer = remoteWith([changed]);
+    expect((await reconcileLibrary({ store, ownerUserId: OWNER_A, remote: newer })).hydrated).toBe(1);
+    expect(newer.fetchDetail).toHaveBeenCalledTimes(1);
   });
 
   it("notifies the Library once the list is local, before bodies are fetched", async () => {

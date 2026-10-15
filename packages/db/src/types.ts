@@ -599,6 +599,12 @@ export type CanvasPreparationBackfillCourseRow = {
 export interface Database {
   public: {
     Tables: {
+      section_external_visual_requests: {
+        Row: { token: string; user_id: string; artifact_id: string; version_id: string; section_id: string; attempt: number; reserved_at: string; expires_at: string; released: boolean };
+        Insert: { token?: string; user_id: string; artifact_id: string; version_id: string; section_id: string; attempt: number; reserved_at?: string; expires_at?: string; released?: boolean };
+        Update: Partial<Database['public']['Tables']['section_external_visual_requests']['Insert']>;
+        Relationships: [];
+      };
       canvas_preparation_backfill_courses: {Row:CanvasPreparationBackfillCourseRow;Insert:Pick<CanvasPreparationBackfillCourseRow,'course_id'|'user_id'> & Partial<CanvasPreparationBackfillCourseRow>;Update:Partial<CanvasPreparationBackfillCourseRow>;Relationships:[]};
       canvas_preparation_discoveries: {Row:{user_id:string;course_id:string;material_id:string;cycle_key:string;available_at:string;reason_code:string|null;state:'pending'|'failed'};Insert:{user_id:string;course_id:string;material_id:string;cycle_key:string;available_at?:string;reason_code?:string|null;state?:'pending'|'failed'};Update:{cycle_key?:string;available_at?:string;reason_code?:string|null;state?:'pending'|'failed'};Relationships:[]};
       canvas_material_preparations: { Row: CanvasMaterialPreparationRow; Insert: Partial<CanvasMaterialPreparationRow> & Pick<CanvasMaterialPreparationRow,'user_id'|'course_id'|'canvas_connection_id'|'material_id'|'source_type'|'revision_fingerprint'|'cycle_key'>; Update: Partial<CanvasMaterialPreparationRow>; Relationships: [] };
@@ -3787,6 +3793,7 @@ export interface Database {
       };
       generated_artifact_versions: {
         Row: {
+          review_minutes: number | null;
           id: string;
           user_id: string;
           artifact_id: string;
@@ -4333,7 +4340,20 @@ export interface Database {
         ];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      experience_library_v1: {
+        Row: { user_id: string; id: string; artifact_type: string; course_id: string | null; updated_at: string; summary: Json; superseded: boolean };
+        Relationships: [];
+      };
+      experience_reviewer_summaries_v1: {
+        Row: { user_id: string; id: string; artifact_id: string; version_id: string; generation_job_id: string | null; source_version_id: string; snapshot_id: string | null; course_id: string | null; created_at: string; updated_at: string; source_material_id: string | null; summary: Json };
+        Relationships: [];
+      };
+      experience_material_reviewers_v1: {
+        Row: { user_id: string; course_id: string; material_id: string; artifact_id: string; updated_at: string };
+        Relationships: [];
+      };
+    };
     Functions: {
       reserve_section_external_visual_v1: { Args: {p_user_id:string;p_artifact_id:string;p_version_id:string;p_section_id:string;p_find_another:boolean}; Returns:string|null };
       finish_section_external_visual_v1: { Args: {p_token:string;p_result:Json|null}; Returns:boolean };
