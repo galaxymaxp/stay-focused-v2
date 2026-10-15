@@ -56,6 +56,8 @@ export function GenerateScreen() {
     [search, setSearch] = useState(""),
     [runs, setRuns] = useState<Record<string, CourseSyncRun>>({}),
     [showUnsynced, setShowUnsynced] = useState(false);
+  const [showPast, setShowPast] = useState(false);
+  const action = useAction();
   const canvas = useCanvasRefresh("all", courses.refresh);
   const query = search.trim().toLowerCase();
   const all = courses.data?.items ?? [];
@@ -67,8 +69,10 @@ export function GenerateScreen() {
           .some((value) => value!.toLowerCase().includes(query));
       })
     : all;
-  const synced = filtered.filter((c) => generateCourseDestination(c) === "generate");
-  const unsynced = filtered.filter((c) => generateCourseDestination(c) === "sync");
+  const pastCourses = filtered.filter(c => c.courseState === 'past' || (!c.courseState && c.period === 'previous'));
+  const current = filtered.filter(c => !pastCourses.includes(c));
+  const synced = current.filter((c) => generateCourseDestination(c) === "generate");
+  const unsynced = current.filter((c) => generateCourseDestination(c) === "sync");
   const groups = generateCourseGroups(synced);
 
   async function syncCourse(id: string) {
@@ -90,6 +94,7 @@ export function GenerateScreen() {
     courses.refresh();
   }
 
+  const options = (c: GenerateCourseSummary) => <details><summary>Course options</summary><button className="subtle" disabled={action.busy} onClick={() => void action.run(async () => { await api(`/api/experience/courses/${c.id}/state`, { method: 'PATCH', body: { override: c.courseState === 'past' || (!c.courseState && c.period === 'previous') ? 'current' : 'past' } }); courses.refresh(); })}>{c.courseState === 'past' || (!c.courseState && c.period === 'previous') ? 'Move to current' : 'Move to past courses'}</button></details>;
   const card = (c: GenerateCourseSummary) => {
     const identity = courseIdentity(c);
     const counts = [
@@ -97,7 +102,7 @@ export function GenerateScreen() {
       c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
     ].filter(Boolean);
     return (
-      <Link key={c.id} href={`/generate/${c.id}`} className="course-card" title={c.name}>
+      <div key={c.id} className="stack"><Link href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card" title={c.name}>
         <CourseMark course={c} identity={identity} size={44} />
         <span className="grow">
           <strong>{identity.title}</strong>
@@ -105,7 +110,7 @@ export function GenerateScreen() {
           <span className="meta course-sync-line">{generateCourseStatus(c)}</span>
         </span>
         <Icon name="chevron-right" />
-      </Link>
+      </Link>{options(c)}</div>
     );
   };
   return (
@@ -130,6 +135,7 @@ export function GenerateScreen() {
         </div>
         <CanvasRefreshStatus refresh={canvas} />
         <State resource={courses} />
+        {action.message && <Notice>{action.message}</Notice>}
         <div className="course-grid">
           <Link href="/generate/new" className="course-card own">
             <span className="content-icon">
@@ -191,6 +197,7 @@ export function GenerateScreen() {
                       >
                         {run === "syncing" ? "Syncing…" : c.syncState === "sync_incomplete" ? "Retry" : "Sync"}
                       </button>
+                      {options(c)}
                     </div>
                   );
                 })}
@@ -198,7 +205,8 @@ export function GenerateScreen() {
             )}
           </section>
         )}
-        {courses.data && !synced.length && !unsynced.length && (
+        {pastCourses.length > 0 && <section className="stack course-group" aria-label="Past courses"><button className="subtle" aria-expanded={showPast} onClick={() => setShowPast(value => !value)}>Past courses ({pastCourses.length})</button>{showPast && <div className="course-grid">{pastCourses.map(card)}</div>}</section>}
+        {courses.data && !synced.length && !unsynced.length && !pastCourses.length && (
           <Empty title={search ? "No matching courses." : "Sync Canvas to begin."}>
             <Link href="/canvas">Connect Canvas, then sync a course to generate study tools from it.</Link>
           </Empty>
@@ -280,7 +288,7 @@ export function CourseWorkspace({
     const key = m.moduleTitle ?? "Course materials";
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
-  const canvas = useCanvasRefresh(courseId, course.refresh);
+  const canvas = useCanvasRefresh(courseId, course.refresh, !!course.data, course.data?.course.courseState === 'past');
   const name = course.data?.course.name ?? "Course materials",
     code = course.data?.course.code;
   return (

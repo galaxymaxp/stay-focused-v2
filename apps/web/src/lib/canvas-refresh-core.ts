@@ -2,7 +2,7 @@ import { requestKey, type Api } from "./api";
 
 type Job = { id: string; status: string; outcome?: string | null };
 type Inventory = {
-  courses: { id: string; selectable: boolean; classification?: string }[];
+  courses: { id: string; selectable: boolean; courseState?: "current" | "past"; classification?: string }[];
   selectedCourseIds: string[];
 };
 export type RefreshPhase =
@@ -55,7 +55,7 @@ export async function performCanvasRefresh(
     courseIds = [
       ...new Set(
         inventory.courses
-          .filter((c) => selected.has(c.id) && c.selectable && c.classification !== "past_or_concluded")
+          .filter((c) => selected.has(c.id) && c.selectable && (c.courseState ? c.courseState === 'current' : c.classification !== "past_or_concluded"))
           .map((c) => c.id),
       ),
     ];

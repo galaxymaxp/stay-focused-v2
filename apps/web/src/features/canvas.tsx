@@ -23,16 +23,18 @@ interface Inventory {
     selected: boolean;
     selectable: boolean;
     classification: string;
+    courseState?: 'current' | 'past';
     syncHealth?: { overallHealth: string };
     lastSync: { completedAt: string | null } | null;
   }[];
   selectedCourseIds: string[];
 }
-function CourseRow({ course, selected, dirty, busy, onSelectionChange, onSynced }: {
+function CourseRow({ course, selected, dirty, busy, onMove, onSelectionChange, onSynced }: {
   course: Inventory["courses"][number];
   selected: boolean;
   dirty: boolean;
   busy: boolean;
+  onMove: () => void;
   onSelectionChange: (id: string, checked: boolean) => void;
   onSynced: () => void;
 }) {
@@ -50,11 +52,12 @@ function CourseRow({ course, selected, dirty, busy, onSelectionChange, onSynced 
           </span>
         </span>
       </label>
+      <details><summary>Course options</summary><button className="subtle" disabled={busy} onClick={onMove}>{course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded') ? 'Move to current' : 'Move to past courses'}</button></details>
       {course.selected && (
         <div className="row wrap canvas-course-actions">
           <Link className="button subtle" href={`/generate/${course.id}`}>Open materials</Link>
           <Link className="button subtle" href={`/canvas/${course.id}/grades`}>Grades</Link>
-          {!dirty && course.classification !== "past_or_concluded" && (
+          {!dirty && (
             <CourseSync courseId={course.id} onSynced={onSynced} />
           )}
         </div>
@@ -88,11 +91,14 @@ export function CanvasScreen() {
   );
   const isMain = (course: Inventory["courses"][number]) =>
     course.selected || course.classification === "likely_current" || course.classification === "past_or_concluded";
-  const mainCourses = matches.filter(isMain);
-  const otherSpaces = matches.filter((course) => !isMain(course));
+  const pastCourses = matches.filter(course => course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded'));
+  const current = matches.filter(course => !pastCourses.includes(course));
+  const mainCourses = current.filter(isMain);
+  const otherSpaces = current.filter((course) => !isMain(course));
   const courseRow = (course: Inventory["courses"][number]) => (
     <CourseRow key={course.id} course={course} selected={selected.includes(course.id)}
       dirty={dirty} busy={action.busy} onSynced={inventory.refresh}
+      onMove={() => void action.run(async () => { await api(`/api/experience/courses/${course.id}/state`, { method: 'PATCH', body: { override: course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded') ? 'current' : 'past' } }); inventory.refresh(); })}
       onSelectionChange={(id, checked) => {
         setDirty(true);
         setSelected((old) => checked ? [...old, id] : old.filter((value) => value !== id));
@@ -274,6 +280,7 @@ export function CanvasScreen() {
                 <div className="list-card">{otherSpaces.map(courseRow)}</div>
               </details>
             )}
+            {pastCourses.length > 0 && <details><summary>Past courses ({pastCourses.length})</summary><div className="list-card">{pastCourses.map(courseRow)}</div></details>}
             {needle && inventory.data && matches.length === 0 && (
               <p className="muted">No courses match &ldquo;{query.trim()}&rdquo;.</p>
             )}

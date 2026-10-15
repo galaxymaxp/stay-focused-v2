@@ -33,6 +33,16 @@ const run = (api: Api, scope = "all", signal = new AbortController().signal) =>
   performCanvasRefresh(api, scope, signal, () => {}, tick);
 
 describe("explicit Canvas refresh", () => {
+  it('uses the override in routine refresh and allows one explicit past-course refresh', async () => {
+    const { api, calls } = fixture(path => path.endsWith('/courses') ? {
+      courses: [{ id: 'past', selectable: true, courseState: 'past' }, { id: 'current', selectable: true, courseState: 'current', classification: 'past_or_concluded' }], selectedCourseIds: ['past', 'current'],
+    } : undefined);
+    expect(await run(api)).toBe('synced');
+    expect(calls.filter(call => call.options?.method === 'POST').map(call => call.path)).toEqual(['/api/canvas/courses/current/sync', '/api/canvas/courses/current/grades/sync']);
+    calls.length = 0;
+    expect(await run(api, 'past')).toBe('synced');
+    expect(calls.filter(call => call.options?.method === 'POST').map(call => call.path)).toEqual(['/api/canvas/courses/past/sync', '/api/canvas/courses/past/grades/sync']);
+  });
   it("excludes concluded courses even when they remain selected and selectable", async () => {
     const { api, calls } = fixture(path => path.endsWith('/courses') ? {
       courses: [{ id: 'old', selectable: true, classification: 'past_or_concluded' }, { id: 'course-1', selectable: true, classification: 'likely_current' }],

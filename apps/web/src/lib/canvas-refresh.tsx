@@ -15,11 +15,12 @@ import {
  */
 const refreshedThisLoad = new Set<string>();
 
-export function useCanvasRefresh(scope: string, onSynced: () => void, auto = true) {
+export function useCanvasRefresh(scope: string, onSynced: () => void, auto = true, explicitPast = false) {
   const { api, session } = useAuth();
   const owner = session?.user.id ?? "";
   const identity = `${owner}:${scope}`;
   const active = useRef<AbortController | null>(null);
+  const openedPast = useRef<string | null>(null);
   const synced = useRef(onSynced);
   synced.current = onSynced;
   const [state, setState] = useState<{
@@ -75,7 +76,10 @@ export function useCanvasRefresh(scope: string, onSynced: () => void, auto = tru
   useEffect(() => {
     if (!auto || !owner) return;
     // A course needs no second request when the whole account just refreshed.
-    if (refreshedThisLoad.has(identity) || refreshedThisLoad.has(`${owner}:all`)) return;
+    if (explicitPast) {
+      if (openedPast.current === identity) return;
+      openedPast.current = identity;
+    } else if (refreshedThisLoad.has(identity) || refreshedThisLoad.has(`${owner}:all`)) return;
     refreshedThisLoad.add(identity);
     let settled = false;
     void sync().finally(() => {
@@ -83,9 +87,9 @@ export function useCanvasRefresh(scope: string, onSynced: () => void, auto = tru
     });
     // A refresh cut short (navigation, or React's development remount) may run again.
     return () => {
-      if (!settled) refreshedThisLoad.delete(identity);
+      if (!settled) { refreshedThisLoad.delete(identity); if (explicitPast) openedPast.current = null; }
     };
-  }, [auto, identity, owner, sync]);
+  }, [auto, explicitPast, identity, owner, sync]);
   return {
     ...(state.identity === identity
       ? state
