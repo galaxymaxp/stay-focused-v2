@@ -1,4 +1,5 @@
 "use client";
+import { SnapshotStatus } from "../components/snapshot-status";
 import type {
   ActivityDraft,
   ActivityDraftContent,
@@ -71,63 +72,25 @@ function itemHref(item: LibraryArtifactSummary) {
     : `/library/${encodeURIComponent(item.id)}`;
 }
 
-/**
- * The whole saved Library from the account (never a device copy): finished
- * study work only, without Reviewers a newer generation replaced.
- */
+/** Complete Library responses are saved only after every page succeeds. */
 function useSavedLibrary() {
-  const { api, session } = useAuth();
-  const owner = session?.user.id ?? "";
-  const [state, setState] = useState<{
-    owner: string;
-    items: LibraryArtifactSummary[];
-    categories: LibraryOverview["categories"] | null;
-    loading: boolean;
-    error: string | null;
-  }>({ owner, items: [], categories: null, loading: true, error: null });
-  const [version, setVersion] = useState(0);
-  const refresh = useCallback(() => setVersion((v) => v + 1), []);
-  useEffect(() => {
-    if (!session?.user.id) return;
-    let live = true;
-    void (async () => {
-      setState((old) => ({ owner, items: old.owner === owner ? old.items : [], categories: old.owner === owner ? old.categories : null, loading: true, error: null }));
-      try {
-        const items: LibraryArtifactSummary[] = [];
-        const superseded = new Set<string>();
-        let categories: LibraryOverview["categories"] | null = null;
-        let offset: number | null = 0;
-        for (let page = 0; offset !== null && page < 20; page++) {
-          const result: LibraryOverview = await api<LibraryOverview>(`/api/experience/library?limit=100&offset=${offset}`);
-          items.push(...result.items);
-          result.supersededReviewerIds?.forEach((id) => superseded.add(id));
-          categories = result.categories;
-          offset = result.nextOffset;
-        }
-        if (offset !== null) throw new Error("The Library is larger than this view can load. Please try again.");
-        if (live)
-          setState({
-            owner,
-            items: items.filter((item) => item.status === "completed" && !superseded.has(item.id)),
-            categories,
-            loading: false,
-            error: null,
-          });
-      } catch (cause) {
-        if (live)
-          setState((old) => ({
-            ...old,
-            loading: false,
-            error: cause instanceof Error ? cause.message : "Library could not be loaded.",
-          }));
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [api, session?.user.id, owner, version]);
-  const current = state.owner === owner ? state : { items: [], categories: null, loading: true, error: null };
-  return { ...current, data: current.loading && !current.items.length ? null : current.items, refresh };
+  const { api } = useAuth();
+  const load = useCallback(async (signal: AbortSignal): Promise<LibraryOverview> => {
+    const items: LibraryArtifactSummary[] = [];
+    const superseded = new Set<string>();
+    let result: LibraryOverview | null = null;
+    let offset: number | null = 0;
+    for (let page = 0; offset !== null && page < 20; page++) {
+      result = await api<LibraryOverview>(`/api/experience/library?limit=100&offset=${offset}`, { signal });
+      items.push(...result.items);
+      result.supersededReviewerIds?.forEach(id => superseded.add(id));
+      offset = result.nextOffset;
+    }
+    if (offset !== null || !result) throw new Error("The Library is larger than this view can load. Please try again.");
+    return { ...result, items: items.filter(item => item.status === "completed" && !superseded.has(item.id)), nextOffset: null, supersededReviewerIds: [...superseded] };
+  }, [api]);
+  const resource = useResource<LibraryOverview>("/api/experience/library?complete=1", 0, "data", false, load);
+  return { ...resource, items: resource.data?.items ?? [], categories: resource.data?.categories ?? null };
 }
 
 function LibraryCard({
@@ -486,11 +449,11 @@ export function LibraryCourseScreen({ courseKey }: { courseKey: string }) {
 }
 export function ArtifactScreen({ id }: { id: string }) {
   const artifact = useResource<Artifact>(
-    `/api/experience/library/${encodeURIComponent(id)}`,
+    `/api/experience/library/${encodeURIComponent(id)}`, 0, "data", true,
   );
   const data = artifact.data;
   if (data?.reviewer)
-    return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} />;
+    return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} snapshotStatus={<SnapshotStatus {...artifact} />} />;
   return (
     <>
       <Heading

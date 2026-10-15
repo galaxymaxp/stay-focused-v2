@@ -178,7 +178,7 @@ function useSidebar() {
 
 /** The signed-in account: a menu for settings, appearance and signing out. */
 function AccountMenu({ email }: { email: string }) {
-  const { session, client, theme, setTheme } = useAuth();
+  const { session, signOut, theme, setTheme } = useAuth();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -224,8 +224,7 @@ function AccountMenu({ email }: { email: string }) {
             role="menuitem"
             className="sign-out"
             onClick={async () => {
-              const result = await client?.auth.signOut({ scope: "local" });
-              if (result?.error) setError("Could not sign out. Please try again.");
+              try { await signOut(); } catch { setError("Could not sign out. Please try again."); }
             }}
           >
             <Icon name="log-out" />

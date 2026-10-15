@@ -1,3 +1,4 @@
+import { SnapshotStatus } from "./snapshot-status";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BookLoader } from "./brand";
@@ -93,11 +94,13 @@ type Loadable = {
   error: string | null;
   data: unknown;
   refresh: () => void;
+  savedAt?: string | null;
+  refreshing?: boolean;
 };
 /** One loader or error for a screen, however many requests it waits on. */
 export function State({ resource }: { resource: Loadable | readonly Loadable[] }) {
   const all = Array.isArray(resource) ? resource : [resource as Loadable];
-  const failed = all.find((r) => r.error);
+  const failed = all.find((r) => r.error && r.data === null);
   if (failed)
     return (
       <div>
@@ -106,7 +109,7 @@ export function State({ resource }: { resource: Loadable | readonly Loadable[] }
       </div>
     );
   if (all.some((r) => r.loading && !r.data)) return <BookLoader />;
-  return null;
+  return <>{all.filter(r => r.data !== null).map((r, index) => <SnapshotStatus key={index} {...r} />)}</>;
 }
 /**
  * Content identity, as the app's ContentIcon: Reviewers, Quizzes, Drafts,

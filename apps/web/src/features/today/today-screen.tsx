@@ -1,4 +1,5 @@
 "use client";
+import { SnapshotStatus } from "../../components/snapshot-status";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../../lib/canvas-refresh";
 import type {
   ActivitySummary,
@@ -284,6 +285,8 @@ export function TodayScreen() {
           </Link>
         }
       />
+      <SnapshotStatus {...today} refreshing={today.refreshing || announcements.refreshing || activities.refreshing}
+        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); announcements.refresh(); activities.refresh(); }} />
       <CanvasRefreshStatus refresh={canvasRefresh} />
       <div className="today-v2">
         <div className="stack today-clock-column">
@@ -384,7 +387,7 @@ export function TodayScreen() {
         </div>
 
         <div className="stack today-work-column">
-          {today.error ? (
+          {today.error && !today.data ? (
             <div>
               <Notice error>{today.error}</Notice>
               <button onClick={today.refresh}>Try again</button>
@@ -495,7 +498,7 @@ export function TodayScreen() {
             </div>
             {announcements.loading && !announcements.data ? (
               <p className="muted">Checking Canvas updates…</p>
-            ) : announcements.error ? (
+            ) : announcements.error && !announcements.data ? (
               <p className="muted">Announcements are unavailable right now.</p>
             ) : unreadAnnouncements.length ? (
               <div className="list-card">

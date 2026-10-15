@@ -4,7 +4,7 @@ import { Heading, Notice, RowLink } from "../components/ui";
 import { useAction } from "../lib/hooks";
 import { NotificationSettings } from "./notification-settings";
 export function SettingsScreen() {
-  const { session, client, theme, setTheme } = useAuth(),
+  const { session, signOut, theme, setTheme } = useAuth(),
     action = useAction();
   return (
     <>
@@ -22,9 +22,7 @@ export function SettingsScreen() {
             disabled={action.busy}
             onClick={() =>
               void action.run(async () => {
-                const result = await client?.auth.signOut({ scope: "local" });
-                if (result?.error)
-                  throw new Error("Could not sign out. Please try again.");
+                await signOut();
               })
             }
           >

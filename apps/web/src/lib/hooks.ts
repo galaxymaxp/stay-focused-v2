@@ -1,25 +1,36 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { mergeSavedData } from "@stay-focused/shared";
+import { readScreenSnapshot, writeScreenSnapshot, removeScreenSnapshot, snapshotEpoch, isScreenSnapshotPath } from "./screen-snapshots";
 import { useAuth } from "../components/providers";
-import type { RequestOptions } from "./api";
+import { ApiError, type RequestOptions } from "./api";
 
 export function useResource<T>(
   path: string | null,
   poll = 0,
   envelope: RequestOptions["envelope"] = "data",
+  holdReviewer = false,
+  loader?: (signal: AbortSignal) => Promise<T>,
 ) {
   const { api, session } = useAuth();
   const identity = `${session?.user.id ?? ""}:${path}:${envelope}`;
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState<{
     identity: string;
+    savedAt: string | null;
+    refreshing: boolean;
+    pending: T | null;
     data: T | null;
     error: string | null;
     loading: boolean;
-  }>({ identity, data: null, error: null, loading: true });
+  }>({ identity, savedAt: null, refreshing: false, pending: null, data: null, error: null, loading: true });
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
     if (!path || !session?.user.id) return;
+    const owner = session.user.id;
+    const epoch = snapshotEpoch(owner);
+    const cacheKey = `${envelope}:${path}`;
+    const cacheable = isScreenSnapshotPath(path);
     let alive = true;
     let inFlight = false;
     const controller = new AbortController();
@@ -30,30 +41,50 @@ export function useResource<T>(
         identity,
         data: old.identity === identity ? old.data : null,
         error: null,
-        loading: true,
+        savedAt: old.identity === identity ? old.savedAt : null,
+        pending: old.identity === identity ? old.pending : null,
+        refreshing: true,
+        loading: old.identity !== identity || old.data === null,
       }));
       try {
-        const data = await api<T>(path, {
+        const data = loader ? await loader(controller.signal) : await api<T>(path, {
           signal: controller.signal,
           envelope,
         });
-        if (alive) setState({ identity, data, error: null, loading: false });
+        if (alive) setState(old => {
+          const hold = holdReviewer && old.identity === identity && old.data && typeof old.data === "object" && "reviewer" in old.data && JSON.stringify(old.data) !== JSON.stringify(data);
+          return { identity, data: hold ? old.data : mergeSavedData(old.identity === identity ? old.data : null, data),
+            pending: hold ? data : null, savedAt: new Date().toISOString(), refreshing: false, error: null, loading: false };
+        });
+        if (alive && cacheable) await writeScreenSnapshot(owner, cacheKey, data, epoch);
       } catch (error) {
+        const gone = error instanceof ApiError && error.code === "not_found";
+        if (alive && gone && cacheable) await removeScreenSnapshot(owner, cacheKey);
         if (alive)
-          setState({
+          setState(old => ({
+            ...old,
             identity,
-            data: null,
+            data: !gone && old.identity === identity ? old.data : null,
+            pending: gone ? null : old.pending,
+            refreshing: false,
             error:
               error instanceof Error
                 ? error.message
                 : "Could not load this page.",
             loading: false,
-          });
+          }));
       } finally {
         inFlight = false;
       }
     };
-    void load();
+    void (async () => {
+      const snapshot = cacheable ? await readScreenSnapshot<T>(owner, cacheKey) : null;
+      if (!alive) return;
+      if (snapshot) setState(old => old.identity === identity && old.data !== null ? old : {
+        identity, data: snapshot.data, savedAt: snapshot.savedAt, pending: null, refreshing: true, error: null, loading: false,
+      });
+      await load();
+    })();
     const interval = poll ? setInterval(() => void load(), poll) : null;
     const focus = () => void load();
     window.addEventListener("focus", focus);
@@ -72,11 +103,13 @@ export function useResource<T>(
       document.removeEventListener("visibilitychange", focus);
       window.removeEventListener("sf:task-state-changed", taskStateChanged);
     };
-  }, [api, session?.user.id, path, poll, envelope, revision, identity]);
+  }, [api, session?.user.id, path, poll, envelope, revision, identity, holdReviewer, loader]);
   return {
     ...(state.identity === identity
       ? state
-      : { data: null, error: null, loading: true }),
+      : { data: null, savedAt: null, pending: null, refreshing: false, error: null, loading: true }),
+    updateAvailable: state.identity === identity && state.pending !== null,
+    applyUpdate: () => setState(old => old.pending ? { ...old, data: old.pending, pending: null } : old),
     refresh,
   };
 }

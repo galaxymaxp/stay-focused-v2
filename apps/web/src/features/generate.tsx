@@ -1,4 +1,5 @@
 "use client";
+import { useSavedMaterialPages } from "../lib/use-saved-material-pages";
 import type {
   CourseMaterials,
   GenerateCourseList,
@@ -264,15 +265,13 @@ export function CourseWorkspace({
     ),
     segment = useSelectedLayoutSegment(),
     selectedId = segment ? decodeURIComponent(segment) : null,
-    [extra, setExtra] = useState<LearningMaterial[]>([]),
-    [offset, setOffset] = useState<number | null>(null),
     [filter, setFilter] = useState(""),
     action = useAction();
-  useEffect(() => { setExtra([]); }, [courseId]);
-  useEffect(() => {
-    if (!extra.length) setOffset(course.data?.materials.nextOffset ?? null);
-  }, [course.data, extra.length]);
-  const materials = [...(course.data?.materials.items ?? []), ...extra],
+  const savedPages = useSavedMaterialPages(courseId, course.data?.materials.nextOffset ?? null, course.savedAt);
+  const extra = savedPages.items, offset = savedPages.nextOffset;
+  const firstPage = course.data?.materials.items ?? [];
+  const firstIds = new Set(firstPage.map(item => item.id));
+  const materials = [...firstPage, ...extra.filter(item => !firstIds.has(item.id))],
     visible = materials.filter((m) =>
       m.title.toLowerCase().includes(filter.trim().toLowerCase()),
     ),
@@ -389,8 +388,7 @@ export function CourseWorkspace({
                           const page = await api<CourseMaterials>(
                             `/api/experience/courses/${courseId}/materials?offset=${offset}`,
                           );
-                          setExtra((old) => [...old, ...page.items]);
-                          setOffset(page.nextOffset);
+                          await savedPages.acceptPage(offset, page);
                         })
                       }
                     >

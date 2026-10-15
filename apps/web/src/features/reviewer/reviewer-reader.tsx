@@ -59,9 +59,11 @@ function readableText(range: Range): string {
 export function ReviewerReader({
   artifact,
   reviewer,
+  snapshotStatus,
 }: {
   artifact: LibraryArtifactSummary;
   reviewer: ReviewerReaderModel;
+  snapshotStatus?: import("react").ReactNode;
 }) {
   const { api, session } = useAuth();
   const visualArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
@@ -318,6 +320,7 @@ export function ReviewerReader({
           </div>
         }
       />
+      {snapshotStatus}
       <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>
         <nav className="reviewer-toc" aria-label="Topics">
           <label className="reviewer-search">

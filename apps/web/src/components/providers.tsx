@@ -13,6 +13,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { purgeScreenSnapshots } from "../lib/screen-snapshots";
 import { createApi, type Api } from "../lib/api";
 
 type Preference = "system" | "light" | "dark";
@@ -24,6 +25,7 @@ interface AuthState {
   api: Api;
   theme: Preference;
   setTheme: (value: Preference) => void;
+  signOut: () => Promise<void>;
 }
 const Context = createContext<AuthState | null>(null);
 let singleton: SupabaseClient | null = null;
@@ -70,6 +72,12 @@ export function Providers({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+    let observedOwner: string | null = null;
+    const acceptSession = (next: Session | null) => {
+      if (observedOwner && observedOwner !== next?.user.id) void purgeScreenSnapshots(observedOwner);
+      observedOwner = next?.user.id ?? null;
+      setSession(next);
+    };
     let alive = true,
       revision = 0;
     const {
@@ -77,7 +85,7 @@ export function Providers({ children }: { children: ReactNode }) {
     } = auth.auth.onAuthStateChange((_event, next) => {
       revision++;
       if (alive) {
-        setSession(next);
+        acceptSession(next);
         setLoading(false);
         setError(null);
       }
@@ -87,7 +95,7 @@ export function Providers({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data, error: failure }) => {
         if (alive && revision === initialRevision) {
-          setSession(data.session);
+          acceptSession(data.session);
           setError(
             failure
               ? "Your session could not be restored. Please sign in again."
@@ -125,6 +133,12 @@ export function Providers({ children }: { children: ReactNode }) {
       /* Keep the selected theme for this visit. */
     }
   }, []);
+  const signOut = useCallback(async () => {
+    const owner = session?.user.id;
+    const result = await client?.auth.signOut({ scope: "local" });
+    if (result?.error) throw new Error("Could not sign out. Please try again.");
+    if (owner) await purgeScreenSnapshots(owner);
+  }, [client, session?.user.id]);
   const api = useMemo(
     () =>
       createApi(
@@ -138,6 +152,7 @@ export function Providers({ children }: { children: ReactNode }) {
             : (data.session?.access_token ?? null);
         },
         () => {
+          if (session?.user.id) void purgeScreenSnapshots(session.user.id);
           setSession((current) =>
             current?.user.id === session?.user.id ? null : current,
           );
@@ -148,7 +163,7 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <Context.Provider
-      value={{ client, session, loading, error, api, theme, setTheme }}
+      value={{ client, session, loading, error, api, theme, setTheme, signOut }}
     >
       {children}
     </Context.Provider>
