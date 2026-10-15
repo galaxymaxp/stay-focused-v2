@@ -40,6 +40,7 @@ import {
 import { QuizFromReviewerDialog, reviewerArtifactIdFromLibraryId } from "./quiz-from-reviewer";
 import { StudyAssistPanel } from "./study-assist-panel";
 import { SectionVisual, useFigureAvailability, useReviewerVisuals } from "./section-visual";
+import { ShareReviewer } from './share-reviewer';
 
 // Web counterpart of apps/mobile/src/features/reviewer/ReviewerReader.tsx:
 // topics and search on the left, the Reviewer in a reading column, and Study
@@ -313,6 +314,7 @@ export function ReviewerReader({
         back={`/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`}
         action={
           <div className="row">
+            {artifact.id.startsWith('artifact:') && <ShareReviewer artifactId={artifact.id.slice('artifact:'.length)} reviewer={reviewer} />}
             <button onClick={saveText}>Save to file</button>
             <button className="primary" disabled={!generationEnabled} onClick={() => setQuizOpen(true)}>
               Generate Quiz

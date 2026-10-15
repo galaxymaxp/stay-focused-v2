@@ -5,6 +5,8 @@ import {
   assistContentHash,
   assistRequest,
   isAssistResult,
+  selectAssistBlock,
+  type ReviewerReaderModel,
   type AssistResult,
   type AssistSelection,
   type AssistType,
@@ -83,6 +85,22 @@ function peek(owner: string, target: AssistTarget, type: AssistType): string | n
   return saved && saved.canonical === assistContentHash(target.selection.canonicalContent)
     ? saved.text
     : null;
+}
+
+/** Export only saved results for the exact currently displayed reviewer. */
+export function collectSharedAssists(owner: string, reviewer: ReviewerReaderModel): AssistResult[] {
+  const cache = readCache(owner), results: AssistResult[] = [];
+  for (const section of reviewer.sections) for (const block of section.blocks) {
+    const selection = selectAssistBlock(reviewer, section.id, block.id);
+    if (!selection) continue;
+    for (const point of [undefined, ...block.keyPoints.slice(0, 50).map((_, i) => i)]) for (const type of ASSIST_TYPES) {
+      const request = assistRequest(selection, type, undefined, point), saved = cache[assistCacheKey(request)];
+      if (!saved || saved.canonical !== assistContentHash(selection.canonicalContent)) continue;
+      const result = { ...request, text: saved.text, createdAt: saved.createdAt };
+      if (isAssistResult(result, request)) results.push(result);
+    }
+  }
+  return results;
 }
 
 const MESSAGES: Record<string, string> = {

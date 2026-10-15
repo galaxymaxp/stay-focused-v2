@@ -1,4 +1,5 @@
 "use client";
+import { usePathname } from 'next/navigation';
 import {
   createClient,
   type Session,
@@ -46,6 +47,24 @@ function browserClient() {
   return singleton;
 }
 export function Providers({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  return pathname?.startsWith('/s/') ? <PublicTheme>{children}</PublicTheme> : <AuthenticatedProviders>{children}</AuthenticatedProviders>;
+}
+/** Public sharing never initializes auth, refreshes tokens or hydrates private caches. */
+function PublicTheme({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      let saved: string | null = null;
+      try { saved = localStorage.getItem('stay-focused-web-theme'); } catch { /* OS fallback */ }
+      document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved : media.matches ? 'dark' : 'light';
+    };
+    apply(); media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, []);
+  return children;
+}
+function AuthenticatedProviders({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true),

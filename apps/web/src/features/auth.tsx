@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { LogoMark } from "../components/brand";
 import { useAuth } from "../components/providers";
 import { Notice } from "../components/ui";
+import { sharedReturnPath } from '@stay-focused/shared';
 import { useAction } from "../lib/hooks";
 export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
   const { client, session, loading, error, theme, setTheme } = useAuth(),
@@ -13,11 +14,13 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
     [password, setPassword] = useState("");
   const action = useAction();
   useEffect(() => {
-    if (!loading && session) router.replace("/today");
+    if (!loading && session) router.replace(sharedReturnPath(new URLSearchParams(location.search).get('next')));
   }, [loading, session, router]);
   // Set by the OAuth callback when Google or Microsoft did not finish.
   const [oauthFailed, setOauthFailed] = useState(false);
+  const [returnPath, setReturnPath] = useState('/today');
   useEffect(() => {
+    setReturnPath(sharedReturnPath(new URLSearchParams(location.search).get('next')));
     setOauthFailed(
       new URLSearchParams(location.search).get("oauth") === "failed",
     );
@@ -29,7 +32,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
       const { error } = await client.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${location.origin}/auth/callback`,
+          redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(sharedReturnPath(new URLSearchParams(location.search).get('next')))}`,
           // Microsoft only returns an email address when asked for it.
           ...(provider === "azure" ? { scopes: "email" } : {}),
         },
@@ -47,7 +50,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
         ? await client.auth.signUp({
             email: email.trim(),
             password,
-            options: { emailRedirectTo: `${location.origin}/auth/callback` },
+            options: { emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(sharedReturnPath(new URLSearchParams(location.search).get('next')))}` },
           })
         : await client.auth.signInWithPassword({
             email: email.trim(),
@@ -59,7 +62,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
             ? "Could not create your account. Check your details and try again."
             : "Could not sign in. Check your email and password and try again.",
         );
-      if (result.data.session) router.replace("/today");
+      if (result.data.session) router.replace(sharedReturnPath(new URLSearchParams(location.search).get('next')));
       else {
         setPassword("");
         action.setMessage(
@@ -145,7 +148,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
         </form>
         <p className="meta">
           {signUp ? "Already have an account? " : "New to Stay Focused? "}
-          <Link href={signUp ? "/sign-in" : "/sign-up"}>
+          <Link href={(signUp ? '/sign-in' : '/sign-up') + (returnPath === '/today' ? '' : `?next=${encodeURIComponent(returnPath)}`)}>
             {signUp ? "Sign in" : "Create an account"}
           </Link>
         </p>

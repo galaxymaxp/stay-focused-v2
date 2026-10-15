@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../src/components/providers";
+import { sharedReturnPath } from '@stay-focused/shared';
 export default function Page() {
   const { session, loading } = useAuth(),
     router = useRouter();
@@ -13,10 +14,10 @@ export default function Page() {
     );
     router.replace(
       session
-        ? "/today"
+        ? sharedReturnPath(params.get('next'))
         : params.has("error")
-          ? "/sign-in?oauth=failed"
-          : "/sign-in",
+          ? `/sign-in?oauth=failed&next=${encodeURIComponent(sharedReturnPath(params.get('next')))}`
+          : `/sign-in?next=${encodeURIComponent(sharedReturnPath(params.get('next')))}`,
     );
   }, [session, loading, router]);
   return (

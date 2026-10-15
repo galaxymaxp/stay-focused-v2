@@ -4971,3 +4971,5 @@ mark.find-active {
     transition: none;
   }
 }
+.shared-reviewer { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.shared-reviewer img { display: block; width: 100%; max-height: 420px; object-fit: contain; }
