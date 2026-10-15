@@ -8,6 +8,7 @@ import { createGenerationIntent } from '../../services/generationRecovery';
 const visuals=vi.hoisted(()=>({sections:{} as Record<string,import('../../services/externalVisuals').ExternalReferenceVisual>}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:(_client:unknown,_id:unknown,offline:boolean)=>offline?null:visuals.sections}));
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
+vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 const figures=vi.hoisted(()=>({available:new Set<string>(),online:false}));
 vi.mock('./SourceFigures',()=>({
   SourceFigures:(props:{hasFigures:boolean;offline:boolean})=>props.hasFigures&&!props.offline?createElement('SourceFigures',props):null,

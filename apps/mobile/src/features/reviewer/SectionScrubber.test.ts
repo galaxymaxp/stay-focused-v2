@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import type { LibraryArtifactSummary, ReviewerReaderModel } from '@stay-focused/shared';
 
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
+vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 vi.mock("react-native", () => ({
   View: "View",
   Text: "Text",

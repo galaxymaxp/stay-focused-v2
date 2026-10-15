@@ -59,6 +59,7 @@ import { SourcePageSnapshot } from './SourcePageSnapshot';
 import { SourceFigures, useFigureAvailability } from './SourceFigures';
 import { ExternalVisual } from './ExternalVisual';
 import { useReviewerVisuals } from '../../services/externalVisuals';
+import { ShareReviewerMenu } from './ShareReviewerMenu';
 
 type Measurable = View | Text;
 /** Keeps a found line below the header/search bar with readable context above it. */
@@ -364,6 +365,7 @@ export function ReviewerReaderScreen({
         {anchors.length > 1 ? <Copy muted size="caption">{anchors.length} topics</Copy> : null}
         <View style={{ paddingTop: spacing[2] }}><Action hero onPress={() => setQuizOpen(true)}>Generate Quiz</Action></View>
         <Action secondary onPress={() => setExportOpen(true)}>Export</Action>
+        {artifact.id.startsWith('artifact:') && <ShareReviewerMenu artifactId={artifact.id.slice('artifact:'.length)} reviewer={reviewer} client={snapshotClient} offline={deviceCopy} />}
         <Copy muted size="caption">Tap a key point to select it. Hold its group to select all.</Copy>
       </View>
       <View

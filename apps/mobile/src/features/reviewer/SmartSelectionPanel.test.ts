@@ -5,6 +5,7 @@ import { STUDY_GROUNDING_DETAILS, STUDY_LIMITS, STUDY_OFFLINE, STUDY_QUESTION_TO
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
+vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 vi.mock('./SourceFigures',()=>({SourceFigures:()=>null,useFigureAvailability:()=>new Set()}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:()=>null}));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
