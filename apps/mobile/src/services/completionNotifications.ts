@@ -144,17 +144,27 @@ export async function disableCompletionNotifications(input: {
 export function subscribeToProcessingNotificationResponses(
   onNotificationResponse: (data: ProcessingNotificationPayload) => void,
 ): { readonly remove: () => void } {
+  let alive=true;
+  const seen=new Set<string>();
+  const deliver=(response:Notifications.NotificationResponse|null)=>{
+    if(!alive)return;
+    const data=readResponsePayload(response);
+    if(!data || !response)return;
+    const key=`${response.notification.request.identifier}:${response.actionIdentifier}`;
+    if(seen.has(key))return;
+    seen.add(key);
+    onNotificationResponse(data);
+    void Notifications.clearLastNotificationResponseAsync().catch(()=>undefined);
+  };
   void Notifications.getLastNotificationResponseAsync().then((response) => {
-    const data = readResponsePayload(response);
-    if (data) onNotificationResponse(data);
+    deliver(response);
   }).catch(() => undefined);
   const subscription = Notifications.addNotificationResponseReceivedListener(
     (response) => {
-      const data = readResponsePayload(response);
-      if (data) onNotificationResponse(data);
+      deliver(response);
     },
   );
-  return { remove: () => subscription.remove() };
+  return { remove: () => {alive=false;subscription.remove();} };
 }
 
 function readResponsePayload(

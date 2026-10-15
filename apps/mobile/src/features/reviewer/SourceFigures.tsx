@@ -17,17 +17,19 @@ export function useFigureAvailability(client:ExperienceClient,artifactId:string|
     setState({artifactId,sections:EMPTY});
     if(offline || !artifactId)return;
     const read=async()=>{
-      pending?.abort();const controller=new AbortController();pending=controller;
-      const timeout=setTimeout(()=>controller.abort(),5000);
+      // A reachability heartbeat must not cancel an unfinished discovery read.
+      if(pending)return;
+      const controller=new AbortController();pending=controller;
+      const timeout=setTimeout(()=>controller.abort(),15000);
       try {
         const sections=await readFigureAvailability(client,artifactId,controller.signal);
         if(alive && pending===controller && !controller.signal.aborted)setState({artifactId,sections:Object.assign(new Set(sections),{online:true})});
       }catch {if(alive && pending===controller)setState({artifactId,sections:EMPTY});}
-      finally {clearTimeout(timeout);}
+      finally {clearTimeout(timeout);if(pending===controller)pending=null;}
     };
     void read();
     const subscription=AppState.addEventListener('change',status=>{
-      pending?.abort();setState({artifactId,sections:EMPTY});if(status==='active')void read();
+      pending?.abort();pending=null;setState({artifactId,sections:EMPTY});if(status==='active')void read();
     });
     const heartbeat=setInterval(()=>{if(AppState.currentState==='active')void read();},10000);
     return ()=>{alive=false;pending?.abort();clearInterval(heartbeat);subscription.remove();};

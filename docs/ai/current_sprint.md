@@ -1,27 +1,30 @@
 # Current Sprint
 
-## Realignment and mobile visuals parity in progress (2026-10-15)
+## Native visual and cold-notification repair in progress (2026-10-15)
 
-Owner-approved finite scope: realign to main 150df38 (PRs #7/#8), deliver
-JS-only mobile automatic reviewer visuals and inline lazy course visuals,
-pass all quality gates, merge by PR, publish preview OTA, then verify existing
-Reviewers and finish notification/offline checks on the realme. No new manual
-Reviewer generations: the two PDF/PPTX smoke generations are complete.
+Owner-approved release realignment is merged: PR #9 at 4eb29e3 and PR #10 at
+079986c. Main is aligned; WIP remains preserved locally as 6ad67bf. Worker
+00027-rz2 runs 150df38 (authenticated 200 / anonymous 403, 100% traffic).
+Applied migration 20261015020000 was neither edited nor reapplied.
 
-Main was fast-forwarded from d0fa50b to 150df38; pre-realignment edits are
-preserved locally on wip/pre-realign-20261015 at 6ad67bf. Clean-main fresh
-root typecheck passed 8/8 before edits. Cloud Run generation-worker-00027-rz2
-serves 100% from 150df38; authenticated health 200, unauthenticated 403.
-Supabase migration 20261015020000 was already applied and remains untouched.
+The kept EAS build 12ab0357 (2.1.0/code 4) installed in place on the realme and
+opened Today with the preserved account. Public APK download hash is verified.
+Latest published preview OTA: 1e6a0641-3e34-43a4-8a21-62db99b2fa1b, runtime
+2.1.0-sdk57, source 079986c. Website production is READY from 079986c and links
+the signed APK. Live web course images, labeled references and replacement pass.
 
-Mobile parity branch feat/mobile-reviewer-visuals-parity now has 1,024 passing
-mobile tests in 102 files (+15), fresh root typecheck/lint 8/8 and Expo Doctor
-21/21. Fresh root build also passes 8/8 (2m45.765s). PR/CI/merge, OTA, and physical acceptance are pending.
-Finished APK 12ab0357 (2.1.0/code 4, source f989710) is kept; mobile parity
-will arrive through OTA on runtime 2.1.0-sdk57. The existing account is preserved.
-Canvas schedule stays enabled every five minutes; owner automatic reviewers
-are restored. Broad student email stays off because no sending domain is owned.
-See [release evidence](acceptance/release-20261014.md); older entries below are historical.
+Physical course figures, offline saved PDF opening, Reduce Motion, background
+push tap and permission-denial messaging pass. Notification permission, motion
+settings, Wi-Fi and airplane mode are restored. A cold push tap landed on Today;
+a repair now queues notification navigation until session/root/entry routing
+settles, deduplicates native responses and fences unsubscribed callbacks.
+Native Commons frames still need verification: app identification alone did not
+resolve the blank frame. The current follow-up also prevents slow discovery
+reads being cancelled by a heartbeat and adds URL-redacted native diagnostics.
+Mobile tests: 1,033 PASS; Expo Doctor 21/21. Fresh root typecheck/lint/build also pass 8/8 (build 1m59.272s). Follow-up PR/CI,
+merge, OTA and physical retest remain in progress. No new manual generations.
+Schedule stays enabled; broad student email stays off (no sending domain).
+See [release evidence](acceptance/release-20261014.md). Earlier entries below are historical.
 
 ## VL3 Find a visual completed locally; rollout pending (2026-10-14)
 
