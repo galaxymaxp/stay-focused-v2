@@ -1,5 +1,26 @@
 # Current Sprint
 
+## F0S complete: released-main baseline (2026-10-15)
+
+Finite scope: verify the starting checkout, fetch released GitHub main, confirm
+overnight migration/source inclusion, preserve untracked paths, create
+`overnight/2026-10-15_feedback`, install, run all specified baseline gates and
+record local documentation commits. **PASS:** base `079986c` (PR #10), all 37
+overnight-added migrations present, no absent added source paths or untracked
+collisions. The local-path `origin` and all 23 unrelated untracked files remain.
+
+FRESH results: forced typecheck/lint/build 8/8 each with zero cached tasks;
+lint zero errors/five existing warnings; shared 134, Canvas 75, mobile 1,026,
+web 84 passed. API initially timed out once at 5 seconds (2,095 passed, three
+skipped); unchanged full rerun passed 2,096 with three skips in 179 files.
+All test temp stayed in `.local/test-temp`; the F0S handoff retains both attempts.
+
+This checkpoint supersedes older local branch/PR-pending descriptions below.
+Production/device state is **UNVERIFIED (owner to confirm)**. Rollout/device
+checks were skipped; owner steps remaining: none for F0S. No product edits,
+remote service actions, environment edits or push. Next separate item is SP0;
+this run does not advance into it.
+
 ## Realignment and mobile visuals parity in progress (2026-10-15)
 
 Owner-approved finite scope: realign to main 150df38 (PRs #7/#8), deliver

@@ -1,5 +1,26 @@
 # Current State
 
+## F0S released-main base established (2026-10-15)
+
+**PASS for the unattended F0S scope.** Branch
+`overnight/2026-10-15_feedback` was created directly from GitHub `main`
+`079986c` (PR #10), fetched using the new `github` remote. The existing local-path
+`origin` is unchanged. All 37 overnight-added migrations and all added source
+paths exist in released main; no untracked files needed moving.
+
+FRESH baseline: forced typecheck/lint/build each passed 8/8 tasks, zero cached;
+lint has zero errors and five existing mobile warnings. Shared 134/134, Canvas
+75/75, mobile 1,026/1,026 and web 84/84 tests passed. API initially had one
+5-second timeout (2,095 passed, three skipped); the unchanged full rerun passed
+2,096 tests with three skips in 179 files. Tests used repository-local temp.
+Exact commands and both API attempts are recorded in the F0S handoff.
+
+This establishes the local Git baseline and supersedes older branch/PR-pending
+descriptions below. Production and physical-device state are **UNVERIFIED
+(owner to confirm)**; no service calls, rollout, migration application, environment
+edits or push occurred. Owner steps remaining: none for F0S. SP0 is the next
+separate tester-feedback item; no later feature work was started.
+
 ## Realignment and mobile visuals parity in progress (2026-10-15)
 
 Owner-approved finite scope: realign to main 150df38 (PRs #7/#8), deliver

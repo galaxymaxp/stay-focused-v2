@@ -1,5 +1,24 @@
 # Roadmap
 
+## Tester feedback F0S complete (2026-10-15)
+
+**PASS:** the autopilot base is now `overnight/2026-10-15_feedback`, created
+from released GitHub `main` `079986c` (PR #10). All 37 overnight-added migrations
+and all added source paths are present; unrelated untracked files remain intact.
+This supersedes the older local Git/PR-pending state below, without asserting
+production or device acceptance.
+
+FRESH baseline: typecheck/lint/build 8/8 each, zero cached; lint zero errors/five
+existing warnings; shared 134, Canvas 75, mobile 1,026, web 84 tests passed.
+API's first run had 2,095 passed, three skipped and one 5-second timeout; its
+unchanged full rerun passed 2,096 with three skips (179 files). See the F0S
+handoff for exact commands and evidence. Production/device state is
+**UNVERIFIED (owner to confirm)**. Owner steps remaining: none for F0S.
+
+Next separate item: SP0 speed audit, docs only, before implementing speed fixes.
+F0S ends at local baseline verification and documentation; no later roadmap item,
+deployment, remote migration, environment edit or push is included.
+
 ## Realignment and mobile visuals parity in progress (2026-10-15)
 
 Owner-approved finite scope: realign to main 150df38 (PRs #7/#8), deliver
