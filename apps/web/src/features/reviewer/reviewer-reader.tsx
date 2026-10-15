@@ -39,7 +39,7 @@ import {
 } from "./assist-store";
 import { QuizFromReviewerDialog, reviewerArtifactIdFromLibraryId } from "./quiz-from-reviewer";
 import { StudyAssistPanel } from "./study-assist-panel";
-import { SectionVisual, useFigureAvailability } from "./section-visual";
+import { SectionVisual, useFigureAvailability, useReviewerVisuals } from "./section-visual";
 
 // Web counterpart of apps/mobile/src/features/reviewer/ReviewerReader.tsx:
 // topics and search on the left, the Reviewer in a reading column, and Study
@@ -66,6 +66,7 @@ export function ReviewerReader({
   const { api, session } = useAuth();
   const visualArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
   const figureAvailability = useFigureAvailability(visualArtifactId);
+  const reviewerVisuals = useReviewerVisuals(visualArtifactId);
   const owner = session?.user.id ?? "";
   const segments = useMemo(() => reviewerSegments(reviewer), [reviewer]);
   const [query, setQuery] = useState("");
@@ -395,7 +396,7 @@ export function ReviewerReader({
                 <span className="kicker">Topic {sectionIndex + 1}</span>
                 <h2 data-segment={segmentIds.sectionTitle(section.id)}>{render(segmentIds.sectionTitle(section.id), section.title)}</h2>
               </header>
-              {visualArtifactId && <SectionVisual artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} />}
+              {visualArtifactId && <SectionVisual artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} external={reviewerVisuals?.[section.id]} />}
               {section.blocks.map((block) => {
                 const pickingHere = picking?.block === block.id;
                 return (
