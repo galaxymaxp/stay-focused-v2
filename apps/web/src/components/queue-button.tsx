@@ -2,6 +2,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueueCard } from "../features/queue";
+import { CourseBatchQueue } from '../features/course-batch-queue';
 import { useQueueItems } from "../features/queue-items";
 import { useListPreferences } from "../lib/list-preferences";
 export { countActiveJobs } from "../features/queue-items";
@@ -122,10 +123,11 @@ export function QueueButton() {
             Refresh
           </button>
           {queue.error ? <p role="status">{queue.error}</p> : null}
+          <CourseBatchQueue />
           {queue.loading ? (
             <p role="status">Loading your generations...</p>
           ) : null}
-          {queue.data && sections.length === 0 ? (
+          {queue.data && sections.length === 0 && !queue.data.courseBatches?.requests.some(row => ['waiting', 'quota', 'failed'].includes(row.state)) ? (
             <p className="muted">Nothing generating right now.</p>
           ) : null}
           {sections.map((group) => (

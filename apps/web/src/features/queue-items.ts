@@ -68,7 +68,7 @@ export function useQueueSource(open = false, hidden: readonly string[] = []) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const reader = createJobStatusReader((id, signal) => {
       const path =
-        "/api/jobs?scope=all&limit=50" +
+        "/api/jobs?scope=all&limit=50&batches=1" +
         (id ? "&detailId=" + encodeURIComponent(id) : "");
       return credentials.current<ProcessingJobListPage>(path, { signal });
     });

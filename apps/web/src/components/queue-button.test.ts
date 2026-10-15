@@ -1,3 +1,4 @@
+vi.mock('../features/course-batch-queue', () => ({ CourseBatchQueue: () => null }));
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";

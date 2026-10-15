@@ -1,5 +1,6 @@
 "use client";
 import { useSavedMaterialPages } from "../lib/use-saved-material-pages";
+import { CourseBatchControls } from './course-batch';
 import type {
   CourseMaterials,
   GenerateCourseList,
@@ -338,6 +339,7 @@ export function CourseWorkspace({
         {course.data && (
           <div className="course-split">
             <section className="pane-list" aria-label="Course materials">
+              <CourseBatchControls courseId={courseId} />
               <div className="pane-tools">
                 <input
                   type="search"
