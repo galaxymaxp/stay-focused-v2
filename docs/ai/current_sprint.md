@@ -7,7 +7,10 @@ with RLS and private-bucket verification. PR #5 is merged at dfd5383. The merged
 as generation-worker-00026-dlz with dispatch IAM configured. The SDK 57 APK
 installed with the existing signature but physical launch exposed an incompatible
 query-string override. The override is removed; two real-serializer regressions
-and all 1,007 mobile tests pass. Corrected APK/OTA and live acceptance remain open. Resend has no verified domain; broad student email remains inactive.
+and all 1,009 mobile tests pass. A second realme crash exposed Expo WebGL2
+inheritance incompatibility; the context adapter and static failure fallback are
+implemented. API/web are live from merged main; CIT17/CC17 preparation guards
+completed with 5/11 materials. Corrected APK/OTA and visual acceptance remain open. Resend has no verified domain; broad student email remains inactive.
 See [consolidated release evidence](acceptance/release-20261014.md). Older entries below are historical milestones.
 
 ## VL3 Find a visual completed locally; rollout pending (2026-10-14)

@@ -1,7 +1,7 @@
 import { useIsFocused } from "expo-router/react-navigation";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, View } from "react-native";
+import { AppState, Image, Pressable, StyleSheet, View } from "react-native";
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
@@ -10,6 +10,7 @@ import {
 } from "./coreModel";
 import { createOrbAura } from "./orbAura";
 import { createOrbBody } from "./orbBody";
+import { threeContext } from "./threeContext";
 
 const DEFAULT_SIZE = 320;
 /** Radians per second at full spin (generating): about one turn every seven seconds. */
@@ -37,6 +38,7 @@ export interface KnowledgeCoreProps {
 export function KnowledgeCore({ state, colors, mode, reducedMotion = false, active = true, size = DEFAULT_SIZE }: KnowledgeCoreProps) {
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === "active");
+  const [renderingFailed, setRenderingFailed] = useState(false);
   const runtime = useRef<RuntimeProps>({ state, colors, mode, reducedMotion, active: active && foreground, focused });
   const controller = useRef<SceneController | null>(null);
   const touch = useRef<TouchState>({ strength: 0, x: 0, y: 0, age: 10 });
@@ -50,8 +52,10 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   // Effects can re-run on a live GL context (Fast Refresh, StrictMode), so rebuild rather than stay disposed.
   useEffect(() => {
     if (context.current && !controller.current) {
-      controller.current = buildScene(context.current, runtime, touch);
-      controller.current.renderForChange();
+      try {
+        controller.current = buildScene(context.current, runtime, touch);
+        controller.current.renderForChange();
+      } catch { context.current = null; setRenderingFailed(true); }
     }
     return () => {
       controller.current?.dispose();
@@ -61,18 +65,23 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   const createScene = useCallback((gl: ExpoWebGLRenderingContext) => {
     context.current = gl;
     controller.current?.dispose();
-    controller.current = buildScene(gl, runtime, touch);
-    controller.current.renderForChange();
+    try {
+      controller.current = buildScene(gl, runtime, touch);
+      controller.current.renderForChange();
+    } catch { context.current = null; setRenderingFailed(true); }
   }, []);
   return (
     <View style={[styles.frame, { width: size, height: size }]}>
-      <GLView onContextCreate={createScene} style={styles.canvas} />
+      {renderingFailed
+        ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
+        : <GLView onContextCreate={createScene} style={styles.canvas} />}
       <Pressable
         accessibilityLabel={coreAccessibilityLabel(state)}
         accessibilityRole="imagebutton"
         accessibilityState={{ busy: ["reading", "generating", "finalizing"].includes(state) }}
         hitSlop={8}
         onPressIn={(event) => {
+          if (reducedMotion) return;
           touch.current = {
             strength: reducedMotion ? 0.25 : 1, age: 0,
             x: event.nativeEvent.locationX / size - 0.5, y: event.nativeEvent.locationY / size - 0.5,
@@ -101,7 +110,7 @@ function buildScene(
   } as unknown as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    context: gl as unknown as WebGLRenderingContext,
+    context: threeContext(gl),
     alpha: true,
     antialias: true,
   });
@@ -142,12 +151,12 @@ function buildScene(
     lastFrame = now;
     const current = runtime.current;
     const profile = CORE_MOTION_PROFILES[current.state];
-    const ease = 1 - Math.pow(0.002, delta);
+    const ease = current.reducedMotion ? 1 : 1 - Math.pow(0.002, delta);
     activity += (profile.activity - activity) * ease;
     completion += (profile.completion - completion) * ease;
     error += (profile.error - error) * ease;
     // Spin, shimmer and liveliness carry momentum between states; failure winds them down rather than cutting them.
-    const momentum = 1 - Math.pow(0.12, delta);
+    const momentum = current.reducedMotion ? 1 : 1 - Math.pow(0.12, delta);
     const spinTarget = coreSpinTarget(current.state, current.reducedMotion);
     const shimmerTarget = coreShimmerTarget(current.state, current.reducedMotion);
     const lifeTarget = current.reducedMotion ? 0.15 : 0.35 + activity * 0.65;
@@ -172,7 +181,7 @@ function buildScene(
 
     const glow = 0.55 + activity * 0.5 + completion * 0.15;
     aura.update({
-      delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
+      delta: current.reducedMotion ? 0 : delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
       // Reduced Motion keeps a steady glow.
       shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
     });
@@ -187,7 +196,7 @@ function buildScene(
     const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
       || Math.abs(spin - spinTarget) > 0.004 || Math.abs(shimmer - shimmerTarget) > 0.004 || Math.abs(life - lifeTarget) > 0.004
       || touch.current.strength > 0.01;
-    requestId = motionRate > 0 || settling ? requestAnimationFrame(draw) : null;
+    requestId = !current.reducedMotion && (motionRate > 0 || settling) ? requestAnimationFrame(draw) : null;
   };
 
   return {

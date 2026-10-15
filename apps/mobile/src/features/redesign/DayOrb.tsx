@@ -1,10 +1,11 @@
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { AppState, View } from "react-native";
+import { AppState, Image, View } from "react-native";
 import * as THREE from "three";
 
 import { createOrbAura } from "../generation-core/orbAura";
 import { createOrbBody } from "../generation-core/orbBody";
+import { threeContext } from "../generation-core/threeContext";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
 
 const CAMERA_DISTANCE = 4.55;
@@ -61,6 +62,7 @@ export const DayOrb = memo(function DayOrb({
   live: boolean;
 }) {
   const [foreground, setForeground] = useState(AppState.currentState === "active");
+  const [renderingFailed, setRenderingFailed] = useState(false);
   const runtime = useRef<Runtime>({ tones: dayOrbTones(minutes), mode, reducedMotion, running: live && foreground });
   runtime.current = { tones: dayOrbTones(minutes), mode, reducedMotion, running: live && foreground };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
@@ -71,7 +73,10 @@ export const DayOrb = memo(function DayOrb({
   }, []);
   useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground]);
   useEffect(() => {
-    if (context.current && !controller.current) controller.current = buildScene(context.current, runtime);
+    if (context.current && !controller.current) {
+      try { controller.current = buildScene(context.current, runtime); }
+      catch { context.current = null; setRenderingFailed(true); }
+    }
     return () => {
       controller.current?.dispose();
       controller.current = null;
@@ -80,12 +85,15 @@ export const DayOrb = memo(function DayOrb({
   const create = useCallback((gl: ExpoWebGLRenderingContext) => {
     context.current = gl;
     controller.current?.dispose();
-    controller.current = buildScene(gl, runtime);
+    try { controller.current = buildScene(gl, runtime); }
+    catch { context.current = null; setRenderingFailed(true); }
   }, []);
   const inner = size * RENDER_SCALE;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />
+      {renderingFailed
+        ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
+        : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
     </View>
   );
 });
@@ -99,7 +107,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     addEventListener: () => {},
     removeEventListener: () => {},
   } as unknown as HTMLCanvasElement;
-  const renderer = new THREE.WebGLRenderer({ canvas, context: gl as unknown as WebGLRenderingContext, alpha: true, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, context: threeContext(gl), alpha: true, antialias: true });
   renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
   renderer.setPixelRatio(1);
   renderer.setClearColor(0x000000, 0);
@@ -145,7 +153,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       lastFrame = now;
       lastRender = now;
       const rate = current.reducedMotion ? 0.08 : 0.35;
-      if (current.running) {
+      if (moving) {
         time += delta * rate;
         spinAngle = (spinAngle + delta * (current.reducedMotion ? 0.03 : 0.12)) % (Math.PI * 2);
       }
@@ -185,7 +193,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       renderer.render(scene, camera);
       gl.endFrameEXP();
     }
-    if (!disposed && (moving || now < settleUntil)) requestId = requestAnimationFrame(draw);
+    if (!disposed && !current.reducedMotion && (moving || now < settleUntil)) requestId = requestAnimationFrame(draw);
   };
 
   const wake = () => {
