@@ -24,7 +24,7 @@ const sections = [
   { prefixes: ["/schedule"], href: "/schedule", label: "Schedule" },
   { prefixes: ["/canvas"], href: "/canvas", label: "Canvas" },
   { prefixes: ["/settings"], href: "/settings", label: "Settings" },
-  { prefixes: ["/queue"], href: "/queue", label: "Queue" },
+  { prefixes: ["/queue"], href: "/today?queue=open", label: "Queue" },
   { prefixes: ["/announcements"], href: "/announcements", label: "Announcements" },
 ];
 

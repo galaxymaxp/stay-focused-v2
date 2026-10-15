@@ -54,7 +54,7 @@ export function SettingsScreen() {
             icon="globe"
           />
           <RowLink
-            href="/queue"
+            href="/today?queue=open"
             title="Generation Queue"
             detail="Accepted generations continue on the server when you leave the page."
             icon="layers"

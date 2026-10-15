@@ -1,17 +1,15 @@
 "use client";
 import type {
   GenerationView,
-  ProcessingJobListPage,
   ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   generationCoreState,
   generationMessages,
-  queueSections,
   stalledInQueue,
 } from "../app-model/presentation";
 import { CountUp } from "../components/count-up";
@@ -19,7 +17,7 @@ import { useAuth } from "../components/providers";
 import { ContentIcon, Heading, Notice, State } from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
-import { useListPreferences } from "../lib/list-preferences";
+import { queueProgress } from "./queue-presentation";
 import { jobCoreState } from "./knowledge-core/coreModel";
 
 // Web counterparts of QueueScreen and GenerationScreen in
@@ -40,136 +38,24 @@ const typeLabel = (job: ProcessingJobStatusView) =>
         ? "Material preparation"
         : "Reviewer";
 
-export function QueueScreen() {
-  const { api } = useAuth(),
-    queue = useResource<ProcessingJobListPage>("/api/jobs?scope=all&limit=50", 5000),
-    [extra, setExtra] = useState<ProcessingJobStatusView[]>([]),
-    [historyLoaded, setHistoryLoaded] = useState(false),
-    [cursor, setCursor] = useState<string | null>(null),
-    action = useAction(),
-    { prefs, hide } = useListPreferences();
-  useEffect(() => {
-    if (!historyLoaded) setCursor(queue.data?.nextCursor ?? null);
-  }, [queue.data, historyLoaded]);
-  const cleared = new Set(prefs.hidden.queue);
-  const jobs = Array.from(
-    new Map([...extra, ...(queue.data?.jobs ?? [])].map((job) => [job.id, job])).values(),
-  ).filter((job) => !cleared.has(job.id));
-  const sections = queueSections(jobs);
-  const section = (key: string) => sections.find((s) => s.key === key);
-  const active = sections.filter((s) => s.key === "generating" || s.key === "queued" || s.key === "attention");
-  const completed = section("completed")?.jobs ?? [];
-  return (
-    <>
-      <Heading
-        title="Queue"
-        subtitle="Reviewers, quizzes and drafts while they're made."
-        back="/generate"
-        action={
-          <button
-            className="subtle"
-            onClick={() => {
-              setHistoryLoaded(false);
-              setExtra([]);
-              queue.refresh();
-            }}
-          >
-            Refresh
-          </button>
-        }
-      />
-      <State resource={queue} />
-      {queue.data && jobs.length === 0 ? (
-        <section className="surface stack queue-empty">
-          <h2>Nothing in your Queue</h2>
-          <p className="muted">
-            Reviewers and quizzes you generate appear here while they&apos;re made, then
-            stay in Library.
-          </p>
-          <Link className="button" href="/generate">
-            Go to Generate
-          </Link>
-        </section>
-      ) : (
-        <div className="queue-layout">
-          <div className="stack">
-            {active.map((group) => (
-              <section className="stack" key={group.key}>
-                <div className="row between">
-                  <h2>{group.key === "attention" ? "Needs attention" : group.title}</h2>
-                  {group.key === "attention" && (
-                    <button
-                      className="subtle"
-                      aria-label="Clear items that need attention"
-                      onClick={() => group.jobs.forEach((job) => hide("queue", job.id, true))}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="list-card">
-                  {group.jobs.map((job) => (
-                    <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
-                  ))}
-                </div>
-              </section>
-            ))}
-            {queue.data && active.length === 0 && (
-              <p className="muted queue-idle">Nothing is generating right now.</p>
-            )}
-          </div>
-          <div className="stack">
-            {completed.length > 0 && (
-              <section className="stack">
-                <div className="row between">
-                  <h2>Completed</h2>
-                  <button
-                    className="subtle"
-                    aria-label={`Clear ${completed.length} completed Queue entries`}
-                    onClick={() => completed.forEach((job) => hide("queue", job.id, true))}
-                  >
-                    Clear completed
-                  </button>
-                </div>
-                <div className="list-card">
-                  {completed.map((job) => (
-                    <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
-                  ))}
-                </div>
-              </section>
-            )}
-            {cursor && (
-              <button
-                disabled={action.busy}
-                onClick={() =>
-                  void action.run(async () => {
-                    const page = await api<ProcessingJobListPage>(
-                      `/api/jobs?scope=all&limit=50&cursor=${encodeURIComponent(cursor)}`,
-                    );
-                    setExtra((old) => [...old, ...page.jobs]);
-                    setHistoryLoaded(true);
-                    setCursor(page.nextCursor);
-                  })
-                }
-              >
-                Load older generations
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      {action.message && <Notice error>{action.message}</Notice>}
-    </>
-  );
-}
-
-function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh: () => void }) {
+export function QueueCard({
+  job,
+  onRefresh,
+  onOpen,
+}: {
+  job: ProcessingJobStatusView;
+  onRefresh: () => void;
+  onOpen: () => void;
+}) {
   const { api, session } = useAuth(),
     router = useRouter(),
     action = useAction();
   const type = typeLabel(job);
   const title = job.source.displayName || type;
-  const stalled = stalledInQueue({ status: job.status, since: job.updatedAt ?? job.createdAt });
+  const stalled = stalledInQueue({
+    status: job.status,
+    since: job.updatedAt ?? job.createdAt,
+  });
   const status =
     job.status === "succeeded"
       ? job.jobType === "activity_generation"
@@ -196,6 +82,7 @@ function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh
           : "warn";
   function open() {
     if (job.status !== "succeeded" || job.jobType === "document_extraction") {
+      onOpen();
       router.push(`/generation/${encodeURIComponent(job.id)}`);
       return;
     }
@@ -203,7 +90,9 @@ function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh
       const result = await api<GenerationView>(
         `/api/experience/generations/${encodeURIComponent(job.id)}`,
       );
-      if (!result.artifactId) throw new Error("The saved output is no longer available.");
+      if (!result.artifactId)
+        throw new Error("The saved output is no longer available.");
+      onOpen();
       router.push(`/library/${encodeURIComponent(result.artifactId)}`);
     });
   }
@@ -234,10 +123,17 @@ function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh
           <span className="meta">{type}</span>
           <strong>{title}</strong>
           <span className={`meta queue-status ${tone}`}>{status}</span>
+          {job.status === "running" || job.status === "queued" ? (
+            <span className="meta">{queueProgress(job)}</span>
+          ) : null}
+          {job.status === "succeeded" ? (
+            <span className="meta">Open</span>
+          ) : null}
         </span>
         <span className={`queue-state ${tone}`} aria-hidden="true" />
       </button>
-      {(stalled || (job.retryable && ["failed", "expired"].includes(job.status))) && (
+      {(stalled ||
+        (job.retryable && ["failed", "expired"].includes(job.status))) && (
         <div className="row queue-card-actions">
           {stalled && (
             <button
@@ -245,7 +141,9 @@ function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh
               disabled={action.busy}
               onClick={() =>
                 void action.run(async () => {
-                  await api(`/api/jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
+                  await api(`/api/jobs/${encodeURIComponent(job.id)}/cancel`, {
+                    method: "POST",
+                  });
                   onRefresh();
                 })
               }
@@ -259,13 +157,18 @@ function QueueCard({ job, onRefresh }: { job: ProcessingJobStatusView; onRefresh
               disabled={!generationEnabled || action.busy}
               onClick={() =>
                 void action.run(async () => {
-                  const key = generationKey(session!.user.id, `retry:${job.id}`, {});
+                  const key = generationKey(
+                    session!.user.id,
+                    `retry:${job.id}`,
+                    {},
+                  );
                   const result = await api<ProcessingJobStatusView>(
                     `/api/jobs/${encodeURIComponent(job.id)}/retry`,
                     { method: "POST", key: key.key },
                   );
                   key.accepted();
                   onRefresh();
+                  onOpen();
                   router.push(`/generation/${encodeURIComponent(result.id)}`);
                 })
               }
@@ -303,9 +206,13 @@ export function GenerationScreen({ id }: { id: string }) {
   const running = job.data
     ? ["queued", "running", "cancellation_requested"].includes(job.data.status)
     : true;
-  const isDraft = job.data?.jobType === "activity_generation" || data?.artifactId?.startsWith("activity:") === true;
-  const stalled = !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
-  const canRetry = !!job.data?.retryable && ["failed", "expired"].includes(job.data.status);
+  const isDraft =
+    job.data?.jobType === "activity_generation" ||
+    data?.artifactId?.startsWith("activity:") === true;
+  const stalled =
+    !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
+  const canRetry =
+    !!job.data?.retryable && ["failed", "expired"].includes(job.data.status);
   const message = !job.data
     ? "Connecting to your generation…"
     : stalled
@@ -329,7 +236,12 @@ export function GenerationScreen({ id }: { id: string }) {
   const opened = useRef<string | null>(null);
   useEffect(() => {
     const artifactId = data?.artifactId;
-    if (!artifactId || data.state !== "completed" || opened.current === artifactId) return;
+    if (
+      !artifactId ||
+      data.state !== "completed" ||
+      opened.current === artifactId
+    )
+      return;
     opened.current = artifactId;
     const timer = setTimeout(
       () => router.replace(`/library/${encodeURIComponent(artifactId)}`),
@@ -365,8 +277,8 @@ export function GenerationScreen({ id }: { id: string }) {
           </p>
           {data?.progress && (
             <p className="meta">
-              <CountUp value={data.progress.completed} /> of {data.progress.total}{" "}
-              {data.progress.unit}
+              <CountUp value={data.progress.completed} /> of{" "}
+              {data.progress.total} {data.progress.unit}
             </p>
           )}
           {data?.error && (
@@ -380,12 +292,18 @@ export function GenerationScreen({ id }: { id: string }) {
           )}
           <div className="generation-actions">
             {data?.artifactId && (
-              <Link className="button primary" href={`/library/${encodeURIComponent(data.artifactId)}`}>
+              <Link
+                className="button primary"
+                href={`/library/${encodeURIComponent(data.artifactId)}`}
+              >
                 {isDraft ? "Open Draft" : "Open saved output"}
               </Link>
             )}
             {job.data.status === "succeeded" && preparingSource && (
-              <Link className="button primary" href={`/generate/new?extraction=${encodeURIComponent(id)}`}>
+              <Link
+                className="button primary"
+                href={`/generate/new?extraction=${encodeURIComponent(id)}`}
+              >
                 Continue
               </Link>
             )}
@@ -411,12 +329,21 @@ export function GenerationScreen({ id }: { id: string }) {
                 onClick={() =>
                   void action.run(async () => {
                     if (!generationEnabled)
-                      throw new Error("Generation is unavailable in this environment.");
-                    const key = generationKey(session!.user.id, `retry:${id}`, {});
-                    const result = await api<ProcessingJobStatusView>(`/api/jobs/${id}/retry`, {
-                      method: "POST",
-                      key: key.key,
-                    });
+                      throw new Error(
+                        "Generation is unavailable in this environment.",
+                      );
+                    const key = generationKey(
+                      session!.user.id,
+                      `retry:${id}`,
+                      {},
+                    );
+                    const result = await api<ProcessingJobStatusView>(
+                      `/api/jobs/${id}/retry`,
+                      {
+                        method: "POST",
+                        key: key.key,
+                      },
+                    );
                     key.accepted();
                     router.replace(`/generation/${result.id}`);
                   })

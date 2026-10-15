@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { BookLoader, LogoMark } from "./brand";
 import { Breadcrumbs, CrumbProvider, trailFor, useCrumbState } from "./crumbs";
 import { useAuth } from "./providers";
@@ -104,7 +104,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </Link>
           <Breadcrumbs trail={trailFor(pathname, page)} />
           <div className="row topbar-actions">
-            <QueueButton current={active("/queue")} />
+            <Suspense fallback={null}><QueueButton /></Suspense>
             <Link
               href="/settings"
               className="icon-button mobile-only"

@@ -1,0 +1,51 @@
+import type { ProcessingJobStatusView } from "@stay-focused/shared";
+export function job(
+  overrides: Partial<ProcessingJobStatusView> = {},
+): ProcessingJobStatusView {
+  return {
+    acceptedAt: "2026-07-23T00:00:00.000Z",
+    attemptCount: 1,
+    cancellationRequestedAt: null,
+    completedAt: null,
+    createdAt: "2026-07-23T00:00:00.000Z",
+    errorCode: null,
+    failedAt: null,
+    id: "job-1",
+    jobType: "reviewer_generation",
+    progress: {
+      completedUnits: 2,
+      message: "Creating reviewer sections",
+      totalUnits: 5,
+      unitLabel: "sections",
+    },
+    resultAvailable: false,
+    retryable: false,
+    retryOfJobId: null,
+    sourceVersionId: "source-version-1",
+    artifactType: "reviewer",
+    reuseMode: "fresh",
+    reusedFromJobId: null,
+    reuseCandidateArtifactVersionId: null,
+    provenance: {
+      generationPolicyVersion: "reviewer-policy-v1",
+      engineVersion: "engine-stage0-6-v1",
+      schemaVersion: "reviewer-output-v1",
+      providerId: "openai:gpt-4o",
+      settingsFingerprint: "a".repeat(64),
+      language: "auto",
+      outputMode: "standard",
+    },
+    safeErrorMessage: null,
+    source: {
+      characterCount: 100,
+      displayName: "Neutral source",
+      mimeType: "text/plain",
+      sourceKind: "text",
+    },
+    stage: "generating_sections",
+    startedAt: "2026-07-23T00:00:01.000Z",
+    status: "running",
+    updatedAt: "2026-07-23T00:00:02.000Z",
+    ...overrides,
+  };
+}

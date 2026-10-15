@@ -1,6 +1,10 @@
 import type { ProcessingJobStatusView } from "@stay-focused/shared";
 import { describe, expect, it } from "vitest";
-import { queueItems, queueProgress, unseenFailures } from "./queue-presentation";
+import {
+  queueItems,
+  queueProgress,
+  unseenFailures,
+} from "./queue-presentation";
 import { queueSections } from "../app-model/presentation";
 function job(
   overrides: Partial<ProcessingJobStatusView> = {},
@@ -55,21 +59,64 @@ function job(
 
 describe("header Queue grouping", () => {
   it("matches the old page groups for mixed active, attention and finished jobs", () => {
-    const jobs = ["running", "queued", "cancellation_requested", "failed", "expired", "cancelled", "succeeded"].map((status,i) => job({ id: String(i), status: status as ProcessingJobStatusView["status"] }));
+    const jobs = [
+      "running",
+      "queued",
+      "cancellation_requested",
+      "failed",
+      "expired",
+      "cancelled",
+      "succeeded",
+    ].map((status, i) =>
+      job({
+        id: String(i),
+        status: status as ProcessingJobStatusView["status"],
+      }),
+    );
     expect(queueItems(jobs)).toEqual(queueSections(jobs));
   });
   it("keeps only the latest five finished entries and respects dismissed entries", () => {
-    const jobs = Array.from({length: 8}, (_,i) => job({id: String(i), status: "succeeded", completedAt: new Date(2026, 0, i+1).toISOString()}));
-    expect(queueItems(jobs, ["7"])[0]!.jobs.map(j => j.id)).toEqual(["6", "5", "4", "3", "2"]);
+    const jobs = Array.from({ length: 8 }, (_, i) =>
+      job({
+        id: String(i),
+        status: "succeeded",
+        completedAt: new Date(2026, 0, i + 1).toISOString(),
+      }),
+    );
+    expect(queueItems(jobs, ["7"])[0]!.jobs.map((j) => j.id)).toEqual([
+      "6",
+      "5",
+      "4",
+      "3",
+      "2",
+    ]);
   });
   it("reports only unseen failed or expired items, never idle, cancelled or successful jobs", () => {
     expect(unseenFailures([], new Set())).toBe(false);
-    expect(unseenFailures([job({status:"succeeded"}),job({status:"cancelled"})],new Set())).toBe(false);
-    expect(unseenFailures([job({status:"failed"})],new Set())).toBe(true);
-    expect(unseenFailures([job({status:"expired"})],new Set(["job-1"]))).toBe(false);
+    expect(
+      unseenFailures(
+        [job({ status: "succeeded" }), job({ status: "cancelled" })],
+        new Set(),
+      ),
+    ).toBe(false);
+    expect(unseenFailures([job({ status: "failed" })], new Set())).toBe(true);
+    expect(
+      unseenFailures([job({ status: "expired" })], new Set(["job-1"])),
+    ).toBe(false);
   });
   it("presents measured progress or the server progress message without inventing a percentage", () => {
     expect(queueProgress(job())).toBe("2 of 5 sections");
-    expect(queueProgress(job({progress:{completedUnits:null,totalUnits:null,unitLabel:null,message:"Waiting"}}))).toBe("Waiting");
+    expect(
+      queueProgress(
+        job({
+          progress: {
+            completedUnits: null,
+            totalUnits: null,
+            unitLabel: null,
+            message: "Waiting",
+          },
+        }),
+      ),
+    ).toBe("Waiting");
   });
 });

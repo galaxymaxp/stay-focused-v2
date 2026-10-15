@@ -1,4 +1,4 @@
-import { QueueScreen } from "../../../src/features/queue";
-export default function Page() {
-  return <QueueScreen />;
+import { redirect } from "next/navigation";
+export default function QueuePage() {
+  redirect("/today?queue=open");
 }
