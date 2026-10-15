@@ -38,6 +38,13 @@ describe('automatic separate external card',()=>{
     await act(async()=>tree!.root.findAllByType(Pressable).filter(n=>n.props.accessibilityLabel==='Ask about this image').at(-1)!.props.onPress());
     expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
   });
+  it('redacts image URLs from native load diagnostics',async()=>{
+    const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    try {
+      await mount();await act(async()=>tree!.root.findByType(Image).props.onError({nativeEvent:{error:'HTTP 403 loading https://upload.wikimedia.org/private-title.png'}}));
+      expect(warning).toHaveBeenCalledWith('reviewer.external_image_failed',{reason:'HTTP 403 loading [image]'});
+    }finally{warning.mockRestore();}
+  });
   it.each([{online:false},{hasSourceVisual:true}])('hides actions and images for %j',async override=>{
     await mount(override);expect(tree!.root.findAllByType(Pressable).filter(node=>!node.props.disabled)).toHaveLength(0);expect(mocks.find).not.toHaveBeenCalled();
   });

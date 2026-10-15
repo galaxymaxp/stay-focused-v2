@@ -94,6 +94,16 @@ describe('in-place source figure sheet',()=>{
 });
 describe('batched availability lifecycle',()=>{
   function Discovery({offline=false}:{offline?:boolean}) {const available=useFigureAvailability(client,'artifact',offline);return createElement('Discovery',{sections:[...available]});}
+  it('allows slow discovery to finish without a heartbeat cancelling or overlapping it',async()=>{
+    vi.useFakeTimers();let resolve!:(value:Set<string>)=>void;
+    mocks.availability.mockReturnValue(new Promise(r=>{resolve=r;}));
+    await act(async()=>{tree=create(createElement(Discovery));});
+    const signal=mocks.availability.mock.calls[0]![2];
+    await act(async()=>{await vi.advanceTimersByTimeAsync(12000);});
+    expect(mocks.availability).toHaveBeenCalledOnce();expect(signal.aborted).toBe(false);
+    await act(async()=>resolve(new Set(['s'])));expect(tree!.root.findByType('Discovery' as never).props.sections).toEqual(['s']);
+    await act(async()=>tree!.update(createElement(Discovery,{offline:true})));expect(tree!.root.findByType('Discovery' as never).props.sections).toEqual([]);
+  });
   it('uses one discovery request for multiple icons, and hides all offline',async()=>{
     mocks.availability.mockResolvedValue(new Set(['s','another']));
     await act(async()=>{tree=create(createElement(Discovery));});
