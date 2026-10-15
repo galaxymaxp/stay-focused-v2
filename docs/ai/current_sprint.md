@@ -3,9 +3,11 @@
 ## Consolidated showcase release in progress (2026-10-15)
 
 VL3 guard review is owner-approved. Eleven production migrations are applied
-with RLS and private-bucket verification. SDK 57 implementation and automated
-gates pass; native build, production deployments and physical acceptance remain
-open. Resend has no verified domain; broad student email remains inactive.
+with RLS and private-bucket verification. PR #5 is merged at dfd5383. The merged-main LibreOffice worker is deployed
+as generation-worker-00026-dlz with dispatch IAM configured. The SDK 57 APK
+installed with the existing signature but physical launch exposed an incompatible
+query-string override. The override is removed; two real-serializer regressions
+and all 1,007 mobile tests pass. Corrected APK/OTA and live acceptance remain open. Resend has no verified domain; broad student email remains inactive.
 See [consolidated release evidence](acceptance/release-20261014.md). Older entries below are historical milestones.
 
 ## VL3 Find a visual completed locally; rollout pending (2026-10-14)
