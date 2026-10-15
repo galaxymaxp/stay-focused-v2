@@ -162,6 +162,9 @@ export interface AcceptedProcessingJobResponse {
 export interface ProcessingJobListPage {
   readonly jobs: readonly ProcessingJobStatusView[];
   readonly nextCursor: string | null;
+  /** Only present when the caller requests a detail alongside the Queue page. */
+  readonly detailId?: string;
+  readonly detail?: { readonly job: ProcessingJobStatusView; readonly generation: import('./experience').GenerationView | null } | null;
 }
 
 export interface SourceVersionSummary {
@@ -234,3 +237,4 @@ export * from './quiz-grading';
 export * from "./saved-snapshot";
 
 export * from "./course-state";
+export * from './job-status-reader';

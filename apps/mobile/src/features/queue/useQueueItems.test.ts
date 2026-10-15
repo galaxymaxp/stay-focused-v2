@@ -46,7 +46,7 @@ vi.mock("../redesign/useListPreferences", () => ({
     hide: vi.fn(),
   }),
 }));
-const { useQueueSource, useQueueGroups, QueueItemsContext } = await import(
+const { useQueueSource, useQueueGroups, QueueItemsContext, useJobRead } = await import(
   "./useQueueItems"
 );
 let source: ReturnType<typeof useQueueSource>,
@@ -132,4 +132,22 @@ it("retains CQ1 past-course exclusion for local unaccepted requests", async () =
   expect(groups.visiblePending.map((item) => item.key)).toEqual([
     "current-request",
   ]);
+});
+
+it('shares AppActivity and detail in one request and deduplicates simultaneous refreshes', async () => {
+  let detail!: ReturnType<typeof useJobRead>;
+  function Detail() { detail = useJobRead('job'); return null; }
+  function WithDetail() {
+    source = useQueueSource();
+    return createElement(QueueItemsContext.Provider, { value: source }, createElement(Detail));
+  }
+  mocks.request.mockResolvedValue({ jobs: [job()], nextCursor: null, detailId: 'job', detail: { job: job(), generation: { id: 'job', state: 'generating', artifactId: null } } });
+  await act(async () => { rendered = create(createElement(WithDetail)); });
+  expect(mocks.request).toHaveBeenCalledTimes(1);
+  expect(mocks.request.mock.calls[0]![1]).toContain('&detailId=job');
+  expect(detail.data?.state).toBe('generating');
+  await act(async () => { source.refresh(); detail.refresh(); });
+  expect(mocks.request).toHaveBeenCalledTimes(2);
+  await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+  expect(mocks.request).toHaveBeenCalledTimes(3);
 });

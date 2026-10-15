@@ -6,7 +6,13 @@ const mocks = vi.hoisted(() => ({ api: vi.fn(), owner: "a" }));
 vi.mock("../components/providers", () => ({
   useAuth: () => ({ api: mocks.api, session: { user: { id: mocks.owner } } }),
 }));
-const { useQueueItems, countActiveJobs } = await import("./queue-items");
+const {
+  useQueueSource: useQueueItems,
+  countActiveJobs,
+  QueueReadProvider,
+  useJobRead,
+  useQueueItems: useSharedQueue,
+} = await import("./queue-items");
 let source: ReturnType<typeof useQueueItems>;
 function Probe({ open = false }: { open?: boolean }) {
   source = useQueueItems(open);
@@ -49,10 +55,14 @@ it("uses one visible-only adaptive poller, deduplicates wakes and stops after un
     rendered = create(createElement(Probe));
   });
   expect(mocks.api).toHaveBeenCalledTimes(1);
-  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
   expect(mocks.api).toHaveBeenCalledTimes(2);
   doc.visibilityState = "hidden";
-  await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
   expect(mocks.api).toHaveBeenCalledTimes(2);
   let resolve!: (value: unknown) => void;
   mocks.api.mockReturnValue(
@@ -67,13 +77,19 @@ it("uses one visible-only adaptive poller, deduplicates wakes and stops after un
   });
   expect(mocks.api).toHaveBeenCalledTimes(3);
   await act(async () => resolve({ jobs: [], nextCursor: null }));
-  await act(async () => { await vi.advanceTimersByTimeAsync(29999); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(29999);
+  });
   expect(mocks.api).toHaveBeenCalledTimes(3);
-  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
   expect(mocks.api).toHaveBeenCalledTimes(4);
   await act(async () => rendered!.unmount());
   rendered = undefined;
-  await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
   expect(mocks.api).toHaveBeenCalledTimes(4);
 });
 it("acknowledges only observed failures and clears all data on an owner change", async () => {
@@ -111,4 +127,51 @@ it("retains the last server data during a failed refresh", async () => {
   await act(async () => source.refresh());
   expect(source.generating).toBe(1);
   expect(source.error).toBe("Couldn't refresh Queue. Try again.");
+});
+
+it("shares the header and generation detail response, polling and concurrent refreshes", async () => {
+  let detail!: ReturnType<typeof useJobRead>;
+  function Header() {
+    source = useSharedQueue();
+    return null;
+  }
+  function Detail() {
+    detail = useJobRead("job");
+    return null;
+  }
+  mocks.api.mockResolvedValue({
+    jobs: [job()],
+    nextCursor: null,
+    detailId: "job",
+    detail: {
+      job: job(),
+      generation: { id: "job", state: "generating", artifactId: null },
+    },
+  });
+  await act(async () => {
+    rendered = create(
+      createElement(
+        QueueReadProvider,
+        null,
+        createElement(Header),
+        createElement(Detail),
+      ),
+    );
+  });
+  expect(mocks.api).toHaveBeenCalledTimes(1);
+  expect(mocks.api.mock.calls[0]![0]).toContain("&detailId=job");
+  expect(detail.data?.state).toBe("generating");
+  expect(detail.loading).toBe(false);
+  await act(async () => {
+    source.refresh();
+    detail.refresh();
+  });
+  expect(mocks.api).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3000);
+  });
+  expect(mocks.api).toHaveBeenCalledTimes(3);
+  expect(
+    mocks.api.mock.calls.every((call) => call[0].startsWith("/api/jobs?")),
+  ).toBe(true);
 });

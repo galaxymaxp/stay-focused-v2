@@ -1,6 +1,3 @@
-import type {
-  GenerationView,
-} from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
@@ -20,8 +17,8 @@ import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibr
 import { persistedArtifactId } from "../../services/localLibrary/librarySync";
 import { GenerationCore } from "./GenerationCore";
 import { generationCoreState, generationMessages, stalledInQueue } from "./presentation";
-import { useExperience, useExperienceClient } from "./useExperience";
-import { useQueueItems } from "../queue/useQueueItems";
+import { useExperienceClient } from "./useExperience";
+import { useJobRead, useQueueItems } from "../queue/useQueueItems";
 
 
 
@@ -92,12 +89,7 @@ export function GenerationScreen() {
     autoStarted.current = true;
     void confirmGeneration();
   });
-  const generation = useExperience<GenerationView>(
-    id ? `/api/experience/generations/${encodeURIComponent(id)}` : null,
-    3000,
-    (value) =>
-      ["queued", "preparing", "generating", "finalizing"].includes(value.state),
-  );
+  const generation = useJobRead(id);
   const data = generation.data;
   const isDraft = intent?.type === "activity_output" || data?.artifactId?.startsWith("activity:") === true;
   // Completed and cloud-persisted: keep a device copy for Library and offline reading.
@@ -150,7 +142,6 @@ export function GenerationScreen() {
     try {
       await experienceRequest(client, `/api/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" });
       generation.refresh();
-      activity.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not cancel this generation.");
     } finally {

@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   validateCanvasReviewerGenerationGate: vi.fn(),
   validateCanvasPreviewSessionForGeneration: vi.fn(),
   verifyBearerToken: vi.fn(),
+  listOwnedProcessingJobs: vi.fn(),
+  findOwnedProcessingJob: vi.fn(),
+  getGenerationForOwnedJob: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ verifyBearerToken: mocks.verifyBearerToken }));
@@ -32,7 +35,8 @@ vi.mock("@/lib/processing-jobs/creation", () => ({
 vi.mock("@/lib/processing-jobs/repository", () => ({
   createProcessingJobServiceClient: mocks.createProcessingJobServiceClient,
   listOwnedActiveProcessingJobs: vi.fn(),
-  listOwnedProcessingJobs: vi.fn(),
+  listOwnedProcessingJobs: mocks.listOwnedProcessingJobs,
+  findOwnedProcessingJob: mocks.findOwnedProcessingJob,
   toProcessingJobStatusView: (job: unknown) => job,
 }));
 vi.mock("@/lib/processing-jobs/structured-source-blocks", () => ({
@@ -56,7 +60,57 @@ vi.mock("@/lib/reviewer-source-provenance", () => ({
     mocks.validateCanvasPreviewSessionForGeneration,
 }));
 
-const { POST } = await import("./route");
+vi.mock('@/lib/experience/http', () => ({ createExperienceService: () => ({ getGenerationForOwnedJob: mocks.getGenerationForOwnedJob }) }));
+const { POST, GET } = await import("./route");
+
+describe('GET /api/jobs combined detail', () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const status = { id, user_id: 'owner', job_type: 'reviewer_generation', status: 'running' };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.verifyBearerToken.mockResolvedValue({ id: 'owner' });
+    mocks.createProcessingJobServiceClient.mockReturnValue({});
+    mocks.listOwnedProcessingJobs.mockResolvedValue([status]);
+    mocks.findOwnedProcessingJob.mockResolvedValue(null);
+    mocks.getGenerationForOwnedJob.mockResolvedValue({ id, state: 'generating', artifactId: null });
+  });
+  const read = () => GET(new Request(`https://local.invalid/api/jobs?scope=all&detailId=${id}`));
+  it('verifies one JWT, reuses the page status, and returns a safe generation in one response', async () => {
+    const response = await read();
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({ detailId: id, detail: { job: status, generation: { state: 'generating' } } });
+    expect(mocks.verifyBearerToken).toHaveBeenCalledTimes(1);
+    expect(mocks.findOwnedProcessingJob).not.toHaveBeenCalled();
+    expect(mocks.getGenerationForOwnedJob).toHaveBeenCalledExactlyOnceWith('owner', status);
+  });
+  it('looks up older direct links with verified owner scoping', async () => {
+    mocks.listOwnedProcessingJobs.mockResolvedValue([]);
+    mocks.findOwnedProcessingJob.mockResolvedValue(status);
+    expect((await (await read()).json()).data.detail.job.id).toBe(id);
+    expect(mocks.findOwnedProcessingJob).toHaveBeenCalledWith(expect.anything(), 'owner', id);
+  });
+  it('never includes a foreign direct-link result', async () => {
+    mocks.listOwnedProcessingJobs.mockResolvedValue([]);
+    mocks.findOwnedProcessingJob.mockResolvedValue({ ...status, user_id: 'foreign' });
+    expect((await (await read()).json()).data.detail).toBeNull();
+    expect(mocks.getGenerationForOwnedJob).not.toHaveBeenCalled();
+  });
+  it('keeps extraction status without asking for a generation projection', async () => {
+    mocks.listOwnedProcessingJobs.mockResolvedValue([{ ...status, job_type: 'document_extraction' }]);
+    expect((await (await read()).json()).data.detail.generation).toBeNull();
+    expect(mocks.getGenerationForOwnedJob).not.toHaveBeenCalled();
+  });
+  it('returns no persisted target when the existing result verification denies it', async () => {
+    const { ExperienceFailure } = await import('@/lib/experience/errors');
+    mocks.getGenerationForOwnedJob.mockRejectedValue(new ExperienceFailure(404, 'not_found'));
+    expect((await (await read()).json()).data.detail.generation).toBeNull();
+  });
+  it('does not read jobs before authentication', async () => {
+    mocks.verifyBearerToken.mockResolvedValue(null);
+    expect((await read()).status).toBe(401);
+    expect(mocks.listOwnedProcessingJobs).not.toHaveBeenCalled();
+  });
+});
 
 describe("POST /api/jobs reviewer admission", () => {
   beforeEach(() => {

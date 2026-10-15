@@ -1,6 +1,16 @@
 "use client";
+import { createJobStatusReader } from "@stay-focused/shared";
 import type { ProcessingJobListPage } from "@stay-focused/shared";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAuth } from "../components/providers";
 import {
   failedQueueIds,
@@ -23,7 +33,7 @@ export function countActiveJobs(jobs: readonly { readonly status: string }[]) {
   return { generating, queued };
 }
 
-export function useQueueItems(open: boolean, hidden: readonly string[] = []) {
+export function useQueueSource(open = false, hidden: readonly string[] = []) {
   const { api, session } = useAuth();
   const owner = session?.user.id ?? "";
   const [state, setState] = useState<{
@@ -32,10 +42,22 @@ export function useQueueItems(open: boolean, hidden: readonly string[] = []) {
     error: string | null;
   }>({ owner, data: null, error: null });
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
-  const [kick, setKick] = useState(0);
+  const detailId = useRef<string | null>(null);
+  const wakeRef = useRef<(() => void) | null>(null);
+  const refresh = useCallback(() => wakeRef.current?.(), []);
+  const watchDetail = useCallback(
+    (id: string) => {
+      detailId.current = id;
+      refresh();
+      return () => {
+        if (detailId.current === id) detailId.current = null;
+      };
+    },
+    [refresh],
+  );
   const credentials = useRef(api);
   credentials.current = api;
-  const refresh = useCallback(() => setKick((n) => n + 1), []);
+
   useEffect(() => {
     setSeen(new Set());
   }, [owner]);
@@ -44,21 +66,29 @@ export function useQueueItems(open: boolean, hidden: readonly string[] = []) {
     let live = true,
       busy = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const controller = new AbortController();
+    const reader = createJobStatusReader((id, signal) => {
+      const path =
+        "/api/jobs?scope=all&limit=50" +
+        (id ? "&detailId=" + encodeURIComponent(id) : "");
+      return credentials.current<ProcessingJobListPage>(path, { signal });
+    });
     async function check() {
       if (busy) return;
       clearTimeout(timer);
+      let stateDetail: string | null = detailId.current;
       let next = IDLE_POLL_MS;
       if (document.visibilityState === "visible") {
         busy = true;
         try {
-          const data = await credentials.current<ProcessingJobListPage>(
-            "/api/jobs?scope=all&limit=50",
-            { signal: controller.signal },
-          );
+          const requested = detailId.current;
+          stateDetail = requested;
+          const data = await reader.read(requested);
           if (live) setState({ owner, data, error: null });
-          const counts = countActiveJobs(data.jobs);
-          if (counts.generating + counts.queued > 0) next = ACTIVE_POLL_MS;
+          const counts = countActiveJobs(
+            data.detail ? [...data.jobs, data.detail.job] : data.jobs,
+          );
+          if (counts.generating + counts.queued > 0)
+            next = detailId.current ? 3_000 : ACTIVE_POLL_MS;
         } catch {
           if (live)
             setState((old) => ({
@@ -70,9 +100,16 @@ export function useQueueItems(open: boolean, hidden: readonly string[] = []) {
           busy = false;
         }
       }
-      if (live) timer = setTimeout(() => void check(), next);
+      if (live)
+        timer = setTimeout(
+          () => void check(),
+          detailId.current && stateDetail !== detailId.current ? 0 : next,
+        );
     }
-    void check();
+    wakeRef.current = () => void check();
+    void Promise.resolve().then(() => {
+      if (live) void check();
+    });
     const wake = () => {
       if (document.visibilityState === "visible") void check();
     };
@@ -80,25 +117,74 @@ export function useQueueItems(open: boolean, hidden: readonly string[] = []) {
     window.addEventListener("focus", wake);
     return () => {
       live = false;
-      controller.abort();
+      reader.dispose();
+      wakeRef.current = null;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("focus", wake);
     };
-  }, [owner, kick]);
+  }, [owner]);
   const data = state.owner === owner ? state.data : null;
   const jobs = data?.jobs ?? [];
   useEffect(() => {
     if (open) setSeen(new Set(failedQueueIds(data?.jobs ?? [])));
   }, [open, data]);
   const error = state.owner === owner ? state.error : null;
+  const markSeen = useCallback(
+    () => setSeen(new Set(failedQueueIds(data?.jobs ?? []))),
+    [data],
+  );
   return {
     data,
     loading: !data && !error,
     error,
     refresh,
+    watchDetail,
+    markSeen,
     sections: queueItems(jobs, hidden),
     ...countActiveJobs(jobs),
     unseenError: !open && unseenFailures(jobs, seen),
+  };
+}
+
+const QueueReadContext = createContext<ReturnType<
+  typeof useQueueSource
+> | null>(null);
+export function QueueReadProvider({ children }: { children: ReactNode }) {
+  const source = useQueueSource();
+  return createElement(QueueReadContext.Provider, { value: source }, children);
+}
+export function useQueueItems(open = false, hidden: readonly string[] = []) {
+  const source = useContext(QueueReadContext);
+  if (!source) throw new Error("Queue read provider is missing");
+  useEffect(() => {
+    if (open) source.markSeen();
+  }, [open, source.markSeen]);
+  return {
+    ...source,
+    sections: queueItems(source.data?.jobs ?? [], hidden),
+    unseenError: !open && source.unseenError,
+  };
+}
+export function useJobRead(id: string | null) {
+  const source = useQueueItems();
+  useEffect(
+    () => (id ? source.watchDetail(id) : undefined),
+    [id, source.watchDetail],
+  );
+  const known = !!id && source.data?.detailId === id;
+  const detail = known ? source.data?.detail : null;
+  return {
+    data: detail?.generation ?? null,
+    job: detail?.job ?? null,
+    loading: !!id && !known && !source.error,
+    error:
+      source.error ??
+      (known &&
+      (!detail ||
+        (detail.job.jobType !== "document_extraction" && !detail.generation))
+        ? "This generation is no longer available."
+        : null),
+    refresh: source.refresh,
   };
 }

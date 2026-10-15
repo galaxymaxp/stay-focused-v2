@@ -1,4 +1,5 @@
 "use client";
+import { QueueReadProvider } from '../features/queue-items';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -18,6 +19,9 @@ const tools = [
   { href: "/canvas", label: "Canvas", icon: "globe" },
 ];
 export function Shell({ children }: { children: ReactNode }) {
+  return <QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider>;
+}
+function ShellContent({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),
     router = useRouter(),
     pathname = usePathname(),

@@ -1,4 +1,8 @@
-import type { GenerateCourseList, ProcessingJobListPage } from "@stay-focused/shared";
+import { createJobStatusReader } from "@stay-focused/shared";
+import type {
+  GenerateCourseList,
+  ProcessingJobListPage,
+} from "@stay-focused/shared";
 import {
   attributeGenerationIntent,
   discardGenerationIntents,
@@ -7,7 +11,11 @@ import {
 } from "../../services/generationRecovery";
 import { useExperience, useExperienceClient } from "../redesign/useExperience";
 import { useListPreferences } from "../redesign/useListPreferences";
-import { queueItems, failedQueueIds, unseenFailures } from "./queuePresentation";
+import {
+  queueItems,
+  failedQueueIds,
+  unseenFailures,
+} from "./queuePresentation";
 
 import {
   createContext,
@@ -33,11 +41,23 @@ export function useQueueSource() {
     data: ProcessingJobListPage | null;
     error: string | null;
   }>({ owner, data: null, error: null });
-  const [kick, setKick] = useState(0);
+  const detailId = useRef<string | null>(null);
+  const wakeRef = useRef<(() => void) | null>(null);
+  const refresh = useCallback(() => wakeRef.current?.(), []);
+  const watchDetail = useCallback(
+    (id: string) => {
+      detailId.current = id;
+      refresh();
+      return () => {
+        if (detailId.current === id) detailId.current = null;
+      };
+    },
+    [refresh],
+  );
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState({ top: 72, right: 16 });
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
-  const refresh = useCallback(() => setKick((n) => n + 1), []);
+
   useEffect(() => {
     setOpen(false);
     setSeen(new Set());
@@ -47,22 +67,33 @@ export function useQueueSource() {
     let live = true,
       busy = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const controller = new AbortController();
+    const reader = createJobStatusReader((id, signal) => {
+      const path =
+        "/api/jobs?scope=all&limit=50" +
+        (id ? "&detailId=" + encodeURIComponent(id) : "");
+      return experienceRequest<ProcessingJobListPage>(
+        credentials.current,
+        path,
+        { signal },
+      );
+    });
     async function check() {
       if (busy) return;
       clearTimeout(timer);
+      let stateDetail: string | null = detailId.current;
       let next = 30_000;
       if (AppState.currentState === "active") {
         busy = true;
         try {
-          const data = await experienceRequest<ProcessingJobListPage>(
-            credentials.current,
-            "/api/jobs?scope=all&limit=50",
-            { signal: controller.signal },
-          );
+          const requested = detailId.current;
+          stateDetail = requested;
+          const data = await reader.read(requested);
           if (live) setState({ owner, data, error: null });
-          const counts = countActiveJobs(data.jobs);
-          if (counts.generating + counts.queued > 0) next = 5_000;
+          const counts = countActiveJobs(
+            data.detail ? [...data.jobs, data.detail.job] : data.jobs,
+          );
+          if (counts.generating + counts.queued > 0)
+            next = detailId.current ? 3_000 : 5_000;
         } catch {
           if (live)
             setState((old) => ({
@@ -74,19 +105,27 @@ export function useQueueSource() {
           busy = false;
         }
       }
-      if (live) timer = setTimeout(() => void check(), next);
+      if (live)
+        timer = setTimeout(
+          () => void check(),
+          detailId.current && stateDetail !== detailId.current ? 0 : next,
+        );
     }
-    void check();
+    wakeRef.current = () => void check();
+    void Promise.resolve().then(() => {
+      if (live) void check();
+    });
     const listener = AppState.addEventListener("change", (state) => {
       if (state === "active") void check();
     });
     return () => {
       live = false;
-      controller.abort();
+      reader.dispose();
+      wakeRef.current = null;
       clearTimeout(timer);
       listener.remove();
     };
-  }, [owner, kick]);
+  }, [owner]);
   const data = state.owner === owner ? state.data : null;
   const jobs = data?.jobs ?? [];
   useEffect(() => {
@@ -107,6 +146,7 @@ export function useQueueSource() {
     error,
     loading: !data && !error,
     refresh,
+    watchDetail,
     ...countActiveJobs(jobs),
     open,
     anchor,
@@ -226,5 +266,28 @@ export function useQueueGroups() {
     hide,
     error,
     jobs,
+  };
+}
+
+export function useJobRead(id: string | null) {
+  const source = useQueueItems();
+  useEffect(
+    () => (id ? source.watchDetail(id) : undefined),
+    [id, source.watchDetail],
+  );
+  const known = !!id && source.data?.detailId === id;
+  const detail = known ? source.data?.detail : null;
+  return {
+    data: detail?.generation ?? null,
+    job: detail?.job ?? null,
+    loading: !!id && !known && !source.error,
+    error:
+      source.error ??
+      (known &&
+      (!detail ||
+        (detail.job.jobType !== "document_extraction" && !detail.generation))
+        ? "This generation is no longer available."
+        : null),
+    refresh: source.refresh,
   };
 }

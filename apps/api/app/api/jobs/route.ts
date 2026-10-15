@@ -15,6 +15,7 @@ import {
   createProcessingJobServiceClient,
   listOwnedActiveProcessingJobs,
   listOwnedProcessingJobs,
+  findOwnedProcessingJob,
   toProcessingJobStatusView,
 } from "@/lib/processing-jobs/repository";
 import { readStructuredSourceBlocks } from "@/lib/processing-jobs/structured-source-blocks";
@@ -135,11 +136,32 @@ export async function GET(request: Request): Promise<Response> {
       );
       const page = rows.slice(0, limit);
       const last = page.at(-1);
+      const detailId = url.searchParams.get('detailId');
+      let detail: import('@stay-focused/shared').ProcessingJobListPage['detail'] = null;
+      if (detailId) {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(detailId)) {
+          return errorResponse(400, 'invalid_processing_job_id', 'The processing job ID is invalid.', false, request);
+        }
+        // A direct link may be older than, or excluded from, the CQ1 Queue page.
+        const job = page.find(row => row.id === detailId && row.user_id === user.id)
+          ?? await findOwnedProcessingJob(createProcessingJobServiceClient(), user.id, detailId);
+        if (job && job.user_id === user.id) {
+          let generation = null;
+          if (job.job_type !== 'document_extraction') {
+            const { createExperienceService } = await import('@/lib/experience/http');
+            const { ExperienceFailure } = await import('@/lib/experience/errors');
+            try { generation = await createExperienceService(user.id).getGenerationForOwnedJob(user.id, job); }
+            catch (error) { if (!(error instanceof ExperienceFailure && error.status === 404)) throw error; }
+          }
+          detail = { job: toProcessingJobStatusView(job), generation };
+        }
+      }
       return jsonResponse(
         {
           ok: true,
           data: {
             jobs: page.map(toProcessingJobStatusView),
+            ...(detailId ? { detailId, detail } : {}),
             nextCursor:
               rows.length > limit && last
                 ? encodeJobCursor(last.created_at, last.id)

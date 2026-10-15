@@ -311,7 +311,14 @@ export class ExperienceService {
     return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
   }
   async getGeneration(userId: string, generationId: string): Promise<GenerationView> {
-    const job = requireFound((await this.rows('processing_jobs', userId)).find(j => j.id === generationId && (j.job_type === 'reviewer_generation' || j.job_type === 'activity_generation' || j.job_type === 'quiz_generation')));
+    const rows = this.dependencies.repository.exactRows
+      ? await this.dependencies.repository.exactRows('processing_jobs', userId, 'id', generationId) : await this.rows('processing_jobs', userId);
+    const job = requireFound(rows.find(j => j.id === generationId && j.user_id === userId));
+    return this.getGenerationForOwnedJob(userId, job);
+  }
+  /** Reuse a status row already read under the verified request identity. */
+  async getGenerationForOwnedJob(userId: string, candidate: ExperienceRow<'processing_jobs'>): Promise<GenerationView> {
+    const job = requireFound(candidate.user_id === userId && ['reviewer_generation', 'activity_generation', 'quiz_generation'].includes(candidate.job_type) ? candidate : null);
     if (job.job_type === 'quiz_generation') {
       const quiz=job.status==='succeeded'?(await this.quizRecords(userId)).find(r=>r.generationId===job.id):null;
       return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:quiz?.summary.id??null,error:['failed','expired'].includes(job.status)?{code:'quiz_generation_failed',title:'Quiz',message:'Quiz generation did not finish.',retryable:job.retryable===true,action:job.retryable===true?'retry':'none'}:null};
@@ -320,6 +327,10 @@ export class ExperienceService {
       const draft=job.status==='succeeded'?(await this.activityDraftRecords(userId)).find(r=>r.draft.generationId===job.id):null;
       const sourceUnavailable = job.error_code === 'activity_source_unavailable';
       return {id:job.id,state:activityGenerationState(job),updatedAt:job.updated_at,progress:null,artifactId:draft?.summary.id??null,error:job.status==='failed'?{code:sourceUnavailable?'activity_source_unavailable':'activity_generation_failed',title:'Activity Maker',message:sourceUnavailable?'A linked assignment resource could not be prepared. Open the assignment or choose another source.':'Draft generation did not finish.',retryable:false,action:'none'}:null};
+    }
+    if (job.status === 'succeeded' && this.dependencies.repository.reviewerDetail) {
+      const artifact = requireFound(await this.dependencies.repository.reviewerDetail(userId, `generation:${job.id}`));
+      return generationView(toProcessingJobStatusView(job), artifact.summary.id);
     }
     const artifact = job.status === 'succeeded' ? (await this.artifactRecords(userId)).find(r => r.aliases.includes(`generation:${job.id}`)) : null;
     if (job.status === 'succeeded' && !artifact) throw new ExperienceFailure(404, 'not_found');

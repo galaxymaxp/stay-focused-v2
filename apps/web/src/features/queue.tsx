@@ -1,4 +1,5 @@
 "use client";
+import { useJobRead } from './queue-items';
 import type {
   GenerationView,
   ProcessingJobStatusView,
@@ -16,7 +17,7 @@ import { CountUp } from "../components/count-up";
 import { useAuth } from "../components/providers";
 import { ContentIcon, Heading, Notice, State } from "../components/ui";
 import { generationEnabled, generationKey } from "../lib/generation";
-import { useAction, useResource } from "../lib/hooks";
+import { useAction } from "../lib/hooks";
 import { queueProgress } from "./queue-presentation";
 import { jobCoreState } from "./knowledge-core/coreModel";
 
@@ -195,12 +196,10 @@ function GenerationStatus({ message }: { message: string }) {
 export function GenerationScreen({ id }: { id: string }) {
   const { api, session } = useAuth(),
     router = useRouter(),
-    job = useResource<ProcessingJobStatusView>(`/api/jobs/${id}`, 3000),
-    preparingSource = job.data?.jobType === "document_extraction",
-    view = useResource<GenerationView>(
-      job.data && !preparingSource ? `/api/experience/generations/${id}` : null,
-      3000,
-    ),
+    shared = useJobRead(id),
+    job = { ...shared, data: shared.job },
+    preparingSource = job.data?.jobType === 'document_extraction',
+    view = shared,
     action = useAction();
   const data = view.data;
   const running = job.data
@@ -315,7 +314,6 @@ export function GenerationScreen({ id }: { id: string }) {
                   void action.run(async () => {
                     await api(`/api/jobs/${id}/cancel`, { method: "POST" });
                     job.refresh();
-                    view.refresh();
                   })
                 }
               >

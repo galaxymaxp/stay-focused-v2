@@ -22,7 +22,7 @@ type TestData = Partial<{ [T in ExperienceTable]: readonly Partial<ExperienceRow
 function service(data: TestData = {}, materials = vi.fn(async () => ({ ok: true as const, value: sourceList }))) {
   const selectedData: TestData = { canvas_course_sync_preferences: (data.canvas_courses ?? []).map(c => ({ id: `preference:${c.id}`, user_id: c.user_id, canvas_connection_id: c.canvas_connection_id, course_id: c.id, selected: true })), ...data };
   const repository: ExperienceRepository = { async rows<T extends ExperienceTable>(table: T) { return (selectedData[table] ?? []) as unknown as readonly ExperienceRow<T>[]; } };
-  return { api: new ExperienceService({ repository, materials, now: () => now }), materials };
+  return { api: new ExperienceService({ repository, materials, now: () => now }), materials, repo: repository };
 }
 function activities(tasks: readonly TaskRow[] = [task], assignments: readonly CanvasAssignmentRow[] = [assignment]) {
   return composeActivities({ userId: 'owner', assignments, tasks, courses: [course], now, dayEnd: dayWindow(date).end });
@@ -385,6 +385,15 @@ describe('Library ownership and persisted output', () => {
     const { api } = service(libraryData);
     await expect(api.getGeneration('other', 'job')).rejects.toMatchObject({ status: 404 });
     expect((await api.getLibrary('other')).items).toEqual([]);
+  });
+  it.each(['reviewer_generation', 'quiz_generation', 'activity_generation'] as const)('reuses an owned %s status with unchanged projection and no second status read', async jobType => {
+    const row = { ...libraryData.processing_jobs![0], job_type: jobType, status: 'running' } as unknown as import('./repository').ExperienceRow<'processing_jobs'>;
+    const { api, repo } = service({ processing_jobs: [row] });
+    const previous = await api.getGeneration('owner', row.id);
+    const read = vi.spyOn(repo, 'rows');
+    expect(await api.getGenerationForOwnedJob('owner', row)).toEqual(previous);
+    expect(read).not.toHaveBeenCalled();
+    await expect(api.getGenerationForOwnedJob('other', row)).rejects.toMatchObject({ status: 404 });
   });
   it('returns supported empty categories with explicit missing capability', async () => {
     const { api } = service(libraryData);
