@@ -15,7 +15,7 @@ export function useSavedMaterialPages(courseId: string, firstNext: number | null
   const writeEpoch = screenSnapshotEpoch(owner);
   const identity = `${owner}:${courseId}`;
   const prefix = `/api/experience/courses/${encodeURIComponent(courseId)}/materials?offset=`;
-  const [state, setState] = useState<{ identity: string; pages: ReadonlyMap<number, CourseMaterials>; error: string | null }>({ identity, pages: new Map(), error: null });
+  const [state, setState] = useState<{ identity: string; pages: ReadonlyMap<number, CourseMaterials>; error: string | null; refreshing: boolean }>({ identity, pages: new Map(), error: null, refreshing: false });
   const pages = state.identity === identity ? state.pages : new Map<number, CourseMaterials>();
   useEffect(() => {
     if (!owner || !courseId) return;
@@ -31,7 +31,7 @@ export function useSavedMaterialPages(courseId: string, firstNext: number | null
         if (Number.isSafeInteger(offset) && offset > 0) saved.set(offset, snapshot.data);
       }
       for (const [offset, page] of saved) for (const item of page.items) openedMaterialOffsets.set(`${owner}:${item.id}`, offset);
-      setState(old => ({ identity, pages: old.identity === identity && old.pages.size ? old.pages : saved, error: null }));
+      setState(old => ({ identity, pages: old.identity === identity && old.pages.size ? old.pages : saved, error: null, refreshing: saved.size > 0 }));
       try {
         const fresh = new Map<number, CourseMaterials>();
         for (const offset of [...saved.keys()].sort((a, b) => a - b)) {
@@ -41,8 +41,8 @@ export function useSavedMaterialPages(courseId: string, firstNext: number | null
           fresh.set(offset, mergeSavedData(saved.get(offset) ?? null, page));
           await writeScreenSnapshot(owner, path, page, epoch);
         }
-        if (live && fresh.size) setState(old => ({ identity, pages: new Map([...(old.identity === identity ? old.pages : []), ...fresh]), error: null }));
-      } catch { if (live) setState(old => ({ ...old, error: "Couldn't refresh saved materials." })); }
+        if (live && fresh.size) setState(old => ({ identity, pages: new Map([...(old.identity === identity ? old.pages : []), ...fresh]), error: null, refreshing: false }));
+      } catch { if (live) setState(old => ({ ...old, error: "Couldn't refresh saved materials.", refreshing: false })); }
     })().catch(() => undefined);
     return () => { live = false; controller.abort(); };
   }, [owner, courseId, client, prefix, identity, refreshedAt]);
@@ -50,10 +50,10 @@ export function useSavedMaterialPages(courseId: string, firstNext: number | null
   const acceptPage = useCallback(async (offset: number, page: CourseMaterials) => {
     if (screenSnapshotEpoch(owner) !== writeEpoch) return;
     for (const item of page.items) openedMaterialOffsets.set(`${owner}:${item.id}`, offset);
-    setState(old => ({ identity, pages: new Map(old.identity === identity ? old.pages : []).set(offset, page), error: null }));
+    setState(old => ({ identity, pages: new Map(old.identity === identity ? old.pages : []).set(offset, page), error: null, refreshing: old.identity === identity && old.refreshing }));
     await writeScreenSnapshot(owner, prefix + offset, page, writeEpoch);
   }, [owner, prefix, identity, writeEpoch]);
   const ordered = [...pages].sort(([a], [b]) => a - b);
   const items = [...new Map(ordered.flatMap(([, page]) => page.items).map(item => [item.id, item])).values()] as LearningMaterial[];
-  return { items, nextOffset: ordered.length ? ordered[ordered.length - 1]![1].nextOffset : firstNext, acceptPage, error: state.identity === identity ? state.error : null };
+  return { items, nextOffset: ordered.length ? ordered[ordered.length - 1]![1].nextOffset : firstNext, acceptPage, refreshing: state.identity === identity && state.refreshing, error: state.identity === identity ? state.error : null };
 }

@@ -84,7 +84,8 @@ vi.mock("../../design/theme", async () => {
 vi.mock("../../design/primitives", () => ({
   Sheet: "Sheet",
   RowLink: "RowLink",
-  Page: "Page",
+  Page: (props: { children?: import("react").ReactNode; headerBelow?: import("react").ReactNode }) =>
+    createElement("Page", props, props.headerBelow, props.children),
   Action: "Action",
   Surface: "Surface",
   Notice: "Notice",
@@ -476,7 +477,7 @@ describe("B25 screen interactions", () => {
     ] };
     const root = await render(createElement(GenerateScreen));
     const titles = () => root.findAll((node) => String(node.type) === "CourseCard").map((node) => node.props.identity.title);
-    const search = () => root.findAll((node) => String(node.type) === "Page")[0]!.props.headerBelow.props.children;
+    const search = () => root.findAll((node) => String(node.type) === "SearchField")[0]!;
     expect(titles()).toHaveLength(2);
     await act(async () => search().props.onChangeText("cit 17"));
     expect(titles()).toEqual(["Web Information Systems"]);
@@ -1159,7 +1160,7 @@ describe("B38 saved assignment Draft", () => {
     mocks.params = { courseKey: "personal" };
     mocks.library.items = [{ ...artifact, activityStudyStatus: "not_started" }];
     const root = await render(createElement(LibraryCourseScreen));
-    const segment = root.findAll(node => String(node.type) === "Page")[0]!.props.headerBelow.props.children[0];
+    const segment = root.findAll(node => String(node.type) === "SegmentedControl")[0]!;
     expect(segment.props.segments.map((value: { label: string }) => value.label)).toEqual(["All", "Reviewers", "Quizzes", "Drafts"]);
     await act(async () => segment.props.onChange("activity_output"));
     const cards = root.findAll(node => String(node.type) === "RowLink");

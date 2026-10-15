@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLocalArtifactStore } from './artifactStore';
-import { migrateLocalLibrary } from './schema';
+import { LOCAL_LIBRARY_SCHEMA_VERSION, migrateLocalLibrary } from './schema';
 import { draftDetail, quizDetail, reviewerDetail, openNodeSqlite, OWNER_A, OWNER_B } from './localLibrary.testSupport';
 import { replayPendingDraftEdits } from './pendingDraftSync';
 import type { ActivityDraftContent, OfflineDraftSaveResult, QuizAnswerKey } from '@stay-focused/shared';
@@ -19,7 +19,7 @@ async function setup() {
   return { h, store, detail, draft, content, confirmed };
 }
 describe('offline Draft SQLite queue', () => {
-  it('upgrades schema 6 to 7 without losing bodies, drafts, Quiz keys or practice', async () => {
+  it('upgrades schema 6 to the current version without losing bodies, drafts, Quiz keys or practice', async () => {
     const h = openNodeSqlite(); handles.push(h);
     await migrateLocalLibrary(h.db);
     // Reconstruct the shipped v6 schema, which has no offline Draft tables.
@@ -34,7 +34,7 @@ describe('offline Draft SQLite queue', () => {
     await store.saveQuizAnswerKey(OWNER_A, key, quiz.artifact.updatedAt);
     await store.saveQuizPractice(OWNER_A, key.quizId, practice);
 
-    await expect(migrateLocalLibrary(h.db)).resolves.toBe(7);
+    await expect(migrateLocalLibrary(h.db)).resolves.toBe(LOCAL_LIBRARY_SCHEMA_VERSION);
     const upgraded = createLocalArtifactStore(h.db);
     for (const value of [body, detail, quiz]) {
       expect((await upgraded.readDetail(OWNER_A, value.artifact.id))?.detail).toEqual(value);

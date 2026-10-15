@@ -248,7 +248,7 @@ export function GenerateCourseScreen() {
   }
 
   return (
-    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={workspace.refresh} headerBelow={<SnapshotStatus {...workspace} error={workspace.error ?? savedPages.error} />} headerLeading={<CourseMark identity={identity} size={34} />}>
+    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={workspace.refresh} headerBelow={<SnapshotStatus {...workspace} refreshing={workspace.refreshing || savedPages.refreshing} error={workspace.error ?? savedPages.error} />} headerLeading={<CourseMark identity={identity} size={34} />}>
       {workspace.loading && !workspace.data ? <GenerateSkeleton rows={4} /> : null}
       {workspace.error && !workspace.data && workspace.errorCode === "course_not_synced" ? (
         <Surface>

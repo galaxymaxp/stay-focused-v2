@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { QuizAnswerKey } from '@stay-focused/shared';
 import { createLocalArtifactStore } from './artifactStore';
 import { OWNER_A, OWNER_B, openNodeSqlite, quizDetail } from './localLibrary.testSupport';
-import { migrateLocalLibrary } from './schema';
+import { LOCAL_LIBRARY_SCHEMA_VERSION, migrateLocalLibrary } from './schema';
 import { hydrateLibraryBodies, refreshArtifactDetail } from './librarySync';
 import { libraryRemote } from './deviceLibrary';
 import { parseQuizAnswerKey } from './quizAnswerKeys';
@@ -42,7 +42,7 @@ describe('owner-scoped device quiz keys', () => {
     await store.upsertDetail(OWNER_A, detail.artifact.id, detail);
     await store.saveQuizPractice(OWNER_A, key.quizId, { attempt: null, result: null, selected: ['draft'], dirty: true });
     raw.exec('DROP TABLE quiz_answer_keys; PRAGMA user_version = 5;');
-    await expect(migrateLocalLibrary(db)).resolves.toBe(7);
+    await expect(migrateLocalLibrary(db)).resolves.toBe(LOCAL_LIBRARY_SCHEMA_VERSION);
     expect(await store.readDetail(OWNER_A, detail.artifact.id)).not.toBeNull();
     expect(await store.readQuizPractice(OWNER_A, key.quizId)).toMatchObject({ selected: ['draft'] });
   });

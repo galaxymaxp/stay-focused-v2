@@ -326,7 +326,7 @@ export function CourseWorkspace({
           />
         </div>
         <CanvasRefreshStatus refresh={canvas} />
-        <State resource={course} />
+        <State resource={{ ...course, refreshing: course.refreshing || savedPages.refreshing, error: course.error ?? savedPages.error }} />
         {course.data && (
           <div className="course-split">
             <section className="pane-list" aria-label="Course materials">
