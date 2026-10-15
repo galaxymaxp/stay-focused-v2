@@ -3432,3 +3432,112 @@ real latency/cold starts, Metro contribution and physical behavior remain
 **UNVERIFIED (owner to confirm)**. No remote service call, remote SQL/application,
 environment-file edit, deployment, Scheduler action, push or outside-repository
 deletion occurred. SP2b ends here; no further roadmap scope was started.
+
+## SH1 — public reviewer snapshot links (2026-10-16)
+
+**Status: PASS for the unattended local code scope.** STEP 0-5, tests, fresh
+serial gates, documentation reconciliation and local commits are complete on
+`overnight/2026-10-15_feedback`. Baseline `2ff66b0`; SP2 and SP2b status files
+were PASS. SH0 and the external roadmap's SH1 section were read in full.
+No code contradiction required a stop. GA1 batch generation remains excluded;
+SP1/CQ1/QD1/SP2/SP2b behavior is retained. This finite SH1 run ends here.
+
+Website and mobile owner controls create/copy/update/stop a frozen reviewer
+link. Anonymous `/s/<token>` reads only the stored allow-list: reviewer text,
+existing key terms, included quizzes/answers for local scoring, existing
+matching assistance saved on the sharing device, attributed/licensed Wikimedia
+references and numeric citations as text. It excludes account/Canvas/provider
+metadata, source text, grades/tasks, course page snapshots and extracted figures.
+The actual public HTTP handler has zero auth/model/write calls in fresh tests;
+the public page bypasses auth/private caches, routes every AI control to sign-in
+with a safe return, and scores without network/storage writes. Owner RLS,
+256-bit tokens, same-link explicit updates, revocation, token rotation after
+stop, soft-delete revocation and bounded best-effort IP/token limiting are
+covered. Late mobile responses cannot copy/share the previous owner's link.
+See [acceptance](acceptance/sh1-public-share-links.md) and
+[ADR-033](../architecture/ADR-033-public-share-links.md).
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `f991d2b feat(db): store owner-isolated reviewer share snapshots`
+- `cc1b502 feat(api): serve allow-listed reviewer snapshots by public token`
+- `d087e09 fix(api): resolve share route test through the configured alias`
+- `aa3cce8 feat(web): read shared reviewers and score included quizzes anonymously`
+- `025bc1f feat(mobile): share reviewer links with copy and system sharing`
+- `fe88b54 fix(db): revoke public links when a reviewer is deleted`
+- `71b616b test(api): verify complete owner-bound share snapshot projections`
+- `b9700e2 fix(mobile): discard late share actions after account changes`
+- `bcf9ed7 fix(web): clear obsolete quiz corrections before shared scoring`
+- `147db48 test(api): prove anonymous share handler has no model or write calls`
+- Final `docs: close SH1 with fresh public sharing acceptance` checkpoint is
+  this commit; the resolved complete commit list is in `tmp/overnight/SH1.status`.
+
+FRESH final gates, executed serially:
+
+| Gate | Exact result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks; 0 cached |
+| `npm run lint -- --force` | 8/8 tasks; 0 cached; 0 errors / 6 existing warnings |
+| API full suite | 2,166 passed / 3 existing opt-in skips; 187 files |
+| Mobile full suite | 1,068 passed; 112 files |
+| Shared full suite | 264 passed; 25 files, includes emitted test copies |
+| Web full suite | 150 passed; 24 files |
+| Standalone API build | 1/1; 34/34 generated pages |
+| Standalone website build | 1/1; 19/19 generated pages; public route included |
+| Standalone Android export | 1/1; 1 bundle / 35 assets |
+| `npm run build -- --force` | 8/8 tasks; 0 cached; mobile 8 web / 1 Android / 1 iOS bundles |
+| Diff/staged whitespace checks | 0 errors |
+
+Additional final API typecheck/lint passed 1/1 each after the actual-handler
+test was added. Initial full API was 2,165 passed / 3 skips; the final additional
+boundary assertion increased it to 2,166. Focused SQL 4/4, initial SH1 API 19/19,
+web 11/11, mobile 56/56 and shared link checks 2/2 passed. Subsequent full suites
+include the late-owner guard and all applicable O2 scoring fixtures.
+
+Failed first attempts are retained in acceptance: draft strict API narrowing
+and emphasis type errors; focused route fixture 15 passed / 1 failed because
+GET had a body; TypeScript-only test import alias error; one unsupported mobile
+Copy prop; five web parser diagnostics from one malformed href template. These
+were repaired and affected checks rerun. Initial lint's four new test import
+warnings were removed; final six warnings predate SH1. No nondeterministic flake
+observed. Vitest configuration/renderer and Metro color warnings remain in logs.
+The first npm lockfile update pruned unrelated entries; only the 12-line exact
+clipboard dependency addition remains. Python was unavailable; Node performed
+the local lockfile cleanup.
+
+TEMP/TMP were repo-local `tmp/overnight/sh1-temp`; logs remain under ignored
+`tmp/overnight/SH1-*`. Next/Turbo telemetry was disabled, exports ran offline,
+and live Quiz flags were disabled. Generated API/web `next-env.d.ts` changes
+were inspected and restored. No temp output, generated bundle, credential or
+private fixture was staged. Initial untracked `UI/`, `apps/mobile/.gitignore`
+and `supabase/` were left alone. Provider/workflow live smoke is NOT APPLICABLE
+to unchanged provider execution; remote/device work is NOT RUN by instruction.
+
+### Owner steps remaining
+
+Rollout and Device checks were **entirely skipped**. Apply new migrations
+`20261015050000_public_reviewer_shares.sql` then
+`20261015050100_revoke_deleted_reviewer_shares.sql` after canonical/SP2
+prerequisites. Deploy API/website; confirm the target preview binary includes
+SDK 57 `expo-clipboard` 57.0.2, or build/install a compatible preview before OTA.
+Confirm the website origin (`EXPO_PUBLIC_WEBSITE_URL`, default existing documented
+`https://stay-focused-ten.vercel.app`) and trusted forwarded-IP behavior.
+The Vercel CLI is unavailable; installing `npm i -g vercel` is recommended for
+the later owner deploy/env/log session. No Vercel CLI command ran here.
+
+Run CIT17 sharing from both platforms, open in a private browser window, read
+and take every quiz format without signing in, verify saved assistance and
+Wikimedia credit/license, absent course images, sign-in returns, explicit update
+with stable token, Stop sharing and deletion killing the link. Check clipboard,
+native sharing, account changes and existing SP1/CQ1/QD1/SP2/SP2b behavior on the
+physical device. Production revisions, applied history/live rows, Scheduler,
+origin/ingress, latency and physical behavior are **UNVERIFIED (owner to confirm)**.
+
+No clean authorized path exists to save a viewer score against another owner's
+quiz after sign-in; this scope returns to the link without a write. Viewer score
+ownership/copying is a follow-up. Study Assist saved exclusively on another
+device is unavailable to the sharing device; cross-device synchronization is
+also a follow-up. Neither gap authorizes work beyond SH1.
+
+No remote service call, remote SQL/migration application, environment-file edit,
+deployment, Cloud Scheduler action, push or outside-repository deletion occurred.

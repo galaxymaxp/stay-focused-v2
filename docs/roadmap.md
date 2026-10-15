@@ -1,5 +1,13 @@
 # Roadmap
 
+## SH1 share reviewer links complete locally (2026-10-16)
+
+**PASS for the finite unattended SH0-approved SH1 code scope.** Owner share/copy/update/stop on web/mobile, anonymous frozen reader and local quiz, saved device assistance, attributed Wikimedia visuals, no private course images, safe sign-in returns, no public AI/database writes, RLS, bounded limiting and revocation/deletion handling are implemented and committed through `147db48`. SP1/CQ1/QD1/SP2/SP2b remain intact; GA1 batch generation is excluded. [Acceptance](ai/acceptance/sh1-public-share-links.md), [ADR-033](architecture/ADR-033-public-share-links.md).
+
+FRESH final forced typecheck/lint/root build **8/8 each, zero cached**; API **2,166 passed/3 existing skips**, mobile **1,068**, shared **264** (includes emitted copies), web **150** passed. Standalone API/web/Android builds **1/1 each**. Six existing lint warnings, zero errors. Failed draft attempts are recorded; no flake observed.
+
+**Owner steps remaining:** Rollout and Device checks entirely skipped: apply migrations `20261015050000`/`20261015050100` after prerequisites, publish API/website and compatible mobile preview (confirm clipboard native module before OTA), then CIT17 anonymous/share/quiz/sign-in/update/stop/deletion and mobile checks. Live revisions, database/Scheduler, website origin/ingress and physical behavior **UNVERIFIED (owner to confirm)**. Score saving after sign-in and cross-device assistance remain follow-ups. No remote service action, env edit, deployment or push. SH1 ends here; no next scope is started.
+
 ## SP2b remaining speed findings complete locally (2026-10-15)
 
 **PASS for the unattended SP2b code scope: findings 4/7/8/10/13, tests, fresh serial gates, documentation and local commits.** Courses opens from stored inventory with zero Canvas calls/writes; Today shares one verified bundle; website WebGL loads after useful content; read handlers shed preparation/document imports; Queue/header/generation detail share one owner-scoped reader and poller. Mobile detail follows screen focus. SP1/CQ1/QD1/SP2 are preserved; GA1 stays STOPPED. Code tip `19028c5`; [acceptance](ai/acceptance/sp2b-read-path-speed.md), [ADR-032](architecture/ADR-032-today-and-job-read-context.md).

@@ -1,5 +1,13 @@
 # Current Sprint
 
+## SH1 finite unattended scope complete locally (2026-10-16)
+
+**PASS for STEP 0-5, fresh serial gates, reconciled docs and local commits.** SH0-approved public snapshot reader/quiz, owner share/copy/update/stop on both platforms, saved assistance and attributed Wikimedia images, explicit privacy allow-list, RLS, bounded limiter and revocation/deletion handling are complete through `147db48`. Public paths make zero auth/model calls and database writes; scores stay in memory. SP1/CQ1/QD1/SP2/SP2b behavior is preserved; GA1 remains excluded. [Acceptance](acceptance/sh1-public-share-links.md), [ADR-033](../architecture/ADR-033-public-share-links.md).
+
+FRESH forced typecheck/lint/root build **8/8 each, zero cached**; API **2,166 passed/3 existing skips in 187 files**, mobile **1,068/1,068 in 112**, shared **264/264 in 25** (includes emitted copies), web **150/150 in 24**. Standalone API/web/Android builds **1/1 each**. Lint zero errors/six existing warnings. Repaired drafts/first attempts retained in acceptance; no nondeterministic flake.
+
+**Owner steps remaining:** entirely skipped Rollout and Device checks, migrations `20261015050000` then `20261015050100` after prerequisites, API/website publication, native clipboard compatibility confirmation or preview rebuild before OTA, then CIT17 private-window/mobile share/read/quiz/sign-in/update/stop/deletion checks. Live production/database/Scheduler/ingress and physical state **UNVERIFIED (owner to confirm)**. Score saving after sign-in and assistance synchronization across devices are follow-ups. No remote service/SQL, env-file edit, deployment, Scheduler action or push. Finite SH1 endpoint reached; no additional roadmap item is started.
+
 ## Tester feedback (2026-10-15)
 
 ### SP2b complete locally
