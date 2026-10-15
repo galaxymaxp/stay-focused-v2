@@ -18,9 +18,10 @@ function harness(admission: 'manual' | 'automatic' = 'manual') {
   });
   const client = { rpc, from } as never;
   const prerender = vi.fn(async () => { expect(committed).toBe(true); });
+  const visuals = vi.fn(async () => ({ found: 0, none: 0, skipped: 0, failed: 0 }));
   const input = { jobId: completed.id, workerId: 'worker', resultType: 'reviewer_generation' as const,
     payload: { reviewer: { title: 'Private title' } }, metrics: {} };
-  return { client, input, completed, rpc, from, eq, prerender, receipt };
+  return { client, input, completed, rpc, from, eq, prerender, visuals, receipt };
 }
 describe('shared manual/automatic Reviewer publication hook', () => {
   it.each(['manual', 'automatic'] as const)('%s generation invokes pre-render once after the completion transaction', async admission => {
@@ -31,6 +32,7 @@ describe('shared manual/automatic Reviewer publication hook', () => {
     expect(h.eq).toHaveBeenCalledWith('generation_job_id', h.completed.id);
     expect(h.eq).toHaveBeenCalledWith('user_id', 'owner');
     expect(h.prerender).toHaveBeenCalledExactlyOnceWith(h.client, { userId: 'owner', artifactId: 'artifact' });
+    expect(h.visuals).toHaveBeenCalledExactlyOnceWith(h.client, { userId: 'owner', artifactId: 'artifact' });
   });
   it.each(['manual', 'automatic'] as const)('keeps %s generation succeeded if pre-render unexpectedly throws', async admission => {
     const h = harness(admission); h.prerender.mockRejectedValueOnce(new Error('Private source text/path/provider error'));
