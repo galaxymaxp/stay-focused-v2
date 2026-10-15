@@ -3118,3 +3118,78 @@ Unrelated untracked UI/, apps/mobile/.gitignore and supabase/ were preserved.
 
 Final docs hygiene first found one extra sprint EOF blank line; repaired, then
 final diff/staged-diff checks passed with zero errors.
+
+## GA1 unattended course batch generation (2026-10-15)
+
+**Status: STOPPED at STEP 0**, as required by UNATTENDED rules 3/4 and
+"Verify (STOP on any surprise)". Inspected HEAD `65c9150` on
+`overnight/2026-10-15_feedback`; branch/QD1 PASS/clean tracked tree prerequisites
+passed **3/3 FRESH**. Unrelated untracked UI/, apps/mobile/.gitignore and
+supabase/ were preserved. No product code, migration or later step was started.
+
+**Findings:** EP1 manual admission reads preparation then admits preparation and
+throws `409 not_ready`, without creating a Reviewer job or durable explicit
+intent (`apps/api/src/lib/experience/generation.ts:44`, line 49; existing test at
+`generation.test.ts:37`). Completion wakes only automatic admission
+(`canvas-preparation/orchestration.ts:107`), which skips Auto opt-out, baseline
+material and past courses. E2's `packages/shared/src/reviewer-estimate.ts:21`
+requires a saved reviewer and estimates study/recall time; it cannot supply
+pre-generation wall-clock minutes. These contradict the requested reusable
+prerequisites, rather than merely lacking live confirmation.
+
+**AG1/AG2 coverage finding:** coverage is incomplete by design, not just hidden.
+`apps/api/src/lib/auto-reviewers/admission.ts:152` baselines initial material;
+line 64 requires a valid newer timestamp; lines 53-60 limit File/Page eligibility;
+line 132 honors Auto off; lines 15-18/179/191/236 enforce three/run, five/rolling
+day, three attempts and run budget. Lines 225-234 skip mapped existing material
+and wait for preparation. Existing mapped-reviewer presence does not prove the
+current revision is up to date (`experience/service.ts:374`). `after-sync.ts:13`
+skips past courses. `poll-trigger.ts:13` only detects new File/Page module items
+from complete prior evidence, and line 45 reserves a capped sync. QD1 shows
+admitted jobs, not the ungenerated backlog. Live student inventory was not read.
+
+**Quota:** server enforcement does exist. The transaction-serialized trigger in
+`packages/db/migrations/20260723090006_processing_quota_concurrency_hardening.sql:15`
+enforces active/hourly/queued/daily caps on normal job insertion. Reuse it;
+`study-tools.ts:310` explicitly says its in-memory limiter is not a durable quota.
+The no-server-quota STOP condition is not triggered. Full reuse inventory,
+actual mobile/web course routes, ownership/idempotency and evidence are in
+[GA1 audit](acceptance/ga1-course-batch-generation.md); ADR-030 is deferred.
+
+**Exact questions for the owner (recorded, not sent during unattended work):**
+
+1. May GA1 add a durable explicit batch-intent receipt/resumer independent of
+   Auto preference/baseline, including explicitly opened past courses, while
+   retaining server quotas for every eventual Reviewer?
+2. Should confirmation use a new, separately labelled coarse generation-duration
+   estimate, or omit minutes until supported? E2 remains a saved-reviewer
+   study-time estimate and cannot honestly supply generation duration.
+
+**Commits:** `2c0a02b docs: record GA1 prerequisite contradictions`; accompanying
+`docs: checkpoint GA1 unattended stop` reconciles current-state/roadmap/sprint
+and this footer. Exact final commit IDs are in `tmp/overnight/GA1.status`.
+The external feedback roadmap's GA1 status is also updated locally.
+
+**Gates/counts:** forced typecheck **NOT RUN (0 tasks)**; forced lint **NOT RUN
+(0 tasks)**; API/mobile/shared/web tests **NOT RUN (0 tests each)**; API/web/Android
+builds **NOT RUN (0 each)** because the mandatory stop preceded implementation.
+`git diff --check` and `git diff --cached --check`: **FRESH PASS, 0 whitespace
+errors each** for documentation. No cached product result is claimed; no suite
+was run, no product gate failure or flake occurred. Read-only discovery had
+Windows wildcard/path misses, resolved by locating real paths; no private
+fixture/temp output was created. All tmp files remain uncommitted.
+
+**UNVERIFIED (owner to confirm):** deployed API/web/worker revisions, applied
+migration/database rows, Cloud Scheduler state, CIT17 material/reviewer counts
+and physical behavior. Local absence of the explicit intent/generation estimator
+is proven from code, not inferred from missing production access.
+
+**Owner steps remaining:** resolve the two questions and revise prerequisites;
+resume GA1 STEP 1-3, fresh serial gates and scoped API/mobile/web/docs commits.
+Rollout and Device checks were entirely skipped: after code acceptance, apply
+any new migration via Supabase connector (filename as name), deploy API/website,
+publish preview OTA, then CIT17 Generate all on realme/website: skip current
+reviewers, confirm honest count/time/quota remainder, normal QD1 jobs/summary,
+independent Retry and SP1/CQ1 preservation. No remote service call, remote SQL,
+migration application, deployment, Scheduler action, environment-file edit, push
+or file deletion occurred. GA1 remains STOPPED; no later item was started.

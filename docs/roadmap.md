@@ -1,5 +1,24 @@
 # Roadmap
 
+## Tester feedback GA1 stopped at STEP 0 (2026-10-15)
+
+**STOPPED, no product implementation.** Inspection at `65c9150` found two
+contradictions in the prompt prerequisites: EP1 has no durable explicit Reviewer
+wait-for-prepared intent (manual admission returns `409 not_ready`), and E2 is a
+saved-reviewer study-time estimate, not a pre-generation duration estimate.
+Existing server quota enforcement is reusable. AG1/AG2 leave the baseline
+backlog out and cap later automatic admissions; this is a coverage gap.
+Audit commit `2c0a02b`; [evidence and exact owner questions](ai/acceptance/ga1-course-batch-generation.md),
+[deferred ADR-030](architecture/ADR-030-course-batch-generation.md).
+
+FRESH baseline prerequisites **3/3 PASS**; product typecheck/lint/test/build gates
+**NOT RUN**, zero executed. Documentation whitespace checks: zero errors.
+Owner steps remaining: resolve durable explicit intent and honest estimate
+semantics before resuming GA1, then implementation, fresh gates and the entirely
+skipped Rollout/Device checks. Live production/database/Scheduler/CIT17/device
+state **UNVERIFIED (owner to confirm)**. No remote action, env edit or push.
+QD1 remains locally complete; GA1 is not PASS and no later item was started.
+
 ## Tester feedback QD1 complete locally (2026-10-15)
 
 **PASS for the unattended QD1 code scope (STEP 0-4, gates, docs and local commits).** Queue now opens over the current screen from the mobile/web header. Shared owner-scoped sources replace duplicate list polling, with running-only badges, unseen failure dots, progress, Retry, and the latest five completed entries from the existing bounded Queue window. Mobile keeps Auto, pending request recovery and outside/Back dismissal; web has native keyboard activation, focus entry/return and Escape/outside dismissal. Old Queue routes open the overlay; the separate processing notification target, SP1 and CQ1 remain intact. Code tip: `1183369`; [acceptance](ai/acceptance/qd1-queue-dropdown.md), [ADR-029](architecture/ADR-029-queue-dropdown.md).

@@ -1,5 +1,24 @@
 # Current State
 
+## GA1 stopped at prerequisite audit (2026-10-15)
+
+**STOPPED at STEP 0 under the unattended prompt's code-surprise rule.** EP1
+returns `409 not_ready` without retaining explicit Reviewer intent for pending
+preparation; only eligible automatic candidates resume after preparation. E2
+estimates saved-reviewer study time, not generation duration. Existing server
+quota enforcement is reusable. No product or migration change was made.
+The [audit](ai/acceptance/ga1-course-batch-generation.md) records exact evidence,
+AG1/AG2 coverage gaps, reusable paths and the two owner questions; [ADR-030](architecture/ADR-030-course-batch-generation.md)
+is deferred. QD1 remains PASS locally; SP1/CQ1 behavior is unchanged.
+
+FRESH baseline prerequisites **3/3 PASS**; product gates **NOT RUN** (zero
+typecheck/lint tasks, tests or builds). Documentation whitespace checks pass
+with zero errors. Owner steps remaining: resolve explicit intent resumption and
+confirmation-time semantics, resume implementation/gates, then perform the
+entirely skipped Rollout and Device checks. Production/database/Scheduler/CIT17
+and physical state are **UNVERIFIED (owner to confirm)**. No remote service,
+environment-file edit, deployment or push occurred.
+
 ## QD1 header Queue complete locally (2026-10-15)
 
 **PASS for the unattended QD1 code scope (STEP 0-4, gates, docs and local commits).** Queue now opens over the current screen from the mobile/web header. Shared owner-scoped sources replace duplicate list polling, with running-only badges, unseen failure dots, progress, Retry, and the latest five completed entries from the existing bounded Queue window. Mobile keeps Auto, pending request recovery and outside/Back dismissal; web has native keyboard activation, focus entry/return and Escape/outside dismissal. Old Queue routes open the overlay; the separate processing notification target, SP1 and CQ1 remain intact. Code tip: `1183369`; [acceptance](ai/acceptance/qd1-queue-dropdown.md), [ADR-029](architecture/ADR-029-queue-dropdown.md).

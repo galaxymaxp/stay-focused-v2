@@ -2,6 +2,22 @@
 
 ## Tester feedback (2026-10-15)
 
+- GA1 **STOPPED at STEP 0**, inspected `65c9150`; audit `2c0a02b`.
+  [Evidence/owner questions](acceptance/ga1-course-batch-generation.md),
+  [deferred ADR-030](../architecture/ADR-030-course-batch-generation.md).
+  EP1 returns `409 not_ready` without durable explicit Reviewer intent while
+  preparation is pending; its automatic wakeup cannot cover baseline material,
+  Auto opt-out or explicit past courses. E2 estimates saved-reviewer study time,
+  not generation duration. These code contradictions trigger the unattended
+  STOP rule. Server quota enforcement exists; no product change was made.
+- GA1 FRESH baseline **3/3 PASS**, documentation diff/staged checks **0 errors**.
+  Product typecheck/lint/tests/builds **NOT RUN**, zero executed, no cached
+  verification claimed. Owner steps remaining: resolve the two recorded
+  questions, resume GA1 implementation/gates, then entirely skipped Rollout and
+  Device checks. Live revisions/database/Scheduler/CIT17/physical behavior
+  **UNVERIFIED (owner to confirm)**. No remote service, env edit, deploy or push.
+  No later roadmap work was started; existing SP1/CQ1/QD1 stays intact.
+
 - QD1 **PASS locally**, finite STEP 0-4/gates/docs/local commits only. Code `1183369`; [acceptance](acceptance/qd1-queue-dropdown.md), [ADR-029](../architecture/ADR-029-queue-dropdown.md). Header dropdown/popover on both apps, one adaptive owner-scoped poller, running badge/unseen error dot, progress/Retry/Open, latest five finished entries, retained mobile Auto/local requests, old-route recovery and web focus/Esc are implemented. Processing notification route, SP1 saved-first and CQ1 filtering remain intact.
 - QD1 FRESH final serial: forced typecheck/lint/root build **8/8 each, zero cached**; mobile **1,056/1,056 (110 files)**, web **113/113 (20 files)**; standalone API/web/Android builds **1/1 each**; zero skips, zero lint errors, six existing warnings. First failures and deterministic harness repairs retained; no product flake observed. API/shared tests **NOT APPLICABLE** (source unchanged).
 - QD1 **Owner steps remaining:** website deployment, preview OTA, then entirely skipped realme/website Rollout/Device checks for badge, overlay, Retry/Open, old links, outside/Back, Reduce Motion and web keyboard/focus. Revisions/live database/Scheduler/physical behavior **UNVERIFIED (owner to confirm)**. No remote service action, migration application, env-file edit, deployment, Scheduler change or push. Next separate item GA1; do not start it in this run.
