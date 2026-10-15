@@ -271,9 +271,10 @@ export function useQueueGroups() {
 
 export function useJobRead(id: string | null) {
   const source = useQueueItems();
+  const { watchDetail } = source;
   useEffect(
-    () => (id ? source.watchDetail(id) : undefined),
-    [id, source.watchDetail],
+    () => (id ? watchDetail(id) : undefined),
+    [id, watchDetail],
   );
   const known = !!id && source.data?.detailId === id;
   const detail = known ? source.data?.detail : null;

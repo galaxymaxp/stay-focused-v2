@@ -157,9 +157,10 @@ export function QueueReadProvider({ children }: { children: ReactNode }) {
 export function useQueueItems(open = false, hidden: readonly string[] = []) {
   const source = useContext(QueueReadContext);
   if (!source) throw new Error("Queue read provider is missing");
+  const { markSeen } = source;
   useEffect(() => {
-    if (open) source.markSeen();
-  }, [open, source.markSeen]);
+    if (open) markSeen();
+  }, [open, markSeen]);
   return {
     ...source,
     sections: queueItems(source.data?.jobs ?? [], hidden),
@@ -168,9 +169,10 @@ export function useQueueItems(open = false, hidden: readonly string[] = []) {
 }
 export function useJobRead(id: string | null) {
   const source = useQueueItems();
+  const { watchDetail } = source;
   useEffect(
-    () => (id ? source.watchDetail(id) : undefined),
-    [id, source.watchDetail],
+    () => (id ? watchDetail(id) : undefined),
+    [id, watchDetail],
   );
   const known = !!id && source.data?.detailId === id;
   const detail = known ? source.data?.detail : null;

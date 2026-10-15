@@ -11,6 +11,7 @@ import type {
   LibraryArtifactSummary,
   LibraryOverview,
   TodayOverview,
+  TodayScreenData,
 } from "@stay-focused/shared";
 import { GenerateCourseScreen, GenerateMaterialScreen, GenerateScreen } from "./GenerateScreen";
 import { ArtifactScreen, LibraryCourseScreen, LibraryScreen } from "./LibraryScreen";
@@ -324,6 +325,15 @@ const workspace: CourseLearningWorkspace = {
     calendar: unavailable,
   },
 };
+function todayFixture(): TodayScreenData {
+  return {
+    date: localDate(), utcOffsetMinutes: -new Date().getTimezoneOffset(), asOf: new Date().toISOString(),
+    progress: { completed: 0, total: 0, scheduledMinutes: 0 }, urgent: [], current: null, next: null,
+    later: [], overdue: [], upcomingDeadlines: [], timeline: [],
+    plannerState: { status: 'not_planned', lastPlannedAt: null, needsTaskImport: false },
+    capabilities: workspace.capabilities, announcements: { items: [], nextOffset: null }, activities: { items: [] },
+  };
+}
 const ringTouch = (root: ReactTestRenderer["root"]) => root.findAll((node) => node.props.testID === "day-ring-touch")[0]!;
 /** A touch at a design point on the 340-point clock (scale 1 at this window width). */
 const touchAt = (x: number, y: number) => ({ nativeEvent: { locationX: x, locationY: y } });
@@ -853,9 +863,12 @@ describe("B25 screen interactions", () => {
   });
   it("has no pull-to-refresh on Today, and pauses scrolling while the ring is held", async () => {
     vi.useFakeTimers();
-    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
     const root = await render(createElement(TodayScreen));
     const page = () => root.findAll((node) => String(node.type) === "Page")[0]!;
+    expect(new Set(mocks.paths)).toEqual(new Set([
+      `/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+    ]));
     expect(page().props.onRefresh).toBeUndefined();
     const overlay = ringTouch(root);
     const clock = root.findByType(DayRingClock).props;
@@ -870,7 +883,7 @@ describe("B25 screen interactions", () => {
   });
 
   it("keeps Today quiet: no sync line, no free-time or hint text", async () => {
-    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
     const root = await render(createElement(TodayScreen));
     const text = copyText(root).join(" ");
     expect(root.findAll((node) => String(node.type) === "SyncStatus")).toHaveLength(0);
@@ -929,10 +942,11 @@ describe("B25 screen interactions", () => {
     expect(overlay.props.onShouldBlockNativeResponder()).toBe(false);
   });
   it("sends a planner preview when the ring is committed, never applying silently", async () => {
-    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
     mocks.data[
       `/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`
     ] = {
+      ...todayFixture(),
       timeline: [],
       next: null,
       later: [],
@@ -1090,8 +1104,9 @@ describe("B25 screen interactions", () => {
   it("pins Today items with a swipe right, keeps the real next item, and hides with a swipe left for the day", async () => {
     type Action = { key: string; onPress: () => void };
     const make = (id: string, title: string) => ({ id, kind: "canvas_activity", title, course: { id: "c", code: "CIT17", name: "CIT17" }, startAt: null, endAt: null, dueAt: null, estimatedMinutes: null, priority: "medium", status: "unknown", source: "canvas", deepLinkTarget: { surface: "activity", id } });
-    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
     mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = {
+      ...todayFixture(),
       timeline: [], next: make("next", "Next actual item"), later: [make("later", "IT Security reviewer")], upcomingDeadlines: [], plannerState: { needsTaskImport: false },
     } as unknown as TodayOverview;
     mocks.prefs.pinned.today = ["later"];
@@ -1115,8 +1130,9 @@ describe("B25 screen interactions", () => {
   });
 
   it("never asks the student to add Canvas work to Tasks, and shows plain deadlines", async () => {
-    mocks.data["/api/experience/capabilities"] = workspace.capabilities;
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
     mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = {
+      ...todayFixture(),
       timeline: [],
       next: { id: "canvas:a", kind: "canvas_activity", title: "Midterm Seminar", course: { id: "c", code: "CIT5", name: "CIT5" }, startAt: null, endAt: null, dueAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), estimatedMinutes: null, priority: "medium", status: "unknown", source: "canvas", deepLinkTarget: { surface: "activity", id: "canvas:a" } },
       later: [],
