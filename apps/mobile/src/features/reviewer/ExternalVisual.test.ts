@@ -4,12 +4,12 @@ import { afterEach,describe,expect,it,vi } from 'vitest';
 import { Image,Pressable,Text } from 'react-native';
 import { Sheet } from '../../design/primitives';
 import { ExternalVisual } from './ExternalVisual';
-import { EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
+import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
 const mocks=vi.hoisted(()=>({find:vi.fn(),link:vi.fn(async()=>{})}));
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
 vi.mock('../../design/theme',async()=>{const tokens=await import('../../design/themeTokens');return {useTheme:()=>({colors:tokens.palettes.light,reducedMotion:true})};});
-vi.mock('./SourcePageSnapshot',()=>({ZoomablePage:({url,label}:{url:string;label:string})=>createElement('ZoomablePage',{url,label})}));
+vi.mock('./SourcePageSnapshot',()=>({ZoomablePage:({url,label,headers}:{url:string;label:string;headers?:Readonly<Record<string,string>>})=>createElement('ZoomablePage',{url,label,headers})}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),findExternalVisual:mocks.find}));
 Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
 const baseProps={client:{baseUrl:'https://local.test',accessToken:'jwt'},artifactId:'artifact',sectionId:'s',online:true,hasSourceVisual:false};
@@ -26,8 +26,9 @@ describe('automatic separate external card',()=>{
   });
   it('displays the batch image without a section search and labels its zoom sheet',async()=>{
     mocks.find.mockResolvedValue(found);await mount();expect(mocks.find).not.toHaveBeenCalled();
-    expect(tree!.root.findByType(Image).props.source).toEqual({uri:found.image});expect(text()).toContain(EXTERNAL_VISUAL_LABEL);
+    expect(tree!.root.findByType(Image).props.source).toEqual({uri:found.image,headers:EXTERNAL_IMAGE_HEADERS});expect(text()).toContain(EXTERNAL_VISUAL_LABEL);
     await act(async()=>button('View external reference').props.onPress());expect(tree!.root.findByType(Sheet).props.title).toBe('External reference');
+    expect(tree!.root.findByType('ZoomablePage' as never).props.headers).toEqual(EXTERNAL_IMAGE_HEADERS);
     expect(text().filter(t=>t===EXTERNAL_VISUAL_LABEL)).toHaveLength(2);
     await act(async()=>button('View attribution on Wikimedia Commons').props.onPress());expect(mocks.link).toHaveBeenCalledWith(found.sourceUrl);
     await act(async()=>button('View image license').props.onPress());expect(mocks.link).toHaveBeenCalledWith(found.licenseUrl);
