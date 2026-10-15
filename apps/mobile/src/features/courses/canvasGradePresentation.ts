@@ -266,7 +266,7 @@ export function formatDateTime(value: string | null): string {
   }
   return date.toLocaleString(undefined, {
     day: "numeric",
-    hour: "numeric",
+    hour: "numeric", hour12: true,
     minute: "2-digit",
     month: "short",
     year: "numeric",

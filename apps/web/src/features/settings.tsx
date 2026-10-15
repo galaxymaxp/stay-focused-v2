@@ -2,6 +2,7 @@
 import { useAuth } from "../components/providers";
 import { Heading, Notice, RowLink } from "../components/ui";
 import { useAction } from "../lib/hooks";
+import { NotificationSettings } from "./notification-settings";
 export function SettingsScreen() {
   const { session, client, theme, setTheme } = useAuth(),
     action = useAction();
@@ -45,6 +46,7 @@ export function SettingsScreen() {
             ))}
           </div>
         </section>
+        <NotificationSettings />
         <section className="stack settings-links">
           <h2>Connections and work</h2>
           <RowLink

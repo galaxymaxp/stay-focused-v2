@@ -3,14 +3,31 @@ import type {
   GenerationRequest,
   StructuredOutputSchema,
 } from "@stay-focused/engine";
-import OpenAI from "openai";
-import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
+import OpenAI, { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } from "openai";
+import type { Response, ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 
 import { REVIEWER_PROVIDER_CALL_TIMEOUT_MS } from "../lib/processing-jobs/constants";
 
 // Each generation call has a provider-level deadline. The durable worker may
 // retry a retryable job, but no individual HTTP call may wait indefinitely.
 export const OPENAI_PROVIDER_REQUEST_TIMEOUT_MS = REVIEWER_PROVIDER_CALL_TIMEOUT_MS;
+
+export type ProviderFailureKind =
+  | "timeout" | "network"
+  | "http_error" | "rate_limited"
+  | "incomplete" | "empty" | "invalid_json" | "not_object";
+
+export class ProviderCallError extends Error {
+  public constructor(
+    public readonly kind: ProviderFailureKind,
+    public readonly details: { readonly httpStatus?: number; readonly incompleteReason?: string; readonly model: string },
+  ) {
+    super(`provider_${kind}`);
+    this.name = "ProviderCallError";
+  }
+}
+
+export const PROVIDER_OUTCOME_UNKNOWN: ReadonlySet<ProviderFailureKind> = new Set(["timeout", "network"]);
 
 export interface OpenAIJsonSchemaFormat {
   readonly type: "json_schema";
@@ -28,7 +45,7 @@ export interface OpenAIResponsesCreateRequest {
   readonly instructions?: string;
   readonly max_output_tokens?: number;
   readonly model: string;
-  readonly input: string;
+  readonly input: string | { role: 'user'; content: ({ type: 'input_text'; text: string } | { type: 'input_image'; image_url: string; detail: 'low' })[] }[];
   readonly temperature?: number;
   readonly reasoning?: { readonly effort: "low" | "medium" | "high" };
   readonly text: OpenAITextFormat;
@@ -41,6 +58,8 @@ export interface OpenAIOutputTextItem {
 }
 
 export interface OpenAIResponsesCreateResponse {
+  readonly status?: Response["status"];
+  readonly incomplete_details?: Response["incomplete_details"];
   readonly output_text?: string;
   readonly output?: readonly OpenAIOutputTextItem[];
 }
@@ -93,6 +112,19 @@ export class OpenAIProvider implements GenerationProvider {
   public async generate<TOutput>(
     request: GenerationRequest<TOutput>,
   ): Promise<TOutput> {
+    return this.generateResponse(request);
+  }
+
+  /** Vision stays on the same typed Responses adapter, key and error boundary. */
+  public async generateWithImage<TOutput>(request: GenerationRequest<TOutput>, imageUrl: string): Promise<TOutput> {
+    const url = new URL(imageUrl);
+    if (url.protocol !== 'https:' || url.hostname !== 'upload.wikimedia.org' || url.username || url.password || url.port) {
+      throw new Error('invalid_vision_image');
+    }
+    return this.generateResponse(request, url.href);
+  }
+
+  private async generateResponse<TOutput>(request: GenerationRequest<TOutput>, imageUrl?: string): Promise<TOutput> {
     if (!request || typeof request !== "object") {
       throw new Error("OpenAIProvider.generate requires a request.");
     }
@@ -108,7 +140,7 @@ export class OpenAIProvider implements GenerationProvider {
     const model = readNonEmptyString(request.model) ?? this.defaultModel;
     const openAIRequest: OpenAIResponsesCreateRequest = {
       model,
-      input: prompt,
+      input: imageUrl ? [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_image', image_url: imageUrl, detail: 'low' }] }] : prompt,
       ...(request.instructions ? { instructions: request.instructions } : {}),
       ...(request.maxOutputTokens ? { max_output_tokens: request.maxOutputTokens } : {}),
       ...(request.temperature !== undefined
@@ -130,25 +162,39 @@ export class OpenAIProvider implements GenerationProvider {
     try {
       response = await this.client.responses.create(openAIRequest);
     } catch (error) {
-      throw new Error(
-        `OpenAI provider request failed for model "${model}": ${errorMessage(error)}`,
-      );
+      if (error instanceof APIConnectionTimeoutError || error instanceof APIUserAbortError ||
+          (error instanceof Error && error.name === "AbortError")) {
+        throw new ProviderCallError("timeout", { model });
+      }
+      if (error instanceof APIConnectionError) throw new ProviderCallError("network", { model });
+      if (isRecord(error) && typeof error.status === "number") {
+        throw new ProviderCallError(error.status === 429 ? "rate_limited" : "http_error", { model, httpStatus: error.status });
+      }
+      throw new ProviderCallError("network", { model });
+    }
+
+    if (response.status === "incomplete") {
+      const reason = response.incomplete_details?.reason;
+      throw new ProviderCallError("incomplete", {
+        model,
+        ...(reason === "max_output_tokens" || reason === "content_filter" ? { incompleteReason: reason } : {}),
+      });
     }
 
     const outputText = extractOutputText(response);
     if (!outputText) {
-      throw new Error("OpenAIProvider received an empty response.");
+      throw new ProviderCallError("empty", { model });
     }
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(outputText);
     } catch {
-      throw new Error("OpenAIProvider received invalid JSON output.");
+      throw new ProviderCallError("invalid_json", { model });
     }
 
     if (!isRecord(parsed)) {
-      throw new Error("OpenAIProvider received JSON output that is not an object.");
+      throw new ProviderCallError("not_object", { model });
     }
 
     return parsed as TOutput;
@@ -205,7 +251,7 @@ function createOpenAIResponsesClient(apiKey: string, timeoutMs = OPENAI_PROVIDER
           ...(request.reasoning ? { reasoning: { effort: request.reasoning.effort } } : {}),
         };
         const response = await client.responses.create(sdkRequest);
-        return { output_text: response.output_text };
+        return { output_text: response.output_text, status: response.status, incomplete_details: response.incomplete_details };
       },
     },
   };
@@ -267,8 +313,4 @@ function readNonEmptyString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -6,6 +6,9 @@ import { decryptConnectionToken } from "@/lib/canvas-routes";
 import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import { createCanvasAnnouncementsSnapshotPayload, createCanvasCourseSnapshotPayload } from "@/lib/canvas-sync-normalize";
 import { canonicalSerialize } from "@/lib/canvas-sync-fingerprint";
+import { detectNewInstructionalModuleItems, maybeRequestContentSync, moduleItemIds } from "@/lib/auto-reviewers/poll-trigger";
+import { reconcilePreparationCourse } from '@/lib/canvas-preparation/orchestration';
+import { BACKFILL_POLL_RESERVE_MS, processPreparationBackfill } from '@/lib/canvas-preparation/backfill';
 
 type Client = SupabaseClient<Database>;
 const hash = (value: unknown) => createHash("sha256").update(canonicalSerialize(value)).digest("hex");
@@ -90,6 +93,20 @@ export async function pollCanvasCourse(client: Client, row: CanvasCourseRow, wor
   if (authenticationFailed) { await markCanvasReconnectRequired(client, connection); return { failures }; }
   const applied = await client.rpc("apply_canvas_notification_metadata_v1", { p_course_id: row.id, p_worker_id: workerId, p_payload: { ...payload, fingerprints }, p_error: failures ? "canvas_metadata_scope_unavailable" : null });
   if (applied.error) throw new Error("canvas_notification_persistence_failed");
+  if (Array.isArray(payload.moduleItems)) {
+    try{await reconcilePreparationCourse(client,{userId:row.user_id,courseId:row.id,drainDeferred:true});}
+    catch{console.warn('canvas_preparation.poll_reconciliation_unavailable');}
+    // Marks are independent of scope hashes, which cannot retain item identity.
+    // Failed scopes and failed applies leave the previous complete evidence intact.
+    try {
+      const marks = await client.from("canvas_auto_reviewer_poll_marks").select("last_seen_module_item_ids").eq("course_id", row.id).maybeSingle();
+      if (marks.error) throw new Error("poll_marks_unavailable");
+      const newIds = detectNewInstructionalModuleItems(marks.data?.last_seen_module_item_ids, payload);
+      const saved = await client.from("canvas_auto_reviewer_poll_marks").upsert({ course_id: row.id, last_seen_module_item_ids: moduleItemIds(payload), updated_at: new Date().toISOString() });
+      if (saved.error) throw new Error("poll_marks_unavailable");
+      if (newIds.length) await maybeRequestContentSync(client, { userId: row.user_id, courseId: row.id, newItemCount: newIds.length, now: Date.now() });
+    } catch { console.error("auto_reviewers.poll_marks_unavailable", { requested: 0 }); }
+  }
   if (deferMs > 300_000) {
     const deferred = await client.from("canvas_notification_poll_state").update({ next_poll_at: new Date(Date.now() + deferMs).toISOString() }).eq("course_id", row.id);
     if (deferred.error) throw new Error("canvas_notification_defer_failed");
@@ -100,7 +117,7 @@ export async function pollCanvasCourse(client: Client, row: CanvasCourseRow, wor
 export async function processCanvasMetadataPolls(client: Client, workerId: string, deadline: number): Promise<{ courses: number; failed: number }> {
   let courses = 0;
   let failed = 0;
-  while (courses < 20 && Date.now() + 45_000 < deadline) {
+  while (courses < 20 && Date.now() + 45_000 + BACKFILL_POLL_RESERVE_MS < deadline) {
     const claim = await client.rpc("claim_canvas_notification_course_v1", { p_worker_id: workerId });
     if (claim.error) throw new Error("canvas_notification_claim_failed");
     const course = claim.data?.[0];
@@ -113,5 +130,7 @@ export async function processCanvasMetadataPolls(client: Client, workerId: strin
       if (release.error) throw new Error("canvas_notification_release_failed");
     }
   }
+  try { await processPreparationBackfill(client, workerId, deadline); }
+  catch { console.warn('canvas_preparation.backfill_unavailable'); }
   return { courses, failed };
 }

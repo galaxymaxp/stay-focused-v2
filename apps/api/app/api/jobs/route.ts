@@ -701,6 +701,7 @@ function jsonResponse(
 
 function createCorsHeaders(origin: string | null): HeadersInit {
   return {
+    "Cache-Control": "private, no-store",
     ...(origin ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
     "Access-Control-Allow-Headers": CORS_ALLOWED_HEADERS,
     "Access-Control-Allow-Methods": CORS_ALLOWED_METHODS,

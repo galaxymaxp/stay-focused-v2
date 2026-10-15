@@ -116,6 +116,7 @@ export interface ProcessingJobSourceMetadata {
 }
 
 export interface ProcessingJobStatusView {
+  readonly origin?: "automatic" | "manual";
   readonly id: string;
   readonly jobType: ProcessingJobType;
   readonly status: ProcessingJobStatus;
@@ -224,5 +225,9 @@ export type * from './experience';
 
 export type * from './quiz';
 export * from './quiz-capacity';
+export * from './quiz-title';
 export * from './study-assist';
 export * from './study-tools';
+export * from './reviewer-estimate';
+
+export * from './quiz-grading';

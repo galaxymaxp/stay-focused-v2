@@ -1,3 +1,4 @@
+import { OFFICE_MIME, OFFICE_STRUCTURE_VERSION } from './activity-maker/office-extraction';
 import type {
   CanvasAnnouncementRow,
   CanvasAssignmentRow,
@@ -19,7 +20,7 @@ import type {
 } from "@stay-focused/db";
 import type { OcrProvider } from "@stay-focused/ocr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
+
 import {
   CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST,
   classifyDirectlyAccessiblePageFile,
@@ -29,11 +30,11 @@ import {
 import { readConnection } from "@/lib/canvas-routes";
 import {
   classifyStoredCanvasFileKind,
-  extractPreparedCanvasFileText,
   isPreparedCanvasFileReadyForOcr,
   type CanvasStoredFileExtractionResult,
   type CanvasStoredFileKind,
 } from "@/lib/canvas-stored-file-extraction";
+import { extractCanvasPreparedFileText as extractPreparedCanvasFileText,loadPreparedPageEvidence } from '@/lib/canvas-preparation/cache';
 import {
   assembleSelectedCanvasBlocks,
   assembleSourceBlocks,
@@ -65,7 +66,7 @@ import {
   resolveCanvasUsableContent,
   type CanvasUsableContentMethod,
 } from "@/lib/canvas-usable-content";
-import { createServerOcrProvider } from "@/lib/ocr/create-server-ocr-provider";
+
 import { OCR_MAX_IMAGE_BYTES, OCR_MAX_PDF_BYTES } from "@/lib/ocr/upload-policy";
 import { REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS } from "@/lib/reviewer-generation-limits";
 import {
@@ -83,7 +84,7 @@ import {
 } from "@/lib/reviewer-source-provenance";
 import type {
   CanvasApiErrorCode,
-  CanvasFileIngestionResultStatus,
+
 } from "@/types/canvas";
 
 export const CANVAS_REVIEWER_MAX_SOURCES = 8;
@@ -94,6 +95,9 @@ export const CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS = 120;
 export const CANVAS_REVIEWER_SOURCE_LIST_LIMIT = 100;
 export const CANVAS_REVIEWER_SOURCE_LIST_MAX_OFFSET = 1_000;
 export const CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE = 150;
+export const CANVAS_REVIEWER_INVENTORY_PAGE_SIZE = 200;
+/** Per owned course and type. A full final page is incomplete, never success. */
+export const CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE = 50;
 export const CANVAS_REVIEWER_EXISTING_GENERATE_LIMIT =
   REVIEWER_GENERATE_MAX_SOURCE_TEXT_CHARS;
 
@@ -139,6 +143,7 @@ export interface CanvasReviewerSourcePlacement {
 
 export type CanvasReviewerFilePreparationStatus =
   | "ready"
+  /** @deprecated Use descriptor.preparation; retained for older mobile builds. */
   | "not_prepared"
   | "failed"
   | "blocked"
@@ -152,6 +157,7 @@ export interface CanvasReviewerFileState {
 }
 
 export interface CanvasReviewerSourceDescriptor {
+  readonly preparation?: import('@stay-focused/shared').MaterialPreparation;
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
   readonly title: string;
@@ -364,12 +370,21 @@ export async function listCanvasReviewerSources({
   courseId,
   limit,
   offset,
+  completeInventory = false,
+  includePreparationStatus = true,
+  includeClientPreparationStatus = false,
   userId,
 }: {
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
   readonly limit?: number;
   readonly offset?: number;
+  /** Server orchestration only; HTTP list callers retain their existing paging. */
+  readonly completeInventory?: boolean;
+  /** Internal eligibility scans may batch revision receipts separately. */
+  readonly includePreparationStatus?: boolean;
+  /** Explicit opt-in because older Canvas clients reject unknown fields. */
+  readonly includeClientPreparationStatus?: boolean;
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<CanvasReviewerSourceList>> {
   const course = await loadStoredSelectedCanvasCourse({
@@ -391,14 +406,33 @@ export async function listCanvasReviewerSources({
     return sources;
   }
 
-  const ordered = sources.value
+  const candidates = sources.value
     .filter((source) => !source.excludeFromGenerate)
     .map((source) => source.descriptor)
     .filter(isCanvasGenerateCandidate)
     .sort(compareSources);
+  const ordered:CanvasReviewerSourceDescriptor[]=[];
+  const {lookupMaterialPreparation}=await import('@/lib/canvas-preparation/admission');
+  for(const source of candidates){
+    if(completeInventory && !includePreparationStatus){ordered.push(source);continue;}
+    if(source.file && (!source.file.canPrepare && source.file.preparationStatus!=='ready')){ordered.push(source);continue;}
+    const job=await lookupMaterialPreparation(client,{userId,courseId,materialId:source.id});
+    if(job?.state==='prepared' && job.result_id){ordered.push(source);continue;}
+    if(!job && source.file && source.file.preparationStatus!=='ready'){ordered.push(source);continue;}
+    const failed=job?.state==='failed';
+    ordered.push({...source,availability:'unavailable',capability:failed?'failed':'needs_preparation',
+      unavailableReason:failed?'Preparation failed. Try preparing this material again.':'This material is being prepared.',
+      file:source.file?{...source.file,preparationStatus:failed?'failed':'not_prepared',canPrepare:true}:null});
+  }
   const normalizedLimit = normalizeListLimit(limit);
   const normalizedOffset = normalizeListOffset(offset);
-  const page = ordered.slice(normalizedOffset, normalizedOffset + normalizedLimit);
+  let page = completeInventory ? ordered : ordered.slice(normalizedOffset, normalizedOffset + normalizedLimit);
+  if (includeClientPreparationStatus) {
+    const { materialClientStatus } = await import('@/lib/canvas-preparation/client-status');
+    page = await Promise.all(page.map(async source => ({ ...source,
+      preparation: await materialClientStatus(client, { userId, courseId, materialId: source.id }, source),
+    })));
+  }
   const availableSourceCount = ordered.filter(
     (source) => source.availability === "available",
   ).length;
@@ -416,7 +450,7 @@ export async function listCanvasReviewerSources({
         synchronizedSourcesAvailable: availableSourceCount > 0,
       }),
       pagination: {
-        hasMore: normalizedOffset + normalizedLimit < ordered.length,
+        hasMore: !completeInventory && normalizedOffset + normalizedLimit < ordered.length,
         limit: normalizedLimit,
         offset: normalizedOffset,
         returned: page.length,
@@ -488,7 +522,7 @@ function isCanvasGenerateCandidate(
 function normalizeRoutingLabel(value: string): string {
   return value
     .normalize("NFKD")
-    .replace(/[’']/g, " ")
+    .replace(/[Ã¢â‚¬â„¢']/g, " ")
     .replace(/[^a-zA-Z0-9]+/g, " ")
     .trim()
     .toLowerCase();
@@ -1115,12 +1149,17 @@ export async function previewSelectiveCanvasReviewerSources({
 }
 
 export async function prepareCanvasReviewerSources({
+  manualRetry=true,
+  brokeredCanvasToken,
   client,
   courseId,
   pageAttachmentId,
   sourceIds,
   userId,
 }: {
+  readonly manualRetry?:boolean;
+  /** Canvas token brokered for the current sync job. When absent, the stored connection is decrypted (Vercel path). */
+  readonly brokeredCanvasToken?: string;
   readonly client: SupabaseClient<Database>;
   readonly courseId: string;
   /** Owned Page row ID, supplied only after resolving its authenticated same-course link. */
@@ -1139,6 +1178,16 @@ export async function prepareCanvasReviewerSources({
       code: "payload_too_large",
       message: `Prepare 1 to ${CANVAS_FILE_MAX_FILES_PER_INGESTION_REQUEST} Canvas files at a time.`,
     };
+  }
+  if(normalizedIds.value.length===1 && normalizedIds.value[0]?.type==='page'){
+    const {admitMaterialPreparation}=await import('@/lib/canvas-preparation/admission');
+    const {randomUUID}=await import('node:crypto');
+    const materialId=normalizedIds.value[0].original;
+    const job=await admitMaterialPreparation(client,{userId,courseId,materialId,cycleKey:`manual:${randomUUID()}`,manualRetry,brokeredCanvasToken});
+    const listed=await listCanvasReviewerSources({client,userId,courseId,completeInventory:true});
+    if(!listed.ok)return listed;
+    return {ok:true,value:{requested:1,sources:listed.value.sources.filter(source=>source.id===materialId),results:[{id:materialId,
+      status:job?.state==='prepared'?'ready':job?.state==='failed'?'failed':'unavailable',code:job?.state==='prepared'?'prepared':job && ['pending','running'].includes(job.state)?'preparation_pending':job?.reason_code??'preparation_unavailable',retryable:job?.state!=='prepared'}]}};
   }
   if (normalizedIds.value.some((source) => source.type !== "file")) {
     return {
@@ -1208,53 +1257,24 @@ export async function prepareCanvasReviewerSources({
     };
   }
 
-  const ingestion = await ingestCanvasFiles({
-    client,
-    ...(directlyLinkedFileId ? { directlyLinkedFileId } : {}),
-    fileIds,
-    userId,
-  });
-  if (!ingestion.ok) {
-    return {
-      ok: false,
-      status: ingestion.status,
-      code: ingestion.code,
-      message: ingestion.message,
-    };
+  const {admitMaterialPreparation}=await import('@/lib/canvas-preparation/admission');
+  const {randomUUID}=await import('node:crypto');
+  const results:CanvasReviewerSourcePrepare['results'][number][]=[];
+  const sources:CanvasReviewerSourceDescriptor[]=[];
+  for(const file of files.value){
+    const id=formatSourceId('file',file.id);
+    let job;
+    try{job=await admitMaterialPreparation(client,{userId,courseId,materialId:pageAttachmentId?`page:${pageAttachmentId}`:id,cycleKey:`manual:${randomUUID()}`,
+      manualRetry,brokeredCanvasToken,explicitFilePermission:!pageAttachmentId});}
+    catch{return storageFailure('Canvas preparation could not be accepted.');}
+    const ready=job?.state==='prepared';
+    results.push({id,status:ready?'ready':job?.state==='failed'?'failed':'unavailable',code:ready?'prepared':job && ['pending','running'].includes(job.state)?'preparation_pending':job?.reason_code??'preparation_unavailable',retryable:!ready});
+    const descriptor=mapFileSource(file).descriptor;
+    sources.push(ready?descriptor:{...descriptor,availability:'unavailable',capability:job?.state==='failed'?'failed':'needs_preparation',
+      file:descriptor.file?{...descriptor.file,preparationStatus:job?.state==='failed'?'failed':'not_prepared',canPrepare:true}:null});
   }
-
-  const refreshed = await readFilesByIds({
-    client,
-    connectionId: course.value.connection.id,
-    courseId: course.value.course.id,
-    ids: fileIds,
-    userId,
-  });
-  if (!refreshed.ok) {
-    return storageFailure("Prepared Canvas file descriptors could not be loaded.");
-  }
-
-  const descriptorsById = new Map(
-    refreshed.value.map((file) => [formatSourceId("file", file.id), mapFileSource(file).descriptor]),
-  );
-
-  return {
-    ok: true,
-    value: {
-      requested: normalizedIds.value.length,
-      results: ingestion.response.results.map((result) => ({
-        code: safePreparationResultCode(result.code),
-        id: formatSourceId("file", result.fileId),
-        retryable: result.retryable,
-        status: preparationResultStatus(result.status),
-      })),
-      sources: normalizedIds.value
-        .map((source) => descriptorsById.get(source.original))
-        .filter(isDefined),
-    },
-  };
+  return {ok:true,value:{requested:normalizedIds.value.length,results,sources}};
 }
-
 function isDirectlyLinkedPageFileCandidate(file: CanvasFileRow): boolean {
   const kind = classifyStoredCanvasFileKind(file);
   if (kind === 'unsupported') return false;
@@ -1474,13 +1494,12 @@ async function loadCourseSourceDescriptors({
     readFileReferencesForCourse({ client, connectionId: connection.id, courseId: course.id, userId }),
   ]);
 
+  if (!pages.ok || !files.ok || !modules.ok || !moduleItems.ok) {
+    return storageFailure("Canvas source inventory could not be completely loaded.");
+  }
   if (
-    !pages.ok ||
     !assignments.ok ||
     !announcements.ok ||
-    !files.ok ||
-    !modules.ok ||
-    !moduleItems.ok ||
     !fileReferences.ok
   ) {
     return storageFailure("Canvas sources could not be loaded.");
@@ -1582,16 +1601,18 @@ async function loadPreviewSourceRecords({
   }
 
   const directSources = await Promise.all([
-    ...pages.value.map((row) =>
-      resolveHtmlPreviewSource({
+    ...pages.value.map(async(row) => {
+      const cached=await loadPreparedPageEvidence({client,userId,courseId:course.id,pageRow:row});
+      if(!cached)return {descriptor:mapPageSource(row).descriptor,text:null};
+      return resolveHtmlPreviewSource({
         connectionId: connection.id,
         courseId: course.id,
         html: row.body_html,
         method: "synchronized_page_html",
         record: mapPagePreviewSource(row, course),
         userId,
-      }),
-    ),
+      });
+    }),
     ...assignments.value.map((row) =>
       resolveHtmlPreviewSource({
         connectionId: connection.id,
@@ -1755,6 +1776,8 @@ async function loadStructuredSourceRecords({
   const records: StructuredSourceRecord[] = [];
 
   for (const row of pages.value) {
+    const cached=await loadPreparedPageEvidence({client,userId,courseId:course.id,pageRow:row});
+    if(!cached)return {ok:false,status:409,code:'canvas_source_file_preparation_required',message:'This material is still being prepared.'};
     const source = mapPagePreviewSource(row, course);
     const resolvedText = await resolveHtmlPreviewSource({
       connectionId: connection.id,
@@ -1771,7 +1794,7 @@ async function loadStructuredSourceRecords({
     records.push({
       createBlocks: (sourceOrdinal) =>
         finalizeStructuredBlockDrafts({
-          drafts: normalizeCanvasHtmlToStructuredBlockDrafts(row.body_html),
+          drafts: cached.blocks,
           parserVersion: CANVAS_HTML_STRUCTURED_BLOCKS_VERSION,
           sourceOrdinal,
         }),
@@ -1932,15 +1955,8 @@ async function extractFileStructuredRecord({
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<StructuredSourceRecord>> {
   const descriptor = mapFileSource(file).descriptor;
-  const fileKind = classifyStoredCanvasFileKind(file);
-  let provider = ocrProvider;
-  if ((fileKind === "pdf" || fileKind === "image") && !provider) {
-    const createdProvider = createOcrProviderForCanvasPreview();
-    if (!createdProvider.ok) {
-      return createdProvider;
-    }
-    provider = createdProvider.value;
-  }
+  const provider = ocrProvider;
+
 
   const extraction = await resolveStoredFileForReviewer({
     client,
@@ -1959,15 +1975,15 @@ async function extractFileStructuredRecord({
     value: {
       createBlocks: (sourceOrdinal) =>
         finalizeStructuredBlockDrafts({
-          drafts: extraction.value.ocrResult
+          drafts: extraction.value.officeDrafts ?? (extraction.value.ocrResult
             ? normalizeOcrResultToStructuredBlockDrafts(
                 extraction.value.ocrResult,
               )
-            : normalizePlainTextToStructuredBlockDrafts(extraction.value.text),
+            : normalizePlainTextToStructuredBlockDrafts(extraction.value.text)),
           ocrVersion: extraction.value.ocrResult
             ? CANVAS_OCR_STRUCTURED_BLOCKS_VERSION
             : null,
-          parserVersion: CANVAS_STORED_FILE_EXTRACTION_VERSION,
+          parserVersion: extraction.value.officeDrafts ? OFFICE_STRUCTURE_VERSION : CANVAS_STORED_FILE_EXTRACTION_VERSION,
           sourceOrdinal,
         }),
       descriptor,
@@ -2008,15 +2024,8 @@ async function extractFilePreviewRecord({
   readonly userId: string;
 }): Promise<CanvasReviewerSourceResult<PreviewSourceRecord>> {
   const descriptor = mapFileSource(file).descriptor;
-  const fileKind = classifyStoredCanvasFileKind(file);
-  let provider = ocrProvider;
-  if ((fileKind === "pdf" || fileKind === "image") && !provider) {
-    const createdProvider = createOcrProviderForCanvasPreview();
-    if (!createdProvider.ok) {
-      return createdProvider;
-    }
-    provider = createdProvider.value;
-  }
+  const provider = ocrProvider;
+
 
   const extraction = await resolveStoredFileForReviewer({
     client,
@@ -2162,19 +2171,6 @@ async function resolveStoredFileForReviewer({
     ok: true,
     value: { ...extraction.value, text: resolution.sourceText },
   };
-}
-
-function createOcrProviderForCanvasPreview(): CanvasReviewerSourceResult<OcrProvider> {
-  try {
-    return { ok: true, value: createServerOcrProvider() };
-  } catch {
-    return {
-      ok: false,
-      status: 500,
-      code: "canvas_source_ocr_not_configured",
-      message: "OCR provider is not configured.",
-    };
-  }
 }
 
 function fileUnavailablePreviewResult(
@@ -2485,9 +2481,9 @@ function createFileSourceProvenance({
   };
   readonly row: CanvasFileRow;
 }): CanvasSourceManifestItemBase {
-  const mimeType =
-    normalizeMimeType(row.stored_content_type) ??
-    normalizeMimeType(row.content_type);
+  const mimeType = extraction.fileKind === 'pptx' || extraction.fileKind === 'docx'
+    ? OFFICE_MIME[extraction.fileKind]
+    : normalizeMimeType(row.stored_content_type) ?? normalizeMimeType(row.content_type);
   return {
     canvas_connection_id: row.canvas_connection_id,
     canvas_course_id: row.canvas_course_id || course.canvas_course_id,
@@ -2702,31 +2698,6 @@ function isSupportedFileForSourcePreparation(file: CanvasFileRow): boolean {
   );
 }
 
-function preparationResultStatus(
-  status: CanvasFileIngestionResultStatus,
-): CanvasReviewerSourcePrepare["results"][number]["status"] {
-  switch (status) {
-    case "stored":
-    case "unchanged":
-      return "ready";
-    case "failed":
-      return "failed";
-    case "blocked":
-      return "blocked";
-    case "unavailable":
-      return "unavailable";
-    case "metadata_only":
-      return "unsupported";
-  }
-}
-
-function safePreparationResultCode(code: string): string {
-  if (!/^[a-z0-9_:-]{1,80}$/i.test(code)) {
-    return "canvas_file_preparation_result";
-  }
-  return code;
-}
-
 async function readCourseRow({
   client,
   connectionId,
@@ -2877,20 +2848,12 @@ async function readCourseSyncState({
 
 async function readPages(query: SourceQuery): Promise<
   | { readonly ok: true; readonly value: readonly CanvasPageRow[] }
-  | { readonly ok: false }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
 > {
-  const { data, error } = await query.client
-    .from("canvas_pages")
-    .select("*")
-    .eq("user_id", query.userId)
-    .eq("canvas_connection_id", query.connectionId)
-    .eq("course_id", query.courseId)
-    .limit(CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE);
-
-  if (error || !data) {
-    return { ok: false };
-  }
-  return { ok: true, value: data as readonly CanvasPageRow[] };
+  return readCompleteSourceInventory((offset) => query.client.from("canvas_pages").select("*")
+    .eq("user_id", query.userId).eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId).order("id", { ascending: true })
+    .range(offset, offset + CANVAS_REVIEWER_INVENTORY_PAGE_SIZE - 1));
 }
 
 async function readAssignments(query: SourceQuery): Promise<
@@ -2931,37 +2894,39 @@ async function readAnnouncements(query: SourceQuery): Promise<
 
 async function readFiles(query: SourceQuery): Promise<
   | { readonly ok: true; readonly value: readonly CanvasFileRow[] }
-  | { readonly ok: false }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
 > {
-  const { data, error } = await query.client
-    .from("canvas_files")
-    .select("*")
-    .eq("user_id", query.userId)
-    .eq("canvas_connection_id", query.connectionId)
-    .eq("course_id", query.courseId)
-    .limit(CANVAS_REVIEWER_SOURCE_LIST_FETCH_LIMIT_PER_TYPE);
+  return readCompleteSourceInventory((offset) => query.client.from("canvas_files").select("*")
+    .eq("user_id", query.userId).eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId).order("id", { ascending: true })
+    .range(offset, offset + CANVAS_REVIEWER_INVENTORY_PAGE_SIZE - 1));
+}
 
-  if (error || !data) {
-    return { ok: false };
+async function readCompleteSourceInventory<TRow>(
+  readPage: (offset: number) => PromiseLike<{ readonly data: TRow[] | null; readonly error: unknown }>,
+): Promise<
+  | { readonly ok: true; readonly value: readonly TRow[] }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
+> {
+  const rows: TRow[] = [];
+  for (let page = 0; page < CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE; page++) {
+    const offset = page * CANVAS_REVIEWER_INVENTORY_PAGE_SIZE;
+    const { data, error } = await readPage(offset);
+    if (error || !data) return { ok: false, reason: "incomplete_inventory" };
+    rows.push(...data);
+    if (data.length < CANVAS_REVIEWER_INVENTORY_PAGE_SIZE) return { ok: true, value: rows };
   }
-  return { ok: true, value: data as readonly CanvasFileRow[] };
+  return { ok: false, reason: "incomplete_inventory" };
 }
 
 async function readModules(query: SourceQuery): Promise<
   | { readonly ok: true; readonly value: readonly CanvasModuleRow[] }
-  | { readonly ok: false }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
 > {
-  const { data, error } = await query.client
-    .from("canvas_modules")
-    .select("*")
-    .eq("user_id", query.userId)
-    .eq("canvas_connection_id", query.connectionId)
-    .eq("course_id", query.courseId);
-
-  if (error || !data) {
-    return { ok: false };
-  }
-  return { ok: true, value: data as readonly CanvasModuleRow[] };
+  return readCompleteSourceInventory((offset) => query.client.from("canvas_modules").select("*")
+    .eq("user_id", query.userId).eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId).order("id", { ascending: true })
+    .range(offset, offset + CANVAS_REVIEWER_INVENTORY_PAGE_SIZE - 1));
 }
 
 async function readPagesByIds(query: SourceIdsQuery): Promise<
@@ -3348,58 +3313,35 @@ async function readFileReferencesByFileIds(
   query: SourceIdsQuery,
 ): Promise<
   | { readonly ok: true; readonly value: readonly CanvasFileReferenceRow[] }
-  | { readonly ok: false }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
 > {
   if (query.ids.length === 0) {
     return { ok: true, value: [] };
   }
-  const { data, error } = await query.client
-    .from("canvas_file_references")
-    .select("*")
-    .eq("user_id", query.userId)
-    .eq("canvas_connection_id", query.connectionId)
-    .eq("course_id", query.courseId)
-    .in("file_id", [...query.ids]);
-
-  if (error || !data) {
-    return { ok: false };
-  }
-  return { ok: true, value: data as readonly CanvasFileReferenceRow[] };
+  return readCompleteSourceInventory((offset) => query.client.from("canvas_file_references").select("*")
+    .eq("user_id", query.userId).eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId).in("file_id", [...query.ids]).order("id", { ascending: true })
+    .range(offset, offset + CANVAS_REVIEWER_INVENTORY_PAGE_SIZE - 1));
 }
 
 async function readFileReferencesForCourse(query: SourceQuery): Promise<
   | { readonly ok: true; readonly value: readonly Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[] }
-  | { readonly ok: false }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
 > {
-  const references: Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[] = [];
-  for (let offset = 0; offset < 10_000; offset += 200) {
-    const { data, error } = await query.client.from("canvas_file_references")
+  return readCompleteSourceInventory((offset) => query.client.from("canvas_file_references")
       .select("file_id,reference_type").eq("user_id", query.userId)
       .eq("canvas_connection_id", query.connectionId).eq("course_id", query.courseId)
-      .order("id").range(offset, offset + 199);
-    if (error || !data) return { ok: false };
-    const page = data as unknown as readonly Pick<CanvasFileReferenceRow, "file_id" | "reference_type">[];
-    references.push(...page);
-    if (page.length < 200) return { ok: true, value: references };
-  }
-  return { ok: false };
+      .order("id").range(offset, offset + CANVAS_REVIEWER_INVENTORY_PAGE_SIZE - 1));
 }
 
 async function readModuleItemsForReferences(query: SourceQuery): Promise<
   | { readonly ok: true; readonly value: readonly CanvasModuleItemRow[] }
-  | { readonly ok: false }
+  | { readonly ok: false; readonly reason: "incomplete_inventory" }
 > {
-  const { data, error } = await query.client
-    .from("canvas_module_items")
-    .select("*")
-    .eq("user_id", query.userId)
-    .eq("canvas_connection_id", query.connectionId)
-    .eq("course_id", query.courseId);
-
-  if (error || !data) {
-    return { ok: false };
-  }
-  return { ok: true, value: data as readonly CanvasModuleItemRow[] };
+  return readCompleteSourceInventory((offset) => query.client.from("canvas_module_items").select("*")
+    .eq("user_id", query.userId).eq("canvas_connection_id", query.connectionId)
+    .eq("course_id", query.courseId).order("id", { ascending: true })
+    .range(offset, offset + CANVAS_REVIEWER_INVENTORY_PAGE_SIZE - 1));
 }
 
 function groupSourcesByKey(

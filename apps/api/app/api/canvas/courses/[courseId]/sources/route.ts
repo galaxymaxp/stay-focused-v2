@@ -44,6 +44,7 @@ export async function GET(
     limit: parseIntegerQueryParam(url.searchParams.get("limit")),
     offset: parseIntegerQueryParam(url.searchParams.get("offset")),
     userId: auth.value.user.id,
+    ...(url.searchParams.get('preparationStatus') === '1' ? { includeClientPreparationStatus: true } : {}),
   });
   if (!result.ok) {
     return jsonResponse(

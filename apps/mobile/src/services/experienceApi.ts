@@ -22,7 +22,7 @@ const messages: Record<string, string> = {
   server_error: "The server could not load this content. Try again later.",
   not_found: "This item is no longer available.",
   course_not_synced: "This course is not synced with Stay Focused yet.",
-  not_ready: "This material is not ready yet. Prepare it and try again.",
+  not_ready: "This material is still preparing. Check again shortly.",
   insufficient_source: "This Canvas page doesn't contain enough readable study material.",
   source_attachment_unavailable: "The lesson attachment couldn't be accessed from Canvas. Check its access and try again.",
   invalid_request: "Check your selection and try again.",

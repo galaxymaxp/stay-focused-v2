@@ -13,6 +13,25 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 describe("owner notification preferences API", () => {
+  it("marks owner success and auth denial private, no-store", async () => {
+    const success = await GET(new Request("https://example.test", { headers: { authorization: "Bearer session" } }));
+    expect(success.status).toBe(200);
+    expect(success.headers.get("Cache-Control")).toBe("private, no-store");
+    fake.auth.mockResolvedValue({ ok: false, response: new Response(null, { status: 401 }) });
+    const denial = await GET(new Request("https://example.test"));
+    expect(denial.status).toBe(401);
+    expect(denial.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it.each([undefined, "1"])("stream-caps oversized bytes with Content-Length %s", async contentLength => {
+    const response = await (await import("./route")).PATCH(new Request("https://example.test", {
+      method: "PATCH", headers: { authorization: "Bearer session", "content-type": "application/json", ...(contentLength ? { "content-length": contentLength } : {}) },
+      body: " ".repeat(2048 + 1),
+    }));
+    expect(response.status).toBe(413);
+    expect((await response.json()).error).toEqual({ code: "invalid_request", message: "Settings request is too large." });
+  });
+
   it("initializes device timezone defaults without overwriting persisted preferences", async () => {
     const response = await GET(new Request("https://app.example/api/notification-preferences?timezone=Asia%2FManila"));
     expect(response.status).toBe(200);

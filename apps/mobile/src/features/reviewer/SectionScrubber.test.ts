@@ -1,7 +1,9 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import type { LibraryArtifactSummary, ReviewerReaderModel } from '@stay-focused/shared';
 
+vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
 vi.mock("react-native", () => ({
   View: "View",
   Text: "Text",
@@ -36,7 +38,7 @@ vi.mock("../../design/theme", async () => {
   return { ...tokens, useTheme: () => ({ colors: tokens.palettes.light, mode: "light", reducedMotion: true }) };
 });
 
-const { SectionScrubber } = await import("./ReviewerReader");
+const { SectionScrubber, ReviewerReaderScreen } = await import("./ReviewerReader");
 type Handle = import("./ReviewerReader").ScrubberHandle;
 const STRIP_TOP = 100;
 
@@ -75,6 +77,27 @@ async function mount() {
 const at = (trackY: number, pageX = 350) => ({ nativeEvent: { pageX, pageY: STRIP_TOP + trackY } }) as never;
 const bubbleText = () =>
   rendered!.root.findAll((node) => String(node.type) === "Copy").map((node) => [node.props.children].flat().join("")).join(" | ");
+
+describe('Reviewer review-time header', () => {
+  it.each([
+    { reviewMinutes: 10, origin: 'manual' as const, expected: '~10 min review' },
+    { reviewMinutes: null, origin: 'manual' as const, expected: null },
+    { reviewMinutes: undefined, origin: 'manual' as const, expected: null },
+    { reviewMinutes: 10, origin: 'automatic' as const, expected: 'Made automatically from Cells.pdf · ~10 min review' },
+    { reviewMinutes: null, origin: 'automatic' as const, expected: 'Made automatically from Cells.pdf' },
+  ])('renders the existing secondary slot: %j', async ({ reviewMinutes, origin, expected }) => {
+    const artifact: LibraryArtifactSummary = { id: 'artifact:saved', type: 'reviewer', title: 'Cells', course: null,
+      sourceId: null, sourceTitle: 'Cells.pdf', activityId: null, createdAt: '2026-10-13', updatedAt: '2026-10-13',
+      lastOpenedAt: null, status: 'completed', relatedArtifactIds: [], origin, reviewMinutes: 90 };
+    const reviewer: ReviewerReaderModel = { id: artifact.id, title: artifact.title, course: null,
+      source: { id: null, title: 'Cells.pdf' }, generatedAt: artifact.createdAt, freshness: 'unknown', sections: [], reviewMinutes };
+    await act(async () => { rendered = create(createElement(ReviewerReaderScreen, { artifact, reviewer, deviceCopy: false })); });
+    if (expected) {
+      const line = rendered!.root.findAll(node => String(node.type) === 'Copy').find(node => node.props.children === expected);
+      expect(line?.props).toMatchObject({ muted: true, size: 'caption' });
+    } else expect(bubbleText()).not.toContain('min review');
+  });
+});
 
 describe("Reviewer section scrubber", () => {
   it("activates only after a still hold, then scrubs topic by topic and settles on release", async () => {

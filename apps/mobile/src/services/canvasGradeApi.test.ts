@@ -3,11 +3,41 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getCanvasCourseGradeAssignment,
   getCanvasCourseGradeSummary,
+  getCanvasCourseGradeEstimate,
   getCanvasCourseGradeSyncStatus,
   listCanvasCourseGrades,
   syncCanvasCourseGrades,
   type CanvasNormalizedAssignmentStatus,
 } from "./canvasApi";
+import { estimateGradeNeeds } from "@stay-focused/shared/grade-estimator";
+
+it("reads computed grade estimates with bearer auth and rejects malformed results", async () => {
+  const estimate = estimateGradeNeeds({ targetPercent: 90, groups: [], assignments: [], canvasCurrentScore: null });
+  const fetchImpl = createFetch({ ok: true, estimate });
+  const input = { apiBaseUrl: "http://localhost:3000", accessToken: "token", courseId: "course", targetPercent: 90, fetchImpl };
+  expect(await getCanvasCourseGradeEstimate(input)).toEqual({ ok: true, data: { estimate } });
+  expect(fetchImpl).toHaveBeenCalledWith("http://localhost:3000/api/canvas/courses/course/grades/estimate?target=90",
+    expect.objectContaining({ method: "GET", headers: expect.objectContaining({ Authorization: "Bearer token" }) }));
+  expect(await getCanvasCourseGradeEstimate({ ...input, fetchImpl: createFetch({ ok: true, estimate: { ...estimate, warnings: null } }) }))
+    .toMatchObject({ ok: false, error: { code: "invalid_response" } });
+  fetchImpl.mockClear();
+  expect(await getCanvasCourseGradeEstimate({ ...input, targetPercent: 90.55 })).toMatchObject({ ok: false, error: { code: "invalid_request" } });
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+it.each([{ dropRuleMessages: [] }, { dropRuleMessages: ["Drop rules applied: 1 lowest dropped in Quizzes"] }])("accepts validated drop details %j", async ({ dropRuleMessages }) => {
+  const estimate = estimateGradeNeeds({ targetPercent: 90, groups: [], assignments: [], canvasCurrentScore: null });
+  const withDrops = { ...estimate, warnings: { ...estimate.warnings, hasDropRules: true, dropRuleMessages } };
+  expect(await getCanvasCourseGradeEstimate({ apiBaseUrl: "http://localhost:3000", accessToken: "token", courseId: "course",
+    targetPercent: 90, fetchImpl: createFetch({ ok: true, estimate: withDrops }) })).toMatchObject({ ok: true, data: { estimate: withDrops } });
+});
+
+it.each([{ dropRuleMessages: null }, { dropRuleMessages: "invalid" }, { dropRuleMessages: [1] }, { dropRuleMessages: [{}] }])("rejects malformed drop details %j", async ({ dropRuleMessages }) => {
+  const estimate = estimateGradeNeeds({ targetPercent: 90, groups: [], assignments: [], canvasCurrentScore: null });
+  expect(await getCanvasCourseGradeEstimate({ apiBaseUrl: "http://localhost:3000", accessToken: "token", courseId: "course",
+    targetPercent: 90, fetchImpl: createFetch({ ok: true, estimate: { ...estimate, warnings: { ...estimate.warnings, dropRuleMessages } } }) }))
+    .toMatchObject({ ok: false, error: { code: "invalid_response" } });
+});
 
 const API_BASE_URL = "http://localhost:3000";
 const COURSE_ID = "11111111-1111-4111-8111-111111111111";

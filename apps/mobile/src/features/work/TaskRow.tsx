@@ -36,7 +36,7 @@ export function TaskRow({ task, now, busy = false, onOpen, onToggleComplete }: T
   const meta = [
     due?.text,
     task.priority === "high" && !completed ? "High priority" : null,
-    formatEstimate(task.estimatedMinutes),
+    formatEstimate(task.estimatedMinutes, task.estimateSource),
     source,
   ].filter((part): part is string => Boolean(part));
 

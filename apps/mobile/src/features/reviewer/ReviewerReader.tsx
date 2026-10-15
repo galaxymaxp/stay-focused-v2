@@ -1,5 +1,5 @@
 import type { AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
-import { quizCountOptions, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
+import { suggestedQuizTitle, quizCountOptions, quizFormatMaximum, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
 import { CheckCircle2, ChevronDown, ChevronUp, Circle, Sparkles } from "lucide-react-native";
@@ -53,6 +53,11 @@ import {
 import { createGenerationIntent } from "../../services/generationRecovery";
 import { QUIZ_DIFFICULTIES, quizIntentInput, reviewerArtifactIdFromLibraryId } from "../redesign/quizRequest";
 import { ExportSheet } from '../export/ExportSheet';
+import { automaticReviewerLabel } from "../redesign/automationPresentation";
+import { reviewerSecondaryLine } from './reviewerEstimatePresentation';
+import { SourcePageSnapshot } from './SourcePageSnapshot';
+import { SourceFigures, useFigureAvailability } from './SourceFigures';
+import { ExternalVisual } from './ExternalVisual';
 
 type Measurable = View | Text;
 /** Keeps a found line below the header/search bar with readable context above it. */
@@ -83,6 +88,7 @@ export function ReviewerReaderScreen({
   openQuizInitially?: boolean;
 }) {
   const { colors, reducedMotion } = useTheme();
+  const secondaryLine = reviewerSecondaryLine(automaticReviewerLabel(artifact), reviewer.reviewMinutes);
   const scrollRef = useRef<ScrollView>(null);
   const rootRef = useRef<View>(null);
   const rootY = useRef(0);
@@ -101,6 +107,12 @@ export function ReviewerReaderScreen({
   const [quizOpen, setQuizOpen] = useState(openQuizInitially);
   const [exportOpen, setExportOpen] = useState(false);
   const { session } = useAuth();
+  const snapshotClient = useMemo(() => ({ baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' }), [session?.accessToken]);
+  const figureArtifactId = session?.accessToken && /^artifact:/.test(artifact.id) ? artifact.id.slice('artifact:'.length) : null;
+  const figureSections = useFigureAvailability(snapshotClient, figureArtifactId, deviceCopy);
+  const [snapshotAvailability, setSnapshotAvailability] = useState<Record<string, boolean | null>>({});
+  useEffect(() => setSnapshotAvailability({}), [artifact.id, snapshotClient, deviceCopy]);
+  const hasSnapshotControl = artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null;
   const [assistPassage, setAssistPassage] = useState<{ section: string; block: string; point?: number } | null>(null);
   const assistTarget = useMemo<AssistTarget | null>(() => {
     if (!assistPassage) return null;
@@ -254,7 +266,7 @@ export function ReviewerReaderScreen({
     ranges.forEach((range, index) => {
       if (range.start < from) return;
       if (range.start > from) runs.push(text.slice(from, range.start));
-      runs.push(<Text key={index} style={range.style === 'highlight' ? { backgroundColor: colors.findMatch, color: colors.textPrimary } :
+      runs.push(<Text key={index} style={range.style === 'highlight' ? { backgroundColor: colors.orangeSoft, color: colors.textPrimary } :
         range.style === 'underline' ? { textDecorationLine: 'underline', textDecorationColor: colors.textPrimary } : { fontWeight: '700' }}>{range.text}</Text>);
       from = range.start + range.text.length;
     });
@@ -329,6 +341,7 @@ export function ReviewerReaderScreen({
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
       <View style={{ gap: spacing[1], paddingRight: spacing[2] }}>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
+        {secondaryLine ? <Copy muted size="caption">{secondaryLine}</Copy> : null}
         {anchors.length > 1 ? <Copy muted size="caption">{anchors.length} topics</Copy> : null}
         <View style={{ paddingTop: spacing[2] }}><Action hero onPress={() => setQuizOpen(true)}>Generate Quiz</Action></View>
         <Action secondary onPress={() => setExportOpen(true)}>Export</Action>
@@ -357,7 +370,15 @@ export function ReviewerReaderScreen({
               <Text ref={register(segmentIds.sectionTitle(section.id))} style={{ color: colors.textPrimary, fontSize: 22, lineHeight: 29, fontWeight: "600" }}>
                 {render(segmentIds.sectionTitle(section.id), section.title)}
               </Text>
+              {figureArtifactId ? <SourceFigures client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
+                hasFigures={figureSections.has(section.id)} offline={deviceCopy} /> : null}
+              {!figureSections.has(section.id) && (artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null) && session?.accessToken && /^artifact:/.test(artifact.id) ?
+                <SourcePageSnapshot client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy}
+                  onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
             </View>
+            {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
+              online={!deviceCopy && figureSections.online === true && (!hasSnapshotControl || snapshotAvailability[section.id] != null)}
+              hasSourceVisual={figureSections.has(section.id) || snapshotAvailability[section.id] === true} /> : null}
             {section.blocks.map((block, blockIndex) => (
               <View
                 key={block.id}
@@ -477,16 +498,22 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
   const [customCount, setCustomCount] = useState("25");
   const [topicsOpen, setTopicsOpen] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState(() => reviewer.sections.map(section => section.id));
-  const capacity = useMemo(() => quizSourceCapacity(reviewer.sections.filter(section => selectedTopics.includes(section.id))), [reviewer, selectedTopics]);
-  const countOptions = useMemo(() => quizCountOptions(capacity.maximum), [capacity.maximum]);
-  const questionSegments = countOptions.length ? [...countOptions.map(value => ({ value: String(value), label: value === capacity.maximum && value !== 100 ? `${value} max` : String(value) })), { value: "custom", label: "Custom" }] : [];
-  const questionCount = Number(count === "custom" ? customCount : count);
-  const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= capacity.maximum;
-  useEffect(() => {
-    if (count !== "custom" && Number(count) > capacity.maximum && countOptions.length) setCount(String(countOptions.at(-1)));
-  }, [capacity.maximum, count, countOptions]);
-  const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
   const [format, setFormat] = useState<QuizQuestionType | "mixed">("mixed");
+  const capacity = useMemo(() => quizSourceCapacity(reviewer.sections.filter(section => selectedTopics.includes(section.id))), [reviewer, selectedTopics]);
+  const maximum = quizFormatMaximum(capacity, format === "mixed" ? undefined : [format]);
+  const countOptions = useMemo(() => quizCountOptions(maximum), [maximum]);
+  const questionSegments = countOptions.length ? [...countOptions.map(value => ({ value: String(value), label: value === maximum && value !== 100 ? `${value} max` : String(value) })), { value: "custom", label: "Custom" }] : [];
+  const questionCount = Number(count === "custom" ? customCount : count);
+  const [customTitle, setCustomTitle] = useState<string | null>(null);
+  const quizTitle = customTitle ?? suggestedQuizTitle(artifact.title, reviewer.sections.filter(s => selectedTopics.includes(s.id)).map(s => s.title), questionCount);
+  const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= maximum;
+  useEffect(() => {
+    if (count !== "custom" && !countOptions.includes(Number(count)) && countOptions.length) {
+      setCount(String(countOptions.find(value => value >= Number(count)) ?? countOptions.at(-1)));
+    }
+    if (format === "matching" && Number(customCount) > maximum) setCustomCount(String(maximum));
+  }, [maximum, count, countOptions, customCount, format]);
+  const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function next() {
@@ -496,7 +523,7 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
     try {
       const intent = await createGenerationIntent(
         session.user.id,
-        quizIntentInput({ title: artifact.title, reviewerArtifactId, questionCount, difficulty, selectedTopicIds: selectedTopics, ...(format === "mixed" ? {} : { questionTypes: [format] }) }),
+        quizIntentInput({ title: quizTitle, reviewerArtifactId, questionCount, difficulty, selectedTopicIds: selectedTopics, ...(format === "mixed" ? {} : { questionTypes: [format] }) }),
       );
       onClose();
       router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
@@ -518,11 +545,14 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
         {artifact.course ? <Copy muted size="caption">{courseIdentity(artifact.course).title}</Copy> : null}
       </View>
       <View style={{ gap: spacing[2] }}>
+        <Copy muted size="caption">Quiz title (optional)</Copy>
+        <TextInput accessibilityLabel="Quiz title" value={quizTitle} onChangeText={setCustomTitle} maxLength={200} editable={!busy} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} />
         <Copy muted size="caption">Questions</Copy>
         {questionSegments.length ? <SegmentedControl segments={questionSegments} value={count} onChange={setCount} /> : null}
-        {capacity.maximum >= 5 ? <Copy muted size="caption">{capacity.maximum}-question maximum. Based on the topics and key points in this material.</Copy> : null}
-        {count === "custom" ? <TextInput accessibilityLabel={`Custom question count, 5 to ${capacity.maximum}`} keyboardType="number-pad" value={customCount} onChangeText={setCustomCount} maxLength={3} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} /> : null}
-        {!validCount ? <Copy size="caption" color={colors.danger}>{capacity.maximum < 5 ? "This material needs more distinct study points for a Quiz." : `Choose 5 to ${capacity.maximum} questions.`}</Copy> : null}
+        {format === "matching" ? <Copy muted size="caption">{`This reviewer supports up to ${maximum} Matching questions.`}</Copy>
+          : maximum >= 5 ? <Copy muted size="caption">{maximum}-question maximum. Based on the topics and key points in this material.</Copy> : null}
+        {count === "custom" && maximum >= 5 ? <TextInput accessibilityLabel={`Custom question count, 5 to ${maximum}`} keyboardType="number-pad" value={customCount} onChangeText={setCustomCount} maxLength={3} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary }} /> : null}
+        {!validCount ? <Copy size="caption" color={colors.danger}>{maximum < 5 ? "This material needs more distinct study points for a Quiz." : `Choose 5 to ${maximum} questions.`}</Copy> : null}
       </View>
       <View style={{ gap: spacing[2] }}>
         <Action secondary onPress={() => setTopicsOpen(value => !value)}>{`Select Topics · ${selectedTopics.length} of ${reviewer.sections.length}`}</Action>

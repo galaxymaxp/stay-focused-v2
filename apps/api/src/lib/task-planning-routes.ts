@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import type { Database } from "@stay-focused/db";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -71,8 +72,8 @@ export async function readTaskPlanningJson(
       ),
     };
   }
-  const raw = await request.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_JSON_BODY_BYTES) {
+  const boundedBody = await readBoundedText(request, MAX_JSON_BODY_BYTES);
+  if (!boundedBody.ok && boundedBody.reason === "too_large") {
     return {
       ok: false,
       response: taskPlanningError(
@@ -83,6 +84,7 @@ export async function readTaskPlanningJson(
       ),
     };
   }
+  const raw = boundedBody.ok ? boundedBody.text : "";
   try {
     return { ok: true, value: JSON.parse(raw) as unknown };
   } catch {

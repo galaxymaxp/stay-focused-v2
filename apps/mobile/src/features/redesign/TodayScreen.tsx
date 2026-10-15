@@ -8,7 +8,7 @@ import type {
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { router } from "expo-router";
 import { EyeOff, Pin, PinOff } from "lucide-react-native";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, View, type ScrollView } from "react-native";
 
@@ -82,7 +82,7 @@ export function TodayScreen() {
     "/api/experience/announcements?limit=20",
     60000,
   );
-  const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 60000);
+  const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
   const focused = useIsFocused();
   const client = useExperienceClient();
   // No pull-to-refresh on Today: coming back to it is the refresh.

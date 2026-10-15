@@ -6,6 +6,7 @@ import type {
 
 import { JOB_WORKER_LEASE_SECONDS } from "./constants";
 import type { ProcessingJobServiceClient } from "./repository";
+import type { prerenderSourcePageSnapshots } from '../source-page-snapshot-prerender';
 
 export async function recoverStaleProcessingJobs(
   client: ProcessingJobServiceClient,
@@ -142,6 +143,7 @@ export async function completeProcessingJob(
     readonly payload: Json;
     readonly metrics: Json;
   },
+  dependencies: { readonly prerender?: typeof prerenderSourcePageSnapshots; readonly figures?: typeof import("../source-figures/store").extractLocalPreparedFigures } = {},
 ): Promise<ProcessingJobDatabaseRow> {
   const { data, error } = await client.rpc(input.resultType === "quiz_generation" ? "complete_quiz_processing_job" : input.resultType === "activity_generation" ? "complete_activity_processing_job" : "complete_processing_job_v2", {
     p_job_id: input.jobId,
@@ -156,7 +158,29 @@ export async function completeProcessingJob(
       readSafeDatabaseCode(error),
     );
   }
-  return data[0];
+  const completed = data[0];
+  if (input.resultType === 'document_extraction' && completed.status === 'succeeded') {
+    try { await (dependencies.figures ?? (await import('../source-figures/store')).extractLocalPreparedFigures)(client,completed); }
+    catch { console.warn('source_figures.extraction',{code:'post_commit_failed',failureCount:1}); }
+  }
+  if (input.resultType === 'reviewer_generation' && completed.status === 'succeeded') {
+    // The RPC has committed the artifact, version and source before this lookup.
+    // Both manual and automatic jobs use this single publication boundary.
+    try {
+      const version = await client.from('generated_artifact_versions').select('artifact_id,source_version_id,user_id')
+        .eq('generation_job_id', completed.id).eq('user_id', completed.user_id).eq('artifact_type', 'reviewer').maybeSingle();
+      if (version.error || !version.data || version.data.user_id !== completed.user_id ||
+          version.data.source_version_id !== completed.source_version_id) throw new Error('prerender_receipt_unavailable');
+      const prerender = dependencies.prerender ?? (await import('../source-page-snapshot-prerender')).prerenderSourcePageSnapshots;
+      await prerender(client, {
+        userId: completed.user_id, artifactId: version.data.artifact_id,
+      });
+    } catch {
+      // No provider errors, IDs, paths or academic content in pre-render logs.
+      console.warn('source_page_snapshot.prerender', { code: 'post_commit_failed', failureCount: 1 });
+    }
+  }
+  return completed;
 }
 
 export async function failProcessingJob(

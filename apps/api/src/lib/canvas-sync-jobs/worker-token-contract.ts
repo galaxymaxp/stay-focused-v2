@@ -2,16 +2,23 @@
 export const CANVAS_WORKER_TOKEN_ENDPOINT =
   "https://stay-focused-v2-prototype.vercel.app/api/internal/canvas/sync-token";
 
-export interface CanvasWorkerTokenRequest {
+export interface CanvasSyncWorkerTokenRequest {
   readonly jobId: string;
   readonly dispatchId: string;
   readonly workerId: string;
 }
+export type CanvasWorkerTokenRequest=CanvasSyncWorkerTokenRequest | (CanvasSyncWorkerTokenRequest & {readonly jobType:'preparation';readonly leaseToken:string});
 
 export function parseCanvasWorkerTokenRequest(value: unknown): CanvasWorkerTokenRequest | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if(record.jobType==='preparation'){
+    if(Object.keys(record).sort().join(',')!=='dispatchId,jobId,jobType,leaseToken,workerId' ||
+      typeof record.jobId!=='string' || !uuid.test(record.jobId) || typeof record.dispatchId!=='string' || !uuid.test(record.dispatchId) ||
+      typeof record.leaseToken!=='string' || !uuid.test(record.leaseToken) || typeof record.workerId!=='string' || !/^google-preparation:[0-9a-f-]{36}$/i.test(record.workerId))return null;
+    return {jobId:record.jobId,dispatchId:record.dispatchId,workerId:record.workerId,jobType:'preparation',leaseToken:record.leaseToken};
+  }
   if (Object.keys(record).sort().join(",") !== "dispatchId,jobId,workerId" ||
       typeof record.jobId !== "string" || !uuid.test(record.jobId) ||
       typeof record.dispatchId !== "string" || !uuid.test(record.dispatchId) ||

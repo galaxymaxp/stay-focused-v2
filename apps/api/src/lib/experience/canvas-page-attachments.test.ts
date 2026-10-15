@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const mocks = vi.hoisted(() => ({ readConnection: vi.fn(), getCourseFile: vi.fn(), downloadFile: vi.fn(), mapCanvasFile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readConnection: vi.fn(), getCourseFile: vi.fn(), downloadFile: vi.fn(), mapCanvasFile: vi.fn(), decrypt: vi.fn(), createCanvasClient: vi.fn() }));
 vi.mock('@/lib/canvas-routes', () => ({
   CONNECTION_SECRET_COLUMNS: 'id,base_url', readConnection: mocks.readConnection,
-  decryptConnectionToken: () => 'private-token',
-  createCanvasClient: () => ({ getCourseFile: mocks.getCourseFile, downloadFile: mocks.downloadFile }),
+  decryptConnectionToken: mocks.decrypt,
+  createCanvasClient: mocks.createCanvasClient,
 }));
 vi.mock('@/lib/canvas-file-normalize', async (load) => ({
   ...await load<typeof import('@/lib/canvas-file-normalize')>(), mapCanvasFile: mocks.mapCanvasFile,
@@ -16,7 +16,7 @@ import { isInstructionalPageAttachment, resolveInstructionalPageAttachments } fr
 const row = { id: 'file-row', user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_file_id: '42', display_name: 'Unit 3 Lesson 1.pdf' };
 const course = { id: 'course', user_id: 'owner', canvas_connection_id: 'connection', canvas_course_id: '101' };
 const page = { id: 'page-row', user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_page_url: 'unit-3-lesson-1', body_html: '<a href="/courses/101/files/42?download=1">Lesson.pdf</a><a href="/api/v1/files/42">Duplicate</a>' };
-const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn(), insert: vi.fn() };
+const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn(), insert: vi.fn(), update:vi.fn() };
 const upsert = vi.fn();
 const from = vi.fn((table: string) => table === 'canvas_file_references' ? { upsert } : query);
 const client = { from } as unknown as SupabaseClient<Database>;
@@ -24,7 +24,10 @@ const client = { from } as unknown as SupabaseClient<Database>;
 beforeEach(() => {
   vi.resetAllMocks();
   query.select.mockReturnValue(query); query.eq.mockReturnValue(query); query.insert.mockReturnValue(query);
-  mocks.readConnection.mockResolvedValue({ ok: true, row: { id: 'connection', base_url: 'https://canvas.test' } });
+  query.update.mockReturnValue(query);
+  mocks.readConnection.mockResolvedValue({ ok: true, row: { id: 'connection', user_id: 'owner', status: 'active', base_url: 'https://canvas.test' } });
+  mocks.decrypt.mockReturnValue('private-token');
+  mocks.createCanvasClient.mockReturnValue({ getCourseFile: mocks.getCourseFile, downloadFile: mocks.downloadFile });
   mocks.getCourseFile.mockResolvedValue({ id: '42' });
   mocks.downloadFile.mockResolvedValue({ bytes: new Uint8Array([37, 80, 68, 70, 45]), byteLength: 5, contentType: 'application/pdf' });
   mocks.mapCanvasFile.mockReturnValue({ canvas_file_id: '42', display_name: 'Unit 3 Lesson 1.pdf', ingestion_eligibility: 'eligible_document', metadata_fingerprint: 'a', content_version_fingerprint: 'b' });
@@ -33,12 +36,34 @@ beforeEach(() => {
 });
 
 describe('instructional Canvas Page attachments', () => {
+  it('invalidates old bytes when fresh Page attachment metadata reveals a new revision',async()=>{
+    const old={...row,content_version_fingerprint:'a',ingestion_status:'stored',current_sha256:'c'.repeat(64),storage_object_key:'retained-original'};
+    const next={...old,content_version_fingerprint:'b',ingestion_status:'not_requested'};
+    query.maybeSingle.mockReset().mockResolvedValueOnce({data:old,error:null}).mockResolvedValueOnce({data:next,error:null});
+    expect(await resolveInstructionalPageAttachments({client,course:course as never,page:page as never,userId:'owner'})).toEqual([next]);
+    expect(query.update).toHaveBeenCalledWith(expect.objectContaining({content_version_fingerprint:'b',ingestion_status:'not_requested'}));
+    expect(query.update.mock.calls[0]![0]).not.toHaveProperty('storage_object_key');
+    expect(query.eq).toHaveBeenCalledWith('content_version_fingerprint','a');
+  });
+  it.each([
+    { id: 'connection', user_id: 'owner', status: 'disconnected' },
+    { id: 'connection', user_id: 'other-owner', status: 'active' },
+    { id: 'other-connection', user_id: 'owner', status: 'active' },
+  ])('rejects an inactive or mismatched connection even with a brokered token (%s)', async connection => {
+    mocks.readConnection.mockResolvedValue({ ok: true, row: connection });
+    await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never,
+      userId: 'owner', brokeredCanvasToken: 'brokered-sync-token' })).rejects.toMatchObject({ code: 'source_attachment_unavailable' });
+    expect(mocks.createCanvasClient).not.toHaveBeenCalled();
+    expect(mocks.decrypt).not.toHaveBeenCalled();
+  });
   it('leaves a body-only Page available without fetching Canvas credentials', async () => {
     await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: { ...page, body_html: '<p>HTML provides structure.</p>' } as never, userId: 'owner' })).resolves.toEqual([]);
     expect(mocks.readConnection).not.toHaveBeenCalled();
   });
-  it('discovers and stores a linked PDF once even when it appears twice', async () => {
-    await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner' })).resolves.toEqual([row]);
+  it.each([undefined, 'brokered-sync-token'])('discovers a linked PDF using token %s', async brokeredCanvasToken => {
+    await expect(resolveInstructionalPageAttachments({ client, course: course as never, page: page as never, userId: 'owner', brokeredCanvasToken })).resolves.toEqual([row]);
+    expect(mocks.createCanvasClient).toHaveBeenCalledWith('https://canvas.test', brokeredCanvasToken ?? 'private-token');
+    expect(mocks.decrypt).toHaveBeenCalledTimes(brokeredCanvasToken ? 0 : 1);
     expect(mocks.getCourseFile).toHaveBeenCalledTimes(1);
     expect(query.insert).toHaveBeenCalledTimes(1);
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ reference_type: 'page', referenced_row_id: 'page-row', file_id: 'file-row' }), expect.anything());

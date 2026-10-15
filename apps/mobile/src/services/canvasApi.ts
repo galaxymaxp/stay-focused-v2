@@ -5,6 +5,7 @@ import type {
 } from "@stay-focused/canvas";
 
 import { API_BASE_URL_SETUP_HINT } from "./reviewerApi";
+import type { GradeEstimate } from "@stay-focused/shared/grade-estimator";
 import { API_CONFIGURATION_MESSAGE, requireApiBaseUrl } from "../config/apiBaseUrlResolution";
 
 const CONNECTION_PATH = "/api/canvas/connection";
@@ -484,7 +485,7 @@ export type CanvasReviewerSourceType =
   | "announcement"
   | "file";
 
-export type CanvasReviewerFileKind = "pdf" | "image" | "text" | "unsupported";
+export type CanvasReviewerFileKind = "pdf" | "image" | "text" | "docx" | "pptx" | "unsupported";
 
 export type CanvasReviewerFilePreparationStatus =
   | "ready"
@@ -504,6 +505,7 @@ export interface CanvasReviewerCourseSyncSummary {
 }
 
 export interface CanvasReviewerSourceDescriptor {
+  readonly preparation?: import('@stay-focused/shared').MaterialPreparation;
   readonly id: string;
   readonly type: CanvasReviewerSourceType;
   readonly title: string;
@@ -1160,6 +1162,35 @@ export async function getCanvasCourseGradeSummary(
   });
 }
 
+export async function getCanvasCourseGradeEstimate(
+  input: CanvasCourseGradeInput & { readonly targetPercent: number },
+): Promise<CanvasApiResult<{ readonly estimate: GradeEstimate }>> {
+  const courseId = input.courseId.trim();
+  if (!courseId) return clientError("course_not_found", "Choose a selected Canvas course before estimating grades.");
+  if (!Number.isFinite(input.targetPercent) || input.targetPercent < 1 || input.targetPercent > 100 ||
+    !/^\d+(?:\.\d)?$/.test(String(input.targetPercent))) return clientError("invalid_request", "Enter a target between 1 and 100.");
+  const endpoint = createEndpoint(input.apiBaseUrl, `/api/canvas/courses/${encodeURIComponent(courseId)}/grades/estimate?target=${input.targetPercent}`);
+  if (!endpoint.ok) return endpoint;
+  return requestJson({ endpoint: endpoint.url, input, method: "GET", parseSuccess: parsed => {
+    if (isRecord(parsed) && parsed.ok === true && isGradeEstimate(parsed.estimate)) return { ok: true, data: { estimate: parsed.estimate } };
+    return clientError("invalid_response", "Canvas returned an invalid grade estimate response.");
+  } });
+}
+
+function isGradeEstimate(value: unknown): value is GradeEstimate {
+  if (!isRecord(value) || !["weighted", "points"].includes(String(value.mode)) ||
+    !["secured", "reachable", "out_of_reach", "complete", "no_gradable_work"].includes(String(value.status))) return false;
+  const finite = (n: unknown) => typeof n === "number" && Number.isFinite(n);
+  if (![value.targetPercent, value.minimumFinalPercent, value.maximumFinalPercent].every(finite) ||
+    value.currentPercent !== null && !finite(value.currentPercent) || value.requiredPercent !== null && !finite(value.requiredPercent)) return false;
+  if (!isRecord(value.warnings) || typeof value.warnings.hasDropRules !== "boolean" || typeof value.warnings.differsFromCanvas !== "boolean" ||
+    !Number.isInteger(value.warnings.hiddenGradeCount) || Number(value.warnings.hiddenGradeCount) < 0) return false;
+  if (value.warnings.dropRuleMessages !== undefined && (!Array.isArray(value.warnings.dropRuleMessages) ||
+    !value.warnings.dropRuleMessages.every(message => typeof message === "string"))) return false;
+  return Array.isArray(value.needs) && value.needs.every(n => isRecord(n) && typeof n.assignmentId === "string" && typeof n.title === "string" &&
+    (n.dueAt === null || typeof n.dueAt === "string") && finite(n.pointsPossible) && finite(n.neededPoints));
+}
+
 export async function getCanvasCourseGradeSyncStatus(
   input: CanvasCourseGradeInput,
 ): Promise<CanvasApiResult<CanvasGradeSyncStatusPayload>> {
@@ -1210,6 +1241,7 @@ export async function listCanvasReviewerSources(
     );
   }
   const query = new URLSearchParams();
+  query.set('preparationStatus', '1');
   if (input.limit !== undefined) query.set("limit", String(input.limit));
   if (input.offset !== undefined) query.set("offset", String(input.offset));
   const endpoint = createEndpoint(
@@ -1257,7 +1289,7 @@ export async function prepareCanvasReviewerSources(
 
   const endpoint = createEndpoint(
     input.apiBaseUrl,
-    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources/prepare`,
+    `/api/canvas/courses/${encodeURIComponent(courseId)}/sources/prepare?preparationStatus=1`,
   );
   if (!endpoint.ok) return endpoint;
 
@@ -3241,6 +3273,12 @@ function isCanvasReviewerCourseSyncSummary(
   );
 }
 
+function isMaterialPreparation(value: unknown): value is import('@stay-focused/shared').MaterialPreparation {
+  return isRecord(value) && hasOnlyKeys(value, ['status', 'reasonCode']) &&
+    typeof value.status === 'string' && ['ready', 'preparing', 'failed', 'unsupported', 'empty', 'unavailable'].includes(value.status) &&
+    (value.reasonCode === null || (typeof value.reasonCode === 'string' && ['preparation_failed', 'preparation_cancelled', 'attempt_limit', 'preparation_paused'].includes(value.reasonCode)));
+}
+
 function isCanvasReviewerSourceDescriptor(
   value: unknown,
 ): value is CanvasReviewerSourceDescriptor {
@@ -3251,6 +3289,7 @@ function isCanvasReviewerSourceDescriptor(
       "type",
       "title",
       "capability",
+      "preparation",
       "placement",
       "availability",
       "unavailableReason",
@@ -3259,6 +3298,7 @@ function isCanvasReviewerSourceDescriptor(
       "file",
     ]) &&
     typeof value.id === "string" &&
+    (value.preparation === undefined || isMaterialPreparation(value.preparation)) &&
     isCanvasReviewerSourceType(value.type) &&
     typeof value.title === "string" &&
     isCanvasReviewerSourceCapability(value.capability) &&
@@ -3539,6 +3579,8 @@ function isCanvasReviewerFileKind(
     value === "pdf" ||
     value === "image" ||
     value === "text" ||
+    value === "docx" ||
+    value === "pptx" ||
     value === "unsupported"
   );
 }

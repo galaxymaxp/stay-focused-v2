@@ -1,0 +1,107 @@
+import { createElement } from 'react';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
+import { SourcePageSnapshot } from './SourcePageSnapshot';
+
+const mocks = vi.hoisted(() => ({ read: vi.fn(), state: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) } }));
+vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: mocks.state }));
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('../../design/theme', async () => {
+  const tokens = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: tokens.palettes.light, reducedMotion: true }) };
+});
+vi.mock('../../services/sourcePageSnapshots', async original => ({ ...await original<typeof import('../../services/sourcePageSnapshots')>(), readPageSnapshot: mocks.read }));
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+let tree: ReactTestRenderer | undefined;
+const client = { baseUrl: 'https://api.example.test', accessToken: 'test' };
+const props = { client, artifactId: 'artifact', sectionId: 'section', offline: false };
+const ready = { available: true, url: 'https://image.example.test/opaque.png', page: 2, width: 1400, height: 1867, sourceLabel: 'Accepted lecture' };
+async function mount(offline = false) { await act(async () => { tree = create(createElement(SourcePageSnapshot, { ...props, offline })); }); }
+const buttons = () => tree!.root.findAllByType(Pressable);
+afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
+describe('source-page thumbnail and viewer', () => {
+  it('labels an exact PPTX snapshot From slide n in the header and caption', async () => {
+    mocks.read.mockResolvedValue({ ...ready, labelKind: 'slide' }); await mount();
+    expect(buttons()[0]?.props.accessibilityLabel).toBe('From slide 2');
+    await act(async () => buttons()[0]!.props.onPress());
+    expect(tree!.root.findAllByType(Text).map(node => [node.props.children].flat().join('')).join(' '))
+      .toContain('Accepted lecture · Slide 2');
+    expect(tree!.root.findByType(Modal).props.animationType).toBe('none');
+  });
+  it.each(['not_canvas_pdf', 'no_page_source', 'source_revision_unavailable'])('has no control for %s', async reason => {
+    mocks.read.mockResolvedValue({ available: false, reason }); await mount(); expect(buttons()).toHaveLength(0);
+  });
+  it('hides offline without asking the server to render', async () => {
+    await mount(true); expect(buttons()).toHaveLength(0); expect(mocks.read).not.toHaveBeenCalled();
+  });
+  it('shows the local PDF thumbnail in the existing page viewer', async () => {
+    mocks.read.mockResolvedValue({ ...ready, sourceLabel: 'My uploaded PDF' }); await mount();
+    expect(tree!.root.findAllByType(Image)[0]?.props.source).toEqual({ uri: ready.url });
+    expect(buttons()[0]?.props.accessibilityLabel).toBe('From page 2');
+    await act(async () => buttons()[0]!.props.onPress());
+    expect(tree!.root.findByType(Modal).props.visible).toBe(true);
+    expect(tree!.root.findAllByType(Text).map(node => node.props.children).join(' ')).toContain('My uploaded PDF');
+  });
+  it('keeps the page number with calm unavailable copy and no image/control after deletion', async () => {
+    mocks.read.mockResolvedValue({ available: false, reason: 'source_revision_unavailable', page: 2 }); await mount();
+    expect(buttons()).toHaveLength(0); expect(tree!.root.findAllByType(Image)).toHaveLength(0);
+    expect(tree!.root.findAllByType(Text).map(node => [node.props.children].flat().join('')).join(' '))
+      .toContain('From page 2 Page preview unavailable');
+    await act(async () => tree!.update(createElement(SourcePageSnapshot, { ...props, offline: true })));
+    expect(tree!.root.findAllByType(Text)).toHaveLength(0);
+  });
+  it('closes an open viewer and keeps the page text when deletion wins on recheck', async () => {
+    mocks.read.mockResolvedValue(ready); await mount();
+    mocks.read.mockResolvedValue({ available: false, reason: 'source_revision_unavailable', page: 2 });
+    await act(async () => buttons()[0]!.props.onPress());
+    expect(buttons()).toHaveLength(0); expect(tree!.root.findAllByType(Modal)).toHaveLength(0);
+    expect(tree!.root.findAllByType(Text).map(node => node.props.children).join(' ')).toContain('Page preview unavailable');
+  });
+  it('discovers without rendering, then opens a full-screen modal with caption and Reduce Motion', async () => {
+    mocks.read.mockResolvedValue(ready); await mount();
+    expect(mocks.read).toHaveBeenCalledWith(client, 'artifact', 'section', false, expect.any(AbortSignal));
+    expect(buttons()[0]?.props.accessibilityLabel).toBe('From page 2');
+    await act(async () => buttons()[0]!.props.onPress());
+    const modal = tree!.root.findByType(Modal); expect(modal.props.visible).toBe(true); expect(modal.props.animationType).toBe('none');
+    expect(tree!.root.findAllByType(Text).map(node => node.props.children).join(' ')).toContain('Accepted lecture · Page 2');
+    expect(mocks.read.mock.calls.at(-1)?.[3]).toBe(true);
+    await act(async () => buttons().find(node => node.props.accessibilityLabel === 'Close source page')!.props.onPress());
+    expect(tree!.root.findByType(Modal).props.visible).toBe(false);
+  });
+  it('shows a quiet rendering placeholder and polls at most five times over 15 seconds', async () => {
+    vi.useFakeTimers(); mocks.read.mockResolvedValue({ available: true, status: 'rendering', page: 2 }); await mount();
+    await act(async () => buttons()[0]!.props.onPress());
+    expect(tree!.root.findAllByType(ActivityIndicator).length).toBeGreaterThan(0);
+    const start = mocks.read.mock.calls.filter(call => call[3] === true).length;
+    for (let i = 0; i < 5; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(mocks.read.mock.calls.filter(call => call[3] === true)).toHaveLength(start + 5);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(mocks.read.mock.calls.filter(call => call[3] === true)).toHaveLength(start + 5);
+    expect(mocks.read.mock.calls).toHaveLength(7); // Discovery + open + exactly five progress checks.
+  });
+  it('hides the button and closes the viewer on a connection failure', async () => {
+    mocks.read.mockResolvedValue(ready); await mount(); mocks.read.mockRejectedValue(new Error('offline'));
+    await act(async () => buttons()[0]!.props.onPress()); expect(buttons()).toHaveLength(0);
+  });
+  it('hides a ready snapshot when the reader switches to an offline device copy', async () => {
+    mocks.read.mockResolvedValue(ready); await mount();
+    await act(async () => tree!.update(createElement(SourcePageSnapshot, { ...props, offline: true })));
+    expect(buttons()).toHaveLength(0);
+  });
+  it('handles double-tap reset and bounded pinch/pan in the full-screen image', async () => {
+    mocks.read.mockResolvedValue(ready); await mount(); await act(async () => buttons()[0]!.props.onPress());
+    const page = tree!.root.findAllByType(View).find(node => node.props.accessibilityLabel?.startsWith('Source page.'))!;
+    await act(async () => page.props.onLayout({ nativeEvent: { layout: { width: 360, height: 640 } } }));
+    const touch = (positions: { pageX: number; pageY: number }[]) => ({ nativeEvent: { touches: positions } });
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    await act(async () => { page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])); page.props.onResponderRelease(); });
+    vi.mocked(Date.now).mockReturnValue(1200);
+    await act(async () => { page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])); page.props.onResponderRelease(); });
+    expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({ scale: 2 });
+    await act(async () => page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }, { pageX: 200, pageY: 100 }])));
+    await act(async () => page.props.onResponderMove(touch([{ pageX: 100, pageY: 100 }, { pageX: 400, pageY: 100 }])));
+    expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({ scale: 4 });
+    vi.mocked(Date.now).mockRestore();
+  });
+});

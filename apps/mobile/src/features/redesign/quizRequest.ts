@@ -51,6 +51,7 @@ export function quizIntentInput({
       sourceIds: [reviewerArtifactId],
       reviewerArtifactId,
       questionCount,
+      ...(title.trim() ? { title: title.trim() } : {}),
       difficulty,
       questionTypes: questionTypes ?? ["single_select", "identification", "true_false", "modified_true_false", "matching"],
       ...(selectedTopicIds ? { selectedTopicIds } : {}),

@@ -3,11 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  ingestCanvasFiles: vi.fn(),
+  admitMaterialPreparation: vi.fn(),
 }));
 
-vi.mock("@/lib/canvas-file-ingestion", () => ({
-  ingestCanvasFiles: mocks.ingestCanvasFiles,
+vi.mock("@/lib/canvas-preparation/admission", () => ({
+  admitMaterialPreparation: mocks.admitMaterialPreparation,
 }));
 
 const { prepareCanvasReviewerSources } = await import("./canvas-reviewer-sources");
@@ -24,38 +24,17 @@ const NOW = "2026-07-07T00:00:00.000Z";
 describe("Canvas reviewer source preparation service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.ingestCanvasFiles.mockResolvedValue({
-      ok: true,
-      response: {
-        blocked: 0,
-        failed: 0,
-        metadataOnly: 0,
-        ok: true,
-        requested: 1,
-        results: [
-          {
-            bytesStored: 1024,
-            code: "stored",
-            fileId: FILE_ID,
-            retryable: false,
-            status: "stored",
-          },
-        ],
-        succeeded: 1,
-        totalBytesStored: 1024,
-        unchanged: 0,
-        unavailable: 0,
-      },
-    });
+    mocks.admitMaterialPreparation.mockResolvedValue({id:'preparation-job',state:'prepared'});
   });
 
-  it("delegates validated file IDs to the existing ingestion service", async () => {
+  it.each([undefined, "brokered-sync-token"])("delegates validated file IDs with token %s", async brokeredCanvasToken => {
     const fake = createFakeCanvasClient({
       canvas_files: [baseFileRow()],
     });
 
     const result = await prepareCanvasReviewerSources({
       client: fake.client,
+      brokeredCanvasToken,
       courseId: COURSE_ID,
       sourceIds: [`file:${FILE_ID}`],
       userId: USER_ID,
@@ -67,7 +46,7 @@ describe("Canvas reviewer source preparation service", () => {
         requested: 1,
         results: [
           {
-            code: "stored",
+            code: "prepared",
             id: `file:${FILE_ID}`,
             retryable: false,
             status: "ready",
@@ -75,11 +54,9 @@ describe("Canvas reviewer source preparation service", () => {
         ],
       },
     });
-    expect(mocks.ingestCanvasFiles).toHaveBeenCalledWith({
-      client: fake.client,
-      fileIds: [FILE_ID],
-      userId: USER_ID,
-    });
+    expect(mocks.admitMaterialPreparation).toHaveBeenCalledWith(fake.client,expect.objectContaining({
+      materialId:`file:${FILE_ID}`,courseId:COURSE_ID,brokeredCanvasToken,userId:USER_ID,manualRetry:true,explicitFilePermission:true,
+    }));
     expect(JSON.stringify(result)).not.toContain("storage_object_key");
     expect(JSON.stringify(result)).not.toContain("current_sha256");
     expect(JSON.stringify(result)).not.toContain("token_ciphertext");
@@ -93,8 +70,19 @@ describe("Canvas reviewer source preparation service", () => {
     });
     await prepareCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID,
       pageAttachmentId: 'page-row', sourceIds: [`file:${FILE_ID}`], userId: USER_ID });
-    expect(mocks.ingestCanvasFiles).toHaveBeenCalledWith({ client: fake.client,
-      directlyLinkedFileId: FILE_ID, fileIds: [FILE_ID], userId: USER_ID });
+    expect(mocks.admitMaterialPreparation).toHaveBeenCalledWith(fake.client,expect.objectContaining({materialId:'page:page-row',explicitFilePermission:false}));
+  });
+  it.each(['pending','running'])('reports accepted %s work as pending even after a retryable failure',async state=>{
+    mocks.admitMaterialPreparation.mockResolvedValue({state,reason_code:'preparation_download_failed'});
+    const fake=createFakeCanvasClient();
+    expect(await prepareCanvasReviewerSources({client:fake.client,courseId:COURSE_ID,sourceIds:[`file:${FILE_ID}`],userId:USER_ID}))
+      .toMatchObject({ok:true,value:{results:[{status:'unavailable',code:'preparation_pending'}]}});
+  });
+  it('does not claim background acceptance when no job was admitted',async()=>{
+    mocks.admitMaterialPreparation.mockResolvedValue(null);
+    const fake=createFakeCanvasClient();
+    expect(await prepareCanvasReviewerSources({client:fake.client,courseId:COURSE_ID,sourceIds:[`file:${FILE_ID}`],userId:USER_ID}))
+      .toMatchObject({ok:true,value:{results:[{status:'unavailable',code:'preparation_unavailable'}]}});
   });
   it('does not allow a hidden file without its owned Page reference', async () => {
     const fake = createFakeCanvasClient({ canvas_files: [{ ...baseFileRow(), hidden: true,
@@ -102,13 +90,13 @@ describe("Canvas reviewer source preparation service", () => {
     const result = await prepareCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID,
       pageAttachmentId: 'other-page', sourceIds: [`file:${FILE_ID}`], userId: USER_ID });
     expect(result).toMatchObject({ ok: false, code: 'canvas_file_not_found' });
-    expect(mocks.ingestCanvasFiles).not.toHaveBeenCalled();
+    expect(mocks.admitMaterialPreparation).not.toHaveBeenCalled();
   });
 
   it.each([
     ["malformed source IDs", ["file:not-a-uuid"], "invalid_request"],
     ["duplicate source IDs", [`file:${FILE_ID}`, `file:${FILE_ID}`], "canvas_source_duplicate"],
-    ["non-file source IDs", [`page:${FILE_ID}`], "invalid_request"],
+    ["non-file source IDs", [`announcement:${FILE_ID}`], "invalid_request"],
   ])("rejects %s before ingestion", async (_name, sourceIds, code) => {
     const fake = createFakeCanvasClient();
 
@@ -120,7 +108,7 @@ describe("Canvas reviewer source preparation service", () => {
     });
 
     expect(result).toMatchObject({ ok: false, code });
-    expect(mocks.ingestCanvasFiles).not.toHaveBeenCalled();
+    expect(mocks.admitMaterialPreparation).not.toHaveBeenCalled();
   });
 
   it("rejects unselected courses before ingestion", async () => {
@@ -139,7 +127,7 @@ describe("Canvas reviewer source preparation service", () => {
       ok: false,
       code: "canvas_course_not_selected",
     });
-    expect(mocks.ingestCanvasFiles).not.toHaveBeenCalled();
+    expect(mocks.admitMaterialPreparation).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -173,7 +161,7 @@ describe("Canvas reviewer source preparation service", () => {
       ok: false,
       code: "canvas_file_not_found",
     });
-    expect(mocks.ingestCanvasFiles).not.toHaveBeenCalled();
+    expect(mocks.admitMaterialPreparation).not.toHaveBeenCalled();
   });
 
   it("rejects unsupported files before ingestion", async () => {
@@ -201,16 +189,11 @@ describe("Canvas reviewer source preparation service", () => {
       ok: false,
       code: "canvas_source_unsupported_file_type",
     });
-    expect(mocks.ingestCanvasFiles).not.toHaveBeenCalled();
+    expect(mocks.admitMaterialPreparation).not.toHaveBeenCalled();
   });
 
   it("maps ingestion failures without leaking internals", async () => {
-    mocks.ingestCanvasFiles.mockResolvedValue({
-      ok: false,
-      status: 500,
-      code: "canvas_file_ingestion_failed",
-      message: "Safe ingestion failure.",
-    });
+    mocks.admitMaterialPreparation.mockRejectedValue(new Error('private provider response'));
     const fake = createFakeCanvasClient({
       canvas_files: [baseFileRow()],
     });
@@ -224,8 +207,8 @@ describe("Canvas reviewer source preparation service", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      code: "canvas_file_ingestion_failed",
-      message: "Safe ingestion failure.",
+      code: "canvas_storage_failed",
+      message: "Canvas preparation could not be accepted.",
     });
     expect(JSON.stringify(result)).not.toContain("token");
   });

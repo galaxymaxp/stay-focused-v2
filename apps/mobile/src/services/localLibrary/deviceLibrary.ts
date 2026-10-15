@@ -2,6 +2,7 @@ import type {
   GenerationView,
   LibraryArtifactDetail,
   LibraryOverview,
+  QuizAnswerKey,
 } from "@stay-focused/shared";
 
 import { experienceRequest, type ExperienceClient } from "../experienceApi";
@@ -11,6 +12,8 @@ import { persistCompletedGeneration, type LibraryRemote } from "./librarySync";
 
 export function libraryRemote(client: ExperienceClient, signal?: AbortSignal): LibraryRemote {
   return {
+    fetchQuizAnswerKey: quizId => experienceRequest<QuizAnswerKey>(client,
+      `/api/experience/quizzes/${encodeURIComponent(quizId)}/answer-key`, signal ? { signal } : {}),
     fetchPage: (offset, limit) =>
       experienceRequest<LibraryOverview>(
         client,
@@ -34,12 +37,17 @@ export async function storeCompletedGeneration(
 ): Promise<LocalUpsertOutcome | null> {
   const store = await getLocalArtifactStore();
   if (!store) return null;
-  return persistCompletedGeneration({
+  const outcome = await persistCompletedGeneration({
     store,
     ownerUserId,
     remote: libraryRemote(client),
     generation,
   });
+  if (outcome !== null) {
+    const { runOfflineCatchUp } = await import("./offlineCatchUp");
+    void runOfflineCatchUp(ownerUserId, client, { force: true });
+  }
+  return outcome;
 }
 
 /** Mirrors a confirmed server-side delete. Never throws. */

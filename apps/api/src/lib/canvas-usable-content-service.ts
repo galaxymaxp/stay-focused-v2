@@ -11,9 +11,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   classifyStoredCanvasFileKind,
-  extractPreparedCanvasFileText,
+
 } from "./canvas-stored-file-extraction";
-import { createServerOcrProvider } from "./ocr/create-server-ocr-provider";
+import { extractCanvasPreparedFileText as extractPreparedCanvasFileText,loadPreparedPageEvidence } from "./canvas-preparation/cache";
 import { loadStoredSelectedCanvasCourse } from "./canvas-reviewer-sources";
 import {
   resolveCanvasUsableContent,
@@ -129,7 +129,7 @@ async function loadCandidate({
   switch (sourceType) {
     case "page": {
       const loaded = await readOwnedRow<CanvasPageRow>(client, "canvas_pages", rowId, boundary);
-      return loaded === "storage_failed" ? loaded : loaded ? pageCandidate(loaded, boundary) : null;
+      return loaded === "storage_failed" ? loaded : loaded ? pageCandidate(loaded, boundary,client) : null;
     }
     case "assignment": {
       const loaded = await readOwnedRow<CanvasAssignmentRow>(
@@ -178,16 +178,19 @@ async function loadCandidate({
   }
 }
 
-function pageCandidate(
+async function pageCandidate(
   row: CanvasPageRow,
   boundary: OwnershipBoundary,
-): CanvasUsableContentCandidate {
-  return baseCandidate(row, boundary, {
+  client:SupabaseClient<Database>,
+): Promise<CanvasUsableContentCandidate> {
+  const cached=await loadPreparedPageEvidence({client,userId:boundary.userId,courseId:boundary.courseId,pageRow:row});
+  const candidate=baseCandidate(row, boundary, {
     html: row.body_html,
     method: "synchronized_page_html",
     sourceKind: "page",
     canvasObjectId: row.canvas_page_id ?? row.canvas_page_url,
   });
+  return {...candidate,accessible:cached!==null};
 }
 
 function assignmentCandidate(
@@ -230,14 +233,7 @@ function fileCandidate(
     expectedUserId: boundary.userId,
     extractFile: async () => {
       if (kind === "unsupported") return { status: "unsupported" };
-      let provider = injectedProvider;
-      if (kind !== "text" && !provider) {
-        try {
-          provider = createServerOcrProvider();
-        } catch {
-          return { status: "failed" };
-        }
-      }
+      const provider = injectedProvider;
       const extraction = await extractPreparedCanvasFileText({
         client,
         connectionId: boundary.connectionId,
@@ -340,7 +336,7 @@ async function loadLinkedModuleCandidate({
         : null;
     if (!filtered) return null;
     const { data, error } = await filtered.maybeSingle();
-    return error || !data ? null : pageCandidate(data as CanvasPageRow, boundary);
+    return error || !data ? null : pageCandidate(data as CanvasPageRow, boundary, client);
   }
   if (!contentId) return null;
   if (row.item_type === "Assignment") {

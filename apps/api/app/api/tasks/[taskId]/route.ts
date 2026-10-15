@@ -52,7 +52,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
     ...(validation.value.priority !== undefined ? { priority: validation.value.priority } : {}),
     ...(validation.value.dueAt !== undefined ? { due_at: validation.value.dueAt } : {}),
     ...(validation.value.estimatedMinutes !== undefined
-      ? { estimated_minutes: validation.value.estimatedMinutes }
+      ? { estimated_minutes: validation.value.estimatedMinutes, estimate_source: "user", estimate_note: null }
       : {}),
     ...(validation.value.status !== undefined
       ? {

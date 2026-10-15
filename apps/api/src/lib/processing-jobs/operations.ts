@@ -33,8 +33,8 @@ inspectPdfTextPages,
 type PdfPageInspection,
 } from "@/lib/ocr/pdf-native-text";
 import {
+getConfiguredDocumentMaxPdfPages,
 getConfiguredDurableDocumentMaxOcrPages,
-getConfiguredDurableDocumentMaxPdfPages,
 OCR_PROVIDER_MAX_PDF_PAGES_PER_REQUEST,
 } from "@/lib/ocr/upload-policy";
 import {
@@ -100,11 +100,33 @@ export async function prepareCanvasReviewerExtractionStep(jobId: string, workerI
     await assertWorkflowJobMayContinue(client, jobId, workerId);
     const source = await findProcessingJobSource(client, job);
     if (source.source_kind !== "pdf") throw new FatalError("processing_job_source_invalid");
-    if (source.page_count) return source.page_count;
+    const preparationId=source.metadata && typeof source.metadata==='object' && 'canvasPreparationJobId' in source.metadata?source.metadata.canvasPreparationJobId:undefined;
+    if(typeof preparationId==='string'){
+      const {readPreparation,readPreparedResult}=await import('@/lib/canvas-preparation/repository');
+      const prepared=await readPreparation(client,preparationId);
+      const result=prepared && prepared.user_id===job.user_id?await readPreparedResult(client,prepared):null;
+      const component=result?.components.find(item=>item.type==='file' && item.originalSha256===source.content_sha256);
+      if(!component?.extraction?.ocrResult)throw new FatalError('canvas_preparation_not_ready');
+      const {prepareDeferredCanvasReviewerSource}=await import('./deferred-canvas-reviewer');
+      await prepareDeferredCanvasReviewerSource({client,job,workerId,normalizedText:component.text,pages:component.extraction.ocrResult.pages});
+      return null;
+    }
+    const documentMaxPages = getConfiguredDocumentMaxPdfPages();
+    if (source.page_count) {
+      if (source.page_count > documentMaxPages) {
+        await failKnownWorkflowJob(client, jobId, workerId, {
+          code: "pdf_page_limit_exceeded",
+          message: "The Canvas PDF could not be validated for complete extraction.",
+          retryable: false,
+        });
+        throw new FatalError("pdf_page_limit_exceeded");
+      }
+      return source.page_count;
+    }
     const bytes = await downloadSourceBytes(client, source);
     const validation = await validatePdfOcrBytes({
       bytes,
-      documentMaxPages: getConfiguredDurableDocumentMaxPdfPages(),
+      documentMaxPages,
       fileName: source.display_name,
       mimeType: source.mime_type,
     });

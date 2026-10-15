@@ -18,16 +18,20 @@ import { ActivityScreen, TasksCourseScreen, TasksScreen } from "./TasksScreen";
 import { TodayScreen } from "./TodayScreen";
 import { DayRingClock } from "./DayRingClock";
 import { localDate } from "./presentation";
+import { TASK_COURSE_GRADES_PATHNAME, courseRouteParams } from "../../navigation/appRoutes";
 import { AnnouncementDetailScreen, AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 
 const mocks = vi.hoisted(() => ({
   artifact: null as LibraryArtifactDetail | null,
+  offlineMissing: false,
   storeConfirmed: vi.fn(),
   data: {} as Record<string, unknown>,
   errors: {} as Record<string, { message: string; code: string }>,
   paths: [] as string[],
   library: {
-    items: [] as LibraryArtifactSummary[],
+    items: [] as (LibraryArtifactSummary & { offlineReady?: boolean })[],
+    offlineStats: null as { total: number; current: number; approximateBytes: number } | null,
+    errorCode: null as string | null,
     categories: null as LibraryOverview["categories"] | null,
     localReady: true,
     refreshing: false,
@@ -51,13 +55,14 @@ const mocks = vi.hoisted(() => ({
   hide: vi.fn(),
   unsync: vi.fn(async () => true),
   selectedCourseIds: new Set<string>(),
+  reducedMotion: true,
 }));
 vi.mock("expo-router", () => ({
   router: { push: mocks.push, navigate: mocks.navigate, back: mocks.back, replace: mocks.replace, canGoBack: () => true },
   useLocalSearchParams: () => mocks.params,
 }));
 vi.mock('./GenerationCore', () => ({ GenerationCore: 'GenerationCore' }));
-vi.mock("@react-navigation/native", () => ({
+vi.mock("expo-router/react-navigation", () => ({
   useIsFocused: () => true,
   useNavigation: () => ({ dispatch: vi.fn() }),
   usePreventRemove: vi.fn(),
@@ -71,7 +76,7 @@ vi.mock("../../design/theme", async () => {
     ...tokens,
     useTheme: () => ({
       colors: tokens.palettes.light,
-      reducedMotion: true,
+      reducedMotion: mocks.reducedMotion,
       active: true,
     }),
   };
@@ -116,7 +121,7 @@ vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () =>
 vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642, dayOrbTouch: { active: false } }));
 vi.mock("react-native", () => ({
   View: "View",
-  StyleSheet: { absoluteFillObject: { position: "absolute" } },
+  StyleSheet: { absoluteFill: { position: "absolute" } },
   ScrollView: "ScrollView",
   Pressable: "Pressable",
   TextInput: "TextInput",
@@ -212,7 +217,16 @@ vi.mock("./useExperience", () => ({
 }));
 vi.mock("./useLocalLibrary", () => ({
   useLocalLibrary: () => ({ ...mocks.library, refresh: vi.fn() }),
-  useLocalArtifact: () => ({ data: mocks.artifact, loading: false, error: null, deviceCopy: false, refresh: vi.fn(), storeConfirmed: mocks.storeConfirmed }),
+  useLocalArtifact: () => ({ offlineMissing: mocks.offlineMissing, data: mocks.artifact, loading: false, error: null, deviceCopy: false, refresh: vi.fn(), storeConfirmed: mocks.storeConfirmed }),
+}));
+vi.mock("../../services/localLibrary/localArtifactDatabase", () => ({
+  // This online screen fixture has no pending device edit or local body.
+  getLocalArtifactStore: async () => ({
+    readPendingDraftEdit: async () => null,
+    listPendingDraftEdits: async () => [],
+    readDraftCopyReceipt: async () => null,
+    readDetail: async () => null,
+  }),
 }));
 vi.mock("../../services/experienceApi", () => ({
   experienceRequest: mocks.request,
@@ -224,13 +238,15 @@ vi.mock("../../services/generationRecovery", () => ({
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   mocks.artifact = null;
+  mocks.offlineMissing = false;
   mocks.data = {};
   mocks.errors = {};
   mocks.paths = [];
   mocks.params = {};
-  mocks.library = { items: [], categories: null, localReady: true, refreshing: false, error: null };
+  mocks.library = { items: [], offlineStats: null, errorCode: null, categories: null, localReady: true, refreshing: false, error: null };
   mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] } };
   mocks.selectedCourseIds = new Set();
+  mocks.reducedMotion = true;
   vi.clearAllMocks();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
@@ -479,6 +495,7 @@ describe("B25 screen interactions", () => {
     ] };
     mocks.params = { courseKey: "personal" };
     const root = await render(createElement(TasksCourseScreen));
+    expect(root.findAll(node => String(node.type) === "RowLink" && node.props.label === "Grades")).toHaveLength(0);
     const controls = root.findAll(node => String(node.type) === "IconAction" && node.props.label.startsWith("Edit completion:"));
     expect(controls).toHaveLength(1);
     await act(async () => controls[0]!.props.onPress());
@@ -585,8 +602,8 @@ describe("B25 screen interactions", () => {
       params: { intent: "saved-key", start: "1" },
     });
   });
-  it("shows preparation immediately and rejoins the same request after returning to the material", async () => {
-    const needsPreparation = { ...workspace.materials.items[0]!, readiness: "needs_preparation" as const };
+  it("keeps Retry quiet, single-flight, and rejoins it after returning to the material", async () => {
+    const needsPreparation = { ...workspace.materials.items[0]!, preparation: {status:'failed' as const,reasonCode:'preparation_failed' as const} };
     mocks.data["/api/experience/courses/course"] = {
       ...workspace,
       materials: { ...workspace.materials, items: [needsPreparation] },
@@ -595,18 +612,49 @@ describe("B25 screen interactions", () => {
     let resolvePreparation!: (value: { items: typeof workspace.materials.items }) => void;
     mocks.request.mockImplementationOnce(() => new Promise((resolve) => { resolvePreparation = resolve; }));
     let root = await render(createElement(GenerateMaterialScreen));
-    const prepare = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Prepare material")!;
-    await act(async () => { void prepare.props.onPress(); });
-    expect(copyText(root).join(" ")).toContain("Preparing source");
-    expect(root.findAll((node) => String(node.type) === "GenerationCore")).toHaveLength(1);
+    const prepare = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Retry")!;
+    await act(async () => { void prepare.props.onPress(); void prepare.props.onPress(); });
+    expect(copyText(root).join(" ")).toContain("Couldn't prepare");
+    expect(root.findAll((node) => String(node.type) === "GenerationCore")).toHaveLength(0);
     expect(mocks.request).toHaveBeenCalledTimes(1);
 
     await act(async () => rendered!.unmount());
     root = await render(createElement(GenerateMaterialScreen));
-    expect(copyText(root).join(" ")).toContain("Preparing source");
+    expect(copyText(root).join(" ")).toContain("Couldn't prepare");
     expect(mocks.request).toHaveBeenCalledTimes(1);
-    await act(async () => resolvePreparation({ items: [{ ...needsPreparation, readiness: "ready" }] }));
+    await act(async () => resolvePreparation({ items: [{ ...needsPreparation, preparation: {status:'ready',reasonCode:null} }] }));
     expect(root.findAll((node) => String(node.type) === "Action").some((node) => node.props.children === "Prepare material")).toBe(false);
+  });
+  it.each(['ready', 'preparing', 'failed'] as const)('shows calm %s status with generation gated on Ready', async status => {
+    mocks.data['/api/experience/courses/course'] = { ...workspace, materials: { ...workspace.materials,
+      items: [{ ...workspace.materials.items[0]!, preparation:{status,reasonCode:null} }] } };
+    mocks.params = {courseId:'course',materialId:'file:one'};
+    const root = await render(createElement(GenerateMaterialScreen));
+    expect(copyText(root).join(' ')).toContain(status==='failed'?"Couldn't prepare":status==='ready'?'Ready':'Preparing');
+    const actions=root.findAll(node=>String(node.type)==='Action');
+    expect(actions.some(node=>node.props.children==='Retry')).toBe(status==='failed');
+    expect(actions.find(node=>node.props.children==='Generate Reviewer')!.props.disabled).toBe(status!=='ready');
+    expect(root.findAll(node=>String(node.type)==='GenerationCore')).toHaveLength(0);
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('hides Retry when the current material read is offline', async () => {
+    mocks.data['/api/experience/courses/course'] = { ...workspace, materials: { ...workspace.materials,
+      items: [{ ...workspace.materials.items[0]!, preparation:{status:'failed',reasonCode:'preparation_paused'} }] } };
+    mocks.errors['/api/experience/courses/course/materials?offset=0']={code:'connection',message:'Offline'};
+    mocks.params={courseId:'course',materialId:'file:one'};
+    const root=await render(createElement(GenerateMaterialScreen));
+    expect(copyText(root).join(' ')).toContain('Preparation paused. Tap Retry');
+    expect(root.findAll(node=>String(node.type)==='Action').some(node=>node.props.children==='Retry')).toBe(false);
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it.each([true,false])('Preparing stays static with Reduce Motion %s',async reducedMotion=>{
+    mocks.reducedMotion=reducedMotion;
+    mocks.data['/api/experience/courses/course']={...workspace,materials:{...workspace.materials,
+      items:[{...workspace.materials.items[0]!,preparation:{status:'preparing',reasonCode:null}}]}};
+    mocks.params={courseId:'course',materialId:'file:one'};
+    const root=await render(createElement(GenerateMaterialScreen));
+    expect(copyText(root).join(' ')).toContain('Preparing');
+    expect(root.findAll(node=>['GenerationCore','ActivityIndicator','AnimatedView'].includes(String(node.type)))).toHaveLength(0);
   });
   it("shows submission progress while saving one Reviewer intent", async () => {
     mocks.data["/api/experience/courses/course"] = workspace;
@@ -672,6 +720,25 @@ describe("B25 screen interactions", () => {
     });
     expect(mocks.createIntent).not.toHaveBeenCalled();
     expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it.each([
+    { reviewMinutes: 15, origin: 'manual' as const, expected: '~15 min review' },
+    { reviewMinutes: null, origin: 'manual' as const, expected: null },
+    { reviewMinutes: undefined, origin: 'manual' as const, expected: null },
+    { reviewMinutes: 15, origin: 'automatic' as const, expected: 'Made automatically · ~15 min review' },
+    { reviewMinutes: null, origin: 'automatic' as const, expected: 'Made automatically' },
+  ])('renders the saved reviewer card secondary line: %j', async ({ reviewMinutes, origin, expected }) => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [{ ...savedQuiz, id: 'artifact:saved', type: 'reviewer', title: 'Saved reviewer', reviewMinutes, origin }];
+    const root = await render(createElement(LibraryCourseScreen));
+    const lines = copyText(root);
+    if (expected) expect(lines).toContain(expected);
+    else expect(lines.join(' ')).not.toContain('min review');
+  });
+  it('does not show reviewer estimates on quiz cards', async () => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [{ ...savedQuiz, reviewMinutes: 15 }];
+    expect(copyText(await render(createElement(LibraryCourseScreen))).join(' ')).not.toContain('min review');
   });
   it("keeps device-saved work visible while the cloud refresh runs", async () => {
     mocks.library.items = [savedQuiz];
@@ -746,6 +813,10 @@ describe("B25 screen interactions", () => {
     const open = root.findAll((node) => String(node.type) === "Pressable").find((node) => node.props.accessibilityLabel === "Open task: Proposal")!;
     await act(async () => open.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith({ pathname: "/activity", params: { id: "missed" } });
+    const grades = root.findAll(node => String(node.type) === "RowLink" && node.props.label === "Grades")[0]!;
+    await act(async () => grades.props.onPress());
+    expect(mocks.push).toHaveBeenLastCalledWith({ pathname: TASK_COURSE_GRADES_PATHNAME,
+      params: { ...courseRouteParams({ courseId: course.id, courseName: course.name }), courseKey: "capstone" } });
   });
   it("has no pull-to-refresh on Today, and pauses scrolling while the ring is held", async () => {
     vi.useFakeTimers();
@@ -1088,7 +1159,7 @@ describe("B38 saved assignment Draft", () => {
     mocks.params = { courseKey: "personal" };
     mocks.library.items = [{ ...artifact, activityStudyStatus: "not_started" }];
     const root = await render(createElement(LibraryCourseScreen));
-    const segment = root.findAll(node => String(node.type) === "Page")[0]!.props.headerBelow.props.children;
+    const segment = root.findAll(node => String(node.type) === "Page")[0]!.props.headerBelow.props.children[0];
     expect(segment.props.segments.map((value: { label: string }) => value.label)).toEqual(["All", "Reviewers", "Quizzes", "Drafts"]);
     await act(async () => segment.props.onChange("activity_output"));
     const cards = root.findAll(node => String(node.type) === "RowLink");
@@ -1113,5 +1184,31 @@ describe("B38 saved assignment Draft", () => {
     await act(async () => generate.props.onPress());
     expect(mocks.createIntent).toHaveBeenCalledWith("owner", { title: draft.title, type: "activity_output", path: "/api/experience/activities/canvas%3Aassignment/generate", body: { mode: "draft" } });
     expect(mocks.push).toHaveBeenCalledWith({ pathname: "/generation", params: { intent: "draft-request", start: "1" } });
+  });
+});
+
+
+describe('O1 calm offline Library', () => {
+  it('shows the calm banner and availability marker in the course Library', async () => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [{ ...savedQuiz, course: null, offlineReady: true }];
+    mocks.library.offlineStats = { total: 1, current: 1, approximateBytes: 1024 };
+    mocks.library.errorCode = 'connection'; mocks.library.error = 'connection';
+    const root = await render(createElement(LibraryCourseScreen));
+    const copy = root.findAll(node => String(node.type) === 'Copy' || String(node.type) === 'Notice').map(node => node.props.children).join(' ');
+    expect(copy).toContain("You're offline. Items marked Saved offline still open.");
+    expect(copy).toContain('Saved offline');
+    expect(root.findAll(node => String(node.type) === 'RowLink')[0]!.props.label).toContain('Saved offline');
+    expect(copy).not.toContain('Try again');
+  });
+  it('opens a missing offline body with a Back action and no retry loop', async () => {
+    mocks.params = { id: 'quiz:missing' }; mocks.offlineMissing = true;
+    const root = await render(createElement(ArtifactScreen));
+    const back = root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Back');
+    expect(back).toHaveLength(1);
+    expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')).toHaveLength(0);
+    await act(async () => back[0]!.props.onPress());
+    expect(mocks.back).toHaveBeenCalledOnce();
+    expect(root.findAll(node => String(node.type) === 'Copy').map(node => node.props.children).join(' ')).toContain("This one isn't saved on your device yet.");
   });
 });

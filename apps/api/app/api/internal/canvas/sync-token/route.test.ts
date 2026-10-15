@@ -1,19 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  verify: vi.fn(), context: vi.fn(), decrypt: vi.fn(),
+  verify: vi.fn(), context: vi.fn(), decrypt: vi.fn(), preparation:vi.fn(),
 }));
 vi.mock("google-auth-library", () => ({ OAuth2Client: class { verifyIdToken = mocks.verify; } }));
 vi.mock("@/lib/canvas-db", () => ({ createCanvasServiceClient: () => ({}) }));
 vi.mock("@/lib/canvas-routes", () => ({ decryptConnectionToken: mocks.decrypt }));
 vi.mock("@/lib/canvas-sync-jobs/checkpoints", () => ({ loadCanvasSyncCheckpointContext: mocks.context }));
+vi.mock('@/lib/canvas-preparation/repository',()=>({preparationTokenContext:mocks.preparation}));
 
 const { POST } = await import("./route");
 const jobId = "11111111-1111-4111-8111-111111111111";
 const dispatchId = "22222222-2222-4222-8222-222222222222";
 const workerId = "google-canvas:33333333-3333-4333-8333-333333333333";
 
-function request(body = { jobId, dispatchId, workerId }, authorization = "Bearer google-id-token") {
+function request(body:unknown = { jobId, dispatchId, workerId }, authorization = "Bearer google-id-token") {
   return new Request("https://stay-focused-v2-prototype.vercel.app/api/internal/canvas/sync-token", {
     method: "POST", headers: { authorization }, body: JSON.stringify(body),
   });
@@ -34,6 +35,20 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllEnvs(); });
 
 describe("claimed Canvas token handoff", () => {
+  it('authorizes a claimed preparation lease after Google identity verification',async()=>{
+    const body={jobId,dispatchId,workerId:workerId.replace('google-canvas:','google-preparation:'),jobType:'preparation',leaseToken:jobId};
+    mocks.preparation.mockResolvedValue({connection:{status:'active'}});
+    expect((await POST(request(body))).status).toBe(200);
+    expect(mocks.preparation).toHaveBeenCalledWith(expect.anything(),body);
+    expect(mocks.context).not.toHaveBeenCalled();
+  });
+  it('denies unclaimed preparation jobs and arbitrary owner/course payloads',async()=>{
+    const body={jobId,dispatchId,workerId:workerId.replace('google-canvas:','google-preparation:'),jobType:'preparation',leaseToken:jobId};
+    mocks.preparation.mockResolvedValue(null);
+    expect((await POST(request(body))).status).toBe(404);
+    expect((await POST(request({...body,userId:jobId}))).status).toBe(400);
+    expect(mocks.decrypt).not.toHaveBeenCalled();
+  });
   it("denies callers without a Google worker ID token before reading storage", async () => {
     expect((await POST(request(undefined, ""))).status).toBe(401);
     expect(mocks.context).not.toHaveBeenCalled();

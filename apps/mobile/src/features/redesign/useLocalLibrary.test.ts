@@ -11,6 +11,7 @@ import {
   quizDetail,
   reviewerDetail,
 } from "../../services/localLibrary/localLibrary.testSupport";
+import { runOfflineCatchUp } from "../../services/localLibrary/offlineCatchUp";
 import { migrateLocalLibrary } from "../../services/localLibrary/schema";
 import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
 
@@ -25,7 +26,7 @@ vi.mock("../../auth", () => ({
   useAuth: () => ({ session: mocks.owner ? { user: { id: mocks.owner }, accessToken: "token" } : null }),
 }));
 vi.mock("../../design/theme", () => ({ useTheme: () => ({ active: true }) }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => true }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => true }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => mocks.client,
 }));
@@ -82,6 +83,29 @@ afterEach(async () => {
 });
 
 describe("useLocalLibrary", () => {
+  it("joins a foreground catch-up instead of starting another reconcile", async () => {
+    const page = deferred<unknown>();
+    const detail = quizDetail();
+    if (!('quiz' in detail)) throw new Error('fixture');
+    const key = { quizId: detail.quiz.id, versionId: 'v1', questions: [{ id: 'q1', correctOptionIds: ['a'], explanation: 'Synthetic explanation' }] };
+    mocks.request.mockImplementation((_client: unknown, path: string) => path.includes('?') ? page.promise : Promise.resolve(path.endsWith('/answer-key') ? key : detail));
+    const foreground = runOfflineCatchUp(OWNER_A, mocks.client, { force: true });
+    await act(async () => { rendered = create(createElement(LibraryProbe)); });
+    await flush();
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      page.resolve({ items: [detail.artifact], categories, nextOffset: null });
+      await foreground;
+    });
+    await flush();
+    expect(mocks.request.mock.calls.map(([, path]) => path)).toEqual([
+      '/api/experience/library?limit=100&offset=0',
+      `/api/experience/library/${encodeURIComponent(detail.artifact.id)}`,
+      `/api/experience/quizzes/${detail.quiz.id}/answer-key`,
+    ]);
+    expect(await mocks.store!.readQuizAnswerKey(OWNER_A, detail.quiz.id, detail.artifact.updatedAt)).toEqual(key);
+    expect(library.items[0]?.offlineReady).toBe(true);
+  });
   it("renders device-saved work before the cloud answers, then reconciles", async () => {
     await mocks.store!.upsertDetail(OWNER_A, "r", reviewerDetail());
     const page = deferred<unknown>();
@@ -100,6 +124,8 @@ describe("useLocalLibrary", () => {
     expect(library.items.map((item) => item.id)).toEqual([quizDetail().artifact.id, reviewerDetail().artifact.id]);
     expect(library.refreshing).toBe(false);
     expect(library.error).toBeNull();
+    expect(library.offlineStats).toMatchObject({ total: 2, current: 2 });
+    expect(library.items.every(item => item.offlineReady)).toBe(true);
   });
 
   it("keeps device-saved work when the cloud refresh fails", async () => {
@@ -111,6 +137,9 @@ describe("useLocalLibrary", () => {
     await flush();
     expect(library.items).toHaveLength(1);
     expect(library.error).toBe("connection");
+    expect(library.errorCode).toBe("connection");
+    expect(library.offlineStats).toMatchObject({ total: 1, current: 1 });
+    expect(library.items[0]?.offlineReady).toBe(true);
     expect(library.refreshing).toBe(false);
   });
 
@@ -127,6 +156,15 @@ describe("useLocalLibrary", () => {
 });
 
 describe("useLocalArtifact", () => {
+  it("identifies a missing device body on a connection failure", async () => {
+    await mocks.store!.upsertSummaries(OWNER_A, [quizDetail().artifact]);
+    mocks.request.mockRejectedValue(new RemoteError("connection"));
+    await act(async () => { rendered = create(createElement(ArtifactProbe, { id: quizDetail().artifact.id })); });
+    await flush();
+    expect(artifact.data).toBeNull();
+    expect(artifact.offlineMissing).toBe(true);
+    expect(artifact.loading).toBe(false);
+  });
   it("opens a saved artifact offline from the device copy", async () => {
     await mocks.store!.upsertDetail(OWNER_A, "q", quizDetail());
     mocks.request.mockRejectedValue(new RemoteError("connection"));

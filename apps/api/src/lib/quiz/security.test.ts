@@ -96,6 +96,21 @@ describe('Quiz source selection', () => {
         expect(value.reviewerArtifactId).toBe(id);
         expect(mocks.structure).not.toHaveBeenCalled();
     });
+    it('returns typed 422 for too many Matching items using the actual owned Reviewer', async () => {
+        const data = canonical();
+        data.generated_artifact_versions[0]!.payload.reviewer.sections[0]!.items[0]!.sourceCore.keyPoints =
+            Array.from({ length: 15 }, (_, index) => `Protocol ${index + 1}: A distinct source definition.`);
+        const db = client(data); mocks.client.mockReturnValue(db);
+        const source = await assembleQuizSources(db, A, input);
+        expect(source.capacity).toMatchObject({ maximum: 30, matchingTermCount: 15, matchingMaximum: 5 });
+        const httpRequest = request('POST', { ...input, questionCount: 10, questionTypes: ['matching'] });
+        httpRequest.headers.set('idempotency-key', 'matching-capacity-test');
+        const response = await generate(httpRequest);
+        expect(response.status).toBe(422);
+        expect(await response.json()).toMatchObject({ ok: false, error: { code: 'quiz_source_capacity_exceeded', supportedMaximum: 5, retryable: false } });
+        expect(db.rpc).not.toHaveBeenCalled();
+        expect(mocks.prepare).not.toHaveBeenCalled();
+    });
     it.each(['text', 'camera', 'local_file'] as const)('uses an owned %s source for the same Quiz capacity and regions', async kind => {
         const data = canonical(A, 'reviewer', '');
         Object.assign(data.source_versions[0]!, { source_text: 'Mitochondria produce ATP. Ribosomes synthesize proteins. Nuclei contain DNA.', metadata: { sourceType: kind, sourceTitle: 'Cell notes' } });
@@ -167,4 +182,23 @@ describe('Quiz Library and weak areas', () => {
         expect(resultView(attemptView(build(true), questions), questions).weakAreas).toMatchObject([{ kind: 'missed_topic', asked: 1, missed: 1 }]);
         expect(resultView(attemptView(build(false), questions), questions).weakAreas).toEqual([]);
     });
+});
+
+describe('owner-only offline answer key',()=>{
+ const get=()=>quizGet(request(),{params:Promise.resolve({quizPath:[id,'answer-key']})});
+ it('serves only grading and reveal data to the verified owner',async()=>{
+  const response=await get();expect(response.status).toBe(200);
+  expect(response.headers.get('cache-control')).toBe('private, no-store');
+  const body=await response.json();expect(body.data).toMatchObject({quizId:id,versionId:quiz.generation_id,questions:questions.map(q=>({id:q.id,correctOptionIds:q.correctOptionIds,explanation:q.explanation}))});
+  expect(Object.keys(body.data.questions[0]).sort()).toEqual(['correctOptionIds','explanation','id','topic','topicId']);
+  expect(JSON.stringify(body)).not.toMatch(/sourceEvidence|sourceRefs|reviewerSectionIds|provenance|concept|incorrectTerm/);
+ });
+ it('denies a different owner with 404 and no key',async()=>{mocks.auth.mockResolvedValue({id:B});const response=await get();expect(response.status).toBe(404);expect(await response.text()).not.toContain('correctOptionIds');});
+ it('rejects unauthenticated requests before database access',async()=>{mocks.auth.mockResolvedValue(null);expect((await get()).status).toBe(401);expect(mocks.client).not.toHaveBeenCalled();});
+ it('denies missing owned key with 404',async()=>{mocks.client.mockReturnValue(client({quizzes:[quiz],quiz_keys:[]}));expect((await get()).status).toBe(404);});
+ it('uses the immutable quiz id when a retained legacy publication has no generation job',async()=>{
+  mocks.client.mockReturnValue(client({quizzes:[{...quiz,generation_id:null}],quiz_keys:[{quiz_id:id,user_id:A,questions}]}));
+  const response=await get();expect(response.status).toBe(200);expect((await response.json()).data.versionId).toBe(id);
+ });
+ it('keeps the existing learner body key-free after reading the key',async()=>{await get();const response=await quizGet(request(),{params:Promise.resolve({quizPath:[id]})});expect(response.status).toBe(200);expect(await response.text()).not.toMatch(/correctOptionIds|acceptedAnswers|explanation|sourceEvidence/);});
 });

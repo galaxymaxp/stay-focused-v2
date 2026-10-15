@@ -1,12 +1,16 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import { defaultNotificationPreferences, parseNotificationPreferencePatch, validNotificationTimezone } from "@stay-focused/shared/notification-preferences";
 import { requireCanvasAuth, createCorsHeaders, optionsResponse } from "@/lib/canvas-routes";
 
-function jsonResponse(body: unknown, status: number, request: Request): Response { return Response.json(body, { status, headers: createCorsHeaders(request.headers.get("origin"), "GET, PATCH, OPTIONS") }); }
+function jsonResponse(body: unknown, status: number, request: Request): Response { return Response.json(body, { status, headers: { "Cache-Control": "private, no-store", ...createCorsHeaders(request.headers.get("origin"), "GET, PATCH, OPTIONS") } }); }
 
 export const runtime = "nodejs";
 export async function GET(request: Request): Promise<Response> {
   const auth = await requireCanvasAuth(request);
-  if (!auth.ok) return auth.response;
+  if (!auth.ok) {
+    auth.response.headers.set("Cache-Control", "private, no-store");
+    return auth.response;
+  }
   const timezone = new URL(request.url).searchParams.get("timezone");
   const result = await auth.value.client.from("notification_preferences").upsert({ user_id: auth.value.user.id, ...defaultNotificationPreferences(validNotificationTimezone(timezone) ? timezone : "UTC") }, { onConflict: "user_id", ignoreDuplicates: true });
   if (result.error) return jsonResponse({ ok: false, error: { code: "unavailable", message: "Notification settings are unavailable." } }, 503, request);
@@ -16,12 +20,15 @@ export async function GET(request: Request): Promise<Response> {
 }
 export async function PATCH(request: Request): Promise<Response> {
   const auth = await requireCanvasAuth(request);
-  if (!auth.ok) return auth.response;
+  if (!auth.ok) {
+    auth.response.headers.set("Cache-Control", "private, no-store");
+    return auth.response;
+  }
   let patch: ReturnType<typeof parseNotificationPreferencePatch> = null;
   try {
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).length > 2048) return jsonResponse({ ok: false, error: { code: "invalid_request", message: "Settings request is too large." } }, 413, request);
-    patch = parseNotificationPreferencePatch(JSON.parse(raw));
+    const boundedBody = await readBoundedText(request, 2048);
+    if (!boundedBody.ok && boundedBody.reason === "too_large") return jsonResponse({ ok: false, error: { code: "invalid_request", message: "Settings request is too large." } }, 413, request);
+    patch = parseNotificationPreferencePatch(JSON.parse(boundedBody.ok ? boundedBody.text : ""));
   } catch { patch = null; }
   if (!patch || !Object.keys(patch).length) return jsonResponse({ ok: false, error: { code: "invalid_request", message: "Use valid switches, a local time after midnight, and a timezone such as Asia/Manila." } }, 400, request);
   const initialized = await auth.value.client.from("notification_preferences").upsert({ user_id: auth.value.user.id }, { onConflict: "user_id", ignoreDuplicates: true });

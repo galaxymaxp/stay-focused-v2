@@ -2,9 +2,9 @@
   "expo": {
     "name": "Stay Focused V2",
     "slug": "stay-focused-v2",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "icon": "./assets/branding/app-icon.png",
-    "runtimeVersion": "2.0.0",
+    "runtimeVersion": "2.1.0-sdk57",
     "orientation": "portrait",
     "scheme": "stayfocused",
     "ios": {
@@ -12,8 +12,9 @@
       "icon": "./assets/branding/app-icon.png"
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "package": "com.galaxymaxp.stayfocusedv2",
-      "runtimeVersion": "2.0.1",
+      "runtimeVersion": "2.1.0-sdk57",
       "adaptiveIcon": {
         "foregroundImage": "./assets/branding/orb-adaptive-foreground.png",
         "monochromeImage": "./assets/branding/orb-monochrome.png",
@@ -35,7 +36,9 @@
           "cameraPermission": "Allow Stay Focused to take study photos for OCR."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-audio",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

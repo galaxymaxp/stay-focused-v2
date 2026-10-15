@@ -1,4 +1,4 @@
-import type { BottomTabNavigationOptions } from "@react-navigation/bottom-tabs";
+import type { BottomTabNavigationOptions } from "expo-router/js-tabs";
 import { BookOpen, CheckSquare, Clock, Sparkles } from "lucide-react-native";
 import type { ThemeColors } from "./themeTokens";
 import { density, hitTarget } from "./tokens";

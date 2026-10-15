@@ -105,6 +105,7 @@ function isUuid(value: string): boolean {
 
 function corsHeaders(): HeadersInit {
   return {
+    "Cache-Control": "private, no-store",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, content-type, idempotency-key",
     "Access-Control-Allow-Methods": "POST, OPTIONS",

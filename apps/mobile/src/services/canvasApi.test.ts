@@ -407,7 +407,7 @@ describe("Canvas mobile API client", () => {
       },
     });
     expect(lastRequest(fetchImpl)).toMatchObject({
-      url: `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sources`,
+      url: `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sources?preparationStatus=1`,
       init: {
         method: "GET",
         headers: { Authorization: "Bearer session-token" },
@@ -415,6 +415,19 @@ describe("Canvas mobile API client", () => {
     });
   });
 
+  it.each(['docx','pptx'])('reads safe preparation status for supported %s files', async kind => {
+    const response=sourceListResponse();
+    const fetchImpl=createFetch({...response,sources:response.sources.map(source=>({...source,
+      preparation:{status:'preparing',reasonCode:null},file:source.file?{...source.file,kind}:null}))});
+    const result=await listCanvasReviewerSources({accessToken:'session-token',apiBaseUrl:API_BASE_URL,courseId:'course',fetchImpl});
+    expect(result).toMatchObject({ok:true,data:{sources:[{preparation:{status:'preparing',reasonCode:null}},{file:{kind}}]}});
+  });
+  it('rejects private or unrecognized preparation fields', async () => {
+    const response=sourceListResponse();
+    const fetchImpl=createFetch({...response,sources:response.sources.map(source=>({...source,
+      preparation:{status:'failed',reasonCode:'raw provider failure',lease_token:'private'}}))});
+    expect(await listCanvasReviewerSources({accessToken:'token',apiBaseUrl:API_BASE_URL,courseId:'course',fetchImpl})).toMatchObject({ok:false});
+  });
   it("loads a bounded later Canvas source page without exposing cursor state", async () => {
     const fetchImpl = createFetch(sourceListResponse());
 
@@ -429,7 +442,7 @@ describe("Canvas mobile API client", () => {
 
     expect(result.ok).toBe(true);
     expect(lastRequest(fetchImpl).url).toBe(
-      `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sources?limit=100&offset=100`,
+      `${API_BASE_URL}/api/canvas/courses/11111111-1111-4111-8111-111111111111/sources?preparationStatus=1&limit=100&offset=100`,
     );
   });
 
@@ -482,7 +495,7 @@ describe("Canvas mobile API client", () => {
       },
     });
     expect(lastRequest(fetchImpl)).toMatchObject({
-      url: `${API_BASE_URL}/api/canvas/courses/33333333-3333-4333-8333-333333333333/sources/prepare`,
+      url: `${API_BASE_URL}/api/canvas/courses/33333333-3333-4333-8333-333333333333/sources/prepare?preparationStatus=1`,
       init: {
         method: "POST",
         headers: {

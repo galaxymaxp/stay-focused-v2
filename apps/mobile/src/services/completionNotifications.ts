@@ -52,6 +52,16 @@ export async function enableCompletionNotifications(input: {
       message: "This build is not linked to an EAS project yet.",
     };
   }
+  try {
+  // Android 13 must have a channel before requesting notification permission
+  // and registering a push token.
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("study-completions", {
+      name: "Study completions",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: "default",
+    });
+  }
   const current = await Notifications.getPermissionsAsync();
   const permission = current.status === "granted"
     ? current
@@ -59,7 +69,7 @@ export async function enableCompletionNotifications(input: {
   if (permission.status !== "granted") {
     return {
       ok: false,
-      message: "Notification permission was not granted in iOS Settings.",
+      message: "Notifications are off. You can enable them in this device's app settings.",
     };
   }
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
@@ -80,6 +90,9 @@ export async function enableCompletionNotifications(input: {
   return response.ok
     ? { ok: true, installationId }
     : { ok: false, message: response.message };
+  } catch {
+    return { ok: false, message: "Notifications could not be enabled. Check your connection and try again." };
+  }
 }
 
 export async function sendCompletionNotificationTest(input: {

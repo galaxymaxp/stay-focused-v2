@@ -1,3 +1,5 @@
+import type { CreateTaskInput, PatchTaskInput, TaskView } from "@stay-focused/shared/task-planning";
+
 /**
  * Input parsing for the task editor.
  *
@@ -63,6 +65,15 @@ export function parseDueInput(value: string): string | null | "invalid" {
   }
 
   return "invalid";
+}
+
+/** Preserve an automatic estimate when saving edits to other task fields. */
+export function taskPatchFromDraft(
+  draft: CreateTaskInput,
+  task: TaskView | null,
+): PatchTaskInput {
+  const { estimatedMinutes, ...fields } = draft;
+  return { ...fields, ...(task?.estimatedMinutes === estimatedMinutes ? {} : { estimatedMinutes }) };
 }
 
 export function parseEstimateInput(value: string): number | null {

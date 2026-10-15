@@ -72,6 +72,7 @@ export async function POST(request: Request): Promise<Response> {
     due_at: validation.value.dueAt,
     estimated_minutes: validation.value.estimatedMinutes,
     source_type: "manual",
+    estimate_source: "user",
     status: "pending",
   };
   try {

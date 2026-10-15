@@ -284,7 +284,7 @@ export async function createReviewerProcessingJob({
       sourceMetadata,
       sourcePrivateMetadata: toJson({
         ...privateMetadata,
-        ...(canvasSourceType ? { sourceType: canvasSourceType } : {}),
+        ...(canvasSourceType ? { sourceType: canvasSourceType } : privateMetadata.sourceType === undefined && source.sourceKind === "plain-text" ? { sourceType: "text" } : {}),
         ...(normalizedTitle ? { sourceTitle: normalizedTitle } : {}),
         ...(source.sourceKind ? { reviewerSourceKind: source.sourceKind } : {}),
         ...(source.sourceBlocks && source.sourceBlocks.length > 0

@@ -13,6 +13,8 @@ function taskPayload(overrides: Record<string, unknown> = {}) {
     priority: "high",
     dueAt: "2026-09-04T12:00:00.000Z",
     estimatedMinutes: 90,
+    estimateSource: "user",
+    estimateNote: null,
     sourceType: "manual",
     canvasConnectionId: null,
     canvasCourseId: null,

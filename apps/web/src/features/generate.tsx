@@ -16,6 +16,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -40,6 +41,7 @@ import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
 import { performCanvasRefresh } from "../lib/canvas-refresh-core";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
+import { preparationPresentation } from "../app-model/materialPreparationPresentation";
 type Resource<T> = ReturnType<typeof useResource<T>>;
 type CourseSyncRun = "syncing" | "synced" | "partial" | "failed";
 /**
@@ -266,10 +268,10 @@ export function CourseWorkspace({
     [offset, setOffset] = useState<number | null>(null),
     [filter, setFilter] = useState(""),
     action = useAction();
+  useEffect(() => { setExtra([]); }, [courseId]);
   useEffect(() => {
-    setExtra([]);
-    setOffset(course.data?.materials.nextOffset ?? null);
-  }, [course.data]);
+    if (!extra.length) setOffset(course.data?.materials.nextOffset ?? null);
+  }, [course.data, extra.length]);
   const materials = [...(course.data?.materials.items ?? []), ...extra],
     visible = materials.filter((m) =>
       m.title.toLowerCase().includes(filter.trim().toLowerCase()),
@@ -357,7 +359,7 @@ export function CourseWorkspace({
                           <strong>{m.title}</strong>
                           <span className="meta">
                             {kindLabels[m.kind]} ·{" "}
-                            {readinessLabels[m.readiness]}
+                            {m.preparation ? preparationPresentation(m.preparation).label : readinessLabels[m.readiness]}
                           </span>
                         </span>
                         <span
@@ -431,6 +433,20 @@ export function MaterialScreen({ id }: { id: string }) {
   const [material, setMaterial] = useState<LearningMaterial | null>(null),
     [searched, setSearched] = useState(false),
     [lookupError, setLookupError] = useState<string | null>(null);
+  const [online, setOnline] = useState(false);
+  const preparationPolls = useRef(0);
+  const refreshCourse = course.refresh;
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update(); window.addEventListener("online", update); window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
+  useEffect(() => { preparationPolls.current = 0; }, [id]);
+  useEffect(() => {
+    if (!online || material?.preparation?.status !== "preparing" || preparationPolls.current >= 60) return;
+    const timer = setInterval(() => { if (++preparationPolls.current <= 60) refreshCourse(); else clearInterval(timer); }, 5000);
+    return () => clearInterval(timer);
+  }, [online, material?.preparation?.status, refreshCourse]);
   // Deep links may identify a material beyond the initial page. Scan bounded server pages.
   useEffect(() => {
     if (!course.data) return;
@@ -529,7 +545,7 @@ export function MaterialScreen({ id }: { id: string }) {
             <div className="detail-meta">
               <span className="badge">{kindLabels[material.kind]}</span>
               <span className={`status ${material.readiness}`}>
-                {readinessLabels[material.readiness]}
+                {material.preparation ? preparationPresentation(material.preparation).label : readinessLabels[material.readiness]}
               </span>
             </div>
             <h2>{material.title}</h2>
@@ -537,7 +553,7 @@ export function MaterialScreen({ id }: { id: string }) {
               {[material.moduleTitle, courseName].filter(Boolean).join(" · ")}
             </p>
             <div className="detail-actions">
-              {material.readiness === "needs_preparation" && (
+              {material.preparation?.status === "failed" && online && (
                 <button
                   disabled={action.busy}
                   onClick={() =>
@@ -553,7 +569,7 @@ export function MaterialScreen({ id }: { id: string }) {
                     })
                   }
                 >
-                  Prepare material
+                  Retry
                 </button>
               )}
               <button
@@ -610,7 +626,7 @@ export function MaterialScreen({ id }: { id: string }) {
                 <dt>Module</dt>
                 <dd>{material.moduleTitle ?? "Course materials"}</dd>
                 <dt>Status</dt>
-                <dd>{readinessLabels[material.readiness]}</dd>
+                <dd>{material.preparation ? preparationPresentation(material.preparation).label : readinessLabels[material.readiness]}</dd>
                 <dt>Reviewer</dt>
                 <dd>{capabilityLabel(material.generation.reviewer)}</dd>
                 <dt>Quiz</dt>

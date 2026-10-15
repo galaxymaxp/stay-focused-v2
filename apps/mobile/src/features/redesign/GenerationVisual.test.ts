@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   values: [] as { stopAnimation: MockFn }[],
 }));
 
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => mocks.focused }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
 vi.mock("../../design/theme", async () => {
   const tokens = await import("../../design/themeTokens");
   return { ...tokens, useTheme: () => ({ active: mocks.active, colors: tokens.palettes.light, mode: "light", reducedMotion: mocks.reducedMotion }) };
@@ -29,7 +29,7 @@ vi.mock("react-native", () => {
   const animation = () => ({ start: vi.fn(), stop: vi.fn() });
   return {
     View: "View",
-    StyleSheet: { absoluteFillObject: { position: "absolute", inset: 0 }, create: (styles: unknown) => styles },
+    StyleSheet: { absoluteFill: { position: "absolute", inset: 0 }, create: (styles: unknown) => styles },
     Easing: { ease: vi.fn(), linear: vi.fn(), inOut: (value: unknown) => value },
     Animated: {
       View: "AnimatedView",

@@ -22,6 +22,7 @@ import type {
   CanvasSyncJobStatusView,
 } from "../app-model/canvasGradeTypes";
 import { SpringProgress } from "../components/count-up";
+import { GradeGoal } from "./grade-goal";
 import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
 import { Heading, Icon, Notice, State } from "../components/ui";
@@ -236,6 +237,7 @@ export function GradesWorkspace({ courseId, children }: { courseId: string; chil
             </div>
           </section>
         )}
+        <GradeGoal courseId={courseId} />
         <State resource={list} />
         {list.data && (
           <div className="course-split">

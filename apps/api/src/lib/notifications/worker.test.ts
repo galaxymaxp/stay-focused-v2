@@ -28,6 +28,7 @@ describe("completion notification content", () => {
     ).toEqual({
       to: "ExpoPushToken[test-token]",
       sound: "default",
+      channelId: "study-completions",
       title: "Stay Focused",
       body: "Your reviewer is ready.",
       data: {

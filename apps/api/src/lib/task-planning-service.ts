@@ -1,4 +1,5 @@
 import type { Database } from "@stay-focused/db";
+import type { GenerationProvider } from "@stay-focused/engine";
 import {
   generateDeterministicStudyPlan,
   type DeterministicStudyPlan,
@@ -6,6 +7,8 @@ import {
 } from "@stay-focused/shared/task-planning";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
+import { createServerOpenAIProvider } from "@/providers";
+import { refreshCanvasTaskEstimates, TASK_ESTIMATE_TIMEOUT_MS } from "@/lib/task-estimates";
 
 import {
   importSchedulableCanvasAssignments,
@@ -29,10 +32,14 @@ export async function previewOwnedStudyPlan(
   userId: string,
   request: StudyPlanningRequest,
   now = Date.now(),
+  provider?: GenerationProvider | null,
 ): Promise<DeterministicStudyPlan> {
   // Planning the student's whole day includes their synced Canvas work
   // automatically. An explicit task selection plans exactly those tasks.
-  if (!request.taskIds) await importSchedulableCanvasAssignments(client, userId, now);
+  if (!request.taskIds) {
+    await importSchedulableCanvasAssignments(client, userId, now);
+    await refreshCanvasTaskEstimates(client, userId, provider === undefined ? estimateProvider() : provider, now);
+  }
   const tasks = await loadOwnedPlannerTasks(client, userId, request.taskIds);
   if (request.taskIds && tasks.length !== request.taskIds.length) {
     throw new OwnedPlanningError(
@@ -51,8 +58,10 @@ export async function applyOwnedStudyPlan(
   client: SupabaseClient<Database>,
   userId: string,
   request: StudyPlanningRequest,
+  now = Date.now(),
+  provider?: GenerationProvider | null,
 ) {
-  const plan = await previewOwnedStudyPlan(client, userId, request);
+  const plan = await previewOwnedStudyPlan(client, userId, request, now, provider);
   const inputHash = createHash("sha256")
     .update(
       JSON.stringify({
@@ -73,4 +82,12 @@ export async function applyOwnedStudyPlan(
     sessions: persisted.sessions.map(toStudySessionView),
     unscheduledWork: plan.unscheduledWork,
   } as const;
+}
+
+function estimateProvider(): GenerationProvider | null {
+  try {
+    return createServerOpenAIProvider({ timeoutMs: TASK_ESTIMATE_TIMEOUT_MS, maxRetries: 0 });
+  } catch {
+    return null;
+  }
 }

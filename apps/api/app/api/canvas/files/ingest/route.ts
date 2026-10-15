@@ -1,4 +1,5 @@
-import { ingestCanvasFiles } from "@/lib/canvas-file-ingestion";
+import { readBoundedText } from "@/lib/bounded-body";
+import { admitCanvasFilePreparations as ingestCanvasFiles } from '@/lib/canvas-preparation/manual';
 import {
   jsonResponse,
   optionsResponse,
@@ -42,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
   });
 
   if (result.ok) {
-    return jsonResponse(result.response, 200, request);
+    return jsonResponse(result.response, result.response.results.some(item=>item.code==='preparation_pending')?202:200, request);
   }
 
   return jsonResponse(
@@ -86,8 +87,8 @@ async function readIngestRequest(
     };
   }
 
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_INGEST_BODY_BYTES) {
+  const boundedBody = await readBoundedText(request, MAX_INGEST_BODY_BYTES);
+  if (!boundedBody.ok && boundedBody.reason === "too_large") {
     return {
       ok: false,
       status: 413,
@@ -95,6 +96,7 @@ async function readIngestRequest(
       message: `Request body must be at most ${MAX_INGEST_BODY_BYTES} bytes.`,
     };
   }
+  const rawBody = boundedBody.ok ? boundedBody.text : "";
 
   let parsed: unknown;
   try {

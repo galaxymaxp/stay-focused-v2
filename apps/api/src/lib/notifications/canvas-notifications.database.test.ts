@@ -35,6 +35,7 @@ beforeAll(async () => {
   await db.exec(`create table public.canvas_course_sync_preferences(course_id uuid primary key,user_id uuid,selected boolean);
     create table public.tasks(id uuid primary key default gen_random_uuid(),user_id uuid,canvas_assignment_row_id uuid,canvas_connection_id uuid,canvas_course_id text,canvas_assignment_id text,status text);`);
   await db.exec(migration("20261003025905_canvas_notification_sync.sql"));
+  await db.exec(migration("20261013000100_skip_stale_canvas_email_events.sql"));
 }, 30000);
 beforeEach(async () => {
   await db.exec(`begin;
@@ -49,6 +50,26 @@ afterEach(async () => { await db.exec("rollback"); });
 afterAll(async () => { await db?.close(); });
 
 describe("transactional Canvas emails in Postgres", () => {
+  it("skips only old pending email events before activation and is idempotent", async () => {
+    for (const kind of ["old", "recent", "sent", "failed", "skipped"]) {
+      await db.query(`insert into public.notification_outbox(user_id,course_id,type,dedupe_key,payload,created_at,sent_at,failed_at,skipped_at,last_error)
+        values($1,$2,'new_assignment',$3,'{}',now()-case when $3='recent' then interval '1 hour' else interval '25 hours' end,
+          case when $3='sent' then now() end,case when $3='failed' then now() end,case when $3='skipped' then now() end,
+          case when $3 in ('failed','skipped') then 'existing_error' end)`, [owner, course, kind]);
+    }
+    await db.exec("set local role service_role");
+    const skip = async () => (await db.query<{ n: number }>("select public.skip_stale_canvas_email_events_v1() n")).rows[0]!.n;
+    expect(await skip()).toBe(1); expect(await skip()).toBe(0);
+    expect((await db.query("select dedupe_key from public.notification_outbox where last_error='stale_before_activation'")).rows).toEqual([{ dedupe_key: "old" }]);
+    expect((await db.query("select dedupe_key from public.notification_outbox where sent_at is null and failed_at is null and skipped_at is null")).rows).toEqual([{ dedupe_key: "recent" }]);
+    expect((await db.query("select last_error from public.notification_outbox where dedupe_key='failed'")).rows).toEqual([{ last_error: "existing_error" }]);
+    expect((await db.query("select public.skip_stale_canvas_email_events_v1(interval '30 minutes') n")).rows).toEqual([{ n: 1 }]);
+  });
+  it.each(["anon", "authenticated"])("denies %s the stale activation guard", async role => {
+    await db.exec(`set local role ${role}; savepoint guard_denied`);
+    await expect(db.exec("select public.skip_stale_canvas_email_events_v1()")).rejects.toThrow();
+    await db.exec("rollback to savepoint guard_denied");
+  });
   it("deduplicates assignment inserts, repeated snapshot polls, and unchanged due dates", async () => {
     await db.query("select * from public.claim_canvas_notification_course_v1($1)", [worker]);
     const payload = { assignments: [{ canvas_assignment_id: "canvas-1", name: "Task", published: true, submission_types: ["online_upload"], due_at: "2026-10-11T12:00:00Z" }] };

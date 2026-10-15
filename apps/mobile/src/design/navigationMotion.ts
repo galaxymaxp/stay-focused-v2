@@ -1,5 +1,5 @@
-import type { BottomTabNavigationOptions } from "@react-navigation/bottom-tabs";
-import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
+import type { BottomTabNavigationOptions } from "expo-router/js-tabs";
+import type { NativeStackNavigationOptions } from "expo-router/native-stack";
 
 /**
  * Motion carries meaning, so each kind of navigation has one treatment:

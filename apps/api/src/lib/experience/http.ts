@@ -33,7 +33,7 @@ export function createExperienceService(authenticatedUserId: string) {
   // Every read dependency is then bound to that verified identity.
   const client = createCanvasServiceClient();
   return new ExperienceService({ repository: trustedExperienceReadRepository(client, authenticatedUserId),
-    materials: (_userId, courseId, offset) => listCanvasReviewerSources({ client, userId: authenticatedUserId, courseId, offset, limit: 100 }),
+    materials: (_userId, courseId, offset) => listCanvasReviewerSources({ client, userId: authenticatedUserId, courseId, offset, limit: 100, includeClientPreparationStatus: true }),
     courseInventory: () => loadCanvasCourseInventory({ client, userId: authenticatedUserId, allowStoredFallback: true }),
     freshness: async (_userId, reviewerArtifactId) => {
       const status = await readReviewerSourceStatus({ client, userId: authenticatedUserId, reviewerArtifactId });
@@ -48,8 +48,9 @@ export async function experienceRoute(request: Request, action: (service: Experi
     return await action(createExperienceService(user.id), user.id);
   } catch (error) {
     const normalized = normalizeExperienceError(error);
-    // No error messages/stacks: provider and database errors may contain content.
-    console.error('experience.request.failed', { code: normalized.error.code, status: normalized.status, errorType: error instanceof Error ? error.name : 'unknown' });
+    // Exception names, messages and stacks may contain private provider content.
+    const errorType = error instanceof ExperienceFailure ? 'ExperienceFailure' : error instanceof Error ? 'Error' : 'unknown';
+    console.error('experience.request.failed', { code: normalized.error.code, status: normalized.status, errorType });
     return Response.json({ ok: false, error: normalized.error }, { status: normalized.status, headers });
   }
 }

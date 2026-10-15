@@ -447,7 +447,7 @@ export function DayRingClock({
         ) : (
           <>
             <span className="readout-time">
-              {readoutTime.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              {readoutTime.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" })}
             </span>
             <span className="readout-sub">
               {now.toLocaleDateString([], { weekday: "long" })}

@@ -6,7 +6,6 @@ import { normalizeCanvasHtmlToText } from '../canvas-content-normalization';
 import { loadStoredSelectedCanvasCourse,prepareCanvasReviewerSources,previewCanvasReviewerSources } from '../canvas-reviewer-sources';
 import { sanitizeCanvasTitleText } from '../canvas-source-safety';
 import { ExperienceFailure } from '../experience/errors';
-import { createServerOcrProvider } from '../ocr/create-server-ocr-provider';
 type Client = SupabaseClient<Database>;
 export async function ownedAssignment(client: Client, userId: string, activityId: string): Promise<CanvasAssignmentRow> {
     if (!/^canvas:[0-9a-f-]{36}$/i.test(activityId))
@@ -117,14 +116,11 @@ export async function assembleActivitySources(client: Client, userId: string, ac
         if (file) {
             if (/\.(?:doc|ppt)$/i.test(file.filename ?? file.display_name))
                 throw new ExperienceFailure(422, 'unsupported_attachment_type');
-            const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: assignment.course_id, sourceIds: [id] });
+            const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: assignment.course_id, sourceIds: [id],manualRetry:false });
             if (!prepared.ok || prepared.value.results.some(r => r.status !== 'ready'))
                 throw new ExperienceFailure(409, 'activity_source_unavailable');
         }
-        let ocrProvider;
-        if (file && /pdf|image\//.test(file.content_type ?? ''))
-            ocrProvider = createServerOcrProvider();
-        const preview = await previewCanvasReviewerSources({ client, userId, courseId: assignment.course_id, sourceIds: [id], ...(ocrProvider ? { ocrProvider } : {}) });
+        const preview = await previewCanvasReviewerSources({ client, userId, courseId: assignment.course_id, sourceIds: [id] });
         if (!preview.ok)
             throw new ExperienceFailure(422, /template|worksheet/i.test(file?.display_name ?? '') ? 'activity_template_unreadable' : 'activity_source_unavailable');
         const title = sanitizeCanvasTitleText(file?.display_name ?? pages.find(p => id === `page:${p.id}`)?.title ?? 'Course material').slice(0, 220);

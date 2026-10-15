@@ -17,6 +17,13 @@ import {
 // A fixed local "now": Wednesday 2026-09-02, 10:00 local time.
 const NOW = new Date(2026, 8, 2, 10, 0, 0);
 
+it("marks AI and heuristic time as approximate and leaves student time exact", () => {
+  expect(formatEstimate(45, "ai")).toBe("~45 min");
+  expect(formatEstimate(90, "heuristic")).toBe("~90 min");
+  expect(formatEstimate(45, "user")).toBe("45 min");
+  expect(formatEstimate(60, "default")).toBe("60 min");
+});
+
 function task(overrides: Partial<TaskView> & Pick<TaskView, "id">): TaskView {
   return {
     title: "Read chapter",
@@ -25,6 +32,8 @@ function task(overrides: Partial<TaskView> & Pick<TaskView, "id">): TaskView {
     priority: "medium",
     dueAt: null,
     estimatedMinutes: 30,
+    estimateSource: "user",
+    estimateNote: null,
     sourceType: "manual",
     canvasConnectionId: null,
     canvasCourseId: null,

@@ -528,6 +528,7 @@ function parseJobPage(value: unknown): ProcessingJobListPage | null {
 function isJobStatusView(value: unknown): value is ProcessingJobStatusView {
   return (
     isRecord(value) &&
+    (value.origin === undefined || value.origin === "automatic" || value.origin === "manual") &&
     typeof value.id === "string" &&
     (value.jobType === "document_extraction" || value.jobType === "reviewer_generation") &&
     typeof value.status === "string" &&

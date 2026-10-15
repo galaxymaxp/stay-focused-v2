@@ -46,6 +46,7 @@ beforeAll(async () => {
  create table processing_cleanup_queue(status text,not_before timestamptz);`);
     await db.exec(`alter table processing_jobs enable row level security;grant select on processing_jobs to authenticated;create policy processing_owner on processing_jobs for select to authenticated using(user_id=(select auth.uid()));`);
     await db.exec(readFileSync(resolve('../../packages/db/migrations/20260912100000_activity_maker.sql'), 'utf8'));
+    await db.exec(readFileSync(resolve('../../packages/db/migrations/20261013000500_offline_activity_draft_copies.sql'), 'utf8'));
     jobId = await queue('initial-request');
     await finish(jobId);
     draftId = (await db.query<{
@@ -54,6 +55,41 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Activity Maker real Postgres ownership and transactions', () => {
+    it('offline same-revision save, conflict copy, replay and five-copy cap are atomic', async () => {
+        await asUser(A, async () => {
+            const save = async (base: number, edit: string, title: string) => (await db.query<{ result: { draft: { revision: number; content: typeof content }; conflict: boolean; copyId: string | null; replayed: boolean } }>(
+                'select public.save_offline_activity_draft($1,$2,$3,$4) as result', [draftId, base, JSON.stringify({ ...content, title }), edit])).rows[0]!.result;
+            const edit = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+            const normal = await save(1, edit, 'Offline');
+            expect(normal).toMatchObject({ conflict: false, replayed: false, draft: { revision: 2, content: { title: 'Offline' } } });
+            expect(await save(1, edit, 'Offline')).toMatchObject({ replayed: true, draft: { revision: 2 } });
+            const conflict = await save(1, 'ffffffff-ffff-4fff-8fff-ffffffffffff', 'New offline');
+            expect(conflict).toMatchObject({ conflict: true, draft: { revision: 3, content: { title: 'New offline' } } });
+            expect((await db.query('select content,revision from activity_draft_copies')).rows).toEqual([{ content: { ...content, title: 'Offline' }, revision: 2 }]);
+            await save(1, 'ffffffff-ffff-4fff-8fff-ffffffffffff', 'New offline');
+            expect((await db.query('select id from activity_draft_copies')).rows).toHaveLength(1);
+            for (let i = 1; i <= 6; i++) await save(1, `00000000-0000-4000-8000-00000000000${i}`, `Edit ${i}`);
+            expect((await db.query('select revision from activity_draft_copies order by revision')).rows).toEqual([4, 5, 6, 7, 8].map(revision => ({ revision })));
+            await expect(db.query('update activity_drafts set last_offline_edit_id=$1 where id=$2', [edit, draftId])).rejects.toThrow(/permission denied/);
+        });
+    });
+    it('offline RPC and copies deny foreign owners, anonymous writes and invalid content', async () => {
+        await db.exec('begin');
+        try {
+            await db.query("insert into activity_draft_copies(user_id,draft_id,content,revision,reason) values($1,$2,$3,1,'offline_conflict')", [A, draftId, JSON.stringify(content)]);
+            await db.exec(`set local role authenticated;select set_config('request.jwt.claim.sub','${B}',true)`);
+            expect((await db.query('select id from activity_draft_copies')).rows).toEqual([]);
+            expect((await db.query('delete from activity_draft_copies returning id')).rows).toEqual([]);
+            await expect(db.query('select save_offline_activity_draft($1,1,$2,$3)', [draftId, JSON.stringify(content), A])).rejects.toThrow(/activity_draft_not_found/);
+        } finally { await db.exec('rollback'); }
+        for (const value of ['[]', JSON.stringify({ title: 'x'.repeat(200001) })]) {
+            await expect(asUser(A, () => db.query('select save_offline_activity_draft($1,1,$2,$3)', [draftId, value, A]))).rejects.toThrow(/invalid_request/);
+        }
+        await db.exec('begin;set local role anon');
+        try { await expect(db.query('select save_offline_activity_draft($1,1,$2,$3)', [draftId, JSON.stringify(content), A])).rejects.toThrow(/permission denied/); }
+        finally { await db.exec('rollback'); }
+        await expect(asUser(A, () => db.query("insert into activity_draft_copies(user_id,draft_id,content,revision,reason) values($1,$2,$3,1,'offline_conflict')", [A, draftId, JSON.stringify(content)]))).rejects.toThrow(/permission denied/);
+    });
     it.each([
         { label: 'dice-roller', title: 'Lab Activity 2: Dice Roller', courseId: '66935', html: '<p>Build a Dice Roller app, test it, and export an APK.</p><a href="https://developer.android.com/codelabs/basic-android-kotlin-compose-build-a-dice-roller-app#0">Instructions</a>', type: 'programming', heading: 'Build and test', body: 'Create the app and export the tested APK.', missing: false },
         { label: 'firewall-vpn', title: 'Implementing Firewalls and VPNs', courseId: '61456', html: '<h2>Instructions:</h2><p>Read the scenario from Group Announcement. Prepare a 10–15 minute presentation about security concerns, firewall and VPN choices.</p><a href="https://canvas.test/courses/55287/pages/presentation-sequence-fw-and-vpn" data-api-endpoint="https://canvas.test/api/v1/courses/55287/pages/presentation-sequence-fw-and-vpn">Presentation Sequence (FW &amp; VPN)</a>', type: 'presentation', heading: 'Scenario and security concerns', body: 'Add the assigned scenario and describe its security concerns before choosing a firewall or VPN.', missing: true },

@@ -33,10 +33,10 @@ describe("Canvas source selection presentation", () => {
   it.each([
     ["ready", true, "Ready", "preview"],
     ["empty", false, "No study text found", "none"],
-    ["needs_preparation", true, "Prepare", "prepare"],
+    ["needs_preparation", true, "Preparing", "none"],
     ["unsupported", false, "This file type isn't supported yet.", "none"],
     ["inaccessible", false, "Unavailable", "none"],
-    ["failed", true, "Try preparation again", "retry"],
+    ["failed", true, "Couldn't prepare", "retry"],
   ] as const)(
     "maps %s to safe student-facing capability copy",
     (capability, selectable, statusLabel, action) => {

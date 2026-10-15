@@ -1,0 +1,88 @@
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Image as ImageIcon } from 'lucide-react-native';
+import { Sheet } from '../../design/primitives';
+import { useTheme } from '../../design/theme';
+import { hitTarget, radius, spacing } from '../../design/tokens';
+import type { ExperienceClient } from '../../services/experienceApi';
+import { readFigureAvailability, readSectionFigures, type SourceFigure } from '../../services/sourceFigures';
+import { ZoomablePage } from './SourcePageSnapshot';
+
+export type FigureDiscovery = ReadonlySet<string> & { readonly online?: boolean };
+const EMPTY:FigureDiscovery=Object.assign(new Set<string>(),{online:false});
+/** One batched, read-only discovery request for the entire Reviewer. */
+export function useFigureAvailability(client:ExperienceClient,artifactId:string|null,offline:boolean):FigureDiscovery {
+  const [state,setState]=useState<{artifactId:string|null;sections:FigureDiscovery}>({artifactId:null,sections:EMPTY});
+  useEffect(()=>{
+    let alive=true;let pending:AbortController|null=null;
+    setState({artifactId,sections:EMPTY});
+    if(offline || !artifactId)return;
+    const read=async()=>{
+      pending?.abort();const controller=new AbortController();pending=controller;
+      const timeout=setTimeout(()=>controller.abort(),5000);
+      try {
+        const sections=await readFigureAvailability(client,artifactId,controller.signal);
+        if(alive && pending===controller && !controller.signal.aborted)setState({artifactId,sections:Object.assign(new Set(sections),{online:true})});
+      }catch {if(alive && pending===controller)setState({artifactId,sections:EMPTY});}
+      finally {clearTimeout(timeout);}
+    };
+    void read();
+    const subscription=AppState.addEventListener('change',status=>{
+      pending?.abort();setState({artifactId,sections:EMPTY});if(status==='active')void read();
+    });
+    const heartbeat=setInterval(()=>{if(AppState.currentState==='active')void read();},10000);
+    return ()=>{alive=false;pending?.abort();clearInterval(heartbeat);subscription.remove();};
+  },[client,artifactId,offline]);
+  return !offline && artifactId===state.artifactId?state.sections:EMPTY;
+}
+
+export function SourceFigures({client,artifactId,sectionId,hasFigures,offline}:{
+  client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;
+}) {
+  const {colors}=useTheme();const {height}=useWindowDimensions();
+  const [open,setOpen]=useState(false);const [figures,setFigures]=useState<readonly SourceFigure[]>([]);
+  const [index,setIndex]=useState(0);const [hidden,setHidden]=useState(false);
+  const request=useRef<AbortController|null>(null);
+  useEffect(()=>{
+    setOpen(false);setFigures([]);setHidden(false);request.current?.abort();
+    return ()=>{request.current?.abort();request.current=null;};
+  },[client,artifactId,sectionId,offline,hasFigures]);
+  const close=()=>{request.current?.abort();request.current=null;setOpen(false);setFigures([]);};
+  const show=async()=>{
+    if(offline || !hasFigures || open)return;
+    request.current?.abort();const controller=new AbortController();request.current=controller;
+    setIndex(0);setFigures([]);setOpen(true);
+    const timeout=setTimeout(()=>{controller.abort();if(request.current===controller){setHidden(true);setOpen(false);}},10000);
+    try {
+      const found=await readSectionFigures(client,artifactId,sectionId,controller.signal);
+      if(request.current!==controller || controller.signal.aborted)return;
+      if(!found.length){setHidden(true);setOpen(false);}else setFigures(found);
+    }catch {if(request.current===controller && !controller.signal.aborted){setHidden(true);setOpen(false);}}
+    finally {clearTimeout(timeout);}
+  };
+  if(offline || !hasFigures || hidden)return null;
+  const figure=figures[index];const label=figure?.page?`From page ${figure.page}`:figure?.slide?`From slide ${figure.slide}`:'From source';
+  return <>
+    <Pressable accessibilityRole="button" accessibilityLabel="View source figures" onPress={()=>void show()}
+      style={{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:spacing[2],minHeight:hitTarget.min,
+        padding:spacing[2],borderRadius:radius.control,backgroundColor:colors.surfaceSecondary}}>
+      <ImageIcon size={spacing[5]} color={colors.accent}/><Text style={{color:colors.accent}}>Figures</Text>
+    </Pressable>
+    {open?<Sheet title="Source figures" onClose={close}>
+      {figure?<>
+        <Text style={{color:colors.textPrimary}}>{label}</Text>
+        <View style={{height:Math.min(height*0.5,spacing[12]*8)}} onTouchStart={event=>event.stopPropagation()} onTouchMove={event=>event.stopPropagation()}>
+          <ZoomablePage key={figure.id} url={figure.url} width={figure.width} height={figure.height} label="Source figure"
+            onError={()=>{setHidden(true);close();}}/>
+        </View>
+        {figures.length>1?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing[2]}}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Previous figure" accessibilityState={{disabled:index===0}} disabled={index===0}
+            onPress={()=>setIndex(n=>Math.max(0,n-1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===0?colors.textMuted:colors.accent}}>Previous</Text></Pressable>
+          <Text style={{color:colors.textMuted}}>{index+1} / {figures.length}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Next figure" accessibilityState={{disabled:index===figures.length-1}} disabled={index===figures.length-1}
+            onPress={()=>setIndex(n=>Math.min(figures.length-1,n+1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===figures.length-1?colors.textMuted:colors.accent}}>Next</Text></Pressable>
+        </View>:null}
+      </>:<ActivityIndicator accessibilityLabel="Loading source figures" color={colors.accent}/>}
+    </Sheet>:null}
+  </>;
+}

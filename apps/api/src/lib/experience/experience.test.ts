@@ -38,7 +38,33 @@ const libraryData: TestData = {
   generated_artifacts: [{ id: 'artifact', user_id: 'owner', artifact_type: 'reviewer', safe_title: 'Cells', source_version_id: 'source-version', latest_version_id: 'version', deleted_at: null, created_at: date, updated_at: date }],
   generated_artifact_versions: [{ id: 'version', user_id: 'owner', artifact_id: 'artifact', artifact_type: 'reviewer', source_version_id: 'source-version', generation_job_id: 'job', payload }],
 };
+describe('automatic Library origin', () => {
+  it('joins owned candidate receipts through the job to the exact saved version', async () => {
+    const { api } = service({ ...libraryData, canvas_auto_reviewer_candidates: [{ id: 'receipt', user_id: 'owner', processing_job_id: 'job' }] });
+    expect((await api.getLibrary('owner')).items[0]?.origin).toBe('automatic');
+    const detail = await api.getLibraryArtifact('owner', 'artifact:artifact');
+    expect(detail.artifact).toMatchObject({ origin: 'automatic', sourceTitle: 'Cells.pdf' });
+    expect(JSON.stringify(detail)).not.toContain('receipt');
+  });
+  it('does not label manual work or accept a foreign candidate/job', async () => {
+    expect((await service(libraryData).api.getLibrary('owner')).items[0]?.origin).toBe('manual');
+    const data = { ...libraryData, canvas_auto_reviewer_candidates: [{ id: 'foreign', user_id: 'other', processing_job_id: 'job' }] };
+    expect((await service(data).api.getLibrary('owner')).items[0]?.origin).toBe('manual');
+    expect((await service({ ...data, canvas_auto_reviewer_candidates: [{ id: 'receipt', user_id: 'owner', processing_job_id: 'job' }], processing_jobs: [] }).api.getLibrary('owner')).items[0]?.origin).toBe('manual');
+  });
+});
 describe('Today and activity composition', () => {
+  it('carries task estimate sources into activities and Today without exposing fingerprints', () => {
+    const imported = { ...task, canvas_assignment_row_id: assignment.id, source_type: 'canvas' as const,
+      estimate_source: 'ai' as const, estimate_note: 'Lab report', estimate_fingerprint: 'private-fingerprint' };
+    const result = activities([imported]);
+    expect(result[0]).toMatchObject({ estimateSource: 'ai', estimatedMinutes: 30 });
+    const today = composeToday({ userId: 'owner', date, offset: 0, now, activities: result, tasks: [imported], sessions: [session], plans: [plan] });
+    expect(today.timeline[0]?.estimateSource).toBe('ai');
+    expect(today.overdue[0]?.estimateSource).toBe('ai');
+    expect(JSON.stringify(today)).not.toContain('private-fingerprint');
+    expect(activities([], [assignment])[0]?.estimateSource).toBeNull();
+  });
   it('combines assignments, manual tasks and sessions without importing on reads', async () => {
     const { api } = service({ canvas_courses: [course], canvas_assignments: [assignment], tasks: [task], study_sessions: [session], study_plans: [plan] });
     const result = await api.getTodayOverview('owner', date);
@@ -251,6 +277,39 @@ describe('Learn and Activity details', () => {
   });
 });
 describe('Library ownership and persisted output', () => {
+  it('estimates the exact saved version in both Library and the reader', async () => {
+    const { api } = service(libraryData);
+    expect((await api.getLibrary('owner')).items[0]?.reviewMinutes).toBe(5);
+    const detail = await api.getLibraryArtifact('owner', 'artifact:artifact');
+    if (!('reviewer' in detail)) throw new Error('Expected reviewer');
+    expect(detail.reviewer.reviewMinutes).toBe(5);
+    // Never trust a stale estimate on the summary over the reader's own payload.
+    expect(reviewerReader(payload, { ...detail.artifact, reviewMinutes: 90 }).reviewMinutes).toBe(5);
+    const larger = { reviewer: { sections: [{ id: 's', title: 'Cells', items: [{ id: 'i', title: 'Cells',
+      sourceCore: { explanation: 'word '.repeat(1000), keyPoints: [] } }] }] } };
+    const changed = service({ ...libraryData, generated_artifact_versions: [{ ...libraryData.generated_artifact_versions![0], payload: larger }] }).api;
+    expect((await changed.getLibrary('owner')).items[0]?.reviewMinutes).toBe(10);
+    const changedDetail = await changed.getLibraryArtifact('owner', 'artifact:artifact');
+    if (!('reviewer' in changedDetail)) throw new Error('Expected reviewer');
+    expect(changedDetail.reviewer.reviewMinutes).toBe(10);
+  });
+  it.each([null, {}, { reviewer: { sections: [] } }])('leaves an old empty/invalid version estimate null: %j', async saved => {
+    const { api } = service({ ...libraryData, generated_artifact_versions: [{ ...libraryData.generated_artifact_versions![0], payload: saved }] });
+    expect((await api.getLibrary('owner')).items[0]?.reviewMinutes).toBeNull();
+  });
+  it('returns null review estimates for quizzes and activity outputs', async () => {
+    const { api } = service({
+      quizzes: [{ id: 'quiz', user_id: 'owner', title: 'Quiz', source_material_ids: [], questions: [], created_at: date, updated_at: date }],
+      activity_drafts: [{ id: 'draft', user_id: 'owner', sources: [],
+        content: { title: 'Draft', slides: [], sections: [{ id: 'section-1', heading: 'Draft', level: 1, content: 'Saved draft text.', order: 1, sourceRefs: [] }] },
+        created_at: date, updated_at: date }],
+    });
+    const library = await api.getLibrary('owner');
+    expect(library.items).toHaveLength(2);
+    expect(library.items.map(item => item.reviewMinutes)).toEqual([null, null]);
+    expect((await api.getLibraryArtifact('owner', 'quiz:quiz')).artifact.reviewMinutes).toBeNull();
+    expect((await api.getLibraryArtifact('owner', 'activity:draft')).artifact.reviewMinutes).toBeNull();
+  });
   it('opens the persisted durable artifact without calling materials/generation', async () => {
     const { api, materials } = service(libraryData);
     const library = await api.getLibrary('owner');

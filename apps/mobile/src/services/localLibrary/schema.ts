@@ -66,10 +66,35 @@ const MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL,
      PRIMARY KEY (owner_user_id, activity_id)
    );`,
+  `CREATE TABLE quiz_answer_keys (
+     owner_user_id TEXT NOT NULL,
+     quiz_id TEXT NOT NULL,
+     version_id TEXT NOT NULL,
+     key_json TEXT NOT NULL,
+     updated_at TEXT NOT NULL,
+     PRIMARY KEY (owner_user_id, quiz_id)
+   );`,
+  `CREATE TABLE IF NOT EXISTS pending_draft_edits (
+     owner_user_id TEXT NOT NULL,
+     draft_id TEXT NOT NULL,
+     client_edit_id TEXT NOT NULL,
+     base_revision INTEGER NOT NULL CHECK (base_revision > 0),
+     content_json TEXT NOT NULL,
+     sent_content_json TEXT,
+     state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','needs_attention')),
+     updated_at TEXT NOT NULL,
+     PRIMARY KEY (owner_user_id, draft_id)
+   );
+   CREATE TABLE IF NOT EXISTS draft_sync_receipts (
+     owner_user_id TEXT NOT NULL,
+     draft_id TEXT NOT NULL,
+     copy_id TEXT NOT NULL,
+     PRIMARY KEY (owner_user_id, draft_id)
+   );`,
 ];
 
 export const LOCAL_LIBRARY_SCHEMA_VERSION = MIGRATIONS.length;
-const LOCAL_TABLES = ["experience_activity_snapshots", "quiz_practice", "activity_responses", "study_assists", "library_artifact_aliases", "library_artifacts"] as const;
+const LOCAL_TABLES = ["pending_draft_edits", "draft_sync_receipts", "quiz_answer_keys", "experience_activity_snapshots", "quiz_practice", "activity_responses", "study_assists", "library_artifact_aliases", "library_artifacts"] as const;
 
 export async function migrateLocalLibrary(db: LocalSqlDatabase): Promise<number> {
   let version = await userVersion(db);

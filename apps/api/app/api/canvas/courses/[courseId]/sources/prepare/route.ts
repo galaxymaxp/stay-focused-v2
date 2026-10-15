@@ -1,3 +1,4 @@
+import { readBoundedText } from "@/lib/bounded-body";
 import {
   jsonResponse,
   optionsResponse,
@@ -76,7 +77,14 @@ export async function POST(
     );
   }
 
-  return jsonResponse({ ok: true, ...result.value }, 200, request);
+  let sources = result.value.sources;
+  if (new URL(request.url).searchParams.get('preparationStatus') === '1') {
+    const { materialClientStatus } = await import('@/lib/canvas-preparation/client-status');
+    sources = await Promise.all(sources.map(async source => ({ ...source,
+      preparation: await materialClientStatus(auth.value.client, { userId: auth.value.user.id, courseId, materialId: source.id }, source),
+    })));
+  }
+  return jsonResponse({ ok: true, ...result.value, sources }, result.value.results.some(item=>item.code==='preparation_pending')?202:200, request);
 }
 
 export function OPTIONS(request: Request): Response {
@@ -104,8 +112,8 @@ async function readPrepareRequest(request: Request): Promise<
     };
   }
 
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_PREPARE_BODY_BYTES) {
+  const boundedBody = await readBoundedText(request, MAX_PREPARE_BODY_BYTES);
+  if (!boundedBody.ok && boundedBody.reason === "too_large") {
     return {
       ok: false,
       status: 413,
@@ -113,6 +121,7 @@ async function readPrepareRequest(request: Request): Promise<
       message: `Request body must be at most ${MAX_PREPARE_BODY_BYTES} bytes.`,
     };
   }
+  const rawBody = boundedBody.ok ? boundedBody.text : "";
 
   let parsed: unknown;
   try {

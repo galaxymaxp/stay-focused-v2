@@ -1,3 +1,6 @@
+import { useIsFocused } from "expo-router/react-navigation";
+import { usePreparationRefresh } from "./usePreparationRefresh";
+import { useTheme } from "../../design/theme";
 import { router } from "expo-router";
 import { useMemo ,
   useCallback,
@@ -146,6 +149,9 @@ export function CanvasSourceReviewerScreen({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { session } = useAuth();
+  const focused = useIsFocused();
+  const { active } = useTheme();
+  const [offline, setOffline] = useState(false);
   const [sourceList, setSourceList] =
     useState<CanvasReviewerSourceListPayload | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
@@ -170,7 +176,7 @@ export function CanvasSourceReviewerScreen({
   const [saveError, setSaveError] = useState<CanvasSourceDisplayError | null>(null);
   const [isLoadingSources, setIsLoadingSources] = useState(true);
   const [isLoadingMoreSources, setIsLoadingMoreSources] = useState(false);
-  const [isPreparing, setIsPreparing] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [isStructuring, setIsStructuring] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -193,7 +199,7 @@ export function CanvasSourceReviewerScreen({
   const structureTokenRef = useRef(0);
   const resolutionTokenRef = useRef(0);
   const selectedSourceIdRef = useRef<string | null>(null);
-  const preparationLockRef = useRef(false);
+  const retryLockRef = useRef(false);
   const structureLockRef = useRef(false);
   const loadMoreLockRef = useRef(false);
   const previewLockRef = useRef(false);
@@ -318,6 +324,7 @@ export function CanvasSourceReviewerScreen({
         if (inventoryTokenRef.current !== requestToken) return;
 
         if (result.ok) {
+          setOffline(false);
           setSourceList(result.data);
           const preferred = preferredSourceId
             ? result.data.sources.find((source) => source.id === preferredSourceId)
@@ -345,6 +352,27 @@ export function CanvasSourceReviewerScreen({
     },
     [clearDependentState, courseId, session?.accessToken],
   );
+
+  usePreparationRefresh(courseId, !offline && Boolean(sourceList?.sources.some(source => presentCanvasSourceCapability(source).statusLabel === 'Preparing')), async signal => {
+    const context = createRequestContext(session?.accessToken);
+    if (!context.ok) return false;
+    const refreshed: CanvasReviewerSourceDescriptor[] = [];
+    let first: CanvasReviewerSourceListPayload | null = null;
+    let offset = 0;
+    do {
+      const result = await listCanvasReviewerSources({ ...context.value, courseId, limit: 100, offset, signal });
+      if (signal.aborted) return false;
+      if (!result.ok) { setOffline(result.error.code === 'network_error'); return false; }
+      first ??= result.data;
+      refreshed.push(...result.data.sources);
+      offset += result.data.pagination.returned;
+      if (!result.data.pagination.hasMore || result.data.pagination.returned === 0) break;
+    } while (offset < (sourceList?.sources.length ?? 0) && offset <= 1000);
+    if (!first || signal.aborted) return false;
+    setOffline(false);
+    setSourceList({ ...first, sources: refreshed, pagination: { ...first.pagination, returned: refreshed.length, hasMore: refreshed.length < first.pagination.totalKnown } });
+    return refreshed.some(source => presentCanvasSourceCapability(source).statusLabel === 'Preparing');
+  });
 
   const loadMoreSources = async () => {
     if (
@@ -401,7 +429,8 @@ export function CanvasSourceReviewerScreen({
   };
 
   useEffect(() => {
-    void loadSources();
+    if (!focused || !active) return;
+    void loadSources(selectedSourceIdRef.current);
     return () => {
       inventoryTokenRef.current += 1;
       preparationTokenRef.current += 1;
@@ -419,21 +448,21 @@ export function CanvasSourceReviewerScreen({
       saveAbortRef.current = null;
       generationLockRef.current = false;
       saveLockRef.current = false;
-      preparationLockRef.current = false;
+      retryLockRef.current = false;
       structureLockRef.current = false;
       previewLockRef.current = false;
       loadMoreLockRef.current = false;
       dispatchResolution({ type: "cleared" });
     };
-  }, [loadSources]);
+  }, [loadSources, focused, active]);
 
   const selectSource = (source: CanvasReviewerSourceDescriptor) => {
     if (!presentCanvasSourceCapability(source).selectable) return;
     preparationTokenRef.current += 1;
     preparationAbortRef.current?.abort();
     preparationAbortRef.current = null;
-    finishCanvasSingleFlight(preparationLockRef);
-    setIsPreparing(false);
+    finishCanvasSingleFlight(retryLockRef);
+    setIsRetrying(false);
     setSelectedSourceId(source.id);
     selectedSourceIdRef.current = source.id;
     setShowSourceDetails(false);
@@ -577,22 +606,23 @@ export function CanvasSourceReviewerScreen({
     clearSourceSelection();
   };
 
-  const handlePrepare = async () => {
+  const handleRetry = async () => {
     if (
       !selectedSource ||
-      isPreparing ||
-      !tryBeginCanvasSingleFlight(preparationLockRef)
+      offline ||
+      isRetrying ||
+      !tryBeginCanvasSingleFlight(retryLockRef)
     ) {
       return;
     }
     const presentation = presentCanvasSourceCapability(selectedSource);
-    if (presentation.action !== "prepare" && presentation.action !== "retry") {
-      finishCanvasSingleFlight(preparationLockRef);
+    if (presentation.action !== "retry") {
+      finishCanvasSingleFlight(retryLockRef);
       return;
     }
     const context = createRequestContext(session?.accessToken);
     if (!context.ok) {
-      finishCanvasSingleFlight(preparationLockRef);
+      finishCanvasSingleFlight(retryLockRef);
       setError(context.error);
       return;
     }
@@ -604,7 +634,7 @@ export function CanvasSourceReviewerScreen({
     preparationTokenRef.current = requestToken;
     const activeSelectionKey = sourceSelectionKey;
     clearDependentState(selectedSource.id);
-    setIsPreparing(true);
+    setIsRetrying(true);
 
     try {
       const result = await prepareCanvasReviewerSources({
@@ -625,13 +655,14 @@ export function CanvasSourceReviewerScreen({
       if (result.ok) {
         await loadSources(selectedSource.id);
       } else {
+        setOffline(result.error.code === "network_error");
         setError(formatCanvasSourceError(result.error));
       }
     } finally {
       if (preparationTokenRef.current === requestToken) {
         preparationAbortRef.current = null;
-        finishCanvasSingleFlight(preparationLockRef);
-        setIsPreparing(false);
+        finishCanvasSingleFlight(retryLockRef);
+        setIsRetrying(false);
       }
     }
   };
@@ -1729,9 +1760,10 @@ export function CanvasSourceReviewerScreen({
             ) : null}
             {selectedSource ? (
               <SelectionAction
-                isPreparing={isPreparing}
+                isRetrying={isRetrying}
+                offline={offline}
                 isPreviewing={isPreviewing}
-                onPrepare={() => void handlePrepare()}
+                onRetry={() => void handleRetry()}
                 onPreview={() => void handlePreview()}
                 source={selectedSource}
               />
@@ -1741,13 +1773,7 @@ export function CanvasSourceReviewerScreen({
               </Button>
             )}
           </Card>
-          {isPreparing ? (
-            <StatusCard
-              loading
-              message="Stay Focused is securely preparing this file. Preparation may take a moment."
-              title="Preparing file"
-            />
-          ) : isPreviewing ? (
+          {isPreviewing ? (
             <StatusCard
               loading
               message={
@@ -1934,32 +1960,36 @@ function SourceTypeIcon({ type }: { readonly type: CanvasReviewerSourceType }) {
 }
 
 function SelectionAction({
-  isPreparing,
+  isRetrying,
+  offline,
   isPreviewing,
-  onPrepare,
+  onRetry,
   onPreview,
   source,
 }: {
-  readonly isPreparing: boolean;
+  readonly isRetrying: boolean;
+  readonly offline: boolean;
   readonly isPreviewing: boolean;
-  readonly onPrepare: () => void;
+  readonly onRetry: () => void;
   readonly onPreview: () => void;
   readonly source: CanvasReviewerSourceDescriptor;
 }) {
   const presentation = presentCanvasSourceCapability(source);
-  if (presentation.action === "prepare" || presentation.action === "retry") {
+  if (presentation.action === "retry") {
+    if (offline) return <StatusCard title="Couldn't prepare" message="Connect to retry." />;
     return (
       <Button
         fullWidth
-        loading={isPreparing}
-        onPress={onPrepare}
+        disabled={isRetrying}
+        onPress={onRetry}
         testID="canvas-prepare-selected-source"
         variant="primary"
       >
-        {presentation.action === "retry" ? "Try preparation again" : "Prepare file"}
+        {isRetrying ? "Retrying…" : "Retry"}
       </Button>
     );
   }
+  if (presentation.statusLabel === "Preparing") return <StatusCard title="Preparing" message={presentation.explanation} />;
   return (
     <Button
       disabled={presentation.action !== "preview"}
@@ -2437,7 +2467,7 @@ function CanvasReviewerJobCard({
         <Text style={styles.errorText}>{job.safeErrorMessage}</Text>
       ) : null}
       <Text style={styles.characterCount}>
-        Latest update: {new Date(job.updatedAt).toLocaleString()}
+        Latest update: {new Date(job.updatedAt).toLocaleString([], { hour12: true })}
       </Text>
       {job.status === "queued" || job.status === "running" ? (
         <Button fullWidth onPress={onCancel} variant="secondary">
@@ -2692,10 +2722,10 @@ function formatCanvasSourceError(
     case "source_unavailable":
       return { message: "Choose another synchronized item.", title: "Item unavailable" };
     case "source_preparation_required":
-      return { message: "Prepare this file before checking its text.", title: "Preparation needed" };
+      return { message: "This material is still preparing. Check again shortly.", title: "Preparing" };
     case "stored_file_missing":
     case "stored_file_corrupt":
-      return { message: "Prepare this file again, then retry.", title: "File needs preparation" };
+      return { message: "This material needs another try. Tap Retry.", title: "File needs preparation" };
     case "unsupported_file_type":
       return { message: "This item type cannot create a reviewer yet.", title: "Item not supported" };
     case "ocr_empty":

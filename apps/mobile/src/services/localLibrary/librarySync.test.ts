@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createLocalArtifactStore } from "./artifactStore";
 import {
+  hydrateLibraryBodies,
   persistCompletedGeneration,
   persistedArtifactId,
   reconcileLibrary,
@@ -58,7 +59,7 @@ describe("cloud reconciliation", () => {
     const store = await setup();
     const remote = remoteWith([reviewerDetail(), quizDetail(), draftDetail()]);
     const result = await reconcileLibrary({ store, ownerUserId: OWNER_A, remote });
-    expect(result).toEqual({ categories, listComplete: true, hydrated: 3, supersededReviewerIds: [] });
+    expect(result).toEqual({ categories, listComplete: true, hydrated: 3, supersededReviewerIds: [], bodyStoppedBy: "done" });
 
     const offline = remoteWith([]);
     offline.fetchDetail.mockRejectedValue(new RemoteError("connection"));
@@ -199,5 +200,49 @@ describe("Queue → Library completion", () => {
       persistCompletedGeneration({ store, ownerUserId: OWNER_A, remote, generation: generation("completed", "reviewer:x") }),
     ).rejects.toThrow("connection");
     await expect(store.listSummaries(OWNER_A)).resolves.toEqual([]);
+  });
+});
+
+
+describe('batched body hydration', () => {
+  async function missing(count: number) {
+    const store = await setup();
+    const details = Array.from({ length: count }, (_, n) => ({ ...reviewerDetail(), artifact: { ...reviewerDetail().artifact, id: 'reviewer:' + n } }));
+    await store.upsertSummaries(OWNER_A, details.map(detail => detail.artifact));
+    return { store, remote: remoteWith(details), ownerUserId: OWNER_A };
+  }
+  it('hydrates 45 bodies in three batches', async () => {
+    const input = await missing(45);
+    const progress = vi.fn();
+    expect(await hydrateLibraryBodies({ ...input, onProgress: progress })).toEqual({ hydrated: 45, stoppedBy: 'done' });
+    expect(progress).toHaveBeenCalledTimes(3);
+    expect((await input.store.offlineStats(OWNER_A)).current).toBe(45);
+  });
+  it('stops offline without removing rows', async () => {
+    const input = await missing(3);
+    input.remote.fetchDetail.mockRejectedValue(new RemoteError('connection'));
+    expect(await hydrateLibraryBodies(input)).toEqual({ hydrated: 0, stoppedBy: 'offline' });
+    expect(await input.store.listSummaries(OWNER_A)).toHaveLength(3);
+  });
+  it('skips artifact failures with no loop, allowing later bodies to hydrate', async () => {
+    const input = await missing(45);
+    input.remote.fetchDetail.mockRejectedValueOnce(new RemoteError('unavailable'));
+    expect(await hydrateLibraryBodies(input)).toEqual({ hydrated: 44, stoppedBy: 'done' });
+    expect(input.remote.fetchDetail).toHaveBeenCalledTimes(45);
+  });
+  it('cancels before saving an in-flight body', async () => {
+    const input = await missing(3); let cancelled = false;
+    input.remote.fetchDetail.mockImplementationOnce(async () => { cancelled = true; return reviewerDetail(); });
+    expect(await hydrateLibraryBodies({ ...input, isCancelled: () => cancelled })).toMatchObject({ stoppedBy: 'cancelled' });
+    expect((await input.store.offlineStats(OWNER_A)).current).toBe(0);
+    expect(input.remote.fetchDetail).toHaveBeenCalledTimes(1);
+  });
+  it('checks time budget between requests', async () => {
+    const input = await missing(3); let ticks = 0;
+    expect(await hydrateLibraryBodies({ ...input, now: () => ticks++ < 3 ? 0 : 60_001 })).toEqual({ hydrated: 1, stoppedBy: 'limit' });
+  });
+  it('bounds a large run to 300 bodies', async () => {
+    const input = await missing(305);
+    expect(await hydrateLibraryBodies(input)).toEqual({ hydrated: 300, stoppedBy: 'limit' });
   });
 });

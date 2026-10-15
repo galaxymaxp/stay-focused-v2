@@ -1,8 +1,19 @@
 # Frequent Canvas sync and email notifications
 
+Release activation uses `CANVAS_EMAIL_DELIVERY_ENABLED=1` as an explicit server
+switch after sender verification and the stale-event guard. Its default is off.
+Completion push and preparation polling continue while email delivery is off;
+pending email events remain durable. A Resend free account can verify an owned
+domain; the shared onboarding sender is restricted to provider testing.
+
 Google Cloud Scheduler → POST Vercel `/api/cron/canvas-sync` every five minutes → existing Canvas client and normalizers → canonical Supabase Canvas tables → transactional notification outbox → email worker → existing Resend sender.
 
-This route runs metadata synchronization and email delivery only. It does not start reviewer generation, download files, run OCR, or dispatch the existing Cloud Run worker. Explicit student content/grade synchronization remains available through the existing system.
+The route runs completion push, metadata polling, bounded preparation backfill,
+automatic-reviewer admission, deadline queuing, and optionally email delivery.
+Preparation dispatch uses the private Cloud Run worker and existing Cloud Tasks
+queue. Course receipts enforce batches of 25 and at most 200 enqueues per sync;
+repeat/no-progress guards stop unsafe cycles. Explicit content/grade sync remains
+available through the existing system.
 
 ## Scheduling and deployment
 
@@ -85,7 +96,28 @@ Four new RLS-enabled tables: `notification_preferences`, `notification_outbox`, 
 
 Local acceptance executes the actual migration against PGlite/Postgres canonical table DDL, tests RLS under authenticated/anonymous roles, and tests authorized/unauthorized Request handlers and mocked provider delivery. Full API/mobile suites, typecheck/lint, and production API build must pass. These local checks do not substitute for a live Canvas/provider or physical-device test.
 
-Before enabling the job: migrate, configure variables by name, deploy API and Mobile, verify the Resend sender, use only the existing developer-controlled safe recipient for a real delivery check, reject an unauthorized production POST, run an authorized POST twice against unchanged Canvas state, confirm canonical/outbox counts and receipts do not grow, check Settings across restart/login, and confirm workload/backlog and retry behavior. No real emails, production migration, deployment, or Scheduler job were performed for this implementation task.
+Owner activation sequence (separate from AG2's unattended local work):
+
+1. Keep Scheduler paused or absent and confirm no delivery invocation is in flight.
+2. Verify the Resend sender, configure the required server variables, apply the
+   notification and AG2 forward-only migrations, and deploy API and Mobile.
+3. Immediately before activation, run with the service role:
+   `select public.skip_stale_canvas_email_events_v1();`
+   Record its count. It skips only pending events older than 24 hours, leaves
+   sent/failed/already-skipped events untouched, and returns zero on a repeat.
+   This prevents historical pending events from becoming an activation mail storm.
+4. Reject an unauthorized production POST, then run the authorized POST twice
+   against unchanged Canvas state. Confirm canonical/outbox counts and delivery
+   receipts do not grow on the repeat; check Settings across restart/login and
+   require zero sustained polling backlog. Use only the existing developer-controlled
+   recipient for separately authorized real delivery checks.
+5. Resume Scheduler only after these checks. If activation is delayed another
+   day, rerun the stale guard before resuming.
+
+No real emails, production migration, deployment, or Scheduler action was
+performed for AG2's unattended implementation. Scheduler state is UNVERIFIED
+(owner to confirm). Website parity and R1.4 device/production acceptance remain
+pending.
 
 ## Local verification record (October 3, 2026)
 

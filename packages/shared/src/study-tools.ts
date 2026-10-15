@@ -132,6 +132,16 @@ export function checkStudySelection(block: AssistBlock, selection: string): Stud
   if (text.length > STUDY_LIMITS.selection) return { ok: false, reason: 'too_large' };
   return normalizeStudyText(studySurface(block)).includes(text) ? { ok: true, text } : { ok: false, reason: 'outside' };
 }
+/** A bounded concept/key-point subject for Ask; the server already supplies block context. */
+export function studyAskSubject(block: AssistBlock, pointIndex?: number): string {
+  const candidates = [pointIndex === undefined ? block.explanation : block.keyPoints[pointIndex], block.title];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const check = checkStudySelection(block, candidate);
+    if (check.ok) return check.text;
+  }
+  return '';
+}
 /** Same-session reuse key. Inputs that change the answer are part of it. */
 export function studyCacheKey(request: StudyToolRequest): string {
   return JSON.stringify([request.reviewerId, request.blockId, request.contentHash, normalizeStudyText(request.selection), request.action,

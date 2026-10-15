@@ -1,4 +1,5 @@
 import type { Quiz } from '@stay-focused/shared';
+import { estimateReviewerMinutes } from '@stay-focused/shared';
 import type { CanvasAssignmentRow } from '@stay-focused/db';
 import { quizView } from '../quiz/service';
 import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerateCourseList, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
@@ -6,6 +7,7 @@ import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib
 import type { CanvasCourseInventory, CanvasCourseSelectionResult } from '@/lib/canvas-course-selection';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
+import type { ExperienceRow } from './repository';
 import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
 import { composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
@@ -66,25 +68,7 @@ export class ExperienceService {
       console.error('experience.course_materials.failed', { code: result.code, status: result.status });
       throw new ExperienceFailure(503, 'unavailable');
     }
-    const courseSnapshots = new Set(snapshots.filter(snapshot => snapshot.course_id === courseId).map(snapshot => snapshot.id));
-    const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
-    const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
-    const latestReviewerBySnapshot = new Map<string, { id: string; updatedAt: string }>();
-    for (const artifact of [...artifacts].filter(row => row.artifact_type === 'reviewer' && !row.deleted_at).sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))) {
-      const version = artifact.latest_version_id ? versionMap.get(artifact.latest_version_id) : null;
-      const source = version ? sourceVersionMap.get(version.source_version_id) : null;
-      const snapshotId = source ? text(record(source.metadata).reviewerSourceSnapshotId) : null;
-      if (version?.artifact_id === artifact.id && snapshotId && courseSnapshots.has(snapshotId) && !latestReviewerBySnapshot.has(snapshotId)) {
-        latestReviewerBySnapshot.set(snapshotId, { id: artifact.id, updatedAt: artifact.updated_at });
-      }
-    }
-    const reviewerByMaterial = new Map<string, { id: string; updatedAt: string }>();
-    for (const item of snapshotItems) {
-      if (item.course_id !== courseId || !item.source_row_id) continue;
-      const reviewer = latestReviewerBySnapshot.get(item.source_snapshot_id);
-      const key = `${item.source_type}:${item.source_row_id}`;
-      if (reviewer && (!reviewerByMaterial.has(key) || Date.parse(reviewer.updatedAt) > Date.parse(reviewerByMaterial.get(key)!.updatedAt))) reviewerByMaterial.set(key, reviewer);
-    }
+    const reviewerByMaterial = mapReviewerArtifactsByMaterial({ courseId, artifacts, versions, sourceVersions, snapshots, snapshotItems });
     return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null)), totalKnown: result.value.pagination.totalKnown,
       nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
   }
@@ -201,20 +185,23 @@ export class ExperienceService {
       const quiz=quizView(row,attempts), course=courses.find(c=>c.id===quiz.courseId);
       const summary = { ...quiz, questions: undefined };
       const source = sources.find(value => value.id === row.source_version_id);
-      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceType:sourceType(source?.metadata),sourceTitle:source ? text(record(source.metadata).sourceTitle) : null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary}};
+      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceType:sourceType(source?.metadata),sourceTitle:source ? text(record(source.metadata).sourceTitle) : null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary,reviewMinutes:null}};
     });
   }
   private async activityDraftRecords(userId: string): Promise<{summary:LibraryArtifactSummary;draft:ActivityDraft}[]> {
     const [drafts,courses] = await Promise.all([this.rows('activity_drafts',userId),this.getCourses(userId)]);
     return drafts.map(row => { const draft=draftView(row); const course=courses.find(c=>c.id===row.course_id);
-      return {draft,summary:{id:`activity:${row.id}`,type:'activity_output' as const,title:draft.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:draft.activityId,sourceTitle:draft.title,activityId:draft.activityId,createdAt:draft.createdAt,updatedAt:draft.updatedAt,lastOpenedAt:null,status:'completed' as const,relatedArtifactIds:[]}};
+      return {draft,summary:{id:`activity:${row.id}`,type:'activity_output' as const,title:draft.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:draft.activityId,sourceTitle:draft.title,activityId:draft.activityId,createdAt:draft.createdAt,updatedAt:draft.updatedAt,lastOpenedAt:null,status:'completed' as const,relatedArtifactIds:[],reviewMinutes:null}};
     }).sort((a,b)=>Date.parse(b.draft.createdAt)-Date.parse(a.draft.createdAt)||a.draft.id.localeCompare(b.draft.id));
   }
   private async artifactRecords(userId: string): Promise<ArtifactRecord[]> {
-    const [artifacts, versions, sourceVersions, snapshots, courses, snapshotItems] = await Promise.all([
+    const [artifacts, versions, sourceVersions, snapshots, courses, snapshotItems, candidates, jobs] = await Promise.all([
       this.rows('generated_artifacts', userId), this.rows('generated_artifact_versions', userId), this.rows('source_versions', userId),
       this.rows('reviewer_source_snapshots', userId), this.rows('canvas_courses', userId), this.rows('reviewer_source_snapshot_items', userId),
+      this.rows('canvas_auto_reviewer_candidates', userId), this.rows('processing_jobs', userId),
     ]);
+    const ownedJobIds = new Set(jobs.map(job => job.id));
+    const automaticJobIds = new Set(candidates.filter(candidate => candidate.processing_job_id && ownedJobIds.has(candidate.processing_job_id)).map(candidate => candidate.processing_job_id));
     const snapshotMap = new Map(snapshots.map(s => [s.id, s]));
     const courseMap = new Map(courses.map(c => [c.id, { id: c.id, code: c.course_code, name: c.name }]));
     function summary(id: string, title: string, createdAt: string, updatedAt: string, snapshotId: string | null, sourceId: string | null, sourceTitle: string | null, kind: LibraryArtifactSummary['sourceType']): LibraryArtifactSummary {
@@ -237,7 +224,7 @@ export class ExperienceService {
       const snapshotId = text(record(source.metadata).reviewerSourceSnapshotId);
       const id = `artifact:${artifact.id}`;
       records.push({
-        summary: summary(id, artifact.safe_title, artifact.created_at, artifact.updated_at, snapshotId, source.id, text(record(source.metadata).sourceTitle), sourceType(source.metadata)),
+        summary: { ...summary(id, artifact.safe_title, artifact.created_at, artifact.updated_at, snapshotId, source.id, text(record(source.metadata).sourceTitle), sourceType(source.metadata)), origin: version.generation_job_id && automaticJobIds.has(version.generation_job_id) ? 'automatic' : 'manual', reviewMinutes: estimateReviewerMinutes(version.payload)?.minutes ?? null },
         payload: version.payload,
         reviewerArtifactId: artifact.id,
         aliases: [id, ...(version.generation_job_id ? [`generation:${version.generation_job_id}`] : [])],
@@ -381,4 +368,35 @@ function announcementTime(value: string | null): number {
   if (!value) return Number.NEGATIVE_INFINITY;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+export function mapReviewerArtifactsByMaterial(input: {
+  readonly courseId: string;
+  readonly artifacts: readonly ExperienceRow<'generated_artifacts'>[];
+  readonly versions: readonly ExperienceRow<'generated_artifact_versions'>[];
+  readonly sourceVersions: readonly ExperienceRow<'source_versions'>[];
+  readonly snapshots: readonly ExperienceRow<'reviewer_source_snapshots'>[];
+  readonly snapshotItems: readonly ExperienceRow<'reviewer_source_snapshot_items'>[];
+}): Map<string, { readonly id: string; readonly updatedAt: string }> {
+  const { courseId, artifacts, versions, sourceVersions, snapshots, snapshotItems } = input;
+    const courseSnapshots = new Set(snapshots.filter(snapshot => snapshot.course_id === courseId).map(snapshot => snapshot.id));
+    const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
+    const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
+    const latestReviewerBySnapshot = new Map<string, { id: string; updatedAt: string }>();
+    for (const artifact of [...artifacts].filter(row => row.artifact_type === 'reviewer' && !row.deleted_at).sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))) {
+      const version = artifact.latest_version_id ? versionMap.get(artifact.latest_version_id) : null;
+      const source = version ? sourceVersionMap.get(version.source_version_id) : null;
+      const snapshotId = source ? text(record(source.metadata).reviewerSourceSnapshotId) : null;
+      if (version?.artifact_id === artifact.id && snapshotId && courseSnapshots.has(snapshotId) && !latestReviewerBySnapshot.has(snapshotId)) {
+        latestReviewerBySnapshot.set(snapshotId, { id: artifact.id, updatedAt: artifact.updated_at });
+      }
+    }
+    const reviewerByMaterial = new Map<string, { id: string; updatedAt: string }>();
+    for (const item of snapshotItems) {
+      if (item.course_id !== courseId || !item.source_row_id) continue;
+      const reviewer = latestReviewerBySnapshot.get(item.source_snapshot_id);
+      const key = `${item.source_type}:${item.source_row_id}`;
+      if (reviewer && (!reviewerByMaterial.has(key) || Date.parse(reviewer.updatedAt) > Date.parse(reviewerByMaterial.get(key)!.updatedAt))) reviewerByMaterial.set(key, reviewer);
+    }
+  return reviewerByMaterial;
 }

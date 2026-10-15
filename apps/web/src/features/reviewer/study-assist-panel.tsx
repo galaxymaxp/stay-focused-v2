@@ -3,6 +3,7 @@ import {
   ASSIST_LABELS,
   ASSIST_RESULT_LABELS,
   ASSIST_TYPES,
+  studyAskSubject,
   type AssistType,
 } from "@stay-focused/shared";
 import { useEffect, useState } from "react";
@@ -98,6 +99,7 @@ export function StudyAssistPanel({
             selection={target.selection}
             initialText={initialText}
             initialAction={initialAction}
+            askText={studyAskSubject(target.selection.block, target.pointIndex)}
             onActiveChange={setStudying}
           />
           {!studying && (

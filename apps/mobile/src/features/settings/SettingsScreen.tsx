@@ -12,6 +12,9 @@ import { Copy, Notice, Page, SegmentedControl, Surface } from "../../design/prim
 import { useTheme, type PaletteFamily, type ThemePreference } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
 import { NotificationSettings } from "./NotificationSettings";
+import { CompletionNotificationSettings } from "./CompletionNotificationSettings";
+import { OfflineStorageSettings } from "./OfflineStorageSettings";
+import { AutoReviewerSettings } from "./AutoReviewerSettings";
 
 const modes: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "Automatic" },
@@ -125,7 +128,10 @@ export function SettingsScreen() {
         {notice ? <Notice>{notice}</Notice> : null}
       </Section>
 
-      <NotificationSettings />
+      <AutoReviewerSettings />
+      <OfflineStorageSettings />
+        <NotificationSettings />
+        <CompletionNotificationSettings />
       <Section title="Appearance">
         <Surface style={{ gap: spacing[3] }}>
           <View style={{ gap: spacing[2] }}>

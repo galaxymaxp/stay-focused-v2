@@ -84,6 +84,11 @@ export async function prepareDeferredCanvasReviewerSource({
   });
   const file = await readOwnedPreparedFile(client, job.user_id, courseId, rowId);
   if (!file || !isPreparedCanvasFileReadyForOcr(file)) throw new ExperienceFailure(409, 'not_ready');
+  // Extraction belongs to the immutable staged original, not whichever original
+  // happens to be current when this worker finishes.
+  if (!source.content_sha256 || source.content_sha256 !== file.current_sha256 ||
+      source.byte_size !== file.stored_byte_count || source.storage_bucket !== file.storage_bucket ||
+      source.storage_object_path !== file.storage_object_key) throw new ExperienceFailure(409,'not_ready');
   const page = pageId ? await readOwnedPage(client, job.user_id, courseId, pageId) : null;
   if (pageId && (!page || page.canvas_connection_id !== file.canvas_connection_id)) throw new ExperienceFailure(409, 'not_ready');
   const pageText = page ? normalizeCanvasHtmlToText(page.body_html) : '';
@@ -135,13 +140,7 @@ export async function prepareDeferredCanvasReviewerSource({
     parser_version: CANVAS_STORED_FILE_EXTRACTION_VERSION,
     ocr_version: CANVAS_STORED_PDF_OCR_VERSION,
   }];
-  const fileBlocks = orderedPages.filter((item) => item.text.trim()).map((item, index) => ({
-    id: `page-${item.pageNumber}`,
-    kind: 'paragraph' as const,
-    order: index,
-    pageNumber: item.pageNumber,
-    text: item.text.trim(),
-  }));
+  const fileBlocks = buildCanvasPdfPageBlocks(orderedPages,orderedPages.length);
   const sourceBlocks = [
     ...(substantivePageText ? [{ id: 'canvas-page-body', kind: 'paragraph' as const, order: 0, text: substantivePageText }] : []),
     ...fileBlocks,
@@ -271,6 +270,15 @@ export async function prepareDeferredCanvasReviewerSource({
     sourceCharacterCount: combinedText.length,
   });
   return true;
+}
+
+/** Shared canonical PDF builder: blanks remain evidence, never invented blocks. */
+export function buildCanvasPdfPageBlocks(pages:readonly OcrPage[],expectedPageCount:number) {
+  const ordered=[...pages].sort((a,b)=>a.pageNumber-b.pageNumber);
+  if(!Number.isSafeInteger(expectedPageCount) || expectedPageCount<1 || ordered.length!==expectedPageCount ||
+    ordered.some((page,index)=>page.pageNumber!==index+1 || page.status==='failed'))throw new Error('preparation_pages_incomplete');
+  return ordered.filter(item=>item.text.trim()).map((item,index)=>({id:`page-${item.pageNumber}`,kind:'paragraph' as const,
+    order:index,pageNumber:item.pageNumber,text:item.text.trim()}));
 }
 
 async function readOwnedPage(client: SupabaseClient<Database>, userId: string, courseId: string, rowId: string): Promise<CanvasPageRow | null> {

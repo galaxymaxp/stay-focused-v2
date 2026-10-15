@@ -5,7 +5,16 @@ import {
   formatDueInput,
   parseDueInput,
   parseEstimateInput,
+  taskPatchFromDraft,
 } from "./taskEditorInput";
+import type { TaskView } from "@stay-focused/shared/task-planning";
+
+it("preserves automatic estimates when editing other fields, and includes a changed number", () => {
+  const draft = { title: "Renamed", notes: null, priority: "medium" as const, dueAt: null, estimatedMinutes: 45 };
+  const task = { estimatedMinutes: 45, estimateSource: "ai" } as TaskView;
+  expect(taskPatchFromDraft(draft, task)).not.toHaveProperty("estimatedMinutes");
+  expect(taskPatchFromDraft({ ...draft, estimatedMinutes: 30 }, task)).toHaveProperty("estimatedMinutes", 30);
+});
 
 describe("parseDueInput", () => {
   it("accepts a date with and without a time", () => {

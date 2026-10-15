@@ -3,6 +3,7 @@ import type {
   LibraryArtifactSummary,
   LibraryArtifactType,
   QuizAttempt,
+  QuizAnswerKey,
   QuizResult,
   ActivityDetail,
   ActivitySummary,
@@ -10,6 +11,8 @@ import type {
 
 import type { LocalSqlDatabase, LocalSqlExecutor } from "./sqlDatabase";
 import { createAssistCache, type AssistCache } from "./assistCache";
+import { keyMatchesQuiz, parseQuizAnswerKey } from "./quizAnswerKeys";
+import { createPendingDraftStore, type PendingDraftStore } from './pendingDraftStore';
 
 /** Version of the stored detail payload shape (the Library detail DTO). */
 export const LOCAL_PAYLOAD_SCHEMA = 1;
@@ -22,7 +25,7 @@ export interface LocalArtifactDetail {
   readonly bodyBehindCloud: boolean;
 }
 
-/** A local copy of one attempt; only unfinished drafts may be pending sync. */
+/** A local attempt and provisional result pending server-authoritative replay. */
 export interface LocalQuizPractice {
   readonly attempt: QuizAttempt | null;
   readonly result: QuizResult | null;
@@ -30,7 +33,19 @@ export interface LocalQuizPractice {
   readonly dirty: boolean;
 }
 
-export interface LocalArtifactStore extends AssistCache {
+export interface OfflineStats {
+  readonly total: number;
+  readonly current: number;
+  readonly approximateBytes: number;
+}
+export type LocalLibrarySummary = LibraryArtifactSummary & { readonly offlineReady: boolean };
+
+export interface LocalArtifactStore extends AssistCache, PendingDraftStore {
+  readQuizAnswerKey(ownerUserId: string, quizId: string, bodyUpdatedAt: string): Promise<QuizAnswerKey | null>;
+  saveQuizAnswerKey(ownerUserId: string, key: QuizAnswerKey, bodyUpdatedAt: string): Promise<void>;
+  offlineStats(ownerUserId: string): Promise<OfflineStats>;
+  /** Remove cloud copies only; keep summaries and unsynced student work. */
+  clearBodies(ownerUserId: string): Promise<void>;
   readActivitySummaries(ownerUserId: string): Promise<ActivitySummary[] | null>;
   saveActivitySummaries(ownerUserId: string, summaries: readonly ActivitySummary[]): Promise<void>;
   readActivityDetail(ownerUserId: string, activityId: string): Promise<ActivityDetail | null>;
@@ -39,7 +54,7 @@ export interface LocalArtifactStore extends AssistCache {
   saveQuizPractice(ownerUserId: string, quizId: string, practice: LocalQuizPractice): Promise<void>;
   readActivityResponse(ownerUserId: string, artifactId: string): Promise<{ responses: Record<string, string>; completed: boolean; updatedAt: string } | null>;
   saveActivityResponse(ownerUserId: string, artifactId: string, responses: Record<string, string>, completed: boolean): Promise<void>;
-  listSummaries(ownerUserId: string): Promise<LibraryArtifactSummary[]>;
+  listSummaries(ownerUserId: string): Promise<LocalLibrarySummary[]>;
   readDetail(ownerUserId: string, artifactId: string): Promise<LocalArtifactDetail | null>;
   upsertSummaries(
     ownerUserId: string,
@@ -50,7 +65,7 @@ export interface LocalArtifactStore extends AssistCache {
     requestedId: string,
     detail: LibraryArtifactDetail,
   ): Promise<LocalUpsertOutcome>;
-  idsNeedingBody(ownerUserId: string, limit: number): Promise<string[]>;
+  idsNeedingBody(ownerUserId: string, limit: number, includeQuizKeys?: boolean): Promise<string[]>;
   removeArtifact(ownerUserId: string, artifactId: string): Promise<void>;
   purgeOwner(ownerUserId: string): Promise<void>;
 }
@@ -80,6 +95,33 @@ export function createLocalArtifactStore(
 ): LocalArtifactStore {
   return {
     ...createAssistCache(db),
+    ...createPendingDraftStore(db, now),
+    async readQuizAnswerKey(ownerUserId, quizId, bodyUpdatedAt) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ key_json: string; version_id: string; updated_at: string }>(
+        'SELECT key_json, version_id, updated_at FROM quiz_answer_keys WHERE owner_user_id = ? AND quiz_id = ?', [ownerUserId, quizId]);
+      if (!row || row.updated_at !== bodyUpdatedAt) return null;
+      const key = parseQuizAnswerKey(row.key_json, quizId);
+      const artifact = await currentRow(db, ownerUserId, `quiz:${quizId}`);
+      const detail = artifact?.payload_json ? parseDetail(artifact.payload_json) : null;
+      return key?.versionId === row.version_id && artifact?.payload_cloud_updated_at === bodyUpdatedAt &&
+        detail && 'quiz' in detail && keyMatchesQuiz(key, detail.quiz.questions) ? key : null;
+    },
+    async saveQuizAnswerKey(ownerUserId, key, bodyUpdatedAt) {
+      requireOwner(ownerUserId);
+      if (!parseQuizAnswerKey(JSON.stringify(key), key.quizId)) throw new Error('invalid_quiz_key');
+      await db.withExclusiveTransactionAsync(async transaction => {
+        const row = await currentRow(transaction, ownerUserId, `quiz:${key.quizId}`);
+        // A delayed fetch cannot repopulate a removed copy or attach to another body revision.
+        if (!row?.payload_json || row.payload_cloud_updated_at !== bodyUpdatedAt || row.cloud_updated_at !== bodyUpdatedAt) return;
+        const detail = parseDetail(row.payload_json);
+        if (!detail || !('quiz' in detail) || !keyMatchesQuiz(key, detail.quiz.questions)) throw new Error('quiz_key_mismatch');
+        await transaction.runAsync(`INSERT INTO quiz_answer_keys(owner_user_id, quiz_id, version_id, key_json, updated_at)
+          VALUES (?, ?, ?, ?, ?) ON CONFLICT(owner_user_id, quiz_id) DO UPDATE SET
+          version_id = excluded.version_id, key_json = excluded.key_json, updated_at = excluded.updated_at`,
+        [ownerUserId, key.quizId, key.versionId, JSON.stringify(key), bodyUpdatedAt]);
+      });
+    },
     async readActivitySummaries(ownerUserId) {
       requireOwner(ownerUserId);
       const rows = await db.getAllAsync<{ summary_json: string }>(
@@ -147,9 +189,13 @@ export function createLocalArtifactStore(
     },
     async listSummaries(ownerUserId) {
       requireOwner(ownerUserId);
-      // The list reads summaries only; bodies stay on disk until an artifact opens.
-      const rows = await db.getAllAsync<{ summary_json: string }>(
-        `SELECT summary_json FROM library_artifacts
+      // Compute readiness without loading full bodies into the list.
+      const rows = await db.getAllAsync<{ summary_json: string; offline_ready: number }>(
+        `SELECT summary_json, CASE WHEN payload_json IS NOT NULL
+          AND payload_schema = ${LOCAL_PAYLOAD_SCHEMA}
+          AND payload_cloud_updated_at IS NOT NULL
+          AND payload_cloud_updated_at >= cloud_updated_at THEN 1 ELSE 0 END AS offline_ready
+          FROM library_artifacts
           WHERE owner_user_id = ?
           ORDER BY cloud_updated_at DESC, artifact_id ASC`,
         [ownerUserId],
@@ -162,9 +208,18 @@ export function createLocalArtifactStore(
       const practices = new Map(quizRows.flatMap(row => {
         try { return [[row.quiz_id, JSON.parse(row.snapshot_json) as LocalQuizPractice] as const]; } catch { return []; }
       }));
+      const pendingDrafts = new Map((await db.getAllAsync<{ draft_id: string; content_json: string }>(
+        'SELECT draft_id,content_json FROM pending_draft_edits WHERE owner_user_id=?', [ownerUserId]))
+        .map(row => [row.draft_id, row.content_json]));
       return rows.flatMap((row) => {
-        const summary = parseSummary(row.summary_json);
-        if (!summary) return [];
+        const parsed = parseSummary(row.summary_json);
+        if (!parsed) return [];
+        const summary: LocalLibrarySummary = { ...parsed, offlineReady: row.offline_ready === 1 };
+        const pendingContent = pendingDrafts.get(summary.id.replace(/^activity:/, ''));
+        if (pendingContent && summary.type === 'activity_output') {
+          try { return [{ ...summary, title: (JSON.parse(pendingContent) as import('@stay-focused/shared').ActivityDraftContent).title, offlineReady: true }]; }
+          catch { /* Keep the pending row even if its content needs recovery. */ }
+        }
         if (summary.type === 'quiz' && summary.quiz) {
           const attempt = practices.get(summary.quiz.id)?.attempt;
           if (attempt?.status === 'in_progress') return [{ ...summary, quiz: { ...summary.quiz, activeAttempt: {
@@ -213,9 +268,13 @@ export function createLocalArtifactStore(
       const summary = parseSummary(row.summary_json);
       const detail = parseDetail(row.payload_json);
       if (!summary || !detail || detail.artifact.id !== row.artifact_id) return null;
+      const pending = 'draft' in detail ? await db.getFirstAsync<{ content_json: string }>(
+        'SELECT content_json FROM pending_draft_edits WHERE owner_user_id=? AND draft_id=?', [ownerUserId, detail.draft.id]) : null;
+      const visible = pending && 'draft' in detail
+        ? { ...detail, draft: { ...detail.draft, ...JSON.parse(pending.content_json) as import('@stay-focused/shared').ActivityDraftContent } } : detail;
       return {
         // The newest summary wins for list-level fields; the body is as stored.
-        detail: { ...detail, artifact: summary },
+        detail: { ...visible, artifact: { ...summary, ...('draft' in visible && pending ? { title: visible.draft.title } : {}) } },
         bodyBehindCloud: (row.payload_cloud_updated_at ?? "") < row.cloud_updated_at,
       };
     },
@@ -260,7 +319,7 @@ export function createLocalArtifactStore(
       return outcome;
     },
 
-    async idsNeedingBody(ownerUserId, limit) {
+    async idsNeedingBody(ownerUserId, limit, includeQuizKeys = false) {
       requireOwner(ownerUserId);
       const rows = await db.getAllAsync<{ artifact_id: string }>(
         `SELECT artifact_id FROM library_artifacts
@@ -268,10 +327,14 @@ export function createLocalArtifactStore(
             AND (payload_json IS NULL
                  OR payload_schema IS NOT ?
                  OR payload_cloud_updated_at IS NULL
-                 OR payload_cloud_updated_at < cloud_updated_at)
+                 OR payload_cloud_updated_at < cloud_updated_at
+                 OR (? = 1 AND artifact_type = 'quiz' AND NOT EXISTS (
+                   SELECT 1 FROM quiz_answer_keys k WHERE k.owner_user_id = library_artifacts.owner_user_id
+                     AND 'quiz:' || k.quiz_id = library_artifacts.artifact_id
+                     AND k.updated_at = library_artifacts.cloud_updated_at)))
           ORDER BY cloud_updated_at DESC, artifact_id ASC
           LIMIT ?`,
-        [ownerUserId, LOCAL_PAYLOAD_SCHEMA, Math.max(0, Math.floor(limit))],
+        [ownerUserId, LOCAL_PAYLOAD_SCHEMA, includeQuizKeys ? 1 : 0, Math.max(0, Math.floor(limit))],
       );
       return rows.map((row) => row.artifact_id);
     },
@@ -280,8 +343,11 @@ export function createLocalArtifactStore(
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
         const canonical = await resolveAlias(transaction, ownerUserId, artifactId);
+        await transaction.runAsync('DELETE FROM pending_draft_edits WHERE owner_user_id=? AND draft_id IN (?,?)', [ownerUserId, artifactId.replace(/^activity:/, ''), canonical.replace(/^activity:/, '')]);
+        await transaction.runAsync('DELETE FROM draft_sync_receipts WHERE owner_user_id=? AND draft_id IN (?,?)', [ownerUserId, artifactId.replace(/^activity:/, ''), canonical.replace(/^activity:/, '')]);
         await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ? AND artifact_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
         await transaction.runAsync("DELETE FROM quiz_practice WHERE owner_user_id = ? AND quiz_id IN (?, ?)", [ownerUserId, artifactId.replace(/^quiz:/, ''), canonical.replace(/^quiz:/, '')]);
+        await transaction.runAsync("DELETE FROM quiz_answer_keys WHERE owner_user_id = ? AND quiz_id IN (?, ?)", [ownerUserId, artifactId.replace(/^quiz:/, ''), canonical.replace(/^quiz:/, '')]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ? AND reviewer_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
         await transaction.runAsync(
           "DELETE FROM library_artifacts WHERE owner_user_id = ? AND artifact_id IN (?, ?)",
@@ -294,12 +360,42 @@ export function createLocalArtifactStore(
       });
     },
 
+    async offlineStats(ownerUserId) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ total: number; current: number; approximate_bytes: number }>(
+        `SELECT COUNT(*) AS total,
+          COALESCE(SUM(CASE WHEN payload_json IS NOT NULL AND payload_schema = ?
+            AND payload_cloud_updated_at IS NOT NULL
+            AND payload_cloud_updated_at >= cloud_updated_at THEN 1 ELSE 0 END), 0) AS current,
+          COALESCE(SUM(LENGTH(CAST(payload_json AS BLOB))), 0)
+            + COALESCE((SELECT SUM(LENGTH(CAST(result_json AS BLOB))) FROM study_assists
+              WHERE owner_user_id = ?), 0) AS approximate_bytes
+          FROM library_artifacts WHERE owner_user_id = ?`,
+        [LOCAL_PAYLOAD_SCHEMA, ownerUserId, ownerUserId]);
+      return { total: row?.total ?? 0, current: row?.current ?? 0, approximateBytes: row?.approximate_bytes ?? 0 };
+    },
+
+    async clearBodies(ownerUserId) {
+      requireOwner(ownerUserId);
+      await db.withExclusiveTransactionAsync(async (transaction) => {
+        await transaction.runAsync(`UPDATE library_artifacts
+          SET payload_json = NULL, payload_schema = NULL, payload_cloud_updated_at = NULL
+          WHERE owner_user_id = ? AND NOT EXISTS (SELECT 1 FROM pending_draft_edits p
+            WHERE p.owner_user_id=library_artifacts.owner_user_id AND 'activity:' || p.draft_id=library_artifacts.artifact_id)`, [ownerUserId]);
+        await transaction.runAsync('DELETE FROM study_assists WHERE owner_user_id = ?', [ownerUserId]);
+        await transaction.runAsync('DELETE FROM quiz_answer_keys WHERE owner_user_id = ?', [ownerUserId]);
+      });
+    },
+
     async purgeOwner(ownerUserId) {
       requireOwner(ownerUserId);
       await db.withExclusiveTransactionAsync(async (transaction) => {
+        await transaction.runAsync('DELETE FROM pending_draft_edits WHERE owner_user_id=?', [ownerUserId]);
+        await transaction.runAsync('DELETE FROM draft_sync_receipts WHERE owner_user_id=?', [ownerUserId]);
         await transaction.runAsync("DELETE FROM experience_activity_snapshots WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM quiz_practice WHERE owner_user_id = ?", [ownerUserId]);
+        await transaction.runAsync("DELETE FROM quiz_answer_keys WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifacts WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifact_aliases WHERE owner_user_id = ?", [ownerUserId]);
@@ -316,7 +412,7 @@ function parseActivitySummary(json: string): ActivitySummary | null {
       !Array.isArray(value.submissionTypes) || typeof value.hasGeneratedDraft !== "boolean") return null;
     if (value.course !== null && (!value.course || typeof value.course !== "object" ||
       typeof value.course.id !== "string" || typeof value.course.name !== "string")) return null;
-    return value as ActivitySummary;
+    return { ...value, estimateSource: value.estimateSource ?? null } as ActivitySummary;
   } catch {
     return null;
   }
@@ -329,7 +425,7 @@ function parseActivityDetail(json: string, activityId: string): ActivityDetail |
       typeof value.instructions !== "string" && value.instructions !== null ||
       !Array.isArray(value.attachments) || value.attachments.some(attachment =>
         !attachment || typeof attachment.key !== "string" || typeof attachment.filename !== "string")) return null;
-    return value as ActivityDetail;
+    return { ...value, estimateSource: value.estimateSource ?? null } as ActivityDetail;
   } catch {
     return null;
   }
@@ -337,11 +433,11 @@ function parseActivityDetail(json: string, activityId: string): ActivityDetail |
 
 function activitySummary(detail: ActivityDetail): ActivitySummary {
   const {
-    id, taskId, course, title, dueAt, status, priority, estimatedMinutes,
+    id, taskId, course, title, dueAt, status, priority, estimatedMinutes, estimateSource,
     submissionTypes, source, isOverdue, urgency, hasGeneratedDraft,
   } = detail;
   return {
-    id, taskId, course, title, dueAt, status, priority, estimatedMinutes,
+    id, taskId, course, title, dueAt, status, priority, estimatedMinutes, estimateSource,
     submissionTypes, source, isOverdue, urgency, hasGeneratedDraft,
   };
 }

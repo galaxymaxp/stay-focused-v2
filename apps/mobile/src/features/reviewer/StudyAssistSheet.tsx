@@ -1,4 +1,4 @@
-import { ASSIST_LABELS, ASSIST_RESULT_LABELS, ASSIST_TYPES, type AssistType } from '@stay-focused/shared';
+import { ASSIST_LABELS, ASSIST_RESULT_LABELS, ASSIST_TYPES, studyAskSubject, type AssistType } from '@stay-focused/shared';
 import { AlignLeft, ArrowLeftRight, Check, FlaskConical, Lightbulb, RotateCcw } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { ActivityIndicator, Pressable, View, type ScrollView } from 'react-native';
@@ -71,7 +71,7 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
   const [minHeight, setMinHeight] = useState(0);
   return <Sheet title="Study Assist" onClose={onClose} scrollRef={scroll}>
     {target ? <View onLayout={event => { const height = event.nativeEvent.layout.height; setMinHeight(current => Math.max(current, height)); }} style={{ gap: spacing[3], minHeight }}>
-      <SmartSelectionPanel selection={target.selection} onActiveChange={setStudying} scrollRef={scroll} />
+      <SmartSelectionPanel key={key} selection={target.selection} askText={studyAskSubject(target.selection.block, target.pointIndex)} onActiveChange={setStudying} scrollRef={scroll} />
       {studying ? null : <>
       <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700', letterSpacing: 0.8, paddingTop: spacing[2] }}>QUICK ASSISTS · WHOLE {target.pointIndex !== undefined ? 'KEY POINT' : 'CONCEPT'}</Copy>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>

@@ -85,6 +85,20 @@ describe("R5 API persistence and two-user acceptance", () => {
     installStatefulRepository();
   });
 
+  it("marks manual creation and explicit estimate edits as user-owned, preserving other patches", async () => {
+    const created = await tasksRoute.POST(jsonRequest("/api/tasks", USER_A, { title: "Manual" }));
+    const body = await created.json() as { data: { id: string; estimateSource: string } };
+    expect(body.data.estimateSource).toBe("user");
+    const row = mocks.taskRows.get(body.data.id)!;
+    row.estimate_source = "ai";
+    row.estimate_note = "Short quiz";
+    const context = { params: Promise.resolve({ taskId: row.id }) };
+    const titlePatch = await taskRoute.PATCH(jsonRequest(`/api/tasks/${row.id}`, USER_A, { title: "Renamed" }), context);
+    expect((await titlePatch.json()).data).toMatchObject({ estimateSource: "ai", estimateNote: "Short quiz" });
+    const estimatePatch = await taskRoute.PATCH(jsonRequest(`/api/tasks/${row.id}`, USER_A, { estimatedMinutes: 45 }), context);
+    expect((await estimatePatch.json()).data).toMatchObject({ estimatedMinutes: 45, estimateSource: "user", estimateNote: null });
+  });
+
   it("persists the full User A flow and denies every User B attack", async () => {
     const create = await tasksRoute.POST(jsonRequest("/api/tasks", USER_A, {
       title: "Prepare defense notes",
@@ -516,6 +530,10 @@ function taskRow(overrides: Partial<TaskRow> & Pick<TaskRow, "id" | "user_id" | 
     due_at: null,
     estimated_minutes: 30,
     source_type: "manual",
+    estimate_source: "default",
+    estimate_note: null,
+    estimate_fingerprint: null,
+    estimated_at: null,
     canvas_connection_id: null,
     canvas_course_id: null,
     canvas_assignment_id: null,
@@ -549,6 +567,8 @@ function toTaskView(row: TaskRow) {
     priority: row.priority,
     dueAt: row.due_at,
     estimatedMinutes: row.estimated_minutes,
+    estimateSource: row.estimate_source,
+    estimateNote: row.estimate_note,
     sourceType: row.source_type,
     canvasConnectionId: row.canvas_connection_id,
     canvasCourseId: row.canvas_course_id,

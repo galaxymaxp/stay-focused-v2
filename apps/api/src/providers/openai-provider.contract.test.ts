@@ -242,7 +242,7 @@ const checks: readonly ContractCheck[] = [
       const provider = new OpenAIProvider({ client: new FakeClient({}) });
       await expectAsyncError(
         () => provider.generate(createRequest()),
-        "OpenAIProvider received an empty response.",
+        "provider_empty",
       );
     },
   },
@@ -254,7 +254,7 @@ const checks: readonly ContractCheck[] = [
       });
       await expectAsyncError(
         () => provider.generate(createRequest()),
-        "OpenAIProvider received invalid JSON output.",
+        "provider_invalid_json",
       );
     },
   },
@@ -266,19 +266,19 @@ const checks: readonly ContractCheck[] = [
       });
       await expectAsyncError(
         () => provider.generate(createRequest()),
-        "OpenAIProvider received JSON output that is not an object.",
+        "provider_not_object",
       );
     },
   },
   {
-    name: "wraps client failure with model context",
+    name: "classifies client failure without private error text",
     run: async () => {
       const provider = new OpenAIProvider({
         client: new FakeClient(new Error("client unavailable")),
       });
       await expectAsyncError(
         () => provider.generate(createRequest({ model: "gpt-contract" })),
-        'OpenAI provider request failed for model "gpt-contract": client unavailable',
+        'provider_network',
       );
     },
   },

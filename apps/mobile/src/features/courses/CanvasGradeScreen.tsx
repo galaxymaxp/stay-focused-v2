@@ -37,6 +37,7 @@ import {
   startDurableCanvasSync,
 } from "../../services/canvasSyncJobCoordinator";
 import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
+import { GradeGoalSection } from "./GradeGoalSection";
 import {
   formatDate,
   formatDateTime,
@@ -454,6 +455,9 @@ export function CanvasGradeScreen({
         onBackToCourses={onBackToCourses}
         syncStatus={syncStatus}
       />
+
+      <GradeGoalSection key={`${session?.user.id ?? "guest"}.${courseId}`} courseId={courseId}
+        userId={session?.user.id ?? null} accessToken={session?.accessToken ?? null} lastSyncedAt={summary?.lastSyncedAt ?? null} />
 
       <View style={styles.actions}>
         <Button

@@ -1,4 +1,4 @@
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, View } from "react-native";
@@ -207,6 +207,6 @@ function buildScene(
 
 const styles = StyleSheet.create({
   frame: { alignItems: "center", justifyContent: "center" },
-  canvas: { ...StyleSheet.absoluteFillObject },
-  touchTarget: { ...StyleSheet.absoluteFillObject },
+  canvas: { ...StyleSheet.absoluteFill },
+  touchTarget: { ...StyleSheet.absoluteFill },
 });

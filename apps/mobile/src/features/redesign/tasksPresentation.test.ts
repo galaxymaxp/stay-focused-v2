@@ -18,6 +18,7 @@ function task(id: string, overrides: Partial<ActivitySummary>): ActivitySummary 
     status: "unknown",
     priority: "medium",
     estimatedMinutes: null,
+    estimateSource: null,
     submissionTypes: [],
     source: "canvas",
     isOverdue: false,

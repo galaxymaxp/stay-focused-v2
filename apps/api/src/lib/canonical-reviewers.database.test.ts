@@ -52,7 +52,7 @@ beforeAll(async () => {
       ('cccccccc-cccc-4ccc-8ccc-ccccccccccc2', '${OTHER}');
   `);
   await db.exec(readFileSync(resolve("../../packages/db/migrations/20260923010000_authenticated_canonical_reviewer_reads.sql"), "utf8"));
-});
+}, 30000); // Match other PGlite bootstraps under the full-suite CPU load.
 
 afterAll(async () => {
   await db?.close();

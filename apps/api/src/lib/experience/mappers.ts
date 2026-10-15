@@ -3,6 +3,7 @@ import type { ActivitySummary, CourseSummary, ExperienceCapabilities, GenerateCo
 import type { CanvasReviewerSourceDescriptor } from '@/lib/canvas-reviewer-sources';
 import type { CanvasCourseClassification, CanvasCourseInventoryItem } from '@/lib/canvas-course-selection';
 import { ExperienceFailure, normalizeExperienceError } from './errors';
+import { estimateReviewerMinutes } from '@stay-focused/shared';
 
 const available: FeatureCapability = { status: 'available' };
 const missing: FeatureCapability = { status: 'unavailable', reasonCode: 'not_implemented' };
@@ -49,8 +50,9 @@ export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: 
   const readiness = row.capability === 'failed' || row.capability === 'inaccessible' || (row.capability === 'ready' && row.availability !== 'available') ? 'unavailable' : row.capability;
   const kind = row.file?.kind === 'docx' ? 'document' : row.file?.kind === 'pptx' ? 'slides' : row.type !== 'file' ? row.type : row.file?.kind === 'unsupported'
     ? /\.pptx?$/i.test(row.title) ? 'slides' : 'document' : row.file?.kind ?? 'document';
-  return { id: row.id, courseId, title: row.title, kind, readiness, count: null, sourceId: row.id, reviewerArtifactId,
-    moduleTitle: row.placement.moduleTitle, generation: generationCapability(readiness === 'ready', readiness === 'unsupported', reviewerArtifactId !== null) };
+  const ready = row.preparation ? row.preparation.status === 'ready' : readiness === 'ready';
+  return { id: row.id, courseId, title: row.title, kind, readiness, preparation: row.preparation, count: null, sourceId: row.id, reviewerArtifactId,
+    moduleTitle: row.placement.moduleTitle, generation: generationCapability(ready, readiness === 'unsupported', ready && reviewerArtifactId !== null) };
 }
 export function dayWindow(date: string, offset = 0) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(offset) || offset < -720 || offset > 840) throw new ExperienceFailure(400, 'invalid_request');
@@ -85,13 +87,13 @@ export function composeActivities(input: {
     const course = courses.get(row.course_id)!;
     return finish({ id: `canvas:${row.id}`, taskId: task?.id ?? null, course: { id: course.id, code: course.code, name: course.name },
       title: row.name, dueAt: row.due_at, status: task?.status === 'completed' ? 'completed' : input.submittedAssignmentIds?.has(row.id) ? 'submitted' : task?.status ?? 'unknown',
-      priority: task?.priority ?? 'medium', estimatedMinutes: task?.estimated_minutes ?? null, submissionTypes: [...row.submission_types], source: 'canvas' });
+      priority: task?.priority ?? 'medium', estimatedMinutes: task?.estimated_minutes ?? null, estimateSource: task?.estimate_source ?? null, submissionTypes: [...row.submission_types], source: 'canvas' });
   });
   for (const task of tasks) {
     // Imported/orphaned Canvas rows must never reappear as personal tasks after
     // a course is deselected or its canonical assignment becomes unavailable.
     if (task.source_type === 'canvas' || task.canvas_assignment_row_id) continue;
-    result.push(finish({ id: `task:${task.id}`, taskId: task.id, course: null, title: task.title, dueAt: task.due_at, status: task.status, priority: task.priority, estimatedMinutes: task.estimated_minutes, submissionTypes: [], source: 'local' }));
+    result.push(finish({ id: `task:${task.id}`, taskId: task.id, course: null, title: task.title, dueAt: task.due_at, status: task.status, priority: task.priority, estimatedMinutes: task.estimated_minutes, estimateSource: task.estimate_source ?? null, submissionTypes: [], source: 'local' }));
   }
   return result.sort(compareActivities);
 }
@@ -122,12 +124,12 @@ export function composeToday(input: {
   const asOf = input.now;
   const tasks = input.tasks.filter(t => t.user_id === input.userId);
   const byTask = new Map(input.activities.filter(a => a.taskId).map(a => [a.taskId!, a]));
-  const activityItems: TodayItem[] = input.activities.map(a => ({ id: a.id, kind: a.source === 'canvas' ? 'canvas_activity' : 'personal_task', title: a.title, course: a.course, startAt: null, endAt: null, dueAt: a.dueAt, estimatedMinutes: a.estimatedMinutes, priority: a.priority, status: a.status, source: a.source, deepLinkTarget: { surface: 'activity', id: a.id } }));
+  const activityItems: TodayItem[] = input.activities.map(a => ({ id: a.id, kind: a.source === 'canvas' ? 'canvas_activity' : 'personal_task', title: a.title, course: a.course, startAt: null, endAt: null, dueAt: a.dueAt, estimatedMinutes: a.estimatedMinutes, estimateSource: a.estimateSource, priority: a.priority, status: a.status, source: a.source, deepLinkTarget: { surface: 'activity', id: a.id } }));
   const timeline: TodayItem[] = input.sessions.filter(s => s.user_id === input.userId && Date.parse(s.starts_at) < end && Date.parse(s.ends_at) > start && !(tasks.some(t => t.id === s.task_id && (t.source_type === 'canvas' || t.canvas_assignment_row_id)) && !byTask.has(s.task_id))).map((s): TodayItem => {
     const task = tasks.find(t => t.id === s.task_id);
     const activity = byTask.get(s.task_id);
     return { id: `session:${s.id}`, kind: 'study_session', title: activity?.title ?? task?.title ?? 'Study session', course: activity?.course ?? null, startAt: s.starts_at, endAt: s.ends_at, dueAt: activity?.dueAt ?? task?.due_at ?? null,
-      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), priority: task?.priority ?? 'medium', status: s.status === 'planned' && (activity?.status === 'submitted' || activity?.status === 'completed' || task?.status === 'completed') ? activity?.status === 'submitted' ? 'submitted' : 'completed' : s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id } };
+      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), estimateSource: task?.estimate_source ?? null, priority: task?.priority ?? 'medium', status: s.status === 'planned' && (activity?.status === 'submitted' || activity?.status === 'completed' || task?.status === 'completed') ? activity?.status === 'submitted' ? 'submitted' : 'completed' : s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id } };
   }).sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!) || a.id.localeCompare(b.id));
   const active = (item: TodayItem) => !['completed', 'submitted', 'skipped'].includes(item.status);
   const todayTasks = activityItems.filter(i => i.dueAt && Date.parse(i.dueAt) >= start && Date.parse(i.dueAt) < end);
@@ -198,5 +200,5 @@ export function reviewerReader(payload: unknown, summary: LibraryArtifactSummary
       return { id: item.id, title: item.title, explanation: core.explanation, keyPoints: core.keyPoints as string[], emphasis, evidence };
     }) };
   });
-  return { id: summary.id, title: summary.title, course: summary.course, source: { id: summary.sourceId, title: summary.sourceTitle }, generatedAt: summary.createdAt, freshness, sections };
+  return { id: summary.id, title: summary.title, course: summary.course, source: { id: summary.sourceId, title: summary.sourceTitle }, generatedAt: summary.createdAt, freshness, sections, reviewMinutes: estimateReviewerMinutes(payload)?.minutes ?? null };
 }

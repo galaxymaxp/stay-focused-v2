@@ -3,11 +3,31 @@ import type { OcrInput, OcrProvider, OcrResult } from "@stay-focused/ocr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PDFDocument } from "pdf-lib";
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+// These source-formatting fixtures model completed preparation separately from
+// extraction. The real cache/worker/store contracts have their own suites.
+vi.mock('./canvas-preparation/cache',async()=>({
+  extractCanvasPreparedFileText:(await import('./canvas-stored-file-extraction')).extractPreparedCanvasFileText,
+  loadPreparedPageEvidence:async(input:{pageRow:{id:string;body_html:string|null}})=>{
+    const blocks=(await import('./canvas-structured-blocks')).normalizeCanvasHtmlToStructuredBlockDrafts(input.pageRow.body_html);
+    return {type:'page',id:input.pageRow.id,text:(await import('./canvas-content-normalization')).normalizeCanvasHtmlToText(input.pageRow.body_html),blocks};
+  },
+}));
+vi.mock('./canvas-preparation/admission',async load=>({
+  ...await load<typeof import('./canvas-preparation/admission')>(),
+  lookupMaterialPreparation:async(client:SupabaseClient<Database>,input:{userId:string;courseId:string;materialId:string})=>{
+    const [type,id]=input.materialId.split(':');
+    if(type==='page')return {state:'prepared',result_id:'synthetic-result'};
+    const result=await client.from('canvas_files').select('*').eq('id',id!).eq('user_id',input.userId).eq('course_id',input.courseId).maybeSingle();
+    return result.data && ['stored','unchanged'].includes(result.data.ingestion_status)?{state:'prepared',result_id:'synthetic-result'}:null;
+  },
+}));
 import { safeObjectKeyForCanvasFile } from "@/lib/canvas-file-policy";
 import {
   CANVAS_REVIEWER_MAX_COMBINED_CHARS,
+  CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE,
+  CANVAS_REVIEWER_INVENTORY_PAGE_SIZE,
   CANVAS_REVIEWER_MAX_SOURCES,
   CANVAS_REVIEWER_MAX_SOURCE_CHARS,
   CANVAS_REVIEWER_SUGGESTED_TITLE_MAX_CHARS,
@@ -19,6 +39,7 @@ import {
   previewCanvasReviewerSources,
   previewSelectiveCanvasReviewerSources,
   type PreviewSourceRecord,
+  type CanvasReviewerSourceDescriptor,
   structureCanvasReviewerSources,
 } from "./canvas-reviewer-sources";
 import {
@@ -27,6 +48,7 @@ import {
   CANVAS_STRUCTURED_BLOCKS_VERSION,
 } from "./canvas-structured-blocks";
 import { CANVAS_SOURCE_DUPLICATE_ANALYSIS_VERSION } from "./reviewer-source-provenance";
+import { runAutomaticReviewerAdmission } from "./auto-reviewers/admission";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const CONNECTION_ID = "00000000-0000-4000-8000-000000000002";
@@ -1249,6 +1271,194 @@ function source(
   };
 }
 
+describe("complete Canvas File/Page inventory", () => {
+  const inventory = (kind: "file" | "page", count: number): FakeRecord[] =>
+    Array.from({ length: count }, (_, index) => ({
+      ...(kind === "file" ? baseFileRow() : basePageRow()),
+      id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`,
+      ...(kind === "file" ? { canvas_file_id: String(index + 1), display_name: `Lesson ${index + 1}.pdf` }
+        : { canvas_page_id: String(index + 1), title: `Lesson ${index + 1}` }),
+    })).reverse();
+
+  it.each(["file", "page"] as const)("discovers all 230 owned %s sources with correct public pagination", async (kind) => {
+    const rows = inventory(kind, 230);
+    const fake = createFakeCanvasClient({
+      canvas_files: kind === "file" ? rows : [], canvas_pages: kind === "page" ? rows : [],
+      canvas_assignments: [], canvas_announcements: [],
+      [kind === "file" ? "canvas_files" : "canvas_pages"]: [
+        ...rows, { ...rows[0], id: "foreign", user_id: "another-owner" },
+        { ...rows[0], id: "foreign-course", course_id: OTHER_COURSE_ID },
+        { ...rows[0], id: "foreign-connection", canvas_connection_id: "another-connection" },
+      ],
+    });
+    const all: string[] = [];
+    for (const [offset, returned, hasMore] of [[0, 100, true], [100, 100, true], [200, 30, false]] as const) {
+      const result = await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID, limit: 100, offset });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.pagination).toEqual({ limit: 100, offset, returned, hasMore, totalKnown: 230 });
+      all.push(...result.value.sources.map(row => row.id));
+    }
+    expect(new Set(all).size).toBe(230);
+    expect(new Set(all)).toEqual(new Set(rows.map(row => `${kind}:${row.id}`)));
+  });
+
+  it.each(['file','page'] as const)('server orchestration reads all 1,230 %s sources beyond the UI offset bound', async kind => {
+    const fake=createFakeCanvasClient({canvas_files:kind==='file'?inventory(kind,1230):[],canvas_pages:kind==='page'?inventory(kind,1230):[],canvas_assignments:[],canvas_announcements:[]});
+    const result=await listCanvasReviewerSources({client:fake.client,courseId:COURSE_ID,userId:USER_ID,completeInventory:true});
+    expect(result.ok && result.value.sources.length).toBe(1230);
+    expect(result.ok && result.value.pagination.hasMore).toBe(false);
+  });
+
+  it('prepares 200 of 230 real discovered owned files and drains the remaining 30 without a new item',async()=>{
+    const {createPreparationStore,registerDiscoveredFiles,completeHealthyBatches}=await import('./canvas-preparation/store.fixture');
+    const fake=createFakeCanvasClient({canvas_files:inventory('file',230),canvas_pages:[],canvas_assignments:[],canvas_announcements:[]});
+    const discovery=await listCanvasReviewerSources({client:fake.client,courseId:COURSE_ID,userId:USER_ID,completeInventory:true});
+    if(!discovery.ok)throw new Error('Expected complete discovery');
+    expect(discovery.value.sources).toHaveLength(230);
+    const db=await createPreparationStore({userId:USER_ID,courseId:COURSE_ID,connectionId:CONNECTION_ID});
+    try{
+      const sync=await registerDiscoveredFiles(db,{userId:USER_ID,courseId:COURSE_ID,materialIds:discovery.value.sources.map(source=>source.id)});
+      await completeHealthyBatches(db,sync);
+      expect((await db.query('select enqueued_count,prepared_total,deferred_count,guard_state from canvas_preparation_syncs where id=$1',[sync])).rows)
+        .toEqual([{enqueued_count:200,prepared_total:200,deferred_count:30,guard_state:'deferred'}]);
+      const next=(await db.query<{id:string}>(`select drain_canvas_preparation_sync_v1($1,'poll-with-no-new-item') as id`,[sync])).rows[0]!.id;
+      await completeHealthyBatches(db,next);
+      expect((await db.query('select enqueued_count,prepared_total,deferred_count,guard_state from canvas_preparation_syncs where id=$1',[next])).rows)
+        .toEqual([{enqueued_count:30,prepared_total:30,deferred_count:0,guard_state:'completed'}]);
+    }finally{await db.close();}
+  },20_000);
+
+  it.each(["file", "page"] as const)("fails closed at the %s safety bound and records no admission baseline", async (kind) => {
+    const fake = createFakeCanvasClient({
+      canvas_files: [], canvas_pages: [], canvas_assignments: [], canvas_announcements: [],
+      [kind === "file" ? "canvas_files" : "canvas_pages"]:
+        inventory(kind, CANVAS_REVIEWER_INVENTORY_PAGE_SIZE * CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE),
+    });
+    const result = await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID });
+    expect(result).toMatchObject({ ok: false, message: "Canvas source inventory could not be completely loaded." });
+    expect(await runAutomaticReviewerAdmission(fake.client, { userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ status: "unavailable", admitted: 0 });
+    expect(fake.insertedRowsFor("canvas_auto_reviewer_course_state")).toEqual([]);
+    expect(fake.insertedRowsFor("canvas_auto_reviewer_candidates")).toEqual([]);
+    expect(fake.selectedColumnsFor("canvas_auto_reviewer_course_state")).toEqual([]);
+  });
+
+  it("preserves placements, parent-work exclusions and Page references beyond the first inventory page", async () => {
+    const files = inventory("file", 230);
+    const moduleFile = files[0]!;
+    const attachmentOnly = files[1]!;
+    const page = { ...basePageRow(), body_html: "<p>Instructional lesson with a linked handout.</p>" };
+    const fake = createFakeCanvasClient({
+      canvas_files: files, canvas_pages: [page],
+      canvas_modules: [moduleRow("teaching-module", "Week 1", 1)],
+      canvas_module_items: [{ ...moduleItemRow({ id: "module-file", pageUrl: "" }),
+        module_id: "teaching-module", item_type: "File", canvas_content_id: moduleFile.canvas_file_id }],
+      canvas_file_references: [
+        { id: "ref-1", user_id: USER_ID, canvas_connection_id: CONNECTION_ID, course_id: COURSE_ID,
+          file_id: moduleFile.id, reference_type: "typed_attachment" },
+        { id: "ref-2", user_id: USER_ID, canvas_connection_id: CONNECTION_ID, course_id: COURSE_ID,
+          file_id: attachmentOnly.id, reference_type: "announcement" },
+        { id: "ref-3", user_id: USER_ID, canvas_connection_id: CONNECTION_ID, course_id: COURSE_ID,
+          file_id: files[2]!.id, reference_type: "page", referenced_row_id: PAGE_ID },
+      ],
+    });
+    const all: CanvasReviewerSourceDescriptor[] = [];
+    for (let offset = 0; offset < 300; offset += 100) {
+      const result = await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID, offset });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      all.push(...result.value.sources);
+      if (!result.value.pagination.hasMore) break;
+    }
+    expect(all).toHaveLength(230);
+    expect(all.find(row => row.id === `file:${moduleFile.id}`)?.placement)
+      .toMatchObject({ group: "module", moduleTitle: "Week 1" });
+    expect(all.some(row => row.id === `file:${attachmentOnly.id}`)).toBe(false);
+    expect(all.some(row => row.id === `file:${files[2]!.id}`)).toBe(true);
+    expect(all.some(row => row.type === "assignment" || row.type === "announcement")).toBe(false);
+  });
+
+  it.each(["file", "page"] as const)("fails closed on a mid-pagination %s read error", async (kind) => {
+    const table = kind === "file" ? "canvas_files" : "canvas_pages";
+    const fake = createFakeCanvasClient({ canvas_files: [], canvas_pages: [],
+      [table]: inventory(kind, 230) }, [], { [table]: CANVAS_REVIEWER_INVENTORY_PAGE_SIZE });
+    expect(await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ ok: false, message: "Canvas source inventory could not be completely loaded." });
+    expect(await runAutomaticReviewerAdmission(fake.client, { userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ status: "unavailable", admitted: 0 });
+    expect(fake.selectedColumnsFor("canvas_auto_reviewer_course_state")).toEqual([]);
+  });
+});
+
+describe("complete Canvas Module placement inventory", () => {
+  const inventory = (table: string, count: number): FakeRecord[] => Array.from({ length: count }, (_, index) =>
+    table === "canvas_modules" ? moduleRow(`filler-${String(index).padStart(6, "0")}`, "Week 1", index + 1)
+      : { ...moduleItemRow({ id: `filler-${String(index).padStart(6, "0")}`, pageUrl: "" }), item_type: "ExternalUrl", canvas_content_id: null });
+
+  it("reads the 1,002-item placement case completely under a 1,000-row response cap", async () => {
+    const administrative = { ...baseFileRow(), id: OTHER_FILE_ID, canvas_file_id: "handbook",
+      display_name: "Student Handbook-UC College.pdf", filename: "handbook.pdf" };
+    const fake = createFakeCanvasClient({ canvas_files: [baseFileRow(), administrative], canvas_pages: [],
+      canvas_modules: [...inventory("canvas_modules", 1000), moduleRow("late-teaching", "Week 2", 1001),
+        moduleRow("late-admin", "Module 0: Course Information Module", 1002)],
+      canvas_module_items: [...inventory("canvas_module_items", 1000),
+        { ...moduleItemRow({ id: "late-lesson", pageUrl: "" }), module_id: "late-teaching", item_type: "File", canvas_content_id: "file-1" },
+        { ...moduleItemRow({ id: "late-handbook", pageUrl: "" }), module_id: "late-admin", item_type: "File", canvas_content_id: "handbook" },
+        { ...moduleItemRow({ id: "foreign-module-item", pageUrl: "" }), user_id: "foreign-owner", module_id: "late-admin", item_type: "File", canvas_content_id: "file-1" }],
+      canvas_file_references: [{ id: "ref", user_id: USER_ID, canvas_connection_id: CONNECTION_ID,
+        course_id: COURSE_ID, file_id: FILE_ID, reference_type: "typed_attachment" }],
+    });
+    const result = await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sources.map(source => source.id)).toEqual([`file:${FILE_ID}`]);
+    expect(result.value.sources[0]?.placement).toMatchObject({ group: "module", moduleTitle: "Week 2" });
+    expect(result.value.pagination.hasMore).toBe(false);
+  });
+
+  it.each(["canvas_modules", "canvas_module_items"])("fails closed at the %s safety bound without a baseline", async (table) => {
+    const fake = createFakeCanvasClient({ [table]: inventory(table, CANVAS_REVIEWER_INVENTORY_PAGE_SIZE * CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE) });
+    expect(await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ ok: false, message: "Canvas source inventory could not be completely loaded." });
+    expect(await runAutomaticReviewerAdmission(fake.client, { userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ status: "unavailable", admitted: 0 });
+    expect(fake.insertedRowsFor("canvas_auto_reviewer_course_state")).toEqual([]);
+    expect(fake.insertedRowsFor("canvas_auto_reviewer_candidates")).toEqual([]);
+  });
+
+  it.each(["canvas_modules", "canvas_module_items"])("fails closed on a mid-pagination %s error", async (table) => {
+    const fake = createFakeCanvasClient({ [table]: inventory(table, 230) }, [], { [table]: CANVAS_REVIEWER_INVENTORY_PAGE_SIZE });
+    expect(await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ ok: false, message: "Canvas source inventory could not be completely loaded." });
+    expect(await runAutomaticReviewerAdmission(fake.client, { userId: USER_ID, courseId: COURSE_ID }))
+      .toMatchObject({ status: "unavailable", admitted: 0 });
+    expect(fake.selectedColumnsFor("canvas_auto_reviewer_course_state")).toEqual([]);
+  });
+});
+
+describe("complete Canvas file-reference inventory", () => {
+  const references = (count: number): FakeRecord[] => Array.from({ length: count }, (_, index) => ({
+    id: `ref-${String(index).padStart(6, "0")}`, user_id: USER_ID, canvas_connection_id: CONNECTION_ID,
+    course_id: COURSE_ID, file_id: FILE_ID, reference_type: "page", referenced_row_id: PAGE_ID,
+  }));
+  it("keeps a late parent-work exclusion beyond the response cap", async () => {
+    const fake = createFakeCanvasClient({ canvas_pages: [], canvas_file_references: [...references(1000),
+      { ...references(1)[0], id: "z-assignment", reference_type: "assignment" }] });
+    const result = await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.sources).toEqual([]);
+  });
+  it.each(["overflow", "error"])("fails closed on reference %s and records no baseline", async (kind) => {
+    const fake = createFakeCanvasClient({ canvas_file_references: references(kind === "overflow"
+      ? CANVAS_REVIEWER_INVENTORY_PAGE_SIZE * CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE : 230) }, [],
+      kind === "error" ? { canvas_file_references: CANVAS_REVIEWER_INVENTORY_PAGE_SIZE } : {});
+    expect(await listCanvasReviewerSources({ client: fake.client, userId: USER_ID, courseId: COURSE_ID })).toMatchObject({ ok: false });
+    expect(await runAutomaticReviewerAdmission(fake.client, { userId: USER_ID, courseId: COURSE_ID })).toMatchObject({ status: "unavailable", admitted: 0 });
+    expect(fake.selectedColumnsFor("canvas_auto_reviewer_course_state")).toEqual([]);
+  });
+});
+
 type FakeRecord = Readonly<Record<string, unknown>>;
 
 function isRecord(value: unknown): value is FakeRecord {
@@ -1267,7 +1477,7 @@ interface FakeStorageCall {
 
 interface FakeQueryResult {
   readonly data: unknown;
-  readonly error: null;
+  readonly error: { readonly code: string } | null;
 }
 
 class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
@@ -1288,6 +1498,7 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     private readonly rows: readonly FakeRecord[],
     private readonly calls: FakeCall[],
     private readonly capturedInserts: Map<string, FakeRecord[]>,
+    private readonly failAtOffset: number | undefined = undefined,
   ) {}
 
   public select(columns: string): this {
@@ -1382,6 +1593,9 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
       | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2> {
+    if (this.failAtOffset !== undefined && (this.rangeStart ?? 0) >= this.failAtOffset) {
+      return Promise.resolve({ data: null, error: { code: "fixture_read_failure" } }).then(onfulfilled, onrejected);
+    }
     return Promise.resolve({
       data: this.executeRows(),
       error: null,
@@ -1405,7 +1619,8 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     const ranged = this.rangeStart === null || this.rangeEnd === null
       ? ordered
       : ordered.slice(this.rangeStart, this.rangeEnd + 1);
-    return this.limitCount === null ? ranged : ranged.slice(0, this.limitCount);
+    // Model the Data API's response cap after filters, ordering and range.
+    return (this.limitCount === null ? ranged : ranged.slice(0, this.limitCount)).slice(0, 1000);
   }
 }
 
@@ -1452,6 +1667,7 @@ function compareFakeValues(
 function createFakeCanvasClient(
   overrides: Partial<Record<string, readonly FakeRecord[]>> = {},
   storageEntries: readonly (readonly [string, Uint8Array])[] = [],
+  readFailures: Partial<Record<string, number>> = {},
 ): {
   readonly calls: readonly FakeCall[];
   readonly client: SupabaseClient<Database>;
@@ -1474,7 +1690,9 @@ function createFakeCanvasClient(
         tables[tableName] ?? [],
         calls,
         capturedInserts,
+        readFailures[tableName],
       ),
+    rpc: async () => ({ data: true, error: null }),
     storage: {
       from: (bucket: string) => ({
         download: async (key: string) => {
@@ -1754,7 +1972,7 @@ function readyFileRow({
     filename: `fictional-${fileId.slice(-4)}.${extension}`,
     ingestion_eligibility:
       contentType === "application/pdf" ? "eligible_document" : "eligible_image",
-    ingestion_status: "stored",
+    content_version_fingerprint: "revision-a", ingestion_status: "stored",
     last_successful_ingestion_at: NOW,
     storage_bucket: "canvas-source-files",
     storage_object_key: safeObjectKeyForCanvasFile({

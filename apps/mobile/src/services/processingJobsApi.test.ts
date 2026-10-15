@@ -29,6 +29,16 @@ const BASE_INPUT = {
 } as const;
 
 describe("processing jobs mobile API", () => {
+  it.each([undefined, "automatic", "manual"])("accepts and preserves optional origin %s", async origin => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => jsonResponse({ ok: true, data: { ...jobView(), ...(origin ? { origin } : {}) } }, 200));
+    const result = await getProcessingJobStatus({ ...BASE_INPUT, jobId: "job-1", fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(result.data.origin).toBe(origin);
+  });
+  it("rejects an invalid origin enum", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => jsonResponse({ ok: true, data: { ...jobView(), origin: "unknown" } }, 200));
+    expect(await getProcessingJobStatus({ ...BASE_INPUT, jobId: "job-1", fetchImpl: fetchImpl as unknown as typeof fetch })).toMatchObject({ ok: false, error: { code: "invalid_response" } });
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it("reuses the caller idempotency key so duplicate taps resolve to one server job", async () => {

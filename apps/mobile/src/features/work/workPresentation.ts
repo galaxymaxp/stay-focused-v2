@@ -1,4 +1,4 @@
-import type { TaskPriority, TaskView } from "@stay-focused/shared/task-planning";
+import type { TaskEstimateSource, TaskPriority, TaskView } from "@stay-focused/shared/task-planning";
 
 /**
  * Deterministic grouping and derivation for the Work surface.
@@ -172,7 +172,8 @@ export function formatDueLabel(
   return { text: formatDate(dueDate), isOverdue: false };
 }
 
-export function formatEstimate(minutes: number): string {
+export function formatEstimate(minutes: number, source?: TaskEstimateSource | null): string {
+  if (source !== undefined) return `${source === "ai" || source === "heuristic" ? "~" : ""}${minutes} min`;
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;

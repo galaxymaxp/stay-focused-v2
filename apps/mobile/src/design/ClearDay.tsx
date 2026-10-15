@@ -1,4 +1,4 @@
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Path, Rect, G } from "react-native-svg";
@@ -42,7 +42,7 @@ export function ClearDay({
           <Rect x={62} y={70} width={36} height={30} rx={6} fill={colors.surfacePrimary} stroke={colors.textMuted} strokeWidth={2} />
           <Path d="M71 85l6 6 12-12" stroke={colors.textPrimary} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </Svg>
-        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: glow }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: glow }]}>
           <Svg width={width} height={width * 0.75} viewBox="0 0 160 120" accessible={false}>
             <G stroke={colors.amber} strokeWidth={2.5} strokeLinecap="round" fill="none">
               <Path d="M80 52v-12" /><Path d="M57 61l-8-8" /><Path d="M103 61l8-8" /><Path d="M44 80H32" /><Path d="M116 80h12" />

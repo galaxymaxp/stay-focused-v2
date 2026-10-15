@@ -1,6 +1,8 @@
 import { unzipSync } from 'fflate';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { posix } from 'node:path';
+import type { CanvasStructuredBlockDraft } from '../canvas-structured-blocks';
+export const OFFICE_STRUCTURE_VERSION = 'canvas-office-structured-v2';
 export const OFFICE_MIME = {
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -10,6 +12,10 @@ function nodes(value: unknown): Node[] { return Array.isArray(value) ? value.fil
 function children(node: Node, key: string) { return nodes(node[key]); }
 function attr(node: Node, name: string): string { const attrs = node[':@']; return attrs && typeof attrs === 'object' ? String((attrs as Node)[`@_${name}`] ?? '') : ''; }
 function all(tree: Node[], key: string): Node[] { return tree.flatMap(n => [...(key in n ? [n] : []), ...Object.entries(n).filter(([k]) => k !== ':@').flatMap(([, v]) => all(nodes(v), key))]); }
+function figureBlips(tree: Node[]): Node[] {
+    return tree.flatMap(n => 'w:del' in n || 'w:instrText' in n || 'p:bg' in n ? [] :
+        [...('a:blip' in n ? [n] : []), ...Object.entries(n).filter(([k]) => k !== ':@').flatMap(([, v]) => figureBlips(nodes(v)))]);
+}
 function text(tree: Node[]): string { return tree.map(n => typeof n['#text'] === 'string' ? n['#text'] : Object.entries(n).filter(([k]) => ![':@', 'w:del', 'w:instrText'].includes(k)).map(([k, v]) => k === 'w:tab' ? '\t' : /^(w:br|a:br)$/.test(k) ? '\n' : text(nodes(v))).join('')).join(''); }
 function xml(value: Uint8Array | undefined): Node[] {
     if (!value)
@@ -20,7 +26,10 @@ function xml(value: Uint8Array | undefined): Node[] {
     return nodes(new XMLParser({ preserveOrder: true, ignoreAttributes: false, parseTagValue: false, trimValues: false, processEntities: true }).parse(decoded));
 }
 /** Only bounded XML parts are expanded. Nothing is written to disk or fetched. */
-export function extractOfficeText(bytes: Uint8Array, kind: 'docx' | 'pptx'): string {
+export interface OfficeFigureAnchor { readonly path: string; readonly blockOrdinal?: number; readonly slideNumber?: number }
+export interface OfficeStructure { readonly text: string; readonly drafts: readonly CanvasStructuredBlockDraft[]; readonly anchors: readonly OfficeFigureAnchor[]; readonly parts: Record<string, Uint8Array> }
+export function extractOfficeText(bytes: Uint8Array, kind: 'docx' | 'pptx'): string { return extractOfficeStructure(bytes, kind).text; }
+export function extractOfficeStructure(bytes: Uint8Array, kind: 'docx' | 'pptx', includeMedia = false): OfficeStructure {
     if (bytes.length > 20000000)
         throw new Error('office_too_large');
     let expanded = 0;
@@ -32,20 +41,21 @@ export function extractOfficeText(bytes: Uint8Array, kind: 'docx' | 'pptx'): str
             names.add(entry.name);
             if (/vbaProject|activeX|embeddings/i.test(entry.name))
                 throw new Error('office_active_content');
-            const relevant = /^(word\/(document|styles|numbering)\.xml|ppt\/presentation\.xml|ppt\/_rels\/presentation\.xml\.rels|ppt\/slides\/slide\d+\.xml)$/.test(entry.name);
+            const relevant = /^(word\/(document|styles|numbering)\.xml|ppt\/presentation\.xml|ppt\/_rels\/presentation\.xml\.rels|ppt\/slides\/slide\d+\.xml)$/.test(entry.name) || (includeMedia && /^(word\/_rels\/document\.xml\.rels|ppt\/slides\/_rels\/slide\d+\.xml\.rels|(word|ppt)\/media\/[^/]+)$/.test(entry.name));
             if (!relevant)
                 return false;
             expanded += entry.originalSize;
-            if (entry.originalSize > 4000000 || expanded > 12000000)
+            if (entry.originalSize > 4000000 || expanded > (includeMedia ? 40000000 : 12000000))
                 throw new Error('office_too_large');
             return true;
         } });
-    const result = kind === 'docx' ? docx(parts) : pptx(parts);
+    const drafts: CanvasStructuredBlockDraft[] = []; const anchors: OfficeFigureAnchor[] = [];
+    const result = kind === 'docx' ? docx(parts, drafts, anchors) : pptx(parts, drafts, anchors);
     if (!result.trim() || result.length > 120000)
         throw new Error('office_unreadable');
-    return result.trim();
+    return { text: result.trim(), drafts, anchors, parts };
 }
-function docx(parts: Record<string, Uint8Array>): string {
+function docx(parts: Record<string, Uint8Array>, drafts: CanvasStructuredBlockDraft[], anchors: OfficeFigureAnchor[]): string {
     const tree = xml(parts['word/document.xml']);
     const body = all(tree, 'w:body')[0];
     if (!body)
@@ -88,9 +98,43 @@ function docx(parts: Record<string, Uint8Array>): string {
             return Object.entries(n).filter(([k]) => k !== ':@').flatMap(([, v]) => blocks(nodes(v)));
         });
     }
-    return blocks(children(body, 'w:body')).filter(Boolean).join('\n\n');
+    const relations = parts['word/_rels/document.xml.rels'] ? all(xml(parts['word/_rels/document.xml.rels']), 'Relationship') : [];
+    // Traverse body order, retaining exact parser output. Images before the first
+    // textual block have no preceding canonical evidence and are omitted.
+    function visit(tree: Node[]): string[] {
+      return tree.flatMap(n => {
+        if ('w:del' in n) return [];
+        if ('w:p' in n || 'w:tbl' in n) {
+          if ('w:tbl' in n) {
+            const output: string[] = [];
+            for (const row of all(children(n,'w:tbl'),'w:tr')) {
+              const value = '| ' + children(row,'w:tr').filter(c=>'w:tc' in c).map(cell=>blocks(children(cell,'w:tc')).filter(Boolean).join(' / ') || '[empty field]').join(' | ') + ' |';
+              drafts.push({kind:'paragraph',text:value}); output.push(value);
+              for (const image of figureBlips([row])) {
+                const relation=relations.find(r=>attr(r,'Id')===attr(image,'r:embed'));
+                if(!relation || attr(relation,'TargetMode')==='External') continue;
+                const path=posix.normalize(posix.join('word',attr(relation,'Target')));
+                if(/^word\/media\/[^/]+$/.test(path)) anchors.push({path,blockOrdinal:drafts.length});
+              }
+            }
+            return output;
+          }
+          const output = [paragraph(n)].filter(Boolean);
+          for (const value of output) drafts.push({ kind: 'paragraph', text: value });
+          for (const image of figureBlips([n])) {
+            const relation = relations.find(r => attr(r, 'Id') === attr(image, 'r:embed'));
+            if (!relation || attr(relation, 'TargetMode') === 'External' || !drafts.length) continue;
+            const path = posix.normalize(posix.join('word', attr(relation, 'Target')));
+            if (/^word\/media\/[^/]+$/.test(path)) anchors.push({path, blockOrdinal: drafts.length});
+          }
+          return output;
+        }
+        return Object.entries(n).filter(([k]) => k !== ':@').flatMap(([,v]) => visit(nodes(v)));
+      });
+    }
+    return visit(children(body, 'w:body')).join('\n\n');
 }
-function pptx(parts: Record<string, Uint8Array>): string {
+function pptx(parts: Record<string, Uint8Array>, drafts: CanvasStructuredBlockDraft[], anchors: OfficeFigureAnchor[]): string {
     const presentation = xml(parts['ppt/presentation.xml']);
     const relations = all(xml(parts['ppt/_rels/presentation.xml.rels']), 'Relationship');
     const slides = all(presentation, 'p:sldId');
@@ -123,6 +167,16 @@ function pptx(parts: Record<string, Uint8Array>): string {
         }
         for (const row of all(tree, 'a:tr'))
             body.push('| ' + children(row, 'a:tr').filter(c => 'a:tc' in c).map(c => text(children(c, 'a:tc')).trim() || '[empty field]').join(' | ') + ' |');
-        return `# Slide ${i + 1}: ${title || '[empty title]'}\n\n${body.join('\n\n')}`;
+        const value = `# Slide ${i + 1}: ${title || '[empty title]'}\n\n${body.join('\n\n')}`;
+        drafts.push({kind: 'paragraph', text: value.trim(), slideNumber: i + 1, pageNumber: i + 1});
+        const relPath = posix.join(posix.dirname(path), '_rels', posix.basename(path) + '.rels');
+        const imageRelations = parts[relPath] ? all(xml(parts[relPath]), 'Relationship') : [];
+        for (const image of figureBlips(tree)) {
+          const relation = imageRelations.find(r => attr(r, 'Id') === attr(image, 'r:embed'));
+          if (!relation || attr(relation, 'TargetMode') === 'External') continue;
+          const target = posix.normalize(posix.join(posix.dirname(path), attr(relation, 'Target')));
+          if (/^ppt\/media\/[^/]+$/.test(target)) anchors.push({path: target, slideNumber: i + 1});
+        }
+        return value;
     }).join('\n\n');
 }

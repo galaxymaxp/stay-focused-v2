@@ -1376,6 +1376,14 @@ describe("CanvasClient", () => {
     expect(request.init.redirect).toBe("manual");
     expect(authorizationHeader(request.init)).toBe("Bearer download-token");
   });
+  it.each([429,503])('preserves the full binary-download cooldown for durable work (%i)',async status=>{
+    const fetchImpl=createFetch([new Response('private provider body',{status,headers:{'Retry-After':'600'}})]);
+    const client=createClient(fetchImpl,'synthetic-token');
+    await expect(client.downloadFile(fileFixture(),{maxBytes:10,maxRedirects:2,timeoutMs:1000})).rejects.toMatchObject({
+      code:'canvas_file_download_failed',status,retryAfterMs:300_000,providerRetryAfterMs:600_000,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
 
   it("strips bearer auth when following HTTPS file redirects off Canvas", async () => {
     const fetchImpl = vi.fn(
@@ -1723,6 +1731,7 @@ describe("CanvasClient", () => {
     await expect(client.getCurrentUser()).rejects.toMatchObject({
       code: "canvas_unavailable",
       retryAfterMs: 5 * 60_000,
+      providerRetryAfterMs: 10 * 60_000,
     });
   });
 

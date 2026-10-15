@@ -2,6 +2,7 @@
 import {
   quizCountOptions,
   quizSourceCapacity,
+  suggestedQuizTitle,
   type QuizDifficulty,
   type QuizGenerationRequest,
   type QuizQuestionType,
@@ -61,6 +62,8 @@ export function QuizFromReviewerDialog({
   );
   const countOptions = useMemo(() => quizCountOptions(capacity.maximum), [capacity.maximum]);
   const questionCount = Number(count === "custom" ? customCount : count);
+  const [customTitle, setCustomTitle] = useState<string | null>(null);
+  const quizTitle = customTitle ?? suggestedQuizTitle(title, reviewer.sections.filter(s => selectedTopics.includes(s.id)).map(s => s.title), questionCount);
   const validCount = Number.isInteger(questionCount) && questionCount >= 5 && questionCount <= capacity.maximum;
   useEffect(() => {
     if (count !== "custom" && Number(count) > capacity.maximum && countOptions.length)
@@ -89,6 +92,7 @@ export function QuizFromReviewerDialog({
         sourceIds: [reviewerArtifactId],
         reviewerArtifactId,
         questionCount,
+        ...(quizTitle.trim() ? { title: quizTitle.trim() } : {}),
         difficulty,
         questionTypes: format === "mixed" ? ALL_TYPES : [format],
         selectedTopicIds: selectedTopics,
@@ -126,6 +130,10 @@ export function QuizFromReviewerDialog({
           <span className="meta">Source</span>
           <strong>{title}</strong>
         </div>
+        <label>
+          Quiz title (optional)
+          <input aria-label="Quiz title" value={quizTitle} maxLength={200} disabled={busy} onChange={e => setCustomTitle(e.target.value)} />
+        </label>
         <fieldset className="stack plain-fieldset">
           <legend className="meta">Questions</legend>
           {segments.length > 0 && (

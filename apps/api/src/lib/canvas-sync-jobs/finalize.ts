@@ -22,6 +22,7 @@ import type {
 } from "@stay-focused/db";
 
 import { syncCanvasCourseGrades } from "@/lib/canvas-grade-sync";
+import { runAutomaticReviewersAfterSync } from "@/lib/auto-reviewers/after-sync";
 import {
   syncSelectedCanvasCourse,
   type CanvasCourseSyncProvider,
@@ -245,12 +246,25 @@ export async function finalizeCheckpointedCanvasSync(
     return { status: "failed", retryable };
   }
 
-  await completeCheckpointedCanvasSyncJob(client, {
+  const completed = await completeCheckpointedCanvasSyncJob(client, {
     jobId: input.jobId,
     outcome,
     resultSummary,
     workerId: input.workerId,
   });
+  if (completed?.status === "succeeded" && context.job.job_type === "course_content") {
+    try {
+      const { enqueuePreparationAfterSync }=await import('@/lib/canvas-preparation/orchestration');
+      await enqueuePreparationAfterSync(client,{userId:context.job.user_id,courseId:context.job.course_id,syncId:context.job.id,brokeredCanvasToken:input.accessToken});
+    } catch {
+      console.warn('canvas_preparation.sync_admission_unavailable');
+    }
+    await runAutomaticReviewersAfterSync(client, {
+      brokeredCanvasToken: input.accessToken,
+      userId: context.job.user_id,
+      courseId: context.job.course_id,
+    });
+  }
   return { status: "succeeded", outcome };
 }
 

@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   loop: vi.fn(), start: vi.fn(), stop: vi.fn(), timing: vi.fn(),
 }));
 vi.mock("react-native", () => ({
-  View: "View", StyleSheet: { absoluteFillObject: { position: "absolute" } },
+  View: "View", StyleSheet: { absoluteFill: { position: "absolute" } },
   Easing: { ease: "ease", inOut: () => "inOut" },
   Animated: {
     View: "AnimatedView", Value: class { setValue() {} stopAnimation() {} },
@@ -18,7 +18,7 @@ vi.mock("react-native", () => ({
   },
 }));
 vi.mock("react-native-svg", () => ({ default: "Svg", Path: "Path", Rect: "Rect", G: "G" }));
-vi.mock("@react-navigation/native", () => ({ useIsFocused: () => mocks.focused }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
 vi.mock("./primitives", () => ({ Copy: "Copy" }));
 vi.mock("./theme", async () => {
   const tokens = await import("./themeTokens");

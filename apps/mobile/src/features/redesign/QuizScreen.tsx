@@ -1,4 +1,4 @@
-import type { Quiz, QuizAttempt, QuizResult, QuizQuestion } from "@stay-focused/shared";
+import type { Quiz, QuizAnswerKey, QuizAttempt, QuizResult, QuizQuestion } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { TextInput, View } from "react-native";
@@ -14,7 +14,7 @@ import type { LocalQuizPractice } from '../../services/localLibrary/artifactStor
 import { useExperience, useExperienceClient } from "./useExperience";
 import { useLocalArtifact } from "./useLocalLibrary";
 import { QuestionSlider } from './QuestionSlider';
-import { moveOffline, newOfflineAttempt, syncOfflinePractice } from './localQuizPractice';
+import { answerOffline, finishOffline, moveOffline, newOfflineAttempt, syncedPracticeResult, syncOfflinePractice } from './localQuizPractice';
 
 type AttemptHistory = {
   id: string;
@@ -28,7 +28,7 @@ function compatibleAttempt(value: QuizAttempt): QuizAttempt {
     skippedQuestionIds: value.skippedQuestionIds ?? [], revealedQuestionIds: value.revealedQuestionIds ?? [],
     assistedQuestionIds: value.assistedQuestionIds ?? [], updatedAt: value.updatedAt ?? value.startedAt };
 }
-function answerText(question: QuizQuestion | undefined, values: readonly string[]): string {
+function answerText(question: QuizQuestion | undefined, values: readonly string[], acceptedAnswerText?: string): string {
   if (!values.length) return 'No answer';
   return values.map(value => {
     const [leftId, rightId] = value.split(':');
@@ -36,7 +36,7 @@ function answerText(question: QuizQuestion | undefined, values: readonly string[
       const left = question.matchingPairs.find(pair => pair.id === leftId)?.leftItem ?? leftId;
       return `${left} → ${question.options.find(option => option.id === rightId)?.text ?? rightId}`;
     }
-    return question?.options.find(option => option.id === value)?.text ?? value;
+    return question?.options.find(option => option.id === value)?.text ?? acceptedAnswerText ?? value;
   }).join('; ');
 }
 export function QuizScreen() {
@@ -49,8 +49,8 @@ export function QuizScreen() {
   const history = useExperience<AttemptHistory>(
     id ? `/api/experience/quizzes/${encodeURIComponent(id)}/attempts` : null,
   );
-  // The device copy lets saved questions open offline; practice stays server-scored.
-  const saved = useLocalArtifact(id ? `quiz:${id}` : null, { refreshRemote: false });
+  // Separate owner-scoped keys enable provisional scoring; synced server results win.
+  const saved = useLocalArtifact(id ? `quiz:${id}` : null);
   const savedQuiz = saved.data && "quiz" in saved.data ? saved.data.quiz : null;
   const quizData = quiz.data ?? savedQuiz;
   const client = useExperienceClient();
@@ -62,6 +62,7 @@ export function QuizScreen() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [key, setKey] = useState(newRequestKey);
+  const [checking, setChecking] = useState(false);
   const [matchingReady, setMatchingReady] = useState(false);
   const [matchingLeft, setMatchingLeft] = useState<string | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -69,18 +70,42 @@ export function QuizScreen() {
   const [localReady, setLocalReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
+  const [storedKey, setStoredKey] = useState<{ owner: string; key: QuizAnswerKey } | null>(null);
+  const answerKey = storedKey?.owner === owner && storedKey?.key.quizId === id ? storedKey.key : null;
   const [sliderDragging, setSliderDragging] = useState(false);
   const initialized = useRef<string | null>(null);
+  const loadedIdentity = useRef<string | null>(null);
   const localWrites = useRef<Promise<void>>(Promise.resolve());
   const question = quizData?.questions[index],
     feedback = attempt?.feedback.find(
       (item) => item.questionId === question?.id,
     );
   const offline = offlineMode || !quiz.data || quiz.errorCode === 'connection' || history.errorCode === 'connection' || !!attempt?.id.startsWith('local:');
+  const refreshQuiz = quiz.refresh, refreshHistory = history.refresh;
+  useEffect(() => {
+    if (!dirty || !result) return;
+    const timer = setTimeout(() => {
+      initialized.current = null;
+      refreshQuiz(); refreshHistory();
+    }, 15_000);
+    return () => clearTimeout(timer);
+  }, [dirty, result, refreshQuiz, refreshHistory, quiz.error, history.data, history.error]);
+  useEffect(() => {
+    setStoredKey(null);
+    if (!id || !owner || !quizData) return;
+    let live = true;
+    void (async () => {
+      const store = await getLocalArtifactStore();
+      const key = await store?.readQuizAnswerKey(owner, id, quizData.updatedAt);
+      if (live) setStoredKey(key ? { owner, key } : null);
+    })().catch(() => { /* Missing/corrupt keys retain the connection-required state. */ });
+    return () => { live = false; };
+  }, [id, owner, quizData, saved.data]);
   useEffect(() => {
     if (!id || !owner) return;
     let live = true;
     initialized.current = null;
+    loadedIdentity.current = null;
     setAttempt(null); setResult(null); setSelected([]); setDirty(false); setOfflineMode(false);
     setLocalReady(false);
     void (async () => {
@@ -93,15 +118,17 @@ export function QuizScreen() {
         setSelected([...practice.selected]);
         setDirty(practice.dirty);
       }
+      loadedIdentity.current = `${owner}:${id}`;
       setLocalReady(true);
     })();
-    return () => { live = false; };
+    return () => { live = false; loadedIdentity.current = null; };
   }, [id, owner]);
   useEffect(() => {
-    if (!localReady || !id || !owner || (!attempt && !result)) return;
+    if (!localReady || !id || !owner || loadedIdentity.current !== `${owner}:${id}` || (!attempt && !result)) return;
     const practice: LocalQuizPractice = { attempt, result, selected: [...selected], dirty };
     localWrites.current = localWrites.current.then(async () => {
-      await (await getLocalArtifactStore())?.saveQuizPractice(owner, id, practice);
+      const store = await getLocalArtifactStore();
+      if (loadedIdentity.current === `${owner}:${id}`) await store?.saveQuizPractice(owner, id, practice);
     }).catch(() => { /* Online attempt remains authoritative if device storage fails. */ });
   }, [localReady, id, owner, attempt, result, selected, dirty]);
   function selectDraft(change: (old: string[]) => string[]) {
@@ -149,13 +176,9 @@ export function QuizScreen() {
       const practice = await (await getLocalArtifactStore())?.readQuizPractice(owner!, id);
       if (practice?.dirty && practice.attempt) {
         const current = quizData?.questions[practice.attempt.currentQuestion];
-        const prepared = current ? { ...practice, attempt: moveOffline(practice.attempt, current.id, practice.selected, practice.attempt.currentQuestion) } : practice;
-        let synced: QuizAttempt;
-        try { synced = await syncOfflinePractice(client, id, prepared); }
+        const prepared = current && practice.attempt.status === 'in_progress' ? { ...practice, attempt: moveOffline(practice.attempt, current.id, practice.selected, practice.attempt.currentQuestion) } : practice;
+        try { await syncPractice(prepared); }
         catch (cause) { setOfflineMode(true); throw cause; }
-        setAttempt(compatibleAttempt(synced)); setResult(null); setIndex(synced.currentQuestion);
-        setSelected(synced.answers.find(answer => answer.questionId === quizData?.questions[synced.currentQuestion]?.id)?.selectedOptionIds.slice() ?? []);
-        setDirty(false); setOfflineMode(false); history.refresh();
       } else if (unfinished) await resume(unfinished.id, false);
       else if (completed) await resume(completed.id, true);
       else await start();
@@ -240,7 +263,11 @@ export function QuizScreen() {
   }
   async function revealAnswer() {
     if (!attempt || !question) return;
-    if (offline) throw new Error('Connect to reveal the answer. Your draft is saved on this device.');
+    if (offline) {
+      setAttempt(answerOffline(attempt, quizData!, answerKey, question.id, selected, true));
+      setDirty(true);
+      return;
+    }
     try {
       if (!feedback && JSON.stringify(selected) !== JSON.stringify(attempt.answers.find(answer => answer.questionId === question.id)?.selectedOptionIds ?? [])) {
         const savedAttempt = await experienceRequest<QuizAttempt>(client,
@@ -256,8 +283,74 @@ export function QuizScreen() {
     } catch (cause) {
       if (!(cause instanceof ExperienceApiError) || cause.code !== 'connection') throw cause;
       setOfflineMode(true);
-      throw new Error('Connect to reveal the answer. Your draft is saved on this device.');
+      setAttempt(answerOffline(attempt, quizData!, answerKey, question.id, selected, true));
+      setDirty(true);
     }
+  }
+  async function syncPractice(practice: LocalQuizPractice) {
+    const identity = `${owner}:${id}`;
+    const active = () => loadedIdentity.current === identity;
+    const store = await getLocalArtifactStore();
+    if (!active()) return;
+    const synced = await syncOfflinePractice(client, id, practice, async serverId => {
+      if (active() && owner && practice.attempt) await store?.saveQuizPractice(owner, id,
+        { ...practice, attempt: { ...practice.attempt, id: serverId } });
+    });
+    if (!active()) return;
+    const serverResult = await syncedPracticeResult(client, synced, practice.result);
+    if (!active()) return;
+    const adopted: LocalQuizPractice = { attempt: compatibleAttempt(synced), result: serverResult,
+      selected: serverResult ? [] : synced.answers.find(answer => answer.questionId === quizData?.questions[synced.currentQuestion]?.id)?.selectedOptionIds.slice() ?? [], dirty: false };
+    if (owner) await store?.saveQuizPractice(owner, id, adopted);
+    setAttempt(adopted.attempt); setResult(serverResult); setIndex(synced.currentQuestion);
+    setSelected([...adopted.selected]); setDirty(false); setOfflineMode(false); history.refresh();
+  }
+  async function checkAnswer() {
+    if (!attempt || !question || !quizData) return;
+    let value: QuizAttempt;
+    if (offline) {
+      value = answerOffline(attempt, quizData, answerKey, question.id, selected);
+      setDirty(true);
+    } else {
+      try {
+        value = await experienceRequest<QuizAttempt>(client,
+          `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
+          { method: 'PATCH', body: { selectedOptionIds: selected, finalize: true } });
+        setDirty(false);
+      } catch (cause) {
+        if (!(cause instanceof ExperienceApiError) || cause.code !== 'connection') throw cause;
+        setOfflineMode(true);
+        value = answerOffline(attempt, quizData, answerKey, question.id, selected);
+        setDirty(true);
+      }
+    }
+    setAttempt(compatibleAttempt(value));
+    const checked = value.feedback.find(item => item.questionId === question.id);
+    if (checked) {
+      if (checked.correct) haptic.success(); else haptic.error();
+      void playFeedbackSound(checked.correct ? 'correct' : 'wrong');
+    }
+  }
+  async function finishQuiz() {
+    if (!attempt || !quizData) return;
+    const completeLocally = async () => {
+      const completed = finishOffline(attempt, quizData, answerKey);
+      await localWrites.current;
+      if (owner) await (await getLocalArtifactStore())?.saveQuizPractice(owner, id, completed);
+      setAttempt(completed.attempt); setResult(completed.result); setSelected([]); setDirty(true);
+    };
+    if (offline) await completeLocally();
+    else {
+      try {
+        setResult(await experienceRequest<QuizResult>(client,
+          `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/complete`, { method: 'POST' }));
+        setAttempt(null); setDirty(false); history.refresh();
+      } catch (cause) {
+        if (!(cause instanceof ExperienceApiError) || cause.code !== 'connection') throw cause;
+        setOfflineMode(true); await completeLocally();
+      }
+    }
+    haptic.success(); void playFeedbackSound('complete');
   }
   async function reconnectPractice() {
     if (!id || !owner || !quizData) return;
@@ -265,11 +358,8 @@ export function QuizScreen() {
     const practice = await (await getLocalArtifactStore())?.readQuizPractice(owner, id);
     if (!practice?.attempt) { quiz.refresh(); history.refresh(); return; }
     const current = quizData.questions[practice.attempt.currentQuestion];
-    const prepared = current ? { ...practice, attempt: moveOffline(practice.attempt, current.id, practice.selected, practice.attempt.currentQuestion) } : practice;
-    const synced = await syncOfflinePractice(client, id, prepared);
-    setAttempt(compatibleAttempt(synced)); setResult(null); setIndex(synced.currentQuestion);
-    setSelected(synced.answers.find(answer => answer.questionId === quizData.questions[synced.currentQuestion]?.id)?.selectedOptionIds.slice() ?? []);
-    setDirty(false); setOfflineMode(false);
+    const prepared = current && practice.attempt.status === 'in_progress' ? { ...practice, attempt: moveOffline(practice.attempt, current.id, practice.selected, practice.attempt.currentQuestion) } : practice;
+    await syncPractice(prepared);
     quiz.refresh(); history.refresh();
   }
   return (
@@ -279,13 +369,21 @@ export function QuizScreen() {
       {quizData && <Copy size="h2">{quizData.title}</Copy>}
       {!quiz.data && savedQuiz && !quiz.loading && !attempt && !result && (
         <>
-          <Notice>Practice and scoring need a connection. These are the questions saved on this device.</Notice>
+          {!answerKey && <Notice>Practice and scoring need a connection. These are the questions saved on this device.</Notice>}
           {savedQuiz.questions[index] ? <Surface key={savedQuiz.questions[index]!.id}>
             <Copy muted size="caption">Question {index + 1} of {savedQuiz.questionCount}</Copy>
             <Copy size="h3">{savedQuiz.questions[index]!.prompt}</Copy>
             {savedQuiz.questions[index]!.leftItem ? <Copy>{savedQuiz.questions[index]!.leftItem}</Copy> : null}
             {savedQuiz.questions[index]!.options.map((option) => <Copy key={option.id} muted>• {option.text}</Copy>)}
           </Surface> : null}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <Action secondary disabled={busy || index === 0} onPress={() => setIndex(index - 1)}>Previous</Action>
+            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => setIndex(index + 1)}>Next</Action>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
+            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
+          </View>
           <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} onDragActiveChange={setSliderDragging} />
           {localReady && <Action onPress={() => {
             const value = newOfflineAttempt(savedQuiz.id, newRequestKey());
@@ -321,7 +419,7 @@ export function QuizScreen() {
       )}
       {attempt && question && !result && (
         <>
-          {offline && <Notice>Offline practice is saved on this device. Connect to check or reveal answers and sync your progress.</Notice>}
+          {offline && !answerKey && <Notice>Offline practice is saved on this device. Connect to check or reveal answers and sync your progress.</Notice>}
           {offline && <Action secondary disabled={busy} onPress={() => void run(reconnectPractice)}>Sync progress</Action>}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Copy muted size="caption">{attempt.answers.filter(answer => answer.finalizedAt).length} answered · {quizData!.questions.length - attempt.answers.filter(answer => answer.finalizedAt).length} unanswered</Copy>
@@ -366,62 +464,38 @@ export function QuizScreen() {
                 {option.text}
               </Action>
             ))}
-            {question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) ? <TextInput accessibilityLabel="Correct the wrong term or phrase" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected.find(id => !question.options.some(option => option.id === id)) ?? ""} onChangeText={value => { const falseId = question.options.find(option => option.text.toLowerCase() === "false")?.id; selectDraft(() => falseId ? [falseId, value] : []); }} placeholder="Type the correction" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
+            {question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.trim().toLowerCase() === "false")) ? <TextInput accessibilityLabel="Correct the wrong term or phrase" autoCapitalize="none" autoCorrect={false} editable={!busy && !feedback} value={selected.find(id => !question.options.some(option => option.id === id)) ?? ""} onChangeText={value => { const falseId = question.options.find(option => option.text.trim().toLowerCase() === "false")?.id; selectDraft(() => falseId ? [falseId, value] : []); }} placeholder="Type the correction" placeholderTextColor={colors.textMuted} style={{ minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, fontSize: 16 }} /> : null}
           </Surface>
           {feedback ? (
             <Surface>
               <Copy size="h2">{feedback.assisted ? 'Revealed · no recall credit' : feedback.correct ? 'Correct' : 'Keep learning'}</Copy>
+              {question.type !== "identification" && question.type !== "modified_true_false" ? <>
               <Copy muted>Your answer: {answerText(question, feedback.selectedOptionIds)}</Copy>
-              <Copy>Correct answer: {answerText(question, feedback.correctOptionIds)}</Copy>
+              <Copy>Correct answer: {answerText(question, feedback.correctOptionIds, feedback.correctAnswerText)}</Copy>
               {feedback.pairCount ? <Copy>{feedback.pairCorrectCount} / {feedback.pairCount} pairs correct</Copy> : null}
               <Copy>{feedback.explanation}</Copy>
+              </> : null}
             </Surface>
           ) : (
             <Action
-              disabled={busy || offline || (question.matchingPairs?.length ? selected.length !== question.matchingPairs.length : selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim()))}
+              disabled={busy || offline && !answerKey || (question.matchingPairs?.length ? selected.length !== question.matchingPairs.length : selected.length === 0 || question.type === "modified_true_false" && selected.some(id => question.options.some(option => option.id === id && option.text.toLowerCase() === "false")) && (selected.length < 2 || !selected[1]?.trim()))}
               onPress={() =>
-                void run(async () => {
-                  const value = await experienceRequest<QuizAttempt>(
-                    client,
-                    `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/answers/${encodeURIComponent(question.id)}`,
-                    {
-                      method: "PATCH",
-                      body: { selectedOptionIds: selected, finalize: true },
-                    },
-                  );
-                  setAttempt(compatibleAttempt(value));
-                  setDirty(false);
-                  const checked = value.feedback.find((item) => item.questionId === question.id);
-                  if (checked) {
-                    if (checked.correct) haptic.success();
-                    else haptic.error();
-                    void playFeedbackSound(checked.correct ? "correct" : "wrong");
-                  }
-                })
+                void run(async () => { setChecking(true); try { await checkAnswer(); } finally { setChecking(false); } })
               }
             >
-              Check answer
+              {checking ? "Checking\u2026" : "Check answer"}
             </Action>
           )}
-          {!attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline} onPress={() => void run(() => revealAnswer())}>Reveal Answer</Action>}
+          {question.type !== "identification" && question.type !== "modified_true_false" && !attempt.revealedQuestionIds.includes(question.id) && <Action secondary disabled={busy || offline && !answerKey} onPress={() => void run(() => revealAnswer())}>Reveal Answer</Action>}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
+            <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
+          </View>
           <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} onDragActiveChange={setSliderDragging} />
           <Action
-              disabled={busy || offline}
+              disabled={busy || offline && !answerKey}
               onPress={() =>
-                void run(async () => {
-                  setResult(
-                    await experienceRequest<QuizResult>(
-                      client,
-                      `/api/experience/quiz-attempts/${encodeURIComponent(attempt.id)}/complete`,
-                      { method: "POST" },
-                    ),
-                  );
-                  setAttempt(null);
-                  setDirty(false);
-                  haptic.success();
-                  void playFeedbackSound("complete");
-                  history.refresh();
-                })
+                void run(finishQuiz)
               }
             >Finish quiz</Action>
         </>
@@ -439,16 +513,18 @@ export function QuizScreen() {
       {result && (
         <>
           <Copy size="display">{result.percentage}%</Copy>
+          {dirty && <Copy muted size="caption">Scored offline · will sync</Copy>}
+          {dirty && <Action secondary disabled={busy} onPress={() => void run(reconnectPractice)}>Sync progress</Action>}
           {Number.isFinite(result.earnedPoints) && Number.isFinite(result.possiblePoints) ? <Copy>{result.earnedPoints} / {result.possiblePoints} points</Copy> : null}
           <Copy>{result.correctCount} correct · {result.incorrectCount} incorrect · {result.skippedCount} skipped · {result.revealedCount ?? 0} revealed before answer</Copy>
           <Action secondary onPress={() => setReviewing(value => !value)}>{reviewing ? 'Hide answers' : 'Review answers'}</Action>
           {reviewing && result.questions.map((entry, position) => {
-            const item = quizData?.questions[position];
+            const item = quizData?.questions.find(q => q.id === entry.questionId);
             return <Surface key={entry.questionId}>
               <Copy size="h3">{position + 1}. {item?.prompt ?? entry.questionId}</Copy>
               <Copy muted>{entry.assisted ? 'Revealed' : entry.skipped ? 'Skipped' : entry.correct ? 'Correct' : 'Incorrect'}</Copy>
               <Copy>Your answer: {answerText(item, entry.selectedOptionIds)}</Copy>
-              <Copy>Correct answer: {answerText(item, entry.correctOptionIds)}</Copy>
+              <Copy>Correct answer: {answerText(item, entry.correctOptionIds, entry.correctAnswerText)}</Copy>
               {entry.pairCount ? <Copy>{entry.pairCorrectCount} / {entry.pairCount} pairs correct</Copy> : null}
               <Copy muted>{entry.explanation}</Copy>
             </Surface>;
@@ -467,10 +543,14 @@ export function QuizScreen() {
             <Copy muted>No weak areas identified in this attempt.</Copy>
           )}
           <Action
+            disabled={busy || dirty}
             onPress={() => {
               const nextKey = newRequestKey();
               setKey(nextKey);
-              void run(() => start(nextKey));
+              if (offline && quizData) {
+                setAttempt(newOfflineAttempt(quizData.id, nextKey)); setResult(null); setIndex(0);
+                setSelected([]); setDirty(true); setReviewing(false);
+              } else void run(() => start(nextKey));
             }}
           >
             Retake quiz

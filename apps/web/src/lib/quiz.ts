@@ -81,6 +81,7 @@ export function canCheck(question: QuizQuestion, selected: readonly string[]) {
   if (question.matchingPairs?.length)
     return selected.length === question.matchingPairs.length;
   if (!selected.length) return false;
+  if (question.type === "identification") return !!selected[0]?.trim();
   if (
     question.type === "modified_true_false" &&
     selected.some((id) => isFalseOption(question, id))
@@ -93,6 +94,7 @@ export function canCheck(question: QuizQuestion, selected: readonly string[]) {
 export function answerText(
   question: QuizQuestion | undefined,
   values: readonly string[],
+  acceptedAnswerText?: string,
 ): string {
   if (!values.length) return "No answer";
   return values
@@ -109,6 +111,7 @@ export function answerText(
       }
       const option = question?.options.find((o) => o.id === value);
       if (option) return option.text;
+      if (acceptedAnswerText) return acceptedAnswerText;
       // Typed answers (identification, corrections) are the learner's own words.
       return question?.type === "identification" ||
         question?.type === "modified_true_false"
