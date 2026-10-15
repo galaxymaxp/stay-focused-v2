@@ -1,5 +1,15 @@
 # Roadmap
 
+## Realme generation orb hotfix (2026-10-16)
+
+The generation screen incorrectly checked the retired `ExponentGLObjectManager`
+native module after the SDK 57 upgrade. It now checks `ExpoGL`, matching the
+installed GLView, so supported devices use the existing 3D Knowledge Core.
+Scoped from published preview source `079986c`; unrelated unshipped work is
+excluded. FRESH generation/core tests: 23/23; mobile typecheck and focused
+ESLint PASS. JavaScript-only preview OTA and physical Realme verification
+are in progress. No native/APK/EAS build requested or run.
+
 ## Realignment and mobile visuals parity in progress (2026-10-15)
 
 Owner-approved finite scope: realign to main 150df38 (PRs #7/#8), deliver

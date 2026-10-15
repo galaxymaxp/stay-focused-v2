@@ -12,9 +12,11 @@ import { GenerationVisual } from "./GenerationVisual";
  * expo-gl resolves its native module as soon as it is imported, so an
  * installed app built before GL was added would crash on this screen if the
  * core were imported normally. It is loaded only after a non-throwing check
- * finds the native module; otherwise the previous visual stays in place.
+ * finds ExpoGL (the module used by this SDK's GLView); otherwise the previous
+ * visual stays in place. The legacy ExponentGLObjectManager name is absent
+ * in SDK 57 even when GL is installed.
  */
-const glAvailable = requireOptionalNativeModule("ExponentGLObjectManager") != null;
+const glAvailable = requireOptionalNativeModule("ExpoGL") != null;
 let knowledgeCore: ComponentType<KnowledgeCoreProps> | null = null;
 
 function loadKnowledgeCore(): ComponentType<KnowledgeCoreProps> | null {
