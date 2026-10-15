@@ -24,6 +24,16 @@ vi.mock('./canvas-preparation/admission',async load=>({
   },
 }));
 import { safeObjectKeyForCanvasFile } from "@/lib/canvas-file-policy";
+// This formatting suite models completed preparation; the unmocked batched
+// evidence/paging/receipt path is covered by preparation/projection.test.ts.
+vi.mock('./canvas-preparation/projection', () => ({
+  loadPreparationProjection: async (client: SupabaseClient<Database>, input: { userId: string; course: { id: string }; materialIds: readonly string[] }) => {
+    const { lookupMaterialPreparation } = await import('./canvas-preparation/admission');
+    return new Map(await Promise.all(input.materialIds.map(async materialId => [materialId, {
+      job: await lookupMaterialPreparation(client, { userId: input.userId, courseId: input.course.id, materialId }), control: null,
+    }] as const)));
+  },
+}));
 import {
   CANVAS_REVIEWER_MAX_COMBINED_CHARS,
   CANVAS_REVIEWER_INVENTORY_MAX_PAGES_PER_TYPE,

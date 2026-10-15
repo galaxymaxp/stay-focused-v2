@@ -3,6 +3,14 @@ import type { CanvasMaterialPreparationRow } from '@stay-focused/db';
 import type { CanvasReviewerSourceDescriptor } from '@/lib/canvas-reviewer-sources';
 import { lookupMaterialPreparation, type MaterialIdentity } from './admission';
 import type { PreparationClient } from './repository';
+import type { PreparationProjection } from './projection';
+
+export function materialStatusFromProjection(source: CanvasReviewerSourceDescriptor, projection: PreparationProjection): MaterialPreparation {
+  if (source.capability === 'unsupported' || source.file?.kind === 'unsupported') return { status: 'unsupported', reasonCode: null };
+  if (source.capability === 'empty') return { status: 'empty', reasonCode: null };
+  if (source.capability === 'inaccessible') return { status: 'unavailable', reasonCode: null };
+  return projectPreparationStatus(projection.job, projection.control);
+}
 
 /** Explicit projection: never spread a job, control, provider reason or evidence. */
 export function projectPreparationStatus(

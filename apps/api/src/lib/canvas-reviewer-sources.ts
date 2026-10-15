@@ -406,17 +406,26 @@ export async function listCanvasReviewerSources({
     return sources;
   }
 
-  const candidates = sources.value
+  const candidates = sources.value.records
     .filter((source) => !source.excludeFromGenerate)
     .map((source) => source.descriptor)
     .filter(isCanvasGenerateCandidate)
     .sort(compareSources);
   const ordered:CanvasReviewerSourceDescriptor[]=[];
-  const {lookupMaterialPreparation}=await import('@/lib/canvas-preparation/admission');
+  const {loadPreparationProjection}=await import('@/lib/canvas-preparation/projection');
+  let preparations: Awaited<ReturnType<typeof loadPreparationProjection>> = new Map();
+  if (!(completeInventory && !includePreparationStatus) || includeClientPreparationStatus) {
+    try {
+      preparations = await loadPreparationProjection(client, { userId, course: course.value.course, connection: course.value.connection,
+        materialIds: candidates.map(source => source.id), pages: sources.value.pages, files: sources.value.files });
+    } catch {
+      return storageFailure('Canvas source preparation status could not be completely loaded.');
+    }
+  }
   for(const source of candidates){
     if(completeInventory && !includePreparationStatus){ordered.push(source);continue;}
     if(source.file && (!source.file.canPrepare && source.file.preparationStatus!=='ready')){ordered.push(source);continue;}
-    const job=await lookupMaterialPreparation(client,{userId,courseId,materialId:source.id});
+    const job=preparations.get(source.id)?.job;
     if(job?.state==='prepared' && job.result_id){ordered.push(source);continue;}
     if(!job && source.file && source.file.preparationStatus!=='ready'){ordered.push(source);continue;}
     const failed=job?.state==='failed';
@@ -428,10 +437,10 @@ export async function listCanvasReviewerSources({
   const normalizedOffset = normalizeListOffset(offset);
   let page = completeInventory ? ordered : ordered.slice(normalizedOffset, normalizedOffset + normalizedLimit);
   if (includeClientPreparationStatus) {
-    const { materialClientStatus } = await import('@/lib/canvas-preparation/client-status');
-    page = await Promise.all(page.map(async source => ({ ...source,
-      preparation: await materialClientStatus(client, { userId, courseId, materialId: source.id }, source),
-    })));
+    const { materialStatusFromProjection } = await import('@/lib/canvas-preparation/client-status');
+    page = page.map(source => ({ ...source,
+      preparation: materialStatusFromProjection(source, preparations.get(source.id) ?? { job: null, control: null }),
+    }));
   }
   const availableSourceCount = ordered.filter(
     (source) => source.availability === "available",
@@ -1468,7 +1477,7 @@ async function loadCourseSourceDescriptors({
   readonly connection: CanvasConnectionRow;
   readonly course: CanvasCourseRow;
   readonly userId: string;
-}): Promise<CanvasReviewerSourceResult<readonly NormalizedSourceRecord[]>> {
+}): Promise<CanvasReviewerSourceResult<{ readonly records: readonly NormalizedSourceRecord[]; readonly pages: readonly CanvasPageRow[]; readonly files: readonly CanvasFileRow[] }>> {
   const [pages, assignments, announcements, files, modules, moduleItems, fileReferences] = await Promise.all([
     readPages({ client, connectionId: connection.id, courseId: course.id, userId }),
     readAssignments({
@@ -1523,7 +1532,7 @@ async function loadCourseSourceDescriptors({
 
   return {
     ok: true,
-    value: [
+    value: { pages: pages.value, files: files.value, records: [
       ...pages.value.map(mapPageSource).map(applyPlacement),
       ...assignments.value.map(mapAssignmentSource).map(applyPlacement),
       ...announcements.value.map(mapAnnouncementSource).map(applyPlacement),
@@ -1534,7 +1543,7 @@ async function loadCourseSourceDescriptors({
         );
         return { ...mapFileSource(file), excludeFromGenerate: parentWorkReference && placement.group !== "module" };
       }).map(applyPlacement),
-    ],
+    ] },
   };
 }
 
