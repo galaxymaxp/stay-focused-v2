@@ -8,7 +8,7 @@ import {
   OCR_MAX_PDF_BYTES,
 } from "@/lib/ocr/upload-policy";
 
-import { OFFICE_MIME } from "./activity-maker/office-extraction";
+import { OFFICE_MIME } from "./activity-maker/office-metadata";
 import type { CanvasFileRow } from '@stay-focused/db';
 
 export function isNewlySupportedOfficeFile(file: CanvasFileRow): boolean {

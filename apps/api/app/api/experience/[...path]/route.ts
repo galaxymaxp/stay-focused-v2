@@ -4,12 +4,9 @@ import { experienceJson, experienceOptions, experienceRoute, readBoundedExperien
 import { setOwnedCourseState } from '@/lib/course-state-mutation';
 import { ExperienceFailure } from '@/lib/experience/errors';
 import { experienceCapabilities, generationView, learningMaterial, record } from '@/lib/experience/mappers';
-import { startReviewerGeneration } from '@/lib/experience/generation';
 import { createCanvasServiceClient } from '@/lib/canvas-db';
-import { prepareCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
 import { validateStudyPlanningRequest } from '@stay-focused/shared/task-planning';
-import { previewOwnedStudyPlan, applyOwnedStudyPlan } from '@/lib/task-planning-service';
 import { CONNECTION_SECRET_COLUMNS, createCanvasClient, decryptConnectionToken, readConnection } from '@/lib/canvas-routes';
 import { CANVAS_FILE_DOWNLOAD_TIMEOUT_MS, CANVAS_FILE_MAX_REDIRECTS, CANVAS_FILE_MAX_SINGLE_BYTES } from '@/lib/canvas-file-policy';
 
@@ -105,6 +102,7 @@ export async function POST(request: Request, context: Context): Promise<Response
       const validation = validateStudyPlanningRequest(value);
       if (!validation.ok) throw new ExperienceFailure(400, 'invalid_request');
       try {
+        const { previewOwnedStudyPlan, applyOwnedStudyPlan } = await import('@/lib/task-planning-service');
         const run = route === 'planner/preview' ? previewOwnedStudyPlan : applyOwnedStudyPlan;
         return experienceJson(await run(createCanvasServiceClient(), userId, validation.value));
       } catch (error) {
@@ -116,6 +114,7 @@ export async function POST(request: Request, context: Context): Promise<Response
     requireId(body.courseId); requireId(body.materialId.slice(body.materialId.indexOf(':') + 1));
     const client = createCanvasServiceClient();
     if (route === 'materials/prepare') {
+      const { prepareCanvasReviewerSources } = await import('@/lib/canvas-reviewer-sources');
       const prepared = await prepareCanvasReviewerSources({ client, userId, courseId: body.courseId, sourceIds: [body.materialId] });
       if (!prepared.ok) throw new ExperienceFailure(prepared.status === 404 ? 404 : 409, prepared.status === 404 ? 'not_found' : 'not_ready');
       const { materialClientStatus } = await import('@/lib/canvas-preparation/client-status');
@@ -125,6 +124,7 @@ export async function POST(request: Request, context: Context): Promise<Response
       }, courseId)));
       return experienceJson({ items },prepared.value.results.some(item=>item.code==='preparation_pending')?202:200);
     }
+    const { startReviewerGeneration } = await import('@/lib/experience/generation');
     const job = await startReviewerGeneration(client, userId, { courseId: body.courseId, materialId: body.materialId }, request.headers.get('idempotency-key'));
     const view = job.status === 'succeeded' ? await service.getGeneration(userId, job.id) : generationView(toProcessingJobStatusView(job), null);
     return experienceJson(view, 202);

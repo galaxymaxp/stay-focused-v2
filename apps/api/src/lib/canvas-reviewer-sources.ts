@@ -1,4 +1,4 @@
-import { OFFICE_MIME, OFFICE_STRUCTURE_VERSION } from './activity-maker/office-extraction';
+import { OFFICE_MIME, OFFICE_STRUCTURE_VERSION } from './activity-maker/office-metadata';
 import type {
   CanvasAnnouncementRow,
   CanvasAssignmentRow,

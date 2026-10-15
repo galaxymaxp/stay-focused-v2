@@ -16,7 +16,7 @@ import {
   classifyStoredCanvasFileKind,
   isPreparedCanvasFileReadyForOcr,
 } from "@/lib/canvas-stored-file-extraction";
-import { normalizeCanvasHtmlToText } from "@/lib/canvas-reviewer-sources";
+import { normalizeCanvasHtmlToText } from "@/lib/canvas-content-normalization";
 import { sha256Utf8Hex } from "@/lib/reviewer-source-provenance";
 
 export type ReviewerSourceItemStatus =

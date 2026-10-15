@@ -2,7 +2,7 @@ import { isPastStoredCourse } from '@/lib/course-state';
 import type { Quiz } from '@stay-focused/shared';
 import { estimateReviewerMinutes } from '@stay-focused/shared';
 import type { CanvasAssignmentRow } from '@stay-focused/db';
-import { quizView } from '../quiz/service';
+import { quizView } from '../quiz/read-model';
 import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerateCourseList, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
 import type { CanvasCourseInventory, CanvasCourseSelectionResult } from '@/lib/canvas-course-selection';
@@ -14,7 +14,7 @@ import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
 import { composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
 import { readActivityContext } from './task-state';
-import { activityGenerationState, draftView } from '../activity-maker/service';
+import { activityGenerationState, draftView } from '../activity-maker/read-model';
 import type { ActivityDraft } from '@stay-focused/shared';
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
 

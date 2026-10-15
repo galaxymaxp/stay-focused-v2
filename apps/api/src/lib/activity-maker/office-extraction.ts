@@ -2,11 +2,9 @@ import { unzipSync } from 'fflate';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { posix } from 'node:path';
 import type { CanvasStructuredBlockDraft } from '../canvas-structured-blocks';
-export const OFFICE_STRUCTURE_VERSION = 'canvas-office-structured-v2';
-export const OFFICE_MIME = {
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-} as const;
+
+export { OFFICE_MIME, OFFICE_STRUCTURE_VERSION } from './office-metadata';
+
 type Node = Record<string, unknown>;
 function nodes(value: unknown): Node[] { return Array.isArray(value) ? value.filter((n): n is Node => typeof n === 'object' && n !== null) : []; }
 function children(node: Node, key: string) { return nodes(node[key]); }

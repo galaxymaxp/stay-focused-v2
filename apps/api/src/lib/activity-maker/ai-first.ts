@@ -30,4 +30,5 @@ export async function generateActivityDocument(provider: GenerationProvider, tit
     context: JSON.stringify({ title, assignment, source: JSON.parse(source) }), validate: raw => validateActivityDocument(raw, sources) });
 }
 
-export const MISSING_INFORMATION = 'Source material does not provide the information required for this section.';
+export { MISSING_INFORMATION } from './messages';
+
