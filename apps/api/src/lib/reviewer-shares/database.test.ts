@@ -19,6 +19,7 @@ beforeAll(async () => {
     insert into auth.users values('${owner}'),('${other}');
     insert into generated_artifacts values('${owner}','${owner}','${version}','reviewer',null);`);
   await db.exec(readFileSync(resolve('../../packages/db/migrations/20261015050000_public_reviewer_shares.sql'), 'utf8'));
+  await db.exec(readFileSync(resolve('../../packages/db/migrations/20261015050100_revoke_deleted_reviewer_shares.sql'), 'utf8'));
 }, 30000);
 afterAll(async () => { await db?.close(); });
 async function mutate(action: string, user = owner, nextToken = token, snapshot = { title: 'Original' }) {
@@ -34,6 +35,9 @@ async function role(name: string, user: string, sql: string) {
 it('create is idempotent, later reviewer edits are frozen, update retains token, stop and reshare rotates', async () => {
   expect((await mutate('create')).token).toBe(token);
   expect((await mutate('create', owner, 'b'.repeat(64), { title: 'Edited' })).snapshot.title).toBe('Original');
+  await db.exec(`update generated_artifacts set latest_version_id='${other}'`);
+  expect((await db.query<{ snapshot: { title: string } }>('select snapshot from reviewer_shares')).rows[0]!.snapshot.title).toBe('Original');
+  await db.exec(`update generated_artifacts set latest_version_id='${version}'`);
   const updated = await mutate('update', owner, 'b'.repeat(64), { title: 'Edited' });
   expect(updated.token).toBe(token); expect(updated.snapshot.title).toBe('Edited');
   expect((await mutate('revoke')).revoked_at).not.toBeNull();
@@ -59,6 +63,10 @@ it('fences a changed/deleted/non-reviewer artifact and enforces random-token sha
   await expect(db.query(`select * from mutate_reviewer_share_v1('${owner}','${owner}','update','${token}','${other}','{}')`)).rejects.toThrow('not_found');
   await expect(db.exec("update reviewer_shares set token='guessable'")).rejects.toThrow();
   await db.exec('begin');
-  try { await db.exec('update generated_artifacts set deleted_at=now()'); await expect(mutate('create')).rejects.toThrow('not_found'); }
+  try {
+    await db.exec('update generated_artifacts set deleted_at=now()');
+    expect((await db.query('select token from reviewer_shares where revoked_at is null')).rows).toEqual([]);
+    await expect(mutate('create')).rejects.toThrow('not_found');
+  }
   finally { await db.exec('rollback'); }
 });
