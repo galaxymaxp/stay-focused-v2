@@ -123,7 +123,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
   </>;
 }
 
-export function ZoomablePage({ url, width, height, onError, label = 'Source page' }: { url: string; width: number; height: number; onError: () => void; label?: string }) {
+export function ZoomablePage({ url, headers, width, height, onError, label = 'Source page' }: { url: string; headers?: Readonly<Record<string,string>>; width: number; height: number; onError: () => void; label?: string }) {
   const [frame, setFrame] = useState({ width: 1, height: 1 });
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   const current = useRef(transform); current.current = transform;
@@ -156,7 +156,7 @@ export function ZoomablePage({ url, width, height, onError, label = 'Source page
   return <View accessibilityLabel={`${label}. Pinch or double tap to zoom.`} style={{ flex: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}
     onLayout={event => setFrame(event.nativeEvent.layout)} onStartShouldSetResponder={() => true}
     onMoveShouldSetResponder={() => true} onResponderTerminationRequest={() => false} onResponderGrant={capture} onResponderMove={move} onResponderRelease={release}>
-    <Image source={{ uri: url }} resizeMode="contain" accessibilityIgnoresInvertColors onError={onError}
+    <Image source={{ uri: url, ...(headers ? {headers} : {}) }} resizeMode="contain" accessibilityIgnoresInvertColors onError={onError}
       style={{ width: width * ratio, height: height * ratio, transform: [{ translateX: transform.x }, { translateY: transform.y }, { scale: transform.scale }] }} />
   </View>;
 }

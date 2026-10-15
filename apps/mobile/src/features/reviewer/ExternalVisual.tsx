@@ -4,7 +4,7 @@ import { Sheet } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
 import { hitTarget, radius, spacing } from '../../design/tokens';
 import type { ExperienceClient } from '../../services/experienceApi';
-import { EXTERNAL_VISUAL_LABEL, findExternalVisual, type ExternalReferenceVisual } from '../../services/externalVisuals';
+import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, findExternalVisual, type ExternalReferenceVisual } from '../../services/externalVisuals';
 import { ZoomablePage } from './SourcePageSnapshot';
 
 /** Batch images arrive from the reader; only an explicit replacement searches here. */
@@ -27,7 +27,7 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
     {result?.status==='found'?<View style={{gap:spacing[2],padding:spacing[3],borderWidth:1,borderColor:colors.separator,borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
       <Text style={{color:colors.textMuted}}>{EXTERNAL_VISUAL_LABEL}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="View external reference" onPress={()=>setOpen(true)}>
-        <Image source={{uri:result.image}} accessibilityLabel={result.title} resizeMode="contain" style={{height:spacing[12]*4,width:'100%'}} onError={()=>setOpen(false)}/>
+        <Image source={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS}} accessibilityLabel={result.title} resizeMode="contain" style={{height:spacing[12]*4,width:'100%'}} onError={()=>setOpen(false)}/>
       </Pressable>
       <Pressable accessibilityRole="link" accessibilityLabel="View attribution on Wikimedia Commons" onPress={()=>{void Linking.openURL(result.sourceUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
         <Text style={{color:colors.accent}}>{result.credit} · {result.license}</Text>
@@ -41,7 +41,7 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
     {open && result?.status==='found'?<Sheet title="External reference" onClose={()=>setOpen(false)}>
       <Text style={{color:colors.textMuted}}>{EXTERNAL_VISUAL_LABEL}</Text>
       <View style={{height:Math.min(height*0.5,spacing[12]*8)}} onTouchStart={e=>e.stopPropagation()} onTouchMove={e=>e.stopPropagation()}>
-        <ZoomablePage url={result.image} width={result.width} height={result.height} label="External reference" onError={()=>setOpen(false)}/>
+        <ZoomablePage url={result.image} headers={EXTERNAL_IMAGE_HEADERS} width={result.width} height={result.height} label="External reference" onError={()=>setOpen(false)}/>
       </View>
       <Text style={{color:colors.textMuted}}>{result.credit} · {result.license}</Text>
     </Sheet>:null}

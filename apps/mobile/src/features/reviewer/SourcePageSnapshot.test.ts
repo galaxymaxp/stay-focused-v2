@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
-import { SourcePageSnapshot } from './SourcePageSnapshot';
+import { SourcePageSnapshot, ZoomablePage } from './SourcePageSnapshot';
 
 const mocks = vi.hoisted(() => ({ read: vi.fn(), state: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) } }));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: mocks.state }));
@@ -21,6 +21,10 @@ async function mount(offline = false) { await act(async () => { tree = create(cr
 const buttons = () => tree!.root.findAllByType(Pressable);
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('source-page thumbnail and viewer', () => {
+  it.each([undefined, {'User-Agent':'StayFocused/2.1.0 (https://github.com/galaxymaxp/stay-focused-v2)'}])('passes optional external headers to zoom images without adding them to course images (%j)',async headers=>{
+    await act(async()=>{tree=create(createElement(ZoomablePage,{url:ready.url,width:1400,height:1867,onError:vi.fn(),...(headers?{headers}:{})}));});
+    expect(tree!.root.findByType(Image).props.source).toEqual({uri:ready.url,...(headers?{headers}:{})});
+  });
   it('labels an exact PPTX snapshot From slide n in the header and caption', async () => {
     mocks.read.mockResolvedValue({ ...ready, labelKind: 'slide' }); await mount();
     expect(buttons()[0]?.props.accessibilityLabel).toBe('From slide 2');
