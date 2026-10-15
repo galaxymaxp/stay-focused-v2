@@ -1,6 +1,8 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ShareReviewerMenu } from './ShareReviewerMenu';
+import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 const mocks = vi.hoisted(() => ({ mutate: vi.fn(), read: vi.fn(), copy: vi.fn(), share: vi.fn(), owner: 'owner' }));
 vi.mock('react-native', () => ({ View: 'View', Share: { share: mocks.share } }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: mocks.copy }));
@@ -8,8 +10,6 @@ vi.mock('../../auth', () => ({ useAuth: () => ({ session: { user: { id: mocks.ow
 vi.mock('../../design/primitives', () => ({ Action: 'Action', Copy: 'Copy', Notice: 'Notice', Sheet: 'Sheet' }));
 vi.mock('../../services/experienceApi', () => ({ experienceRequest: mocks.read }));
 vi.mock('../../services/reviewerShares', () => ({ mutateReviewerShare: mocks.mutate, reviewerShareUrl: (token: string) => `https://website.test/s/${token}` }));
-import { ShareReviewerMenu } from './ShareReviewerMenu';
-import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 const detail = reviewerDetail(), reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const link = { token: 'a'.repeat(64), updatedAt: '' };
 const props = { artifactId: 'artifact', reviewer, client: { baseUrl: 'https://api.test', accessToken: 'jwt' }, offline: false };
@@ -43,4 +43,13 @@ it('offline sharing is disabled and owner changes discard the old link/menu', as
   expect(button('Stop sharing')).toBeUndefined();
   await act(async () => tree!.update(createElement(ShareReviewerMenu, { ...props, offline: true })));
   expect(button('Share').props.disabled).toBe(true);
+});
+it('a late response after an account switch never copies or opens the old owner link', async () => {
+  let complete!: (value: typeof link) => void;
+  mocks.mutate.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+  await mount(); await act(async () => button('Share').props.onPress());
+  await act(async () => { void button('Share link').props.onPress(); });
+  mocks.owner = 'other'; await act(async () => tree!.update(createElement(ShareReviewerMenu, props)));
+  await act(async () => complete(link));
+  expect(mocks.copy).not.toHaveBeenCalled(); expect(mocks.share).not.toHaveBeenCalled();
 });

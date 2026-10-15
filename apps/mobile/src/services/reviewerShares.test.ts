@@ -1,9 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { assistRequest, selectAssistBlock } from '@stay-focused/shared';
-const mocks = vi.hoisted(() => ({ peek: vi.fn() }));
-vi.mock('./studyAssist', () => ({ studyAssist: { peek: mocks.peek } }));
 import { collectSharedAssists, mutateReviewerShare, reviewerShareUrl } from './reviewerShares';
 import { reviewerDetail } from './localLibrary/localLibrary.testSupport';
+const mocks = vi.hoisted(() => ({ peek: vi.fn() }));
+vi.mock('./studyAssist', () => ({ studyAssist: { peek: mocks.peek } }));
 const detail = reviewerDetail(), reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const token = 'a'.repeat(64);
 beforeEach(() => { vi.clearAllMocks(); mocks.peek.mockResolvedValue(null); });
