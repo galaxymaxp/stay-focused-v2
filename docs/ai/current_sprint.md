@@ -7,8 +7,9 @@ native module after the SDK 57 upgrade. It now checks `ExpoGL`, matching the
 installed GLView, so supported devices use the existing 3D Knowledge Core.
 Scoped from published preview source `079986c`; unrelated unshipped work is
 excluded. FRESH generation/core tests: 23/23; mobile typecheck and focused
-ESLint PASS. JavaScript-only preview OTA and physical Realme verification
-are in progress. No native/APK/EAS build requested or run.
+ESLint PASS. JavaScript-only preview OTA `d1b79016-9ed3-4de4-85af-184896cbc25e`
+published from `e18dda0`; FRESH physical Realme verification PASS: the
+generation screen shows the animated 3D orb after relaunch. No native/APK/EAS build requested or run.
 
 ## Realignment and mobile visuals parity in progress (2026-10-15)
 
