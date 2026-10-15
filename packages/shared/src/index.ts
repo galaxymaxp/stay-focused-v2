@@ -232,3 +232,5 @@ export * from './reviewer-estimate';
 
 export * from './quiz-grading';
 export * from "./saved-snapshot";
+
+export * from "./course-state";

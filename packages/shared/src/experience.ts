@@ -42,6 +42,9 @@ export interface GenerationCapability {
 }
 export interface CourseReference { readonly id: string; readonly code: string | null; readonly name: string }
 export interface CourseSummary extends CourseReference {
+  /** Optional only for older owner-scoped snapshots, refreshed by the API. */
+  readonly courseState?: 'current' | 'past';
+  readonly courseStateOverridden?: boolean;
   readonly status: string | null;
   /** Null means not counted; never imply an empty course. */
   readonly materialCount: number | null;
