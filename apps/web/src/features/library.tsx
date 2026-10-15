@@ -6,14 +6,13 @@ import type {
   ActivityDraftContent,
   GenerationView,
   LibraryArtifactSummary,
-  LibraryOverview,
   Quiz,
   QuizSummary,
   ReviewerReaderModel,
 } from "@stay-focused/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { courseIdentity } from "../app-model/courseIdentity";
 import {
   PERSONAL_LIBRARY_KEY,
@@ -34,6 +33,7 @@ import { ContentIcon, Empty, Heading, Icon, Notice, State, contentTone } from ".
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 import { useListPreferences } from "../lib/list-preferences";
+import { useSavedLibrary } from '../lib/use-saved-library';
 type Artifact = {
   artifact: LibraryArtifactSummary;
   reviewer?: ReviewerReaderModel;
@@ -71,27 +71,6 @@ function itemHref(item: LibraryArtifactSummary) {
   return item.type === "quiz"
     ? `/quiz/${encodeURIComponent(item.quiz?.id ?? item.id.slice(item.id.indexOf(":") + 1))}`
     : `/library/${encodeURIComponent(item.id)}`;
-}
-
-/** Complete Library responses are saved only after every page succeeds. */
-function useSavedLibrary() {
-  const { api } = useAuth();
-  const load = useCallback(async (signal: AbortSignal): Promise<LibraryOverview> => {
-    const items: LibraryArtifactSummary[] = [];
-    const superseded = new Set<string>();
-    let result: LibraryOverview | null = null;
-    let offset: number | null = 0;
-    for (let page = 0; offset !== null && page < 20; page++) {
-      result = await api<LibraryOverview>(`/api/experience/library?limit=100&offset=${offset}`, { signal });
-      items.push(...result.items);
-      result.supersededReviewerIds?.forEach(id => superseded.add(id));
-      offset = result.nextOffset;
-    }
-    if (offset !== null || !result) throw new Error("The Library is larger than this view can load. Please try again.");
-    return { ...result, items: items.filter(item => item.status === "completed" && !superseded.has(item.id)), nextOffset: null, supersededReviewerIds: [...superseded] };
-  }, [api]);
-  const resource = useResource<LibraryOverview>("/api/experience/library?complete=1", 0, "data", false, load);
-  return { ...resource, items: resource.data?.items ?? [], categories: resource.data?.categories ?? null };
 }
 
 function LibraryCard({

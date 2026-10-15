@@ -10,7 +10,7 @@ export function useResource<T>(
   poll = 0,
   envelope: RequestOptions["envelope"] = "data",
   holdReviewer = false,
-  loader?: (signal: AbortSignal) => Promise<T>,
+  loader?: (signal: AbortSignal, publish: (data: T) => void) => Promise<T>,
 ) {
   const { api, session } = useAuth();
   const identity = `${session?.user.id ?? ""}:${path}:${envelope}`;
@@ -47,7 +47,14 @@ export function useResource<T>(
         loading: old.identity !== identity || old.data === null,
       }));
       try {
-        const data = loader ? await loader(controller.signal) : await api<T>(path, {
+        const publish = (data: T) => {
+          if (!alive || controller.signal.aborted || snapshotEpoch(owner) !== epoch) return;
+          // A partial walk is visible immediately but never replaces the saved
+          // complete snapshot or marks refresh finished.
+          setState(old => ({ ...old, identity, data: mergeSavedData(old.identity === identity ? old.data : null, data),
+            loading: false, refreshing: true, error: null }));
+        };
+        const data = loader ? await loader(controller.signal, publish) : await api<T>(path, {
           signal: controller.signal,
           envelope,
         });
