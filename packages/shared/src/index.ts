@@ -238,3 +238,4 @@ export * from "./saved-snapshot";
 
 export * from "./course-state";
 export * from './job-status-reader';
+export * from './reviewer-share';
