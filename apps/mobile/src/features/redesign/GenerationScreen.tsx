@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
 
@@ -23,6 +24,7 @@ import { useJobRead, useQueueItems } from "../queue/useQueueItems";
 
 
 export function GenerationScreen() {
+  const focused = useIsFocused();
   const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string; quiz?: string }>();
   // Requests made from a Generate action start at once; only an old saved
   // request reopened from Queue still asks before it starts.
@@ -89,7 +91,7 @@ export function GenerationScreen() {
     autoStarted.current = true;
     void confirmGeneration();
   });
-  const generation = useJobRead(id);
+  const generation = useJobRead(focused ? id : null);
   const data = generation.data;
   const isDraft = intent?.type === "activity_output" || data?.artifactId?.startsWith("activity:") === true;
   // Completed and cloud-persisted: keep a device copy for Library and offline reading.

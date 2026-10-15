@@ -5,7 +5,7 @@ import type { GenerationView } from "@stay-focused/shared";
 import type { GenerationIntent } from "../../services/generationRecovery";
 import { GenerationScreen } from "./GenerationScreen";
 
-vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn() }), useJobRead: () => ({ data: mocks.generation, error: null, refresh: vi.fn() }) }));
+vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn() }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, error: null, refresh: vi.fn() }; } }));
 
 const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
@@ -16,12 +16,15 @@ const mocks = vi.hoisted(() => ({
   params: { intent: "pending-key" } as Record<string, string>,
   persistedId: null as string | null,
   storeCompleted: vi.fn(),
+  focused: true,
+  detailRead: vi.fn(),
 }));
 
 vi.mock("expo-router", () => ({
   router: { push: mocks.push, replace: mocks.replace },
   useLocalSearchParams: () => mocks.params,
 }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" } } }) }));
 vi.mock("../../services/generationRecovery", () => ({
   acceptGeneration: mocks.accept,
@@ -59,6 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.params = { intent: "pending-key" };
   mocks.generation = null;
+  mocks.focused = true;
   mocks.persistedId = null;
   mocks.storeCompleted.mockResolvedValue(undefined);
   mocks.read.mockResolvedValue([pending]);
@@ -75,6 +79,17 @@ async function render(element: ReactElement) {
 }
 
 describe("Queue generation confirmation safety", () => {
+  it('releases the shared detail while covered and subscribes again on return', async () => {
+    mocks.params = { id: 'job-id' };
+    await render(createElement(GenerationScreen));
+    expect(mocks.detailRead).toHaveBeenLastCalledWith('job-id');
+    mocks.focused = false;
+    await act(async () => rendered!.update(createElement(GenerationScreen)));
+    expect(mocks.detailRead).toHaveBeenLastCalledWith(null);
+    mocks.focused = true;
+    await act(async () => rendered!.update(createElement(GenerationScreen)));
+    expect(mocks.detailRead).toHaveBeenLastCalledWith('job-id');
+  });
   it("starts a request made from a Generate action at once, exactly once", async () => {
     mocks.params = { intent: "pending-key", start: "1" };
     const root = await render(createElement(GenerationScreen));
