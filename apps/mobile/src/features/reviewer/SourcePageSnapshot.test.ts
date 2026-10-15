@@ -71,14 +71,13 @@ describe('source-page thumbnail and viewer', () => {
   });
   it('shows a quiet rendering placeholder and polls at most five times over 15 seconds', async () => {
     vi.useFakeTimers(); mocks.read.mockResolvedValue({ available: true, status: 'rendering', page: 2 }); await mount();
-    await act(async () => buttons()[0]!.props.onPress());
     expect(tree!.root.findAllByType(ActivityIndicator).length).toBeGreaterThan(0);
     const start = mocks.read.mock.calls.filter(call => call[3] === true).length;
     for (let i = 0; i < 5; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     expect(mocks.read.mock.calls.filter(call => call[3] === true)).toHaveLength(start + 5);
     await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
     expect(mocks.read.mock.calls.filter(call => call[3] === true)).toHaveLength(start + 5);
-    expect(mocks.read.mock.calls).toHaveLength(7); // Discovery + open + exactly five progress checks.
+    expect(mocks.read.mock.calls).toHaveLength(7); // Discovery + inline render + exactly five progress checks.
   });
   it('hides the button and closes the viewer on a connection failure', async () => {
     mocks.read.mockResolvedValue(ready); await mount(); mocks.read.mockRejectedValue(new Error('offline'));
@@ -88,6 +87,20 @@ describe('source-page thumbnail and viewer', () => {
     mocks.read.mockResolvedValue(ready); await mount();
     await act(async () => tree!.update(createElement(SourcePageSnapshot, { ...props, offline: true })));
     expect(buttons()).toHaveLength(0);
+  });
+  it('does not discover before the section approaches view and automatically renders after discovery',async()=>{
+    mocks.read.mockResolvedValueOnce({available:true,status:'unrendered',page:2}).mockResolvedValue(ready);
+    await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,visible:false}));});expect(mocks.read).not.toHaveBeenCalled();
+    await act(async()=>tree!.update(createElement(SourcePageSnapshot,{...props,visible:true})));
+    expect(mocks.read.mock.calls.map(call=>call[3])).toEqual([false,true]);
+    expect(tree!.root.findAllByType(Image)[0]!.props.style.width).toBe('100%');
+    expect(tree!.root.findAllByType(Text).map(node=>[node.props.children].flat().join('')).join(' ')).toContain('From page 2 \u00b7 your course material');
+  });
+  it('aborts late discovery offscreen and starts no render',async()=>{
+    let resolve!:(value:unknown)=>void;mocks.read.mockReturnValue(new Promise(r=>{resolve=r;}));await mount();
+    const signal=mocks.read.mock.calls[0]![4];
+    await act(async()=>tree!.update(createElement(SourcePageSnapshot,{...props,visible:false})));expect(signal.aborted).toBe(true);
+    await act(async()=>resolve({available:true,status:'unrendered',page:2}));expect(mocks.read).toHaveBeenCalledOnce();expect(buttons()).toHaveLength(0);
   });
   it('handles double-tap reset and bounded pinch/pan in the full-screen image', async () => {
     mocks.read.mockResolvedValue(ready); await mount(); await act(async () => buttons()[0]!.props.onPress());

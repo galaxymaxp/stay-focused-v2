@@ -6,6 +6,7 @@ import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSup
 
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
 vi.mock('./SourceFigures',()=>({SourceFigures:()=>null,useFigureAvailability:()=>new Set()}));
+vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:()=>null}));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),

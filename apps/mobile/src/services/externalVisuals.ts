@@ -1,7 +1,15 @@
+import { useEffect, useState } from 'react';
 import { experienceRequest, type ExperienceClient } from './experienceApi';
 export const EXTERNAL_VISUAL_LABEL='External reference — not from your course material.';
 export type ExternalVisual = ({status:'found';image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
   | {status:'none';message:'No reliable visual found'}) & {attemptCount:number};
+export type ExternalReferenceVisual = Extract<ExternalVisual, { status: 'found' }>;
+export interface ReviewerVisuals {
+  sections: Record<string, ExternalReferenceVisual>;
+  checked: number;
+  total: number;
+  running: boolean;
+}
 function allowedUrl(value:unknown,hosts:readonly string[]):value is string {
   if(typeof value!=='string')return false;
   try{const url=new URL(value);return url.protocol==='https:' && hosts.includes(url.hostname) && !url.username && !url.password && !url.port;}catch{return false;}
@@ -23,4 +31,57 @@ export function parseExternalVisual(value:unknown):ExternalVisual {
 export async function findExternalVisual(client:ExperienceClient,artifactId:string,sectionId:string,findAnother:boolean,signal?:AbortSignal):Promise<ExternalVisual> {
   return parseExternalVisual(await experienceRequest(client,`/api/reviewers/${encodeURIComponent(artifactId)}/sections/${encodeURIComponent(sectionId)}/external-visual`,
     {method:'POST',body:{findAnother},signal}));
+}
+
+export function parseReviewerVisuals(value: unknown): ReviewerVisuals {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('visual_invalid');
+  const v = value as Record<string, unknown>;
+  if (!Number.isSafeInteger(v.checked) || Number(v.checked) < 0 || !Number.isSafeInteger(v.total) || Number(v.total) < 0 ||
+      typeof v.running !== 'boolean' || !v.sections || typeof v.sections !== 'object' || Array.isArray(v.sections)) throw new Error('visual_invalid');
+  const sections: Record<string, ExternalReferenceVisual> = Object.create(null);
+  for (const [id, raw] of Object.entries(v.sections)) {
+    if (!/^[a-zA-Z0-9_-]{1,220}$/.test(id)) throw new Error('visual_invalid');
+    const visual = parseExternalVisual(raw);
+    if (visual.status !== 'found') throw new Error('visual_invalid');
+    sections[id] = visual;
+  }
+  return { sections, checked: Number(v.checked), total: Number(v.total), running: v.running };
+}
+
+/** One reviewer-level batch, with bounded polling and ephemeral owner-scoped URLs. */
+export function useReviewerVisuals(client: ExperienceClient, artifactId: string | null, offline: boolean): Record<string, ExternalReferenceVisual> | null {
+  const [state, setState] = useState<{ client: ExperienceClient; artifactId: string; sections: Record<string, ExternalReferenceVisual> } | null>(null);
+  useEffect(() => {
+    setState(null);
+    if (offline || !artifactId || !client.accessToken) return;
+    const controller = new AbortController();
+    const path = `/api/reviewers/${encodeURIComponent(artifactId)}/visuals`;
+    let alive = true, polls = 0, idle = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async (): Promise<ReviewerVisuals | null> => {
+      try {
+        const value = parseReviewerVisuals(await experienceRequest(client, path, { signal: controller.signal }));
+        if (alive && !controller.signal.aborted) setState({ client, artifactId, sections: value.sections });
+        return value;
+      } catch { return null; }
+    };
+    const poll = async () => {
+      const value = await load();
+      if (!alive || controller.signal.aborted) return;
+      polls++;
+      idle = value?.running ? 0 : idle + 1;
+      if (polls < 60 && idle < 4) timer = setTimeout(() => void poll(), 4000);
+    };
+    void (async () => {
+      const first = await load();
+      if (!alive || !first || (first.checked >= first.total && !first.running)) return;
+      if (!first.running) {
+        try { await experienceRequest(client, path, { method: 'POST', body: {}, signal: controller.signal }); }
+        catch { return; }
+      }
+      if (alive && !controller.signal.aborted) timer = setTimeout(() => void poll(), 4000);
+    })();
+    return () => { alive = false; controller.abort(); if (timer) clearTimeout(timer); };
+  }, [client, artifactId, offline]);
+  return !offline && state?.client === client && state.artifactId === artifactId ? state.sections : null;
 }

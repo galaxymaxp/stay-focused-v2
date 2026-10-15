@@ -5,13 +5,15 @@ import { ASSIST_TYPES, assistRequest, selectAssistBlock } from '@stay-focused/sh
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 import { createGenerationIntent } from '../../services/generationRecovery';
 
+const visuals=vi.hoisted(()=>({sections:{} as Record<string,import('../../services/externalVisuals').ExternalReferenceVisual>}));
+vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:(_client:unknown,_id:unknown,offline:boolean)=>offline?null:visuals.sections}));
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
 const figures=vi.hoisted(()=>({available:new Set<string>(),online:false}));
 vi.mock('./SourceFigures',()=>({
   SourceFigures:(props:{hasFigures:boolean;offline:boolean})=>props.hasFigures&&!props.offline?createElement('SourceFigures',props):null,
   useFigureAvailability:(_client:unknown,_id:unknown,offline:boolean)=>Object.assign(offline?new Set():figures.available,{online:!offline&&figures.online}),
 }));
-vi.mock('react-native', () => ({ View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+vi.mock('react-native', () => ({ View: 'View', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),
   Animated: { View: 'AnimatedView', Value: class { setValue() {} stopAnimation() {} interpolate() { return 1; } },
@@ -40,16 +42,17 @@ const { studyAssist, StudyAssistError } = await import('../../services/studyAssi
 const { assistStore } = await import('./assistStore');
 let rendered: ReactTestRenderer | undefined;
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.clearAllMocks(); assistStore.reset(); figures.available.clear(); figures.online=false; });
+afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.clearAllMocks(); assistStore.reset(); figures.available.clear(); figures.online=false; visuals.sections={}; });
 const detail = reviewerDetail();
 const reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const selection = selectAssistBlock(reviewer, reviewer.sections[0]!.id, reviewer.sections[0]!.blocks[0]!.id)!;
 const target = { selection };
 describe('snapshot discovery for persisted reviewer headers', () => {
-  it('offers external search only after online source discovery and hides it for source visuals/offline',async()=>{
+  it('shows batched references after source discovery and hides them for source visuals/offline',async()=>{
     figures.online=true;
+    visuals.sections[reviewer.sections[0]!.id]={status:'found',image:'https://upload.wikimedia.org/reference.png',title:'Reference',credit:'Author',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Reference.png',label:'External reference \u2014 not from your course material.',width:640,height:480,attemptCount:1};
     const props={artifact:detail.artifact,reviewer,deviceCopy:false};
-    const externalButtons=()=>rendered!.root.findAll(node=>node.props.accessibilityLabel==='Find a visual');
+    const externalButtons=()=>rendered!.root.findAll(node=>node.props.accessibilityLabel==='View external reference');
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,props));});
     expect(externalButtons()).toHaveLength(0);
     const snapshot=rendered!.root.findAll(node=>String(node.type)==='SourcePageSnapshot')[0]!;
@@ -61,6 +64,20 @@ describe('snapshot discovery for persisted reviewer headers', () => {
     figures.available.clear();figures.online=false;
     await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,props)));expect(externalButtons()).toHaveLength(0);
     figures.online=true;await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,{...props,deviceCopy:true})));expect(externalButtons()).toHaveLength(0);
+  });
+  it('activates course visual reads only for sections near the current scroll viewport',async()=>{
+    figures.online=true;
+    await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:detail.artifact,reviewer,deviceCopy:false}));});
+    const snapshot=()=>rendered!.root.findAll(node=>String(node.type)==='SourcePageSnapshot')[0]!;
+    expect(snapshot().props.visible).toBe(false);
+    const section=snapshot().parent!.parent!;
+    await act(async()=>section.props.onLayout({nativeEvent:{layout:{y:4000,height:1000}}}));
+    expect(snapshot().props.visible).toBe(false);
+    const page=rendered!.root.findAll(node=>String(node.type)==='Page')[0]!;
+    await act(async()=>page.props.onScroll({nativeEvent:{contentOffset:{y:3500},contentSize:{height:6000},layoutMeasurement:{height:800}}}));
+    expect(snapshot().props.visible).toBe(true);
+    await act(async()=>page.props.onScroll({nativeEvent:{contentOffset:{y:0},contentSize:{height:6000},layoutMeasurement:{height:800}}}));
+    expect(snapshot().props.visible).toBe(false);
   });
   it('uses batched figure availability per header and keeps the page fallback for other sections',async()=>{
     figures.available.add(reviewer.sections[0]!.id);

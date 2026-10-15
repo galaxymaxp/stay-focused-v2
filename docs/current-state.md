@@ -1,17 +1,27 @@
 # Current State
 
-## Consolidated showcase release in progress (2026-10-15)
+## Realignment and mobile visuals parity in progress (2026-10-15)
 
-VL3 guard review is owner-approved. Eleven production migrations are applied
-with RLS and private-bucket verification. PR #5 is merged at dfd5383. The merged-main LibreOffice worker is deployed
-as generation-worker-00026-dlz with dispatch IAM configured. The SDK 57 APK
-installed with the existing signature but physical launch exposed an incompatible
-query-string override. The override is removed; two real-serializer regressions
-and all 1,009 mobile tests pass. A second realme crash exposed Expo WebGL2
-inheritance incompatibility; the context adapter and static failure fallback are
-implemented. API/web are live from merged main; CIT17/CC17 preparation guards
-completed with 5/11 materials. Corrected APK/OTA and visual acceptance remain open. Resend has no verified domain; broad student email remains inactive.
-See [consolidated release evidence](ai/acceptance/release-20261014.md). Older entries below are historical milestones.
+Owner-approved finite scope: realign to main 150df38 (PRs #7/#8), deliver
+JS-only mobile automatic reviewer visuals and inline lazy course visuals,
+pass all quality gates, merge by PR, publish preview OTA, then verify existing
+Reviewers and finish notification/offline checks on the realme. No new manual
+Reviewer generations: the two PDF/PPTX smoke generations are complete.
+
+Main was fast-forwarded from d0fa50b to 150df38; pre-realignment edits are
+preserved locally on wip/pre-realign-20261015 at 6ad67bf. Clean-main fresh
+root typecheck passed 8/8 before edits. Cloud Run generation-worker-00027-rz2
+serves 100% from 150df38; authenticated health 200, unauthenticated 403.
+Supabase migration 20261015020000 was already applied and remains untouched.
+
+Mobile parity branch feat/mobile-reviewer-visuals-parity now has 1,024 passing
+mobile tests in 102 files (+15), fresh root typecheck/lint 8/8 and Expo Doctor
+21/21. Fresh root build also passes 8/8 (2m45.765s). PR/CI/merge, OTA, and physical acceptance are pending.
+Finished APK 12ab0357 (2.1.0/code 4, source f989710) is kept; mobile parity
+will arrive through OTA on runtime 2.1.0-sdk57. The existing account is preserved.
+Canvas schedule stays enabled every five minutes; owner automatic reviewers
+are restored. Broad student email stays off because no sending domain is owned.
+See [release evidence](ai/acceptance/release-20261014.md); older entries below are historical.
 
 ## VL3 Find a visual completed locally; rollout pending (2026-10-14)
 
