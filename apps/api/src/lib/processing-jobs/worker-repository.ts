@@ -143,7 +143,8 @@ export async function completeProcessingJob(
     readonly payload: Json;
     readonly metrics: Json;
   },
-  dependencies: { readonly prerender?: typeof prerenderSourcePageSnapshots; readonly figures?: typeof import("../source-figures/store").extractLocalPreparedFigures } = {},
+  dependencies: { readonly prerender?: typeof prerenderSourcePageSnapshots; readonly figures?: typeof import("../source-figures/store").extractLocalPreparedFigures;
+    readonly visuals?: typeof import("../external-visuals/batch").prepareReviewerVisuals } = {},
 ): Promise<ProcessingJobDatabaseRow> {
   const { data, error } = await client.rpc(input.resultType === "quiz_generation" ? "complete_quiz_processing_job" : input.resultType === "activity_generation" ? "complete_activity_processing_job" : "complete_processing_job_v2", {
     p_job_id: input.jobId,
@@ -166,18 +167,29 @@ export async function completeProcessingJob(
   if (input.resultType === 'reviewer_generation' && completed.status === 'succeeded') {
     // The RPC has committed the artifact, version and source before this lookup.
     // Both manual and automatic jobs use this single publication boundary.
+    let artifactId: string | null = null;
     try {
       const version = await client.from('generated_artifact_versions').select('artifact_id,source_version_id,user_id')
         .eq('generation_job_id', completed.id).eq('user_id', completed.user_id).eq('artifact_type', 'reviewer').maybeSingle();
       if (version.error || !version.data || version.data.user_id !== completed.user_id ||
           version.data.source_version_id !== completed.source_version_id) throw new Error('prerender_receipt_unavailable');
+      artifactId = version.data.artifact_id;
       const prerender = dependencies.prerender ?? (await import('../source-page-snapshot-prerender')).prerenderSourcePageSnapshots;
       await prerender(client, {
-        userId: completed.user_id, artifactId: version.data.artifact_id,
+        userId: completed.user_id, artifactId,
       });
     } catch {
       // No provider errors, IDs, paths or academic content in pre-render logs.
       console.warn('source_page_snapshot.prerender', { code: 'post_commit_failed', failureCount: 1 });
+    }
+    // Labeled reference visuals are prepared at publication so the reader shows them immediately.
+    if (artifactId) {
+      try {
+        const visuals = dependencies.visuals ?? (await import('../external-visuals/batch')).prepareReviewerVisuals;
+        await visuals(client, { userId: completed.user_id, artifactId });
+      } catch {
+        console.warn('external_visual.batch', { code: 'post_commit_failed', failureCount: 1 });
+      }
     }
   }
   return completed;
