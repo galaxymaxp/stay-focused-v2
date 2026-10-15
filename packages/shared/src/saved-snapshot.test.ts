@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { mergeSavedData, readSavedSnapshot, savedSnapshot, snapshotUpdatedLabel } from "./saved-snapshot";
+import { mergeSavedData, readSavedSnapshot, savedSnapshot, snapshotUpdatedLabel, stableSavedList } from "./saved-snapshot";
 
 describe("saved snapshots", () => {
+  it("keeps derived course groups in place when refreshed dates would sort them differently", () => {
+    expect(stableSavedList([{ key: "a", count: 1 }, { key: "b", count: 1 }],
+      [{ key: "b", count: 9 }, { key: "a", count: 2 }, { key: "new", count: 1 }], item => item.key))
+      .toEqual([{ key: "a", count: 2 }, { key: "b", count: 9 }, { key: "new", count: 1 }]);
+  });
   it("accepts the exact owner/query and preserves successful empty responses", () => {
     const value = savedSnapshot("a", "today:date:zone", { items: [] });
     expect(readSavedSnapshot(value, "a", value.key)).toEqual(value);

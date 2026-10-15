@@ -1,5 +1,6 @@
 "use client";
 import { SnapshotStatus } from "../components/snapshot-status";
+import { useStableSnapshotGroups } from "../lib/use-stable-snapshot-groups";
 import type {
   ActivityDraft,
   ActivityDraftContent,
@@ -148,7 +149,7 @@ export function LibraryScreen() {
   const library = useSavedLibrary();
   const { prefs, pin } = useListPreferences();
   const [search, setSearch] = useState("");
-  const groups = useMemo(() => groupLibraryByCourse(library.items), [library.items]);
+  const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items));
   const arranged = arrangeList(groups, (group) => group.key, prefs.pinned.course, []);
   const query = search.trim().toLowerCase();
   const found = query

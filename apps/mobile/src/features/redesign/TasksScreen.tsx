@@ -1,4 +1,5 @@
 import { SnapshotStatus } from "./SnapshotStatus";
+import { useStableSnapshotGroups } from "./useStableSnapshotGroups";
 import type { ActivityAttachment, ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { Plus, Circle, Pin, PinOff, Paperclip } from "lucide-react-native";
@@ -45,7 +46,7 @@ function identityFor(summary: Pick<TaskCourseSummary, "key" | "course">) {
 export function TasksScreen() {
   const { colors } = useTheme();
   const tasks = useExperience<{ items: ActivitySummary[] }>(activitiesPath(), 0, undefined, activitySummariesOfflineCache);
-  const courses = useMemo(() => summarizeTaskCourses(tasks.data?.items ?? []), [tasks.data]);
+  const courses = useStableSnapshotGroups(summarizeTaskCourses(tasks.data?.items ?? []));
   return (
     <Page
       title="Tasks"

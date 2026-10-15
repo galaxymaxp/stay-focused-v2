@@ -29,6 +29,17 @@ export function readSavedSnapshot<T>(value: unknown, ownerUserId: string, key: s
 export function mergeSavedData<T>(previous: T | null, next: T): T {
   return merge(previous, next) as T;
 }
+
+/** Preserve derived group positions even when a refreshed count/date changes its sort. */
+export function stableSavedList<T>(previous: readonly T[], next: readonly T[], identify: (item: T) => string): T[] {
+  const remaining = new Map(next.map(item => [identify(item), item]));
+  const result: T[] = [];
+  for (const item of previous) {
+    const key = identify(item);
+    if (remaining.has(key)) { result.push(remaining.get(key)!); remaining.delete(key); }
+  }
+  return [...result, ...remaining.values()];
+}
 function merge(previous: unknown, next: unknown): unknown {
   if (Array.isArray(previous) && Array.isArray(next)) {
     const identified = (value: unknown): value is { id: string } =>
