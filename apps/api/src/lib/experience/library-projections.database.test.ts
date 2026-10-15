@@ -127,6 +127,8 @@ describe('SP2 Library SQL projections', () => {
     await db.query('insert into quizzes values ($1,$2,$3,$4,$5,null,$6,$7,1,$8,$9,$10,$10)', [id(6000),owner,id(1),id(3000),id(1000),'Quiz',[`file:${id(4002)}`],'easy',[{ id: 'q', type: 'multiple_choice', prompt: 'Private question', options: [] }],stamp]);
     await db.query('insert into quiz_attempts values ($1,$2,$3,$4,$5,$5,80,$6,$7)', [id(6001),owner,id(6000),'completed',stamp,[],{}]);
     await db.query('insert into quiz_attempts values ($1,$2,$3,$4,$5,null,null,$6,$7)', [id(6002),owner,id(6000),'in_progress',stamp,[{ finalizedAt: stamp }],{ currentQuestion: 1, skipped: ['q'], revealed: [] }]);
+    await db.query('insert into activity_drafts values ($1,$2,$3,$4,$5,$6,$7,$8,$8,1,$9,$10,$10)', [id(7000),owner,id(1),id(7001),id(7002),'reflection',
+      {title:'Draft',sections:[{id:'section-1',heading:'Reflection',level:1,content:'Private draft body',order:1,sourceRefs:[]}],slides:[]},[],'draft',stamp]);
     const local = localClient(), repository = experienceRepository(local.client);
     const legacy = new ExperienceService({ repository: { rows: repository.rows }, materials: async () => ({ ok: true, value: sources }) });
     const current = new ExperienceService({ repository, materials: async () => ({ ok: true, value: sources }) });
@@ -137,8 +139,11 @@ describe('SP2 Library SQL projections', () => {
     expect((await repository.materialReviewers!(owner,id(1),[`file:${id(4002)}`])).get(`file:${id(4002)}`)).toBe(id(1000));
     expect(await current.getLibraryArtifact(owner, `artifact:${id(1001)}`)).toHaveProperty('reviewer');
     expect(normalize(await current.getLibrary(owner, { type: 'quiz' }))).toEqual(normalize(await legacy.getLibrary(owner, { type: 'quiz' })));
+    for (const artifactId of [`quiz:${id(6000)}`, `activity:${id(7000)}`]) {
+      expect(normalize(await current.getLibraryArtifact(owner, artifactId))).toEqual(normalize(await legacy.getLibraryArtifact(owner, artifactId)));
+    }
     const encoded = JSON.stringify(result);
-    for (const secret of ['sourceCore','explanation','Private question','metadata','payload','source_text']) expect(encoded).not.toContain(secret);
+    for (const secret of ['sourceCore','explanation','Private question','Private draft body','metadata','payload','source_text']) expect(encoded).not.toContain(secret);
   });
   it('binds every optimized read to the verified owner and denies foreign details', async () => {
     const local = localClient(), repo = trustedExperienceReadRepository(local.client, other);

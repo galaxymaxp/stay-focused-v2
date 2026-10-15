@@ -28,10 +28,17 @@ import { safeObjectKeyForCanvasFile } from "@/lib/canvas-file-policy";
 // evidence/paging/receipt path is covered by preparation/projection.test.ts.
 vi.mock('./canvas-preparation/projection', () => ({
   loadPreparationProjection: async (client: SupabaseClient<Database>, input: { userId: string; course: { id: string }; materialIds: readonly string[] }) => {
-    const { lookupMaterialPreparation } = await import('./canvas-preparation/admission');
-    return new Map(await Promise.all(input.materialIds.map(async materialId => [materialId, {
-      job: await lookupMaterialPreparation(client, { userId: input.userId, courseId: input.course.id, materialId }), control: null,
-    }] as const)));
+    // Keep synthetic preparation in this formatting fixture self-contained:
+    // loading the mutation/dispatch graph on the first assertion can exceed
+    // its 5s timeout under full-suite transform load. Real batching is unmocked
+    // in projection.test.ts; no product assertion is removed here.
+    return new Map(await Promise.all(input.materialIds.map(async materialId => {
+      const [type, id] = materialId.split(':');
+      if (type === 'page') return [materialId, { job: { state: 'prepared', result_id: 'synthetic-result' }, control: null }] as const;
+      const result = await client.from('canvas_files').select('*').eq('id', id!).eq('user_id', input.userId).eq('course_id', input.course.id).maybeSingle();
+      return [materialId, { job: result.data && ['stored','unchanged'].includes(result.data.ingestion_status)
+        ? { state: 'prepared', result_id: 'synthetic-result' } : null, control: null }] as const;
+    })));
   },
 }));
 import {

@@ -55,12 +55,14 @@ describe('SP2 batched preparation projection', () => {
   });
   it('projects 100 candidates and 100 visible statuses in two reads, without body bytes', async () => {
     const files = Array.from({length:100},(_,n)=>file(n));
-    const { client, reads } = fixture({});
+    const local = fixture({});
+    const { client, reads } = local;
     const projection = await loadPreparationProjection(client, { ...scope, files, materialIds: files.map(f=>`file:${f.id}`) });
     for (const [id,value] of projection) {
       expect(materialStatusFromProjection({ id, capability: 'needs_preparation', file: { kind: 'pdf' } } as CanvasReviewerSourceDescriptor, value)).toEqual({status:'preparing',reasonCode:null});
     }
     expect(projection.size).toBe(100); expect(reads).toHaveLength(2);
+    expect(local.bytes).toBe(4); // Two empty JSON pages, with no repeated source bodies.
     expect(reads.every(read => read.order.join() === (read.table === 'canvas_material_preparation_controls' ? 'material_id' : 'id'))).toBe(true);
   });
   it('rejects stale revisions, foreign owners/connections and missing/duplicate attachment evidence', async () => {
