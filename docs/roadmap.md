@@ -1,5 +1,35 @@
 # Roadmap
 
+## GA1b explicit course batch generation complete locally (2026-10-16)
+
+**PASS for the finite unattended code scope, STEP 0-3, gates, docs and local
+commits.** The owner's GA1b answers supersede GA1's STEP 0 deferral: saved explicit
+preparation requests are authorized, and confirmation omits generation minutes.
+The API/migration, mobile/web course controls and Queue integration are
+implemented. Auto baseline/off/past-course coverage gaps now have an explicit
+per-material path, with exact-current skip, stable source-version receipts,
+normal server quotas, independent Retry, pending cancellation and recovery.
+SP1/CQ1/QD1/SP2/SP2b/SH1 remain preserved.
+[Acceptance](ai/acceptance/ga1b-saved-course-batch-generation.md),
+[ADR-034](architecture/ADR-034-course-batch-generation.md).
+
+FRESH typecheck/lint **8/8 each, zero cached**; API **2,187 passed/3 existing
+skips**, mobile **1,072**, shared **269**, web **154** passed; standalone
+API/web/Android builds **1/1 each**. Six existing lint warnings, zero errors.
+Forced root build **FRESH PASS, 8/8 tasks, zero cached**. Implementation commits:
+`6f247f0` API/shared/migration, `2782bc3` mobile, `7a73181` web. Repaired failures
+and the interrupted first web build remain disclosed in acceptance.
+
+**Owner steps remaining:** Rollout and Device checks entirely skipped. Apply
+new migration `20261016010000_course_reviewer_batch_requests.sql` via the
+Supabase connector (filename as name), after preparation/quota/CQ1/SP2/SH1
+prerequisites; publish API/website/worker as appropriate and compatible preview
+OTA; confirm existing global poll scheduling and run CIT17/realme/web parity,
+quota, waiting, cancellation, Retry/Open and regression checks. Live deployment,
+database, Scheduler, actual latency and physical behavior are **UNVERIFIED
+(owner to confirm)**. No remote call, SQL/application, env edit, deployment,
+Scheduler action or push occurred. No later scope is authorized by this run.
+
 ## SH1 share reviewer links complete locally (2026-10-16)
 
 **PASS for the finite unattended SH0-approved SH1 code scope.** Owner share/copy/update/stop on web/mobile, anonymous frozen reader and local quiz, saved device assistance, attributed Wikimedia visuals, no private course images, safe sign-in returns, no public AI/database writes, RLS, bounded limiting and revocation/deletion handling are implemented and committed through `147db48`. SP1/CQ1/QD1/SP2/SP2b remain intact; GA1 batch generation is excluded. [Acceptance](ai/acceptance/sh1-public-share-links.md), [ADR-033](architecture/ADR-033-public-share-links.md).

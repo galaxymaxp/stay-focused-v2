@@ -3541,3 +3541,91 @@ also a follow-up. Neither gap authorizes work beyond SH1.
 
 No remote service call, remote SQL/migration application, environment-file edit,
 deployment, Cloud Scheduler action, push or outside-repository deletion occurred.
+
+## GA1b saved course batch generation - unattended local PASS (2026-10-16)
+
+**Status: PASS for STEP 0-3, all fresh serial gates, documentation and scoped
+local commits.** Resumed the uncommitted checkpoint at `d0eb70e` after rereading
+UNATTENDED rules, progress, log/status/diff, AUTOPILOT and planning evidence.
+Reused GA1 audit commits `2c0a02b`/`482cb6e`; no committed product work was redone.
+The owner's answers authorize saved requests and omit generation minutes.
+
+**What changed:** owner-authenticated preview/create and pending Cancel/Retry,
+source-version-unique saved requests with owner SELECT RLS/server-only mutations,
+atomic membership/admission/cancellation fences, exact-current Reviewer skip,
+normal quota-bound per-material jobs, and completion/global-poll recovery.
+Auto off and explicitly requested past courses use this path. Preparation
+failure or changed evidence ends intent without a loop; preview text never
+starts generation. Mobile/web have Generate all, selection/Select all,
+"Generate N reviewers", skipped titles and honest quota/capacity messages.
+QD1 includes waiting requests, Cancel/Retry, normal job Retry/Open and batch
+progress. Existing tokens/static controls respect Reduce Motion.
+
+**AG1/AG2 finding:** the gap is coverage, with visibility only for admitted jobs.
+`auto-reviewers/admission.ts:53` filters File/Page eligibility, `:64` requires
+newer timestamp evidence, `:132` honors Auto off and `:152` baselines old
+material. Limits are three/run, five/rolling day, three attempts and run budget;
+mapped reviewers/preparing material are skipped. `after-sync.ts:13` excludes
+past courses and `poll-trigger.ts:13` only discovers new module File/Page IDs
+from complete prior evidence. Explicit saved intent fills those gaps without
+changing Auto. Reviewer presence alone does not prove source freshness.
+
+**Reuse and resume:** `canvas-preparation/orchestration.ts:107` resumes matching
+requests before Auto; `notifications/canvas-poll.ts:125` recovers open requests
+before current-course eligibility. Every job uses `experience/generation.ts`
+and the existing transaction-serialized processing quota trigger. Timed caps
+return a possible retry threshold; capacity has no promised finish time.
+No new Scheduler or service is introduced. Existing Reviewer/Canvas selection,
+accepted source/preparation evidence, E2 saved study estimates and SP1/CQ1/QD1/
+SP2/SP2b/SH1 behavior remain intact. Full source references and acceptance matrix:
+[GA1b acceptance](acceptance/ga1b-saved-course-batch-generation.md),
+[ADR-034](../architecture/ADR-034-course-batch-generation.md).
+
+**Commits:**
+
+- `6f247f0 feat(api): persist quota-bound course reviewer batch requests`
+- `2782bc3 feat(mobile): generate course reviewers with saved batch progress`
+- `7a73181 feat(web): add course reviewer batches and Queue request controls`
+- Accompanying `docs: close GA1b with fresh batch generation acceptance`; final
+  hash and every subject are in the uncommitted `tmp/overnight/GA1b.status`.
+
+**Gates/counts, FRESH and serial:** `npm run typecheck -- --force`,
+`npm run lint -- --force`, `npm run build -- --force`: **8/8 tasks each,
+zero cached**. Lint has zero errors/six existing warnings (five mobile/one web).
+`npm run test --workspace @stay-focused/api`: **2,187 passed/3 existing skips,
+189 files**; mobile: **1,072/1,072 in 114**; shared: **269/269 in 27**, including
+existing emitted copies; web: **154/154 in 26**. Each corresponding
+`npm run build --workspace` command passes **1/1**: API 34/34 static pages,
+web 19/19, mobile `-- --platform android` one bundle/35 assets. Diff/staged
+whitespace checks pass with zero errors. All logs use repo-local TEMP/TMP and
+remain under ignored `tmp/overnight/GA1b-*`.
+
+**Failed attempts/limits:** first typecheck 7/8 successful, one strict readonly
+JSON narrowing error repaired without weakening types; mobile first full suite
+1,069 passed/3 fixture failures, repaired by isolating the new child, then all
+1,072 pass. Two new import-order warnings were repaired. The interrupted first
+web build had no completion result; resumed build passes with exit 0.
+No nondeterministic flake observed. Local path/patch discovery misses were
+resolved. Generated declarations/build outputs, tmp logs, unrelated UI/,
+mobile `.gitignore` and Supabase CLI temp metadata are excluded from commits.
+
+**UNVERIFIED (owner to confirm):** production API/web/worker revisions, applied
+migration history/live rows, global polling/Scheduler state, CIT17 inventory,
+real latency, ingress/native compatibility and physical behavior. These are
+outside unattended scope, not claims established by passing fixture tests.
+
+**Owner steps remaining:** Rollout and Device checks were entirely skipped.
+Apply `supabase/migrations/20261016010000_course_reviewer_batch_requests.sql`
+via the Supabase connector using its filename as name, after preparation/quota,
+CQ1, SP2 and SH1 prerequisites. Deploy API/website/Google worker as appropriate,
+confirm native preview compatibility and publish OTA. Confirm existing global
+poll scheduling; this run does not create/change/resume Scheduler. On CIT17,
+realme and website verify Generate all/selection, exact done skip, count/skipped
+confirmation, quota remainder/threshold, waiting preparation, Auto off/past-course
+completion, failed preparation/Retry, pending Cancel and normal Retry/Open with
+batch progress. Recheck SP1/CQ1/QD1/SP2/SP2b/SH1. The external roadmap GA1 status
+is reconciled locally; no later roadmap scope is started.
+
+No remote service call, remote SQL/migration application, deployment, email,
+Scheduler action, environment-file edit, push or outside-repository deletion
+occurred. The finite GA1b code endpoint is complete.

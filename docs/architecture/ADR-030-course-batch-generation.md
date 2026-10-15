@@ -3,6 +3,10 @@
 Date: 2026-10-15
 Status: **Deferred at STEP 0; no implementation decision accepted.**
 
+Superseded on 2026-10-16 by [ADR-034](ADR-034-course-batch-generation.md)
+after the owner's GA1b answers authorized saved requests and omitted minutes.
+The original STEP 0 findings below remain historical evidence.
+
 The authorized product intent is one normal Reviewer per selected eligible
 course material, with exact-revision skip logic, server quotas, idempotency,
 independent Retry, mobile/web parity and QD1 visibility. It is not a combined

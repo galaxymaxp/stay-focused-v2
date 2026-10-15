@@ -1,3 +1,29 @@
+# GA1b finite unattended scope complete locally (2026-10-16)
+
+Saved explicit batch requests, normal per-material generation under server quotas, course selection/confirmation and Queue on both platforms, tests, serial local gates, reconciled docs and scoped commits. Auto off, baseline and explicitly opened past courses are included. Confirmation omits generation minutes. All remote calls, rollout, device checks, environment-file edits and pushes are excluded. Prior GA1 audit is reused; SP1/CQ1/QD1/SP2/SP2b/SH1 are preserved.
+
+**PASS for STEP 0-3, gates, reconciled docs and scoped local commits.**
+App gates **FRESH PASS**: forced typecheck/lint **8/8
+each, zero cached**; API **2,187 passed/3 existing skips in 189 files**, mobile
+**1,072/1,072 in 114**, shared **269/269 in 27** (includes emitted copies), web
+**154/154 in 26**. Standalone API/web/Android builds **1/1 each** (34/34 and
+19/19 static pages, one Android bundle). Zero lint errors/six existing warnings.
+Forced root build **FRESH PASS, 8/8 tasks, zero cached**. Implementation commits:
+`6f247f0` API/shared/migration, `2782bc3` mobile, `7a73181` web. Details are in
+[acceptance](acceptance/ga1b-saved-course-batch-generation.md);
+[ADR-034](../architecture/ADR-034-course-batch-generation.md) supersedes ADR-030.
+Repaired first typecheck/mobile failures and interrupted web build are disclosed.
+
+**Owner steps remaining:** entirely skipped Rollout and Device checks, applying
+`supabase/migrations/20261016010000_course_reviewer_batch_requests.sql` after
+preparation/quota/CQ1/SP2/SH1 prerequisites, API/website/worker publication as
+needed, compatible preview OTA, confirmation of existing global polling and
+CIT17/realme/web generation/selection/skip/quota/wait/Cancel/Retry/Open parity.
+Live revisions, applied migrations/rows, Scheduler, latency and physical
+behavior are **UNVERIFIED (owner to confirm)**. No remote call, SQL/application,
+environment edit, deployment, Scheduler action or push. Finite endpoint only;
+no subsequent roadmap work is included.
+
 # Current Sprint
 
 ## SH1 finite unattended scope complete locally (2026-10-16)

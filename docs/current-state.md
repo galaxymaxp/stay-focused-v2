@@ -1,5 +1,38 @@
 # Current State
 
+## GA1b saved course batch generation complete locally (2026-10-16)
+
+**PASS for STEP 0-3, fresh serial gates, docs and local commits.** GA1's
+prerequisite questions are resolved by the owner's GA1b answers. Course
+Generate all and selection create normal per-material Reviewers, skip exact
+current reviewers, and retain owner-isolated preparation intent independently
+of Auto and current-course filtering. Pending requests support Cancel/Retry;
+normal jobs retain Retry/Open, server quotas and QD1 batch progress on mobile
+and web. Confirmation says "Generate N reviewers" without generation minutes.
+SP1/CQ1/QD1/SP2/SP2b/SH1 remain preserved. The historical GA1 STOP below is
+superseded by GA1b. [Acceptance](ai/acceptance/ga1b-saved-course-batch-generation.md),
+[ADR-034](architecture/ADR-034-course-batch-generation.md).
+
+FRESH app gates pass: forced typecheck/lint **8/8 each, zero cached**; API
+**2,187 passed / 3 existing skips**, mobile **1,072**, shared **269**, web **154**
+passed. Standalone API/web/Android builds **1/1 each**, 34/34 and 19/19 static
+pages/one Android bundle and 35 assets; zero lint errors/six existing warnings.
+Forced root build **FRESH PASS, 8/8, zero cached**. Implementation commits:
+`6f247f0` API/shared/migration, `2782bc3` mobile, `7a73181` web. Earlier failed
+attempts are retained in acceptance. Only unrelated untracked UI files,
+mobile `.gitignore` and Supabase CLI temp metadata remain outside these commits.
+
+**Owner steps remaining:** entirely skipped Rollout and Device checks. Apply
+`supabase/migrations/20261016010000_course_reviewer_batch_requests.sql` after
+preparation/quota/CQ1/SP2/SH1 prerequisites, deploy API/website/worker as needed,
+confirm native preview compatibility and publish OTA, then run CIT17/realme/web
+Generate all/selection/done skip, quota remainder, Auto off/past-course preparation,
+failed preparation/Retry, Cancel and Queue progress/Retry/Open checks. Confirm
+existing global poll scheduling; no Scheduler change was made. Live revisions,
+applied migrations/rows, Scheduler, latency and physical behavior remain
+**UNVERIFIED (owner to confirm)**. No remote service call, remote SQL/application,
+deployment, environment-file edit or push is part of GA1b.
+
 ## SH1 public reviewer links complete locally (2026-10-16)
 
 **PASS for the unattended SH1 code scope: STEP 0-5, fresh serial gates, docs and local commits.** Website and mobile create/copy/update/stop owner-scoped snapshot links; anonymous `/s/<token>` reads stored content and scores included quizzes in memory. Saved device-local Study Assist and attributed Wikimedia references are included; private account/source metadata, course page images and extracted figures are excluded. Public reads make no auth/model calls or database writes. RLS, bounded rate limiting, revocation, deletion cleanup and account-switch isolation are verified. Code tip `147db48`; [acceptance](ai/acceptance/sh1-public-share-links.md), [ADR-033](architecture/ADR-033-public-share-links.md). SP1/CQ1/QD1/SP2/SP2b are preserved; GA1 remains excluded.
