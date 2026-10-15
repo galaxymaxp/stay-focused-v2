@@ -84,7 +84,7 @@ export async function loadPreparationProjection(client: PreparationClient, input
         for (let offset = 0; offset < 10_000; offset += 200) {
           const result = await client.from('canvas_material_preparation_controls')
             .select('user_id,course_id,material_id,suppressed,automatic_attempts')
-            .eq('user_id', input.userId).eq('course_id', input.course.id).in('material_id', chunk).order('id').range(offset, offset + 199);
+            .eq('user_id', input.userId).eq('course_id', input.course.id).in('material_id', chunk).order('material_id').range(offset, offset + 199);
           if (result.error || !result.data) throw new Error('preparation_store_unavailable');
           for (const row of result.data) {
             if (row.user_id !== input.userId || row.course_id !== input.course.id || !chunk.includes(row.material_id)) continue;

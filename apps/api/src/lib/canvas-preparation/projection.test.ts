@@ -61,7 +61,7 @@ describe('SP2 batched preparation projection', () => {
       expect(materialStatusFromProjection({ id, capability: 'needs_preparation', file: { kind: 'pdf' } } as CanvasReviewerSourceDescriptor, value)).toEqual({status:'preparing',reasonCode:null});
     }
     expect(projection.size).toBe(100); expect(reads).toHaveLength(2);
-    expect(reads.every(read => read.order.join() === 'id')).toBe(true);
+    expect(reads.every(read => read.order.join() === (read.table === 'canvas_material_preparation_controls' ? 'material_id' : 'id'))).toBe(true);
   });
   it('rejects stale revisions, foreign owners/connections and missing/duplicate attachment evidence', async () => {
     const materialId = `file:${file(1).id}`;
@@ -84,7 +84,7 @@ describe('SP2 batched preparation projection', () => {
     const normal = fixture({ canvas_material_preparations: rows });
     const result = await loadPreparationProjection(normal.client, { ...scope, files,materialIds:files.map(f=>`file:${f.id}`) });
     expect([...result.values()].filter(value => value.job?.state === 'prepared')).toHaveLength(201);
-    expect(normal.reads).toHaveLength(6); expect(normal.reads.every(read => read.order.join() === 'id')).toBe(true);
+    expect(normal.reads).toHaveLength(6); expect(normal.reads.every(read => read.order.join() === (read.table === 'canvas_material_preparation_controls' ? 'material_id' : 'id'))).toBe(true);
     const capped = fixture({},true);
     await expect(loadPreparationProjection(capped.client,{...scope,materialIds:[`file:${file(1).id}`]})).rejects.toThrow('preparation_inventory_incomplete');
     expect(capped.reads.filter(read=>read.table==='canvas_material_preparations')).toHaveLength(50);
