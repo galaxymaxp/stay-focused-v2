@@ -2804,3 +2804,68 @@ viewport/physical results remain historical evidence for the source patches.
 branch push, manual deployment, paid calls, private fixtures or environment
 files. Original dirty mobile docs/design and website evidence directories
 remain untouched. Next: owner laptop/fullscreen review.
+
+## F0S - autopilot base moved to main `079986c` (2026-10-15)
+
+**Status: PASS for the unattended F0S scope.** Created
+`overnight/2026-10-15_feedback` directly at released GitHub main
+`079986c2568d067ea49595f9b4862dac98db2fc0` (PR #10). Starting checkout was
+`overnight/2026-10-13_0132` at `20b12c5`, with no tracked changes or existing
+F0S progress/commits. The new branch did not exist. No committed work was redone.
+
+**Fetch path:** added `github` as
+`https://github.com/galaxymaxp/stay-focused-v2.git`, then successfully ran
+`git fetch github main`. Local release-clone fallback was NOT RUN; stale
+local-path `origin` is unchanged. Required ancestor `079986c` equals fetched
+main. All 37 overnight-added migration paths exist there, including both named
+visual migrations and `20261013000500_offline_activity_draft_copies.sql`.
+STEP 2.3 added non-doc source paths absent from main: **none**.
+
+**Untracked preservation:** 23 initial files: `UI/README.md`, ten screenshots
+under each of `UI/screenshots/dark/` and `UI/screenshots/light/`,
+`apps/mobile/.gitignore`, and `supabase/.temp/cli-latest`. None collide with a
+tracked path in main; moved untracked files: **none**. All remain untouched.
+Runner files under `tmp/` remain uncommitted.
+
+**Install:** FRESH `npm ci --no-audit --no-fund` PASS (1,495 packages, 2m),
+Node v24.16.0/npm 11.13.0; no lockfile/engine mismatch or fallback attempt.
+Deprecation warnings were recorded. `package-lock.json` is unchanged.
+
+**FRESH baseline gates at `079986c`, run serially:**
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck -- --force` | PASS: 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | PASS: 8/8 tasks, 0 cached; 0 errors, 5 existing mobile import-order warnings |
+| `npm test -w @stay-focused/shared` | PASS: 134 tests, 13 files |
+| `npm test -w @stay-focused/canvas` | PASS: 75 tests, 1 file |
+| `npm test -w @stay-focused/api -- --maxWorkers=4` | First run: 2,095 passed / 1 failed / 3 skipped, 178 passed / 1 failed files; unchanged full rerun PASS: 2,096 passed / 3 skipped, 179 files |
+| `npm test -w @stay-focused/mobile` | PASS: 1,026 tests, 102 files |
+| `npm test -w @stay-focused/web` | PASS: 84 tests, 13 files |
+| `npm run build -- --force` | PASS: 8/8 tasks, 0 cached; API 34/34 pages, web 19/19 pages; Expo 68 assets, 8 web bundles, 1 Android bundle, 1 iOS bundle |
+| `git diff --check` | PASS: 0 whitespace errors; also checked after generated-file restoration and documentation edits |
+
+**Failed first attempt / flake:** API test
+`src/lib/canvas-reviewer-sources.test.ts:157`, "lists only selected-course
+descriptors without source bodies", exceeded its unchanged 5,000ms timeout
+(5,665ms reported). The same full suite and four-worker cap passed on rerun;
+no product code, test, timeout or validation setting was changed. Vite's existing
+CommonJS/ESM config warning was recorded. The API's three skips remain explicit.
+All tests used repository-local `.local/test-temp` via TEMP/TMP/TMPDIR; no
+Windows Temp cleanup. Full local evidence: `tmp/overnight/F0S.*.log`, gate
+results `F0S.gates.json`, and the separate `F0S.api-rerun.log`. Next.js generated
+changes to both `next-env.d.ts` files were inspected and restored before commits.
+
+**Commits:** `c2b1cec docs(ai): reconcile F0S released-main baseline` updates
+current-state, roadmap and sprint as required by AGENTS.md. This footer is
+committed alone as `docs(ai): record autopilot base on released main`; its final
+hash and both commit subjects are recorded in `tmp/overnight/F0S.status`.
+All commits use author `galaxymaxp <omgraythekid@gmail.com>`.
+
+**UNVERIFIED (owner to confirm):** deployed revisions, live database/migration
+rows, Scheduler and physical-device behavior. This run establishes a local Git
+and validation baseline only. No Supabase, Vercel, Google Cloud, Canvas or Resend
+call, deployment, remote SQL, Scheduler change, environment-file edit or push
+occurred. Rollout and Device checks were skipped entirely; F0S defines no such
+actions. **Owner steps remaining: none for F0S.** SP0 is the next separate item;
+no later tester-feedback work was started.
