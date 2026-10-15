@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ auth: vi.fn(), client: vi.fn(), get: vi.fn(), 
 vi.mock('@/lib/auth', () => ({ verifyBearerToken: mocks.auth }));
 vi.mock('@/lib/canvas-db', () => ({ createCanvasServiceClient: mocks.client }));
 vi.mock('@/lib/reviewer-shares/owner', () => ({ getOwnerShare: mocks.get, mutateOwnerShare: mocks.mutate }));
-import { GET, POST, PATCH, DELETE } from '../../../../app/api/experience/shares/[artifactId]/route';
+import { GET, POST, PATCH, DELETE } from '@/../app/api/experience/shares/[artifactId]/route';
 const id = '11111111-1111-4111-8111-111111111111';
 const context = { params: Promise.resolve({ artifactId: id }) };
 const req = (method: string, body?: unknown) => new Request('https://example.test/api/experience/shares/' + id,
