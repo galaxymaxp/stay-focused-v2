@@ -54,6 +54,8 @@ function courseMatches(course: GenerateCourseSummary, query: string) {
 export function GenerateScreen() {
   const courses = useExperience<GenerateCourseList>("/api/experience/courses");
   const { unsyncCourse } = useCanvasSync();
+  const client = useExperienceClient();
+  const [showPast, setShowPast] = useState(false);
   const { prefs, pin, hide } = useListPreferences();
   const { reducedMotion } = useTheme();
   const [showHidden, setShowHidden] = useState(false);
@@ -62,7 +64,8 @@ export function GenerateScreen() {
   const searching = query.trim().length > 0;
   const allCourses = courses.data?.items ?? [];
   const matching = searching ? allCourses.filter((course) => courseMatches(course, query)) : allCourses;
-  const arranged = arrangeList(matching, (course) => course.id, prefs.pinned.course, prefs.hidden.generate);
+  const pastCourses = matching.filter(course => course.courseState === "past" || (!course.courseState && course.period === "previous"));
+  const arranged = arrangeList(matching.filter(course => !pastCourses.includes(course)), (course) => course.id, prefs.pinned.course, prefs.hidden.generate);
   const courseGroups = [
     ...(arranged.pinned.length ? [{ key: "pinned", title: "Pinned", items: arranged.pinned }] : []),
     ...generateCourseGroups(arranged.rest),
@@ -82,6 +85,14 @@ export function GenerateScreen() {
     update();
   }
 
+  async function moveCourse(course: GenerateCourseSummary) {
+    setNote(null);
+    try {
+      await experienceRequest(client, `/api/experience/courses/${encodeURIComponent(course.id)}/state`, { method: 'PATCH', body: { override: course.courseState === 'past' || (!course.courseState && course.period === 'previous') ? 'current' : 'past' } });
+      courses.refresh();
+    } catch { setNote('Could not move this course. Try again.'); }
+  }
+
   async function unsync(course: GenerateCourseSummary) {
     setNote(null);
     const done = await unsyncCourse(course.id);
@@ -92,6 +103,9 @@ export function GenerateScreen() {
   // Swipe right pins; swipe left hides (or stops syncing) — the same
   // directions as Today and Announcements.
   function actions(course: GenerateCourseSummary, hidden: boolean) {
+    if (course.courseState === 'past' || (!course.courseState && course.period === 'previous')) return {
+      leading: [], pinned: false, trailing: [{ key: 'course-state', label: 'Move to current', icon: CloudOff, tone: 'neutral', onPress: () => void moveCourse(course) } satisfies SwipeAction],
+    };
     const pinned = prefs.pinned.course.includes(course.id);
     const leading: SwipeAction[] = hidden ? [] : [
       { key: "pin", label: pinned ? "Unpin" : "Pin", icon: pinned ? PinOff : Pin, tone: "accent", onPress: () => change(() => pin("course", course.id, !pinned)) },
@@ -104,6 +118,7 @@ export function GenerateScreen() {
             ? [{ key: "unsync", label: "Unsync", icon: CloudOff, tone: "warning", onPress: () => void unsync(course) } satisfies SwipeAction]
             : []),
         ];
+    trailing.push({ key: 'course-state', label: 'Move to past courses', icon: CloudOff, tone: 'neutral', onPress: () => void moveCourse(course) });
     return { leading, trailing, pinned };
   }
 
@@ -173,6 +188,17 @@ export function GenerateScreen() {
           }) : null}
         </View>
       ) : null}
+      {pastCourses.length > 0 ? (
+        <View style={{ gap: spacing[2] }}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPast }} accessibilityLabel={`Past courses (${pastCourses.length})`} onPress={() => change(() => setShowPast(value => !value))} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Copy>Past courses ({pastCourses.length})</Copy>
+          </Pressable>
+          {showPast ? pastCourses.map(course => {
+            const swipe = actions(course, false);
+            return <SwipeRow key={course.id} trailing={swipe.trailing}><GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} /></SwipeRow>;
+          }) : null}
+        </View>
+      ) : null}
     </Page>
   );
 }
@@ -207,6 +233,16 @@ export function GenerateCourseScreen() {
   const [error, setError] = useState<string | null>(null);
   const { colors } = useTheme();
   const course = workspace.data?.course;
+  const { syncCourse } = useCanvasSync();
+  const openedPast = useRef<string | null>(null);
+  const syncPast = useRef(syncCourse);
+  syncPast.current = syncCourse;
+  useEffect(() => {
+    const key = ownerKey + courseId;
+    if (course?.courseState !== 'past' || openedPast.current === key) return;
+    openedPast.current = key;
+    void syncPast.current({ id: courseId, displayName: course.name });
+  }, [course?.courseState, course?.name, courseId, ownerKey]);
   const identity = useMemo(
     () => courseIdentity({ id: courseId, name: course?.name ?? (firstParam(params.courseName) || "Course"), code: course?.code ?? (firstParam(params.courseCode) || null) }),
     [course?.code, course?.name, courseId, params.courseCode, params.courseName],
@@ -248,7 +284,7 @@ export function GenerateCourseScreen() {
   }
 
   return (
-    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={workspace.refresh} headerBelow={<SnapshotStatus {...workspace} refreshing={workspace.refreshing || savedPages.refreshing} error={workspace.error ?? savedPages.error} />} headerLeading={<CourseMark identity={identity} size={34} />}>
+    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={() => { if (course?.courseState === 'past') void syncCourse({ id: courseId, displayName: course.name }); workspace.refresh(); }} headerBelow={<SnapshotStatus {...workspace} refreshing={workspace.refreshing || savedPages.refreshing} error={workspace.error ?? savedPages.error} />} headerLeading={<CourseMark identity={identity} size={34} />}>
       {workspace.loading && !workspace.data ? <GenerateSkeleton rows={4} /> : null}
       {workspace.error && !workspace.data && workspace.errorCode === "course_not_synced" ? (
         <Surface>
@@ -393,8 +429,8 @@ export function GenerateMaterialScreen() {
       const intent = await createGenerationIntent(
         session.user.id,
         type === "reviewer"
-          ? { title: material.title, type, path: "/api/experience/generations", body: { courseId: material.courseId, materialId: material.id } }
-          : quizIntentInput({ title: material.title, reviewerArtifactId: material.reviewerArtifactId! }),
+          ? { courseId: material.courseId, title: material.title, type, path: "/api/experience/generations", body: { courseId: material.courseId, materialId: material.id } }
+          : { ...quizIntentInput({ title: material.title, reviewerArtifactId: material.reviewerArtifactId! }), courseId: material.courseId },
       );
       router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
     } catch (cause) {

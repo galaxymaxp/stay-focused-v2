@@ -1,4 +1,5 @@
 import type {
+  GenerateCourseList,
   GenerationView,
   ProcessingJobListPage,
   ProcessingJobStatusView,
@@ -15,6 +16,7 @@ import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
   acceptGeneration,
+  attributeGenerationIntent,
   discardGenerationIntents,
   readGenerationIntents,
   type GenerationIntent,
@@ -284,15 +286,30 @@ export function QueueScreen() {
     "/api/jobs?scope=all&limit=50",
     5000,
   );
+  const courses = useExperience<GenerateCourseList>('/api/experience/courses');
   const { session } = useAuth();
+  const client = useExperienceClient();
+  const attributed = useRef(new Set<string>());
   const [pending, setPending] = useState<GenerationIntent[]>([]),
     [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     if (session)
       void readGenerationIntents(session.user.id)
-        .then((items) => {
+        .then(async (items) => {
           if (live) setPending(items.filter((item) => !item.generationId));
+          // Read saved requests immediately, then resolve older missing course
+          // attribution once per mount. Refresh explicitly retries failures.
+          for (const item of items.filter(item => !item.generationId && !item.courseId)) {
+            if (!live) break;
+            const key = `${session.user.id}:${item.key}`;
+            if (attributed.current.has(key)) continue;
+            attributed.current.add(key);
+            try {
+              const resolved = await attributeGenerationIntent(session.user.id, client, item);
+              if (live) setPending(current => current.map(old => old.key === resolved.key ? resolved : old));
+            } catch { /* An unresolved request remains available for Retry. */ }
+          }
         })
         .catch(() => {
           if (live)
@@ -303,20 +320,23 @@ export function QueueScreen() {
     return () => {
       live = false;
     };
-  }, [session, queue.data]);
+  }, [session, client, queue.data]);
   const { prefs, hide } = useListPreferences();
   const cleared = new Set(prefs.hidden.queue);
   const jobs = (queue.data?.jobs ?? []).filter((job) => !cleared.has(job.id));
   const sections = queueSections(jobs);
   const attention = sections.find((section) => section.key === "attention")?.jobs ?? [];
   const completed = sections.find((section) => section.key === "completed")?.jobs ?? [];
-  const needsAttention = attention.length > 0 || pending.length > 0;
+  const pastIds = new Set(courses.data?.items.filter(course => course.courseState === 'past' || (!course.courseState && course.period === 'previous')).map(course => course.id) ?? []);
+  const visiblePending = pending.filter(item => !pastIds.has(item.courseId ?? (typeof item.body.courseId === 'string' ? item.body.courseId : '')));
+  const needsAttention = attention.length > 0 || visiblePending.length > 0;
   async function clearAttention() {
     for (const job of attention) hide("queue", job.id, true);
-    if (session && pending.length) {
+    if (session && visiblePending.length) {
       try {
-        await discardGenerationIntents(session.user.id, pending.map((item) => item.key));
-        setPending([]);
+        const cleared = new Set(visiblePending.map(item => item.key));
+        await discardGenerationIntents(session.user.id, [...cleared]);
+        setPending(items => items.filter(item => !cleared.has(item.key)));
       } catch {
         setError("Could not clear saved requests on this device.");
       }
@@ -326,7 +346,7 @@ export function QueueScreen() {
     <Page
       title="Queue"
       back
-      onRefresh={queue.refresh}
+      onRefresh={() => { attributed.current.clear(); queue.refresh(); courses.refresh(); }}
     >
       {queue.error && <Notice>{queue.error}</Notice>}
       {error && <Notice>{error}</Notice>}
@@ -337,7 +357,7 @@ export function QueueScreen() {
           <Action secondary label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action>
         </View>
       ) : null}
-      {pending.map((item) => (
+      {visiblePending.map((item) => (
         <Surface key={item.key}>
           <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}
             onPress={() =>
@@ -367,7 +387,7 @@ export function QueueScreen() {
           ))}
         </View>
       ))}
-      {queue.data && jobs.length === 0 && pending.length === 0 && (
+      {queue.data && jobs.length === 0 && visiblePending.length === 0 && (
         <Surface>
           <Copy size="h3">Nothing in your Queue</Copy>
           <Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they’re made, then stay in Library.</Copy>

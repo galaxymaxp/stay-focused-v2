@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acceptGeneration,
+  attributeGenerationIntent,
   createGenerationIntent,
   readGenerationIntents,
 } from "./generationRecovery";
@@ -21,6 +22,18 @@ const input = {
 };
 beforeEach(() => values.clear());
 describe("durable generation admission", () => {
+  it.each(['quiz', 'activity_output'] as const)('attributes an older %s request without starting generation or changing its key', async type => {
+    const intent = await createGenerationIntent('owner', { title: 'Saved request', type,
+      path: type === 'quiz' ? '/api/experience/quizzes' : '/api/experience/activities/canvas%3Aassignment/generate',
+      body: type === 'quiz' ? { reviewerArtifactId: 'reviewer' } : { mode: 'draft' },
+    });
+    const fetchImpl = vi.fn(async () => Response.json({ ok: true, data: type === 'quiz' ? { artifact: { course: { id: 'past-course' } } } : { course: { id: 'past-course' } } }));
+    const result = await attributeGenerationIntent('owner', { baseUrl: 'https://api.example', accessToken: 'token', fetchImpl }, intent);
+    expect(result).toMatchObject({ key: intent.key, courseId: 'past-course' });
+    expect(fetchImpl.mock.calls).toHaveLength(1);
+    expect((await readGenerationIntents('owner'))[0]?.courseId).toBe('past-course');
+    expect(await readGenerationIntents('other')).toEqual([]);
+  });
   it("persists admission identity before contacting the server and scopes it to the owner", async () => {
     const intent = await createGenerationIntent("owner-a", input);
     expect(await readGenerationIntents("owner-a")).toEqual([intent]);

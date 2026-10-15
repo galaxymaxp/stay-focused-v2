@@ -105,7 +105,7 @@ vi.mock("../../design/CourseViews", () => ({
   CourseTile: "CourseTile",
 }));
 vi.mock("../sync/CanvasSyncProvider", () => ({
-  useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync, unsyncCourse: mocks.unsync, selectedCourseIds: mocks.selectedCourseIds, courseStates: {} }),
+  useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync, syncCourse: mocks.sync, unsyncCourse: mocks.unsync, selectedCourseIds: mocks.selectedCourseIds, courseStates: {} }),
 }));
 vi.mock("./useListPreferences", () => ({
   useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead }),
@@ -517,7 +517,7 @@ describe("B25 screen interactions", () => {
     });
     expect(onCommit).toHaveBeenLastCalledWith(360, 1080);
   });
-  it("groups current before previous courses and routes only synced courses to materials", async () => {
+  it("collapses past courses below current courses and routes only synced courses to materials", async () => {
     mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
       generateCourse({ id: "current", name: "Current synced" }),
       generateCourse({ id: "unsynced", name: "Current unsynced", syncState: "not_synced" }),
@@ -525,8 +525,11 @@ describe("B25 screen interactions", () => {
       generateCourse({ id: "course", name: "Previous synced", period: "previous" }),
     ] };
     const root = await render(createElement(GenerateScreen));
-    const text = root.findAll((node) => String(node.type) === "Copy").map((node) => String(node.props.children));
-    expect(text.indexOf("Current courses")).toBeLessThan(text.indexOf("Previous courses"));
+    expect(root.findAll(node => String(node.type) === 'CourseCard')).toHaveLength(2);
+    const past = root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Past courses (2)')[0]!;
+    expect(past.props.accessibilityState.expanded).toBe(false);
+    await act(async () => past.props.onPress());
+    expect(past.props.accessibilityState.expanded).toBe(true);
     const rows = root.findAll((node) => String(node.type) === "CourseCard");
     expect(rows.map((node) => node.props.accessibilityLabel)).toEqual([
       "Open Current synced, Synced", "Sync Current unsynced, Not synced · Tap to sync", "Sync Previous failed, Sync incomplete · Tap to retry", "Open Previous synced, Synced",
@@ -539,6 +542,35 @@ describe("B25 screen interactions", () => {
     // Opening a course is a navigation entry, so back returns to this list.
     expect(mocks.push).toHaveBeenLastCalledWith({ pathname: "/courses/[courseId]", params: { courseId: "course", courseName: "Previous synced", courseCode: "" } });
     expect(mocks.paths.some((path) => path.startsWith("/api/experience/courses/"))).toBe(false);
+  });
+  it('keeps a pinned past course collapsed and offers both owner move controls', async () => {
+    mocks.data['/api/experience/courses'] = { classificationSource: 'canvas', items: [
+      generateCourse({ id: 'current', name: 'Current', courseState: 'current' }),
+      generateCourse({ id: 'past', name: 'Past', courseState: 'past' }),
+    ] };
+    mocks.prefs.pinned.course = ['past'];
+    mocks.request.mockResolvedValueOnce({}).mockResolvedValueOnce({});
+    const root = await render(createElement(GenerateScreen));
+    expect(root.findAll(node => String(node.type) === 'CourseCard').map(node => node.props.identity.title)).toEqual(['Current']);
+    const current = root.findAll(node => String(node.type) === 'SwipeRow')[0]!;
+    await act(async () => current.props.trailing.find((action: { key: string }) => action.key === 'course-state').onPress());
+    expect(mocks.request).toHaveBeenLastCalledWith(expect.anything(), '/api/experience/courses/current/state', { method: 'PATCH', body: { override: 'past' } });
+    await act(async () => root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Past courses (1)')[0]!.props.onPress());
+    const past = root.findAll(node => String(node.type) === 'SwipeRow')[1]!;
+    expect(past.props.leading ?? []).toEqual([]);
+    await act(async () => past.props.trailing.find((action: { key: string }) => action.key === 'course-state').onPress());
+    expect(mocks.request).toHaveBeenLastCalledWith(expect.anything(), '/api/experience/courses/past/state', { method: 'PATCH', body: { override: 'current' } });
+    expect(mocks.refresh).toHaveBeenCalledTimes(2);
+  });
+  it('refreshes a past-course open once and a later explicit refresh once more', async () => {
+    mocks.params = { courseId: 'course' };
+    mocks.data['/api/experience/courses/course'] = { ...workspace, course: { ...workspace.course, courseState: 'past' } };
+    const root = await render(createElement(GenerateCourseScreen));
+    expect(mocks.sync).toHaveBeenCalledExactlyOnceWith({ id: 'course', displayName: workspace.course.name });
+    await act(async () => rendered!.update(createElement(GenerateCourseScreen)));
+    expect(mocks.sync).toHaveBeenCalledTimes(1);
+    await act(async () => root.findAll(node => String(node.type) === 'Page')[0]!.props.onRefresh());
+    expect(mocks.sync).toHaveBeenCalledTimes(2);
   });
   it("gives every Generate course the same title-first identity", async () => {
     mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
@@ -1002,7 +1034,7 @@ describe("B25 screen interactions", () => {
     ] };
     const generate = await render(createElement(GenerateScreen));
     const generateRows = generate.findAll((node) => String(node.type) === "SwipeRow");
-    expect(generateRows.map(keys)).toEqual([[["pin"], ["hide", "unsync"]], [["pin"], ["hide"]]]);
+    expect(generateRows.map(keys)).toEqual([[["pin"], ["hide", "unsync", "course-state"]], [["pin"], ["hide", "course-state"]]]);
     // A normal tap still opens the course.
     await act(async () => generate.findAll((node) => String(node.type) === "CourseCard")[0]!.props.onPress());
     expect(mocks.push).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/courses/[courseId]" }));
@@ -1030,7 +1062,7 @@ describe("B25 screen interactions", () => {
     type Action = { key: string; onPress: () => void };
     mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [
       generateCourse({ id: "first", name: "First" }),
-      generateCourse({ id: "pinned", name: "Pinned one", period: "previous" }),
+      generateCourse({ id: "pinned", name: "Pinned one", period: "previous", courseState: 'current', courseStateOverridden: true }),
       generateCourse({ id: "hidden", name: "Hidden one" }),
     ] };
     mocks.prefs.pinned.course = ["pinned"];

@@ -1,3 +1,4 @@
+import { experienceRequest } from "../../services/experienceApi";
 import { router } from "expo-router";
 import { Check, ChevronDown, CircleHelp, Search, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -72,6 +73,7 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [otherSpacesExpanded, setOtherSpacesExpanded] = useState(false);
+  const [pastExpanded, setPastExpanded] = useState(false);
   const [options, setOptions] = useState<CanvasCourseInventoryItem | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const request = useCallback(() => {
@@ -128,7 +130,8 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
     [focusCourseId, load],
   );
   const matches = ordered.filter((course) => matchesCourseQuery(course, query));
-  const groups = splitSyncCourses(matches);
+  const pastCourses = matches.filter(course => course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded'));
+  const groups = splitSyncCourses(matches.filter(course => !pastCourses.includes(course)));
   const visible = visibleSyncCourses(groups.courses, query, expanded);
   const hasFailedCourse = [...visible.items, ...(otherSpacesExpanded ? groups.otherSpaces : [])].some((course) => courseStates[course.id] === "failed");
 
@@ -248,9 +251,15 @@ export function CanvasSyncScreen({ focusCourseId = null }: { focusCourseId?: str
           ) : null}
         </>
       ) : null}
+      {connected && pastCourses.length > 0 ? <View style={{ gap: spacing[2] }}><Disclosure expanded={pastExpanded} label={`Past courses (${pastCourses.length})`} onPress={() => { animateNextLayout(reducedMotion); setPastExpanded(value => !value); }} />{pastExpanded ? <Surface style={{ padding: 0, gap: 0, overflow: 'hidden' }}>{pastCourses.map((course, index) => <SyncCourseRow key={course.id} course={course} first={index === 0} revealDelay={null} state={syncRowState(course, courseStates[course.id])} onSync={() => void sync(course)} onOptions={() => setOptions(course)} />)}</Surface> : null}</View> : null}
       {options ? (
         <CourseOptions
           course={options}
+          onMove={() => {
+            const input = request(), course = options;
+            if (!input) return;
+            void experienceRequest({ baseUrl: input.apiBaseUrl, accessToken: input.accessToken }, `/api/experience/courses/${encodeURIComponent(course.id)}/state`, { method: 'PATCH', body: { override: course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded') ? 'current' : 'past' } }).then(() => reload(true)).catch(() => setNote('Could not move this course. Try again.'));
+          }}
           onClose={() => setOptions(null)}
           onSyncAgain={() => void sync(options)}
           onUnsync={() => {
@@ -438,11 +447,13 @@ function Disclosure({ expanded, label, onPress, testID = "canvas-course-disclosu
 
 /** Everything beyond syncing lives here, one tap away from a synced course. */
 function CourseOptions({
+  onMove,
   course,
   onClose,
   onSyncAgain,
   onUnsync,
 }: {
+  onMove: () => void;
   course: CanvasCourseInventoryItem;
   onClose: () => void;
   onSyncAgain: () => void;
@@ -462,6 +473,7 @@ function CourseOptions({
       <RowLink label="Grades" onPress={then(() => router.push({ pathname: COURSE_GRADES_PATHNAME, params: courseRouteParams({ courseId: course.id, courseName: course.displayName }) }))}>
         <Copy>Grades</Copy>
       </RowLink>
+      <RowLink label={course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded') ? 'Move to current' : 'Move to past courses'} onPress={then(onMove)}><Copy>{course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded') ? 'Move to current' : 'Move to past courses'}</Copy></RowLink>
       <RowLink label="Sync again" onPress={then(onSyncAgain)}>
         <Copy>Sync again</Copy>
       </RowLink>

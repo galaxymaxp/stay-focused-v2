@@ -254,6 +254,7 @@ export function ActivityScreen() {
     setError(null);
     try {
       const intent = await createGenerationIntent(session.user.id, {
+        ...(activity.data.course ? { courseId: activity.data.course.id } : {}),
         title: activity.data.title,
         type: "activity_output",
         path: `/api/experience/activities/${encodeURIComponent(activity.data.id)}/generate`,

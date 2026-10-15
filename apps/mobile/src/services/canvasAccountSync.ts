@@ -44,7 +44,7 @@ export function selectedSyncCourses(
 ): readonly AccountSyncCourse[] {
   const selected = new Set(payload.selectedCourseIds);
   return payload.courses
-    .filter((course) => selected.has(course.id) && course.selectable)
+    .filter((course) => selected.has(course.id) && course.selectable && (course.courseState ? course.courseState === 'current' : course.classification !== 'past_or_concluded'))
     .map((course) => ({ id: course.id, displayName: course.displayName }));
 }
 

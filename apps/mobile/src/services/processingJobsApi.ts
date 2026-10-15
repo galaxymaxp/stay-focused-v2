@@ -223,7 +223,7 @@ export async function createReviewerJob(
 }
 
 export async function getProcessingJobStatus(
-  input: ProcessingJobApiInput & { readonly jobId: string },
+  input: ProcessingJobApiInput & { readonly jobId: string; readonly queueOnly?: boolean },
 ): Promise<ProcessingJobApiResult<ProcessingJobStatusView>> {
   const setup = validateApiInput(input);
   if (!setup.ok) return setup;
@@ -231,7 +231,7 @@ export async function getProcessingJobStatus(
     ...setup.data,
     fetchImpl: input.fetchImpl,
     method: "GET",
-    path: `${JOBS_PATH}/${encodeURIComponent(input.jobId)}`,
+    path: `${JOBS_PATH}/${encodeURIComponent(input.jobId)}${input.queueOnly ? '?scope=queue' : ''}`,
     timeoutMs: MOBILE_JOB_STATUS_TIMEOUT_MS,
     operation: "status check",
   });

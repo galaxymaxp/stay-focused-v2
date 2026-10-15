@@ -11,6 +11,8 @@ import {
 } from "./experienceApi";
 
 export interface GenerationIntent {
+  /** Local display attribution only; never sent as generation input. */
+  courseId?: string;
   key: string;
   title: string;
   type: LibraryArtifactType;
@@ -42,6 +44,7 @@ export async function readGenerationIntents(
       entry !== null &&
       typeof entry.key === "string" &&
       typeof entry.title === "string" &&
+      (entry.courseId === undefined || typeof entry.courseId === 'string') &&
       ["reviewer", "quiz", "activity_output"].includes(entry.type) &&
       typeof entry.path === "string" &&
       entry.path.startsWith("/api/experience/") &&
@@ -92,6 +95,27 @@ export async function createGenerationIntent(
   const intent = { ...input, key: newRequestKey() };
   await save(owner, intent);
   return intent;
+}
+
+/** Attribute older saved requests using existing owner-authenticated projections.
+ * Missing evidence keeps the request visible; it never implies deletion. */
+export async function attributeGenerationIntent(owner: string, client: ExperienceClient, intent: GenerationIntent): Promise<GenerationIntent> {
+  if (intent.courseId) return intent;
+  let courseId = typeof intent.body.courseId === 'string' ? intent.body.courseId : null;
+  if (!courseId) {
+    const activity = /^\/api\/experience\/activities\/([^/]+)\/generate$/.exec(intent.path);
+    if (activity) {
+      const detail = await experienceRequest<{ course: { id: string } | null }>(client, `/api/experience/activities/${activity[1]}`);
+      courseId = detail.course?.id ?? null;
+    } else if (intent.type === 'quiz' && typeof intent.body.reviewerArtifactId === 'string') {
+      const detail = await experienceRequest<{ artifact: { course: { id: string } | null } }>(client, `/api/experience/library/${encodeURIComponent(`artifact:${intent.body.reviewerArtifactId}`)}`);
+      courseId = detail.artifact.course?.id ?? null;
+    }
+  }
+  if (!courseId) return intent;
+  const attributed = { ...intent, courseId };
+  await save(owner, attributed);
+  return attributed;
 }
 /** Submission is not tied to a screen's lifetime. HTTP 202 work runs on the server. */
 export function acceptGeneration(

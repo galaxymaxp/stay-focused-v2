@@ -145,6 +145,7 @@ function useRemakeReviewer() {
     setNote(null);
     try {
       const intent = await createGenerationIntent(session.user.id, {
+        courseId: item.course.id,
         title: item.title,
         type: "reviewer",
         path: "/api/experience/generations",

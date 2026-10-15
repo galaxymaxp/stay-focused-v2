@@ -53,6 +53,8 @@ export type CanvasCourseClassification =
 export type CanvasCourseSyncStatus = "success" | "partial" | "failed";
 
 export interface CanvasCourseInventoryItem {
+  readonly courseState?: 'current' | 'past';
+  readonly courseStateOverridden?: boolean;
   readonly id: string;
   readonly displayName: string;
   readonly courseCode: string | null;
@@ -3077,6 +3079,8 @@ function isCanvasCourseInventoryItem(
 ): value is CanvasCourseInventoryItem {
   return (
     isRecord(value) &&
+    (value.courseState === undefined || value.courseState === 'current' || value.courseState === 'past') &&
+    (value.courseStateOverridden === undefined || typeof value.courseStateOverridden === 'boolean') &&
     typeof value.id === "string" &&
     typeof value.displayName === "string" &&
     (value.courseCode === null || typeof value.courseCode === "string") &&

@@ -46,6 +46,25 @@ function job(
 const input = { apiBaseUrl: "https://api.example", accessToken: "token" };
 
 describe("account Canvas sync", () => {
+  it('skips automatic and manually past courses during routine sync; current override wins', () => {
+    const payload = inventory([
+      course('past', { courseState: 'past' }),
+      course('current', { courseState: 'current', classification: 'past_or_concluded' }),
+      course('default', { courseState: 'current', classification: 'other_or_uncertain' }),
+    ], ['past', 'current', 'default']);
+    expect(selectedSyncCourses(payload).map(item => item.id)).toEqual(['current', 'default']);
+  });
+  it('explicitly refreshes a past course once using one content/grades pair', async () => {
+    const past = course('past', { courseState: 'past' });
+    const startCourse = vi.fn(async (_course: { id: string }, type: CanvasSyncJobStatusView['jobType']) => ({ ok: true as const, data: job(type, 'succeeded', null, 'past', type) }));
+    const saveSelection = vi.fn();
+    const result = await selectAndSyncCourse(input, past, {
+      readSelection: async () => ({ ok: true, data: { selectedCourseIds: ['past'] } }), saveSelection, startCourse,
+    });
+    expect(result.jobs).toHaveLength(2);
+    expect(startCourse.mock.calls.map(([, type]) => type)).toEqual(['course_content', 'course_grades']);
+    expect(saveSelection).not.toHaveBeenCalled();
+  });
   it("refreshes only selected, selectable courses and never changes the selection", async () => {
     const payload = inventory([course("a"), course("b", { selectable: false }), course("c")], ["a", "b"]);
     expect(selectedSyncCourses(payload).map((item) => item.id)).toEqual(["a"]);

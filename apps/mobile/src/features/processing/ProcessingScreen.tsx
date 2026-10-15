@@ -164,6 +164,7 @@ export function ProcessingScreen({ onBack }: ProcessingScreenProps) {
           apiBaseUrl,
           accessToken,
           jobId: reference.jobId,
+          queueOnly: true,
         });
         if (status.ok) {
           byId.set(status.data.id, status.data);
