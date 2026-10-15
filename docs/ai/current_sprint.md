@@ -1,5 +1,9 @@
 # Current Sprint
 
+## Tester feedback (2026-10-15)
+
+- SP0 **PASS**, docs only: [speed audit](../architecture/sp0-speed-audit.md) `588bbf1`; FRESH web build PASS (19 static pages/28 routes), Library tests 9/9, final hook probes 2/2, service observations 12/12, docs hygiene PASS; harness/tooling failures retained in handoff; production/CIT17/regions/capacity **UNVERIFIED (owner to confirm)**; no rollout/device/service actions or product edits; next separate item SP1, with CQ1/SP2 inputs recorded.
+
 ## F0S complete: released-main baseline (2026-10-15)
 
 Finite scope: verify the starting checkout, fetch released GitHub main, confirm

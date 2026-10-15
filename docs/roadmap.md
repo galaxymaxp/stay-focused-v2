@@ -1,5 +1,21 @@
 # Roadmap
 
+## Tester feedback SP0 complete (2026-10-15)
+
+**PASS, docs only:** [SP0 speed audit](architecture/sp0-speed-audit.md), commit
+`588bbf1`, establishes screen/cache/API/query/sync/hosting baselines and ranked
+code-only fixes plus owner region/capacity decisions. SP1 should reuse mobile
+SQLite Library behavior and add missing screen snapshots; CQ1 must account for
+term/enrollment evidence absent from stored courses; SP2 starts with preparation
+N+1 and exact-id/summary reads. No later item's implementation was started.
+
+FRESH web build PASS (19 static pages, 28 routes), mobile Library 9/9 tests,
+final hook probes 2/2, synthetic service observations 12/12, docs hygiene PASS;
+failed harness/tooling attempts are recorded. Actual production/device timing,
+CIT17 Default Term counts and deployed region/capacity remain **UNVERIFIED
+(owner to confirm)**. Owner-present rollout and Device checks remain excluded.
+This supersedes the F0S "SP0 next" statement below; next separate item is SP1.
+
 ## Tester feedback F0S complete (2026-10-15)
 
 **PASS:** the autopilot base is now `overnight/2026-10-15_feedback`, created

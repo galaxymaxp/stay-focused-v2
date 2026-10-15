@@ -2869,3 +2869,102 @@ call, deployment, remote SQL, Scheduler change, environment-file edit or push
 occurred. Rollout and Device checks were skipped entirely; F0S defines no such
 actions. **Owner steps remaining: none for F0S.** SP0 is the next separate item;
 no later tester-feedback work was started.
+
+## SP0 unattended speed audit (2026-10-15)
+
+**Status: PASS for the docs-only local SP0 scope.** Read the full SP0 prompt,
+including overriding UNATTENDED rules, the tester-feedback roadmap's full
+SP0/SP1/CQ1/SP2 sections, root policy/AUTOPILOT and current planning state.
+Starting branch `overnight/2026-10-15_feedback`, HEAD `89dd1b8`, F0S PASS,
+tracked tree clean. Preserved unrelated untracked `UI/`,
+`apps/mobile/.gitignore`, `supabase/`; no product code or migration was edited.
+
+Deliverable: [SP0 speed audit](../architecture/sp0-speed-audit.md), covering Today,
+Courses/course workspace, Tasks, Library, Reviewer and Queue/processing on mobile
+and the student website, API/query costs, cache boundaries, complete Canvas sync,
+EP1 admission/200/25 guard, bundles/hosting, and concrete SP1/CQ1/SP2 inputs.
+Current-state/roadmap are reconciled and sprint has the requested tester-feedback
+line. Older F0S "SP0 next" descriptions are superseded by these current entries.
+
+**Top 5 findings:**
+
+1. Course preparation status checks run sequentially before pagination, then
+   repeat for the visible page: simple 100 File/Page candidates imply 300 serial
+   reads plus 400 visible-page reads, excluding inventory/auth. Batch evidence,
+   revision-matched receipts and controls without weakening identity checks.
+2. Library/detail/material badge assembly loads full owner histories before
+   filtering. Synthetic 240-reviewer Library case: 18 emulated table-page reads,
+   18,900,915 DB JSON bytes for 38,123 bytes of summaries; one reviewer still
+   reads 18,879,565 bytes. These are synthetic observations, not live wire sizes.
+3. Main resource hooks wait for network on fresh visits. Mobile Tasks has SQLite
+   snapshots but does not read them until connection failure; mobile Library and
+   saved Reviewer already display local content before a remote answer.
+4. Courses reads live Canvas inventory and writes course rows before returning
+   saved course state. This introduces Canvas latency into ordinary navigation.
+5. Website Library fetches all pages before publishing first content. Its isolated
+   unchanged hook hid an available first page while page two was held for 100 ms.
+
+Further findings include overlapping Today context/auth calls, serial Library
+groups, background hydration amplification, duplicate job polling, static Three.js
+on Today (315 kB First Load JS), heavy read-route imports, and owner decisions
+about region/capacity. The stored course schema has course dates/workflow and
+term id, but not term dates/concluded/enrollment evidence. CQ1 must keep undated
+Default Term cases current absent explicit completion or manual override.
+
+**Commits:**
+
+- `588bbf1 docs(architecture): SP0 speed audit` — audit only.
+- Companion local commit `docs(ai): reconcile SP0 audit checkpoint` — this
+  handoff, sprint, current-state and roadmap; its final hash and both subjects
+  are recorded in `tmp/overnight/SP0.status` after commit, avoiding a self-hash.
+
+Both use author `galaxymaxp <omgraythekid@gmail.com>`. No push.
+
+**Gates and measurements (FRESH, implementation baseline `89dd1b8`):**
+
+| Command / evidence | Exact result |
+| --- | --- |
+| `npm run build -w @stay-focused/web` | PASS, exit 0; 1/1 build, compilation 3.6 s, 19/19 static pages, 28 route entries; every route size is in the audit |
+| `npm run test -w @stay-focused/mobile -- src/features/redesign/useLocalLibrary.test.ts` | PASS, 9/9 tests, 1/1 file, test duration 195 ms / total 764 ms; TEMP/TMP under `.local/test-temp` |
+| `node_modules/.bin/vitest.cmd run --config tmp/overnight/SP0.hooks.config.ts` | Final PASS, 2/2 tests, 1/1 file: 11 resource-hook cases plus website Library all-pages gate; test time 1.34 s / total 1.70 s |
+| `node_modules/.bin/tsx.cmd --tsconfig apps/api/tsconfig.json tmp/overnight/SP0.measure.ts` | PASS, exit 0, 12/12 observations: six real service methods against synthetic typed rows, zero/20 ms injected page delays; no network clients |
+| `node tmp/overnight/SP0.verify-docs.cjs` | PASS: 100/100 explicit audit file:line references exist/in range; staged paths all Markdown under docs (1/1 in audit commit, 4/4 in companion commit) |
+| `git diff --check` | PASS, 0 whitespace errors on final owned docs |
+| `git diff --cached --check` | PASS, 0 whitespace errors before each commit |
+| Docs-only scope | PASS: 5 changed paths total, all docs Markdown; generated web `next-env.d.ts` inspected and restored |
+| Root typecheck/lint/full suites/mobile build | NOT APPLICABLE, docs only; F0S baseline results were not relabeled as fresh SP0 results |
+| Production, rollout, physical-device/browser live timings | NOT RUN under UNATTENDED rules; live claims UNVERIFIED (owner to confirm) |
+
+**Failed attempts / tooling:** initial 1-test resource probes passed; one repeat
+added JSON capture because console output was suppressed. Expanding the probe to
+the full web Library module first produced **1 passed / 1 failed** on Vite JSX
+import parsing, before Library assertions; only the temporary harness was changed
+to extract the unchanged private hook in memory. Final 2/2 passed; product files,
+timeouts and assertions were not weakened. Failed log is
+`tmp/overnight/evidence/SP0-hook-measure-jsx-failed.log`. The normal Vite future
+native-config CommonJS/ESM warning remains. No flake observed. Two attempted
+Python helper commands could not start (Python unavailable); a later inline Node
+reference-check command failed from PowerShell quote handling. File-based Node
+helpers completed reconciliation/reference checking. Both Git diff gates were
+green even in that combined inline-helper attempt. These tooling failures are
+retained separately from the successful product build and tests.
+
+Local scripts/logs/JSON stay under `tmp/overnight/` and are not committed. Audit
+embeds measurements needed by future items. Progress is `SP0.progress` and final
+machine status/commit list is `SP0.status`.
+
+**UNVERIFIED (owner to confirm):** actual per-screen cold/warm first-content
+timings, actual API payload sizes and query plans, CIT17 sync split into Canvas/
+DB/preparation admission, CIT17 Default Term/date/enrollment counts, deployed
+API/website/DB/worker regions/revisions, current Cloud Tasks/worker limits,
+provider quotas, live backlog/cold starts and physical behavior. Tokyo DB/worker
+versus iad1 API is repository/historical evidence, not a fresh service check.
+
+**Owner steps remaining:** confirm those live measurements/classification facts;
+decide SP2 region/capacity trade-offs. **Rollout** and **Device checks** were
+skipped entirely and remain owner-present work for later RB3 (migration/deploy/
+OTA as applicable, realme/website saved-first/offline/account isolation/current-
+past/Queue/generation checks and before/after timings). SP0 itself requires no
+rollout because it changes no product behavior. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, remote SQL, deployment, Scheduler change, environment-file
+edit or push occurred. Next separate item is SP1; this run stops at SP0.

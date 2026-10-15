@@ -1,5 +1,24 @@
 # Current State
 
+## SP0 speed audit complete (2026-10-15)
+
+**PASS for the local docs-only SP0 scope.** [Speed audit](architecture/sp0-speed-audit.md)
+at `588bbf1` maps both platforms' main screens, caches, API/database costs,
+Canvas sync/preparation, hosting evidence and bundle sizes. Leading findings:
+pre-pagination preparation N+1 (700 reads in a simple 100-material example),
+whole-owner artifact/body scans, network-first screen loads, live Canvas inventory
+on Courses, and the website Library's all-pages publication gate. No product fix
+or schema change was made. This supersedes the F0S "SP0 next" checkpoint below.
+
+FRESH: web build PASS (19 static pages, 28 routes; Today First Load JS 315 kB),
+mobile local Library tests 9/9, final hook probes 2/2 (11 resource cases plus web
+Library), synthetic service probe 12/12 observations, and docs diff hygiene PASS.
+The audit/handoff retain the failed JSX harness attempt and tooling limitations.
+Production timings, CIT17 course/Default Term counts, deployed regions and queue
+capacity remain **UNVERIFIED (owner to confirm)**. Rollout/Device checks were
+skipped; no service calls, environment edits, push or later feature work occurred.
+Next separate item: SP1 saved-first screens; CQ1 and SP2 have audit inputs.
+
 ## F0S released-main base established (2026-10-15)
 
 **PASS for the unattended F0S scope.** Branch
