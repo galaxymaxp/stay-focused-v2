@@ -11,12 +11,12 @@ describe("Knowledge Core state model", () => {
     expect(coreMotionRate("complete", false, 0.5)).toBeGreaterThan(coreMotionRate("complete", false, 1));
   });
 
-  it("stops only on failure; Reduced Motion slows to a drift instead of freezing", () => {
+  it("stops ambient motion on failure and under Reduce Motion", () => {
     expect(coreMotionRate("error", false, 0)).toBe(0);
     expect(coreMotionRate("error", true, 0)).toBe(0);
     for (const state of CORE_STATES.filter((value) => value !== "error")) {
       const reduced = coreMotionRate(state, true, CORE_MOTION_PROFILES[state].completion);
-      expect(reduced).toBeGreaterThan(0);
+      expect(reduced).toBe(0);
       expect(reduced).toBeLessThanOrEqual(REDUCED_MOTION_RATE);
     }
   });
@@ -33,7 +33,7 @@ describe("Knowledge Core state model", () => {
     expect(spin("complete")).toBeLessThan(spin("idle"));
     expect(spin("error")).toBe(0);
     for (const state of CORE_STATES.filter((value) => value !== "error")) {
-      expect(coreSpinTarget(state, true)).toBeGreaterThan(0);
+      expect(coreSpinTarget(state, true)).toBe(0);
       expect(coreSpinTarget(state, true)).toBeLessThanOrEqual(spin("complete"));
     }
     expect(coreSpinTarget("error", true)).toBe(0);
