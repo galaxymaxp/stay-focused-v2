@@ -1,5 +1,14 @@
 # Roadmap
 
+## Tester feedback QD1 complete locally (2026-10-15)
+
+**PASS for the unattended QD1 code scope (STEP 0-4, gates, docs and local commits).** Queue now opens over the current screen from the mobile/web header. Shared owner-scoped sources replace duplicate list polling, with running-only badges, unseen failure dots, progress, Retry, and the latest five completed entries from the existing bounded Queue window. Mobile keeps Auto, pending request recovery and outside/Back dismissal; web has native keyboard activation, focus entry/return and Escape/outside dismissal. Old Queue routes open the overlay; the separate processing notification target, SP1 and CQ1 remain intact. Code tip: `1183369`; [acceptance](ai/acceptance/qd1-queue-dropdown.md), [ADR-029](architecture/ADR-029-queue-dropdown.md).
+
+FRESH final serial verification: forced typecheck/lint/root build **8/8 tasks each, zero cached**; mobile **1,056/1,056 in 110 files**, web **113/113 in 20 files**, zero skips. Standalone API/web/Android builds **1/1 each** (34/34 and 19/19 static pages; Android 1 bundle/35 assets). Lint: zero errors, five existing mobile warnings plus one existing web warning. Failed draft and first gate attempts remain in acceptance; no nondeterministic flake observed. API/shared tests **NOT APPLICABLE** because their source is unchanged.
+
+**Owner steps remaining:** deploy website, publish preview OTA, then run the entirely skipped Rollout/Device checks on realme and website, including Retry/Open, old links, Back/outside dismissal, Reduce Motion and website keyboard/focus. Deployed revisions, database/Scheduler state and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service action, remote SQL/migration application, deployment, Scheduler action, environment-file edit or push occurred. QD1 adds no migration/API/worker change. Next separate roadmap item: GA1; this finite QD1 run ends here.
+
+
 ## Tester feedback CQ1 complete locally (2026-10-15)
 
 **PASS for the unattended CQ1 code scope (STEP 0-4, gates, docs and local commits).** Current courses show by default; past courses stay in collapsed sections on mobile and website with owner controls to move either way. Shared Canvas conclusion/enrollment/course/term evidence drives the automatic rule; Default Term without completion evidence stays current. Past-course work is omitted from Today, Tasks, calendar, Queue, notification fan-out, routine sync and eager preparation. Explicit opens/refreshes sync once; Library reviewers and quizzes remain labelled and available. Code tip: `6d8759e`; [acceptance](ai/acceptance/cq1-current-and-past-courses.md), [ADR-028](adr/ADR-028-current-and-past-courses.md).

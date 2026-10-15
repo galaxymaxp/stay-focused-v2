@@ -3052,3 +3052,69 @@ Logs/helpers/progress stay under `tmp/overnight/`; test temp stays under `.local
 **Owner steps remaining:** apply migration files `20261015030000` then `20261015030100`, publish API/website/worker and preview OTA, then run the entirely skipped Rollout/Device checks on realme and website. CIT17 Default Term identities/counts, live course evidence, deployed revisions/database/Scheduler state, actual speed and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service call, remote SQL/migration application, deployment, Scheduler action, environment-file edit or push occurred. Next separate roadmap item: QD1; this finite CQ1 run ends here.
 
 Documentation reference check: FRESH PASS, 10/10 CQ1 local links. The first helper scanned historical roadmap sections and flagged an unrelated old RB1 link; limiting the helper to CQ1 additions passed without changing historical content.
+
+## QD1 unattended header Queue - 2026-10-15
+
+**Status: PASS for local code scope.** STEP 0-4, fresh serial gates, documentation
+and local commits complete on `overnight/2026-10-15_feedback`. Queue is now a
+header dropdown/popover over the current screen on both platforms. One owner-
+scoped source per platform supplies jobs and counts, preserving 5 s active /
+30 s idle foreground polling. Running-only badges, unseen failed/expired dots,
+progress/Retry/Open and five recent completed entries reuse the existing grouping
+and bounded history projection. Mobile retains Auto, pending intent recovery,
+past-course filtering and outside/Back dismissal; web uses native button
+activation, dialog focus, Esc/outside dismissal and focus return. Legacy Queue
+routes open the overlay. The distinct processing notification/deep-link target,
+SP1 saved-first screens and CQ1 current/past behavior remain intact.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>, no push):
+
+- `6beec6a` refactor(queue): share header data and bounded history grouping
+- `c94d529` feat(mobile): open generation queue under the header
+- `1183369` feat(web): replace the queue page with a header popover
+- Documentation: `docs: record QD1 header queue acceptance` (this entry's scoped
+  commit; final hash in `tmp/overnight/QD1.status` and Git log).
+
+FRESH final serial gates: forced typecheck **8/8**, forced lint **8/8**, forced
+root build **8/8**, all **0 cached**. Mobile tests **1,056/1,056 in 110 files**;
+web **113/113 in 20 files**; **0 skipped**. Standalone API build **1/1, 34/34 static
+pages**, web **1/1, 19/19 static pages**, Android export **1/1, 1 bundle/35 assets**.
+Diff and staged-diff hygiene **0 errors**. Lint has **0 errors**, five existing
+mobile warnings and one existing web Library warning. API/shared tests **NOT
+APPLICABLE** (their source unchanged). Logs remain under tmp/overnight; tests use
+repo-local TEMP/TMP. Next-generated declarations restored; no generated output
+or private fixture committed.
+
+Failures retained: first root typecheck **4/6 tasks, 0 cached, 12 TS diagnostics**;
+second **4/6, 0 cached, 3 diagnostics**, fixed strict test callback/ref typing.
+First lint **5/8, 0 cached, web 1 error/2 warnings**; fixed const/dependency and all
+13 new mobile warnings revealed by an intermediate passing lint. The first lint
+launch briefly overlapped typecheck; only the final sequential runner counts as
+serial evidence. First expanded mobile focus run **20 passed/1 failed** (test-tree
+serialization), next **21 passed/3 failed** (mock identity/memoization, including
+one 5-second harness timeout); fixed, final focus runs **24/24 mobile**, **18/18
+web**, then full suites passed. Earlier draft source-extraction/token/encoding
+and local helper failures are documented in acceptance. No nondeterministic
+product flake observed; no validation weakened or unrelated work overwritten.
+
+Production revisions, live database/Scheduler state and physical behavior are
+**UNVERIFIED (owner to confirm)**. Code/migrations/docs supported STEP 0; there was
+no uncovered Queue notification dependency or source contradiction. No remote
+service action, remote SQL/migration application, deployment, Scheduler change,
+environment-file edit, push or deletion outside the repository occurred.
+
+**Owner steps remaining:** Rollout and Device checks were entirely skipped.
+Deploy website and publish preview OTA; check realme and website for running
+count, dropdown over current screen, Retry/Open, old links, outside/Android Back,
+Reduce Motion and website Enter/Space/Esc/focus return. Complete earlier CQ1
+migration/API/worker owner rollout separately before combined RB3 acceptance.
+QD1 needs no migration or API/worker deployment. No further approval question
+is pending; this run ends at QD1 and does not start GA1.
+
+[Acceptance](acceptance/qd1-queue-dropdown.md),
+[ADR-029](../architecture/ADR-029-queue-dropdown.md). Reconciled current-state,
+repo roadmap, current sprint and the external tester-feedback roadmap QD1 status.
+Unrelated untracked UI/, apps/mobile/.gitignore and supabase/ were preserved.
+
+Final docs hygiene first found one extra sprint EOF blank line; repaired, then
+final diff/staged-diff checks passed with zero errors.
