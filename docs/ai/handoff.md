@@ -3319,3 +3319,116 @@ plans, Scheduler state, Canvas/CIT17 counts, real speed, capacity and physical
 behavior are **UNVERIFIED (owner to confirm)**. No remote service call, remote
 SQL/application, environment-file edit, deployment, Scheduler action, push or
 outside-repository deletion occurred.
+
+## SP2b remaining speed findings — unattended local PASS (2026-10-15)
+
+**PASS, local code scope only.** Baseline `41377cc` (SP2 PASS), branch
+`overnight/2026-10-15_feedback`. Resume inspected the prompt (UNATTENDED first),
+progress, last 15 commits, status and diff; STEP 1-4 were already committed and
+were not redone. Completed the interrupted STEP 5 client work and API contract,
+STEP 6, serial gates and docs. [Full acceptance](acceptance/sp2b-read-path-speed.md),
+[ADR-032](../architecture/ADR-032-today-and-job-read-context.md).
+
+Implementation commits (this footer is the documentation checkpoint):
+
+- `7a79a3a perf(api): open Courses from stored owner inventory`
+- `7dfcd13 perf(today): bundle activity reads within one verified request`
+- `5cb63ad perf(web): defer Today WebGL until useful content paints`
+- `8151f68 perf(api): isolate read models from document and generation imports`
+- `99de167 perf(queue): share owner-scoped status and generation detail reads`
+- `8db0f3b test(sp2b): reconcile Today fixtures and shared polling effects`
+- `19028c5 fix(mobile): follow generation screen focus in shared job reads`
+
+Reopened current locations after baseline line drift; paths without prefixes are
+under `apps/api/src/lib`:
+
+| Finding | Baseline inspection -> final implementation |
+|---|---|
+| 4 | `canvas-course-selection.ts:100`, `experience/http.ts:31` -> stored branch `:119`, parallel `storedInventory:286`, `experience/http.ts:8` |
+| 7 | mobile `TodayScreen.tsx:75`, web `today-screen.tsx:80` -> `:68` / `:77`; `experience/service.ts:158`; `auth.ts:4`, `experience/task-state.ts:5` remain verified server paths |
+| 8 | web `DayRingClock.tsx:13`, `DayOrb.tsx:3` -> `DeferredDayOrb.tsx:9`; mobile `DayOrb.tsx:4` unchanged |
+| 10 | experience catch-all `route.ts:3,20`, `experience/http.ts:4`, `canvas-reviewer-sources.ts:1` -> catch-all `route.ts:3,17`, `experience/read-http.ts:1` and lightweight quiz/activity/Office metadata modules |
+| 13 | web `queue.tsx:195`, `queue-button.tsx:12`; mobile `AppActivityProvider.tsx:10` -> jobs `route.ts:139`, `experience/service.ts:320`, shared web/mobile Queue hooks |
+
+QD1 already shared mobile header/list polling, so that existing portion was
+retained. Website's two sequential detail requests and mobile's separate detail
+poller still needed fixing. No contradictory code requiring a scope change or
+owner decision was found. First-ever empty Courses inventory still uses the
+existing live discovery and `classificationSource: canvas`; stored inventory
+reports `stored`. Existing sync reconciliation, selection and CQ1 grouping stay.
+
+**Before/after, FRESH local deterministic evidence:**
+
+| Finding | Before | After |
+|---|---|---|
+| 4: stored Courses | 1+ Canvas pages; 1 upsert; at least 5 DB ops after auth | 0 Canvas; 0 writes; 4 data reads + connection read; last 3 parallel |
+| 7: Today, single-page fixture | 4 requests; 16 data + 8 auth/activity calls | 1 request; 9 distinct table reads + 2 auth/activity calls; equivalent results |
+| 8: website `/today` fresh First Load JS | 320 kB | 198 kB |
+| 10: dedicated Today built NFT heavy package entries | 375 PDF.js path entries | 0; 79 total trace files |
+| 13: detail + header | 2 sequential detail requests plus header polling; mobile extra detail poller | 1 shared Queue/detail request and poller |
+
+Courses/Today counts are asserted by tests; builds/logs live uncommitted under
+`tmp/overnight/SP2b.*`. The preserved trace baseline has 375 entries; STEP 0's
+372 shorthand is superseded by that exact file count. Mobile Three.js remains
+**1,292,907 raw bytes**, not a Metro bundle contribution: no behavior-neutral
+chunk deferral was established in this scope. Dedicated Today sheds native/PDF
+packaging; the mixed experience catch-all still packages dynamic write assets.
+Static dependency graph tests verify both read entry points avoid heavy handlers.
+No cold-start or production millisecond result is claimed.
+
+The additive `detailId` response uses one verified owner, reuses page rows and
+uses one exact scoped fallback for older/past-course direct links. CQ1 exclusions
+still apply to Queue lists. Extraction status, Retry/Open, persisted-result
+checks, cancellation without results and account cleanup are preserved. Mobile
+retained screens release/reacquire detail on focus changes; active detail/list
+poll every 3/5 seconds, idle every 30, with visibility/background handling.
+Legacy endpoints remain compatible. Today retains SP1 snapshots and 60-second
+web polling. No new migration, service, queue, region or concurrency change.
+
+**Final serial gates:**
+
+| Exact command | FRESH result |
+|---|---|
+| `npm run typecheck -- --force` | 8/8 tasks; 0 cached |
+| `npm run lint -- --force` | 8/8 tasks; 0 cached; 0 errors; 5 existing mobile + 1 existing web warnings |
+| `npm run test --workspace @stay-focused/api` | 2,146 passed / 3 existing skips; 183/183 files |
+| `npm run test --workspace @stay-focused/mobile` | 1059/1059; 110/110 files; 0 skips |
+| `npm run test --workspace @stay-focused/shared` | 260/260; 23/23 files; includes existing emitted copies |
+| `npm run test --workspace @stay-focused/web` | 121/121; 22/22 files; 0 skips |
+| `npm run build --workspace @stay-focused/api` | 1/1 build; 34/34 static pages |
+| `npm run build --workspace @stay-focused/web` | 1/1 build; 19/19 static pages; 28 routes; `/today` 198 kB |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1/1 export; 1 Android bundle / 35 assets |
+| `npm run build -- --force` (AUTOPILOT) | 8/8 tasks; 0 cached |
+| `git diff --check`; `git diff --cached --check` | 0 errors each |
+
+Failures and attempts preserved: Step 2 focused API **117 passed / 1 failed**
+(old inventory mock contract), repaired **118/118**. Step 4 focused suites
+**427 passed / 1 failed / 3 skips** (tracing glob), repaired final imports **3/3**;
+intermediate build's six unused-import warnings were removed. Resume Step 5
+focused API **85 passed / 1 failed** (undefined fake client), repaired **89/89**.
+Initial full mobile gate **1,056 passed / 2 failed**, stale separate-capability
+fixtures repaired; focused interactions **58/58**, final full mobile **1059**.
+Initial lint passed with three new hook dependency warnings, all repaired;
+final lint retains only six existing warnings. Added a retained-screen focus
+regression during final review; affected gates were rerun after it. No flaky
+failure was observed. Python was unavailable before editing; used installed
+Node. Existing Vitest/renderer and Metro color warnings remain in logs.
+
+TEMP/TMP were repo-local `.local/test-temp`; final exports ran offline and
+Next/Turbo telemetry was disabled. Generated `next-env.d.ts` changes were
+inspected and restored to their clean baseline. Final owned changes are committed;
+initial unrelated `UI/`, `apps/mobile/.gitignore`, `supabase/` remain untouched.
+No temp artifact, credential or private fixture was staged. Live provider/workflow
+smoke is NOT APPLICABLE to unchanged execution/provider contracts.
+
+**Owner steps remaining:** Rollout and Device checks were **entirely skipped**.
+Confirm pending SP2/CQ1 migration prerequisites before deployment, deploy
+API/website and preview OTA, then CIT17 Courses/Today speed and clock/orb/reduced
+motion checks, Queue Retry/Open/extraction/detail and navigation-return updates,
+saved content, account isolation and past-course grouping. Findings 11/12 remain
+owner region/capacity decisions; GA1 remains STOPPED pending its separate questions.
+Production revisions, live rows/applied migrations, Scheduler, Canvas inventory,
+real latency/cold starts, Metro contribution and physical behavior remain
+**UNVERIFIED (owner to confirm)**. No remote service call, remote SQL/application,
+environment-file edit, deployment, Scheduler action, push or outside-repository
+deletion occurred. SP2b ends here; no further roadmap scope was started.

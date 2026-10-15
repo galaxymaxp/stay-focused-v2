@@ -27,10 +27,38 @@ Most avoidable waiting is on the read path: uncached screen loads wait for netwo
 
 ## Ranked findings
 
+### SP2b local implementation follow-up (2026-10-15)
+
+Findings **4/7/8/10/13 DONE** for local code scope. The original ranked table
+remains the SP0 baseline; [SP2b acceptance](../ai/acceptance/sp2b-read-path-speed.md)
+records exact methods, gates, failed attempts, remaining owner work and ADR-032.
+
+- **4 DONE**, `7a79a3a`: stored Courses uses zero Canvas calls/writes;
+  four data reads plus a connection read, final three data reads parallel.
+  First-ever discovery and CQ1 owner/current/past rules remain.
+- **7 DONE**, `7dfcd13`: one verified Today request instead of four;
+  single-page fixture **16 data + 8 auth/activity -> 9 + 2**; same models,
+  separate endpoints preserved, no cross-request identity cache.
+- **8 DONE**, `5cb63ad`: useful content and same-footprint still precede
+  WebGL; fresh website Today First Load JS **320 -> 198 kB**. Mobile orb
+  intentionally unchanged (Three.js **1,292,907 raw bytes**, not a Metro delta).
+- **10 DONE**, `8151f68`: lightweight read imports; dynamic write handlers;
+  dedicated Today server trace **375 PDF.js entries -> 0** (79 total files).
+  Mixed write-route deployment assets remain packaged; cold-start ms UNVERIFIED.
+- **13 DONE**, `99de167`, verification `8db0f3b`, focus guard `19028c5`:
+  **2 sequential detail requests plus header polling -> 1 shared request/poller**;
+  reuse owned status, exact fallback for older links, persisted-result checks,
+  extraction/Retry/Open retained. QD1's existing shared mobile list was reused.
+
+Rollout/device checks entirely skipped. Production latency/configuration and
+physical behavior remain **UNVERIFIED (owner to confirm)**. No migration,
+service, region, queue, concurrency or Scheduler change. Findings 11/12 remain
+owner decisions, and GA1 remains independently STOPPED.
+
 ### SP2 local implementation follow-up (2026-10-15)
 
 The original evidence/cost table below remains the SP0 baseline. SP2 closes
-only this run's server data-path findings; SP2b's 4/7/8/10/13 are untouched.
+only that run's server data-path findings; SP2b's 4/7/8/10/13 are tracked above.
 
 - **1 DONE**: `eeae99b`, corrected control ordering `2092b34`. Reuse complete
   source inventory and current revision receipts/controls across candidate and
