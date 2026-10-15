@@ -1079,6 +1079,12 @@ export interface Database {
           canvas_course_id: string;
           name: string;
           course_code: string | null;
+          concluded: boolean | null;
+          enrollment_states: string[] | null;
+          term_name: string | null;
+          term_start_at: string | null;
+          term_end_at: string | null;
+          course_state_override: 'current' | 'past' | null;
           workflow_state: string | null;
           enrollment_term_id: string | null;
           account_id: string | null;
@@ -1100,6 +1106,12 @@ export interface Database {
           canvas_course_id: string;
           name: string;
           course_code?: string | null;
+          concluded?: boolean | null;
+          enrollment_states?: string[] | null;
+          term_name?: string | null;
+          term_start_at?: string | null;
+          term_end_at?: string | null;
+          course_state_override?: 'current' | 'past' | null;
           workflow_state?: string | null;
           enrollment_term_id?: string | null;
           account_id?: string | null;
@@ -1121,6 +1133,12 @@ export interface Database {
           canvas_course_id?: string;
           name?: string;
           course_code?: string | null;
+          concluded?: boolean | null;
+          enrollment_states?: string[] | null;
+          term_name?: string | null;
+          term_start_at?: string | null;
+          term_end_at?: string | null;
+          course_state_override?: 'current' | 'past' | null;
           workflow_state?: string | null;
           enrollment_term_id?: string | null;
           account_id?: string | null;
