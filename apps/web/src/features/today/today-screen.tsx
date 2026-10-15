@@ -280,6 +280,7 @@ export function TodayScreen() {
         <div className="stack today-clock-column">
           <section className="surface stack today-clock-card">
             <DayRingClock
+              orbReady={today.data !== null || !today.loading}
               date={date}
               timeline={today.data?.timeline ?? []}
               start={start}

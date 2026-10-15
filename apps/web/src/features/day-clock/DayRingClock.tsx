@@ -10,7 +10,8 @@ import {
   type PointerEvent,
 } from "react";
 import { useSpringNumber } from "../../lib/motion";
-import { DAY_ORB_FILL, DayOrb } from "./DayOrb";
+import { DAY_ORB_FILL } from "./orb-footprint";
+import { DeferredDayOrb } from "./DeferredDayOrb";
 import {
   CLOCK,
   DAY_MINUTES,
@@ -148,6 +149,7 @@ const kindTone = (kind: TodayItem["kind"]) =>
  * follows continuously and snaps to fifteen minutes on release.
  */
 export function DayRingClock({
+  orbReady = true,
   date,
   timeline,
   start,
@@ -159,6 +161,7 @@ export function DayRingClock({
   locked = false,
   onToggleLock,
 }: {
+  orbReady?: boolean;
   date: string;
   timeline: readonly TodayItem[];
   start: number;
@@ -417,7 +420,7 @@ export function DayRingClock({
           top: (CLOCK.center - orbCanvas / 2) * scale,
         }}
       >
-        <DayOrb minutes={nowMinutes} size={orbCanvas * scale} />
+        <DeferredDayOrb minutes={nowMinutes} size={orbCanvas * scale} ready={orbReady} />
       </div>
       <div
         className="day-readout"

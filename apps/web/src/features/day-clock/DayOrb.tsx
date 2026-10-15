@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { createOrbAura } from "../knowledge-core/orbAura";
 import { createOrbBody } from "../knowledge-core/orbBody";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
+export { DAY_ORB_FILL } from './orb-footprint';
 
 // Web port of apps/mobile/src/features/redesign/DayOrb.tsx. Same scene,
 // camera, frame rate and tones; expo-gl becomes a canvas, and AppState/screen
@@ -12,9 +13,6 @@ import { dayOrbTones, type DayOrbTones } from "./dayClock";
 const CAMERA_DISTANCE = 4.55;
 const CAMERA_FOV = 36;
 /** Share of the canvas the ball's diameter fills at this camera. */
-export const DAY_ORB_FILL =
-  (0.95 * 2) /
-  (2 * CAMERA_DISTANCE * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)));
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
 /** The Today orb moves slowly, so ~12 fps reads as smooth and stays cheap. */
 const FRAME_MS = 80;
