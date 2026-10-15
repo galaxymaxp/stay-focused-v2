@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { courseState, isPastCourse, type CourseStateEvidence } from './course-state';
+import { mergeSavedData } from './saved-snapshot';
 
 const now = Date.parse('2026-10-15T12:00:00Z');
 describe('current and past courses', () => {
+  it('replaces saved course state and removes omitted activities after a successful refresh', () => {
+    const saved = { items: [{ id: 'course', ...courseState({}, now) }] };
+    const next = { items: [{ id: 'course', ...courseState({ override: 'past' }, now) }] };
+    expect(mergeSavedData(saved, next).items[0]?.courseState).toBe('past');
+    expect(mergeSavedData({ items: [{ id: 'assignment' }] }, { items: [] }).items).toEqual([]);
+  });
   it.each<CourseStateEvidence>([
     { concluded: true }, { workflowState: ' completed ' }, { workflowState: 'concluded' },
     { enrollmentStates: ['active', 'completed'] }, { enrollmentStates: ['concluded'] },
