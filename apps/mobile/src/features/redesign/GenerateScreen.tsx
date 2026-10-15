@@ -1,4 +1,5 @@
 import { useSavedMaterialPages } from "./useSavedMaterialPages";
+import { CourseBatchControls } from '../courses/CourseBatchControls';
 import { SnapshotStatus } from "./SnapshotStatus";
 import { screenSnapshotEpoch } from "../../services/screenSnapshots";
 import { openedMaterials, openedMaterialOffsets, pendingPreparations } from "../../services/courseScreenMemory";
@@ -303,6 +304,7 @@ export function GenerateCourseScreen() {
           </RowLink>
         </Surface>
       ) : null}
+      {workspace.data ? <CourseBatchControls courseId={courseId} /> : null}
       {workspace.data && groups.map((group) => (
         <ModuleGroup key={group.key} title={group.title} items={group.items} onSelect={openMaterial} />
       ))}

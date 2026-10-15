@@ -63,6 +63,7 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams: () => mocks.params,
 }));
 vi.mock('./GenerationCore', () => ({ GenerationCore: 'GenerationCore' }));
+vi.mock('../queue/useQueueItems', () => ({ useQueueItems: () => ({ refresh: mocks.refresh, show: vi.fn() }) }));
 vi.mock("expo-router/react-navigation", () => ({
   useIsFocused: () => true,
   useNavigation: () => ({ dispatch: vi.fn() }),

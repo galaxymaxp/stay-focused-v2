@@ -29,6 +29,7 @@ import { automaticQueueLabel } from "../redesign/automationPresentation";
 import { radius, spacing } from "../../design/tokens";
 import { useQueueItems, useQueueGroups } from "./useQueueItems";
 import { queueProgress } from "./queuePresentation";
+import { CourseBatchQueue } from './CourseBatchQueue';
 export function QueueContents() {
   const queue = useQueueItems();
   const { sections, visiblePending, clearAttention, hide, error, jobs } = useQueueGroups();
@@ -36,6 +37,7 @@ export function QueueContents() {
     ? [...sections.filter(section => section.key !== "completed"), {key: "attention", title: "Needs attention", jobs: []}, ...sections.filter(section => section.key === "completed")]
     : sections;
   return <View style={{gap: spacing[3]}}>
+    <CourseBatchQueue />
     {queue.error ? <Notice>{queue.error}</Notice> : null}
     {error ? <Notice>{error}</Notice> : null}
     {queue.loading ? <SkeletonCards rows={2} label="Loading your generations" /> : null}
@@ -52,7 +54,7 @@ export function QueueContents() {
       </Surface>) : null}
       {group.jobs.map(job => <QueueCard key={job.id} job={job} onRefresh={queue.refresh}/>)}
     </View>)}
-    {queue.data && jobs.length === 0 && visiblePending.length === 0 ? <Surface><Copy size="h3">Nothing generating right now.</Copy><Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they are made, then stay in Library.</Copy></Surface> : null}
+    {queue.data && jobs.length === 0 && visiblePending.length === 0 && !queue.data.courseBatches?.requests.some(row => ['waiting', 'quota', 'failed'].includes(row.state)) ? <Surface><Copy size="h3">Nothing generating right now.</Copy><Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they are made, then stay in Library.</Copy></Surface> : null}
   </View>;
 }
 function QueueCard({
