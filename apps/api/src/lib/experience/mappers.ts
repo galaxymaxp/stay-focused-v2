@@ -1,3 +1,4 @@
+import { storedCourseState, isPastStoredCourse } from '@/lib/course-state';
 import type { CanvasAssignmentRow, CanvasAssignmentSubmissionRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
 import type { ActivitySummary, CourseSummary, ExperienceCapabilities, GenerateCoursePeriod, GenerateCourseSummary, GenerateCourseSyncState, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceDescriptor } from '@/lib/canvas-reviewer-sources';
@@ -14,7 +15,7 @@ export function generationCapability(ready: boolean, unsupported = false, quizRe
   return { reviewer: ready ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, quiz: quizReady ? available : { status: 'unavailable', reasonCode: unsupported ? 'unsupported_material' : 'source_not_ready' }, activityAssistance: missing };
 }
 export function courseSummary(row: CanvasCourseRow): CourseSummary {
-  return { id: row.id, code: row.course_code, name: row.name, status: row.workflow_state, materialCount: null, reviewerCount: null, lastActivityAt: row.last_synced_at };
+  return { ...storedCourseState(row), id: row.id, code: row.course_code, name: row.name, status: row.workflow_state, materialCount: null, reviewerCount: null, lastActivityAt: row.last_synced_at };
 }
 /**
  * Mirrors the gate in listCanvasReviewerSources: materials require a selected
@@ -28,8 +29,8 @@ export function generateCourseSyncState(item: Pick<CanvasCourseInventoryItem, 's
 const periods: Record<CanvasCourseClassification, GenerateCoursePeriod> = { likely_current: 'current', past_or_concluded: 'previous', other_or_uncertain: 'other', unavailable: 'other' };
 export function generateCourseSummary(item: CanvasCourseInventoryItem): GenerateCourseSummary {
   const lastSuccessfulSyncAt = item.lastSync?.lastSuccessfulSyncAt ?? (item.lastSync?.status === 'success' || item.lastSync?.status === 'partial' ? item.lastSync.completedAt : null);
-  return { id: item.id, code: item.courseCode, name: item.displayName, status: item.workflowState, materialCount: null, reviewerCount: null,
-    lastActivityAt: lastSuccessfulSyncAt, syncState: generateCourseSyncState(item), period: periods[item.classification], termName: item.term?.name?.trim() || null, lastSuccessfulSyncAt };
+  return { courseState: item.courseState ?? (item.classification === 'past_or_concluded' ? 'past' : 'current'), courseStateOverridden: item.courseStateOverridden ?? false, id: item.id, code: item.courseCode, name: item.displayName, status: item.workflowState, materialCount: null, reviewerCount: null,
+    lastActivityAt: lastSuccessfulSyncAt, syncState: generateCourseSyncState(item), period: item.courseState ? item.courseState === 'past' ? 'previous' : 'current' : periods[item.classification], termName: item.term?.name?.trim() || null, lastSuccessfulSyncAt };
 }
 const periodRank: Record<GenerateCoursePeriod, number> = { current: 0, previous: 1, other: 2 };
 const syncRank: Record<GenerateCourseSyncState, number> = { synced: 0, sync_incomplete: 1, not_synced: 2 };
@@ -98,9 +99,9 @@ export function composeActivities(input: {
   return result.sort(compareActivities);
 }
 
-export function isActiveTaskCourse(course: Pick<CanvasCourseRow, 'workflow_state' | 'end_at'>, now: number): boolean {
+export function isActiveTaskCourse(course: Pick<CanvasCourseRow, 'workflow_state' | 'end_at'> & Partial<CanvasCourseRow>, now: number): boolean {
   const state = course.workflow_state?.trim().toLowerCase();
-  return !['completed', 'concluded', 'deleted', 'unpublished'].includes(state ?? '') && !(course.end_at && Date.parse(course.end_at) <= now);
+  return !['deleted', 'unpublished'].includes(state ?? '') && !isPastStoredCourse(course, now);
 }
 
 /** Canvas already counts this submission as handed in (or excused), so no work remains. */

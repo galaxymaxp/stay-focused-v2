@@ -1,4 +1,5 @@
 import type { CanvasFileRow, CanvasMaterialPreparationRow } from '@stay-focused/db';
+import { isPastOwnedCourse } from '@/lib/course-state';
 import { listCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { classifyStoredCanvasFileKind } from '@/lib/canvas-stored-file-extraction';
 import { discoverCanvasPageFileIds } from '@/lib/canvas-file-normalize';
@@ -60,6 +61,7 @@ export async function admitMaterialPreparation(client:PreparationClient,input:Ma
   readonly cycleKey:string;readonly manualRetry?:boolean;readonly brokeredCanvasToken?:string;
   readonly explicitFilePermission?:boolean;readonly dispatch?:boolean;
 }):Promise<CanvasMaterialPreparationRow|null>{
+  if (!input.cycleKey.startsWith('manual:') && await isPastOwnedCourse(client,input.userId,input.courseId)) return null;
   const existing=await lookupMaterialPreparation(client,input);
   if(existing && ['pending','running'].includes(existing.state))return input.dispatch===false?existing:await dispatchPreparation(client,existing);
   if(existing?.state==='prepared'){

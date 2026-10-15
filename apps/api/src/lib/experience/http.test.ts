@@ -20,7 +20,7 @@ vi.mock('@/lib/experience/repository', async importOriginal => {
   return { ...original, trustedExperienceReadRepository: mocks.trustedRepository };
 });
 import { GET as todayGet } from '@/../app/api/today/route';
-import { GET, POST, OPTIONS } from '@/../app/api/experience/[...path]/route';
+import { GET, POST, PATCH, OPTIONS } from '@/../app/api/experience/[...path]/route';
 import { experienceRepository } from './repository';
 import { ExperienceService } from './service';
 import { experienceRoute } from './http';
@@ -43,6 +43,21 @@ afterEach(() => {
   else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
 });
 describe('authenticated student routes', () => {
+  it('requires a verified bearer before changing course state', async () => {
+    mocks.auth.mockResolvedValue(null);
+    const response = await PATCH(request(`courses/${id}/state`, 'PATCH', '{"override":"past"}'), context(`courses/${id}/state`));
+    expect(response.status).toBe(401);
+    expect(mocks.serviceClient).not.toHaveBeenCalled();
+  });
+  it('denies an override for another owner course without writing', async () => {
+    const update = vi.fn();
+    const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: null, error: null }), update };
+    mocks.serviceClient.mockReturnValue({ from: () => query });
+    const response = await PATCH(request(`courses/${id}/state`, 'PATCH', '{"override":"past"}'), context(`courses/${id}/state`));
+    expect(response.status).toBe(404);
+    expect(query.eq).toHaveBeenCalledWith('user_id', 'owner');
+    expect(update).not.toHaveBeenCalled();
+  });
   it.each([undefined, "1"])("stream-caps experience bodies with Content-Length %s", async contentLength => {
     const response = await POST(new Request("https://example.test", { method: "POST", headers: { authorization: "Bearer session", ...(contentLength ? { "content-length": contentLength } : {}) }, body: " ".repeat(64 * 1024 + 1) }), context("planner/preview"));
     expect(response.status).toBe(400);
@@ -109,7 +124,7 @@ describe('authenticated student routes', () => {
     ] } });
     const response = await GET(request('courses?user_id=other'), context('courses'));
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toEqual({ classificationSource: 'canvas', items: [{ id: 'course-a', code: 'A', name: 'Owner course', status: 'available', materialCount: null, reviewerCount: null,
+    expect((await response.json()).data).toEqual({ classificationSource: 'canvas', items: [{ courseState: 'current', courseStateOverridden: false, id: 'course-a', code: 'A', name: 'Owner course', status: 'available', materialCount: null, reviewerCount: null,
       lastActivityAt: '2026-09-20T00:00:00Z', syncState: 'synced', period: 'current', termName: '2026-27-1T', lastSuccessfulSyncAt: '2026-09-20T00:00:00Z' }] });
     expect(mocks.inventory).toHaveBeenCalledWith({ client: { kind: 'trusted-service-read-client' }, userId: 'owner', allowStoredFallback: true });
   });

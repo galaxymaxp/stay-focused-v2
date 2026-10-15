@@ -1,3 +1,5 @@
+import { isPastStoredCourse } from './course-state';
+import { upsertCanvasCourseInventory } from './canvas-course-selection';
 import type {
   CanvasAnnouncement,
   CanvasAssignment,
@@ -527,6 +529,10 @@ export async function syncCanvasAcademicGraph({
   let courses: readonly CanvasCourse[];
   try {
     courses = await canvas.listCourses();
+    const inventory = await upsertCanvasCourseInventory({ client, userId, connection: connectionRow, courses });
+    if (!inventory.ok) throw new Error('course_state_unavailable');
+    const currentIds = new Set(inventory.value.filter(row => !isPastStoredCourse(row)).map(row => row.canvas_course_id));
+    courses = courses.filter(course => currentIds.has(course.id));
   } catch (error) {
     const mapped = mapCanvasClientError(error);
     if (mapped.code === "invalid_canvas_token") await markCanvasReconnectRequired(client, connectionRow);

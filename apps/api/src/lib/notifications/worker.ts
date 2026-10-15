@@ -33,6 +33,10 @@ export async function processNotificationWork(
   await Promise.all(deliveries.map(async (delivery) => {
     try {
       const target = await loadDeliveryTarget(client, delivery);
+      if (target.suppressed) {
+        await updateNotificationDelivery(client, { delivery, workerId, status: 'failed', safeErrorCode: 'course_notification_suppressed' });
+        return;
+      }
       if (!Expo.isExpoPushToken(target.token)) {
         await updateNotificationDelivery(client, {
           delivery,

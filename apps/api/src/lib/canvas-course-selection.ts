@@ -1,7 +1,8 @@
+import { courseState, isPastCourse } from '@stay-focused/shared';
+import { storedCourseEvidence } from './course-state';
 import type {
   CanvasCourse,
   CanvasCourseEnrollment,
-  CanvasCourseSection,
   CanvasCourseTerm,
 } from "@stay-focused/canvas";
 import type {
@@ -27,7 +28,7 @@ import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import type { CanvasApiErrorCode } from "@/types/canvas";
 
 const COURSE_COLUMNS =
-  "id,user_id,canvas_connection_id,canvas_course_id,name,course_code,workflow_state,enrollment_term_id,account_id,start_at,end_at,time_zone,public_syllabus,syllabus_body,canvas_updated_at,first_synced_at,last_synced_at,created_at,updated_at";
+  "id,user_id,canvas_connection_id,canvas_course_id,name,course_code,workflow_state,concluded,enrollment_states,term_name,term_start_at,term_end_at,course_state_override,enrollment_term_id,account_id,start_at,end_at,time_zone,public_syllabus,syllabus_body,canvas_updated_at,first_synced_at,last_synced_at,created_at,updated_at";
 const PREFERENCE_COLUMNS =
   "id,user_id,canvas_connection_id,course_id,selected,display_order,selected_at,created_at,updated_at";
 const SYNC_STATE_COLUMNS =
@@ -43,6 +44,8 @@ export type CanvasCourseClassification =
 
 export interface CanvasCourseInventoryItem {
   readonly id: string;
+  readonly courseState?: 'current' | 'past';
+  readonly courseStateOverridden?: boolean;
   readonly displayName: string;
   readonly courseCode: string | null;
   readonly workflowState: string | null;
@@ -466,7 +469,7 @@ async function loadConnectionAndToken(
   }
 }
 
-async function upsertCanvasCourseInventory({
+export async function upsertCanvasCourseInventory({
   client,
   connection,
   courses,
@@ -491,6 +494,11 @@ async function upsertCanvasCourseInventory({
     canvas_updated_at: safeDate(course.updatedAt),
     course_code: course.courseCode,
     end_at: safeDate(course.endAt),
+    concluded: course.concluded ?? null,
+    enrollment_states: course.enrollments?.flatMap(e => [e.enrollmentState, e.workflowState].filter((state): state is string => !!state)) ?? null,
+    term_name: course.term?.name ?? null,
+    term_start_at: safeDate(course.term?.startAt ?? null),
+    term_end_at: safeDate(course.term?.endAt ?? null),
     enrollment_term_id: course.enrollmentTermId,
     name: course.name,
     public_syllabus: course.publicSyllabus,
@@ -708,12 +716,13 @@ function mapInventoryItem({
 
   return {
     id: row.id,
+    ...courseState(storedCourseEvidence(row), now.getTime()),
     displayName: liveCourse?.name ?? row.name,
     courseCode: liveCourse?.courseCode ?? row.course_code,
     workflowState: liveCourse?.workflowState ?? row.workflow_state,
     startAt: liveCourse?.startAt ?? row.start_at,
     endAt: liveCourse?.endAt ?? row.end_at,
-    term: liveCourse?.term ?? null,
+    term: liveCourse?.term ?? (row.term_name || row.term_end_at ? { id: row.enrollment_term_id, name: row.term_name, startAt: row.term_start_at, endAt: row.term_end_at } : null),
     classification: classification.classification,
     selectable: classification.classification !== "unavailable",
     unavailableReason: classification.reason,
@@ -723,11 +732,11 @@ function mapInventoryItem({
 }
 
 /**
- * Stored rows carry no term or enrollment evidence, so only explicit Canvas
- * completion or saved course dates decide; everything else stays uncertain.
+ * CQ1 persists bounded completion, enrollment and term evidence. Missing evidence
+ * remains uncertain for sync hints and current for the visibility rule.
  */
 export function classifyStoredCanvasCourse(
-  row: Pick<CanvasCourseRow, "workflow_state" | "start_at" | "end_at">,
+  row: Pick<CanvasCourseRow, "workflow_state" | "start_at" | "end_at"> & Partial<CanvasCourseRow>,
   now: Date,
 ): {
   readonly classification: CanvasCourseClassification;
@@ -737,7 +746,7 @@ export function classifyStoredCanvasCourse(
   if (workflowState === "deleted" || workflowState === "unpublished") {
     return { classification: "unavailable", reason: "Canvas marks this course unavailable." };
   }
-  if (workflowState === "completed" || isPastDate(row.end_at, now)) {
+  if (isPastCourse(storedCourseEvidence(row), now.getTime())) {
     return { classification: "past_or_concluded", reason: null };
   }
   if (
@@ -772,12 +781,9 @@ function classifyCanvasCourse(
   }
 
   if (
-    course.concluded === true ||
-    workflowState === "completed" ||
-    hasCompletedEnrollment(course.enrollments ?? []) ||
-    isPastDate(course.endAt, now) ||
-    isPastDate(course.term?.endAt ?? null, now) ||
-    allSectionsEnded(course.sections ?? [], now)
+    isPastCourse({ concluded: course.concluded, workflowState: course.workflowState,
+      enrollmentStates: course.enrollments?.flatMap(e => [e.enrollmentState, e.workflowState]),
+      endAt: course.endAt, termEndAt: course.term?.endAt }, now.getTime())
   ) {
     return { classification: "past_or_concluded", reason: null };
   }
@@ -962,28 +968,6 @@ function hasActiveEnrollment(
     const workflowState = normalizeState(enrollment.workflowState);
     return enrollmentState === "active" || workflowState === "active";
   });
-}
-
-function hasCompletedEnrollment(
-  enrollments: readonly CanvasCourseEnrollment[],
-): boolean {
-  return enrollments.some((enrollment) => {
-    const enrollmentState = normalizeState(enrollment.enrollmentState);
-    const workflowState = normalizeState(enrollment.workflowState);
-    return (
-      enrollmentState === "completed" ||
-      enrollmentState === "concluded" ||
-      workflowState === "completed" ||
-      workflowState === "concluded"
-    );
-  });
-}
-
-function allSectionsEnded(
-  sections: readonly CanvasCourseSection[],
-  now: Date,
-): boolean {
-  return sections.length > 0 && sections.every((section) => isPastDate(section.endAt, now));
 }
 
 function isInCurrentDateWindow({

@@ -1,3 +1,4 @@
+import { isPastStoredCourse } from '@/lib/course-state';
 import { createHash } from "node:crypto";
 import { CanvasClient, CanvasClientError, type CanvasCourse, type CanvasOwnSubmission } from "@stay-focused/canvas";
 import type { CanvasCourseRow, Database, Json } from "@stay-focused/db";
@@ -40,6 +41,11 @@ function submissionPayload(submission: CanvasOwnSubmission): Json {
 }
 
 export async function pollCanvasCourse(client: Client, row: CanvasCourseRow, workerId: string): Promise<{ failures: number }> {
+  if (isPastStoredCourse(row)) {
+    const released = await client.from('canvas_notification_poll_state').update({ lease_owner: null, lease_expires_at: null }).eq('course_id', row.id).eq('lease_owner', workerId);
+    if (released.error) throw new Error('canvas_notification_release_failed');
+    return { failures: 0 };
+  }
   const { data: connection, error } = await client.from("canvas_connections").select("*").eq("id", row.canvas_connection_id).eq("user_id", row.user_id).eq("status", "active").maybeSingle();
   if (error || !connection) throw new Error("canvas_notification_connection_unavailable");
   let deferMs = 0;

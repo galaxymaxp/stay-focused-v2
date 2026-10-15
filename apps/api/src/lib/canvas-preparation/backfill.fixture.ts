@@ -36,7 +36,7 @@ export async function preparationBackfillClient(db: PGlite, connectionId: string
       let values: Row[] = []; let count = false;
       const defaults = (row: Row): Row => ({
         canvas_connection_id: connectionId, canvas_course_id: '101', id: row.course_id,
-        name: 'Synthetic Biology', workflow_state: 'completed', base_url: 'https://canvas.example.invalid',
+        name: 'Synthetic Biology', workflow_state: 'available', base_url: 'https://canvas.example.invalid',
         display_name: 'Instructional notes.txt', filename: 'notes.txt', content_type: 'text/plain',
         ingestion_eligibility: 'eligible_document', size_bytes: 10, stored_byte_count: 10,
         stored_content_type: 'text/plain', storage_bucket: 'canvas-source-files',

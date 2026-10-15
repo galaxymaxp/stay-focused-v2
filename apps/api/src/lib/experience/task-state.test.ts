@@ -57,6 +57,10 @@ describe('canonical task state across clients and planning', () => {
     { canvas_course_sync_preferences: [] },
     { canvas_course_sync_preferences: [{ ...preference, selected: false }] },
     { canvas_courses: [{ ...course, workflow_state: 'completed' }] },
+    { canvas_courses: [{ ...course, concluded: true }] },
+    { canvas_courses: [{ ...course, term_end_at: '2026-01-01T00:00:00Z' }] },
+    { canvas_courses: [{ ...course, enrollment_states: ['concluded'] }] },
+    { canvas_courses: [{ ...course, course_state_override: 'past' }] },
     { canvas_courses: [{ ...course, end_at: '2026-10-01T00:00:00Z' }] },
     { canvas_courses: [{ ...course, workflow_state: 'deleted' }] },
     { canvas_assignment_submissions: [{ ...submission, assignment_visible: false }] },
@@ -68,6 +72,12 @@ describe('canonical task state across clients and planning', () => {
     expect((await read()).activities).toEqual([]);
     expect(await loadOwnedPlannerTasks(client, owner)).toEqual([]);
     expect(await listOwnedStudySessions(client, owner, { limit: 200 })).toEqual([]);
+  });
+
+  it('restores ended-term work and schedule with a current override', async () => {
+    const { read, client } = fixture({ canvas_courses: [{ ...course, concluded: true, term_end_at: '2020-01-01', course_state_override: 'current' }] });
+    expect((await read()).activities).toHaveLength(1);
+    expect(await listOwnedStudySessions(client, owner, { limit: 200 })).toHaveLength(1);
   });
 
   it('never hides genuine personal tasks when courses are deselected', async () => {

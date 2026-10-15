@@ -1,3 +1,4 @@
+import { currentCourseJobs } from '@/lib/course-state';
 import type {
   ProcessingNotificationDeliveryRow,
   PushNotificationDeviceRow,
@@ -147,12 +148,18 @@ export async function materializeProcessingNotifications(
   if (error) throw new NotificationRepositoryError("notification_event_read_failed");
   let created = 0;
   for (const event of events ?? []) {
-    const { data: job } = await client
+    const { data: job, error: jobError } = await client
       .from("processing_jobs")
-      .select("job_type")
+      .select("*")
       .eq("id", event.job_id)
       .eq("user_id", event.user_id)
       .maybeSingle();
+    if (jobError) throw new NotificationRepositoryError('notification_event_read_failed');
+    if (!job || !(await currentCourseJobs(client, event.user_id, [job])).length) {
+      const skipped = await client.from('processing_job_events').update({ delivered_at: new Date().toISOString() }).eq('user_id', event.user_id).eq('id', event.id);
+      if (skipped.error) throw new NotificationRepositoryError('notification_materialization_failed');
+      continue;
+    }
     const kind = event.event_type === "job_succeeded"
       ? job?.job_type === "reviewer_generation"
         ? "reviewer_ready"
@@ -240,6 +247,7 @@ export async function loadDeliveryTarget(
   delivery: ProcessingNotificationDeliveryRow,
 ): Promise<{
   readonly token: string;
+  readonly suppressed?: boolean;
   readonly jobId?: string;
   readonly jobType?: "document_extraction" | "reviewer_generation" | "activity_generation" | "quiz_generation";
 }> {
@@ -254,17 +262,21 @@ export async function loadDeliveryTarget(
     throw new NotificationRepositoryError("notification_device_not_found");
   }
   if (!delivery.processing_event_id) return { token: device.expo_push_token };
-  const { data: event } = await client
+  const { data: event, error: eventError } = await client
     .from("processing_job_events")
     .select("job_id")
     .eq("id", delivery.processing_event_id)
     .maybeSingle();
-  if (!event) return { token: device.expo_push_token };
-  const { data: job } = await client
+  if (eventError) throw new NotificationRepositoryError('notification_event_read_failed');
+  if (!event) return { token: device.expo_push_token, suppressed: true };
+  const { data: job, error: jobError } = await client
     .from("processing_jobs")
-    .select("job_type")
+    .select("*")
     .eq("id", event.job_id)
+    .eq("user_id", delivery.user_id)
     .maybeSingle();
+  if (jobError) throw new NotificationRepositoryError('notification_event_read_failed');
+  if (!job || !(await currentCourseJobs(client, delivery.user_id, [job])).length) return { token: device.expo_push_token, suppressed: true };
   return {
     token: device.expo_push_token,
     jobId: event.job_id,

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isPastOwnedCourse } from '@/lib/course-state';
 import type { CanvasPreparationBackfillCourseRow } from '@stay-focused/db';
 import { listCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { admitMaterialPreparation, materialEvidence } from './admission';
@@ -46,6 +47,7 @@ async function recoverLiveWork(client: PreparationClient) {
 }
 
 export async function seedPreparationBackfill(client: PreparationClient, input: { userId: string; courseId: string; cycleKey: string; deadline?: number }) {
+  if (await isPastOwnedCourse(client, input.userId, input.courseId)) return { complete: true, seeded: 0 };
   const inventory = await listCanvasReviewerSources({ client, userId: input.userId, courseId: input.courseId,
     completeInventory: true, includePreparationStatus: false });
   if (!inventory.ok || inventory.value.pagination.hasMore) {

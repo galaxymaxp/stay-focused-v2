@@ -1,6 +1,7 @@
 import { readBoundedText } from "@/lib/bounded-body";
 import type { ActivitySummary, LibraryArtifactType } from '@stay-focused/shared';
-import { experienceJson, experienceOptions, experienceRoute, readInteger, requireId } from '@/lib/experience/http';
+import { experienceJson, experienceOptions, experienceRoute, readBoundedExperienceJson, readInteger, requireId } from '@/lib/experience/http';
+import { setOwnedCourseState } from '@/lib/course-state-mutation';
 import { ExperienceFailure } from '@/lib/experience/errors';
 import { experienceCapabilities, generationView, learningMaterial, record } from '@/lib/experience/mappers';
 import { startReviewerGeneration } from '@/lib/experience/generation';
@@ -130,3 +131,11 @@ export async function POST(request: Request, context: Context): Promise<Response
   });
 }
 export const OPTIONS = experienceOptions;
+
+export async function PATCH(request: Request, context: Context): Promise<Response> {
+  return experienceRoute(request, async (_service, userId) => {
+    const { path } = await context.params;
+    if (path.length !== 3 || path[0] !== 'courses' || path[2] !== 'state') throw new ExperienceFailure(404, 'not_found');
+    return experienceJson(await setOwnedCourseState(createCanvasServiceClient(), userId, requireId(path[1]!), await readBoundedExperienceJson(request, 1024)));
+  });
+}

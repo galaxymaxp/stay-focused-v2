@@ -185,7 +185,7 @@ export class CanvasClient {
 
   public async listCourses(): Promise<readonly CanvasCourse[]> {
     const parsed = await this.requestPaginatedJson(
-      `/courses?per_page=${DEFAULT_PER_PAGE}&enrollment_state=active`,
+      `/courses?per_page=${DEFAULT_PER_PAGE}&enrollment_state=active&include[]=term&include[]=concluded`,
     );
     return parsed.map(normalizeCourse);
   }

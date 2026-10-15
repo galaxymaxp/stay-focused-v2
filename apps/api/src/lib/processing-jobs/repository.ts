@@ -1,3 +1,4 @@
+import { currentCourseJobs } from '@/lib/course-state';
 import type {
   Database,
   Json,
@@ -154,7 +155,7 @@ export async function listOwnedActiveProcessingJobs(
   if (error) {
     throw new ProcessingJobRepositoryError("processing_job_read_failed");
   }
-  return await withOwnedJobOrigins(client, userId, data ?? []);
+  return await withOwnedJobOrigins(client, userId, await currentCourseJobs(client, userId, data ?? []));
 }
 
 export interface ProcessingJobListOptions {
@@ -171,28 +172,24 @@ export async function listOwnedProcessingJobs(
   userId: string,
   options: ProcessingJobListOptions,
 ): Promise<readonly ProcessingJobWithOrigin[]> {
-  let query = client
-    .from("processing_jobs")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(options.limit);
-
-  if (options.scope === "active") {
-    query = query.in("status", ["queued", "running", "cancellation_requested"]);
+  const visible: ProcessingJobDatabaseRow[] = [];
+  let cursor = options.cursor;
+  const pageSize = Math.min(100, Math.max(1, options.limit));
+  // Hidden past-course jobs must not terminate history pagination early.
+  for (let page = 0; page < 100; page++) {
+    let query = client.from('processing_jobs').select('*').eq('user_id', userId)
+      .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(pageSize);
+    if (options.scope === 'active') query = query.in('status', ['queued', 'running', 'cancellation_requested']);
+    if (cursor) query = query.or(`created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`);
+    const { data, error } = await query;
+    if (error || !data) throw new ProcessingJobRepositoryError('processing_job_read_failed');
+    visible.push(...await currentCourseJobs(client, userId, data));
+    if (visible.length >= options.limit || data.length < pageSize) return withOwnedJobOrigins(client, userId, visible.slice(0, options.limit));
+    const last = data.at(-1)!;
+    if (cursor?.id === last.id) throw new ProcessingJobRepositoryError('processing_job_read_failed');
+    cursor = { createdAt: last.created_at, id: last.id };
   }
-  if (options.cursor) {
-    query = query.or(
-      `created_at.lt.${options.cursor.createdAt},and(created_at.eq.${options.cursor.createdAt},id.lt.${options.cursor.id})`,
-    );
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    throw new ProcessingJobRepositoryError("processing_job_read_failed");
-  }
-  return await withOwnedJobOrigins(client, userId, data ?? []);
+  throw new ProcessingJobRepositoryError('processing_job_read_failed');
 }
 
 export async function findOwnedProcessingJobResult(

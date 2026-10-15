@@ -1,3 +1,4 @@
+import { isPastOwnedCourse } from '@/lib/course-state';
 import type { Database } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runAutomaticReviewerAdmission } from "./admission";
@@ -9,6 +10,7 @@ export async function runAutomaticReviewersAfterSync(
   run: typeof runAutomaticReviewerAdmission = runAutomaticReviewerAdmission,
 ): Promise<void> {
   try {
+    if (await isPastOwnedCourse(client, input.userId, input.courseId)) return;
     const result = await run(client, input);
     console.info("auto_reviewers.run", {
       status: result.status,

@@ -404,6 +404,18 @@ describe("POST /api/canvas/sync", () => {
     });
   });
 
+  it('CQ1 routinely skips concluded and manually past courses while restoring a current override', async () => {
+    const db = createSyncDb({ courseOverrides: { restored: 'current', manual: 'past' } });
+    setCanvasFixture([{ ...course('past'), concluded: true }, course('manual'), { ...course('restored'), concluded: true }, course('default')], [courseFixture('restored'), courseFixture('default')]);
+    mocks.createCanvasServiceClient.mockReturnValue(db);
+    const response = await syncRoute.POST(createRequest());
+    expect(response.status).toBe(200);
+    expect(db.graphFor(USER_A, CONNECTION_A, 'past')).toBeNull();
+    expect(db.graphFor(USER_A, CONNECTION_A, 'manual')).toBeNull();
+    expect(db.graphFor(USER_A, CONNECTION_A, 'restored')).not.toBeNull();
+    expect(db.graphFor(USER_A, CONNECTION_A, 'default')).not.toBeNull();
+  });
+
   it("validates sync request JSON and mode without accepting ownership", async () => {
     const malformedDb = createSyncDb({ connectionRows: [connectionRow()] });
     mocks.createCanvasServiceClient.mockReturnValue(malformedDb);
@@ -1215,6 +1227,7 @@ function setCanvasFixture(
 }
 
 function createSyncDb(options: {
+  readonly courseOverrides?: Readonly<Record<string, 'current' | 'past'>>;
   readonly connectionRows?: readonly Record<string, unknown>[];
   readonly activeRun?: boolean;
   readonly staleRun?: boolean;
@@ -1397,6 +1410,7 @@ function createSyncDb(options: {
         throw new Error(`Unexpected table ${table}`);
       }
       const filters = new Map<string, string>();
+      let inventory: readonly Record<string, unknown>[] | null = null;
       const query = {
         eq: vi.fn((column: string, value: string) => {
           filters.set(column, value);
@@ -1428,6 +1442,7 @@ function createSyncDb(options: {
           };
         }),
         then: (resolve: (value: unknown) => void) => {
+          if (inventory) { resolve({ data: inventory, error: null }); return; }
           if (table === "canvas_courses") {
             const userId = filters.get("user_id") ?? "";
             const connectionId = filters.get("canvas_connection_id") ?? "";
@@ -1496,6 +1511,10 @@ function createSyncDb(options: {
       };
       return {
         select: vi.fn(() => query),
+        upsert: vi.fn((rows: readonly Record<string, unknown>[]) => {
+          inventory = rows.map(row => ({ ...row, id: `inventory:${String(row.canvas_course_id)}`, course_state_override: options.courseOverrides?.[String(row.canvas_course_id)] ?? null }));
+          return { select: () => query };
+        }),
       };
     }),
   };
@@ -2378,6 +2397,7 @@ interface SeedGraph {
 }
 
 interface CanvasCourseFixture {
+  readonly concluded?: boolean | null;
   readonly id: string;
   readonly name: string;
   readonly courseCode: string | null;

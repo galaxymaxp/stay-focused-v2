@@ -441,6 +441,7 @@ function connection(
 
 function course(overrides: Partial<CanvasCourseRow> = {}): CanvasCourseRow {
   return {
+    concluded: null, enrollment_states: null, term_name: null, term_start_at: null, term_end_at: null, course_state_override: null,
     account_id: null,
     canvas_connection_id: "connection-1",
     canvas_course_id: "canvas-course-1",

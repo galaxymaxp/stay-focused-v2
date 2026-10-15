@@ -1,3 +1,4 @@
+import { isPastStoredCourse } from '@/lib/course-state';
 import type { Quiz } from '@stay-focused/shared';
 import { estimateReviewerMinutes } from '@stay-focused/shared';
 import type { CanvasAssignmentRow } from '@stay-focused/db';
@@ -145,7 +146,7 @@ export class ExperienceService {
       this.rows('canvas_announcements', userId),
       this.rows('canvas_courses', userId),
     ]);
-    const courseMap = new Map(courses.map(course => [course.id, courseSummary(course)]));
+    const courseMap = new Map(courses.filter(course => !isPastStoredCourse(course, this.now)).map(course => [course.id, courseSummary(course)]));
     const items = announcements
       .filter(row => row.published !== false && row.locked !== true)
       .flatMap((row): readonly StudentAnnouncement[] => {

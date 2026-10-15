@@ -214,7 +214,7 @@ describe("CanvasClient", () => {
 
     const request = lastRequest(fetchImpl);
     expect(request.url).toBe(
-      "https://canvas.test/api/v1/courses?per_page=50&enrollment_state=active",
+      "https://canvas.test/api/v1/courses?per_page=50&enrollment_state=active&include[]=term&include[]=concluded",
     );
     expect(request.init.headers).toMatchObject({
       Authorization: "Bearer course-token",
@@ -1606,7 +1606,7 @@ describe("CanvasClient", () => {
 
   it("rejects repeated pagination links before looping", async () => {
     const firstPage =
-      "https://canvas.test/api/v1/courses?per_page=50&enrollment_state=active";
+      "https://canvas.test/api/v1/courses?per_page=50&enrollment_state=active&include[]=term&include[]=concluded";
     const fetchImpl = createFetch([
       jsonResponse([{ id: 1, name: "One" }], {
         link: `<${firstPage}>; rel="next"`,

@@ -3,13 +3,14 @@ import type { Database, ProcessingJobDatabaseRow } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { listOwnedActiveProcessingJobs, listOwnedProcessingJobs, findOwnedProcessingJob, toProcessingJobStatusView, withOwnedJobOrigins } from "./repository";
 
-const job = { id: "job", user_id: "owner", source_metadata: {}, status: "queued" } as ProcessingJobDatabaseRow;
+const job = { id: "job", user_id: "owner", source_snapshot_id: 'source', source_metadata: {}, status: "queued" } as ProcessingJobDatabaseRow;
 function setup(rows = [{ user_id: "owner", processing_job_id: "job" }], error: object | null = null) {
   const eq = vi.fn(); const ids = vi.fn().mockResolvedValue({ data: rows, error });
   const candidates = { select: () => candidates, eq, in: ids }; eq.mockReturnValue(candidates);
   const query = { select: () => query, eq: () => query, in: () => query, order: () => query,
     limit: async () => ({ data: [job], error: null }), maybeSingle: async () => ({ data: job, error: null }) };
-  const client = { from: (table: string) => table === "canvas_auto_reviewer_candidates" ? candidates : query } as unknown as SupabaseClient<Database>;
+  const sources = { select: () => sources, eq: () => sources, in: async () => ({ data: [{ id: 'source', user_id: 'owner', metadata: {} }], error: null }) };
+  const client = { from: (table: string) => table === "canvas_auto_reviewer_candidates" ? candidates : table === 'processing_job_sources' ? sources : query } as unknown as SupabaseClient<Database>;
   return { client, eq, ids };
 }
 describe("owned automatic job status labels", () => {

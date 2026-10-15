@@ -15,7 +15,8 @@ vi.mock('@/lib/canvas-sync-jobs/checkpoints', () => ({
   failCheckpointedCanvasSyncJob: fake.fail, cancelCheckpointedCanvasSyncJob: vi.fn(),
   canvasSyncItemKeyHash: vi.fn(), fingerprintCanvasSyncItem: vi.fn(),
 }));
-const client = {} as never;
+const builder = { select: () => builder, eq: () => builder, maybeSingle: async () => ({ data: { user_id: 'owner', workflow_state: 'available' }, error: null }) };
+const client = { from: () => builder } as never;
 const input = { jobId: 'sync-job', workerId: 'worker', accessToken: 'brokered-sync-token' };
 let job: { id: string; status: string; user_id: string; course_id: string; job_type: string };
 beforeEach(() => {

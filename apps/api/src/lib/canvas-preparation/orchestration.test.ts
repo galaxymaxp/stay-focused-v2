@@ -9,7 +9,7 @@ import { enqueuePreparationAfterSync, preparationCompleted, reconcilePreparation
 type Row=Record<string,unknown>;
 function fixture(ledgers:Row[]=[],errors:readonly string[]=[]) {
   const mutations: {table:string;action:string;value:unknown}[]=[];
-  const tables:Record<string,Row[]>={canvas_preparation_syncs:ledgers,canvas_preparation_discoveries:[]};
+  const tables:Record<string,Row[]>={canvas_courses:[{id:'course',user_id:'owner',workflow_state:'available'}],canvas_preparation_syncs:ledgers,canvas_preparation_discoveries:[]};
   const rpc=vi.fn(async(name:string)=>({error:null,data:name==='register_canvas_preparation_sync_v1'||name==='drain_canvas_preparation_sync_v1'?'target':[]}));
   const client={rpc,from:(table:string)=>{
     const filters:((row:Row)=>boolean)[]=[];let start=0,end=Infinity;

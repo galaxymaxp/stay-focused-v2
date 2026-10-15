@@ -1,3 +1,4 @@
+import { isPastOwnedCourse } from '@/lib/course-state';
 import type { CanvasMaterialPreparationRow } from '@stay-focused/db';
 import { listCanvasReviewerSources } from '@/lib/canvas-reviewer-sources';
 import { runAutomaticReviewersAfterSync } from '@/lib/auto-reviewers/after-sync';
@@ -25,6 +26,7 @@ export async function advancePreparationSync(client:PreparationClient,syncId:str
 }
 export async function enqueuePreparationAfterSync(client:PreparationClient,input:{userId:string;courseId:string;syncId:string;brokeredCanvasToken?:string}){
   try{
+    if(await isPastOwnedCourse(client,input.userId,input.courseId))return;
     const inventory=await listCanvasReviewerSources({client,userId:input.userId,courseId:input.courseId,completeInventory:true});
     if(!inventory.ok || inventory.value.pagination.hasMore)throw new Error('preparation_inventory_incomplete');
     const eligible=inventory.value.sources.filter(source=>source.type==='page'||(source.type==='file' && source.file && source.file.kind!=='unsupported' && (source.file.canPrepare||source.file.preparationStatus==='ready')));
@@ -55,6 +57,7 @@ export async function enqueuePreparationAfterSync(client:PreparationClient,input
 const PAGE_SIZE=200;const MAX_PAGES=50;
 /** No new module IDs are needed. Read every open owned ledger or fail closed. */
 export async function reconcilePreparationCourse(client:PreparationClient,input:{userId:string;courseId:string;drainDeferred?:boolean;now?:number}){
+  if(await isPastOwnedCourse(client,input.userId,input.courseId))return;
   const ledgers=[];
   for(let page=0;page<MAX_PAGES;page++){
     const result=await client.from('canvas_preparation_syncs').select('*').eq('user_id',input.userId).eq('course_id',input.courseId)

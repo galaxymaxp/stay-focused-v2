@@ -36,6 +36,9 @@ beforeAll(async () => {
     create table public.tasks(id uuid primary key default gen_random_uuid(),user_id uuid,canvas_assignment_row_id uuid,canvas_connection_id uuid,canvas_course_id text,canvas_assignment_id text,status text);`);
   await db.exec(migration("20261003025905_canvas_notification_sync.sql"));
   await db.exec(migration("20261013000100_skip_stale_canvas_email_events.sql"));
+  await db.exec(migration("20261014000200_canvas_preparation_backfill.sql"));
+  await db.exec(migration("20261015030000_current_and_past_courses.sql"));
+  await db.exec('grant select on public.canvas_course_sync_preferences, public.canvas_connections to service_role');
 }, 30000);
 beforeEach(async () => {
   await db.exec(`begin;
@@ -50,6 +53,31 @@ afterEach(async () => { await db.exec("rollback"); });
 afterAll(async () => { await db?.close(); });
 
 describe("transactional Canvas emails in Postgres", () => {
+  it.each(["conclusion", "term", "override"])("CQ1 excludes %s past evidence from routine claims and email fan-out", async evidence => {
+    if (evidence === 'conclusion') await db.exec('update public.canvas_courses set concluded=true');
+    if (evidence === 'term') await db.exec("update public.canvas_courses set term_end_at=now()-interval '1 day'");
+    if (evidence === 'override') await db.exec("update public.canvas_courses set course_state_override='past'");
+    await db.exec('set local role service_role');
+    expect((await db.query('select * from public.claim_canvas_notification_course_v1($1)', [worker])).rows).toHaveLength(0);
+    expect((await db.query('select * from public.claim_canvas_preparation_backfill_courses_v1($1,20)', [worker])).rows).toHaveLength(0);
+    await db.exec('reset role');
+    await addAssignment();
+    expect(await count()).toBe(0);
+    await db.exec("update public.canvas_courses set course_state_override='current'");
+    await db.exec('set local role service_role');
+    expect((await db.query('select * from public.claim_canvas_notification_course_v1($1)', [worker])).rows).toHaveLength(1);
+    expect((await db.query('select * from public.claim_canvas_preparation_backfill_courses_v1($1,20)', [worker])).rows).toHaveLength(1);
+  });
+  it('CQ1 keeps Default Term current and clear returns to automatic; invalid overrides fail', async () => {
+    expect((await db.query('select public.is_past_canvas_course_v1(c) as past from public.canvas_courses c')).rows).toEqual([{ past: false }]);
+    await db.exec("update public.canvas_courses set course_state_override='past'");
+    expect((await db.query('select public.is_past_canvas_course_v1(c) as past from public.canvas_courses c')).rows).toEqual([{ past: true }]);
+    await db.exec('update public.canvas_courses set course_state_override=null');
+    expect((await db.query('select public.is_past_canvas_course_v1(c) as past from public.canvas_courses c')).rows).toEqual([{ past: false }]);
+    await db.exec('savepoint invalid_override');
+    await expect(db.exec("update public.canvas_courses set course_state_override='unknown'")).rejects.toThrow();
+    await db.exec('rollback to invalid_override');
+  });
   it("skips only old pending email events before activation and is idempotent", async () => {
     for (const kind of ["old", "recent", "sent", "failed", "skipped"]) {
       await db.query(`insert into public.notification_outbox(user_id,course_id,type,dedupe_key,payload,created_at,sent_at,failed_at,skipped_at,last_error)

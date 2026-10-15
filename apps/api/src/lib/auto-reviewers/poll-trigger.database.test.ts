@@ -14,20 +14,24 @@ beforeAll(async () => {
     create table auth.users(id uuid primary key);
     insert into auth.users values('${owner}'),('${other}');
     create table public.canvas_connections(id uuid primary key,user_id uuid,status text);
-    create table public.canvas_courses(id uuid primary key,user_id uuid,canvas_connection_id uuid);
+    create table public.canvas_courses(id uuid primary key,user_id uuid,canvas_connection_id uuid,workflow_state text,end_at timestamptz);
     create table public.canvas_course_sync_preferences(course_id uuid,user_id uuid,selected boolean);
     create table public.canvas_auto_reviewer_preferences(user_id uuid primary key,enabled boolean);
     create table public.canvas_auto_reviewer_candidates(user_id uuid,processing_job_id uuid);
     grant select on public.canvas_connections, public.canvas_courses, public.canvas_course_sync_preferences,
       public.canvas_auto_reviewer_preferences to service_role;`);
   await db.exec(readFileSync(resolve("../../packages/db/migrations/20261013000000_canvas_poll_automation.sql"), "utf8"));
+  // Full CQ1 notification/backfill replacements are executed by their own suite.
+  // This fixture executes the actual evidence/helper DDL and reservation update.
+  await db.exec(readFileSync(resolve('../../packages/db/migrations/20261015030000_current_and_past_courses.sql'), 'utf8').split('create or replace function public.claim_canvas_notification_course_v1')[0]!);
+  await db.exec(readFileSync(resolve('../../packages/db/migrations/20261015030100_past_course_poll_sync_guard.sql'), 'utf8'));
 }, 30000);
 beforeEach(async () => {
   await db.exec(`begin;
     insert into public.canvas_connections values('${owner}','${owner}','active');
     insert into public.canvas_auto_reviewer_activity values('${owner}',now());`);
   for (const course of courses) {
-    await db.query("insert into public.canvas_courses values($1,$2,$2)", [course, owner]);
+    await db.query("insert into public.canvas_courses(id,user_id,canvas_connection_id) values($1,$2,$2)", [course, owner]);
     await db.query("insert into public.canvas_course_sync_preferences values($1,$2,true)", [course, owner]);
   }
   await db.exec("set local role service_role");
@@ -40,6 +44,12 @@ async function denied(sql: string) {
   await db.exec("savepoint denied"); await expect(db.exec(sql)).rejects.toThrow(); await db.exec("rollback to savepoint denied");
 }
 describe("atomic poll budget and owner activity", () => {
+  it.each(['concluded', 'term', 'override'])('rejects %s past courses at reservation and lets current override win', async evidence => {
+    await db.exec(`reset role; update public.canvas_courses set ${evidence === 'concluded' ? 'concluded=true' : evidence === 'term' ? "term_end_at=now()-interval '1 day'" : "course_state_override='past'"}; set local role service_role`);
+    expect(await reserve()).toBe(false);
+    await db.exec("reset role; update public.canvas_courses set course_state_override='current'; set local role service_role");
+    expect(await reserve()).toBe(true);
+  });
   it("admits once per course, including across six-hour bucket boundaries", async () => {
     expect(await reserve()).toBe(true); expect(await reserve()).toBe(false);
     await db.exec("update public.canvas_auto_reviewer_poll_requests set reserved_at=now()-interval '5 hours',bucket=bucket-1");

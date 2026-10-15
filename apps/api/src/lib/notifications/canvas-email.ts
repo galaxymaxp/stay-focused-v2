@@ -1,3 +1,4 @@
+import { isPastStoredCourse } from '@/lib/course-state';
 import type { CanvasEmailOutboxRow, Database } from "@stay-focused/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { defaultNotificationPreferences, notificationEmailEnabled, validNotificationTimezone } from "@stay-focused/shared/notification-preferences";
@@ -36,13 +37,13 @@ export async function processCanvasEmailOutbox(client: SupabaseClient<Database>,
     try {
       const [prefs, course, selected] = await Promise.all([
         client.from("notification_preferences").select("*").eq("user_id", row.user_id).maybeSingle(),
-        client.from("canvas_courses").select("canvas_connection_id").eq("id", row.course_id).eq("user_id", row.user_id).maybeSingle(),
+        client.from("canvas_courses").select("*").eq("id", row.course_id).eq("user_id", row.user_id).maybeSingle(),
         client.from("canvas_course_sync_preferences").select("selected").eq("course_id", row.course_id).eq("user_id", row.user_id).maybeSingle(),
       ]);
       if (prefs.error || course.error || selected.error) throw new Error("canvas_email_target_unavailable");
       const conn = course.data ? await client.from("canvas_connections").select("status").eq("id", course.data.canvas_connection_id).eq("user_id", row.user_id).maybeSingle() : null;
       if (conn?.error) throw new Error("canvas_email_connection_unavailable");
-      let skip = !notificationEmailEnabled(prefs.data ?? defaultNotificationPreferences(), row.type) || !selected.data?.selected || conn?.data?.status !== "active";
+      let skip = !course.data || isPastStoredCourse(course.data) || !notificationEmailEnabled(prefs.data ?? defaultNotificationPreferences(), row.type) || !selected.data?.selected || conn?.data?.status !== "active";
       let deferReminder = false;
       if (row.canvas_assignment_id) {
         const assignment = await client.from("canvas_assignments").select("id,due_at,published").eq("user_id", row.user_id).eq("course_id", row.course_id).eq("canvas_assignment_id", row.canvas_assignment_id).maybeSingle();

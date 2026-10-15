@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
+import { currentCourseJobs } from '@/lib/course-state';
 import {
   createProcessingJobServiceClient,
   findOwnedProcessingJob,
@@ -36,12 +37,14 @@ export async function GET(
   }
 
   try {
+    const client = createProcessingJobServiceClient();
     const job = await findOwnedProcessingJob(
-      createProcessingJobServiceClient(),
+      client,
       user.id,
       jobId,
     );
     if (!job) return notFound();
+    if (new URL(request.url).searchParams.get('scope') === 'queue' && !(await currentCourseJobs(client, user.id, [job])).length) return notFound();
     return response(200, { ok: true, data: toProcessingJobStatusView(job) });
   } catch {
     return response(503, {

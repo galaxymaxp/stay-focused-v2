@@ -39,6 +39,13 @@ const libraryData: TestData = {
   generated_artifact_versions: [{ id: 'version', user_id: 'owner', artifact_id: 'artifact', artifact_type: 'reviewer', source_version_id: 'source-version', generation_job_id: 'job', payload }],
 };
 describe('automatic Library origin', () => {
+  it('keeps labelled past-course reviewers and their exact bodies accessible in Library', async () => {
+    const { api } = service({ ...libraryData, canvas_courses: [{ ...course, concluded: true, course_state_override: 'past' }] });
+    const list = await api.getLibrary('owner');
+    expect(list.items[0]?.course).toMatchObject({ id: course.id, name: 'Biology' });
+    const detail = await api.getLibraryArtifact('owner', list.items[0]!.id);
+    expect('reviewer' in detail && detail.reviewer?.sections[0]?.title).toBe('Cells');
+  });
   it('joins owned candidate receipts through the job to the exact saved version', async () => {
     const { api } = service({ ...libraryData, canvas_auto_reviewer_candidates: [{ id: 'receipt', user_id: 'owner', processing_job_id: 'job' }] });
     expect((await api.getLibrary('owner')).items[0]?.origin).toBe('automatic');
