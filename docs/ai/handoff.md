@@ -2968,3 +2968,42 @@ past/Queue/generation checks and before/after timings). SP0 itself requires no
 rollout because it changes no product behavior. No Supabase, Vercel, Google Cloud,
 Canvas or Resend call, remote SQL, deployment, Scheduler change, environment-file
 edit or push occurred. Next separate item is SP1; this run stops at SP0.
+
+
+## SP1 unattended saved-first screens (2026-10-15)
+
+**Status: PASS for STEP 0-4, gates, docs and local commits.** Branch `overnight/2026-10-15_feedback`, starting `68e40d0`, tested code `15811de`. [Acceptance](acceptance/sp1-cached-first-screens.md) records STEP 0 file:line references, each screen's pre-SP1 saved data, the acceptance matrix and failures. [ADR-027](../architecture/ADR-027-cached-first-screens.md) uses the established ADR folder; the prompt's `docs/adr` does not exist.
+
+Owner/query/schema-bound snapshots now hydrate both apps before network, including successful empty results and exact course material offsets. Mobile reuses SQLite Library/draft/answer-key behavior and adds a forward-only local table/purge; web uses one owner-keyed IndexedDB database with silent storage fallback. Status/Retry keeps data visible, derived group positions remain stable, and changed Reviewers require explicit acceptance. Auth cleanup is tested; epochs fence delayed writes. No API/provider/generation/RLS/cancellation behavior changes.
+
+Commits (author `galaxymaxp <omgraythekid@gmail.com>`, local only):
+
+- `2bb62ba feat(shared): add owner-bound saved snapshot contract`
+- `eb6ac80 feat(mobile): render saved screens before background refresh`
+- `2bfbff3 feat(web): persist owner-scoped saved-first screens in IndexedDB`
+- `44f2683 fix(cache): retain derived course positions during refresh`
+- `15811de fix(cache): reconcile pagination status and schema regressions`
+
+The scoped documentation commit containing this footer is listed with its final hash in `tmp/overnight/SP1.status`; no self-hash amendment is needed.
+
+| Command | Evidence/result |
+|---|---|
+| `npm run typecheck -- --force` | FRESH PASS: 8/8 tasks; zero cached; 28.111s |
+| `npm run lint -- --force` | FRESH PASS: 8/8 tasks; zero cached; zero errors, five existing warnings; 32.18s |
+| `npm run test --workspace @stay-focused/mobile` | FRESH PASS: 1,036/1,036 tests; 105/105 files; zero skips; 6.596s |
+| `npm run test --workspace @stay-focused/shared` | FRESH PASS: 223/223 tests; 19/19 files; zero skips; 2.269s |
+| `npm run test --workspace @stay-focused/web` | FRESH PASS: 94/94 tests; 16/16 files; zero skips; 2.96s |
+| `npm run build --workspace @stay-focused/api` | FRESH PASS: 1/1 build; 73.15s |
+| `npm run build --workspace @stay-focused/web` | FRESH PASS: 1/1 build; 19/19 static pages; 37.247s |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | FRESH PASS: 1/1 local Android export; 63.626s |
+| `npm run build -- --force` | FRESH PASS: 8/8 tasks; zero cached; 113.542s |
+| `git diff --check` and `git diff --cached --check` | FRESH PASS before documentation commit |
+| API test suite | NOT APPLICABLE / NOT RUN: no API source changed |
+
+First full mobile gate stopped correctly at **1,032 passed/4 failed**, **102 passed/3 failed files** (1,036 tests/105 files). Two upgrade assertions hard-coded schema 7; they now assert the current schema while retaining body/draft/key/practice checks. Two screen assertions used header-child positions; the stand-in now renders header controls and tests find SearchField/SegmentedControl. Focused repair **77/77**; final full mobile **1,036/1,036**. Earlier draft parse/edit-tail, JSX transform, ordering assertion and lint failures are retained in the acceptance report; no flake observed. Initial forced typecheck/lint also passed 8/8 before final review, then were rerun fresh after the final edits. Logs remain ignored under `tmp/overnight/evidence/SP1-*`; TEMP/TMP stayed inside `.local/test-temp`. No tmp, credential, generated export or private fixture is committed. Unrelated `UI/`, `apps/mobile/.gitignore`, and `supabase/` remain untouched.
+
+**UNVERIFIED (owner to confirm):** live/deployed revision, production first-content latency, live operational state and actual RB3 physical/browser behavior. There were no remote service calls, deployments, remote SQL/migration application, Scheduler changes, environment-file edits or pushes. The only migration is new on-device SQLite migration 8; historical migrations are unchanged. Current-state, roadmap, Tester feedback sprint and the external roadmap's SP1 status are reconciled.
+
+**Owner steps remaining:** the entirely skipped Rollout (preview OTA and website deploy), followed by the entirely skipped Device checks/RB3: reopen saved Today, airplane-mode refresh/Retry with last-updated time, sign out and use a second account, and hold an open Reviewer while its new revision arrives. SP1 requires no remote migration. Next separate roadmap item is CQ1, not started here.
+
+Tooling note: the finalizer's first freshness guard could not parse PowerShell's UTF-16 build log; no docs were written before that guard. Correct decoding confirmed the existing 8/8, zero-cached build result, and finalization succeeded. This was not a product gate failure.

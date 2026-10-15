@@ -2,6 +2,10 @@
 
 ## Tester feedback (2026-10-15)
 
+- SP1 **PASS locally**, finite scope STEP 0-4, all local gates, docs and commits; Rollout/Device checks excluded. Code `15811de`; [acceptance](acceptance/sp1-cached-first-screens.md), [ADR-027](../architecture/ADR-027-cached-first-screens.md). Saved-first screens on both apps, owner/query/schema isolation, sign-out purge, static Retry/time status, stable groups and explicit Reviewer revision updates.
+- SP1 FRESH: forced typecheck/lint/build **8/8 each, zero cached**; mobile **1,036/1,036**, shared **223/223**, web **94/94**, zero skips; standalone API/web/Android builds **1/1 each**; five existing lint warnings. First full mobile **1,032 passed/4 failed**, focused repair **77/77**, full rerun PASS; development failures retained, no flake. API tests NOT APPLICABLE (unchanged API).
+- SP1 **Owner steps remaining:** preview OTA + website deployment, then skipped RB3 reopen/offline Retry/account-switch/reader checks. Production revision, real latency and physical behavior **UNVERIFIED (owner to confirm)**. No remote service/action, environment edit or push. Next separate item CQ1; finite SP1 run ends here.
+
 - SP0 **PASS**, docs only: [speed audit](../architecture/sp0-speed-audit.md) `588bbf1`; FRESH web build PASS (19 static pages/28 routes), Library tests 9/9, final hook probes 2/2, service observations 12/12, docs hygiene PASS; harness/tooling failures retained in handoff; production/CIT17/regions/capacity **UNVERIFIED (owner to confirm)**; no rollout/device/service actions or product edits; next separate item SP1, with CQ1/SP2 inputs recorded.
 
 ## F0S complete: released-main baseline (2026-10-15)

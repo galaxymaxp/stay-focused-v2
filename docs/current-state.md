@@ -1,5 +1,13 @@
 # Current State
 
+## SP1 saved-first screens complete locally (2026-10-15)
+
+**PASS for the unattended SP1 code scope.** Mobile and website render owner-scoped saved Today, Courses, course pages, Tasks/Work, Library and Reviewer content before background requests. Static Syncing/Updated/Retry status preserves saved content on failure; open reviewers require an explicit tap to accept a changed revision. Exact course-page offsets, stable course/list positions, sign-out purge, account-switch isolation and browser storage fallback are covered. Code tip: `15811de`; [acceptance](ai/acceptance/sp1-cached-first-screens.md), [ADR-027](architecture/ADR-027-cached-first-screens.md).
+
+FRESH final verification: forced typecheck and lint **8/8 tasks each, zero cached**; mobile **1,036/1,036 in 105 files**, shared **223/223 in 19 files**, web **94/94 in 16 files**, no skips. Standalone API/website/Android builds pass **1/1 each**; forced repository build passes **8/8, zero cached**. Lint retains five existing warnings/zero errors. First mobile gate was **1,032 passed/4 failed** (schema-version and header-position fixtures); focused repair **77/77** and full rerun pass. Draft failures remain recorded; no flake observed. API tests are NOT APPLICABLE because API source is unchanged.
+
+Production/deployed revision, actual first-content latency and physical/browser RB3 behavior are **UNVERIFIED (owner to confirm)**. Rollout and Device checks were entirely skipped. **Owner steps remaining:** preview OTA, website deployment, then RB3 saved reopen, airplane-mode Retry, second-account isolation and open-reviewer checks. No remote service call, remote SQL/migration, Scheduler action, environment-file change or push occurred. Next separate item: CQ1; this run does not start it.
+
 ## SP0 speed audit complete (2026-10-15)
 
 **PASS for the local docs-only SP0 scope.** [Speed audit](architecture/sp0-speed-audit.md)
