@@ -97,6 +97,18 @@ export interface CourseMaterials {
   readonly nextOffset: number | null;
   readonly totalKnown: number;
 }
+export interface CourseBatchMaterial { readonly id: string; readonly title: string; readonly done: boolean; readonly selectable: boolean }
+export interface CourseBatchPreview { readonly items: readonly CourseBatchMaterial[] }
+export interface CourseBatchResult {
+  readonly created: number; readonly skippedUpToDate: number; readonly waitingForPrepared: number;
+  readonly overLimit: number; readonly failed: number; readonly batchKey: string; readonly nextAvailableAt?: string;
+}
+export interface CourseBatchRequest {
+  readonly id: string; readonly batchKey: string; readonly courseId: string; readonly materialId: string; readonly title: string;
+  readonly state: 'waiting' | 'quota' | 'admitted' | 'failed' | 'cancelled' | 'skipped';
+  readonly jobId: string | null; readonly nextAvailableAt: string | null;
+}
+export interface CourseBatchQueue { readonly requests: readonly CourseBatchRequest[]; readonly summaries: readonly { readonly batchKey: string; readonly done: number; readonly total: number }[] }
 export interface CourseLearningWorkspace {
   readonly course: CourseSummary;
   readonly materials: CourseMaterials;

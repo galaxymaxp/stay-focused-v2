@@ -121,6 +121,10 @@ export async function pollCanvasCourse(client: Client, row: CanvasCourseRow, wor
 }
 
 export async function processCanvasMetadataPolls(client: Client, workerId: string, deadline: number): Promise<{ courses: number; failed: number }> {
+  try {
+    const { resumeCourseRequests } = await import('@/lib/course-batch/service');
+    await resumeCourseRequests(client, {}, Math.min(deadline, Date.now() + 20000));
+  } catch { console.warn('course_batch.recovery_unavailable'); }
   let courses = 0;
   let failed = 0;
   while (courses < 20 && Date.now() + 45_000 + BACKFILL_POLL_RESERVE_MS < deadline) {

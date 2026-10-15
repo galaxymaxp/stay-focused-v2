@@ -105,6 +105,8 @@ export async function reconcilePreparationCourse(client:PreparationClient,input:
   }
 }
 export async function preparationCompleted(client:PreparationClient,job:CanvasMaterialPreparationRow){
+  const { resumeCourseRequests } = await import('@/lib/course-batch/service');
+  await resumeCourseRequests(client, { userId: job.user_id, courseId: job.course_id, materialId: job.material_id });
   await reconcilePreparationCourse(client,{userId:job.user_id,courseId:job.course_id});
   if(job.state==='prepared')await runAutomaticReviewersAfterSync(client,{userId:job.user_id,courseId:job.course_id});
 }

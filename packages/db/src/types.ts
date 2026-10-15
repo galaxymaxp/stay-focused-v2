@@ -596,9 +596,21 @@ export type CanvasPreparationSyncRow = {
 export type CanvasPreparationBackfillCourseRow = {
   course_id:string;user_id:string;last_visited_at:string;lease_owner:string|null;lease_expires_at:string|null;
 };
+export type CourseReviewerRequestRow = {
+  id: string; user_id: string; course_id: string; canvas_connection_id: string;
+  material_id: string; revision: string; batch_key: string; batch_keys: string[]; title: string;
+  state: 'waiting' | 'quota' | 'admitted' | 'failed' | 'cancelled' | 'skipped';
+  job_id: string | null; next_available_at: string | null; created_at: string; updated_at: string;
+};
 export interface Database {
   public: {
     Tables: {
+      course_reviewer_requests: {
+        Row: CourseReviewerRequestRow;
+        Insert: Pick<CourseReviewerRequestRow,'user_id'|'course_id'|'canvas_connection_id'|'material_id'|'revision'|'batch_key'|'title'> & Partial<CourseReviewerRequestRow>;
+        Update: Partial<CourseReviewerRequestRow>;
+        Relationships: [];
+      };
       reviewer_shares: {
         Row: { user_id: string; artifact_id: string; token: string; snapshot: Json; created_at: string; updated_at: string; revoked_at: string | null };
         Insert: { user_id: string; artifact_id: string; token: string; snapshot: Json; created_at?: string; updated_at?: string; revoked_at?: string | null };
@@ -4361,6 +4373,8 @@ export interface Database {
       };
     };
     Functions: {
+      link_course_reviewer_batch_v1: { Args: { p_user_id: string; p_request_id: string; p_batch_key: string }; Returns: boolean };
+      course_reviewer_next_available_v1: { Args: { p_user_id: string }; Returns: string | null };
       mutate_reviewer_share_v1: {
         Args: { p_user_id: string; p_artifact_id: string; p_action: string; p_token: string; p_version_id: string | null; p_snapshot: Json };
         Returns: Database['public']['Tables']['reviewer_shares']['Row'][];

@@ -62,6 +62,8 @@ export async function currentCourseJobs<T extends ProcessingJobDatabaseRow>(clie
     if (activityId && !assignment) return false;
     const courseId = metadataCourseId(source.metadata) ?? assignment?.course_id;
     if (assignment && !courses?.data?.some(course => course.id === assignment.course_id && course.canvas_connection_id === assignment.canvas_connection_id)) return false;
-    return !courseId || current.has(courseId);
+    // Only a server-created explicit course-batch job may surface a past course.
+    return !courseId || current.has(courseId) || (source.metadata && typeof source.metadata === 'object' && !Array.isArray(source.metadata) &&
+      'canvasBatchRequestId' in source.metadata && typeof source.metadata.canvasBatchRequestId === 'string');
   });
 }

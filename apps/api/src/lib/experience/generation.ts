@@ -20,6 +20,8 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
   readonly schedule?: typeof scheduleAcceptedProcessingJobDispatch;
   /** Canvas token brokered for the current sync job. When absent, the stored connection is decrypted (Vercel path). */
   readonly brokeredCanvasToken?: string;
+  readonly expectedPreparationRevision?: string;
+  readonly batchRequestId?: string;
 } = {}): Promise<ProcessingJobDatabaseRow> {
   const schedule = dependencies.schedule ?? scheduleAcceptedProcessingJobDispatch;
   logGenerationAdmissionMemory('request_started', { sourceCount: 1 });
@@ -45,6 +47,8 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
   const {readPreparedResult}=await import('@/lib/canvas-preparation/repository');
   const identity={userId,courseId:input.courseId,materialId:input.materialId};
   const preparation=await lookupMaterialPreparation(client,identity);
+  if (dependencies.expectedPreparationRevision && preparation?.revision_fingerprint !== dependencies.expectedPreparationRevision)
+    throw new ExperienceFailure(409, 'not_ready');
   const evidence=preparation?await readPreparedResult(client,preparation):null;
   if(!preparation || !evidence){
     await admitMaterialPreparation(client,{...identity,cycleKey:`generation:${key}`,brokeredCanvasToken:dependencies.brokeredCanvasToken});
@@ -63,7 +67,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
         contentSha256: fileRow.current_sha256!,
         displayName: descriptor.title,
         sourcePrivateMetadata: {
-          canvasCourseId: input.courseId,
+          canvasCourseId: input.courseId, ...(dependencies.batchRequestId ? { canvasBatchRequestId: dependencies.batchRequestId } : {}),
           canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION, canvasPreparationJobId:preparation.id,
           canvasItemIds: sourceIds,
         },
@@ -89,7 +93,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
         sourceText: `canvas-composite-reference:${sha256Utf8Hex(JSON.stringify({ courseId: input.courseId, sourceIds }))}`,
         sourceTitle: descriptor.title,
         sourcePrivateMetadata: {
-          canvasCourseId: input.courseId,
+          canvasCourseId: input.courseId, ...(dependencies.batchRequestId ? { canvasBatchRequestId: dependencies.batchRequestId } : {}),
           canvasDeferredResolutionVersion: DEFERRED_CANVAS_REVIEWER_VERSION, canvasPreparationJobId:preparation.id,
           canvasItemIds: sourceIds,
         },
@@ -144,7 +148,7 @@ export async function startReviewerGeneration(client: SupabaseClient<Database>, 
     const job = await createReviewerProcessingJob({ client, userId, idempotencyKey: key, source: {
       sourceText: preview.value.sourceText, sourceTitle: preview.value.suggestedTitle,
       sourceBlocks: canonicalCanvasSourceBlocks(accepted.value.row.selected_block_manifest),
-      sourcePrivateMetadata: { canvasPreviewSessionId: preview.value.previewSessionId, canvasCourseId: input.courseId, canvasItemIds: sourceIds, canvasResolutionFingerprint: preview.value.resolutionFingerprint, reviewerSourceSnapshotId: snapshot.value.sourceSnapshotId },
+      sourcePrivateMetadata: { canvasPreviewSessionId: preview.value.previewSessionId, canvasCourseId: input.courseId, ...(dependencies.batchRequestId ? { canvasBatchRequestId: dependencies.batchRequestId } : {}), canvasItemIds: sourceIds, canvasResolutionFingerprint: preview.value.resolutionFingerprint, reviewerSourceSnapshotId: snapshot.value.sourceSnapshotId },
     } });
     // The canonical creator may return a concurrently admitted job. Check its
     // source identity too, even when two materials have identical text/title.

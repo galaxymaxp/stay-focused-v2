@@ -160,6 +160,7 @@ export interface AcceptedProcessingJobResponse {
 }
 
 export interface ProcessingJobListPage {
+  readonly courseBatches?: import('./experience').CourseBatchQueue;
   readonly jobs: readonly ProcessingJobStatusView[];
   readonly nextCursor: string | null;
   /** Only present when the caller requests a detail alongside the Queue page. */
@@ -239,3 +240,4 @@ export * from "./saved-snapshot";
 export * from "./course-state";
 export * from './job-status-reader';
 export * from './reviewer-share';
+export * from './course-batch';

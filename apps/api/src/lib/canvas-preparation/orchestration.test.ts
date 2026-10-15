@@ -1,3 +1,4 @@
+vi.mock('@/lib/course-batch/service', () => ({ resumeCourseRequests: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasMaterialPreparationRow } from '@stay-focused/db';
 const mocks=vi.hoisted(()=>({list:vi.fn(),admit:vi.fn(),dispatch:vi.fn(),automatic:vi.fn()}));

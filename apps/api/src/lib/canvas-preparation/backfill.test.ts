@@ -1,3 +1,4 @@
+vi.mock('@/lib/course-batch/service', () => ({ resumeCourseRequests: vi.fn() }));
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { CanvasMaterialPreparationRow } from '@stay-focused/db';

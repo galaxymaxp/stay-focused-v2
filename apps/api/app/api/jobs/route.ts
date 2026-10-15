@@ -134,6 +134,8 @@ export async function GET(request: Request): Promise<Response> {
           ...(cursor ? { cursor } : {}),
         },
       );
+      const courseBatches = url.searchParams.get('batches') === '1'
+        ? await (await import('@/lib/course-batch/read')).readCourseBatchQueue(createProcessingJobServiceClient(), user.id) : undefined;
       const page = rows.slice(0, limit);
       const last = page.at(-1);
       const detailId = url.searchParams.get('detailId');
@@ -161,6 +163,7 @@ export async function GET(request: Request): Promise<Response> {
           ok: true,
           data: {
             jobs: page.map(toProcessingJobStatusView),
+            ...(courseBatches ? { courseBatches } : {}),
             ...(detailId ? { detailId, detail } : {}),
             nextCursor:
               rows.length > limit && last

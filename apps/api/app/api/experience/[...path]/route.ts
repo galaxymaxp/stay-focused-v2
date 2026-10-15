@@ -30,6 +30,10 @@ export async function GET(request: Request, context: Context): Promise<Response>
     if (surface === 'courses') {
       if (path.length === 1) return experienceJson(await service.getGenerateCourses(userId));
       requireId(id!);
+      if (path.length === 3 && action === 'batch') {
+        const { previewCourseBatch } = await import('@/lib/course-batch/service');
+        return experienceJson(await previewCourseBatch(createCanvasServiceClient(), userId, id!));
+      }
       if (path.length === 2) return experienceJson(await service.getCourseLearningWorkspace(userId, id!));
       if (path.length === 3 && action === 'materials') return experienceJson(await service.getCourseMaterials(userId, id!, readInteger(query.get('offset'), 0, 0, 1000)));
     }
@@ -91,6 +95,19 @@ export async function POST(request: Request, context: Context): Promise<Response
   return experienceRoute(request, async (service, userId) => {
     const { path } = await context.params;
     const route = path.join('/');
+    if (path.length === 3 && path[0] === 'batch-requests' && ['cancel', 'retry'].includes(path[2]!)) {
+      const { mutateCourseRequest } = await import('@/lib/course-batch/service');
+      return experienceJson(await mutateCourseRequest(createCanvasServiceClient(), userId, requireId(path[1]!), path[2] as 'cancel' | 'retry'));
+    }
+    if (path.length === 3 && path[0] === 'courses' && path[2] === 'batch') {
+      const value = record(await readBoundedExperienceJson(request, 512 * 1024));
+      if (Object.keys(value).some(key => key !== 'materialIds') || (value.materialIds !== 'all' &&
+        (!Array.isArray(value.materialIds) || value.materialIds.length === 0 || value.materialIds.length > 10000 ||
+          !value.materialIds.every(id => typeof id === 'string' && /^(page|file):[a-f0-9-]{36}$/i.test(id)))))
+        throw new ExperienceFailure(400, 'invalid_request');
+      const { createCourseBatch } = await import('@/lib/course-batch/service');
+      return experienceJson(await createCourseBatch(createCanvasServiceClient(), userId, requireId(path[1]!), value.materialIds as 'all' | string[]), 202);
+    }
     if (!['generations', 'materials/prepare', 'planner/preview', 'planner/apply', 'planner/replan'].includes(route)) throw new ExperienceFailure(404, 'not_found');
     const boundedBody = await readBoundedText(request, 64 * 1024);
     if (!boundedBody.ok) throw new ExperienceFailure(400, 'invalid_request');
