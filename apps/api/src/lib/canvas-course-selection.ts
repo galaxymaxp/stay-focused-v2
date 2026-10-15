@@ -82,8 +82,8 @@ export interface CanvasCourseInventory {
   readonly counts: CanvasCourseInventoryCounts;
   readonly selectedCourseIds: readonly string[];
   /**
-   * 'stored' only when the caller allowed a stored fallback and Canvas could not
-   * list courses; classifications then use saved course dates alone.
+   * Read-only screens prefer stored CQ1 evidence. First-ever discovery and
+   * explicit reconciliation use Canvas and report 'canvas'.
    */
   readonly classificationSource: "canvas" | "stored";
 }
@@ -99,6 +99,7 @@ export type CanvasCourseSelectionResult<TValue> =
 
 export async function loadCanvasCourseInventory({
   allowStoredFallback = false,
+  preferStored = false,
   client,
   now = new Date(),
   userId,
@@ -108,10 +109,21 @@ export async function loadCanvasCourseInventory({
    * Canvas is unreachable. Sync-state fields never depend on live Canvas.
    */
   readonly allowStoredFallback?: boolean;
+  readonly preferStored?: boolean;
   readonly client: SupabaseClient<Database>;
   readonly now?: Date;
   readonly userId: string;
 }): Promise<CanvasCourseSelectionResult<CanvasCourseInventory>> {
+  // Stored reads do not decrypt credentials or contact Canvas. Only the empty
+  // inventory case enters the existing live discovery/reconciliation path.
+  if (preferStored) {
+    const savedConnection = await readConnection(client, userId);
+    if (!savedConnection.ok) return { ok: false, status: 500, code: 'canvas_storage_failed', message: 'Canvas connection could not be loaded.' };
+    if (!savedConnection.row) return { ok: false, status: 404, code: 'canvas_connection_missing', message: 'Connect Canvas before loading courses.' };
+    const rows = await readStoredCourseRows({ client, connectionId: savedConnection.row.id, userId });
+    if (!rows.ok) return { ok: false, status: 500, code: 'canvas_storage_failed', message: 'Canvas course inventory could not be loaded.' };
+    if (rows.value.length > 0) return storedInventory(client, savedConnection.row, rows.value, userId, now);
+  }
   const connection = await loadConnectionAndToken(client, userId, allowStoredFallback);
   if (!connection.ok) {
     return connection;
@@ -269,6 +281,23 @@ export async function loadCanvasCourseInventory({
       classificationSource: liveCourses ? "canvas" : "stored",
     },
   };
+}
+
+async function storedInventory(client: SupabaseClient<Database>, connection: CanvasConnectionRow,
+  rows: readonly CanvasCourseRow[], userId: string, now: Date): Promise<CanvasCourseSelectionResult<CanvasCourseInventory>> {
+  const scope = { client, connectionId: connection.id, userId };
+  const [preferences, states, runs] = await Promise.all([
+    readCoursePreferences(scope), readCourseSyncStates(scope),
+    readLatestScopedRuns({ ...scope, courseIds: rows.map(row => row.id) }),
+  ]);
+  if (!preferences.ok || !states.ok || !runs.ok) return { ok: false, status: 500, code: 'canvas_storage_failed', message: 'Canvas course status could not be loaded.' };
+  const preferenceMap = new Map(preferences.value.map(row => [row.course_id, row]));
+  const stateMap = new Map(states.value.map(row => [row.course_id, row]));
+  const runMap = latestRunByCourseId(runs.value);
+  const courses = rows.map(row => mapInventoryItem({ row, now, liveCourse: undefined,
+    preference: preferenceMap.get(row.id) ?? null, state: stateMap.get(row.id) ?? null, run: runMap.get(row.id) ?? null })).sort(compareInventoryItems);
+  return { ok: true, value: { connection, courses, counts: countClassifications(courses),
+    selectedCourseIds: preferences.value.filter(row => row.selected).sort(comparePreferences).map(row => row.course_id), classificationSource: 'stored' } };
 }
 
 export async function saveCanvasCoursePreferences({

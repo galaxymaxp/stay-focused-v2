@@ -34,7 +34,7 @@ export function createExperienceService(authenticatedUserId: string) {
   const client = createCanvasServiceClient();
   return new ExperienceService({ repository: trustedExperienceReadRepository(client, authenticatedUserId),
     materials: (_userId, courseId, offset) => listCanvasReviewerSources({ client, userId: authenticatedUserId, courseId, offset, limit: 100, includeClientPreparationStatus: true }),
-    courseInventory: () => loadCanvasCourseInventory({ client, userId: authenticatedUserId, allowStoredFallback: true }),
+    courseInventory: () => loadCanvasCourseInventory({ client, userId: authenticatedUserId, allowStoredFallback: true, preferStored: true }),
     freshness: async (_userId, reviewerArtifactId) => {
       const status = await readReviewerSourceStatus({ client, userId: authenticatedUserId, reviewerArtifactId });
       return status.ok ? status.value.overallStatus : 'unknown';

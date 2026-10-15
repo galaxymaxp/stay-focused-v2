@@ -26,6 +26,7 @@ function courseRow(id: string, overrides: Row = {}): Row {
 /** Minimal PostgREST-shaped reader: eq/in filters over in-memory tables. */
 function fakeClient(tables: Record<string, Row[]>) {
   const writes: string[] = [];
+  const reads: string[] = [];
   const from = (table: string) => {
     const filters: ((row: Row) => boolean)[] = [];
     let single = false;
@@ -38,13 +39,14 @@ function fakeClient(tables: Record<string, Row[]>) {
       maybeSingle: () => { single = true; return builder; },
       upsert: () => { writes.push(table); return builder; },
       then: (resolve: (value: { data: unknown; error: null }) => void) => {
+        reads.push(table);
         const rows = (tables[table] ?? []).filter(row => filters.every(filter => filter(row)));
         resolve({ data: single ? rows[0] ?? null : rows, error: null });
       },
     };
     return builder;
   };
-  return { client: { from } as unknown as SupabaseClient<Database>, writes };
+  return { client: { from } as unknown as SupabaseClient<Database>, writes, reads };
 }
 
 beforeEach(() => {
@@ -78,6 +80,26 @@ describe("loadCanvasCourseInventory stored fallback", () => {
       { id: "s1", user_id: "owner", canvas_connection_id: "connection", canvas_course_id: "canvas-synced", course_id: "synced", last_checked_at: "2026-09-20", last_successful_sync_at: "2026-09-20", consecutive_failure_count: 0, last_failure_code: null },
     ],
     canvas_sync_runs: [],
+  });
+
+  it('opens stored inventory with zero Canvas calls/writes and four data reads, preserving CQ1 and owner fences', async () => {
+    const { client, writes, reads } = fakeClient(tables());
+    const result = await loadCanvasCourseInventory({ preferStored: true, allowStoredFallback: true, client, now, userId: 'owner' });
+    expect(result.ok && result.value.classificationSource).toBe('stored');
+    expect(result.ok && result.value.courses.map(c => [c.id, c.courseState, c.selected])).toEqual([
+      ['synced', 'past', true], ['unselected', 'current', false],
+    ]);
+    expect(mocks.listCourseInventory).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+    expect(reads).toEqual(['canvas_courses', 'canvas_course_sync_preferences', 'canvas_course_sync_states', 'canvas_sync_runs']);
+  });
+
+  it('keeps first-ever live discovery and reports the existing canvas response flag', async () => {
+    mocks.listCourseInventory.mockResolvedValue([]);
+    const { client } = fakeClient({});
+    const result = await loadCanvasCourseInventory({ preferStored: true, allowStoredFallback: true, client, now, userId: 'owner' });
+    expect(result.ok && result.value).toMatchObject({ courses: [], classificationSource: 'canvas' });
+    expect(mocks.listCourseInventory).toHaveBeenCalledOnce();
   });
 
   it("keeps the Sync page strict when Canvas cannot list courses", async () => {
