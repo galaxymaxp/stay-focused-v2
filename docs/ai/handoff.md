@@ -3007,3 +3007,48 @@ First full mobile gate stopped correctly at **1,032 passed/4 failed**, **102 pas
 **Owner steps remaining:** the entirely skipped Rollout (preview OTA and website deploy), followed by the entirely skipped Device checks/RB3: reopen saved Today, airplane-mode refresh/Retry with last-updated time, sign out and use a second account, and hold an open Reviewer while its new revision arrives. SP1 requires no remote migration. Next separate roadmap item is CQ1, not started here.
 
 Tooling note: the finalizer's first freshness guard could not parse PowerShell's UTF-16 build log; no docs were written before that guard. Correct decoding confirmed the existing 8/8, zero-cached build result, and finalization succeeded. This was not a product gate failure.
+
+
+## CQ1 unattended current and past courses (2026-10-15)
+
+**PASS for the unattended CQ1 code scope (STEP 0-4, gates, docs and local commits).** Current courses show by default; past courses stay in collapsed sections on mobile and website with owner controls to move either way. Shared Canvas conclusion/enrollment/course/term evidence drives the automatic rule; Default Term without completion evidence stays current. Past-course work is omitted from Today, Tasks, calendar, Queue, notification fan-out, routine sync and eager preparation. Explicit opens/refreshes sync once; Library reviewers and quizzes remain labelled and available. Code tip: `6d8759e`; [acceptance](acceptance/cq1-current-and-past-courses.md), [ADR-028](../adr/ADR-028-current-and-past-courses.md).
+
+Starting HEAD `33824ca`; branch `overnight/2026-10-15_feedback`. Resumed after interruption by rereading prompt/progress/Git and inspecting the uncommitted implementation; committed migration/shared work was preserved.
+
+Commits (author `galaxymaxp <omgraythekid@gmail.com>`, local only):
+
+- `a4554a9 feat(db): persist course state evidence and owner overrides`
+- `39cf0ff feat(shared): classify current and past courses consistently`
+- `5e1506e fix(db): guard past courses at atomic poll sync reservation`
+- `6d8d51d test(shared): verify refreshed snapshots replace course state`
+- `98024e8 feat(api): hide past-course work and skip routine sync`
+- `132a315 feat(mobile): collapse past courses and retain Library access`
+- `6d8759e feat(web): group past courses behind owner controls`
+
+The documentation commit containing this footer is listed with its final hash in `tmp/overnight/CQ1.status`.
+
+| Command | Evidence/result |
+|---|---|
+| `npm run typecheck -- --force` | FRESH PASS: 8/8 tasks; zero cached |
+| `npm run lint -- --force` | FRESH PASS: 8/8 tasks; zero cached; zero errors/five existing warnings |
+| `npm run test --workspace @stay-focused/api` | FRESH PASS: 2,120 passed; 3 skipped; 180/180 files |
+| `npm run test --workspace @stay-focused/mobile` | FRESH PASS: 1,042/1,042 tests; 105/105 files; zero skips |
+| `npm run test --workspace @stay-focused/shared` | FRESH PASS: 258/258 tests; 22/22 files; zero skips; source and generated JS copies |
+| `npm run test --workspace @stay-focused/shared -- src` | FRESH PASS: 129/129 source tests; 11/11 files; zero skips |
+| `npm run test --workspace @stay-focused/web` | FRESH PASS: 95/95 tests; 16/16 files; zero skips |
+| `npm run test --workspace @stay-focused/canvas` | FRESH PASS: 75/75 tests; 1/1 file; zero skips |
+| `npm run build --workspace @stay-focused/api` | FRESH PASS: 1/1 build |
+| `npm run build --workspace @stay-focused/web` | FRESH PASS: 1/1 build; 19/19 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | FRESH PASS: 1/1 local Android export |
+| `npm run build -- --force` | FRESH PASS: 8/8 tasks; zero cached |
+| `git diff --check; git diff --cached --check` | FRESH PASS: diff hygiene before documentation commit |
+
+FRESH final serial verification: forced typecheck/lint/root build **8/8 tasks each, zero cached**; API **2,120 passed/3 skipped in 180 files**, mobile **1,042/1,042 in 105 files**, shared **258/258 in 22 files** (includes emitted JS copies; source-only **129/129 in 11 files**), web **95/95 in 16 files**, Canvas **75/75 in 1 file**. Standalone API/web/Android builds **1/1 each**. Lint: zero errors/five existing warnings. Repaired draft/first-gate failures and one earlier API timeout flake remain recorded in acceptance; the final serial run passed without retries.
+
+The shared source-only run avoids counting emitted JS as distinct acceptance cases. First API full gate: 2,097 passed/19 failed/3 skipped; adapter repairs passed 80/80, then 2,117 passed/3 skipped. Added atomic reservation tests passed 10/10 and subsequent full API passed 2,120/3 skipped. One unchanged Canvas source test timed out at 5s under load; unchanged focused/full reruns passed, recorded as a flake. First mobile: 1,037 passed/3 failed; repaired fixtures plus behavior tests passed 58/58, final mobile 1,042/1,042. Draft typecheck/SQL/fixture/tooling failures are retained in acceptance. The additional root build was interrupted before completion and has now passed freshly.
+
+Logs/helpers/progress stay under `tmp/overnight/`; test temp stays under `.local/test-temp`. No credentials, generated output, validation artifacts or private fixtures are committed. Generated Next ambient files are restored to their tracked contents after builds. Unrelated `UI/`, `apps/mobile/.gitignore` and `supabase/` remain untouched. Current-state, roadmap, sprint, acceptance, ADR and external roadmap CQ1 status are reconciled.
+
+**Owner steps remaining:** apply migration files `20261015030000` then `20261015030100`, publish API/website/worker and preview OTA, then run the entirely skipped Rollout/Device checks on realme and website. CIT17 Default Term identities/counts, live course evidence, deployed revisions/database/Scheduler state, actual speed and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service call, remote SQL/migration application, deployment, Scheduler action, environment-file edit or push occurred. Next separate roadmap item: QD1; this finite CQ1 run ends here.
+
+Documentation reference check: FRESH PASS, 10/10 CQ1 local links. The first helper scanned historical roadmap sections and flagged an unrelated old RB1 link; limiting the helper to CQ1 additions passed without changing historical content.

@@ -1,5 +1,13 @@
 # Roadmap
 
+## Tester feedback CQ1 complete locally (2026-10-15)
+
+**PASS for the unattended CQ1 code scope (STEP 0-4, gates, docs and local commits).** Current courses show by default; past courses stay in collapsed sections on mobile and website with owner controls to move either way. Shared Canvas conclusion/enrollment/course/term evidence drives the automatic rule; Default Term without completion evidence stays current. Past-course work is omitted from Today, Tasks, calendar, Queue, notification fan-out, routine sync and eager preparation. Explicit opens/refreshes sync once; Library reviewers and quizzes remain labelled and available. Code tip: `6d8759e`; [acceptance](ai/acceptance/cq1-current-and-past-courses.md), [ADR-028](adr/ADR-028-current-and-past-courses.md).
+
+FRESH final serial verification: forced typecheck/lint/root build **8/8 tasks each, zero cached**; API **2,120 passed/3 skipped in 180 files**, mobile **1,042/1,042 in 105 files**, shared **258/258 in 22 files** (includes emitted JS copies; source-only **129/129 in 11 files**), web **95/95 in 16 files**, Canvas **75/75 in 1 file**. Standalone API/web/Android builds **1/1 each**. Lint: zero errors/five existing warnings. Repaired draft/first-gate failures and one earlier API timeout flake remain recorded in acceptance; the final serial run passed without retries.
+
+**Owner steps remaining:** apply migration files `20261015030000` then `20261015030100`, publish API/website/worker and preview OTA, then run the entirely skipped Rollout/Device checks on realme and website. CIT17 Default Term identities/counts, live course evidence, deployed revisions/database/Scheduler state, actual speed and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service call, remote SQL/migration application, deployment, Scheduler action, environment-file edit or push occurred. Next separate roadmap item: QD1; this finite CQ1 run ends here.
+
 ## Tester feedback SP1 complete locally (2026-10-15)
 
 **PASS for the unattended SP1 code scope.** Mobile and website render owner-scoped saved Today, Courses, course pages, Tasks/Work, Library and Reviewer content before background requests. Static Syncing/Updated/Retry status preserves saved content on failure; open reviewers require an explicit tap to accept a changed revision. Exact course-page offsets, stable course/list positions, sign-out purge, account-switch isolation and browser storage fallback are covered. Code tip: `15811de`; [acceptance](ai/acceptance/sp1-cached-first-screens.md), [ADR-027](architecture/ADR-027-cached-first-screens.md).
