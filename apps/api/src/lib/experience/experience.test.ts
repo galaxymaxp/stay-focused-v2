@@ -61,6 +61,24 @@ describe('automatic Library origin', () => {
   });
 });
 describe('Today and activity composition', () => {
+  it('bundles the same read models with nine owner-scoped table reads rather than sixteen', async () => {
+    const data: TestData = { canvas_courses: [course], tasks: [task, { ...task, id: 'foreign', user_id: 'other' }], canvas_assignments: [assignment], study_sessions: [session], study_plans: [plan],
+      canvas_course_sync_preferences: [{ user_id: 'owner', canvas_connection_id: 'connection', course_id: course.id, selected: true }] };
+    const counts: ExperienceTable[] = [];
+    const repository: ExperienceRepository = { rows: async <T extends ExperienceTable>(table: T) => {
+      counts.push(table); return (data[table] ?? []) as unknown as readonly ExperienceRow<T>[];
+    } };
+    const api = new ExperienceService({ repository, materials: async () => ({ ok: true, value: sourceList }), now: () => now });
+    const [today, items, announcements] = await Promise.all([api.getTodayOverview('owner', date), api.getActivityList('owner'), api.getAnnouncements('owner', { limit: 20 })]);
+    expect(counts).toHaveLength(16);
+    counts.length = 0;
+    expect(await api.getTodayScreen('owner', date)).toEqual({ ...today, activities: { items }, announcements, capabilities: experienceCapabilities() });
+    expect(counts).toHaveLength(9);
+    expect(new Set(counts).size).toBe(9);
+    counts.length = 0;
+    await api.getTodayScreen('other', date);
+    expect(counts).toHaveLength(9); // no cross-request/owner cache
+  });
   it('carries task estimate sources into activities and Today without exposing fingerprints', () => {
     const imported = { ...task, canvas_assignment_row_id: assignment.id, source_type: 'canvas' as const,
       estimate_source: 'ai' as const, estimate_note: 'Lab report', estimate_fingerprint: 'private-fingerprint' };

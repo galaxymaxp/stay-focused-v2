@@ -43,6 +43,15 @@ afterEach(() => {
   else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
 });
 describe('authenticated student routes', () => {
+  it('verifies the bearer on every Today bundle request and bounds reads to nine per request', async () => {
+    for (let index = 0; index < 2; index++) {
+      const response = await todayGet(new Request('https://app.example/api/today?date=2026-10-15&utcOffsetMinutes=480'));
+      expect(response.status).toBe(200);
+      expect((await response.json()).data).toMatchObject({ activities: { items: [] }, announcements: { items: [] }, capabilities: expect.any(Object) });
+    }
+    expect(mocks.auth).toHaveBeenCalledTimes(2);
+    expect(mocks.rows).toHaveBeenCalledTimes(18);
+  });
   it('requires a verified bearer before changing course state', async () => {
     mocks.auth.mockResolvedValue(null);
     const response = await PATCH(request(`courses/${id}/state`, 'PATCH', '{"override":"past"}'), context(`courses/${id}/state`));
@@ -126,7 +135,7 @@ describe('authenticated student routes', () => {
     expect(response.status).toBe(200);
     expect((await response.json()).data).toEqual({ classificationSource: 'canvas', items: [{ courseState: 'current', courseStateOverridden: false, id: 'course-a', code: 'A', name: 'Owner course', status: 'available', materialCount: null, reviewerCount: null,
       lastActivityAt: '2026-09-20T00:00:00Z', syncState: 'synced', period: 'current', termName: '2026-27-1T', lastSuccessfulSyncAt: '2026-09-20T00:00:00Z' }] });
-    expect(mocks.inventory).toHaveBeenCalledWith({ client: { kind: 'trusted-service-read-client' }, userId: 'owner', allowStoredFallback: true });
+    expect(mocks.inventory).toHaveBeenCalledWith({ client: { kind: 'trusted-service-read-client' }, userId: 'owner', allowStoredFallback: true, preferStored: true });
   });
   it('returns an empty course list without a Canvas connection and a retryable error on storage failure', async () => {
     mocks.inventory.mockResolvedValueOnce({ ok: false, status: 404, code: 'canvas_connection_missing', message: 'Connect Canvas.' });

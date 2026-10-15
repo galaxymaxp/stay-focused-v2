@@ -8,7 +8,8 @@ import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib
 import type { CanvasCourseInventory, CanvasCourseSelectionResult } from '@/lib/canvas-course-selection';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
 import { toProcessingJobStatusView } from '@/lib/processing-jobs/repository';
-import type { ExperienceRow } from './repository';
+import type { ExperienceRow, ExperienceTable } from './repository';
+import type { TodayScreenData } from '@stay-focused/shared';
 import type { ExperienceRepository } from './repository';
 import { ExperienceFailure, requireFound } from './errors';
 import { composeToday, courseSummary, dayWindow, experienceCapabilities, generationCapability, generationView, learningMaterial, orderGenerateCourses, record, reviewerReader, text } from './mappers';
@@ -153,6 +154,28 @@ export class ExperienceService {
     dayWindow(date, offset);
     const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
     return composeToday({ userId, date, offset, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
+  }
+  async getTodayScreen(userId: string, date: string, offset = 0): Promise<TodayScreenData> {
+    // Cache promises only inside this verified request, including concurrent
+    // reads. Never reuse identity, authorization or data between requests.
+    const reads = new Map<ExperienceTable, Promise<readonly ExperienceRow<ExperienceTable>[]>>();
+    const repository: ExperienceRepository = { ...this.dependencies.repository,
+      rows: <T extends ExperienceTable>(table: T, owner: string): Promise<readonly ExperienceRow<T>[]> => {
+        if (owner !== userId) throw new ExperienceFailure(404, 'not_found');
+        let pending = reads.get(table);
+        if (!pending) { pending = this.dependencies.repository.rows(table, userId); reads.set(table, pending); }
+        // The table key binds each cached promise to its original row type.
+        return pending as Promise<readonly ExperienceRow<T>[]>;
+      },
+    };
+    const now = this.now;
+    const service = new ExperienceService({ ...this.dependencies, repository, now: () => now });
+    const [today, items, announcements] = await Promise.all([
+      service.getTodayOverview(userId, date, offset),
+      service.getActivityList(userId, { offsetMinutes: offset }),
+      service.getAnnouncements(userId, { limit: 20 }),
+    ]);
+    return { ...today, activities: { items }, announcements, capabilities: experienceCapabilities() };
   }
   async getAnnouncements(
     userId: string,

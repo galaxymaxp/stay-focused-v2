@@ -2,11 +2,8 @@
 import { SnapshotStatus } from "../../components/snapshot-status";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../../lib/canvas-refresh";
 import type {
-  ActivitySummary,
-  ExperienceCapabilities,
-  StudentAnnouncementList,
   TodayItem,
-  TodayOverview,
+  TodayScreenData,
 } from "@stay-focused/shared";
 import type {
   DeterministicStudyPlan,
@@ -77,22 +74,14 @@ export function TodayScreen() {
   const { api, session } = useAuth(),
     router = useRouter(),
     date = localDate();
-  const today = useResource<TodayOverview>(
+  const today = useResource<TodayScreenData>(
     `/api/today?date=${date}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
     60000,
   );
-  const capabilities = useResource<ExperienceCapabilities>(
-    "/api/experience/capabilities",
-  );
-  const announcements = useResource<StudentAnnouncementList>(
-    "/api/experience/announcements?limit=20",
-    60000,
-  );
-  const activities = useResource<{ items: ActivitySummary[] }>(
-    `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
-    60000,
-  );
-  const canvasRefresh = useCanvasRefresh("all", () => { today.refresh(); activities.refresh(); announcements.refresh(); }, false);
+  const capabilities = { ...today, data: today.data?.capabilities ?? null };
+  const announcements = { ...today, data: today.data?.announcements ?? null };
+  const activities = { ...today, data: today.data?.activities ?? null };
+  const canvasRefresh = useCanvasRefresh("all", () => { today.refresh(); }, false);
   const { prefs, pin, hide, read } = useListPreferences();
   const meta = session?.user.user_metadata ?? {};
   const displayName = [meta.full_name, meta.name].find(
@@ -201,7 +190,6 @@ export function TodayScreen() {
       setPreview(null);
       setPreviewRequest(null);
       today.refresh();
-      activities.refresh();
       setNote(`“${item.title}” is marked done.`);
     } catch (error) {
       setNote(error instanceof Error ? error.message : "Could not mark it done.");
@@ -286,7 +274,7 @@ export function TodayScreen() {
         }
       />
       <SnapshotStatus {...today} refreshing={today.refreshing || announcements.refreshing || activities.refreshing}
-        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); announcements.refresh(); activities.refresh(); }} />
+        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); }} />
       <CanvasRefreshStatus refresh={canvasRefresh} />
       <div className="today-v2">
         <div className="stack today-clock-column">

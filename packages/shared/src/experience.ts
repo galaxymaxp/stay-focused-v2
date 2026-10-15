@@ -152,6 +152,13 @@ export interface TodayItem {
   readonly source: 'canvas' | 'local';
   readonly deepLinkTarget: { readonly surface: 'activity' | 'study_session'; readonly id: string };
 }
+/** Additive Today contract; optional fields also allow pre-SP2b saved agendas. */
+export interface TodayScreenData extends TodayOverview {
+  readonly capabilities?: ExperienceCapabilities;
+  readonly announcements?: StudentAnnouncementList;
+  readonly activities?: { readonly items: readonly ActivitySummary[] };
+}
+
 export interface TodayOverview {
   readonly date: string;
   /** Fixed UTC offset in minutes for this requested day; supplied by the client. */

@@ -1,10 +1,7 @@
 import { SnapshotStatus } from "./SnapshotStatus";
 import type {
-  ActivitySummary,
-  ExperienceCapabilities,
   TodayItem,
-  TodayOverview,
-  StudentAnnouncementList,
+  TodayScreenData,
 } from "@stay-focused/shared";
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { router } from "expo-router";
@@ -55,10 +52,6 @@ const RESYNC_MS = 3 * 60_000;
 let lastResync = 0;
 const CLOCK_LOCK_KEY = "sf.today.clock-locked";
 
-function activitiesPath() {
-  return `/api/experience/activities?utcOffsetMinutes=${-new Date().getTimezoneOffset()}`;
-}
-
 /** Any finger on Today pauses the orb, so touches are handled without waiting on a frame. */
 const orbTouchPause = {
   onTouchStart: () => { dayOrbTouch.active = true; },
@@ -72,18 +65,13 @@ export function TodayScreen() {
   const displayName = [session?.user.userMetadata?.full_name, session?.user.userMetadata?.name].find(value => typeof value === "string" && value.trim()) as string | undefined;
   const firstName = displayName?.trim().split(/\s+/)[0];
   const date = localDate();
-  const today = useExperience<TodayOverview>(
+  const today = useExperience<TodayScreenData>(
     `/api/today?date=${date}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
     60000,
   );
-  const capabilities = useExperience<ExperienceCapabilities>(
-    "/api/experience/capabilities",
-  );
-  const announcements = useExperience<StudentAnnouncementList>(
-    "/api/experience/announcements?limit=20",
-    60000,
-  );
-  const activities = useExperience<{ items: ActivitySummary[] }>(activitiesPath());
+  const capabilities = { ...today, data: today.data?.capabilities ?? null };
+  const announcements = { ...today, data: today.data?.announcements ?? null };
+  const activities = { ...today, data: today.data?.activities ?? null };
   const focused = useIsFocused();
   const client = useExperienceClient();
   // No pull-to-refresh on Today: coming back to it is the refresh.
@@ -99,8 +87,6 @@ export function TodayScreen() {
     // The first visit already loads fresh data on mount.
     if (!first) {
       current.today.refresh();
-      current.announcements.refresh();
-      current.activities.refresh();
     }
   }, [focused]);
   const [locked, setLocked] = useState(false);
@@ -307,7 +293,7 @@ export function TodayScreen() {
         day: "numeric",
       })}
       headerBelow={<SnapshotStatus {...today} refreshing={today.refreshing || announcements.refreshing || activities.refreshing}
-        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); announcements.refresh(); activities.refresh(); }} />}
+        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); }} />}
       scrollEnabled={!ringActive}
       scrollRef={scrollRef}
       scrollTouch={orbTouchPause}

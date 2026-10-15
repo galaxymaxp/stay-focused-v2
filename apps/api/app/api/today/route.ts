@@ -7,7 +7,7 @@ export async function GET(request: Request): Promise<Response> {
     const query = new URL(request.url).searchParams;
     const offset = readInteger(query.get('utcOffsetMinutes'), 0, -720, 840);
     const date = query.get('date') ?? new Date(Date.now() + offset * 60_000).toISOString().slice(0, 10);
-    return experienceJson(await service.getTodayOverview(userId, date, offset));
+    return experienceJson(await service.getTodayScreen(userId, date, offset));
   });
 }
 export const OPTIONS = experienceOptions;
