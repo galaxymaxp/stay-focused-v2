@@ -3,8 +3,9 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { reviewerShareSignIn, type ReviewerShareSnapshot } from '@stay-focused/shared';
+import { gradingFixtures } from '../../../../packages/shared/src/quiz-grading.fixtures';
 vi.mock('next/link', () => ({ default: 'a' }));
-const { SharedReviewerReader, SharedReviewerPage, SHARED_AI_ACTIONS } = await import('./shared-reviewer');
+const { SharedReviewerReader, SharedReviewerPage, SharedQuizPractice, scoreSharedQuiz, SHARED_AI_ACTIONS } = await import('./shared-reviewer');
 const token = 'a'.repeat(64);
 const snapshot: ReviewerShareSnapshot = { schemaVersion: 1, title: 'Cells', keyTerms: ['Membrane'],
   sections: [{ title: 'Structure', citations: ['From page 4'], blocks: [{ title: 'Membrane', explanation: 'A boundary.', keyPoints: ['Protects the cell.'], evidence: [] }] }],
@@ -57,4 +58,20 @@ it('page is outside the app group, noindex, and does not import private readers 
   expect(page).toContain('index: false');
   const source = readFileSync('src/features/shared-reviewer.tsx', 'utf8');
   for (const forbidden of ['useAuth', 'SectionVisual', 'assistStore', '/api/experience', 'source-page', 'source-figure']) expect(source).not.toContain(forbidden);
+});
+it.each(gradingFixtures.filter(f => f.finalized !== false && !f.assisted && !f.revealed))('public grading reuses O2 semantics: $name', fixture => {
+  const quiz = { title: 'Quiz', questions: [fixture.question], keys: [fixture.key] };
+  expect(scoreSharedQuiz(quiz, { [fixture.question.id]: fixture.selected }).percentage).toBe(fixture.percentage);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it('switching a modified false answer to true clears the obsolete correction before local scoring', async () => {
+  const quiz = { ...snapshot.quizzes[0]!, questions: [{ ...snapshot.quizzes[0]!.questions[0]!, type: 'modified_true_false' as const,
+    options: [{ id: 'a', text: 'True' }, { id: 'b', text: 'False' }] }] };
+  await act(async () => { rendered = create(createElement(SharedQuizPractice, { quiz, signIn: reviewerShareSignIn(token) })); });
+  const root = rendered!.root;
+  await act(async () => root.findAllByType('input').find(n => n.props.value === 'b')!.props.onChange({ target: { checked: true } }));
+  await act(async () => root.findAllByType('input').find(n => n.props['aria-label'] === 'Correction 1')!.props.onChange({ target: { value: 'Old correction' } }));
+  await act(async () => root.findAllByType('input').find(n => n.props.value === 'a')!.props.onChange({ target: { checked: true } }));
+  await act(async () => root.findByType('form').props.onSubmit({ preventDefault() {} }));
+  expect(JSON.stringify(rendered!.toJSON())).toContain('100'); expect(fetcher).not.toHaveBeenCalled();
 });

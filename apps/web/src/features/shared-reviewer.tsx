@@ -39,9 +39,9 @@ export function SharedQuizPractice({ quiz, signIn }: { quiz: SharedQuiz; signIn:
           {q.options.map(o => <label key={o.id} className="row">
             <input type={q.type === 'multi_select' ? 'checkbox' : 'radio'} name={`question-${i}`} value={o.id} checked={(answers[q.id] ?? []).includes(o.id)}
               onChange={event => answer(q.id, q.type === 'multi_select' ? event.target.checked ? [...(answers[q.id] ?? []), o.id] : (answers[q.id] ?? []).filter(value => value !== o.id)
-                : [o.id, ...(q.type === 'modified_true_false' ? (answers[q.id] ?? []).filter(value => !q.options.some(o => o.id === value)) : [])])} />{o.text}
+                : [o.id, ...(q.type === 'modified_true_false' && o.text.trim().toLowerCase() === 'false' ? (answers[q.id] ?? []).filter(value => !q.options.some(o => o.id === value)) : [])])} />{o.text}
           </label>)}
-          {q.type === 'modified_true_false' && <label>Correction, if false<input aria-label={`Correction ${i + 1}`}
+          {q.type === 'modified_true_false' && q.options.some(o => o.text.trim().toLowerCase() === 'false' && answers[q.id]?.includes(o.id)) && <label>Correction, if false<input aria-label={`Correction ${i + 1}`}
             value={(answers[q.id] ?? []).find(value => !q.options.some(o => o.id === value)) ?? ''}
             onChange={event => answer(q.id, [...(answers[q.id] ?? []).filter(value => q.options.some(o => o.id === value)), ...(event.target.value ? [event.target.value] : [])])} /></label>}
         </>}
