@@ -1,5 +1,5 @@
-import { router, usePathname } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
+import { router, usePathname, useRootNavigationState } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth";
@@ -7,7 +7,7 @@ import { useTheme } from "../design/theme";
 import { runOfflineCatchUp, stopOfflineCatchUp } from "../services/localLibrary/offlineCatchUp";
 import { syncPendingDraftEdits, stopPendingDraftSync } from '../services/localLibrary/pendingDraftSync';
 import { getApiBaseUrl } from "../config/apiBaseUrl";
-import { readNotificationDestination } from "../navigation/notificationRoutes";
+import { readNotificationDestination, type NotificationDestination } from "../navigation/notificationRoutes";
 import {
   COURSE_REVIEWER_PATHNAME,
   courseRouteParams,
@@ -29,10 +29,12 @@ const OUTBOX_RECONCILIATION_INTERVAL_MS = 10_000;
  * session, matching the previous behavior of only running behind the auth gate.
  */
 export function AppLifecycle() {
-  const { session } = useAuth();
+  const { session, isRestoring } = useAuth();
   const accessToken = session?.accessToken;
   const ownerUserId = session?.user.id;
   const pathname = usePathname();
+  const navigation = useRootNavigationState();
+  const [pendingNotification,setPendingNotification]=useState<{owner:string;destination:NotificationDestination}|null>(null);
   const { active } = useTheme();
   useEffect(() => {
     const baseUrl = getApiBaseUrl();
@@ -76,6 +78,7 @@ export function AppLifecycle() {
   }, [ownerUserId, reconcileOutbox]);
 
   useEffect(() => {
+    setPendingNotification(null);
     if (!ownerUserId) return;
     const subscription = subscribeToProcessingNotificationResponses((data) => {
       // Real navigation replaces the previous `setActiveView` call, so a
@@ -84,10 +87,18 @@ export function AppLifecycle() {
       // ignored rather than guessed at.
       const destination = readNotificationDestination(data);
       if (!destination) return;
-      router.push({ pathname: destination.pathname, params: destination.params });
+      setPendingNotification({owner:ownerUserId,destination});
     });
     return () => subscription.remove();
   }, [ownerUserId]);
+
+  useEffect(()=>{
+    // The entry Redirect must settle before a cold notification can push above it.
+    if(!pendingNotification || pendingNotification.owner!==ownerUserId || isRestoring || !navigation?.key ||
+      pathname==='/' || pathname==='/sign-in' || pathname==='/sign-up' || pathname.startsWith('/auth'))return;
+    setPendingNotification(null);
+    router.push({pathname:pendingNotification.destination.pathname,params:pendingNotification.destination.params});
+  },[ownerUserId,isRestoring,navigation?.key,pathname,pendingNotification]);
 
   useEffect(() => {
     if (!ownerUserId) {

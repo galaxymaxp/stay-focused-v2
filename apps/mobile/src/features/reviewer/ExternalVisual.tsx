@@ -6,6 +6,7 @@ import { hitTarget, radius, spacing } from '../../design/tokens';
 import type { ExperienceClient } from '../../services/experienceApi';
 import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, findExternalVisual, type ExternalReferenceVisual } from '../../services/externalVisuals';
 import { ZoomablePage } from './SourcePageSnapshot';
+let loggedVisualRuntime=false;
 
 /** Batch images arrive from the reader; only an explicit replacement searches here. */
 export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisual,visual}:{client:ExperienceClient;artifactId:string;sectionId:string;online:boolean;hasSourceVisual:boolean;visual?:ExternalReferenceVisual|null}) {
@@ -13,6 +14,13 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
   const [replacement,setReplacement]=useState<ExternalReferenceVisual|null>(null);const [busy,setBusy]=useState(false);const [open,setOpen]=useState(false);
   const result=replacement??visual;
   const pending=useRef<AbortController|null>(null);
+  useEffect(()=>{
+    // Release-device diagnostics contain no account, artifact, URL or academic text.
+    if(!loggedVisualRuntime && typeof (globalThis as typeof globalThis & {nativeLoggingHook?:unknown}).nativeLoggingHook==='function') {
+      loggedVisualRuntime=true;
+      void import('expo-updates').then(updates=>console.info('reviewer.visual_runtime',{updateId:updates.updateId})).catch(()=>{});
+    }
+  },[]);
   useEffect(()=>{setReplacement(null);setOpen(false);setBusy(false);return ()=>{pending.current?.abort();pending.current=null;};},[client,artifactId,sectionId]);
   useEffect(()=>{if(!online || hasSourceVisual){pending.current?.abort();pending.current=null;setBusy(false);setOpen(false);}},[online,hasSourceVisual]);
   const find=async()=>{
@@ -27,7 +35,9 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
     {result?.status==='found'?<View style={{gap:spacing[2],padding:spacing[3],borderWidth:1,borderColor:colors.separator,borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
       <Text style={{color:colors.textMuted}}>{EXTERNAL_VISUAL_LABEL}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="View external reference" onPress={()=>setOpen(true)}>
-        <Image source={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS}} accessibilityLabel={result.title} resizeMode="contain" style={{height:spacing[12]*4,width:'100%'}} onError={()=>setOpen(false)}/>
+        <Image source={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS}} accessibilityLabel={result.title} resizeMode="contain" style={{height:spacing[12]*4,width:'100%'}}
+          onLoad={event=>console.info('reviewer.external_image_loaded',{width:event.nativeEvent.source.width,height:event.nativeEvent.source.height})}
+          onError={event=>{console.warn('reviewer.external_image_failed',{reason:String(event.nativeEvent.error).replace(/https?:\/\/[^\s]+/g,'[image]').slice(0,240)});setOpen(false);}}/>
       </Pressable>
       <Pressable accessibilityRole="link" accessibilityLabel="View attribution on Wikimedia Commons" onPress={()=>{void Linking.openURL(result.sourceUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
         <Text style={{color:colors.accent}}>{result.credit} · {result.license}</Text>

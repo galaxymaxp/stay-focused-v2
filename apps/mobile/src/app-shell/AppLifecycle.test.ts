@@ -3,20 +3,20 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppLifecycle } from './AppLifecycle';
 
-const fake = vi.hoisted(() => ({ active: true, owner: 'owner', catchUp: vi.fn(), stop: vi.fn(), listener: vi.fn() }));
-vi.mock('expo-router', () => ({ router: { push: vi.fn(), replace: vi.fn() }, usePathname: () => '/today' }));
+const fake = vi.hoisted(() => ({ active: true, owner: 'owner', catchUp: vi.fn(), stop: vi.fn(), listener: vi.fn(), push:vi.fn(), notify:vi.fn(), restoring:false, rootReady:true, pathname:'/today' }));
+vi.mock('expo-router', () => ({ router: { push: fake.push, replace: vi.fn() }, usePathname: () => fake.pathname, useRootNavigationState:()=>fake.rootReady?{key:'root'}:undefined }));
 vi.mock('react-native', () => ({ AppState: { currentState: 'active', addEventListener: fake.listener } }));
-vi.mock('../auth', () => ({ useAuth: () => ({ session: fake.owner ? { user: { id: fake.owner }, accessToken: 'token' } : null }) }));
+vi.mock('../auth', () => ({ useAuth: () => ({ isRestoring:fake.restoring, session: fake.owner ? { user: { id: fake.owner }, accessToken: 'token' } : null }) }));
 vi.mock('../config/apiBaseUrl', () => ({ getApiBaseUrl: () => 'https://example.test' }));
 vi.mock('../design/theme', () => ({ useTheme: () => ({ active: fake.active }) }));
 vi.mock('../services/localLibrary/offlineCatchUp', () => ({ runOfflineCatchUp: fake.catchUp, stopOfflineCatchUp: fake.stop }));
 vi.mock('../services/canvasReviewerRecoveryStore', () => ({ readCanvasReviewerRecovery: async () => null }));
-vi.mock('../services/completionNotifications', () => ({ subscribeToProcessingNotificationResponses: () => ({ remove() {} }) }));
+vi.mock('../services/completionNotifications', () => ({ subscribeToProcessingNotificationResponses: fake.notify }));
 vi.mock('../services/processingOutboxReconciliation', () => ({ reconcileReviewerProcessingOutbox: async () => undefined }));
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.clearAllMocks(); vi.useFakeTimers(); fake.active = true; fake.owner = 'owner';
-  fake.listener.mockReturnValue({ remove() {} });
+  fake.listener.mockReturnValue({ remove() {} });fake.notify.mockReturnValue({remove:vi.fn()});fake.restoring=false;fake.rootReady=true;fake.pathname='/today';
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
 afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.useRealTimers(); });
@@ -41,5 +41,24 @@ describe('app-wide offline catch-up lifecycle', () => {
     await act(async () => rendered!.update(createElement(AppLifecycle)));
     expect(fake.stop).toHaveBeenCalledWith('owner');
     expect(fake.catchUp).toHaveBeenLastCalledWith('other', { baseUrl: 'https://example.test', accessToken: 'token' });
+  });
+});
+
+describe('notification routing after restoration',()=>{
+  it('holds a cold tap until the root navigator and entry redirect are ready',async()=>{
+    fake.restoring=true;fake.rootReady=false;fake.pathname='/';await render();
+    await act(async()=>fake.notify.mock.calls[0]![0]({screen:'processing',jobId:'job-1'}));expect(fake.push).not.toHaveBeenCalled();
+    fake.restoring=false;fake.rootReady=true;await act(async()=>rendered!.update(createElement(AppLifecycle)));expect(fake.push).not.toHaveBeenCalled();
+    fake.pathname='/today';await act(async()=>rendered!.update(createElement(AppLifecycle)));
+    expect(fake.push).toHaveBeenCalledExactlyOnceWith({pathname:'/processing',params:{jobId:'job-1'}});
+    await act(async()=>rendered!.update(createElement(AppLifecycle)));expect(fake.push).toHaveBeenCalledOnce();
+  });
+  it('routes a warm test tap without a job and ignores unknown destinations',async()=>{
+    await render();const notify=fake.notify.mock.calls[0]![0];await act(async()=>notify({screen:'unknown'}));expect(fake.push).not.toHaveBeenCalled();
+    await act(async()=>notify({screen:'processing'}));expect(fake.push).toHaveBeenCalledExactlyOnceWith({pathname:'/processing',params:{}});
+  });
+  it('drops pending notifications when their owner signs out or changes',async()=>{
+    fake.pathname='/';await render();await act(async()=>fake.notify.mock.calls[0]![0]({screen:'processing',jobId:'private-job'}));
+    fake.owner='other';fake.pathname='/today';await act(async()=>rendered!.update(createElement(AppLifecycle)));expect(fake.push).not.toHaveBeenCalled();
   });
 });

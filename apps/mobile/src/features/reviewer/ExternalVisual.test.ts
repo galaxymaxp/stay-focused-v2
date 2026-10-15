@@ -21,6 +21,13 @@ const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().j
 async function mount(override:Partial<typeof props>={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();});
 describe('automatic separate external card',()=>{
+  it('redacts image URLs from native load diagnostics',async()=>{
+    const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    try {
+      await mount();await act(async()=>tree!.root.findByType(Image).props.onError({nativeEvent:{error:'HTTP 403 loading https://upload.wikimedia.org/private-title.png'}}));
+      expect(warning).toHaveBeenCalledWith('reviewer.external_image_failed',{reason:'HTTP 403 loading [image]'});
+    }finally{warning.mockRestore();}
+  });
   it.each([{online:false},{hasSourceVisual:true}])('hides actions and images for %j',async override=>{
     await mount(override);expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);expect(mocks.find).not.toHaveBeenCalled();
   });
