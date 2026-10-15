@@ -16,6 +16,7 @@ beforeAll(async()=>{
     insert into generated_artifacts values('${owner}','${owner}','${version}','reviewer',null);
     insert into generated_artifact_versions values('${version}','${owner}','${owner}','{"reviewer":{"sections":[{"id":"s"},{"id":"none"}]}}');`);
   await db.exec(readFileSync(resolve('../../packages/db/migrations/20261014000700_section_external_visuals.sql'),'utf8'));
+  await db.exec(readFileSync(resolve('../../packages/db/migrations/20261015020000_external_visuals_auto.sql'),'utf8'));
 },30000);
 afterAll(async()=>db?.close());
 async function role(roleName:string,user:string,sql:string){await db.exec('begin');try{await db.exec(`set local role ${roleName};set local request.jwt.claim.sub='${user}';`);return await db.query(sql);}finally{await db.exec('rollback');}}
@@ -57,10 +58,10 @@ describe('owner-private external visual migration contracts',()=>{
     expect((await db.query("select * from section_external_visuals where section_id='none'")).rows).toEqual([]);
     expect(await finish(await token('none'),{status:'none',query:'Cell',verdict:'No match.',excluded_titles:[]})).toBe(true);
   });
-  it('caps all rolling-day reservations at twenty including failures',async()=>{
+  it('caps all rolling-day reservations at three hundred including failures',async()=>{
     await db.exec('begin');try{
       await db.exec(`delete from section_external_visual_requests;delete from section_external_visuals where section_id='none';`);
-      for(let i=0;i<20;i++)expect(await finish(await token('none'),null)).toBe(true);
+      for(let i=0;i<300;i++)expect(await finish(await token('none'),null)).toBe(true);
       await expect(token('none')).rejects.toThrow('external_visual_daily_cap');
     }finally{await db.exec('rollback');}
   });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildCommonsQuery, commonsCandidates, searchCommons, stripAttribution, COMMONS_BODY_BYTES, COMMONS_TIMEOUT_MS, COMMONS_USER_AGENT } from './commons';
+import { buildCommonsQueries, buildCommonsQuery, commonsCandidates, searchCommons, stripAttribution, COMMONS_BODY_BYTES, COMMONS_TIMEOUT_MS, COMMONS_USER_AGENT } from './commons';
 export const candidatePage=(license='CC BY-SA 4.0',licenseUrl='https://creativecommons.org/licenses/by-sa/4.0/')=>({index:1,title:'File:Cell.png',imageinfo:[{
   mime:'image/png',thumburl:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Cell.png/1200px-Cell.png',thumbwidth:1200,thumbheight:800,
   descriptionurl:'https://commons.wikimedia.org/wiki/File:Cell.png',extmetadata:{LicenseShortName:{value:license},LicenseUrl:{value:licenseUrl},Artist:{value:'<a href="private">Ada &amp; Ben</a>'},Credit:{value:'<b>Own work</b>'}}}]});
@@ -34,10 +34,10 @@ describe('bounded Commons search',()=>{
     const fetcher=vi.fn<typeof fetch>(async()=>Response.json(payload()));
     expect(await searchCommons('cell',[],fetcher)).toHaveLength(1);
     const [url,options]=fetcher.mock.calls[0]!;const params=new URL(String(url)).searchParams;
-    expect(params.get('gsrlimit')).toBe('5');expect(params.get('gsrnamespace')).toBe('6');expect(params.get('iiurlwidth')).toBe('1200');
+    expect(params.get('gsrlimit')).toBe('20');expect(params.get('gsrnamespace')).toBe('6');expect(params.get('iiurlwidth')).toBe('1200');
     expect(options).toMatchObject({redirect:'error',headers:{'User-Agent':COMMONS_USER_AGENT}});
     const pages=Object.fromEntries(Array.from({length:8},(_,i)=>[i,{...candidatePage(),title:`File:${i}.png`,index:i}]));
-    expect(commonsCandidates({query:{pages}})).toHaveLength(5);
+    expect(commonsCandidates({query:{pages}})).toHaveLength(6);
   });
   it('bounds bodies before allocating regardless of Content-Length',async()=>{
     let cancelled=false;
@@ -56,5 +56,20 @@ describe('bounded Commons search',()=>{
     await expect(searchCommons('cell',[],async()=>Response.json({batchcomplete:false}))).rejects.toThrow('commons_response_invalid');
     await expect(searchCommons('cell',[],async()=>new Response('',{status:503}))).rejects.toThrow();
     expect(await searchCommons('cell',[],async()=>Response.json({batchcomplete:''}))).toEqual([]);
+  });
+});
+describe('real Commons metadata shapes',()=>{
+  it('accepts versioned licenses without trailing slash, http URLs and thumb.wikimedia.org thumbnails',()=>{
+    const page=candidatePage('CC BY 2.5','http://creativecommons.org/licenses/by/2.5');
+    page.imageinfo[0]!.thumburl='https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/Cell.png/1200px-Cell.png?utm_source=commons.wikimedia.org';
+    const [candidate]=commonsCandidates({query:{pages:{'1':page}}});
+    expect(candidate?.license).toBe('CC BY');
+    expect(candidate?.image).toBe('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Cell.png/1200px-Cell.png');
+  });
+  it('builds short queries that Commons can match',()=>{
+    const queries=buildCommonsQueries('Introduction to the Android Runtime','Android Runtime includes the Dalvik virtual machine. Dalvik runs dex files.');
+    expect(queries[0]).toBe('Dalvik Android Runtime');
+    for(const q of queries)expect(q.split(' ').length).toBeLessThanOrEqual(4);
+    expect(queries.join(' ')).not.toMatch(/\b(to|the|Introduction)\b/);
   });
 });

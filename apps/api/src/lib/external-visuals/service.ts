@@ -5,7 +5,7 @@ import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
 import { getSourcePageSnapshot } from '../source-page-snapshots';
 import { getSectionFigureAvailability } from '../source-figures/sections';
-import { buildCommonsQuery, searchCommons } from './commons';
+import { buildCommonsQueries, searchCommonsQueries } from './commons';
 import { matchVisual } from './match';
 
 export const EXTERNAL_VISUAL_LABEL = 'External reference — not from your course material.';
@@ -13,7 +13,7 @@ type Client=SupabaseClient<Database>;
 export type ExternalVisualResult = ({status:'found';image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
   | {status:'none';message:'No reliable visual found'}) & {attemptCount:number};
 export interface VisualInput { userId:string;artifactId:string;sectionId:string;findAnother:boolean }
-type Dependencies={read?:typeof readCanonicalReviewerRecord;snapshot?:typeof getSourcePageSnapshot;figures?:typeof getSectionFigureAvailability;search?:typeof searchCommons;match?:typeof matchVisual};
+type Dependencies={read?:typeof readCanonicalReviewerRecord;snapshot?:typeof getSourcePageSnapshot;figures?:typeof getSectionFigureAvailability;search?:typeof searchCommonsQueries;match?:typeof matchVisual};
 function response(row:SectionExternalVisualRow):ExternalVisualResult {
   if(row.status==='none')return {status:'none',message:'No reliable visual found',attemptCount:row.attempt_count};
   if(!row.image_url || !row.source_url || !row.title || !row.credit || !row.license || !row.license_url || !row.width || !row.height)throw new ExperienceFailure(503,'unavailable');
@@ -52,9 +52,11 @@ export async function findSectionVisual(client:Client,input:VisualInput,dependen
     if(result.error)throw new ExperienceFailure(503,'unavailable');return result.data;
   };
   const previous=await cache();
-  if(previous && (!input.findAnother || previous.attempt_count>=2))return response(previous);
+  // A cached "none" gets one automatic retry (rows from the original VL3 filter rejected every real Commons result).
+  const findAnother=input.findAnother || (previous?.status==='none' && previous.attempt_count<2);
+  if(previous && (!findAnother || previous.attempt_count>=2))return response(previous);
   const text=sectionText(section);if(!text.trim())throw new ExperienceFailure(400,'insufficient_source');
-  const reservation=await client.rpc('reserve_section_external_visual_v1',{p_user_id:input.userId,p_artifact_id:input.artifactId,p_version_id:saved.version.id,p_section_id:input.sectionId,p_find_another:input.findAnother});
+  const reservation=await client.rpc('reserve_section_external_visual_v1',{p_user_id:input.userId,p_artifact_id:input.artifactId,p_version_id:saved.version.id,p_section_id:input.sectionId,p_find_another:findAnother});
   if(reservation.error) {
     const code=reservation.error.message;
     throw new ExperienceFailure(code==='external_visual_not_found'?404:code==='external_visual_daily_cap'?429:code==='external_visual_busy'?409:503,
@@ -63,12 +65,16 @@ export async function findSectionVisual(client:Client,input:VisualInput,dependen
   if(!reservation.data){const row=await cache();if(!row)throw new ExperienceFailure(503,'unavailable');return response(row);}
   const token=reservation.data;
   try {
-    const query=buildCommonsQuery(String(section.title??''),text);
-    const candidates=await (dependencies.search??searchCommons)(query,previous?.excluded_titles??[]);
+    const queries=buildCommonsQueries(String(section.title??''),text);const query=queries.join(' | ').slice(0,300);
+    const candidates=await (dependencies.search??searchCommonsQueries)(queries,previous?.excluded_titles??[]);
     // Empty Commons evidence needs no provider key/model call.
     const match=candidates.length?await (dependencies.match??matchVisual)(candidates,text):{candidate:null,verdict:'No eligible Commons candidate.',checkedTitles:[]};
     const image=match.candidate;
-    const result:Json={status:image?'found':'none',query,verdict:match.verdict,excluded_titles:[...new Set([...(previous?.excluded_titles??[]),...match.checkedTitles])].slice(0,10),
+    // "Find another" with no better match keeps the image the student already has.
+    const keep=!image && findAnother && previous?.status==='found'?previous:null;
+    const result:Json=keep?{status:'found',query,verdict:keep.verdict,excluded_titles:[...new Set([...keep.excluded_titles,...match.checkedTitles])].slice(0,10),
+      source_url:keep.source_url,image_url:keep.image_url,title:keep.title,credit:keep.credit,license:keep.license,license_url:keep.license_url,width:keep.width,height:keep.height}
+      :{status:image?'found':'none',query,verdict:match.verdict,excluded_titles:[...new Set([...(previous?.excluded_titles??[]),...match.checkedTitles])].slice(0,10),
       ...(image?{source_url:image.sourceUrl,image_url:image.image,title:image.title,credit:image.credit,license:image.license,license_url:image.licenseUrl,width:image.width,height:image.height}:{})};
     const finished=await client.rpc('finish_section_external_visual_v1',{p_token:token,p_result:result});
     if(finished.error || finished.data!==true)throw new ExperienceFailure(503,'unavailable');

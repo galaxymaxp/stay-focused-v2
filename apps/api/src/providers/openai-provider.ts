@@ -117,14 +117,24 @@ export class OpenAIProvider implements GenerationProvider {
 
   /** Vision stays on the same typed Responses adapter, key and error boundary. */
   public async generateWithImage<TOutput>(request: GenerationRequest<TOutput>, imageUrl: string): Promise<TOutput> {
-    const url = new URL(imageUrl);
-    if (url.protocol !== 'https:' || url.hostname !== 'upload.wikimedia.org' || url.username || url.password || url.port) {
-      throw new Error('invalid_vision_image');
-    }
-    return this.generateResponse(request, url.href);
+    return this.generateWithImages(request, [imageUrl]);
   }
 
-  private async generateResponse<TOutput>(request: GenerationRequest<TOutput>, imageUrl?: string): Promise<TOutput> {
+  /** Several labeled candidates in one call; accepts Commons URLs or inline image data fetched by the API. */
+  public async generateWithImages<TOutput>(request: GenerationRequest<TOutput>, imageUrls: readonly string[]): Promise<TOutput> {
+    if (!imageUrls.length || imageUrls.length > 8) throw new Error('invalid_vision_image');
+    const safe = imageUrls.map(imageUrl => {
+      if (/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(imageUrl)) return imageUrl;
+      const url = new URL(imageUrl);
+      if (url.protocol !== 'https:' || url.hostname !== 'upload.wikimedia.org' || url.username || url.password || url.port) {
+        throw new Error('invalid_vision_image');
+      }
+      return url.href;
+    });
+    return this.generateResponse(request, safe);
+  }
+
+  private async generateResponse<TOutput>(request: GenerationRequest<TOutput>, imageUrls?: readonly string[]): Promise<TOutput> {
     if (!request || typeof request !== "object") {
       throw new Error("OpenAIProvider.generate requires a request.");
     }
@@ -140,7 +150,7 @@ export class OpenAIProvider implements GenerationProvider {
     const model = readNonEmptyString(request.model) ?? this.defaultModel;
     const openAIRequest: OpenAIResponsesCreateRequest = {
       model,
-      input: imageUrl ? [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_image', image_url: imageUrl, detail: 'low' }] }] : prompt,
+      input: imageUrls?.length ? [{ role: 'user', content: [{ type: 'input_text', text: prompt }, ...imageUrls.map(image_url => ({ type: 'input_image' as const, image_url, detail: 'low' as const }))] }] : prompt,
       ...(request.instructions ? { instructions: request.instructions } : {}),
       ...(request.maxOutputTokens ? { max_output_tokens: request.maxOutputTokens } : {}),
       ...(request.temperature !== undefined
