@@ -27,6 +27,39 @@ Most avoidable waiting is on the read path: uncached screen loads wait for netwo
 
 ## Ranked findings
 
+### SP2 local implementation follow-up (2026-10-15)
+
+The original evidence/cost table below remains the SP0 baseline. SP2 closes
+only this run's server data-path findings; SP2b's 4/7/8/10/13 are untouched.
+
+- **1 DONE**: `eeae99b`, corrected control ordering `2092b34`. Reuse complete
+  source inventory and current revision receipts/controls across candidate and
+  visible projections. Synthetic preparation reads **700 -> 2**, DB JSON bytes
+  **75,400 -> 4** with empty receipts/controls; stable paging fails closed.
+- **2 DONE**: `f0c7173`. Owner-bound summary views, generated stored E2 estimate,
+  DB filtering/pagination, exact current reviewer version and visible material
+  badges. Same SP0 Library fixture: **18 -> 2 reads, 18,900,915 -> 44,277 bytes**;
+  detail **11 -> 2 reads, 18,879,565 -> 78,702 bytes**, excluding freshness.
+- **5 DONE**: `6fb2d79`, saved-card retention `97a6934`. Publish accepted pages
+  immediately, append stable identities, keep saved cards during partial
+  refresh failures and persist only complete traversals. A first uncached
+  240-card visit shows cards after **1 instead of 3 responses**; total stays 3.
+- **6 DONE**: `f0c7173`. Independent visible/hidden reads and legacy read groups
+  run in parallel; workspace passes its already validated course. SP0 empty
+  inventory fixture **10 -> 1 reads, 18,879,782 -> 221 bytes**.
+- **9 SKIPPED additional implementation (already fixed)**: current body/schema/
+  timestamp checks already avoid unchanged downloads in both catch-up callers.
+  `f0c7173` strengthens its regression and fixes the shared detail dependency;
+  unchanged bodies make **0 detail requests before and after**. Retain the
+  300-attempt / 60-second bounds and explicit not-found deletion.
+
+See [SP2 acceptance](../ai/acceptance/sp2-library-data-path.md) for methods,
+exact gates, failures, migration/ADR-031, and owner work. These are local
+synthetic read/byte counts, not production latency; overlapping savings must
+not be added. New migration `20261015040000_experience_library_projections.sql`
+is a file only. Findings 11/12 remain owner decisions: no region, capacity,
+queue, concurrency, service or Scheduler change was made.
+
 Rank reflects demonstrated amplification and reach, not a production latency
 percentile. `code-only` identifies a bounded implementation direction; its target
 item is explicit. `trade-off` requires an owner decision and belongs in SP2's

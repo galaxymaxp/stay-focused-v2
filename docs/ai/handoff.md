@@ -3193,3 +3193,129 @@ reviewers, confirm honest count/time/quota remainder, normal QD1 jobs/summary,
 independent Retry and SP1/CQ1 preservation. No remote service call, remote SQL,
 migration application, deployment, Scheduler action, environment-file edit, push
 or file deletion occurred. GA1 remains STOPPED; no later item was started.
+
+## SP2 preparation and Library data path — unattended local PASS (2026-10-15)
+
+**Status: PASS for STEP 0-5, gates, docs and local commits.** Inspected baseline
+`482cb6e`, expected `overnight/2026-10-15_feedback`, SP0 PASS, tracked-clean:
+FRESH **3/3 prerequisites**. QD1 PASS; GA1 STOPPED independently, not required.
+The full prompt/UNATTENDED rules, SP0 audit and external SP2 section were read.
+No question was asked. SP1/CQ1/QD1 remain covered; no GA1 implementation or SP2b
+findings 4/7/8/10/13 were added. [Acceptance](acceptance/sp2-library-data-path.md)
+contains the matrix, methods, full failures and owner work; [ADR-031](../architecture/ADR-031-library-summary-projections.md)
+defines the projection contract.
+
+Re-opened current locations at the inspected baseline (line drift from SP0):
+
+| Finding | File:line at `482cb6e` |
+|---|---|
+| 1 | `apps/api/src/lib/canvas-reviewer-sources.ts:414,419`; `apps/api/src/lib/canvas-preparation/admission.ts:12`; `apps/api/src/lib/canvas-preparation/client-status.ts:22` |
+| 2 | `apps/api/src/lib/experience/repository.ts:31,36`; `apps/api/src/lib/experience/service.ts:55,198,236,248` |
+| 5 | `apps/web/src/features/library.tsx:77` (SP1 snapshot existed, all-pages gate remained) |
+| 6 | `apps/api/src/lib/experience/service.ts:78,199,239` |
+| 9 | `apps/mobile/src/app-shell/AppLifecycle.tsx:40`; `apps/mobile/src/features/redesign/useLocalLibrary.ts:99`; `apps/mobile/src/services/localLibrary/librarySync.ts:90`; `apps/mobile/src/services/localLibrary/artifactStore.ts:324` |
+
+Findings 1/2/5/6 are DONE locally. Finding 9 skips additional implementation
+because both callers already use owner/version/schema-bound catch-up; stronger
+regressions prove unchanged copies make zero detail requests, changed copies
+make one, and only explicit owner-authenticated not-found removes a copy.
+Bounds stay 300 attempts / 60 seconds. Its expensive server dependency is fixed
+by finding 2. No code contradiction requiring a stop was found.
+
+Implementation commits (all author `galaxymaxp <omgraythekid@gmail.com>`):
+
+- `f0c7173 perf(api): project Library summaries and read exact reviewer versions`
+- `eeae99b perf(api): batch revision-fenced material preparation projections`
+- `6fb2d79 perf(web): publish Library pages during background refresh`
+- `2092b34 fix(api): order preparation controls by their material primary key`
+- `426edf3 test(api): exercise filtered exact reads through the SQL adapter`
+- `14a45ae test(api): verify summary bytes and isolate preparation fixtures`
+- `97a6934 fix(web): retain saved Library cards during partial refreshes`
+
+The documentation commit contains this footer; its finalized hash and every
+commit above are recorded in `tmp/overnight/SP2.status` after commit. No push.
+
+**Before/after:** same unchanged SP0 service fixture declarations and page/JSON
+accounting, real service/repository with throwing-network synthetic adapter.
+Separate PGlite tests execute the views and compare previous/new results for
+estimates, origin, supersession, ordering, quizzes, drafts, exact details,
+ownership and past-course retention. No production timing is claimed.
+
+| Finding / measure | Reads before -> after | DB JSON bytes before -> after | HTTP requests before -> after |
+|---|---|---|---|
+| 1: 100 candidates + 100 visible statuses, no receipts/controls | 700 -> 2 | 75,400 -> 4 | 1 -> 1 |
+| 2: Library page / 100 cards | 18 -> 2 | 18,900,915 -> 44,277 | 1 -> 1 |
+| 2: exact reviewer, freshness excluded | 11 -> 2 | 18,879,565 -> 78,702 | 1 -> 1 |
+| 5: full 240-card traversal | 54 -> 6 | 56,702,745 -> 105,692 | 3 -> 3 total; **3 -> 1 before uncached cards** |
+| 6: empty-material workspace | 10 -> 1 | 18,879,782 -> 221 | 1 -> 1 |
+| 9: unchanged hydrated body, existing fix retained | 0 -> 0 | 0 -> 0 | 0 -> 0 detail requests |
+
+Do not add overlapping findings' savings. Library/reviewer/workspace response
+JSON remains **38,123 / 78,742 / 893 bytes**. Auth/activity's two calls, freshness,
+actual material inventory, Canvas, Storage, OCR/model work and rendering are
+excluded as in SP0. Nonempty visible badges add one bounded query per 100 unique
+IDs. Preparation reuses loaded source evidence; its isolated repeated File probe
+excludes inventory bytes, while committed tests cover 100 distinct files and 201
+across complete chunks. SP1 saved snapshots render after zero network responses
+before and after; partial website refresh retains unseen saved cards until a
+complete walk succeeds and never persists an incomplete snapshot.
+
+**Final serial gates — FRESH PASS:**
+
+| Exact command | Result |
+|---|---|
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, 5 existing mobile + 1 existing web warnings |
+| `npm run test --workspace @stay-focused/api` | 2,130 passed / 3 existing skips, 182/182 files |
+| `npm run test --workspace @stay-focused/mobile` | 1,057/1,057, 110/110 files, 0 skips |
+| `npm run test --workspace @stay-focused/web` | 118/118, 21/21 files, 0 skips |
+| Shared tests | NOT APPLICABLE: no shared source changed |
+| `npm run build --workspace @stay-focused/api` | 1/1 build, 34/34 static pages |
+| `npm run build --workspace @stay-focused/web` | 1/1 build, 19/19 static pages, 28 routes |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1/1 export, 1 Android bundle / 35 assets |
+| `npm run build -- --force` (AUTOPILOT) | 8/8 tasks, 0 cached |
+| `git diff --check`; `git diff --cached --check` | 0 errors each |
+
+Failures/flake preserved: temp baseline CJS top-level-await transform failed
+before repair; first SQL suite **4 passed/1 timeout** led to storing estimates
+instead of repeated body parsing; draft typecheck **7 errors** repaired with
+typed filtering and the missing existing table type; preparation fixture
+**55 passed/1 failed** on missing `.neq`, then repaired. After an initial full
+API PASS, a repeat hit a first-import timeout (**2,129 passed/1 failed/3 skipped**,
+6.543 seconds against 5-second budget). Its synthetic formatting adapter now
+avoids loading mutation/dispatch modules; all assertions and unmocked batching
+proof remain. Final full API **2,130 passed/3 skipped**, no further retry. This
+load-sensitive timeout flake and earlier failures are in acceptance/logs.
+Vitest retains its existing future native-config warning. No live/provider or
+workflow smoke ran (NOT APPLICABLE to unchanged execution boundaries).
+
+Next build-generated `next-env.d.ts` changes were restored to the verified clean
+baseline and excluded from commits. TEMP/TMP were repo-local `.local/test-temp`.
+Evidence/scripts under `tmp/` stay uncommitted. Initial unrelated `UI/`,
+`apps/mobile/.gitignore`, and `supabase/` remain untouched. Final owned tracked
+changes are committed; local ahead/behind uses recorded refs, with no fetch.
+
+**Decisions for the owner:** finding 11 has repo API `iad1` versus historical DB
+`ap-northeast-1` / worker `asia-northeast1`; serial DB calls cross regions if live
+settings match. RTT/regions remain **UNVERIFIED (owner to confirm)**. Finding 12
+shares one queue/service, historically **2 concurrent tasks, 1/s**, worker
+**concurrency 1, 0-2 instances**; two long preparations can occupy both slots.
+Current backlog, wait, cost and quotas are **UNVERIFIED (owner to confirm)**.
+Measure before choosing region, reservation/priority or separated capacity; no
+queue, region, concurrency, guard, service or Scheduler setting changed.
+
+**Owner steps remaining:** Rollout and Device checks were **entirely skipped**.
+Confirm prerequisites and apply `20261015040000_experience_library_projections.sql`
+via Supabase connector (filename as name), before publishing API; schedule the
+generated-estimate version-table backfill appropriately and inspect live plans.
+Complete pending CQ1 prerequisites where needed, deploy API/website and preview
+OTA, then CIT17/realme/website checks for Library/material speed against SP0,
+saved/offline content, account isolation, explicit not-found, stable open-reader
+revisions, supersession, quizzes, past courses and Queue. Resolve GA1's separate
+questions before resuming batch generation. SP2 ends; SP2b is separate scope.
+
+Production/deployed revisions, database rows/applied migrations, live indexes and
+plans, Scheduler state, Canvas/CIT17 counts, real speed, capacity and physical
+behavior are **UNVERIFIED (owner to confirm)**. No remote service call, remote
+SQL/application, environment-file edit, deployment, Scheduler action, push or
+outside-repository deletion occurred.

@@ -2,6 +2,16 @@
 
 ## Tester feedback (2026-10-15)
 
+### SP2 complete locally
+
+**PASS for the unattended SP2 code scope (STEP 0-5, fresh serial gates, docs and local commits).** Owner-bound summary projections and exact current-version detail reads replace whole-owner body scans; preparation reuses complete current evidence and batched receipts/controls; independent reads run in parallel; website Library publishes accepted pages while retaining saved cards on partial failures. Existing unchanged-version mobile hydration was already implemented and is retained with stronger regression proof. SP1/CQ1/QD1 remain intact; GA1 remains separately STOPPED, with no batch-generation implementation claimed. Code tip `97a6934`; [acceptance](acceptance/sp2-library-data-path.md), [ADR-031](../architecture/ADR-031-library-summary-projections.md).
+
+FRESH final verification: forced typecheck/lint/root build **8/8 tasks each, zero cached**; API **2,130 passed / 3 existing skips in 182 files**, mobile **1,057/1,057 in 110 files**, web **118/118 in 21 files**. Standalone API/web/Android builds **1/1 each** (34/34 and 19/19 static pages; Android 1 bundle/35 assets). Zero lint errors, six existing warnings; one repaired source-fixture import timeout and earlier draft failures remain recorded. Shared tests NOT APPLICABLE (unchanged source). Diff/staged hygiene PASS.
+
+Same SP0 synthetic fixture: Library **18 reads / 18,900,915 bytes -> 2 / 44,277**; exact reviewer **11 / 18,879,565 -> 2 / 78,702**; preparation probe **700 / 75,400 -> 2 / 4** with empty receipts/controls. Response bodies remain identical. These are local DB JSON counts, excluding unchanged auth/freshness and real inventory/provider costs; no production latency claim.
+
+**Owner steps remaining:** apply new migration file `20261015040000_experience_library_projections.sql` before API publication (including appropriate version-table generated-estimate backfill scheduling), deploy API/website and preview OTA, then perform the entirely skipped CIT17/realme/website Rollout and Device checks. Regions, capacity, live rows/applied migrations/query plans, Scheduler, actual latency and physical behavior are **UNVERIFIED (owner to confirm)**. SP0 findings 11/12 remain owner region/capacity decisions; SP2b findings 4/7/8/10/13 were not started. No remote service, remote SQL/migration application, environment-file edit, deployment, Scheduler action or push occurred. This finite SP2 run ends here.
+
 - GA1 **STOPPED at STEP 0**, inspected `65c9150`; audit `2c0a02b`.
   [Evidence/owner questions](acceptance/ga1-course-batch-generation.md),
   [deferred ADR-030](../architecture/ADR-030-course-batch-generation.md).
