@@ -54,13 +54,15 @@ describe('section external visual admission',()=>{
     const h=harness();await findSectionVisual(h.client,input,h);
     h.search.mockClear();h.rpc.mockClear();await findSectionVisual(h.client,input,h);expect(h.search).not.toHaveBeenCalled();expect(h.rpc).not.toHaveBeenCalled();
     expect((await findSectionVisual(h.client,{...input,findAnother:true},h)).attemptCount).toBe(2);
-    expect(h.search).toHaveBeenCalledWith(expect.any(String),['File:Cell.png']);
+    expect(h.search).toHaveBeenCalledWith(expect.any(Array),['File:Cell.png']);
     await findSectionVisual(h.client,{...input,findAnother:true},h);expect(h.search).toHaveBeenCalledOnce();
   });
-  it('a no-match is honest and cached; an empty search makes no model call',async()=>{
+  it('a no-match is honest, retried once and cached; an empty search makes no model call',async()=>{
     const h=harness();h.search.mockResolvedValue([]);
     expect(await findSectionVisual(h.client,input,h)).toEqual({status:'none',message:'No reliable visual found',attemptCount:1});
-    expect(h.match).not.toHaveBeenCalled();await findSectionVisual(h.client,input,h);expect(h.search).toHaveBeenCalledOnce();
+    expect(h.match).not.toHaveBeenCalled();
+    // A cached none gets exactly one automatic retry, then stays cached.
+    await findSectionVisual(h.client,input,h);await findSectionVisual(h.client,input,h);expect(h.search).toHaveBeenCalledTimes(2);
   });
   it.each(['search','match'] as const)('%s errors release reservations and never cache none',async operation=>{
     const h=harness();h[operation].mockRejectedValue(new Error('raw provider private text'));

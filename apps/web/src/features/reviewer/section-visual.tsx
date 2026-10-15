@@ -8,6 +8,14 @@ import { useAction, useResource } from "../../lib/hooks";
 
 type Snapshot = { available: false; reason: string } | { available: true; page: number; labelKind?: "slide"; status?: "rendering" | "unrendered"; url?: string };
 type Figure = { id: string; url: string; page?: number; slide?: number };
+/* Auto-finding runs a few sections at a time so a long reviewer doesn't flood the API. */
+const queue: (() => void)[] = []; let running = 0;
+function limit<T>(task: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const start = () => { running++; task().then(resolve, reject).finally(() => { running--; queue.shift()?.(); }); };
+    if (running < 2) start(); else queue.push(start);
+  });
+}
 type External = ({ status: "found"; image: string; title: string; credit: string; license: string; licenseUrl: string; sourceUrl: string; label: string } | { status: "none"; message: string }) & { attemptCount: number };
 export function SectionVisual({ artifactId, sectionId, hasFigures }: { artifactId: string; sectionId: string; hasFigures: boolean | undefined }) {
   const { api, session } = useAuth();
@@ -23,7 +31,7 @@ export function SectionVisual({ artifactId, sectionId, hasFigures }: { artifactI
   }, []);
   useEffect(() => {
     if (!holder.current) return;
-    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect(); } }, { rootMargin: "100px" });
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect(); } }, { rootMargin: "800px" });
     observer.observe(holder.current); return () => observer.disconnect();
   }, []);
   useEffect(() => {
@@ -44,21 +52,35 @@ export function SectionVisual({ artifactId, sectionId, hasFigures }: { artifactI
   async function find(findAnother = false) {
     setExternal(await api<External>(`${path}/external-visual`, { method: "POST", body: { findAnother } }));
   }
+  const [autoState, setAutoState] = useState<"idle" | "finding" | "done">("idle");
+  // Sections with no course visual get a labeled reference automatically; results are cached server-side.
+  useEffect(() => {
+    if (!online || !visible || !snapshot || snapshot.available || hasFigures !== false || autoState !== "idle") return;
+    let cancelled = false;
+    setAutoState("finding");
+    void limit(() => api<External>(`${path}/external-visual`, { method: "POST", body: { findAnother: false } }))
+      .then(value => { if (!cancelled) setExternal(value); })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setAutoState("done"); });
+    return () => { cancelled = true; };
+  }, [api, path, online, visible, snapshot, hasFigures, autoState]);
   const image = externalZoom && external?.status === "found" ? external.image : snapshot?.available ? snapshot.url : undefined;
   const dialogLabel = externalZoom && external?.status === "found" ? external.label : label;
   return <div ref={holder} className="section-visual stack">
     {online && <>
-      {sources ? <button disabled={action.busy} onClick={() => void action.run(open)}>{label}</button> : snapshot && hasFigures === false ? <button disabled={action.busy} onClick={() => void action.run(() => find())}>{action.busy ? "Finding a visual…" : "Find a visual"}</button> : null}
-      {!sources && external && <div className="surface stack">
-        {external.status === "none" ? <p>No reliable visual found</p> : <>
-          <strong>{external.label}</strong>
-          {/* Signed source URLs and Commons candidates are validated by the owner-scoped API. */}
-          <img src={external.image} alt={external.title} style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain" }} />
-          <button onClick={() => { setExternalZoom(true); setZoom(1); dialog.current?.showModal(); }}>Enlarge visual</button>
-          <p><a href={external.sourceUrl} target="_blank" rel="noreferrer">{external.credit} · {external.license}</a> · <a href={external.licenseUrl} target="_blank" rel="noreferrer">License details</a></p>
-        </>}
-        {external.attemptCount < 2 && <button disabled={action.busy} onClick={() => void action.run(() => find(true))}>Find another</button>}
-      </div>}
+      {sources ? <button disabled={action.busy} onClick={() => void action.run(open)}>{label}</button> : null}
+      {!sources && autoState === "finding" && !external && <p className="muted" style={{ fontSize: 13, opacity: 0.6 }}>Finding a visual…</p>}
+      {!sources && external?.status === "found" && <figure className="surface stack" style={{ margin: 0 }}>
+          <span className="muted" style={{ fontSize: 12, letterSpacing: 0.3, textTransform: "uppercase", opacity: 0.7 }}>{external.label}</span>
+          {/* Commons candidates are validated by the owner-scoped API. */}
+          <button type="button" onClick={() => { setExternalZoom(true); setZoom(1); dialog.current?.showModal(); }} style={{ padding: 0, border: 0, background: "#fff", borderRadius: 12, cursor: "zoom-in" }} aria-label="Enlarge visual">
+            <img src={external.image} alt={external.title} style={{ display: "block", width: "100%", maxHeight: 380, objectFit: "contain", borderRadius: 12 }} />
+          </button>
+          <figcaption className="row" style={{ fontSize: 12, opacity: 0.7, flexWrap: "wrap", gap: 8 }}>
+            <span className="grow"><a href={external.sourceUrl} target="_blank" rel="noreferrer">{external.credit.slice(0, 120)} · {external.license}</a> · <a href={external.licenseUrl} target="_blank" rel="noreferrer">License</a></span>
+            {external.attemptCount < 2 && <button disabled={action.busy} onClick={() => void action.run(() => find(true))} style={{ fontSize: 12 }}>{action.busy ? "Finding…" : "Show a different one"}</button>}
+          </figcaption>
+        </figure>}
       {action.message && <Notice error>{action.message}</Notice>}
     </>}
     <dialog ref={dialog} aria-label={dialogLabel} className="surface stack" style={{ width: "min(94vw, 1000px)", maxHeight: "90vh" }}>
