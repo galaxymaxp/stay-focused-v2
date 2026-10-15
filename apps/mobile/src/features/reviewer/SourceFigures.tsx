@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { Image as ImageIcon } from 'lucide-react-native';
+import { Image, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Sheet } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
 import { hitTarget, radius, spacing } from '../../design/tokens';
@@ -36,8 +35,8 @@ export function useFigureAvailability(client:ExperienceClient,artifactId:string|
   return !offline && artifactId===state.artifactId?state.sections:EMPTY;
 }
 
-export function SourceFigures({client,artifactId,sectionId,hasFigures,offline}:{
-  client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;
+export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true}:{
+  client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;visible?:boolean;
 }) {
   const {colors}=useTheme();const {height}=useWindowDimensions();
   const [open,setOpen]=useState(false);const [figures,setFigures]=useState<readonly SourceFigure[]>([]);
@@ -47,27 +46,31 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline}:{
     setOpen(false);setFigures([]);setHidden(false);request.current?.abort();
     return ()=>{request.current?.abort();request.current=null;};
   },[client,artifactId,sectionId,offline,hasFigures]);
-  const close=()=>{request.current?.abort();request.current=null;setOpen(false);setFigures([]);};
-  const show=async()=>{
-    if(offline || !hasFigures || open)return;
+  const close=()=>setOpen(false);
+  useEffect(()=>{
+    if(offline || !hasFigures || !visible || figures.length || hidden)return;
     request.current?.abort();const controller=new AbortController();request.current=controller;
-    setIndex(0);setFigures([]);setOpen(true);
     const timeout=setTimeout(()=>{controller.abort();if(request.current===controller){setHidden(true);setOpen(false);}},10000);
-    try {
+    void (async()=>{try {
       const found=await readSectionFigures(client,artifactId,sectionId,controller.signal);
       if(request.current!==controller || controller.signal.aborted)return;
       if(!found.length){setHidden(true);setOpen(false);}else setFigures(found);
     }catch {if(request.current===controller && !controller.signal.aborted){setHidden(true);setOpen(false);}}
-    finally {clearTimeout(timeout);}
-  };
+    finally {clearTimeout(timeout);}})();
+    return ()=>{controller.abort();clearTimeout(timeout);if(request.current===controller)request.current=null;};
+  },[client,artifactId,sectionId,hasFigures,offline,visible,figures.length,hidden]);
   if(offline || !hasFigures || hidden)return null;
   const figure=figures[index];const label=figure?.page?`From page ${figure.page}`:figure?.slide?`From slide ${figure.slide}`:'From source';
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="View source figures" onPress={()=>void show()}
-      style={{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:spacing[2],minHeight:hitTarget.min,
-        padding:spacing[2],borderRadius:radius.control,backgroundColor:colors.surfaceSecondary}}>
-      <ImageIcon size={spacing[5]} color={colors.accent}/><Text style={{color:colors.accent}}>Figures</Text>
-    </Pressable>
+    {figures.length?<View style={{gap:spacing[2],padding:spacing[3],borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
+      <Text style={{color:colors.textMuted}}>From your course material</Text>
+      {figures.map((item,i)=>{
+        const caption=item.slide?`Diagram from slide ${item.slide}`:item.page?`Diagram from page ${item.page}`:'Source diagram';
+        return <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Enlarge ${caption}`} onPress={()=>{setIndex(i);setOpen(true);}}>
+          <Image source={{uri:item.url}} accessibilityLabel={caption} resizeMode="contain" style={{width:'100%',height:Math.min(360,360*item.height/item.width)}} onError={()=>{setHidden(true);close();}}/>
+        </Pressable>;
+      })}
+    </View>:null}
     {open?<Sheet title="Source figures" onClose={close}>
       {figure?<>
         <Text style={{color:colors.textPrimary}}>{label}</Text>
@@ -82,7 +85,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline}:{
           <Pressable accessibilityRole="button" accessibilityLabel="Next figure" accessibilityState={{disabled:index===figures.length-1}} disabled={index===figures.length-1}
             onPress={()=>setIndex(n=>Math.min(figures.length-1,n+1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===figures.length-1?colors.textMuted:colors.accent}}>Next</Text></Pressable>
         </View>:null}
-      </>:<ActivityIndicator accessibilityLabel="Loading source figures" color={colors.accent}/>}
+      </>:null}
     </Sheet>:null}
   </>;
 }

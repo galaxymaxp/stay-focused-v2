@@ -6,9 +6,10 @@ import { hitTarget, radius, spacing } from '../../design/tokens';
 import { clampPagePan, clampPageZoom, readPageSnapshot, type PageSnapshot } from '../../services/sourcePageSnapshots';
 import type { ExperienceClient } from '../../services/experienceApi';
 
-/** Availability discovery is read-only. Rendering begins only on image open. */
-export function SourcePageSnapshot({ client, artifactId, sectionId, offline, onAvailability }: {
+/** Discover and render the exact cited page only when its topic approaches view. */
+export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, onAvailability }: {
   client: ExperienceClient; artifactId: string; sectionId: string; offline: boolean;
+  visible?: boolean;
   onAvailability?: (available: boolean | null) => void;
 }) {
   const availabilityRef = useRef(onAvailability); availabilityRef.current = onAvailability;
@@ -29,27 +30,33 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, onA
     const timeout = setTimeout(() => controller.abort(), render ? 20000 : 3000);
     try {
       const result = await readPageSnapshot(client, artifactId, sectionId, render, controller.signal);
-      if (!alive.current || inFlight.current !== controller) return null;
+      if (!alive.current || controller.signal.aborted || inFlight.current !== controller) return null;
       setSnapshot(result);
       availabilityRef.current?.(result.available);
       if (!result.available) setOpen(false);
       return result;
     } catch {
-      if (alive.current && inFlight.current === controller) { setSnapshot(null); setOpen(false); availabilityRef.current?.(null); }
+      if (alive.current && !controller.signal.aborted && inFlight.current === controller) { setSnapshot(null); setOpen(false); availabilityRef.current?.(null); }
       return null;
     } finally { clearTimeout(timeout); }
   }, [client, artifactId, sectionId]);
   useEffect(() => {
-    alive.current = true;
     setSnapshot(null); setOpen(false); setExhausted(false);
     availabilityRef.current?.(null);
-    if (offline) return () => { alive.current = false; inFlight.current?.abort(); };
-    void request(false);
+  }, [offline, request]);
+  useEffect(() => {
+    alive.current = true;
+    if (offline || !visible) return () => { alive.current = false; inFlight.current?.abort(); };
+    const discover=async()=>{
+      const probe=await request(false);
+      if(alive.current && probe?.available && !('url' in probe))await request(true);
+    };
+    void discover();
     const subscription = AppState.addEventListener('change', state => {
       setSnapshot(null); setOpen(false);
       availabilityRef.current?.(null);
       inFlight.current?.abort();
-      if (state === 'active') void request(false);
+      if (state === 'active') void discover();
     });
     // Confirm reachability without adding a native connectivity package. No
     // render admission from heartbeat; failures immediately hide the control.
@@ -59,10 +66,10 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, onA
           AppState.currentState === 'active') void request(false);
     }, 10000);
     return () => { alive.current = false; clearInterval(heartbeat); subscription.remove(); inFlight.current?.abort(); };
-  }, [offline, request]);
+  }, [offline, visible, request]);
   const snapshotStatus = snapshot?.available && 'status' in snapshot ? snapshot.status : null;
   useEffect(() => {
-    if (!open || snapshotStatus !== 'rendering') return;
+    if (offline || !visible || snapshotStatus !== 'rendering') return;
     let polls = 0;
     const timer = setInterval(() => {
       polls += 1;
@@ -70,7 +77,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, onA
       if (polls === 5) { clearInterval(timer); setExhausted(true); }
     }, 3000);
     return () => clearInterval(timer);
-  }, [open, snapshotStatus, request]);
+  }, [offline, visible, snapshotStatus, request]);
   const show = async () => {
     if (waiting || offline) return;
     setWaiting(true); setExhausted(false);
@@ -88,16 +95,17 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, onA
     </View> : null;
   const ready = 'url' in snapshot ? snapshot : null;
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel={`From ${unit} ${snapshot.page}`} accessibilityState={{ busy: waiting }}
-      onPress={() => void show()} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], minHeight: hitTarget.min,
-        alignSelf: 'flex-start', padding: spacing[2], borderRadius: radius.control, backgroundColor: colors.surfaceSecondary }}>
+    <View style={{gap:spacing[2],padding:spacing[3],borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
+      <Text style={{color:colors.textMuted}}>From {unit} {snapshot.page} · your course material</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={`From ${unit} ${snapshot.page}`} accessibilityState={{ busy: waiting }}
+      onPress={() => void show()} style={{ minHeight: hitTarget.min }}>
       {ready ? <Image source={{ uri: ready.url }} resizeMode="contain" accessibilityIgnoresInvertColors
-        style={{ width: spacing[12], height: spacing[12] }} onError={() => { setSnapshot(null); setOpen(false); }} />
-        : <View style={{ width: spacing[12], height: spacing[12], backgroundColor: colors.surfacePrimary }}>
+        style={{ width:'100%', height:Math.min(420,360*ready.height/ready.width) }} onError={() => { setSnapshot(null); setOpen(false); }} />
+        : <View style={{ height:spacing[12], backgroundColor:colors.surfacePrimary }}>
           {'status' in snapshot && snapshot.status === 'rendering' ? <ActivityIndicator color={colors.accent} /> : null}
         </View>}
-      <Text style={{ color: colors.accent }}>From {unit} {snapshot.page}</Text>
     </Pressable>
+    </View>
     <Modal visible={open} animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={() => setOpen(false)}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close source page" onPress={() => setOpen(false)}
