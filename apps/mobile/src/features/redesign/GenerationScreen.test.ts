@@ -5,6 +5,8 @@ import type { GenerationView } from "@stay-focused/shared";
 import type { GenerationIntent } from "../../services/generationRecovery";
 import { GenerationScreen } from "./GenerationScreen";
 
+vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn() }) }));
+
 const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
   read: vi.fn(),

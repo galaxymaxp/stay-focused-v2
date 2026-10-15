@@ -1,34 +1,29 @@
 import type {
-  GenerateCourseList,
   GenerationView,
-  ProcessingJobListPage,
-  ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
-import { CheckCircle2, CircleDashed, Clock3, AlertCircle } from "lucide-react-native";
+
 
 import { useAuth } from "../../auth";
-import { Action, Copy, Notice, Page, Surface, RowLink, ContentIcon, SkeletonCards } from "../../design/primitives";
+import { Action, Copy, Notice, Page } from "../../design/primitives";
 import { useAppActivity } from "../../design/appActivity";
 import { useTheme } from "../../design/theme";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
   acceptGeneration,
-  attributeGenerationIntent,
-  discardGenerationIntents,
   readGenerationIntents,
   type GenerationIntent,
 } from "../../services/generationRecovery";
 import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibrary";
 import { persistedArtifactId } from "../../services/localLibrary/librarySync";
 import { GenerationCore } from "./GenerationCore";
-import { generationCoreState, generationMessages, queueSections, stalledInQueue } from "./presentation";
+import { generationCoreState, generationMessages, stalledInQueue } from "./presentation";
 import { useExperience, useExperienceClient } from "./useExperience";
-import { useListPreferences } from "./useListPreferences";
-import { automaticQueueLabel } from "./automationPresentation";
-import { radius, spacing } from "../../design/tokens";
+import { useQueueItems } from "../queue/useQueueItems";
+
+
 
 export function GenerationScreen() {
   const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string; quiz?: string }>();
@@ -45,6 +40,7 @@ export function GenerationScreen() {
     [confirming, setConfirming] = useState(false);
   const confirmationInFlight = useRef(false);
   const activity = useAppActivity();
+  const queue = useQueueItems();
   useEffect(() => {
     if (!params.intent || !session) return;
     let live = true;
@@ -205,7 +201,7 @@ export function GenerationScreen() {
           {canRetry ? (
             <View style={{ width: 240 }}><Action disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Retry"}</Action></View>
           ) : null}
-          <View style={{ width: 240 }}><Action secondary pill onPress={() => router.push("/generation-queue")}>View Queue</Action></View>
+          <View style={{ width: 240 }}><Action secondary pill onPress={() => queue.show()}>View Queue</Action></View>
         </View>
         {(error || generation.error) && (
           <Notice>{error ?? generation.error}</Notice>
@@ -279,244 +275,5 @@ function GenerationStatus({ message }: { message: string }) {
     <Animated.View style={{ height: 78, width: 290, alignItems: "center", justifyContent: "center", opacity, transform: [{ translateY }] }}>
       <Copy size="h2" style={{ textAlign: "center", fontSize: 24, lineHeight: 30 }}>{visible}</Copy>
     </Animated.View>
-  );
-}
-export function QueueScreen() {
-  const queue = useExperience<ProcessingJobListPage>(
-    "/api/jobs?scope=all&limit=50",
-    5000,
-  );
-  const courses = useExperience<GenerateCourseList>('/api/experience/courses');
-  const { session } = useAuth();
-  const client = useExperienceClient();
-  const attributed = useRef(new Set<string>());
-  const [pending, setPending] = useState<GenerationIntent[]>([]),
-    [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    if (session)
-      void readGenerationIntents(session.user.id)
-        .then(async (items) => {
-          if (live) setPending(items.filter((item) => !item.generationId));
-          // Read saved requests immediately, then resolve older missing course
-          // attribution once per mount. Refresh explicitly retries failures.
-          for (const item of items.filter(item => !item.generationId && !item.courseId)) {
-            if (!live) break;
-            const key = `${session.user.id}:${item.key}`;
-            if (attributed.current.has(key)) continue;
-            attributed.current.add(key);
-            try {
-              const resolved = await attributeGenerationIntent(session.user.id, client, item);
-              if (live) setPending(current => current.map(old => old.key === resolved.key ? resolved : old));
-            } catch { /* An unresolved request remains available for Retry. */ }
-          }
-        })
-        .catch(() => {
-          if (live)
-            setError(
-              "Could not load local requests. Your accepted work is still on the server.",
-            );
-        });
-    return () => {
-      live = false;
-    };
-  }, [session, client, queue.data]);
-  const { prefs, hide } = useListPreferences();
-  const cleared = new Set(prefs.hidden.queue);
-  const jobs = (queue.data?.jobs ?? []).filter((job) => !cleared.has(job.id));
-  const sections = queueSections(jobs);
-  const attention = sections.find((section) => section.key === "attention")?.jobs ?? [];
-  const completed = sections.find((section) => section.key === "completed")?.jobs ?? [];
-  const pastIds = new Set(courses.data?.items.filter(course => course.courseState === 'past' || (!course.courseState && course.period === 'previous')).map(course => course.id) ?? []);
-  const visiblePending = pending.filter(item => !pastIds.has(item.courseId ?? (typeof item.body.courseId === 'string' ? item.body.courseId : '')));
-  const needsAttention = attention.length > 0 || visiblePending.length > 0;
-  async function clearAttention() {
-    for (const job of attention) hide("queue", job.id, true);
-    if (session && visiblePending.length) {
-      try {
-        const cleared = new Set(visiblePending.map(item => item.key));
-        await discardGenerationIntents(session.user.id, [...cleared]);
-        setPending(items => items.filter(item => !cleared.has(item.key)));
-      } catch {
-        setError("Could not clear saved requests on this device.");
-      }
-    }
-  }
-  return (
-    <Page
-      title="Queue"
-      back
-      onRefresh={() => { attributed.current.clear(); queue.refresh(); courses.refresh(); }}
-    >
-      {queue.error && <Notice>{queue.error}</Notice>}
-      {error && <Notice>{error}</Notice>}
-      {queue.loading && <SkeletonCards rows={2} label="Loading your generations" />}
-      {needsAttention ? (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Copy size="h2">Needs attention</Copy>
-          <Action secondary label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action>
-        </View>
-      ) : null}
-      {visiblePending.map((item) => (
-        <Surface key={item.key}>
-          <RowLink inset icon={<ContentIcon kind={item.type} />} label={`Reconnect request: ${item.title}`}
-            onPress={() =>
-              router.push({
-                pathname: "/generation",
-                params: { intent: item.key },
-              })
-            }
-          >
-            <Copy size="h3">{item.title}</Copy>
-            <Copy muted size="caption">Not started</Copy>
-          </RowLink>
-        </Surface>
-      ))}
-      {attention.map((job) => (
-        <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
-      ))}
-      {completed.length ? <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Copy size="h2">Completed</Copy>
-        <Action secondary label={`Clear ${completed.length} completed Queue entries`} onPress={() => completed.forEach(job => hide("queue", job.id, true))}>Clear Completed</Action>
-      </View> : null}
-      {sections.filter((section) => section.key !== "attention").map((section) => (
-        <View key={section.key} style={{ gap: 8 }}>
-          {section.key !== "completed" ? <Copy size="h2">{section.title}</Copy> : null}
-          {section.jobs.map((job) => (
-            <QueueCard key={job.id} job={job} onRefresh={queue.refresh} />
-          ))}
-        </View>
-      ))}
-      {queue.data && jobs.length === 0 && visiblePending.length === 0 && (
-        <Surface>
-          <Copy size="h3">Nothing in your Queue</Copy>
-          <Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they’re made, then stay in Library.</Copy>
-        </Surface>
-      )}
-    </Page>
-  );
-}
-function QueueCard({
-  job,
-  onRefresh,
-}: {
-  job: ProcessingJobStatusView;
-  onRefresh: () => void;
-}) {
-  const client = useExperienceClient();
-  const { colors } = useTheme();
-  const activity = useAppActivity();
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState<string | null>(null),
-    [retryKey] = useState(newRequestKey);
-  const type =
-    job.jobType === "quiz_generation"
-      ? "Quiz"
-      : job.jobType === "activity_generation"
-        ? "Draft"
-        : job.jobType === "document_extraction"
-          ? "Material preparation"
-          : "Reviewer";
-  async function open() {
-    if (busy) return;
-    if (job.jobType === "document_extraction") {
-      router.push("/processing");
-      return;
-    }
-    if (job.status !== "succeeded") {
-      router.push({ pathname: "/generation", params: { id: job.id } });
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await experienceRequest<GenerationView>(
-        client,
-        `/api/experience/generations/${encodeURIComponent(job.id)}`,
-      );
-      if (result.artifactId)
-        router.push({
-          pathname: "/artifact",
-          params: { id: result.artifactId },
-        });
-      else setError("The saved output is no longer available.");
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not open this output.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  const stalled = stalledInQueue({ status: job.status, since: job.updatedAt ?? job.createdAt });
-  async function cancel() {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await experienceRequest(client, `/api/jobs/${encodeURIComponent(job.id)}/cancel`, { method: "POST" });
-      onRefresh();
-      activity.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not cancel this generation.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function retry() {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await experienceRequest<ProcessingJobStatusView>(
-        client,
-        `/api/jobs/${encodeURIComponent(job.id)}/retry`,
-        { method: "POST", key: retryKey },
-      );
-      onRefresh();
-      activity.refresh();
-      router.push({ pathname: "/generation", params: { id: result.id } });
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not retry this generation.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Surface>
-      <RowLink inset disabled={busy} label={job.status === "succeeded" ? `${job.jobType === "activity_generation" ? "Open Draft" : "Open saved output"}: ${job.source.displayName || type}` : `View generation: ${job.source.displayName || type}`} onPress={() => void open()} icon={<ContentIcon kind={job.jobType === "quiz_generation" ? "quiz" : job.jobType === "activity_generation" ? "activity_output" : "reviewer"} />} trailing={job.status === "succeeded" ? <CheckCircle2 size={19} color={colors.success} /> : job.status === "running" ? <CircleDashed size={19} color={colors.accent} /> : job.status === "queued" ? <Clock3 size={19} color={colors.textMuted} /> : <AlertCircle size={19} color={colors.warning} />}>
-      <Copy muted size="caption">{type}</Copy>
-      {automaticQueueLabel(job) ? <View style={{ alignSelf: "flex-start", backgroundColor: colors.blueSoft, borderRadius: radius.pill, paddingHorizontal: spacing[2], paddingVertical: spacing[1] }}><Copy size="caption" color={colors.textPrimary}>{automaticQueueLabel(job)}</Copy></View> : null}
-      <Copy size="h3">{job.source.displayName || type}</Copy>
-      <Copy muted size="caption">
-        {job.status === "succeeded"
-          ? job.jobType === "activity_generation" ? "Draft ready" : "Completed"
-          : job.status === "running"
-            ? "Generating"
-            : job.status === "failed" || job.status === "expired"
-              ? "Couldn’t finish"
-              : job.status === "cancellation_requested"
-                ? "Stopping"
-                : job.status === "queued"
-                  ? stalled ? "Hasn’t started · the generation service may be at its limit" : "Queued"
-                  : "Cancelled"}
-      </Copy>
-      </RowLink>
-      {stalled && (
-        <Action secondary disabled={busy} onPress={() => void cancel()}>
-          Cancel
-        </Action>
-      )}
-      {job.retryable && ["failed", "expired"].includes(job.status) && (
-        <Action secondary disabled={busy} onPress={() => void retry()}>
-          Retry
-        </Action>
-      )}
-      {error && <Notice>{error}</Notice>}
-    </Surface>
   );
 }

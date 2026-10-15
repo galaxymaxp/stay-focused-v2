@@ -1,3 +1,4 @@
+import { QueueDropdown } from "../../src/features/queue/QueueDropdown";
 import { Redirect, Stack } from "expo-router";
 
 import { AppActivityProvider } from "../../src/app-shell/AppActivityProvider";
@@ -33,6 +34,7 @@ export default function AppLayout() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="task" options={modalMotion(reducedMotion)} />
       </Stack>
+      <QueueDropdown />
       </AppActivityProvider>
     </CanvasSyncProvider>
   );
