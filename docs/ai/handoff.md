@@ -3790,3 +3790,26 @@ Save is in each existing owner zoom viewer beside Ask. SDK-compatible media-libr
 **Owner steps remaining:** **Rollout and Device checks were skipped entirely.** Build/install a new preview APK containing expo-clipboard and expo-media-library (OTA alone cannot add native modules), publish the website, then check on realme: page snapshot/figure/Wikimedia saves reach Stay Focused, attribution, Share visibility, offline disabled copy, denied permission/Open settings and missing-clipboard fallback. Verify iOS uses only add-only permission and Photos without an album/full-access prompt. Prior slices' separate rollout debt remains unchanged.
 
 Evidence: [IM1b acceptance](acceptance/im1b-image-save-share.md), [ADR-038](../architecture/ADR-038-reviewer-image-gallery-saving.md), [original IM1 STEP 0](acceptance/im1-image-save-share.md).
+
+## RT1 topic levels and Expound complete locally (2026-10-16)
+
+**PASS for unattended RT1 STEP 0-4, fresh serial gates, docs and local commits.** Each mobile/website topic has compact Original / Simplify / Explain simply controls and collapsible Expound. Canonical content stays unchanged; Original is immediate and has no model action. Server-read, owner-scoped sections feed source-only SA1 formatted answers and grounding labels. Persistent owner/exact-content caches support offline reuse; uncached controls show the existing offline reason. Reading choices last only for the session; canonical search restores Original. Shared snapshots remain unchanged, so shared topic controls route to sign-in and make no model calls.
+
+Study Tools' existing 20/minute warm-instance admission and provider configuration are reused. New bounded server dedup/cache is per warm instance (400 entries / 30 minutes), not a durable global quota/cache. Context is capped at 18,000 characters without truncation; results at 6,000 characters. No migration, dependency or native module is added. All prior SP1/CQ1/QD1/SP2/SP2b/SH1/GA1b/MR1/SA1/SA2/MR2/IM1b local regressions remain green.
+
+FRESH forced typecheck/lint/root build **8/8 each, zero cached**; API **2,268 passed / 3 existing live skips** (199 files), mobile **1,129** (122), shared **345** (39 including existing emitted copies), web **188** (32). Standalone API/web/Android builds **1/1 each**, 35/35 and 19/19 pages, one Android bundle / 35 assets. Zero lint errors, six existing warnings. Repaired first attempts are recorded in acceptance; no nondeterministic flake. Implementation commits: **959424e**, **d0db258**, **dc4f381**, **06b9385**, **f1b09f1**, **ba81163**.
+
+**Owner steps remaining:** Rollout and Device checks were skipped entirely. Publish API/website and compatible preview update, then check topic levels, instant Original/cache switching, organized Expound/collapse, offline, canonical search, manual scrolling/Reduce Motion and shared sign-in routing on realme. Predecessor IM1b APK and MR2 migration/worker rollout remain owner work. Deployed revisions, actual provider output, live database/applied migrations/Scheduler and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service call, deployment, migration application, environment-file edit, Scheduler action, email or push occurred. This finite run ends at RT1; LS1/RB4 were not started.
+
+[Acceptance](acceptance/rt1-topic-levels.md); [ADR-039](../architecture/ADR-039-topic-level-study-tools.md).
+
+Commits:
+
+- 959424e feat(shared): define section topic levels and cached assistance
+- d0db258 feat(api): generate owner-scoped cached topic explanations
+- dc4f381 test(shared): verify topic cache and Original contracts
+- 06b9385 test(api): verify topic isolation caching and admission
+- f1b09f1 feat(mobile): add cached topic levels and collapsible Expound
+- ba81163 feat(web): add topic levels Expound and shared sign-in controls
+
+The docs closure commit is this entry’s containing commit; its final hash is recorded in tmp/overnight/RT1.status. See acceptance for exact commands, gate evidence, repaired first attempts and owner-only remaining checks.
