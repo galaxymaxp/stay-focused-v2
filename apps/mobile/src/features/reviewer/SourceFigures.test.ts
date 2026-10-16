@@ -3,12 +3,13 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Image, Pressable, Text, View } from 'react-native';
 import { SourceFigures, useFigureAvailability } from './SourceFigures';
+import { SaveImageButton } from './SaveImageButton';
 import { Sheet } from '../../design/primitives';
 const mocks=vi.hoisted(()=>({read:vi.fn(),availability:vi.fn(),state:{currentState:'active',addEventListener:vi.fn(()=>({remove:vi.fn()}))}}));
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',ActivityIndicator:'ActivityIndicator',
   AppState:mocks.state,useWindowDimensions:()=>({width:360,height:800})}));
 vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
-vi.mock('lucide-react-native',()=>({Image:'ImageIcon'}));
+vi.mock('lucide-react-native',()=>({Image:'ImageIcon',Download:'Download'}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
 vi.mock('../../design/theme',async()=>{
   const tokens=await import('../../design/themeTokens');return {useTheme:()=>({colors:tokens.palettes.light,reducedMotion:true})};
@@ -20,9 +21,16 @@ const props={client,artifactId:'artifact',sectionId:'s',hasFigures:true,offline:
 const figure={id:'figure',url:'https://image.example.test/short',width:256,height:160,page:2};
 let tree:ReactTestRenderer|undefined;
 const button=(label:string)=>tree!.root.findAllByType(Pressable).find(node=>node.props.accessibilityLabel===label)!;
-async function mount(overrides:Partial<typeof props>={}) {await act(async()=>{tree=create(createElement(SourceFigures,{...props,...overrides}));});}
+async function mount(overrides:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}) {await act(async()=>{tree=create(createElement(SourceFigures,{...props,...overrides}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();vi.useRealTimers();});
 describe('in-place source figure sheet',()=>{
+  it('offers Save only in zoom with the selected figure and reviewer/section titles',async()=>{
+    mocks.read.mockResolvedValue([figure]);await mount({reviewerTitle:'Biology',sectionTitle:'Cells'});
+    expect(button('Save image')).toBeUndefined();
+    await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
+    expect(button('Save image').props.disabled).toBe(false);
+    expect(tree!.root.findByType(SaveImageButton).props.image).toEqual({uri:figure.url,reviewerTitle:'Biology',sectionTitle:'Cells',kind:'figure'});
+  });
   it('asks about each exact figure inline and in zoom, closing the viewer first',async()=>{
     const onAsk=vi.fn();mocks.read.mockResolvedValue([figure]);
     await act(async()=>{tree=create(createElement(SourceFigures,{...props,onAsk}));});

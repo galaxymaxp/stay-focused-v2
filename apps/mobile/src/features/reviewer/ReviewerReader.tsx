@@ -402,12 +402,15 @@ export function ReviewerReaderScreen({
                 {render(segmentIds.sectionTitle(section.id), section.title)}
               </Text>
               {figureArtifactId ? <SourceFigures client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
+                reviewerTitle={reviewer.title} sectionTitle={section.title}
                 onAsk={image => askImage(section.id, image)} hasFigures={figureSections.has(section.id)} offline={deviceCopy} visible={visualIsNear(section.id)} /> : null}
               {!figureSections.has(section.id) && (artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null) && session?.accessToken && /^artifact:/.test(artifact.id) ?
                 <SourcePageSnapshot client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy} visible={figureSections.online===true && visualIsNear(section.id)}
+                  reviewerTitle={reviewer.title} sectionTitle={section.title}
                   onAsk={image => askImage(section.id, image)} onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
             </View>
             {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={reviewerVisuals?.[section.id]} onAsk={image => askImage(section.id, image)}
+              reviewerTitle={reviewer.title} sectionTitle={section.title}
               online={!deviceCopy && figureSections.online === true && (!hasSnapshotControl || snapshotAvailability[section.id] != null)}
               hasSourceVisual={figureSections.has(section.id) || snapshotAvailability[section.id] === true} /> : null}
             {section.blocks.map((block, blockIndex) => (

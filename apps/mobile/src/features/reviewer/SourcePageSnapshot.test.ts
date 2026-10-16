@@ -3,7 +3,9 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
 import { SourcePageSnapshot, ZoomablePage } from './SourcePageSnapshot';
+import { SaveImageButton } from './SaveImageButton';
 
+vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
 const mocks = vi.hoisted(() => ({ read: vi.fn(), state: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) } }));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: mocks.state }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
@@ -21,6 +23,13 @@ async function mount(offline = false) { await act(async () => { tree = create(cr
 const buttons = () => tree!.root.findAllByType(Pressable);
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('source-page thumbnail and viewer', () => {
+  it('offers Save in the page modal with the exact URL and filename titles',async()=>{
+    mocks.read.mockResolvedValue(ready);
+    await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,reviewerTitle:'Biology',sectionTitle:'Cells'}));});
+    await act(async()=>buttons()[0]!.props.onPress());
+    expect(tree!.root.findByType(SaveImageButton).props.image).toEqual({uri:ready.url,reviewerTitle:'Biology',sectionTitle:'Cells',kind:'page_snapshot'});
+    expect(tree!.root.findByType(Modal).findAllByType(Pressable).some(n=>n.props.accessibilityLabel==='Save image')).toBe(true);
+  });
   it('asks about the exact ready snapshot from inline and zoom controls',async()=>{
     const onAsk=vi.fn();const data={...ready,id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'};mocks.read.mockResolvedValue(data);
     await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,onAsk}));});

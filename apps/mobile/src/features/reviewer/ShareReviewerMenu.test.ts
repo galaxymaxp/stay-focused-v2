@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ShareReviewerMenu } from './ShareReviewerMenu';
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 const mocks = vi.hoisted(() => ({ mutate: vi.fn(), read: vi.fn(), copy: vi.fn(), share: vi.fn(), owner: 'owner' }));
-vi.mock('react-native', () => ({ View: 'View', Share: { share: mocks.share } }));
+vi.mock('react-native', () => ({ View: 'View', Platform: { OS: 'android' }, Share: { share: mocks.share } }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: mocks.copy }));
 vi.mock('../../auth', () => ({ useAuth: () => ({ session: { user: { id: mocks.owner } } }) }));
 vi.mock('../../design/primitives', () => ({ Action: 'Action', Copy: 'Copy', Notice: 'Notice', Sheet: 'Sheet' }));
@@ -52,4 +52,14 @@ it('a late response after an account switch never copies or opens the old owner 
   mocks.owner = 'other'; await act(async () => tree!.update(createElement(ShareReviewerMenu, props)));
   await act(async () => complete(link));
   expect(mocks.copy).not.toHaveBeenCalled(); expect(mocks.share).not.toHaveBeenCalled();
+});
+it.each(['reject', 'false'])('clipboard failure (%s) still opens system sharing and offers the visible link', async failure => {
+  if (failure === 'reject') mocks.copy.mockRejectedValue(new Error('Native module missing'));
+  else mocks.copy.mockResolvedValue(false);
+  await mount(); await act(async () => button('Share').props.onPress());
+  await act(async () => button('Share link').props.onPress());
+  expect(mocks.share).toHaveBeenCalledOnce(); expect(JSON.stringify(tree!.toJSON())).toContain('Link ready to share');
+  expect(JSON.stringify(tree!.toJSON())).toContain(link.token);
+  await act(async () => button('Copy link').props.onPress());
+  expect(mocks.share).toHaveBeenCalledTimes(2);
 });

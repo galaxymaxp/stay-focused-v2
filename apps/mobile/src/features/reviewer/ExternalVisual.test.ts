@@ -4,7 +4,9 @@ import { afterEach,describe,expect,it,vi } from 'vitest';
 import { Image,Pressable,Text } from 'react-native';
 import { Sheet } from '../../design/primitives';
 import { ExternalVisual } from './ExternalVisual';
+import { SaveImageButton } from './SaveImageButton';
 import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
+vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
 const mocks=vi.hoisted(()=>({find:vi.fn(),link:vi.fn(async()=>{})}));
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
@@ -18,9 +20,15 @@ const props={...baseProps,visual:found};
 let tree:ReactTestRenderer|undefined;
 const button=(name:string)=>tree!.root.findAllByType(Pressable).find(n=>n.props.accessibilityLabel===name)!;
 const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().join(''));
-async function mount(override:Partial<typeof props>={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
+async function mount(override:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();});
 describe('automatic separate external card',()=>{
+  it('offers Save only in zoom, preserving source title, identification headers and stored attribution',async()=>{
+    await mount({reviewerTitle:'Biology',sectionTitle:'Cells'});expect(button('Save image')).toBeUndefined();
+    await act(async()=>button('View external reference').props.onPress());
+    expect(tree!.root.findByType(SaveImageButton).props.image).toEqual({uri:found.image,headers:EXTERNAL_IMAGE_HEADERS,reviewerTitle:'Biology',sectionTitle:'Cells',kind:'external_visual',sourceTitle:found.title,attribution:`${found.credit} · ${found.license}`});
+    expect(button('Save image').props.disabled).toBe(false);
+  });
   it('asks about the exact attributed image inline and in zoom',async()=>{
     const onAsk=vi.fn();const visual={...found,id:'a'.repeat(64)};
     await act(async()=>{tree=create(createElement(ExternalVisual,{...baseProps,visual,onAsk}));});

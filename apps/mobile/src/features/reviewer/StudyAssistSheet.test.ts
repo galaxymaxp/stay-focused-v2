@@ -14,7 +14,7 @@ vi.mock('./SourceFigures',()=>({
   SourceFigures:(props:{hasFigures:boolean;offline:boolean})=>props.hasFigures&&!props.offline?createElement('SourceFigures',props):null,
   useFigureAvailability:(_client:unknown,_id:unknown,offline:boolean)=>Object.assign(offline?new Set():figures.available,{online:!offline&&figures.online}),
 }));
-vi.mock('react-native', () => ({ View: 'View', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),
   Animated: { View: 'AnimatedView', Value: class { setValue() {} stopAnimation() {} interpolate() { return 1; } },
@@ -22,7 +22,7 @@ vi.mock('react-native', () => ({ View: 'View', Image:'Image', Linking:{openURL:v
     loop: () => ({ start: () => {}, stop: () => {} }), sequence: () => ({}) },
 }));
 vi.mock('lucide-react-native', () => Object.fromEntries(['ChevronDown', 'ChevronUp', 'FileQuestion', 'CheckCircle2', 'Circle', 'Sparkles', 'X', 'AlertCircle',
-  'AlignLeft', 'ArrowLeftRight', 'Check', 'FlaskConical', 'Lightbulb', 'RotateCcw'].map(name => [name, name])));
+  'AlignLeft', 'ArrowLeftRight', 'Check', 'FlaskConical', 'Lightbulb', 'RotateCcw', 'Download'].map(name => [name, name])));
 vi.mock('../../design/primitives', () => ({ Action: 'Action', Copy: 'Copy', Notice: 'Notice', Page: 'Page', SearchField: 'SearchField', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet', Surface: 'Surface', SkeletonBlock: 'SkeletonBlock' }));
 vi.mock('../../design/haptics', () => ({ haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
@@ -50,6 +50,16 @@ const reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const selection = selectAssistBlock(reviewer, reviewer.sections[0]!.id, reviewer.sections[0]!.blocks[0]!.id)!;
 const target = { selection };
 describe('snapshot discovery for persisted reviewer headers', () => {
+  it.each([false,true])('keeps Android owner Share visible for online/saved reviewers (device copy %s)',async deviceCopy=>{
+    await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:detail.artifact,reviewer,deviceCopy}));});
+    const menu=rendered!.root.findByType('ShareReviewerMenu' as never);
+    expect(menu.props.artifactId).toBe(detail.artifact.id.slice('artifact:'.length));expect(menu.props.offline).toBe(deviceCopy);
+    if(deviceCopy)expect(rendered!.root.findAllByType('Notice' as never).map(n=>String(n.props.children)).join(' ')).toContain('device');
+  });
+  it('does not offer Share for reviewer entries without a canonical server artifact id',async()=>{
+    await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:{...detail.artifact,id:'local:only'},reviewer,deviceCopy:true}));});
+    expect(rendered!.root.findAllByType('ShareReviewerMenu' as never)).toHaveLength(0);
+  });
   it('shows batched references after source discovery and hides them for source visuals/offline',async()=>{
     figures.online=true;
     visuals.sections[reviewer.sections[0]!.id]={status:'found',image:'https://upload.wikimedia.org/reference.png',title:'Reference',credit:'Author',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Reference.png',label:'External reference \u2014 not from your course material.',width:640,height:480,attemptCount:1};

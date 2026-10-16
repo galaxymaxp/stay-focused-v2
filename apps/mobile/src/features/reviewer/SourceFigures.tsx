@@ -1,5 +1,6 @@
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
+import { SaveImageButton } from './SaveImageButton';
 import { useEffect, useRef, useState } from 'react';
 import { Image, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Sheet } from '../../design/primitives';
@@ -37,8 +38,9 @@ export function useFigureAvailability(client:ExperienceClient,artifactId:string|
   return !offline && artifactId===state.artifactId?state.sections:EMPTY;
 }
 
-export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,onAsk}:{
+export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,onAsk,reviewerTitle='Reviewer',sectionTitle='Section'}:{
   client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;visible?:boolean;onAsk?:(image:StudyImageTarget)=>void;
+  reviewerTitle?:string;sectionTitle?:string;
 }) {
   const {colors}=useTheme();const {height}=useWindowDimensions();
   const [open,setOpen]=useState(false);const [figures,setFigures]=useState<readonly SourceFigure[]>([]);
@@ -82,6 +84,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
             onError={()=>{setHidden(true);close();}}/>
         </View>
         <AskImageButton offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}} />
+        <SaveImageButton offline={offline} image={{uri:figure.url,reviewerTitle,sectionTitle,kind:'figure'}} />
         {figures.length>1?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing[2]}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Previous figure" accessibilityState={{disabled:index===0}} disabled={index===0}
             onPress={()=>setIndex(n=>Math.max(0,n-1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===0?colors.textMuted:colors.accent}}>Previous</Text></Pressable>

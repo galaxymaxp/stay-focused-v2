@@ -1,5 +1,6 @@
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
+import { SaveImageButton } from './SaveImageButton';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Modal, Pressable, Text, View, type GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,9 +10,10 @@ import { clampPagePan, clampPageZoom, readPageSnapshot, type PageSnapshot } from
 import type { ExperienceClient } from '../../services/experienceApi';
 
 /** Discover and render the exact cited page only when its topic approaches view. */
-export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, onAsk, onAvailability }: {
+export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, onAsk, onAvailability, reviewerTitle = 'Reviewer', sectionTitle = 'Section' }: {
   client: ExperienceClient; artifactId: string; sectionId: string; offline: boolean;
   visible?: boolean;
+  reviewerTitle?: string; sectionTitle?: string;
   onAsk?: (image: StudyImageTarget) => void;
   onAvailability?: (available: boolean | null) => void;
 }) {
@@ -122,6 +124,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
             <Text style={{ color: colors.textMuted }}>{exhausted ? 'The page is still preparing. Close and open it again in a moment.' : 'Preparing source page'}</Text>
           </View>}
         {ready ? <AskImageButton image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}} /> : null}
+        {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} /> : null}
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>

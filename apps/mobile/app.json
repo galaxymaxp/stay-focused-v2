@@ -38,7 +38,15 @@
       ],
       "expo-sqlite",
       "expo-audio",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Stay Focused to save study images to your photos.",
+          "savePhotosPermission": "Allow Stay Focused to save study images to your photos.",
+          "granularPermissions": ["photo"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

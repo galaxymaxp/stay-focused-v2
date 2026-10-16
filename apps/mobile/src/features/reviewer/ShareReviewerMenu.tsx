@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Share, View } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import type { ReviewerReaderModel, ReviewerShareLink } from '@stay-focused/shared';
 import { useAuth } from '../../auth';
 import { Action, Copy, Notice, Sheet } from '../../design/primitives';
@@ -39,13 +38,24 @@ function OwnerShare({ owner, artifactId, reviewer, client, offline }: {
       setShare(result);
       if (method === 'POST' && result) {
         const url = reviewerShareUrl(result.token);
-        await Clipboard.setStringAsync(url);
+        const copied = await copyReviewerLink(url);
         if (!active.current) return;
-        setNote('Link copied.');
-        await Share.share({ message: url, url, title: reviewer.title });
+        setNote(copied ? 'Link copied.' : 'Link ready to share');
+        await Share.share({ message: url, url, title: reviewer.title }).catch(() => {});
       } else setNote(method === 'DELETE' ? 'Sharing stopped.' : 'Shared version updated.');
     } catch { if (active.current) setNote('Could not complete sharing. Please try again.'); }
     finally { if (active.current) setBusy(false); }
+  }
+  async function copy() {
+    if (!share || busy || offline || !owner) return;
+    setBusy(true);
+    const url = reviewerShareUrl(share.token);
+    try {
+      const copied = await copyReviewerLink(url);
+      if (!active.current) return;
+      setNote(copied ? 'Link copied.' : 'Link ready to share');
+      if (!copied) await Share.share({ message: url, url, title: reviewer.title }).catch(() => {});
+    } finally { if (active.current) setBusy(false); }
   }
   return <>
     <Action secondary disabled={offline || !owner} onPress={() => void menu()}>Share</Action>
@@ -54,11 +64,19 @@ function OwnerShare({ owner, artifactId, reviewer, client, offline }: {
       <View style={{ gap: spacing[2] }}>
         <Action disabled={busy} onPress={() => void mutate('POST')}>Share link</Action>
         {share && <><Copy>{reviewerShareUrl(share.token)}</Copy>
-          <Action secondary disabled={busy} onPress={() => void Clipboard.setStringAsync(reviewerShareUrl(share.token)).then(() => setNote('Link copied.'), () => setNote('Could not copy the link.'))}>Copy link</Action>
+          <Action secondary disabled={busy || offline} onPress={() => void copy()}>Copy link</Action>
           <Action secondary disabled={busy} onPress={() => void mutate('PATCH')}>Update shared version</Action>
           <Action secondary disabled={busy} onPress={() => void mutate('DELETE')}>Stop sharing</Action></>}
       </View>
       {note && <Notice>{note}</Notice>}
     </Sheet>}
   </>;
+}
+
+/** An older APK may not contain ExpoClipboard; even module evaluation can throw. */
+export async function copyReviewerLink(url: string): Promise<boolean> {
+  try {
+    const clipboard = await import('expo-clipboard');
+    return await clipboard.setStringAsync(url);
+  } catch { return false; }
 }
