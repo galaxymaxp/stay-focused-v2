@@ -58,7 +58,7 @@ describe('post-generation cited page pre-render', () => {
     await prerenderSourcePageSnapshots(client, input, h);
     h.rpc.mockClear(); h.dispatch.mockClear();
     expect(await getSourcePageSnapshot(client, { ...input, sectionId: 'section-0', render: false }, h)).toEqual({
-      available: true, page: 2, url: 'https://image.example.test/opaque.png', width: 1400, height: 1800, sourceLabel: 'Private title',
+      available: true, id: 'row-2', page: 2, url: 'https://image.example.test/opaque.png', width: 1400, height: 1800, sourceLabel: 'Private title',
     });
     expect(h.rpc).not.toHaveBeenCalled(); expect(h.dispatch).not.toHaveBeenCalled();
     expect(sign).toHaveBeenCalledWith('opaque/attempt.png', 600);

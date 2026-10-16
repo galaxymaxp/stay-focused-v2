@@ -22,7 +22,19 @@ export const loadImageData: ImageLoader = async url => {
     if (!response.ok || !/^image\/(png|jpeg|gif|webp)$/.test(type)) return null;
     const length = Number(response.headers.get('content-length') ?? 0);
     if (length > VISUAL_IMAGE_BYTES) return null;
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (!response.body) return null;
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = []; let total = 0;
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        total += chunk.value.byteLength;
+        if (total > VISUAL_IMAGE_BYTES) { await reader.cancel(); return null; }
+        chunks.push(chunk.value);
+      }
+    } finally { reader.releaseLock(); }
+    const bytes = Buffer.concat(chunks);
     if (bytes.byteLength > VISUAL_IMAGE_BYTES) return null;
     return `data:${type};base64,${Buffer.from(bytes).toString('base64')}`;
   } catch { return null; } finally { clearTimeout(timer); }

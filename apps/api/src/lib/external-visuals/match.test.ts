@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { OpenAIProvider, ProviderCallError, type OpenAIResponsesClient } from '../../providers';
-import { matchVisual, type VisualProvider } from './match';
+import { loadImageData, matchVisual, VISUAL_IMAGE_BYTES, type VisualProvider } from './match';
 import type { CommonsCandidate } from './commons';
 const candidate:CommonsCandidate={fileTitle:'File:Cell.png',title:'Cell.png',image:'https://upload.wikimedia.org/image.png',sourceUrl:'https://commons.wikimedia.org/wiki/File:Cell.png',credit:'Ada',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',width:1200,height:800};
 const other={...candidate,fileTitle:'File:Other.png',title:'Other.png',image:'https://upload.wikimedia.org/other.png'};
@@ -10,6 +10,15 @@ function provider(verdict:unknown={bestImage:2,confidence:0.8,reason:'Shows the 
   return {generateWithImages:vi.fn(async()=>verdict)} as unknown as VisualProvider;
 }
 describe('external vision match',()=>{
+  it('bounds streamed Commons bytes even without a content-length header',async()=>{
+    const cancel=vi.fn();
+    const stream=new ReadableStream<Uint8Array>({pull(controller){controller.enqueue(new Uint8Array(VISUAL_IMAGE_BYTES+1));},cancel});
+    const fetcher=vi.fn(async()=>new Response(stream,{headers:{'content-type':'image/png'}}));
+    vi.stubGlobal('fetch',fetcher);
+    try {expect(await loadImageData(candidate.image)).toBeNull();expect(cancel).toHaveBeenCalledOnce();
+      expect(fetcher).toHaveBeenCalledWith(candidate.image,expect.objectContaining({redirect:'error'}));
+    } finally {vi.unstubAllGlobals();}
+  });
   it('compares candidates in one call and returns the chosen image',async()=>{
     const p=provider();const result=await matchVisual([candidate,other],'Cells contain nuclei.',p,load);
     expect(result.candidate).toEqual(other);expect(result.checkedTitles).toEqual(['File:Other.png']);

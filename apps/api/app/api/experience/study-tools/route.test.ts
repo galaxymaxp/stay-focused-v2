@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { STUDY_LIMITS, STUDY_TOOLS_PROMPT_VERSION, selectAssistBlock, type ReviewerReaderModel } from '@stay-focused/shared';
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), detail: vi.fn(), saved: vi.fn(), client: vi.fn(), provider: vi.fn(), generate: vi.fn(), context: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), detail: vi.fn(), saved: vi.fn(), client: vi.fn(), provider: vi.fn(), generate: vi.fn(), image: vi.fn(), context: vi.fn() }));
+vi.mock('@/lib/study-image',()=>({resolveStudyImage:mocks.image}));
 vi.mock('@/lib/auth', () => ({ verifyBearerToken: mocks.auth }));
 vi.mock('@/lib/canvas-db', () => ({ createCanvasServiceClient: () => ({}) }));
 vi.mock('@/lib/experience/service', () => ({ ExperienceService: class { getLibraryArtifact = mocks.detail; } }));
@@ -24,6 +25,19 @@ beforeEach(() => {
   mocks.generate.mockResolvedValue({ action: 'define', outcome: 'answer', grounding: 'source', text: 'The control center.', createdAt: '2026-10-01T00:00:00Z' });
 });
 describe('authenticated Smart Selection endpoint', () => {
+  it('image Ask shares bearer verification, admission and section context without trusting client bytes', async () => {
+    mocks.image.mockResolvedValue({data:'data:image/png;base64,AAAA',context:'Attributed diagram'});
+    const image={kind:'figure',id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'};
+    const body={...input,action:'ask',question:'What is this?',image};
+    expect((await POST(request(body))).status).toBe(200);
+    expect(mocks.image).toHaveBeenCalledWith({},expect.objectContaining({userId:'verified-owner',image,sectionId:'section'}));
+    expect(mocks.generate).toHaveBeenCalledWith(expect.objectContaining({image:{data:'data:image/png;base64,AAAA',context:'Attributed diagram'},
+      context:expect.objectContaining({nearby:[expect.stringContaining('The nucleus contains DNA.')],imageContext:'Attributed diagram'})}));
+    for(let i=1;i<20;i++) expect((await POST(request(body))).status).toBe(200);
+    expect((await POST(request(body))).status).toBe(429);
+    expect(mocks.image).toHaveBeenCalledTimes(20);expect(mocks.generate).toHaveBeenCalledTimes(20);
+    expect((await POST(request({...body,image:{...image,url:'https://evil.test'}}))).status).toBe(400);
+  });
   it('verifies the bearer identity and uses owner-scoped reads', async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);

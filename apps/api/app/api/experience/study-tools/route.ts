@@ -5,6 +5,8 @@ import { readCanonicalReviewerRecord } from '@/lib/canonical-reviewers';
 import { ExperienceFailure } from '@/lib/experience/errors';
 import { experienceJson, experienceOptions, experienceRoute, readBoundedExperienceJson } from '@/lib/experience/http';
 import { admitStudyRequest, buildStudyContext, generateStudyTool, parseStudyToolRequest, resolveStudySelection, studyContextCharacters, studyToolsModel } from '@/lib/study-tools';
+import { resolveStudyImage } from '@/lib/study-image';
+import { createCanvasServiceClient } from '@/lib/canvas-db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -23,11 +25,17 @@ export async function POST(request: Request) {
     if (!saved.value) throw new ExperienceFailure(404, 'not_found');
     if (!admitStudyRequest(userId)) throw new ExperienceFailure(429, 'rate_limited');
     const context = await buildStudyContext({ reviewer: detail.reviewer, request: input, block, selection, saved: saved.value });
+    const image = input.image ? await resolveStudyImage(createCanvasServiceClient(), { userId, artifactId: input.reviewerId.slice('artifact:'.length),
+      sectionId: input.sectionId, image: input.image, saved: saved.value }) : undefined;
+    const imageSection = input.image ? detail.reviewer.sections.find(section => section.id === input.sectionId)!.blocks
+      .map(item => [item.title, item.explanation, ...item.keyPoints, ...item.evidence.map(e => e.text)].join('\n')).join('\n\n').slice(0, 6000) : '';
+    const generationContext = image ? { ...context, imageContext: image.context, nearby: [imageSection] } : context;
     const model = studyToolsModel();
     // Sizes only: selected text, questions and course content are never logged.
     console.info('study_tools.request', { action: input.action, modifier: input.modifier ?? null, model,
-      selectionCharacters: selection.length, contextCharacters: studyContextCharacters(context), sourceExcerpts: context.sourceExcerpts.length, followUps: input.followUps?.length ?? 0 });
-    const result = await generateStudyTool({ request: input, selection, context, model,
+      selectionCharacters: selection.length, contextCharacters: studyContextCharacters(generationContext), sourceExcerpts: context.sourceExcerpts.length, followUps: input.followUps?.length ?? 0,
+      imageKind: input.image?.kind ?? null });
+    const result = await generateStudyTool({ request: input, selection, context: generationContext, model, image,
       provider: createServerOpenAIProvider({ timeoutMs: 45000, maxRetries: 0 }) });
     return experienceJson(result);
   });

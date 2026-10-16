@@ -14,7 +14,7 @@ export type SourcePageSnapshotResult = (
   | { available: false; reason: 'not_canvas_pdf' | 'no_page_source' | 'source_revision_unavailable' | 'render_failed' | 'render_limit_reached'; page?: number }
   | { available: true; status: 'rendering'; page: number }
   | { available: true; status: 'unrendered'; page: number }
-  | { available: true; url: string; page: number; width: number; height: number; sourceLabel: string }) & { labelKind?: 'slide' };
+  | { available: true; id: string; url: string; page: number; width: number; height: number; sourceLabel: string }) & { labelKind?: 'slide' };
 
 /** Only canonical, persisted citation IDs are accepted; never title/text matching. */
 export function lowestSectionPage(saved: CanonicalReviewerRecord, sectionId: string): number | null {
@@ -79,7 +79,7 @@ export async function getSourcePageSnapshot(client: SupabaseClient<Database>, in
     if (!row.storage_path || !row.width || !row.height) throw new ExperienceFailure(503, 'unavailable');
     const signed = await client.storage.from(SNAPSHOT_BUCKET).createSignedUrl(row.storage_path, 600);
     if (signed.error || !signed.data?.signedUrl) throw new ExperienceFailure(503, 'unavailable');
-    return { available: true, url: signed.data.signedUrl, page, width: row.width, height: row.height, sourceLabel, ...label };
+    return { available: true, id: row.id, url: signed.data.signedUrl, page, width: row.width, height: row.height, sourceLabel, ...label };
   }
   // Await durable task acceptance before HTTP 202. No after()/in-memory work.
   if (input.render !== false) await (dependencies.dispatch ?? dispatchSourcePageSnapshot)(client, row);

@@ -98,7 +98,7 @@ describe('Canvas PDF source-page snapshots', () => {
   it('returns only a short signed image URL and safe presentation metadata', async () => {
     const h = harness(); Object.assign(h.row, { status: 'ready', storage_path: 'opaque-attempt.png', width: 1400, height: 1867 });
     const result = await getSourcePageSnapshot(h.client, input, h);
-    expect(result).toEqual({ available: true, url: 'https://storage.example.test/opaque.png?token=short-lived', page: 2, width: 1400, height: 1867, sourceLabel: 'Accepted lecture' });
+    expect(result).toEqual({ available: true, id: 'row', url: 'https://storage.example.test/opaque.png?token=short-lived', page: 2, width: 1400, height: 1867, sourceLabel: 'Accepted lecture' });
     expect(h.sign).toHaveBeenCalledWith('opaque-attempt.png', 600);
     expect(JSON.stringify(result)).not.toContain('opaque-attempt.png'); expect(JSON.stringify(result)).not.toContain('never-expose-original');
     expect(h.dispatch).not.toHaveBeenCalled();

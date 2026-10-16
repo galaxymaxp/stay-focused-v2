@@ -1,3 +1,4 @@
+import { externalVisualId } from '../study-image';
 import type { Database, SectionExternalVisualRow, Json } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { readCanonicalReviewerRecord } from '../canonical-reviewers';
@@ -10,14 +11,14 @@ import { matchVisual } from './match';
 
 export const EXTERNAL_VISUAL_LABEL = 'External reference — not from your course material.';
 type Client=SupabaseClient<Database>;
-export type ExternalVisualResult = ({status:'found';image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
+export type ExternalVisualResult = ({status:'found';id:string;image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
   | {status:'none';message:'No reliable visual found'}) & {attemptCount:number};
 export interface VisualInput { userId:string;artifactId:string;sectionId:string;findAnother:boolean }
 type Dependencies={read?:typeof readCanonicalReviewerRecord;snapshot?:typeof getSourcePageSnapshot;figures?:typeof getSectionFigureAvailability;search?:typeof searchCommonsQueries;match?:typeof matchVisual};
 function response(row:SectionExternalVisualRow):ExternalVisualResult {
   if(row.status==='none')return {status:'none',message:'No reliable visual found',attemptCount:row.attempt_count};
   if(!row.image_url || !row.source_url || !row.title || !row.credit || !row.license || !row.license_url || !row.width || !row.height)throw new ExperienceFailure(503,'unavailable');
-  return {status:'found',image:row.image_url,title:row.title,credit:row.credit,license:row.license,licenseUrl:row.license_url,sourceUrl:row.source_url,
+  return {status:'found',id:externalVisualId(row),image:row.image_url,title:row.title,credit:row.credit,license:row.license,licenseUrl:row.license_url,sourceUrl:row.source_url,
     label:EXTERNAL_VISUAL_LABEL,width:row.width,height:row.height,attemptCount:row.attempt_count};
 }
 /** Match the reader's displayed sourceCore projection, excluding audit/enrichment. */

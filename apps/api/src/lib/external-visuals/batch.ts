@@ -1,3 +1,4 @@
+import { externalVisualId } from '../study-image';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { readCanonicalReviewerRecord } from '../canonical-reviewers';
@@ -9,7 +10,7 @@ type Client = SupabaseClient<Database>;
 /** Sections checked in parallel; each section is one Commons query set plus one vision call. */
 export const REVIEWER_VISUAL_CONCURRENCY = 4;
 
-export type ReviewerVisual = { status: 'found'; image: string; title: string; credit: string; license: string; licenseUrl: string;
+export type ReviewerVisual = { status: 'found'; id: string; image: string; title: string; credit: string; license: string; licenseUrl: string;
   sourceUrl: string; label: typeof EXTERNAL_VISUAL_LABEL; width: number; height: number; attemptCount: number };
 export interface ReviewerVisuals { readonly sections: Record<string, ReviewerVisual>; readonly checked: number; readonly total: number; readonly running: boolean }
 
@@ -35,7 +36,7 @@ export async function readReviewerVisuals(client: Client, input: { userId: strin
   const sections: Record<string, ReviewerVisual> = {};
   for (const row of rows.data ?? []) {
     if (row.status !== 'found' || !row.image_url || !row.source_url || !row.title || !row.credit || !row.license || !row.license_url || !row.width || !row.height) continue;
-    sections[row.section_id] = { status: 'found', image: row.image_url, title: row.title, credit: row.credit, license: row.license, licenseUrl: row.license_url,
+    sections[row.section_id] = { status: 'found', id: externalVisualId(row), image: row.image_url, title: row.title, credit: row.credit, license: row.license, licenseUrl: row.license_url,
       sourceUrl: row.source_url, label: EXTERNAL_VISUAL_LABEL, width: row.width, height: row.height, attemptCount: row.attempt_count };
   }
   return { sections, checked: rows.data?.length ?? 0, total: sectionIds.length, running: (pending.count ?? 0) > 0 };
