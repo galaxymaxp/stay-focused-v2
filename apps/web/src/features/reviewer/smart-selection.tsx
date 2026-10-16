@@ -1,4 +1,7 @@
 "use client";
+import { StudyAnswerArea, useAnswerReveal } from "./study-answer-scroll";
+
+import { StudyText } from "./study-text";
 import {
   STUDY_ACTIONS,
   STUDY_ACTION_LABELS,
@@ -115,6 +118,7 @@ export function SmartSelectionPanel({
   const [shown, setShown] = useState<{ modifier?: StudyModifier; run: Run } | null>(null);
   const [test, setTest] = useState<TestState>(EMPTY_TEST);
   const [turns, setTurns] = useState<AskTurn[]>([]);
+  const revealAnswer = useAnswerReveal();
   const [draft, setDraft] = useState("");
   const session = useRef(createStudyToolsSession(api)).current;
   const first = useRef<string | undefined>(undefined);
@@ -147,6 +151,8 @@ export function SmartSelectionPanel({
     setPicked(current.toString());
   }
   function run(text: string, act: StudyAction, extra: Extra, apply: (run: Run) => void) {
+    const scrollId = act === 'ask' ? `ask-${turns.length}` : act === 'test' ? `test-${extra.modifier === 'check' || extra.modifier === 'choices' || extra.modifier === 'explain_answer' ? extra.modifier : 'question'}` : 'answer';
+    const revealToken = revealAnswer.begin(scrollId);
     apply({ status: "pending" });
     const request: StudyToolRequest = {
       reviewerId: selection.reviewerId,
@@ -159,7 +165,7 @@ export function SmartSelectionPanel({
       ...(Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== undefined)) as Extra),
     };
     session(request).then(
-      (result) => mounted.current && apply({ status: "ready", result }),
+      (result) => { if (mounted.current) { apply({ status: "ready", result }); revealAnswer.complete(revealToken); } },
       (error: unknown) =>
         mounted.current &&
         apply({
@@ -171,6 +177,7 @@ export function SmartSelectionPanel({
   function choose(next: StudyAction, contextText?: string) {
     const text = contextText ?? (action ? subject : check.ok ? check.text : "");
     if (!text) return;
+    if (next === "ask") revealAnswer.begin("ask");
     setAction(next);
     setSubject(text);
     first.current = undefined;
@@ -232,7 +239,7 @@ export function SmartSelectionPanel({
         <div className="selected-quote">
           <div className="row between">
             <span className="kicker">Selected</span>
-            <button className="subtle link-button" onClick={() => setAction(null)}>
+            <button className="subtle link-button" onClick={() => { revealAnswer.cancel(); setAction(null); }}>
               Change selection
             </button>
           </div>
@@ -288,7 +295,7 @@ export function SmartSelectionPanel({
               : STUDY_ACTION_TITLES[action]}
           </h3>
           {shown && (
-            <RunView run={shown.run} retry={() => (shown.modifier ? refine(shown.modifier) : choose(action))}>
+            <RunView id="answer" run={shown.run} retry={() => (shown.modifier ? refine(shown.modifier) : choose(action))}>
               {(result) => <ResultCard result={result} />}
             </RunView>
           )}
@@ -299,13 +306,14 @@ export function SmartSelectionPanel({
         <div className="stack">
           <h3>{STUDY_ACTION_TITLES.test}</h3>
           {test.question && (
-            <RunView run={test.question} retry={() => nextQuestion()}>
+            <RunView id="test-question" run={test.question} retry={() => nextQuestion()}>
               {(result) =>
                 result.outcome === "insufficient" ? (
                   <p className="notice">{result.text}</p>
                 ) : (
                   <div className="stack">
                     <p className="test-question">{result.question}</p>
+                    <StudyAnswerArea id="test-choices">
                     {test.choices?.status === "ready" && test.choices.result.choices ? (
                       <div className="stack" role="radiogroup" aria-label="Choices">
                         {test.choices.result.choices.map((choice) => (
@@ -330,6 +338,9 @@ export function SmartSelectionPanel({
                         onChange={(e) => setTest((c) => ({ ...c, answer: e.target.value }))}
                       />
                     )}
+                    {test.choices?.status === "pending" && <span className="shimmer-line" />}
+                    {test.choices?.status === "error" && <p className="notice">{test.choices.message}</p>}
+                    </StudyAnswerArea>
                     {test.answer.length > STUDY_LIMITS.answer && (
                       <p className="meta danger-text">Shorten your answer to the key idea.</p>
                     )}
@@ -360,25 +371,23 @@ export function SmartSelectionPanel({
                             Show answer
                           </button>
                         </div>
-                        {test.choices?.status === "pending" && <span className="shimmer-line" />}
-                        {test.choices?.status === "error" && <p className="notice">{test.choices.message}</p>}
                       </>
                     ) : (
-                      <RunView run={test.checked} retry={checkAnswer}>
+                      <RunView id="test-check" run={test.checked} retry={checkAnswer}>
                         {(checked) =>
                           checked.outcome === "insufficient" ? (
                             <p className="notice">{checked.text}</p>
                           ) : (
                             <div className={`result-card verdict-${checked.verdict ?? "incorrect"}`}>
                               <strong className="verdict">{VERDICTS[checked.verdict ?? "incorrect"]}</strong>
-                              <p>{checked.text}</p>
+                              <StudyText text={checked.text} />
                             </div>
                           )
                         }
                       </RunView>
                     )}
                     {test.explained && (
-                      <RunView run={test.explained} retry={() => explainAnswer(result.question)}>
+                      <RunView id="test-explain_answer" run={test.explained} retry={() => explainAnswer(result.question)}>
                         {(explained) => <ResultCard result={explained} />}
                       </RunView>
                     )}
@@ -401,12 +410,12 @@ export function SmartSelectionPanel({
         </div>
       )}
       {action === "ask" && (
-        <div className="stack">
+        <StudyAnswerArea id="ask"><div className="stack">
           <h3>{STUDY_ACTION_TITLES.ask}</h3>
           {turns.map((turn, index) => (
             <div key={index} className="stack ask-turn">
               <strong>{turn.question}</strong>
-              <RunView run={turn.run}>{(result) => <ResultCard result={result} />}</RunView>
+              <RunView id={`ask-${index}`} run={turn.run}>{(result) => <ResultCard result={result} />}</RunView>
             </div>
           ))}
           {turns.length > STUDY_LIMITS.followUps ? (
@@ -443,13 +452,17 @@ export function SmartSelectionPanel({
               </div>
             </>
           )}
-        </div>
+        </div></StudyAnswerArea>
       )}
     </div>
   );
 }
 
-function RunView({ run, retry, children }: { run: Run; retry?: () => void; children: (result: StudyToolResult) => ReactNode }) {
+function RunView({ id, ...props }: { id: string; run: Run; retry?: () => void; children: (result: StudyToolResult) => ReactNode }) {
+  return <StudyAnswerArea id={id}><RunContent {...props} /></StudyAnswerArea>;
+}
+
+function RunContent({ run, retry, children }: { run: Run; retry?: () => void; children: (result: StudyToolResult) => ReactNode }) {
   if (run.status === "pending")
     return (
       <div className="stack shimmer-block" aria-live="polite" aria-label="Working">
@@ -476,7 +489,7 @@ function ResultCard({ result }: { result: StudyToolResult }) {
   return (
     <div className="result-card" aria-live="polite">
       {result.outcome !== "not_applicable" && <GroundingBadge grounding={result.grounding} />}
-      <p>{result.text}</p>
+      <StudyText text={result.text} />
     </div>
   );
 }

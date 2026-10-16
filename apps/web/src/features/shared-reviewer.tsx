@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { ASSIST_RESULT_LABELS, gradeAttempt, gradeQuestion, reviewerShareSignIn, isReviewerShareToken,
   type ReviewerShareSnapshot, type SharedQuiz, type QuizResult } from '@stay-focused/shared';
+import { StudyText } from './reviewer/study-text';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -80,7 +81,7 @@ export function SharedReviewerReader({ snapshot, token }: { snapshot: ReviewerSh
             {b.keyPoints.length > 0 && <div className="key-points"><span className="kicker">Key points</span><ul>{b.keyPoints.map((p, k) => <li key={k}>{p}</li>)}</ul></div>}
             {b.evidence.map((e, k) => <p key={k} className={e.kind === 'code' ? 'code' : undefined}>{e.text}</p>)}
             {snapshot.assists.filter(a => a.section === i && a.block === j).map((a, k) => <details key={k} className="surface stack">
-              <summary>{ASSIST_RESULT_LABELS[a.type]}{a.point === undefined ? '' : ` · Key point ${a.point + 1}`}</summary><p>{a.text}</p>
+              <summary>{ASSIST_RESULT_LABELS[a.type]}{a.point === undefined ? '' : ` · Key point ${a.point + 1}`}</summary><StudyText text={a.text} />
             </details>)}
           </div>)}
         </section>)}

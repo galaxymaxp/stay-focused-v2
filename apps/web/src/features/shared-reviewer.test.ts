@@ -75,3 +75,10 @@ it('switching a modified false answer to true clears the obsolete correction bef
   await act(async () => root.findByType('form').props.onSubmit({ preventDefault() {} }));
   expect(JSON.stringify(rendered!.toJSON())).toContain('100'); expect(fetcher).not.toHaveBeenCalled();
 });
+
+it('renders saved structured answers with the same safe format and no AI calls', async () => {
+  await act(async () => { rendered = create(createElement(SharedReviewerReader, { token, snapshot: { ...snapshot, assists: [{ ...snapshot.assists[0]!, text: 'Lead\n- **Membrane**\n1. Protect\n<script>bad</script>' }] } })); });
+  expect(rendered!.root.findAllByType('strong').some(node => node.props.children === 'Membrane')).toBe(true);
+  expect(rendered!.root.findAllByType('script')).toHaveLength(0);
+  expect(JSON.stringify(rendered!.toJSON())).toContain('<script>bad</script>'); expect(fetcher).not.toHaveBeenCalled();
+});

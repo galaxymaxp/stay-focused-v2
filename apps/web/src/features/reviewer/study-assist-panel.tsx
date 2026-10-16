@@ -1,4 +1,6 @@
 "use client";
+import { StudyAnswerArea, StudyAnswerScrollContext, useAnswerReveal, useStudyAnswerScroll } from "./study-answer-scroll";
+import { StudyText } from "./study-text";
 import {
   ASSIST_LABELS,
   ASSIST_RESULT_LABELS,
@@ -6,7 +8,7 @@ import {
   studyAskSubject,
   type AssistType,
 } from "@stay-focused/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../components/providers";
 import { Icon } from "../../components/ui";
 import { assistStore, keyOf, useAssistEntries, type AssistEntry, type AssistTarget } from "./assist-store";
@@ -29,7 +31,12 @@ const HINTS: Record<AssistType, string> = {
   example: "See it in action",
 };
 
-export function StudyAssistPanel({
+export function StudyAssistPanel(props: Parameters<typeof StudyAssistContent>[0]) {
+  const reveal = useStudyAnswerScroll();
+  return <StudyAnswerScrollContext.Provider value={reveal}><StudyAssistContent {...props} /></StudyAnswerScrollContext.Provider>;
+}
+
+function StudyAssistContent({
   target,
   initialText,
   initialAction,
@@ -45,6 +52,8 @@ export function StudyAssistPanel({
   onClose: () => void;
 }) {
   const { api, session } = useAuth();
+  const reveal = useAnswerReveal();
+  const revealToken = useRef(0);
   const owner = session?.user.id ?? "";
   const key = target ? keyOf(target) : "";
   const entries = useAssistEntries(key);
@@ -75,12 +84,21 @@ export function StudyAssistPanel({
 
   function choose(type: AssistType) {
     if (!target) return;
+    revealToken.current = reveal.begin("quick");
     setShown(type);
     const entry = entries[type];
     if (entry?.status === "ready" || entry?.status === "pending") return;
     assistStore.run(owner, api, target, type);
   }
   const current = shown ? entries[shown] : undefined;
+  const previousStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!studying && current?.status === "ready" && previousStatus.current !== "ready") {
+      if (!revealToken.current) revealToken.current = reveal.begin("quick");
+      else reveal.complete(revealToken.current);
+    }
+    previousStatus.current = current?.status;
+  }, [current?.status, reveal, studying]);
   return (
     <aside className="assist-panel" aria-label="Study Assist">
       <header className="assist-panel-head">
@@ -112,6 +130,7 @@ export function StudyAssistPanel({
                   <OptionTile key={type} type={type} entry={entries[type]} selected={shown === type} onPress={() => choose(type)} />
                 ))}
               </div>
+              <StudyAnswerArea id="quick">
               {current?.status === "pending" && shown && (
                 <div className="stack shimmer-block" aria-live="polite">
                   <span className="shimmer-line" style={{ width: "92%" }} />
@@ -129,11 +148,12 @@ export function StudyAssistPanel({
                     <span className="grounding-badge source">{ASSIST_RESULT_LABELS[shown]}</span>
                     <span className="meta">Saved in this browser</span>
                   </div>
-                  <p>{current.text}</p>
+                  <StudyText text={current.text ?? ""} />
                 </div>
               )}
               {current?.status === "error" && <p className="notice">{current.error}</p>}
               {!current && <p className="meta">Results are AI-generated and saved in this browser.</p>}
+              </StudyAnswerArea>
             </>
           )}
         </div>
