@@ -23,9 +23,11 @@ export function useCourseReviewerBatch(onAccepted: () => void) {
         setNote(remakeIds ? 'No saved Reviewers have ready original materials to remake.' : 'No new ready materials. Saved Reviewers are skipped; preparing materials will be available when ready.');
         return;
       }
-      await submitCourseReviewers(session.user.id, client, targets, (count, total) => {
+      await submitCourseReviewers(session.user.id, client, targets, (count, total, waiting) => {
         accepted = count;
-        setNote(`Queued ${count} of ${total} Reviewers. Keep the app open until submission finishes.`);
+        setNote(waiting
+          ? `Queued ${count} of ${total} Reviewers. Waiting for queue capacity; submission will continue. Keep the app open.`
+          : `Queued ${count} of ${total} Reviewers. Keep the app open until submission finishes.`);
       });
       setNote(`${accepted} Reviewers queued. Follow their progress in Queue.${remakeIds ? ` ${remakeIds.size - targets.length} saved sources unavailable or still preparing.` : ' Already generated materials were skipped.'}`);
     } catch (cause) {

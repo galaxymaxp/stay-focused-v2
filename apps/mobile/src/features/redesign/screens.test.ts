@@ -235,6 +235,7 @@ vi.mock("../../services/localLibrary/localArtifactDatabase", () => ({
 }));
 vi.mock("../../services/experienceApi", () => ({
   experienceRequest: mocks.request,
+  ExperienceApiError: class extends Error { constructor(readonly code: string, message: string) { super(message); } },
 }));
 vi.mock("../../services/generationRecovery", () => ({
   createGenerationIntent: mocks.createIntent,

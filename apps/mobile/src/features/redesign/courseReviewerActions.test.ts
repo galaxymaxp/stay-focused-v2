@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LearningMaterial, LibraryArtifactSummary } from '@stay-focused/shared';
 import { libraryRemovalPath, loadCourseMaterials, reviewerTargets, submitCourseReviewers } from './courseReviewerActions';
+import { ExperienceApiError } from '../../services/experienceApi';
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), read: vi.fn(), create: vi.fn(), accept: vi.fn() }));
-vi.mock('../../services/experienceApi', () => ({ experienceRequest: mocks.request }));
+vi.mock('../../services/experienceApi', async importOriginal => ({ ...await importOriginal<typeof import('../../services/experienceApi')>(), experienceRequest: mocks.request }));
 vi.mock('../../services/generationRecovery', () => ({ readGenerationIntents: mocks.read, createGenerationIntent: mocks.create, acceptGeneration: mocks.accept }));
 const client = { baseUrl: 'https://example.test', accessToken: 'test' };
 const material = (id: string, extra: Partial<LearningMaterial> = {}): LearningMaterial => ({
@@ -57,6 +58,20 @@ describe('course Reviewer batches', () => {
     mocks.accept.mockRejectedValue(new Error('connection'));
     await expect(submitCourseReviewers('owner', client, [material('one'), material('two')], vi.fn())).rejects.toThrow('connection');
     expect(mocks.create).toHaveBeenCalledTimes(1);
+  });
+  it('waits for queue capacity and retries the same persisted request', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.accept.mockRejectedValueOnce(new ExperienceApiError('rate_limited', 'Wait')).mockResolvedValueOnce({ generationId: 'job' });
+      const progress = vi.fn();
+      const work = submitCourseReviewers('owner', client, [material('one')], progress);
+      await vi.advanceTimersByTimeAsync(15000);
+      await work;
+      expect(mocks.create).toHaveBeenCalledTimes(1);
+      expect(mocks.accept.mock.calls[0]![2]).toBe(mocks.accept.mock.calls[1]![2]);
+      expect(progress).toHaveBeenCalledWith(0, 1, true);
+      expect(progress).toHaveBeenLastCalledWith(1, 1);
+    } finally { vi.useRealTimers(); }
   });
 });
 it('routes draft removal to the draft endpoint and leaves Reviewer deletion separate', () => {

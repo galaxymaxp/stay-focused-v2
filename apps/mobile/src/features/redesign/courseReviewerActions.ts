@@ -1,5 +1,5 @@
 import type { CourseMaterials, LearningMaterial, LibraryArtifactSummary } from '@stay-focused/shared';
-import { experienceRequest, type ExperienceClient } from '../../services/experienceApi';
+import { ExperienceApiError, experienceRequest, type ExperienceClient } from '../../services/experienceApi';
 import { acceptGeneration, createGenerationIntent, readGenerationIntents } from '../../services/generationRecovery';
 
 export function materialPreparation(material: LearningMaterial): import('@stay-focused/shared').MaterialPreparation {
@@ -28,9 +28,10 @@ export async function loadCourseMaterials(client: ExperienceClient, courseId: st
 }
 
 /** Persist before admission; reuse uncertain submissions so retry cannot duplicate them. */
-export async function submitCourseReviewers(owner: string, client: ExperienceClient, materials: readonly LearningMaterial[], progress: (accepted: number, total: number) => void): Promise<void> {
+export async function submitCourseReviewers(owner: string, client: ExperienceClient, materials: readonly LearningMaterial[], progress: (accepted: number, total: number, waiting?: boolean) => void): Promise<void> {
   const saved = await readGenerationIntents(owner);
   let accepted = 0;
+  let capacityWaits = 0;
   for (const material of materials) {
     const previous = [...saved].reverse().find(intent => intent.type === 'reviewer' && intent.body.courseId === material.courseId && intent.body.materialId === material.id);
     let intent = previous;
@@ -46,7 +47,19 @@ export async function submitCourseReviewers(owner: string, client: ExperienceCli
       title: material.title, type: 'reviewer', path: '/api/experience/generations',
       body: { courseId: material.courseId, materialId: material.id },
     });
-    await acceptGeneration(owner, client, intent);
+    while (true) {
+      try {
+        await acceptGeneration(owner, client, intent);
+        break;
+      } catch (cause) {
+        // A rejected admission is safe to retry with the same key. Give running
+        // work time to free capacity, without retrying uncertain network errors.
+        if (!(cause instanceof ExperienceApiError) || cause.code !== 'rate_limited' || capacityWaits >= 12) throw cause;
+        capacityWaits++;
+        progress(accepted, materials.length, true);
+        await new Promise(resolve => setTimeout(resolve, 15000));
+      }
+    }
     progress(++accepted, materials.length);
   }
 }

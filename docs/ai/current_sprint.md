@@ -9,10 +9,11 @@ Reviewer or offers Remake. Course Library adds Remake all reviewers and Remove
 all saved work with confirmation; individual drafts can now be removed. Server
 confirmation precedes local removal, failed items remain visible, and quizzes
 are removed before their referenced Reviewers. Batch submissions reuse uncertain
-requests and report partial acceptance and queue limits. Keep the app open until
+requests, wait up to three minutes for queue capacity, and report partial
+acceptance and queue limits. Keep the app open until
 submission finishes; accepted work remains server-backed.
 
-FRESH PASS: 90 tests across screen, batch, generation-recovery, local-Library and
+FRESH PASS: 91 tests across screen, batch, generation-recovery, local-Library and
 Reviewer API suites; mobile TypeScript; focused ESLint; diff hygiene. Initial
 checks caught a CRLF-sensitive edit duplication; corrected before final checks.
 Preview OTA publication and connected Realme verification pending.
