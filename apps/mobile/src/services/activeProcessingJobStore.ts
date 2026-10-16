@@ -15,7 +15,7 @@ export interface ActiveProcessingJobReference {
   readonly ownerUserId: string;
   readonly jobType: ProcessingJobType;
   readonly sourceDisplayName: string;
-  readonly sourceKind: "pdf" | "image" | "text";
+  readonly sourceKind: ProcessingJobStatusView["source"]["sourceKind"];
   readonly createdAt: string;
   readonly lastKnownStatus: ProcessingJobStatus;
   readonly lastStatusCheckAt: string;
@@ -118,7 +118,7 @@ function normalizeReference(
     typeof value.ownerUserId === "string" &&
     (value.jobType === "document_extraction" || value.jobType === "reviewer_generation") &&
     typeof value.sourceDisplayName === "string" &&
-    (value.sourceKind === "pdf" || value.sourceKind === "image" || value.sourceKind === "text") &&
+    (value.sourceKind === "pdf" || value.sourceKind === "image" || value.sourceKind === "text" || value.sourceKind === "docx" || value.sourceKind === "pptx") &&
     typeof value.createdAt === "string" &&
     typeof value.lastKnownStatus === "string" &&
     typeof value.lastStatusCheckAt === "string"

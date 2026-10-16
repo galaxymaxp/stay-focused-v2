@@ -247,6 +247,8 @@ export function processingTimestamp(job: ProcessingJobStatusView): {
 
 export function processingSourceLabel(job: ProcessingJobStatusView): string {
   switch (job.source.sourceKind) {
+    case "docx": return "DOCX";
+    case "pptx": return "PPTX";
     case "pdf":
       return "PDF";
     case "image":

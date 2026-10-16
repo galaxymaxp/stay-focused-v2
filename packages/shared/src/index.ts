@@ -108,7 +108,7 @@ export interface ProcessingJobProgress {
 
 export interface ProcessingJobSourceMetadata {
   readonly displayName: string;
-  readonly sourceKind: "pdf" | "image" | "text";
+  readonly sourceKind: "pdf" | "image" | "text" | "docx" | "pptx";
   readonly mimeType: string;
   readonly byteSize?: number;
   readonly characterCount?: number;
@@ -244,3 +244,5 @@ export * from './course-batch';
 
 export * from './study-format';
 export * from './study-scroll';
+
+export * from "./manual-reviewer-upload";
