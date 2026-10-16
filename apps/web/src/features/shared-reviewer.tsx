@@ -70,6 +70,9 @@ export function SharedReviewerReader({ snapshot, token }: { snapshot: ReviewerSh
       <article className="reviewer-article">
         {snapshot.sections.map((s, i) => <section key={i} id={`topic-${i + 1}`} className="reviewer-topic">
           <header className="topic-head"><span className="kicker">Topic {i + 1}</span><h2>{s.title}</h2></header>
+          <div className="topic-level-row" aria-label="Topic level">
+            {['Original', 'Simplify', 'Explain simply', 'Expound'].map(label => <Link key={label} className="button subtle" href={signIn}>{label}</Link>)}
+          </div>
           {s.citations.map(label => <p className="meta" key={label}>{label}</p>)}
           {snapshot.visuals.filter(v => v.section === i).map((v, j) => <figure className="surface stack" key={j}>
             <p className="meta">External reference — not from your course material.</p>

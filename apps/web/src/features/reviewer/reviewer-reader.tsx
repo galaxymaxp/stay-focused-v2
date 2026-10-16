@@ -1,4 +1,6 @@
 "use client";
+import { TopicAssist } from "./topic-assist";
+import { StudyAnswerScrollContext, useStudyAnswerScroll } from "./study-answer-scroll";
 import {
   ASSIST_LABELS,
   ASSIST_TYPES,
@@ -67,6 +69,13 @@ export function ReviewerReader({
   snapshotStatus?: import("react").ReactNode;
 }) {
   const { api, session } = useAuth();
+  const topicScroll = useStudyAnswerScroll();
+  const [topicOnline, setTopicOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setTopicOnline(navigator.onLine);
+    update(); window.addEventListener('online', update); window.addEventListener('offline', update);
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
+  }, []);
   const visualArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
   const figureAvailability = useFigureAvailability(visualArtifactId);
   const reviewerVisuals = useReviewerVisuals(visualArtifactId);
@@ -308,7 +317,7 @@ export function ReviewerReader({
     : "";
 
   return (
-    <>
+    <StudyAnswerScrollContext.Provider value={topicScroll}>
       <Heading
         title={artifact.title}
         crumb={artifact.title}
@@ -408,6 +417,7 @@ export function ReviewerReader({
                 <span className="kicker">Topic {sectionIndex + 1}</span>
                 <h2 data-segment={segmentIds.sectionTitle(section.id)}>{render(segmentIds.sectionTitle(section.id), section.title)}</h2>
               </header>
+              <TopicAssist key={`${owner}|${reviewer.id}|${reviewer.generatedAt}|${section.id}|${deferredQuery}`} reviewer={reviewer} sectionId={section.id} owner={owner} client={api} online={topicOnline}>
               {visualArtifactId && <SectionVisual reviewerTitle={reviewer.title} sectionTitle={section.title} onAsk={image => askImage(section.id, image)} artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} external={reviewerVisuals?.[section.id]} />}
               {section.blocks.map((block) => {
                 const pickingHere = picking?.block === block.id;
@@ -480,6 +490,7 @@ export function ReviewerReader({
                   </div>
                 );
               })}
+              </TopicAssist>
             </section>
           ))}
         </article>
@@ -570,6 +581,6 @@ export function ReviewerReader({
       {quizOpen && (
         <QuizFromReviewerDialog libraryId={artifact.id} title={artifact.title} reviewer={reviewer} onClose={() => setQuizOpen(false)} />
       )}
-    </>
+    </StudyAnswerScrollContext.Provider>
   );
 }

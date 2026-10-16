@@ -13,6 +13,29 @@ import {
 } from "@stay-focused/shared";
 import { useSyncExternalStore } from "react";
 import type { Api } from "../../lib/api";
+import { createTopicAssist, topicCacheKey, type TopicResult } from '@stay-focused/shared';
+
+// Topic results remain separate from SH1's block-only share export.
+export const topicAssist = createTopicAssist<Api>({
+  read: async (owner, selection, action) => {
+    const raw: unknown = JSON.parse(localStorage.getItem(`sf.study-topic.v1.${owner}`) ?? '{}');
+    if (!raw || typeof raw !== 'object') return null;
+    const row = (raw as Record<string, { canonical?: unknown; result?: unknown }>)[topicCacheKey(selection, action)];
+    return row?.canonical === selection.canonicalContent ? row.result : null;
+  },
+  write: async (owner, selection, result) => {
+    try {
+      const raw: unknown = JSON.parse(localStorage.getItem(`sf.study-topic.v1.${owner}`) ?? '{}');
+      const all: Record<string, { canonical: string; result: TopicResult }> = raw && typeof raw === 'object'
+        ? raw as Record<string, { canonical: string; result: TopicResult }> : {};
+      all[topicCacheKey(selection, result.action)] = { canonical: selection.canonicalContent, result };
+      const keys = Object.keys(all);
+      for (const key of keys.slice(0, Math.max(0, keys.length - 400))) delete all[key];
+      localStorage.setItem(`sf.study-topic.v1.${owner}`, JSON.stringify(all));
+    } catch { /* Blocked browser storage retains this reading session's result. */ }
+  },
+  generate: (api, body) => api('/api/experience/study-tools/topic', { method: 'POST', body }),
+});
 
 // Web port of apps/mobile/src/features/reviewer/assistStore.ts and
 // services/studyAssist.ts. Requests outlive the panel that started them; the

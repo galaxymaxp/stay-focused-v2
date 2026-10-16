@@ -28,7 +28,7 @@ it('renders the read-only reviewer, terms, existing assists, text citations and 
 });
 it('every AI control routes to sign-in with an exact local return link and makes zero calls', async () => {
   await act(async () => { rendered = create(createElement(SharedReviewerReader, { token, snapshot })); });
-  for (const action of SHARED_AI_ACTIONS) {
+  for (const action of [...SHARED_AI_ACTIONS, 'Original', 'Simplify', 'Explain simply', 'Expound']) {
     const anchor = rendered!.root.findAllByType('a').find(node => node.props.children === action)!;
     expect(anchor.props.href).toBe(reviewerShareSignIn(token)); expect(anchor.props.onClick).toBeUndefined();
   }
