@@ -1,5 +1,15 @@
 # Current State
 
+## SA1 Study Assist complete locally (2026-10-16)
+
+**PASS for the unattended SA1 code scope: STEP 0-5, fresh serial gates, reconciled docs and scoped local commits.** Shared flat markdown-lite parsing, v2 prompts/cache keys, organized mobile/web/shared-link answers, press/completion reveal with manual-scroll and Reduce Motion guards, and the exact four Ask chips with **What is this?** first are complete. Test Me question/choice structure, canonical reviewer content, grounding, owner isolation and all existing limits remain intact. SH1 explicitly accepts retained v1 and current v2 assists with exact content validation. SP1/CQ1/QD1/SP2/SP2b/SH1/GA1b/MR1 are preserved. No later roadmap scope is included.
+
+FRESH forced typecheck/lint/root build **8/8 each, zero cached**; API **2,208 passed / 3 existing skips** in 191 files, mobile **1,082/1,082** in 115, shared **296/296** in 30 (includes emitted copies), web **164/164** in 27. Standalone API/web/Android builds **1/1 each** (34/34 and 19/19 pages, one Android bundle / 35 assets). Zero lint errors, six existing warnings. Failed first attempts and their repairs are retained in acceptance; no nondeterministic flake observed. Code commits: ad92609 shared, 5bcf15e API, 051c649 mobile, 5041c1d web.
+
+**Owner steps remaining:** Rollout and Device checks were entirely skipped. Coordinate API/website and compatible preview OTA publication for the v2 prompt contracts, then check Explain loading/answer reveal, organized answers, Ask chip order, manual scrolling, Reduce Motion and website keyboard/focus on realme and website. Production revisions, database/Scheduler state, actual provider formatting, deployed compatibility and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service call, migration application, environment-file edit, deployment, Scheduler action or push occurred. SA2 remains a separate next item.
+
+[Acceptance](ai/acceptance/sa1-study-assist.md).
+
 ## MR1 long-source reviewer recovery complete locally (2026-10-16)
 
 **PASS for STEP 0-2, fresh serial gates, reconciled docs and local commits.**

@@ -3689,3 +3689,23 @@ by MR1; existing prior rollout prerequisites remain owner steps. No Scheduler
 creation/change/resume. No remote service/provider call, SQL/application, email,
 environment-file edit, deployment, push or deletion outside the repo occurred.
 This MR1 run ends here.
+
+
+## SA1 Study Assist unattended handoff (2026-10-16)
+
+Status: **PASS for STEP 0-5, fresh serial gates, documentation and local commits.** Organized answers share one safe parser across mobile, website and saved public snapshots. Prompt versions and cache keys change to v2; retained v1 text stays valid, and SH1 exact-content checks admit both known versions only. Presses reveal loading, completions reveal their answer unless user scrolling/newer intent suppresses it, Reduce Motion jumps, and What is this? is first of exactly four Ask chips. Test Me structure, grounding/length limits and prior SP1/CQ1/QD1/SP2/SP2b/SH1/GA1b/MR1 behavior are preserved.
+
+Commits:
+
+- `ad92609 feat(shared): add safe study answer format and reveal intent`
+- `5bcf15e feat(api): organize study answers and preserve share compatibility`
+- `051c649 feat(mobile): reveal and format study assist answers`
+- `5041c1d feat(web): reveal and format study assist answers`
+
+Documentation closure: this checkpoint; final hash is recorded in tmp/overnight/SA1.status (no self-amend required).
+
+Gate counts: **FRESH** typecheck/lint/root build 8/8 each, 0 cached; API 2,208 passed/3 existing skips (191 files), mobile 1,082 (115), shared 296 (30, includes emitted copies), web 164 (27); standalone API/web/Android builds 1/1 each, 34/34 and 19/19 static pages, 1 Android bundle/35 assets; diff/staged whitespace checks 0 errors. Six existing lint warnings, zero errors. Engine tests **NOT APPLICABLE** (unchanged). Failed first attempts: forced typecheck 5/8 (React fixture unknown props); API 2,203 passed/4 failed/3 skips (SH1 hardcoded v1); mobile 1,064 passed/18 failed (two old harnesses missing native frame global). All repaired and rerun green. Earlier focused parser/cache-key and test-selector draft failures are recorded in the [acceptance report](acceptance/sa1-study-assist.md); no nondeterministic flake observed.
+
+Production revisions, live database/Scheduler state, actual provider formatting, deployed compatibility and physical behavior are **UNVERIFIED (owner to confirm)**.
+
+**Owner steps remaining:** Rollout and Device checks are skipped entirely. Coordinate API/website and compatible preview OTA publication for v2 prompts, then tap Explain and verify immediate loading/answer reveal, bulleted answers, first Ask chip, manual-scroll suppression, Reduce Motion and website focus/keyboard on realme and website. No service call, deployment, migration application, Scheduler change, environment-file edit or push occurred. No tmp files, generated output, credentials, private fixtures or owner untracked files are committed. SA2 remains separately scoped; SA1 stops here.
