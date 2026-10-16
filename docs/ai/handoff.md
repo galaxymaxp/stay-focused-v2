@@ -3733,3 +3733,25 @@ Failed first attempts are preserved in [acceptance](acceptance/sa2-ask-about-ima
 Production revisions, live database/applied migrations, Scheduler, actual provider interpretation, deployed compatibility and physical behavior are **UNVERIFIED (owner to confirm)**.
 
 **Owner steps remaining:** Rollout and Device checks skipped entirely. Coordinate API/website and compatible preview OTA publication for the v3 contract. On a reviewer with a page snapshot, figure and Wikimedia image, check inline/zoom Ask, What is this?, What does it mean?, Explain the parts, Why is it in this lesson?, typed questions/two follow-ups/repeat cache, grounding and organized answer reveal, manual scroll/Reduce Motion, offline disabled controls and shared-link sign-in return with zero viewer AI calls. Preserve prior rollout prerequisites. No remote service/provider call, SQL/migration application, deployment, Scheduler action, email, environment-file edit, push or deletion outside the repo occurred. MR2 remains separate; this finite SA2 run ends here.
+
+
+## 2026-10-16 MR2 unattended closure - PASS locally
+
+Status: **PASS for MR2 STEP 0-3, fresh serial gates, reconciled docs and local commits.** Manual PDF/photo/DOCX/PPTX picks now go directly through upload, extraction and reviewer generation under one job ID, with the existing Queue/generation screen. Paste is unchanged. Office uses the shared bounded extractor and expected ZIP parts at the Canvas cap; legacy DOC/PPT has conversion copy. Empty Office files are verified through the actual worker to fail with the exact message, zero generation calls and no result completion. Existing page/OCR/character bounds, quotas, owner checks, leases, immutable retries, cancellation and MR1 split/replay remain.
+
+Commits:
+
+- 36f19a1 feat(shared): define manual Office upload policy
+- 9e42184 feat(api): chain manual file extraction into reviewer jobs
+- 15c351d feat(mobile): create reviewers immediately from picked files
+- e96c6be feat(web): create reviewers directly from manual uploads
+
+Documentation closure is this checkpoint; its final hash and all five commits are recorded in tmp/overnight/MR2.status and Git history (no self-amend).
+
+Gate counts: **FRESH** forced typecheck/lint/root build **8/8 each, zero cached**. API **2,257 passed / 3 existing live skips** in 197 files; mobile **1,098/1,098** in 117; shared **334/334** in 36 including emitted copies (pre-build 329/35); web **176/176** in 29; provider contract **20/20**. Standalone API/web/Android builds **1/1 each**, 34/34 and 19/19 pages, one Android bundle / 35 assets; API compiler 18 steps / 1 workflow. Diff and staged whitespace checks: zero errors. Six existing lint warnings, zero errors. Engine suite **NOT APPLICABLE** (unchanged). Dedicated workflow runtime command with --passWithNoTests exited 0 with zero sources: **NOT APPLICABLE**, not runtime acceptance; the five mocked workflow orchestration tests pass inside the API suite. Rollout/Device checks **NOT RUN**, skipped entirely.
+
+[Acceptance](acceptance/mr2-manual-reviewer-upload-chain.md) records exact initial failures and repairs: package type unions/accessibility, forced typechecks 6/8 then 7/8, a short retry fixture key (16 passed/1 failed), workflow import (one failed suite), and the first full mobile gate (1,096 passed/2 failed) followed by an upload-envelope fixture correction (14 passed/1 failed; then 15/15). All affected final gates are fresh and green. No nondeterministic flake observed. [ADR-037](../architecture/ADR-037-manual-reviewer-upload-chain.md) records the job-chain/database contract. The PGlite harness uses PostgreSQL sha256 as its pgcrypto digest shim, not remote Supabase. The external MR2 roadmap was updated outside the checkout; all three repository planning files are reconciled. Generated Next ambient files were restored. Owner-untracked UI/, apps/mobile/.gitignore and supabase/.temp/ remain untouched; no tmp/generated/credential/private-fixture artifact is committed.
+
+Production API/website/worker revisions, live database rows/applied migrations/catalog, Scheduler, actual provider behavior, deployed compatibility and physical behavior are **UNVERIFIED (owner to confirm)**.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely. Apply the forward-only migration **20261016000100_manual_reviewer_uploads.sql**; coordinate API, website, Google worker and compatible preview OTA publication. Then device-check DOCX/PPTX straight from file to reviewer, photo straight to reviewer, PDF page/blank accounting, Queue/progress, reconnect after 202, empty-file and legacy conversion messages, cancellation and paste parity. Preserve prior rollout prerequisites. Vercel CLI is not installed; for the owner's later rollout, installing it with `npm i -g vercel` is strongly recommended for env pull/deploy/logs. No remote Supabase/Vercel/Google Cloud/Canvas/Resend call, remote SQL/migration application, Scheduler action, deployment, email, environment-file edit, push or deletion outside the repo occurred. IM1 remains separate; this finite MR2 run ends here.
