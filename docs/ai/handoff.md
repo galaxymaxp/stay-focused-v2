@@ -3709,3 +3709,27 @@ Gate counts: **FRESH** typecheck/lint/root build 8/8 each, 0 cached; API 2,208 p
 Production revisions, live database/Scheduler state, actual provider formatting, deployed compatibility and physical behavior are **UNVERIFIED (owner to confirm)**.
 
 **Owner steps remaining:** Rollout and Device checks are skipped entirely. Coordinate API/website and compatible preview OTA publication for v2 prompts, then tap Explain and verify immediate loading/answer reveal, bulleted answers, first Ask chip, manual-scroll suppression, Reduce Motion and website focus/keyboard on realme and website. No service call, deployment, migration application, Scheduler change, environment-file edit or push occurred. No tmp files, generated output, credentials, private fixtures or owner untracked files are committed. SA2 remains separately scoped; SA1 stops here.
+
+
+## SA2 Ask about an image unattended handoff (2026-10-16)
+
+Status: **PASS for STEP 0-4, fresh serial gates, documentation and local commits.** Image-reference Ask fetches owner/current-section bytes on the server for snapshots, figures and stored Wikimedia visuals; no client bytes/URLs. Three MiB raster cap, section text, title/attribution, honest grounding and SA1 organized answers/reveal/session caching are retained. All inline/zoom controls open the existing Ask panel with a thumbnail, the exact four static chips, typed questions and two follow-ups. Offline controls are disabled with the existing message. Shared visuals route to sign-in with the original return link and zero model calls. Existing SP1/CQ1/QD1/SP2/SP2b/SH1/GA1b/MR1/SA1 behavior remains covered; no later item was started.
+
+Commits:
+
+- 3a03e34 feat(shared): add image references to Study Tools Ask
+- 1e46ee3 feat(api): resolve owner images for vision study answers
+- 99ba4f7 feat(mobile): open image questions in Study Assist
+- c886fec feat(web): add image questions to reviewer surfaces
+
+Documentation closure: this checkpoint; final hash is recorded in tmp/overnight/SA2.status and Git history (no self-amend).
+
+Gate counts: **FRESH** forced typecheck/lint/root build 8/8 each, 0 cached; API 2,226 passed/3 existing live skips in 192 files; mobile 1,086 in 115; shared 324 in 34 (includes emitted copies, rerun after build; pre-build 322/33); web 168 in 28; provider contract 20/20. Standalone API/web/Android builds 1/1 each, 34/34 and 19/19 pages, one Android bundle/35 assets. Diff/staged whitespace checks 0 errors. Zero lint errors/six existing warnings. Engine/workflow suites **NOT APPLICABLE** (unchanged). Rollout/Device checks **NOT RUN**, skipped entirely.
+
+Failed first attempts are preserved in [acceptance](acceptance/sa2-ask-about-image.md): initial typecheck 6/8, three mobile state-field errors; focused API 169 passed/1 failed (snapshot id assertion); mobile 52 passed/2 failed (old offline assertions); web 35 passed/1 failed (React test selector); first full API 2,225 passed/1 failed/3 skipped (pre-render id assertion). All repaired and rerun green, including full API after final prompt wording. Focused final API 170/170 before streaming-cap addition, mobile 57/57, web 39/39. No nondeterministic flake observed. Python was unavailable before edits, so Node was used. Existing Vite future-config and test-renderer deprecation warnings remain.
+
+[ADR-036](../architecture/ADR-036-ask-about-image.md) records owner-scoped service-client retrieval, reference identity, cap and grounding. Private buckets/locator columns remain server-only, with explicit owner/current-source/citation checks. The baseline Study Tools route has a 20/minute warm-instance guard but no durable quota/cost ledger; SA2 preserves that path rather than claiming a new ledger. No migration, dependency, native module or worker change. The external roadmap and all three current planning files are reconciled. Generated Next ambient files are restored. Original untracked UI/, apps/mobile/.gitignore and supabase/.temp/ are untouched; no tmp, generated artifacts, credentials or private fixtures are committed.
+
+Production revisions, live database/applied migrations, Scheduler, actual provider interpretation, deployed compatibility and physical behavior are **UNVERIFIED (owner to confirm)**.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely. Coordinate API/website and compatible preview OTA publication for the v3 contract. On a reviewer with a page snapshot, figure and Wikimedia image, check inline/zoom Ask, What is this?, What does it mean?, Explain the parts, Why is it in this lesson?, typed questions/two follow-ups/repeat cache, grounding and organized answer reveal, manual scroll/Reduce Motion, offline disabled controls and shared-link sign-in return with zero viewer AI calls. Preserve prior rollout prerequisites. No remote service/provider call, SQL/migration application, deployment, Scheduler action, email, environment-file edit, push or deletion outside the repo occurred. MR2 remains separate; this finite SA2 run ends here.
