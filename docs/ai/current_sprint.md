@@ -1,10 +1,16 @@
-# IM1 finite unattended scope - STOPPED
+# IM1b finite unattended scope complete locally
 
-## IM1 stopped at STEP 0 (2026-10-16)
+## IM1b image saving and Android Share complete locally (2026-10-16)
 
-**STOPPED under the IM1 UNATTENDED rules.** SDK 57-compatible expo-media-library 57.0.5 requires full iOS photo-library access for album lookup/creation; IM1 specifies write-only permission and the Stay Focused album. The installed native implementation contradicts that assumption. The exact owner decision (allow full access on iOS or explicitly defer iOS album saving), file:line evidence, Share diagnosis and owner steps are in [IM1 acceptance](acceptance/im1-image-save-share.md). No functional change or native-module addition is committed. SA2/MR2 status files both read PASS, and their implementations remain unchanged.
+**PASS for unattended IM1b STEP 0-4, fresh serial gates, docs and local commits.** Owner resolved the previous iOS album contradiction: write-only photo permission, Android **Stay Focused** album, iOS **Photos without an album** using add-only saving. SDK-compatible expo-media-library ~57.0.5 and the permission plugin are added with no other dependency upgrades. All three mobile image zoom viewers offer Save beside Ask; owner website zoom viewers download the same sanitized title/section/kind filename. Wikimedia includes source title and stored attribution/license confirmation. Failed/non-image/empty downloads never reach gallery insertion; temporary bytes are cleaned. Shared-link viewers have no Save control.
 
-Share has no Android-specific hide branch; canonical artifact IDs survive online and device-copy paths. Eager expo-clipboard native loading is a plausible APK compatibility cause, still **UNVERIFIED (owner to confirm)**. Clipboard fallback remains pending after the stop. Implementation/tests/builds: **NOT RUN**, zero executed; documentation diff checks are recorded in the handoff. Rollout and Device checks were skipped entirely. This finite IM1 run ends at the stop condition; later roadmap items are not started.
+Share retains SH1's canonical owner/server-ID gate and disabled device-copy state. No Android hide branch or lost canonical ID was found. Clipboard is loaded lazily and guarded; a missing module, rejected copy or false result falls back to system sharing with **Link ready to share** and a visible link. Eager native loading is a plausible old-APK cause; actual installed contents and physical diagnosis remain **UNVERIFIED (owner to confirm)**. SA2/MR2 and earlier features remain preserved.
+
+FRESH forced typecheck/lint/root build **8/8 each, 0 cached**; API **2,257 passed / 3 existing live skips** (197 files), mobile **1,119** (120), shared **337** (37 including existing emitted copies), web **179** (30). Standalone API/web/Android builds **1/1 each**, 34/34 and 19/19 pages, one Android bundle / 35 assets. Zero lint errors, six existing warnings. Failed first attempts and repairs are recorded in acceptance; no nondeterministic flake. Code: **1959a0e**, **d8544f9**.
+
+**Owner steps remaining:** Rollout and Device checks were skipped entirely. Build/install a new preview APK containing clipboard and media-library (OTA alone cannot add native modules), publish the website, and verify realme snapshot/figure/Wikimedia saves, Share, offline state, permission denial/settings and clipboard fallback. Verify iOS add-only Photos saving with no album/full-access prompt. Deployed revisions, native permissions/gallery behavior, live database/applied migrations/Scheduler/provider state and physical root cause are **UNVERIFIED (owner to confirm)**. No prohibited remote call, deployment, migration application, environment-file edit, Scheduler action, email or push occurred. No later roadmap item was started.
+
+[IM1b acceptance](acceptance/im1b-image-save-share.md); [ADR-038](../architecture/ADR-038-reviewer-image-gallery-saving.md).
 
 # MR2 finite unattended scope complete locally (2026-10-16)
 
