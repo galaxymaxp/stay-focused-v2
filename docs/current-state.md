@@ -1,5 +1,11 @@
 # Current State
 
+## IM1 stopped at STEP 0 (2026-10-16)
+
+**STOPPED under the IM1 UNATTENDED rules.** SDK 57-compatible expo-media-library 57.0.5 requires full iOS photo-library access for album lookup/creation; IM1 specifies write-only permission and the Stay Focused album. The installed native implementation contradicts that assumption. The exact owner decision (allow full access on iOS or explicitly defer iOS album saving), file:line evidence, Share diagnosis and owner steps are in [IM1 acceptance](ai/acceptance/im1-image-save-share.md). No functional change or native-module addition is committed. SA2/MR2 status files both read PASS, and their implementations remain unchanged.
+
+Share has no Android-specific hide branch; canonical artifact IDs survive online and device-copy paths. Eager expo-clipboard native loading is a plausible APK compatibility cause, still **UNVERIFIED (owner to confirm)**. Clipboard fallback remains pending after the stop. Implementation/tests/builds: **NOT RUN**, zero executed; documentation diff checks are recorded in the handoff. Rollout and Device checks were skipped entirely. This finite IM1 run ends at the stop condition; later roadmap items are not started.
+
 ## MR2 manual file-to-reviewer complete locally (2026-10-16)
 
 **PASS for unattended MR2 STEP 0-3, fresh serial gates, docs and local commits.** Manual PDF/photo/DOCX/PPTX picks now upload, extract and generate one reviewer job with one progress destination in generation and the existing Queue. Office uses the shared extractor at the Canvas 10 MiB cap, validates ZIP/expected parts, and retains ordered source blocks and MR1 generation. Legacy DOC/PPT gets conversion copy. Files/photos have no editable-text step; paste retains editing and explicit generation. Empty extraction fails with the required message before generation. Per-pick keys and upload references survive interrupted acceptance retries.
