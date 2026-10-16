@@ -4,6 +4,7 @@ import {
   attributeGenerationIntent,
   createGenerationIntent,
   readGenerationIntents,
+  resumeAutomaticGenerations,
 } from "./generationRecovery";
 const values = vi.hoisted(() => new Map<string, string>());
 vi.mock("../auth/sessionStore", () => ({
@@ -21,6 +22,45 @@ const input = {
   body: { courseId: "course", materialId: "file:1" },
 };
 beforeEach(() => values.clear());
+
+describe("silent reviewer admission after restart", () => {
+  it("replays only explicitly automatic requests for the current account with their saved key", async () => {
+    await createGenerationIntent("owner", input);
+    const intent = await createGenerationIntent("owner", { ...input, autoSubmit: true });
+    await createGenerationIntent("other", { ...input, autoSubmit: true });
+    const fetchImpl = vi.fn(async () => Response.json({ ok: true, data: { id: "accepted", state: "queued" } }, { status: 202 }));
+    const client = { baseUrl: "https://api.example", accessToken: "token", fetchImpl };
+    await resumeAutomaticGenerations("owner", client, () => true);
+    expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ headers: expect.objectContaining({ "Idempotency-Key": intent.key }) }));
+    await resumeAutomaticGenerations("owner", client, () => true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect((await readGenerationIntents("other"))[0]?.generationId).toBeUndefined();
+  });
+  it("reuses the pending material request when the student returns and taps again", async () => {
+    const [first, second] = await Promise.all([createGenerationIntent("owner", { ...input, autoSubmit: true }),
+      createGenerationIntent("owner", { ...input, autoSubmit: true })]);
+    expect(second.key).toBe(first.key);
+    expect(await readGenerationIntents("owner")).toHaveLength(1);
+  });
+  it("retains offline admission for the next launch and honors an account change before submission", async () => {
+    const intent = await createGenerationIntent("owner", { ...input, autoSubmit: true });
+    const fetchImpl = vi.fn(async () => { throw new TypeError("network unavailable"); });
+    const client = { baseUrl: "https://api.example", accessToken: "token", fetchImpl };
+    await resumeAutomaticGenerations("owner", client, () => true);
+    expect((await readGenerationIntents("owner"))[0]).toMatchObject({ key: intent.key, autoSubmit: true });
+    await resumeAutomaticGenerations("owner", client, () => false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+  it("stops automatic retries after permanent rejection and leaves the request in Queue", async () => {
+    await createGenerationIntent("owner", { ...input, autoSubmit: true });
+    const fetchImpl = vi.fn(async () => Response.json({ ok: false, error: { code: "permission_denied" } }, { status: 403 }));
+    const client = { baseUrl: "https://api.example", accessToken: "token", fetchImpl };
+    await resumeAutomaticGenerations("owner", client, () => true);
+    await resumeAutomaticGenerations("owner", client, () => true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect((await readGenerationIntents("owner"))[0]).toMatchObject({ autoSubmit: false });
+  });
+});
 describe("durable generation admission", () => {
   it.each(['quiz', 'activity_output'] as const)('attributes an older %s request without starting generation or changing its key', async type => {
     const intent = await createGenerationIntent('owner', { title: 'Saved request', type,

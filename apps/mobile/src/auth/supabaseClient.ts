@@ -10,7 +10,7 @@ import type {
 } from "./authTypes";
 import { sessionStore } from "./sessionStore";
 
-const SUPABASE_AUTH_STORAGE_KEY = "stay-focused-v2.supabase.auth";
+export const SUPABASE_AUTH_STORAGE_KEY = "stay-focused-v2.supabase.auth";
 
 interface SupabaseMobileConfig {
   readonly supabaseUrl: string;

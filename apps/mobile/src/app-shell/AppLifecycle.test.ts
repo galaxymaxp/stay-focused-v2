@@ -13,6 +13,7 @@ vi.mock('../services/localLibrary/offlineCatchUp', () => ({ runOfflineCatchUp: f
 vi.mock('../services/canvasReviewerRecoveryStore', () => ({ readCanvasReviewerRecovery: async () => null }));
 vi.mock('../services/completionNotifications', () => ({ subscribeToProcessingNotificationResponses: () => ({ remove() {} }) }));
 vi.mock('../services/processingOutboxReconciliation', () => ({ reconcileReviewerProcessingOutbox: async () => undefined }));
+vi.mock('../services/generationRecovery', () => ({ resumeAutomaticGenerations: vi.fn() }));
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.clearAllMocks(); vi.useFakeTimers(); fake.active = true; fake.owner = 'owner';

@@ -74,6 +74,8 @@ export interface AuthUserProfile {
 }
 
 export interface MobileAuthSession {
+  /** Saved device identity while online authentication is unavailable. */
+  readonly offline?: boolean;
   readonly accessToken: string;
   readonly expiresAt: number | null;
   readonly provider: AuthProvider;

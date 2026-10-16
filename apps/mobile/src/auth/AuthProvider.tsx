@@ -3,12 +3,15 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 
 import {
   getCurrentSession as getStoredSession,
+  getSavedSession,
   onAuthStateChange,
   signInWithEmailPassword as signInWithPassword,
   signOut as signOutSession,
@@ -31,7 +34,7 @@ import { purgeScreenSnapshotsForOwner } from "../services/screenSnapshots";
 import { getApiBaseUrl } from "../config/apiBaseUrl";
 import { disableCompletionNotifications } from "../services/completionNotifications";
 
-export type AuthStatus = "restoring" | "signedOut" | "signedIn";
+export type AuthStatus = "restoring" | "signedOut" | "signedIn" | "offline";
 
 export interface AuthContextValue {
   readonly status: AuthStatus;
@@ -67,11 +70,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const sessionRef = useRef<MobileAuthSession | null>(null);
+  const revision = useRef(0);
 
   const applySession = useCallback((nextSession: MobileAuthSession | null) => {
+    sessionRef.current = nextSession;
     setSession(nextSession);
-    setStatus(nextSession ? "signedIn" : "signedOut");
-    if (nextSession) {
+    setStatus(nextSession ? nextSession.offline ? "offline" : "signedIn" : "signedOut");
+    if (nextSession && !nextSession.offline) {
       void resumeOfflineProcessingIntents(nextSession.user.id);
     }
   }, []);
@@ -82,8 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         applySession(result.data);
         setError(null);
       } else {
-        setSession(null);
-        setStatus("signedOut");
+        applySession(null);
         setError(result.error);
       }
     },
@@ -91,21 +96,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const refreshSession = useCallback(async () => {
-    setStatus("restoring");
+    const started = revision.current;
     const result = await getStoredSession();
-    applySessionResult(result);
+    if (started === revision.current) applySessionResult(result);
 
     return result;
   }, [applySessionResult]);
 
   useEffect(() => {
     let isMounted = true;
+    let refreshing = false;
+    const reconcile = async () => {
+      if (refreshing || !isMounted) return;
+      refreshing = true;
+      const started = revision.current;
+      try {
+        const result = await getStoredSession();
+        if (isMounted && started === revision.current) applySessionResult(result);
+      } finally { refreshing = false; }
+    };
 
-    const subscription = onAuthStateChange((_event, nextSession) => {
+    const subscription = onAuthStateChange((event, nextSession) => {
       if (!isMounted) {
         return;
       }
 
+      // An offline expired-token startup can emit INITIAL_SESSION null. It
+      // does not prove logout; SIGNED_OUT and successful reconciliation do.
+      if (event === "INITIAL_SESSION" && !nextSession) return;
+      revision.current++;
       applySession(nextSession);
       if (nextSession) {
         setError(null);
@@ -117,15 +136,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     void (async () => {
-      setStatus("restoring");
-      const result = await getStoredSession();
-      if (isMounted) {
-        applySessionResult(result);
-      }
+      const started = revision.current;
+      const saved = await getSavedSession();
+      if (!isMounted || started !== revision.current) return;
+      if (saved) applySession(saved);
+      void reconcile();
     })();
+    const foreground = AppState.addEventListener("change", state => {
+      if (state === "active") void reconcile();
+    });
+    const timer = setInterval(() => {
+      if (AppState.currentState === "active" && sessionRef.current?.offline) void reconcile();
+    }, 15_000);
 
     return () => {
       isMounted = false;
+      clearInterval(timer);
+      foreground.remove();
       if (subscription.ok) {
         subscription.data.unsubscribe();
       }
@@ -134,6 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      revision.current++;
       setIsSigningIn(true);
       setError(null);
 
@@ -157,6 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signUp = useCallback(
     async (email: string, password: string) => {
+      revision.current++;
       setIsSigningUp(true);
       setError(null);
 
@@ -179,6 +208,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const signOut = useCallback(async () => {
+    revision.current++;
     setIsSigningOut(true);
     setError(null);
 

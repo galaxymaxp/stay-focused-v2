@@ -1,5 +1,125 @@
 # Roadmap
 
+## Realme offline startup and current Autopilot integration (2026-10-17)
+
+Owner scope: restore saved-account offline startup, retain the Realme Library
+hold/drag and compact toolbar, update to current Autopilot source, and make
+Generate Reviewer submit silently without forcing the generation page.
+
+Isolated branch `fix/realme-offline-current-20261017` combines main `ed67445`
+with Realme branch `e38f96b`. Current durable course batches, cached-first
+screens, Queue, sharing and course-state work are retained alongside the device
+Library changes and ExpoGL hotfix. No main push or backend mutation.
+
+Saved SDK credentials unlock owner-scoped device data before online refresh.
+Retryable auth transport failures retain offline access; explicit SIGNED_OUT,
+invalid/revoked refresh tokens and late pre-logout responses cannot revive it.
+SecureStore uses serialized alternating chunk banks and commits the manifest
+last; legacy chunks remain readable. A visible offline-access message explains
+the saved-content state. Online APIs still verify the bearer token.
+
+Reviewer Generate and confirmed Library Remake save an explicit automatic
+intent, submit independently of the screen and leave navigation alone. Queue
+tracks accepted jobs. Interrupted admissions resume on launch/foreground with
+the same idempotency key; permanent rejection requires a deliberate Retry.
+Server background safety begins at acceptance. If the OS kills the process
+before acceptance, the saved request resumes when the app reopens.
+
+FRESH mobile suite: 1,124 tests / 119 files PASS. Focused authentication/storage
+51 tests PASS; reviewer admission tests cover navigation, restart replay,
+duplicate taps, account fencing and permanent rejection. FRESH forced root typecheck/lint/build pass 8/8 each, zero cached; six
+existing lint warnings. A final lifecycle concurrency adjustment has fresh
+mobile suite/typecheck/lint coverage; the preview export verifies its bundle.
+Preview/device acceptance is in progress. Earlier silent-screen assertion
+failed because it inspected Copy nodes instead of the rendered Notice; fixed.
+
+Read-only live checks confirm the API production deployment uses `ed67445`
+and all CQ1/SP2/SH1/GA1b migrations are present. Vercel connector inspection
+returned 403; the explicitly scoped authenticated CLI fallback succeeded.
+The installed Realme APK 2.1.0/code 5 includes expo-clipboard, so this remains
+a JavaScript-only update on runtime `2.1.0-sdk57`.
+
+See [acceptance](ai/acceptance/realme-offline-current-20261017.md).
+
+## Realme compact Library selection toolbar (2026-10-17)
+
+Owner UI correction supersedes the earlier Library controls: remove the always
+visible remake/remove card, Organize/Done, and the move-to-edge footer. Holding
+a saved item reveals four equal icon targets in place of the filter tabs:
+remake, trash, select/unselect all, and X to cancel. The header shows the selected
+count. Selection covers the current filter, including items beyond the first
+page; remake/removal use only that selection and retain confirmation. Dragging
+and stored order remain available. The toolbar occupies a fixed 48-point slot
+in both modes, preserving the list viewport during the hold.
+
+FRESH PASS: 1,056 mobile tests in 105 files; mobile TypeScript; focused ESLint;
+diff hygiene; EAS preview environment preflight. Final copy-only change also
+passes all 70 screen tests.
+
+FRESH PASS: preview OTA group `b1537d74-77d0-4e80-ad86-24fef46abe6d`
+from `e4f0ae7` is active on Realme 2.1.0/code 5. Physical checks confirm
+three complete Reviewer cards plus part of a fourth remain visible in selection
+mode; four equal icons replace the tabs; select all, unselect all and X work.
+Native hold/drag and saved order after force-stop/relaunch pass. The original
+item order was restored; the course Library is left open in normal mode. Recent
+process sample: 0 matching fatal/JS errors. See
+`docs/ai/acceptance/realme-library-toolbar-20261017.md`.
+
+## Realme course Library organization (2026-10-17)
+
+Owner scope: home-screen-style organization of saved items inside a course,
+not the course grid. Long press selects and arms drag; further taps select
+items without opening them. Drop moves the selection as a block. Order is
+account/course scoped on the device; filtered-out items retain their slots.
+Done returns to ordinary opening. Move-to-edge controls provide a gesture-free
+option, and selected removal uses the existing explicit confirmation.
+
+FRESH PASS: 1,052 mobile tests in 105 files; mobile TypeScript; focused ESLint;
+diff hygiene. Final test-only typing correction also passes 66 screen tests.
+FRESH PASS: preview OTA group `7dc9a912-93aa-4348-8d1f-ca41911575a6`
+from `43131a5` is active on the connected Realme (2.1.0/code 5). Native
+hold-to-select and the selection controls were verified. Recent process log
+sample: zero matching fatal/JS errors. The owner is testing the phone directly;
+agent physical multi-select, drag and restart-persistence checks were not run.
+Those behaviors pass automated regression tests. See
+`docs/ai/acceptance/realme-library-organize-20261017.md`. No native
+dependency, database or backend change.
+
+## Realme Library and generation actions (2026-10-16)
+
+JS-only update adds Generate all Reviewers for ready course materials, including
+PPTX slides, with complete fresh pagination and saved-Reviewer skipping. Generated
+materials have a shaded row and explicit label; their detail opens the saved
+Reviewer or offers Remake. Course Library adds Remake all reviewers and Remove
+all saved work with confirmation; individual drafts can now be removed. Server
+confirmation precedes local removal, failed items remain visible, and quizzes
+are removed before their referenced Reviewers. Batch submissions reuse uncertain
+requests, wait up to three minutes for queue capacity, and report partial
+acceptance and queue limits. Keep the app open until
+submission finishes; accepted work remains server-backed.
+
+FRESH PASS: 91 tests across screen, batch, generation-recovery, local-Library and
+Reviewer API suites; mobile TypeScript; focused ESLint; diff hygiene. Initial
+checks caught a CRLF-sensitive edit duplication; corrected before final checks.
+FRESH PASS: preview OTA `55e1412d-c073-45d6-9bb4-651dfddddb4c` published
+from `9ef1340` and applied to the connected Realme (2.1.0/code 5). Physical
+checks confirm CC17 Generate all, generated labels, both course Library bulk
+actions and the draft Remove swipe. All confirmation dialogs were cancelled;
+NOT RUN: live generation or deletion. Recent process log sample has no matching
+fatal/JS errors. No native build, backend deployment or migration. See
+`docs/ai/acceptance/realme-library-actions-20261016.md` for evidence.
+
+## Realme generation orb hotfix (2026-10-16)
+
+The generation screen incorrectly checked the retired `ExponentGLObjectManager`
+native module after the SDK 57 upgrade. It now checks `ExpoGL`, matching the
+installed GLView, so supported devices use the existing 3D Knowledge Core.
+Scoped from published preview source `079986c`; unrelated unshipped work is
+excluded. FRESH generation/core tests: 23/23; mobile typecheck and focused
+ESLint PASS. JavaScript-only preview OTA `d1b79016-9ed3-4de4-85af-184896cbc25e`
+published from `e18dda0`; FRESH physical Realme verification PASS: the
+generation screen shows the animated 3D orb after relaunch. No native/APK/EAS build requested or run.
+
 ## GA1b explicit course batch generation complete locally (2026-10-16)
 
 **PASS for the finite unattended code scope, STEP 0-3, gates, docs and local
