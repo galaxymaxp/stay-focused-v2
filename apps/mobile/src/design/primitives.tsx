@@ -461,6 +461,7 @@ export function Sheet({
   title,
   footer,
   scrollRef,
+  onScrollBeginDrag,
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -469,6 +470,7 @@ export function Sheet({
   footer?: ReactNode;
   /** Lets content bring a focused field into view; the Modal does not resize for the keyboard. */
   scrollRef?: Ref<ScrollView>;
+  onScrollBeginDrag?: React.ComponentProps<typeof ScrollView>["onScrollBeginDrag"];
 }) {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -551,6 +553,7 @@ export function Sheet({
             onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
             onContentSizeChange={(_width, height) => setContentHeight(height)}
             onScroll={pull.onScroll}
+            onScrollBeginDrag={onScrollBeginDrag}
             scrollEventThrottle={16}
             alwaysBounceVertical={false}
             keyboardShouldPersistTaps="handled"

@@ -1,3 +1,5 @@
+import { StudyAnswerArea, useAnswerReveal } from './studyAnswerScroll';
+import { StudyText } from './StudyText';
 import {
   STUDY_ACTIONS, STUDY_ACTION_LABELS, STUDY_ACTION_TITLES, STUDY_ASK_SUGGESTIONS, STUDY_GROUNDING_DETAILS, STUDY_GROUNDING_LABELS, STUDY_LIMITS,
   STUDY_MODIFIER_LABELS, STUDY_QUESTION_TOO_LONG, STUDY_REFINEMENTS, STUDY_SELECTION_TOO_LARGE, STUDY_TOOLS_PROMPT_VERSION, checkStudySelection,
@@ -44,11 +46,12 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
   const [shown, setShown] = useState<{ modifier?: StudyModifier; run: Run } | null>(null);
   const [test, setTest] = useState<TestState>(EMPTY_TEST);
   const [turns, setTurns] = useState<AskTurn[]>([]);
+  const revealAnswer = useAnswerReveal();
   const [draft, setDraft] = useState('');
   const studySession = useRef(createStudyToolsSession()).current;
   const first = useRef<string | undefined>(undefined);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // A selection (even an oversized one) or an open action replaces the whole-topic quick assists.
   const selecting = action !== null || check.ok || check.reason === 'too_large';
   useEffect(() => onActiveChange?.(selecting), [selecting, onActiveChange]);
@@ -85,13 +88,15 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
   }, [action]);
 
   function run(text: string, act: StudyAction, extra: Extra, apply: (run: Run) => void) {
+    const scrollId = act === 'ask' ? `ask-${turns.length}` : act === 'test' ? `test-${extra.modifier === 'check' || extra.modifier === 'choices' || extra.modifier === 'explain_answer' ? extra.modifier : 'question'}` : 'answer';
+    const revealToken = revealAnswer.begin(scrollId);
     apply({ status: 'pending' });
     const request: StudyToolRequest = { reviewerId: selection.reviewerId, sectionId: selection.sectionId, blockId: selection.blockId,
       contentHash: selection.contentHash, promptVersion: STUDY_TOOLS_PROMPT_VERSION, selection: text, action: act,
       ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== undefined)) };
     const client = { baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' };
     studySession.run(client, request).then(result => {
-      if (mounted.current) { haptic.success(); apply({ status: 'ready', result }); }
+      if (mounted.current) { haptic.success(); apply({ status: 'ready', result }); revealAnswer.complete(revealToken); }
     }, (error: unknown) => {
       if (mounted.current) apply({ status: 'error', message: error instanceof StudyToolsError ? error.message : 'The learning tool is temporarily unavailable. Try again shortly.' });
     });
@@ -100,6 +105,7 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
     const text = contextText ?? (action ? subject : picked);
     if (!contextText && !action && !check.ok) return;
     haptic.tap();
+    if (next === 'ask') revealAnswer.begin('ask');
     setAction(next);
     setSubject(text);
     first.current = undefined;
@@ -149,7 +155,7 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
     {action ? <View style={{ gap: spacing[2], backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Copy size="caption" color={colors.textMuted} style={{ flex: 1, fontWeight: '700', letterSpacing: 0.8 }}>SELECTED</Copy>
-        <Pressable accessibilityRole="button" onPress={() => { haptic.select(); setAction(null); }} hitSlop={8}>
+        <Pressable accessibilityRole="button" onPress={() => { haptic.select(); revealAnswer.cancel(); setAction(null); }} hitSlop={8}>
           <Copy size="caption" color={colors.accent} style={{ fontWeight: '600' }}>Change selection</Copy>
         </Pressable>
       </View>
@@ -197,16 +203,17 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
     {!selecting && askText ? <Action secondary onPress={() => choose('ask', askText)}>Ask about this concept or key point</Action> : null}
     {action && action !== 'test' && action !== 'ask' ? <View style={{ gap: spacing[3] }}>
       <Copy size="h3" style={{ fontWeight: '600' }}>{shown?.modifier ? `${STUDY_ACTION_TITLES[action]} · ${STUDY_MODIFIER_LABELS[shown.modifier]}` : STUDY_ACTION_TITLES[action]}</Copy>
-      {shown ? <RunView run={shown.run} retry={() => shown.modifier ? refine(shown.modifier) : choose(action)}>
+      {shown ? <RunView id="answer" run={shown.run} retry={() => shown.modifier ? refine(shown.modifier) : choose(action)}>
         {result => <ResultCard result={result} />}
       </RunView> : null}
       <Chips items={STUDY_REFINEMENTS[action]} selected={shown?.modifier} disabled={shown?.run.status === 'pending'} onPress={refine} />
     </View> : null}
     {action === 'test' ? <View style={{ gap: spacing[3] }}>
       <Copy size="h3" style={{ fontWeight: '600' }}>{STUDY_ACTION_TITLES.test}</Copy>
-      {test.question ? <RunView run={test.question} retry={() => nextQuestion()}>
+      {test.question ? <RunView id="test-question" run={test.question} retry={() => nextQuestion()}>
         {result => result.outcome === 'insufficient' ? <Notice>{result.text}</Notice> : <View style={{ gap: spacing[3] }}>
           <Copy style={{ lineHeight: 25, fontWeight: '600' }}>{result.question}</Copy>
+          <StudyAnswerArea id="test-choices">
           {test.choices?.status === 'ready' && test.choices.result.choices ? <View accessibilityRole="radiogroup" style={{ gap: spacing[2] }}>
             {test.choices.result.choices.map(choice => <Pressable key={choice} accessibilityRole="radio" accessibilityState={{ selected: test.answer === choice }} disabled={!!test.checked}
               onPress={() => { haptic.select(); setTest(current => ({ ...current, answer: choice })); }}
@@ -216,6 +223,8 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
           </View> : <TextInput ref={answerField} onFocus={() => reveal(answerField)} onBlur={() => setTyping(false)} accessibilityLabel="Your answer" placeholder="Your answer…" placeholderTextColor={colors.textMuted} value={test.answer} editable={!test.checked}
             onChangeText={answer => setTest(current => ({ ...current, answer }))} multiline
             style={{ minHeight: 64, maxHeight: 150, padding: spacing[3], borderRadius: radius.control, borderWidth: 1, borderColor: colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, textAlignVertical: 'top' }} />}
+          {test.choices?.status === 'pending' ? <SkeletonBlock width="70%" height={12} /> : test.choices?.status === 'error' ? <Notice>{test.choices.message}</Notice> : null}
+          </StudyAnswerArea>
           {test.answer.length > STUDY_LIMITS.answer ? <Copy size="caption" color={colors.danger}>Shorten your answer to the key idea.</Copy> : null}
           {!test.checked || test.checked.status === 'error' ? <>
             <Action disabled={!test.answer.trim() || test.answer.length > STUDY_LIMITS.answer} onPress={checkAnswer}>Check Answer</Action>
@@ -224,14 +233,13 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
               {!test.choices ? <TextLink onPress={() => run(subject, 'test', { modifier: 'choices', question: result.question }, choices => setTest(current => ({ ...current, choices })))}>Need choices?</TextLink> : null}
               <TextLink onPress={() => run(subject, 'test', { modifier: 'explain_answer', question: result.question }, explained => setTest(current => ({ ...current, explained })))}>Show answer</TextLink>
             </View>
-            {test.choices?.status === 'pending' ? <SkeletonBlock width="70%" height={12} /> : test.choices?.status === 'error' ? <Notice>{test.choices.message}</Notice> : null}
-          </> : <RunView run={test.checked} retry={checkAnswer}>
+          </> : <RunView id="test-check" run={test.checked} retry={checkAnswer}>
             {checked => checked.outcome === 'insufficient' ? <Notice>{checked.text}</Notice> : <View style={{ gap: spacing[2], backgroundColor: colors.surfacePrimary, borderRadius: radius.card, borderWidth: 1, borderColor: colors.separator, padding: spacing[4] }}>
               <Copy size="bodySmall" color={checked.verdict === 'correct' ? colors.green : checked.verdict === 'partial' ? colors.blue : colors.warning} style={{ fontWeight: '700' }}>{VERDICTS[checked.verdict ?? 'incorrect']}</Copy>
-              <Copy style={{ lineHeight: 24 }}>{checked.text}</Copy>
+              <StudyText text={checked.text} />
             </View>}
           </RunView>}
-          {test.explained ? <RunView run={test.explained} retry={() => run(subject, 'test', { modifier: 'explain_answer', question: result.question }, explained => setTest(current => ({ ...current, explained })))}>
+          {test.explained ? <RunView id="test-explain_answer" run={test.explained} retry={() => run(subject, 'test', { modifier: 'explain_answer', question: result.question }, explained => setTest(current => ({ ...current, explained })))}>
             {explained => <ResultCard result={explained} />}
           </RunView> : null}
           {test.checked?.status === 'ready' ? <Chips items={STUDY_REFINEMENTS.test} disabled={test.explained?.status === 'pending'} onPress={modifier => modifier === 'explain_answer'
@@ -240,11 +248,11 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
         </View>}
       </RunView> : null}
     </View> : null}
-    {action === 'ask' ? <View style={{ gap: spacing[3] }}>
+    {action === 'ask' ? <StudyAnswerArea id="ask"><View style={{ gap: spacing[3] }}>
       <Copy size="h3" style={{ fontWeight: '600' }}>{STUDY_ACTION_TITLES.ask}</Copy>
       {turns.map((turn, index) => <View key={index} style={{ gap: spacing[2] }}>
         <Copy size="bodySmall" style={{ fontWeight: '600' }}>{turn.question}</Copy>
-        <RunView run={turn.run}>{result => <ResultCard result={result} />}</RunView>
+        <RunView id={`ask-${index}`} run={turn.run}>{result => <ResultCard result={result} />}</RunView>
       </View>)}
       {turns.length > STUDY_LIMITS.followUps ? <Action secondary onPress={() => { haptic.select(); setTurns([]); }}>New question</Action>
         : turns.some(turn => turn.run.status === 'pending') ? null : <>
@@ -261,12 +269,16 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
             <Action disabled={!draft.trim() || draft.length > STUDY_LIMITS.question} onPress={() => ask()}>Ask</Action>
           </View>
         </>}
-    </View> : null}
+    </View></StudyAnswerArea> : null}
     {typing ? <View style={{ height: Math.round(windowHeight * 0.5) }} /> : null}
   </View>;
 }
 
-function RunView({ run, retry, children }: { run: Run; retry?: () => void; children: (result: StudyToolResult) => ReactNode }) {
+function RunView({ id, ...props }: { id: string; run: Run; retry?: () => void; children: (result: StudyToolResult) => ReactNode }) {
+  return <StudyAnswerArea id={id}><RunContent {...props} /></StudyAnswerArea>;
+}
+
+function RunContent({ run, retry, children }: { run: Run; retry?: () => void; children: (result: StudyToolResult) => ReactNode }) {
   if (run.status === 'pending') return <View accessibilityLiveRegion="polite" style={{ gap: spacing[2], paddingTop: spacing[1] }}>
     <SkeletonBlock width="92%" height={12} />
     <SkeletonBlock width="84%" height={12} />
@@ -283,7 +295,7 @@ function ResultCard({ result }: { result: StudyToolResult }) {
   const { colors } = useTheme();
   return <View accessibilityLiveRegion="polite" style={{ gap: spacing[2], backgroundColor: colors.surfacePrimary, borderRadius: radius.card, borderWidth: 1, borderColor: colors.separator, padding: spacing[4] }}>
     {result.outcome === 'not_applicable' ? null : <GroundingBadge grounding={result.grounding} />}
-    <Copy style={{ lineHeight: 25 }}>{result.text}</Copy>
+    <StudyText text={result.text} />
   </View>;
 }
 

@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STUDY_GROUNDING_DETAILS, STUDY_LIMITS, STUDY_OFFLINE, STUDY_QUESTION_TOO_LONG, STUDY_SELECTION_TOO_LARGE, selectAssistBlock, studySurface, type ReviewerReaderModel, type StudyToolRequest } from '@stay-focused/shared';
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 
@@ -38,9 +38,10 @@ const { experienceRequest, ExperienceApiError } = await import('../../services/e
 const { assistStore } = await import('./assistStore');
 const network = vi.mocked(experienceRequest);
 
+beforeEach(() => { vi.stubGlobal('requestAnimationFrame', (work: FrameRequestCallback) => { work(0); return 0; }); });
 let rendered: ReactTestRenderer | undefined;
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.clearAllMocks(); assistStore.reset(); });
+afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.clearAllMocks(); vi.unstubAllGlobals(); assistStore.reset(); });
 const detail = reviewerDetail();
 const reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const block = reviewer.sections[0]!.blocks[0]!;

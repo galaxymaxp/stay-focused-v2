@@ -75,7 +75,7 @@ describe('Study Assist on-demand cache', () => {
     const selection = selectAssistBlock(updated, s.selection.sectionId, s.selection.blockId)!;
     expect(selection.contentHash).not.toBe(s.selection.contentHash);
     await s.service.request(OWNER_A, client, selection, 'summarize');
-    await s.service.request(OWNER_A, client, selection, 'summarize', 'study-assist-v2');
+    await s.service.request(OWNER_A, client, selection, 'summarize', 'future-study-assist');
     expect(s.generate).toHaveBeenCalledTimes(3);
   });
   it('uncached offline help is calm and canonical Reviewer remains readable', async () => {
@@ -144,4 +144,13 @@ describe('Study Assist on-demand cache', () => {
     expect(selectAssistBlock(s.reviewer, s.selection.sectionId, 'missing')).toBeNull();
     expect(selectAssistBlock(s.reviewer, 'title', s.selection.blockId)).toBeNull();
   });
+});
+
+it('retains readable version-one plain-text rows while version two is a cache miss', async () => {
+  const s = await setup();
+  const old = assistRequest(s.selection, 'summarize', 'study-assist-v1');
+  const result = { ...output(old), text: 'An older plain answer.' };
+  await s.cache.writeAssist(OWNER_A, result, s.selection.canonicalContent);
+  expect(await s.cache.readAssist(OWNER_A, old, s.selection.canonicalContent)).toEqual(result);
+  expect(await s.cache.readAssist(OWNER_A, assistRequest(s.selection, 'summarize'), s.selection.canonicalContent)).toBeNull();
 });

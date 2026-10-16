@@ -1,3 +1,5 @@
+import { StudyAnswerArea, StudyAnswerScrollContext, useAnswerReveal, useStudyAnswerScroll } from './studyAnswerScroll';
+import { StudyText } from './StudyText';
 import { ASSIST_LABELS, ASSIST_RESULT_LABELS, ASSIST_TYPES, studyAskSubject, type AssistType } from '@stay-focused/shared';
 import { AlignLeft, ArrowLeftRight, Check, FlaskConical, Lightbulb, RotateCcw } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ComponentType } from 'react';
@@ -23,7 +25,18 @@ const HINTS: Record<AssistType, string> = {
  * Every option can run at once; each shows its own state. Requests keep going
  * after the sheet closes, and the Reviewer marks the passage when they land.
  */
-export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | null; onClose: () => void }) {
+export function StudyAssistSheet(props: { target: AssistTarget | null; onClose: () => void }) {
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useStudyAnswerScroll(scroll);
+  return <StudyAnswerScrollContext.Provider value={reveal}><Sheet title="Study Assist" onClose={props.onClose} scrollRef={scroll} onScrollBeginDrag={() => reveal.controller.manualScroll()}>
+    <View ref={reveal.root} collapsable={false}><StudyAssistContent {...props} scroll={scroll} /></View>
+  </Sheet></StudyAnswerScrollContext.Provider>;
+}
+
+function StudyAssistContent({ target, scroll }: { target: AssistTarget | null; onClose: () => void; scroll: React.RefObject<ScrollView | null> }) {
+  const reveal = useAnswerReveal();
+  const [studying, setStudying] = useState(false);
+  const revealToken = useRef(0);
   const { session } = useAuth();
   const { colors } = useTheme();
   const key = target ? keyOf(target) : '';
@@ -51,6 +64,7 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
 
   function choose(type: AssistType) {
     if (!target) return;
+    revealToken.current = reveal.begin('quick');
     setShown(type);
     const entry = entries[type];
     if (entry?.status === 'ready' || entry?.status === 'pending') {
@@ -62,14 +76,20 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
   }
 
   const current = shown ? entries[shown] : undefined;
-  // Selected text (or an open learning action) replaces the whole-topic quick assists.
-  const [studying, setStudying] = useState(false);
-  const scroll = useRef<ScrollView>(null);
+  const previousStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!studying && current?.status === 'ready' && previousStatus.current !== 'ready') {
+      if (!revealToken.current) revealToken.current = reveal.begin('quick');
+      else reveal.complete(revealToken.current);
+    }
+    previousStatus.current = current?.status;
+  }, [current?.status, reveal, studying]);
+
   // Never let the sheet shrink while open: swapping the tall quick assists for the
   // one-row selection actions would otherwise slide the text under a finger that is
   // still holding it, and Android would stretch the selection across the jump.
   const [minHeight, setMinHeight] = useState(0);
-  return <Sheet title="Study Assist" onClose={onClose} scrollRef={scroll}>
+  return <>
     {target ? <View onLayout={event => { const height = event.nativeEvent.layout.height; setMinHeight(current => Math.max(current, height)); }} style={{ gap: spacing[3], minHeight }}>
       <SmartSelectionPanel key={key} selection={target.selection} askText={studyAskSubject(target.selection.block, target.pointIndex)} onActiveChange={setStudying} scrollRef={scroll} />
       {studying ? null : <>
@@ -77,6 +97,7 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
         {ASSIST_TYPES.map(type => <OptionTile key={type} type={type} entry={entries[type]} selected={shown === type} onPress={() => choose(type)} />)}
       </View>
+      <StudyAnswerArea id="quick">
       {current?.status === 'pending' && shown ? <View accessibilityLiveRegion="polite" style={{ gap: spacing[2], paddingTop: spacing[1] }}>
         <SkeletonBlock width="92%" height={12} />
         <SkeletonBlock width="84%" height={12} />
@@ -90,13 +111,14 @@ export function StudyAssistSheet({ target, onClose }: { target: AssistTarget | n
           </View>
           <Copy muted size="caption">Saved for offline study</Copy>
         </View>
-        <Copy style={{ lineHeight: 25 }}>{current.text}</Copy>
+        <StudyText text={current.text ?? ''} />
       </View> : null}
       {current?.status === 'error' ? <Notice>{current.error}</Notice> : null}
       {!current ? <Copy muted size="caption">Results are AI-generated and saved on this device.</Copy> : null}
+      </StudyAnswerArea>
       </>}
     </View> : <Notice>This passage is no longer available. Reopen the Reviewer to choose another.</Notice>}
-  </Sheet>;
+  </>;
 }
 
 function OptionTile({ type, entry, selected, onPress }: { type: AssistType; entry: AssistEntry | undefined; selected: boolean; onPress: () => void }) {
