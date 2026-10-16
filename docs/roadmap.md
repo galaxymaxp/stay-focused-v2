@@ -1,5 +1,17 @@
 # Roadmap
 
+## LS1 Library sorting complete locally (2026-10-16)
+
+**PASS for unattended LS1 STEP 0-3, fresh serial gates, documentation and local commits.** Mobile and website Library now offer Recently added / Course / Title A-Z / Recently opened; course contents default to Canvas order, with Recently added and Title A-Z alternatives. Shared pure comparators sort within pinned and unpinned groups without refetching. Personal & other participates in date sorts and follows courses in alphabetical sorts. Choices and capped opened timestamps stay per owner/device; old or unavailable storage defaults safely. Mobile uses the existing sheet and Reduce Motion-aware layout animation; website uses a compact native select.
+
+Optional sourcePosition is projected server-side from existing synced Canvas module/item/file/page/assignment metadata, with owner/course/connection checks, complete pagination and safe failure. No Canvas calls, migration, dependency or native module is added. Manual/mixed/unplaced sources follow positioned work by creation time. Existing source, authentication, RLS, grants, offline and RT1/earlier behavior remain intact.
+
+FRESH forced typecheck/lint/root build **8/8 each, zero cached**; API **2,280 passed / 3 existing live skips** (200 files), mobile **1,136** (123), shared **358** (41, including emitted copies), web **195** (34). Standalone API/web/Android builds **1/1 each**, 35/35 and 19/19 pages, one Android bundle / 35 assets. Zero lint errors; six existing warnings. Repaired attempts are retained in acceptance; no nondeterministic flake. Code commits: **d027f2b**, **45c6d19**, **451eabb**, **c5f1f6b**.
+
+**Owner steps remaining:** Rollout and Device checks were skipped entirely. Publish API/website and a compatible preview update; verify all Library sorts, Canvas source order, pins, successful reviewer/quiz/draft opens and choice persistence after restart on mobile and website. LS1 adds no native module; inherited IM1b APK and MR2 migration/worker rollout remain owner work. Older API/cache entries use the unpositioned fallback until successful reconciliation. Deployed revisions, actual Canvas positions, database/applied migrations, Scheduler and physical behavior are **UNVERIFIED (owner to confirm)**. No remote service call, deployment, remote SQL/migration application, environment-file edit, Scheduler action, email or push occurred. This finite run ends at LS1; RB4 was not started.
+
+[LS1 acceptance](ai/acceptance/ls1-library-sorting.md); [ADR-040](architecture/ADR-040-library-sort-orders.md).
+
 ## RT1 topic levels and Expound complete locally (2026-10-16)
 
 **PASS for unattended RT1 STEP 0-4, fresh serial gates, docs and local commits.** Each mobile/website topic has compact Original / Simplify / Explain simply controls and collapsible Expound. Canonical content stays unchanged; Original is immediate and has no model action. Server-read, owner-scoped sections feed source-only SA1 formatted answers and grounding labels. Persistent owner/exact-content caches support offline reuse; uncached controls show the existing offline reason. Reading choices last only for the session; canonical search restores Original. Shared snapshots remain unchanged, so shared topic controls route to sign-in and make no model calls.

@@ -3813,3 +3813,15 @@ Commits:
 - ba81163 feat(web): add topic levels Expound and shared sign-in controls
 
 The docs closure commit is this entry’s containing commit; its final hash is recorded in tmp/overnight/RT1.status. See acceptance for exact commands, gate evidence, repaired first attempts and owner-only remaining checks.
+
+## 2026-10-16 LS1 Library sorting - unattended PASS
+
+Status: **PASS for code STEP 0-3, fresh serial gates, documentation and local commits**. Shared deterministic sorts, owner-scoped synced Canvas sourcePosition, per-device sort/open history, and compact accessible mobile/browser controls are complete. Pins stay first; sorting uses loaded summaries and never refreshes. No migration, dependency or native module added.
+
+Commits: d027f2b (shared), 45c6d19 (API), 451eabb (mobile), c5f1f6b (web). This documentation closure commit is recorded after creation in tmp/overnight/LS1.status; no push.
+
+FRESH: npm run typecheck -- --force, npm run lint -- --force and npm run build -- --force each **8/8 tasks / 0 cached**; tests --workspace @stay-focused/api **2,280 passed / 3 existing live skips / 200 files**, @stay-focused/mobile **1,136 / 123**, @stay-focused/shared **358 / 41 including emitted copies**, @stay-focused/web **195 / 34**. Standalone API/web/Android builds **1/1 each** (35/35 pages, 19/19 pages, 1 Android bundle / 35 assets). Diff/staged checks FRESH exit 0. Zero lint errors, six existing warnings. All repaired failures/counts and one interrupted run are preserved in [LS1 acceptance](acceptance/ls1-library-sorting.md); no nondeterministic flake. [ADR-040](../architecture/ADR-040-library-sort-orders.md). Generated ambient declarations restored; owner untracked UI/, apps/mobile/.gitignore and supabase/.temp/ untouched. No remote service call, deploy, remote SQL/migration application, env-file edit, Scheduler action, email or push occurred.
+
+### Owner steps remaining
+
+Rollout and Device checks were skipped entirely (NOT RUN). Publish API/website and compatible preview update, then validate Library/course orders, Canvas positions, pins, reviewer/quiz/draft recently-opened changes and restart persistence on mobile and browser. Older summaries fall back to unpositioned creation order until refreshed. LS1 has no native/migration addition; inherited IM1b APK and MR2 migration/worker rollout remain owner work. Deployed revisions, actual synced positions, database/applied migrations, Scheduler and physical behavior are **UNVERIFIED (owner to confirm)**. No next slice/RB4 was started.
