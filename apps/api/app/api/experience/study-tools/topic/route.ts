@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const detail = await service.getLibraryArtifact(userId, input.reviewerId);
     if (!('reviewer' in detail)) throw new ExperienceFailure(404, 'not_found');
     const selection = selectTopic(detail.reviewer, input.sectionId);
-    if (!selection) throw new ExperienceFailure(404, 'not_found');
+    if (!selection || selection.reviewerId !== input.reviewerId) throw new ExperienceFailure(404, 'not_found');
     const client = createReviewerUserClient(request.headers.get('authorization')!.slice(7));
     const saved = await readCanonicalReviewerRecord(client, userId, input.reviewerId.slice('artifact:'.length));
     if (!saved.ok) throw new ExperienceFailure(503, 'unavailable');
