@@ -47,6 +47,9 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   refresh: vi.fn(),
   createIntent: vi.fn(),
+  alert: vi.fn(),
+  removeLocal: vi.fn(),
+  deleteReviewer: vi.fn(async () => ({ ok: true })),
   vibration: vi.fn(),
   haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
   prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] } },
@@ -120,6 +123,7 @@ vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView",
 vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () => null, setItem: async () => {} } }));
 vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642, dayOrbTouch: { active: false } }));
 vi.mock("react-native", () => ({
+  Alert: { alert: mocks.alert },
   View: "View",
   StyleSheet: { absoluteFill: { position: "absolute" } },
   ScrollView: "ScrollView",
@@ -197,7 +201,8 @@ vi.mock("lucide-react-native", () => ({
 }));
 vi.mock("../../design/haptics", () => ({ haptic: mocks.haptic }));
 vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => "https://example.test" }));
-vi.mock("../../services/reviewerLibraryApi", () => ({ deleteReviewer: vi.fn(async () => ({ ok: true, value: undefined })) }));
+vi.mock("../../services/reviewerLibraryApi", () => ({ deleteReviewer: mocks.deleteReviewer }));
+vi.mock("../../services/localLibrary/deviceLibrary", () => ({ removeLocalArtifact: mocks.removeLocal }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => ({
     baseUrl: "https://api.example",
@@ -1210,5 +1215,54 @@ describe('O1 calm offline Library', () => {
     await act(async () => back[0]!.props.onPress());
     expect(mocks.back).toHaveBeenCalledOnce();
     expect(root.findAll(node => String(node.type) === 'Copy').map(node => node.props.children).join(' ')).toContain("This one isn't saved on your device yet.");
+  });
+});
+
+describe('course Library bulk actions', () => {
+  it('offers Generate all for a course containing PPTX slides', async () => {
+    mocks.params = { courseId: 'course' };
+    mocks.data['/api/experience/courses/course'] = workspace;
+    const root = await render(createElement(GenerateCourseScreen));
+    const button = root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Generate all Reviewers')[0]!;
+    expect(button.props.disabled).toBe(false);
+    await act(async () => button.props.onPress());
+    expect(mocks.alert).toHaveBeenCalledWith('Generate all Reviewers?', expect.stringContaining('saved Reviewers are skipped'), expect.any(Array));
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('marks already generated materials and offers their saved Reviewer', async () => {
+    mocks.params = { courseId: 'course', materialId: 'file:one' };
+    mocks.data['/api/experience/courses/course'] = { ...workspace, materials: { ...workspace.materials, items: [{ ...workspace.materials.items[0], reviewerArtifactId: 'saved' }] } };
+    const root = await render(createElement(GenerateMaterialScreen));
+    expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Remake Reviewer')).toHaveLength(1);
+    const open = root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Open saved Reviewer')[0]!;
+    await act(async () => open.props.onPress());
+    expect(mocks.push).toHaveBeenCalledWith({ pathname: '/artifact', params: { id: 'artifact:saved' } });
+  });
+  it('removes a draft only after confirmation and server success', async () => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [{ ...savedQuiz, id: 'activity:draft', type: 'activity_output', quiz: undefined }];
+    const root = await render(createElement(LibraryCourseScreen));
+    const row = root.findAll(node => String(node.type) === 'SwipeRow')[0]!;
+    await act(async () => row.props.trailing[0].onPress());
+    expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => mocks.alert.mock.calls.at(-1)![2][1].onPress());
+    expect(mocks.request).toHaveBeenCalledWith(expect.anything(), '/api/experience/activity-drafts/draft', { method: 'DELETE' });
+    expect(mocks.removeLocal).toHaveBeenCalledWith('owner', 'activity:draft');
+    expect(root.findAll(node => String(node.type) === 'SwipeRow')).toHaveLength(0);
+  });
+  it('keeps failed items visible while removing successful items from the whole course', async () => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [
+      { ...savedQuiz, id: 'activity:failed', type: 'activity_output', quiz: undefined },
+      { ...savedQuiz, id: 'activity:removed', type: 'activity_output', quiz: undefined },
+    ];
+    mocks.request.mockRejectedValueOnce(new Error('connection')).mockResolvedValueOnce({ deleted: true });
+    const root = await render(createElement(LibraryCourseScreen));
+    const all = root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Remove all')[0]!;
+    await act(async () => all.props.onPress());
+    await act(async () => mocks.alert.mock.calls.at(-1)![2][1].onPress());
+    expect(mocks.removeLocal).toHaveBeenCalledExactlyOnceWith('owner', 'activity:removed');
+    expect(root.findAll(node => String(node.type) === 'SwipeRow')).toHaveLength(1);
+    expect(root.findAll(node => String(node.type) === 'Notice').map(node => node.props.children).join(' ')).toContain('1 could not be removed');
   });
 });

@@ -10,7 +10,7 @@ import { preparationPresentation } from "../courses/materialPreparationPresentat
 import { router, useLocalSearchParams } from "expo-router";
 import { BookOpen, ChevronDown, ChevronRight, ClipboardList, CloudOff, Eye, EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
@@ -30,6 +30,8 @@ import { quizIntentInput } from "./quizRequest";
 import { useExperience, useExperienceClient } from "./useExperience";
 import { arrangeList } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
+import { materialPreparation as materialStatus } from './courseReviewerActions';
+import { useCourseReviewerBatch } from './useCourseReviewerBatch';
 
 /**
  * The material row that was tapped, handed to the material screen so it can
@@ -207,6 +209,7 @@ export function GenerateCourseScreen() {
     [course?.code, course?.name, courseId, params.courseCode, params.courseName],
   );
   const groups = moduleGroups([...(workspace.data?.materials.items ?? []), ...extra]);
+  const batch = useCourseReviewerBatch(workspace.refresh);
 
   useEffect(() => {
     setExtra([]);
@@ -262,6 +265,17 @@ export function GenerateCourseScreen() {
         </Surface>
       ) : workspace.error && !workspace.data ? (
         <Surface><Copy size="h3">Materials could not be loaded</Copy><Copy muted>{workspace.error}</Copy><Action secondary onPress={workspace.refresh}>Try again</Action></Surface>
+      ) : null}
+      {workspace.data ? (
+        <Surface>
+          <Action disabled={batch.busy || !available(workspace.data.capabilities.reviewerGeneration)} onPress={() => Alert.alert('Generate all Reviewers?', 'Queue a Reviewer for every ready material in this course, including slides and documents. Materials with saved Reviewers are skipped.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Generate all', onPress: () => void batch.run(courseId) },
+          ])}>{batch.busy ? 'Submitting Reviewers…' : 'Generate all Reviewers'}</Action>
+          <Copy muted size="caption">Already generated materials are shaded and skipped. Preparing materials can be generated once ready.</Copy>
+          {batch.note ? <Notice>{batch.note}</Notice> : null}
+          <Action secondary onPress={() => router.push('/generation-queue')}>Open Queue</Action>
+        </Surface>
       ) : null}
       {workspace.data ? (
         <Surface style={{ overflow: "hidden" }}>
@@ -441,8 +455,9 @@ export function GenerateMaterialScreen() {
             <Copy muted size="bodySmall">{preparationPresentation(materialStatus(material)).message}</Copy>
             {materialStatus(material).status === "failed" && workspace.errorCode !== "connection" && materialPage.errorCode !== 'connection' && !retryOffline ? <Action disabled={busy} onPress={() => void retry()}>{busy ? "Retrying…" : "Retry"}</Action> : null}
             <Action disabled={busy || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>
-              Generate Reviewer
+              {material.reviewerArtifactId ? 'Remake Reviewer' : 'Generate Reviewer'}
             </Action>
+            {material.reviewerArtifactId ? <Action secondary onPress={() => router.push({ pathname: '/artifact', params: { id: `artifact:${material.reviewerArtifactId}` } })}>Open saved Reviewer</Action> : null}
             {!available(material.generation.reviewer) ? <Copy muted size="caption">{capabilityNote(material.generation.reviewer)}</Copy> : null}
           </Surface>
           <Surface style={{ gap: spacing[3] }}>
@@ -494,18 +509,16 @@ function ModuleGroup({ title, items, onSelect }: {
         </Pressable>
       ) : null}
       {open ? items.map((item) => (
-        <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Open material: ${item.title}`} onPress={() => onSelect(item)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 10, minHeight: 60, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: pressed ? colors.surfaceSecondary : undefined, borderTopWidth: 1, borderColor: colors.separator })}>
+        <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Open material: ${item.title}${item.reviewerArtifactId ? ', Reviewer already generated' : ''}`} onPress={() => onSelect(item)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 10, minHeight: 60, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: pressed || item.reviewerArtifactId ? colors.blueSoft : undefined, borderTopWidth: 1, borderColor: colors.separator })}>
           <ContentIcon kind={item.kind} small />
           <View style={{ flex: 1 }}>
             <Copy size="bodySmall" style={{ fontWeight: "600" }}>{item.title}</Copy>
             <Copy muted size="caption">{materialTypes[item.kind]} · {preparationPresentation(materialStatus(item)).label}</Copy>
+            {item.reviewerArtifactId ? <Copy size="caption" color={colors.textSecondary}>Reviewer already generated</Copy> : null}
           </View>
           <ChevronRight color={colors.textMuted} size={18} />
         </Pressable>
       )) : null}
     </Surface>
   );
-}
-function materialStatus(material: LearningMaterial): import('@stay-focused/shared').MaterialPreparation {
-  return material.preparation ?? { status: material.readiness === 'needs_preparation' ? 'preparing' : material.readiness, reasonCode: null };
 }
