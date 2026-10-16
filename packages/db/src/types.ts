@@ -3924,7 +3924,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          source_kind: "pdf" | "image" | "text";
+          source_kind: "pdf" | "image" | "text" | "docx" | "pptx";
           display_name: string;
           mime_type: string;
           storage_bucket: string | null;
@@ -3945,7 +3945,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
-          source_kind: "pdf" | "image" | "text";
+          source_kind: "pdf" | "image" | "text" | "docx" | "pptx";
           display_name: string;
           mime_type: string;
           storage_bucket?: string | null;
@@ -4177,9 +4177,9 @@ export interface Database {
           id: string;
           user_id: string;
           status: "pending" | "accepted" | "expired";
-          source_kind: "pdf" | "image";
+          source_kind: "pdf" | "image" | "docx" | "pptx";
           display_name: string;
-          mime_type: "application/pdf" | "image/png" | "image/jpeg";
+          mime_type: "application/pdf" | "image/png" | "image/jpeg" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "application/vnd.openxmlformats-officedocument.presentationml.presentation";
           expected_byte_size: number;
           storage_bucket: string;
           storage_object_path: string;
@@ -4193,9 +4193,9 @@ export interface Database {
           id?: string;
           user_id: string;
           status?: "pending" | "accepted" | "expired";
-          source_kind: "pdf" | "image";
+          source_kind: "pdf" | "image" | "docx" | "pptx";
           display_name: string;
-          mime_type: "application/pdf" | "image/png" | "image/jpeg";
+          mime_type: "application/pdf" | "image/png" | "image/jpeg" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "application/vnd.openxmlformats-officedocument.presentationml.presentation";
           expected_byte_size: number;
           storage_bucket: string;
           storage_object_path: string;
@@ -4416,6 +4416,14 @@ export interface Database {
       claim_canvas_email_outbox_v1: { Args: { p_worker_id: string; p_limit?: number }; Returns: CanvasEmailOutboxRow[] };
       claim_canvas_notification_course_v1: { Args: { p_worker_id: string }; Returns: CanvasCourseRow[] };
       apply_canvas_notification_metadata_v1: { Args: { p_course_id: string; p_worker_id: string; p_payload: Json; p_error?: string | null }; Returns: undefined };
+      create_manual_reviewer_job_v1: {
+        Args: { p_user_id: string; p_upload_id: string; p_idempotency_key: string; p_content_sha256: string; p_page_count: number; p_contract: Json };
+        Returns: ProcessingJobDatabaseRow[];
+      };
+      attach_manual_reviewer_source_v1: {
+        Args: { p_job_id: string; p_worker_id: string; p_source_text: string; p_source_blocks: Json };
+        Returns: ProcessingJobDatabaseRow[];
+      };
       attach_deferred_canvas_reviewer_source_v1: {
         Args: {
           p_job_id: string;

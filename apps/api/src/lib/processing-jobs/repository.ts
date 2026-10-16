@@ -363,7 +363,9 @@ function readSourceMetadata(value: Json): ProcessingJobSourceMetadata {
   const sourceKind =
     record.sourceKind === "pdf" ||
     record.sourceKind === "image" ||
-    record.sourceKind === "text"
+    record.sourceKind === "text" ||
+    record.sourceKind === "docx" ||
+    record.sourceKind === "pptx"
       ? record.sourceKind
       : "text";
 

@@ -9,6 +9,12 @@ import { updateProcessingJobProgress } from './worker-repository';
 import { durableGenerationProvider } from './ai-generation';
 
 export async function processAIReviewerJob(client: ProcessingJobServiceClient, job: ProcessingJobDatabaseRow, workerId: string) {
+  const initial = await findProcessingJobSource(client, job);
+  if (record(initial.metadata).manualReviewerVersion === "manual-reviewer-v1" &&
+      (initial.source_kind !== "text" || (!job.source_version_id && initial.source_version_id))) {
+    const { prepareManualReviewerSource } = await import('./manual-reviewer-source');
+    await prepareManualReviewerSource(client, job, workerId);
+  }
   const source = await findProcessingJobSource(client, job);
   if (source.user_id !== job.user_id || !source.source_text?.trim()) throw new ExperienceFailure(409, 'not_ready');
   const saved = await readProcessingJobCheckpoint(client, job.id, 'reviewer:ai-first:complete');

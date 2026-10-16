@@ -65,6 +65,22 @@ export async function processingJobWorkflow(
       }
       await finalizeExtractionStep(jobId, workerId);
     } else {
+      const manual = await readManualReviewerExtractionStep(jobId, workerId);
+      if (manual?.kind === "docx" || manual?.kind === "pptx") {
+        await prepareManualOfficeReviewerStep(jobId, workerId);
+      } else if (manual) {
+        if (manual.kind === "pdf") {
+          for (let page = 1; page <= manual.pageCount; page++) {
+            await inspectPdfPageStep(jobId, workerId, page, manual.pageCount);
+          }
+        }
+        const plan = await prepareExtractionStep(jobId, workerId, manual.kind === "pdf");
+        if (plan.kind === "image") await extractImageStep(jobId, workerId);
+        for (const chunk of plan.chunks) {
+          await extractPdfChunkStep(jobId, workerId, chunk.index, chunk.pageNumbers, true);
+        }
+        await finalizeExtractionStep(jobId, workerId);
+      }
       const deferredCanvasPageCount = await prepareCanvasReviewerExtractionStep(jobId, workerId);
       if (deferredCanvasPageCount !== null) {
         const pageNumbers = Array.from(
@@ -108,6 +124,22 @@ export async function processingJobWorkflow(
   } catch {
     await finalizeWorkflowFailureStep(jobId, workerId);
     return { status: "failed", jobId };
+  }
+}
+
+async function readManualReviewerExtractionStep(jobId: string, workerId: string) {
+  "use step";
+  const operations = await import("@/lib/processing-jobs/operations");
+  return operations.readManualReviewerExtractionStep(jobId, workerId);
+}
+
+async function prepareManualOfficeReviewerStep(jobId: string, workerId: string) {
+  "use step";
+  const operations = await import("@/lib/processing-jobs/operations");
+  try { await operations.prepareManualOfficeReviewerStep(jobId, workerId); }
+  catch (error) {
+    if (error instanceof Error && error.name === "ProcessingOperationError") throw new FatalError(error.message);
+    throw error;
   }
 }
 

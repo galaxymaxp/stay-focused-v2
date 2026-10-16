@@ -1,3 +1,4 @@
+import { isManualUploadMime, LEGACY_OFFICE_MESSAGE } from "@stay-focused/shared";
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
@@ -24,11 +25,11 @@ export async function POST(request: Request): Promise<Response> {
       return error(400, "invalid_json", "Upload metadata is required.", false);
     }
     const mimeType = readMimeType(body.mimeType);
-    if (!mimeType) {
+    if (!mimeType || (typeof body.displayName === "string" && /\.(doc|ppt)$/i.test(body.displayName))) {
       return error(
         415,
         "unsupported_media_type",
-        "Choose a supported PDF, PNG, or JPEG file.",
+        `Choose a PDF, PNG, JPEG, DOCX or PPTX file. ${LEGACY_OFFICE_MESSAGE}`,
         false,
       );
     }
@@ -78,11 +79,7 @@ export function OPTIONS(): Response {
 }
 
 function readMimeType(value: unknown): ProcessingUploadMimeType | null {
-  return value === "application/pdf" ||
-      value === "image/png" ||
-      value === "image/jpeg"
-    ? value
-    : null;
+  return isManualUploadMime(value) ? value : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

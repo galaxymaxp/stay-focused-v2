@@ -45,6 +45,28 @@ export interface ExtractionJobSourceInput {
   readonly stagedObjectPath?: string;
 }
 
+/** The database accepts the immutable binary source and reviewer contract atomically. */
+export async function createManualReviewerProcessingJob({ client, userId, uploadId, idempotencyKey, bytes, pageCount }: {
+  readonly client: ProcessingJobServiceClient; readonly userId: string; readonly uploadId: string;
+  readonly idempotencyKey: string; readonly bytes: Uint8Array; readonly pageCount: number;
+}): Promise<ProcessingJobDatabaseRow> {
+  const { data, error } = await client.rpc("create_manual_reviewer_job_v1", {
+    p_user_id: userId, p_upload_id: uploadId, p_idempotency_key: idempotencyKey,
+    p_content_sha256: sha256Bytes(bytes), p_page_count: pageCount,
+    p_contract: {
+      artifactType: "reviewer", engineVersion: REVIEWER_ENGINE_VERSION,
+      generationPolicyVersion: REVIEWER_GENERATION_POLICY_VERSION, language: "auto",
+      normalizationVersion: DOCUMENT_NORMALIZATION_VERSION, outputMode: "standard",
+      providerId: REVIEWER_PROVIDER_ID, reuseMode: "fresh", schemaVersion: REVIEWER_SCHEMA_VERSION,
+      settingsFingerprint: createGenerationSettingsFingerprint({ artifactType: "reviewer", language: "auto", outputMode: "standard" }),
+    },
+  });
+  if (error || !data?.[0]) {
+    throw mapRepositoryCreationError(new ProcessingJobRepositoryError(error?.message ?? "processing_job_persistence_failed"));
+  }
+  return data[0];
+}
+
 export interface ReviewerJobSourceInput {
   readonly sourceText: string;
   readonly sourceTitle?: string;

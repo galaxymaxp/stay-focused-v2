@@ -1,3 +1,5 @@
+import { isManualUploadMime, manualUploadKind, LEGACY_OFFICE_MESSAGE, type ManualUploadMime } from "@stay-focused/shared";
+import { CANVAS_FILE_MAX_SINGLE_BYTES } from "../canvas-file-policy";
 import type { ProcessingUploadIntentRow } from "@stay-focused/db";
 import { randomUUID } from "node:crypto";
 
@@ -12,10 +14,7 @@ import type { ProcessingJobServiceClient } from "./repository";
 export const PROCESSING_UPLOAD_INTENT_TTL_MS = 60 * 60 * 1_000;
 export const PROCESSING_TUS_CHUNK_BYTES = 6 * 1_024 * 1_024;
 
-export type ProcessingUploadMimeType =
-  | "application/pdf"
-  | "image/png"
-  | "image/jpeg";
+export type ProcessingUploadMimeType = ManualUploadMime;
 
 export async function createProcessingUploadIntent(
   client: ProcessingJobServiceClient,
@@ -30,10 +29,8 @@ export async function createProcessingUploadIntent(
   readonly tusEndpoint: string;
 }> {
   validateUploadMetadata(input);
-  const sourceKind = input.mimeType === "application/pdf" ? "pdf" : "image";
-  const extension = input.mimeType === "application/pdf"
-    ? "pdf"
-    : input.mimeType === "image/png" ? "png" : "jpg";
+  const sourceKind = manualUploadKind(input.mimeType);
+  const extension = sourceKind === "image" ? input.mimeType === "image/png" ? "png" : "jpg" : sourceKind;
   const uploadId = randomUUID();
   const objectPath = `${input.userId}/uploads/${uploadId}.${extension}`;
   const expiresAt = new Date(
@@ -125,9 +122,11 @@ function validateUploadMetadata(input: {
   readonly mimeType: ProcessingUploadMimeType;
   readonly byteSize: number;
 }): void {
-  const maxBytes = input.mimeType === "application/pdf"
-    ? OCR_MAX_PDF_BYTES
-    : OCR_MAX_IMAGE_BYTES;
+  if (/\.(doc|ppt)$/i.test(input.displayName) || !isManualUploadMime(input.mimeType)) {
+    throw new ProcessingUploadIntentError("unsupported_media_type", LEGACY_OFFICE_MESSAGE, false);
+  }
+  const kind = manualUploadKind(input.mimeType);
+  const maxBytes = kind === "docx" || kind === "pptx" ? CANVAS_FILE_MAX_SINGLE_BYTES : kind === "pdf" ? OCR_MAX_PDF_BYTES : OCR_MAX_IMAGE_BYTES;
   if (!Number.isInteger(input.byteSize) || input.byteSize < 1) {
     throw new ProcessingUploadIntentError(
       "empty_file",

@@ -1,3 +1,6 @@
+import { UNREADABLE_MANUAL_FILE_MESSAGE } from "@stay-focused/shared";
+import { WorkerJobError } from "./processor";
+import { record } from "../experience/mappers";
 import type {
 Json,
 ProcessingJobDatabaseRow,
@@ -86,6 +89,35 @@ interface StoredExtractionPlan {
   readonly nativeTextPageCount: number;
   readonly ocrPageCount: number;
   readonly preparedAt: string;
+}
+
+export async function readManualReviewerExtractionStep(jobId: string, workerId: string): Promise<{
+  kind: "pdf" | "image" | "docx" | "pptx"; pageCount: number;
+} | null> {
+  const client = createProcessingJobServiceClient();
+  await assertWorkflowJobMayContinue(client, jobId, workerId);
+  const job = await readProcessingJobState(client, jobId);
+  const source = await findProcessingJobSource(client, job);
+  if (record(source.metadata).manualReviewerVersion !== "manual-reviewer-v1" || source.source_kind === "text") return null;
+  if (source.user_id !== job.user_id) throw new FatalError("processing_job_source_invalid");
+  return { kind: source.source_kind, pageCount: source.page_count ?? 1 };
+}
+
+export async function prepareManualOfficeReviewerStep(jobId: string, workerId: string): Promise<void> {
+  const client = createProcessingJobServiceClient();
+  const job = await readProcessingJobState(client, jobId);
+  await withWorkflowLease(client, jobId, workerId, async () => {
+    const { prepareManualReviewerSource } = await import("./manual-reviewer-source");
+    try { await prepareManualReviewerSource(client, job, workerId); }
+    catch (error) {
+      if (error instanceof WorkerJobError && !error.automaticRetryable) {
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: error.safeMessage,
+          retryable: error.retryable, automaticRetryable: error.automaticRetryable });
+        throw new FatalError(error.code);
+      }
+      throw error;
+    }
+  });
 }
 
 export async function prepareCanvasReviewerExtractionStep(jobId: string, workerId: string): Promise<number | null> {
@@ -706,6 +738,21 @@ export async function finalizeExtractionStep(
       queueWaitMs: queueWaitMs(job),
       workerExecutionMs: Math.max(0, Date.now() - startedAt),
     };
+    if (record(source.metadata).manualReviewerVersion === "manual-reviewer-v1") {
+      const { attachManualReviewerSource } = await import("./manual-reviewer-source");
+      try {
+        await attachManualReviewerSource(client, job, workerId, normalized.text, normalized.pages.filter(page => page.text.trim()).map((page, order) => ({
+          id: `page-${page.pageNumber}`, kind: "unknown", order, pageNumber: page.pageNumber, text: page.text,
+        })));
+      } catch (error) {
+        if (error instanceof WorkerJobError && !error.automaticRetryable) {
+          await failKnownWorkflowJob(client, jobId, workerId, { code: error.code, message: error.safeMessage, retryable: error.retryable });
+          throw new FatalError(error.code);
+        }
+        throw error;
+      }
+      return;
+    }
     await completeProcessingJob(client, {
       jobId,
       workerId,
@@ -827,6 +874,10 @@ export async function processAIReviewerStep(jobId: string, workerId: string): Pr
       throw error;
     }
     const output = await processAIReviewerJob(client, job, workerId).catch(async (error: unknown) => {
+      if (error instanceof WorkerJobError && !error.automaticRetryable) {
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: error.safeMessage, retryable: error.retryable, automaticRetryable: error.automaticRetryable });
+        throw new FatalError(error.code);
+      }
       if (error instanceof ExperienceFailure && error.status < 500) {
         await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Reviewer generation could not be completed.", retryable: false, automaticRetryable: false });
         throw new FatalError(error.code);
@@ -948,7 +999,9 @@ async function failKnownWorkflowJob(
     jobId,
     workerId,
     errorCode: failure.code,
-    safeErrorMessage: failure.message,
+    safeErrorMessage: ["no_text_detected", "ocr_empty_result", "document_unreadable"].includes(failure.code) &&
+      record((await readProcessingJobState(client, jobId)).source_metadata).manualReviewerVersion === "manual-reviewer-v1"
+      ? UNREADABLE_MANUAL_FILE_MESSAGE : failure.message,
     retryable: failure.retryable,
     automaticRetryable: false,
   });

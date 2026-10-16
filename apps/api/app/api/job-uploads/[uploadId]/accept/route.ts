@@ -1,3 +1,5 @@
+import { isManualUploadMime, manualUploadKind, LEGACY_OFFICE_MESSAGE } from "@stay-focused/shared";
+import { validateManualOfficeBytes } from "@/lib/processing-jobs/manual-upload-validation";
 import { OCR_PDF_MIME_TYPE } from "@stay-focused/ocr";
 import { NextResponse } from "next/server";
 
@@ -9,6 +11,7 @@ import {
 import { getConfiguredDurableDocumentMaxPdfPages } from "@/lib/ocr/upload-policy";
 import {
   createExtractionProcessingJob,
+  createManualReviewerProcessingJob,
   ProcessingJobCreationError,
   validateIdempotencyKey,
 } from "@/lib/processing-jobs/creation";
@@ -50,12 +53,14 @@ export async function POST(
     const idempotencyKey = validateIdempotencyKey(
       request.headers.get("idempotency-key"),
     );
+    const body: unknown = await request.json().catch(() => ({}));
+    const wantsReviewer = typeof body === "object" && body !== null && "jobType" in body && body.jobType === "reviewer_generation";
     const intent = await findOwnedProcessingUploadIntent(client, user.id, uploadId);
     if (!intent) return notFound();
     if (intent.status === "accepted" && intent.job_id) {
       const existing = await findOwnedProcessingJob(client, user.id, intent.job_id);
       return existing
-        ? accepted(existing)
+        ? accepted(await dispatchAcceptedProcessingJob(existing, { client }))
         : error(409, "accepted_job_unavailable", "The accepted job is unavailable.", true);
     }
     if (intent.status !== "pending" || Date.parse(intent.expires_at) <= Date.now()) {
@@ -88,6 +93,10 @@ export async function POST(
       );
     }
 
+    if (!isManualUploadMime(intent.mime_type) || /\.(doc|ppt)$/i.test(intent.display_name)) {
+      return error(415, "unsupported_media_type", LEGACY_OFFICE_MESSAGE, false);
+    }
+    const kind = manualUploadKind(intent.mime_type);
     let pageCount = 1;
     if (intent.mime_type === OCR_PDF_MIME_TYPE) {
       const validation = await validatePdfOcrBytes({
@@ -109,6 +118,10 @@ export async function POST(
         );
       }
       pageCount = validation.pageCount;
+    } else if (kind === "docx" || kind === "pptx") {
+      if (!validateManualOfficeBytes(bytes, kind)) {
+        return error(422, "invalid_office_file", "Choose a valid DOCX or PPTX file.", false);
+      }
     } else {
       const validation = validateImageOcrBytes({
         bytes,
@@ -125,14 +138,16 @@ export async function POST(
       }
     }
 
-    const job = await createExtractionProcessingJob({
+    const job = wantsReviewer || kind === "docx" || kind === "pptx"
+      ? await createManualReviewerProcessingJob({ client, userId: user.id, uploadId, idempotencyKey, bytes, pageCount })
+      : await createExtractionProcessingJob({
       client,
       idempotencyKey,
       source: {
         bytes,
         displayName: intent.display_name,
-        mimeType: intent.mime_type,
-        sourceKind: intent.source_kind,
+        mimeType: intent.mime_type as "application/pdf" | "image/png" | "image/jpeg",
+        sourceKind: intent.source_kind as "pdf" | "image",
         pageCount,
         stagedObjectPath: intent.storage_object_path,
       },
