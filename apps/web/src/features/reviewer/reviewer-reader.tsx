@@ -323,6 +323,7 @@ export function ReviewerReader({
         }
       />
       {snapshotStatus}
+      {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
       <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>
         <nav className="reviewer-toc" aria-label="Topics">
           <label className="reviewer-search">

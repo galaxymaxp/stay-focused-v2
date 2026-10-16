@@ -176,6 +176,10 @@ export function text(value: unknown): string | null { return typeof value === 's
 export function reviewerReader(payload: unknown, summary: LibraryArtifactSummary, freshness: ReviewerReaderModel['freshness'] = 'unknown'): ReviewerReaderModel {
   const root = record(payload);
   const reviewer = 'reviewer' in root ? record(root.reviewer) : root;
+  const generation = record(reviewer.metadata);
+  const generationNotice = generation.generationStatus === 'partial'
+    ? 'This reviewer is partial. Some material parts could not be generated after two attempts. Check your original material for the missing content.'
+    : undefined;
   if (!Array.isArray(reviewer.sections)) throw new ExperienceFailure(503, 'unavailable');
   const sections = reviewer.sections.map((value: unknown) => {
     const section = record(value);
@@ -201,5 +205,5 @@ export function reviewerReader(payload: unknown, summary: LibraryArtifactSummary
       return { id: item.id, title: item.title, explanation: core.explanation, keyPoints: core.keyPoints as string[], emphasis, evidence };
     }) };
   });
-  return { id: summary.id, title: summary.title, course: summary.course, source: { id: summary.sourceId, title: summary.sourceTitle }, generatedAt: summary.createdAt, freshness, sections, reviewMinutes: estimateReviewerMinutes(payload)?.minutes ?? null };
+  return { id: summary.id, title: summary.title, course: summary.course, source: { id: summary.sourceId, title: summary.sourceTitle }, generatedAt: summary.createdAt, freshness, sections, ...(generationNotice ? { generationNotice } : {}), reviewMinutes: estimateReviewerMinutes(payload)?.minutes ?? null };
 }

@@ -359,6 +359,7 @@ export function ReviewerReaderScreen({
       }
     >
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
+      {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
       <View style={{ gap: spacing[1], paddingRight: spacing[2] }}>
         <Copy size="h1" style={{ fontSize: 26, lineHeight: 33 }}>{artifact.title}</Copy>
         {secondaryLine ? <Copy muted size="caption">{secondaryLine}</Copy> : null}

@@ -407,6 +407,15 @@ describe('Library ownership and persisted output', () => {
     const summary = (await service(libraryData).api.getLibrary('owner')).items[0]!;
     expect(() => reviewerReader({ reviewer: { sections: [{ items: [{}] }] } }, summary)).toThrow(ExperienceFailure);
   });
+  it('discloses partial generation on the reader without exposing quarantined private source IDs', async () => {
+    const summary = (await service(libraryData).api.getLibrary('owner')).items[0]!;
+    const partial = { reviewer: { ...payload.reviewer, metadata: { generationStatus: 'partial', generationFailures: [{ sourceBlockIds: ['PRIVATE_BLOCK'], reason: 'PRIVATE_PROVIDER_ERROR' }] } } };
+    const reader = reviewerReader(partial, summary);
+    expect(reader.generationNotice).toContain('partial');
+    expect(reader.sections).toEqual(reviewerReader(payload, summary).sections);
+    expect(JSON.stringify(reader)).not.toContain('PRIVATE_');
+    expect(reviewerReader(payload, summary).generationNotice).toBeUndefined();
+  });
   it('reads a saved Reviewer whose optional emphasis was sanitized to zero', async () => {
     const { api } = service(libraryData);
     const summary = (await api.getLibrary('owner')).items[0]!;

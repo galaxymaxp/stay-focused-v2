@@ -253,6 +253,8 @@ export type LibraryArtifactDetail =
   | { readonly artifact: LibraryArtifactSummary; readonly quiz: import('./quiz').Quiz }
   | { readonly artifact: LibraryArtifactSummary; readonly draft: import('./activity-maker').ActivityDraft };
 export interface ReviewerReaderModel {
+  /** Safe disclosure of quarantined generation parts, without private source IDs. */
+  readonly generationNotice?: string;
   /** Deterministic estimate from this version's saved content. */
   readonly reviewMinutes?: number | null;
   readonly id: string;
