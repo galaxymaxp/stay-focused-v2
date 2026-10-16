@@ -1,4 +1,5 @@
 "use client";
+import { useLibraryOpened } from '../lib/use-library-opened';
 import type {
   Quiz,
   QuizAttempt,
@@ -36,6 +37,7 @@ export function QuizScreen({ id }: { id: string }) {
       `/api/experience/quizzes/${id}/attempts`,
     ),
     action = useAction();
+  useLibraryOpened(quiz.data ? 'quiz:' + quiz.data.id : null);
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null),
     [result, setResult] = useState<QuizResult | null>(null),
     [index, setIndex] = useState(0),

@@ -7,6 +7,8 @@ import {
   setHidden,
   setPinned,
   setRead,
+  setLibrarySort,
+  setLibraryOpened,
   type HideSurface,
   type ListPreferences,
   type PinKind,
@@ -85,5 +87,11 @@ export function useListPreferences() {
     (id: string, isRead: boolean) => owner && update(owner, (p) => setRead(p, id, isRead)),
     [owner],
   );
-  return { prefs, pin, hide, read };
+  const setSort = useCallback(<K extends keyof ListPreferences['sort']>(surface: K, sort: ListPreferences['sort'][K]) => {
+    if (owner) update(owner, current => setLibrarySort(current, surface, sort));
+  }, [owner]);
+  const markOpened = useCallback((id: string) => {
+    if (owner) update(owner, current => setLibraryOpened(current, id));
+  }, [owner]);
+  return { prefs, pin, hide, read, setSort, markOpened };
 }

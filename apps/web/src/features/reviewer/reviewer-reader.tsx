@@ -1,4 +1,5 @@
 "use client";
+import { useLibraryOpened } from '../../lib/use-library-opened';
 import { TopicAssist } from "./topic-assist";
 import { StudyAnswerScrollContext, useStudyAnswerScroll } from "./study-answer-scroll";
 import {
@@ -76,6 +77,7 @@ export function ReviewerReader({
     update(); window.addEventListener('online', update); window.addEventListener('offline', update);
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
   }, []);
+  useLibraryOpened(artifact.id);
   const visualArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
   const figureAvailability = useFigureAvailability(visualArtifactId);
   const reviewerVisuals = useReviewerVisuals(visualArtifactId);

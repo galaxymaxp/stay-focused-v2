@@ -4991,3 +4991,16 @@ mark.find-active {
 .topic-level-row .segmented { background: var(--field); border-radius: var(--radius-control); padding: .15rem; }
 .topic-level-row .segmented button { border: 0; background: transparent; box-shadow: none; }
 .topic-level-row .segmented button[aria-pressed="true"] { background: var(--elevated); }
+
+/* Compact, single-line Library preference using the existing form palette. */
+.library-sort {
+  flex-direction: row;
+  align-self: flex-start;
+  white-space: nowrap;
+}
+.library-sort select {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: inherit;
+}
