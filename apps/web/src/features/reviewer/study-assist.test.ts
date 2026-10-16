@@ -42,6 +42,21 @@ function deferred() {
   return async () => { const request = mocks.api.mock.calls.at(-1)![1].body as StudyToolRequest | AssistRequest;
     await act(async () => resolve({ ...('assistType' in request ? request : { action: request.action, ...(request.modifier ? { modifier: request.modifier } : {}), outcome: request.action === 'test' && (!request.modifier || request.modifier === 'choices') ? 'question' : request.modifier === 'check' ? 'checked' : 'answer', ...(request.action === 'test' ? { question: 'What does it contain?' } : {}), ...(request.modifier === 'choices' ? { choices: ['DNA', 'Water', 'Air'] } : {}), ...(request.modifier === 'check' ? { verdict: 'correct' } : {}), grounding: 'source' }), text: 'Lead\n- **DNA** is inside.', createdAt: '2026-10-16T00:00:00Z' })); };
 }
+it('image Ask shows thumbnail and ordered chips, sends references only, supports typed follow-ups and caches repeats',async()=>{
+  const image={reference:{kind:'figure' as const,id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'},thumbnail:'https://private.test/image',label:'Cell diagram'};
+  mocks.api.mockImplementation(async(_path:string,options:{body:StudyToolRequest})=>({action:options.body.action,outcome:'answer',grounding:'source',text:'A cell.\n- **Nucleus** holds DNA.',createdAt:'2026-10-16T00:00:00Z'}));
+  await act(async()=>{tree=create(createElement(StudyAssistPanel,{target:{selection},image,passageLabel:'Cell',onClose:vi.fn()}));});
+  expect(tree!.root.findByType('img').props.src).toBe(image.thumbnail);
+  expect(tree!.root.findAllByType('button').filter(n=>n.props.className==='chip').map(n=>n.props.children)).toEqual(['What is this?','What does it mean?','Explain the parts','Why is it in this lesson?']);
+  await act(async()=>button('What is this?').props.onClick());
+  expect(mocks.api.mock.calls[0]![1].body.image).toEqual(image.reference);expect(JSON.stringify(mocks.api.mock.calls[0]![1].body)).not.toContain(image.thumbnail);
+  for(const question of ['Why?', 'Which part?']) {
+    await act(async()=>tree!.root.findByType('textarea').props.onChange({target:{value:question}}));
+    await act(async()=>button('Ask').props.onClick());
+  }
+  expect(mocks.api.mock.calls[2]![1].body.followUps).toHaveLength(2);expect(tree!.root.findAllByType('textarea')).toHaveLength(0);
+  await act(async()=>button('New question').props.onClick());await act(async()=>button('What is this?').props.onClick());expect(mocks.api).toHaveBeenCalledTimes(3);
+});
 it.each([false, true])('reveals a quick assist loading area and completion, Reduce Motion=%s', async motion => {
   reduced = motion; const finish = deferred(); await mount();
   await act(async () => tree!.root.findAllByType('button').find(n => String(n.props['aria-label']).startsWith('Summarize,'))!.props.onClick());

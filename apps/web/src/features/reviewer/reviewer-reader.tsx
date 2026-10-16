@@ -6,7 +6,7 @@ import {
   STUDY_ACTIONS,
   checkStudySelection,
   selectAssistBlock,
-  type AssistType,
+  type AssistType, type StudyImageTarget,
   type StudyAction,
   type LibraryArtifactSummary,
   type ReviewerReaderModel,
@@ -47,7 +47,7 @@ import { ShareReviewer } from './share-reviewer';
 // Assist in a side panel. Click a key point to select it (Shift-click for its
 // group), click an explanation for Study Assist, or select any text to study it.
 
-type Passage = { section: string; block: string; point?: number; text?: string; action?: StudyAction };
+type Passage = { section: string; block: string; point?: number; text?: string; action?: StudyAction; image?: StudyImageTarget };
 type Pick = { section: string; block: string; points: readonly number[] };
 
 function readableText(range: Range): string {
@@ -117,6 +117,12 @@ export function ReviewerReader({
     const selection = selectAssistBlock(reviewer, passage.section, passage.block);
     return selection ? { selection, ...(passage.point === undefined ? {} : { pointIndex: passage.point }) } : null;
   }, [reviewer, passage]);
+  function askImage(sectionId: string, image: StudyImageTarget) {
+    if (!navigator.onLine) return;
+    const section = reviewer.sections.find(item => item.id === sectionId);
+    const block = section?.blocks.find(item => selectAssistBlock(reviewer, sectionId, item.id));
+    if (block) setPassage({section:sectionId,block:block.id,image});
+  }
   const marks = useAssistMarks();
   const markFor = (blockId: string, point?: number): AssistMark => assistMark(marks[assistTargetKey(reviewer.id, blockId, point)]);
   const pointHasResult = (block: string, index: number) => hasAssistResult(marks[assistTargetKey(reviewer.id, block, index)]);
@@ -402,7 +408,7 @@ export function ReviewerReader({
                 <span className="kicker">Topic {sectionIndex + 1}</span>
                 <h2 data-segment={segmentIds.sectionTitle(section.id)}>{render(segmentIds.sectionTitle(section.id), section.title)}</h2>
               </header>
-              {visualArtifactId && <SectionVisual artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} external={reviewerVisuals?.[section.id]} />}
+              {visualArtifactId && <SectionVisual onAsk={image => askImage(section.id, image)} artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} external={reviewerVisuals?.[section.id]} />}
               {section.blocks.map((block) => {
                 const pickingHere = picking?.block === block.id;
                 return (
@@ -480,7 +486,8 @@ export function ReviewerReader({
 
         {passage && (
           <StudyAssistPanel
-            key={openKey ?? "missing"}
+            key={`${openKey ?? "missing"}|${passage.image?.reference.id ?? ""}`}
+            image={passage.image}
             target={assistTarget}
             initialText={passage.text}
             initialAction={passage.action}

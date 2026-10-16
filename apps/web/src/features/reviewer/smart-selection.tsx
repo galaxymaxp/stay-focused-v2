@@ -3,6 +3,7 @@ import { StudyAnswerArea, useAnswerReveal } from "./study-answer-scroll";
 
 import { StudyText } from "./study-text";
 import {
+  STUDY_IMAGE_SUGGESTIONS, type StudyImageTarget, studyAskSubject,
   STUDY_ACTIONS,
   STUDY_ACTION_LABELS,
   STUDY_ACTION_TITLES,
@@ -97,11 +98,13 @@ const VERDICTS = { correct: "Correct", partial: "Partially correct", incorrect: 
 export function SmartSelectionPanel({
   selection,
   initialText,
+  image,
   initialAction,
   askText,
   onActiveChange,
 }: {
   selection: AssistSelection;
+  image?: StudyImageTarget;
   /** Text already selected in the reader, if the panel opened from it. */
   initialText?: string;
   /** Action chosen with that text in the reader; runs once on open. */
@@ -113,8 +116,8 @@ export function SmartSelectionPanel({
   const surface = useMemo(() => studySurface(selection.block), [selection.block]);
   const [picked, setPicked] = useState(initialText ?? "");
   const check = checkStudySelection(selection.block, picked);
-  const [action, setAction] = useState<StudyAction | null>(null);
-  const [subject, setSubject] = useState("");
+  const [action, setAction] = useState<StudyAction | null>(image ? "ask" : null);
+  const [subject, setSubject] = useState(image ? studyAskSubject(selection.block) : "");
   const [shown, setShown] = useState<{ modifier?: StudyModifier; run: Run } | null>(null);
   const [test, setTest] = useState<TestState>(EMPTY_TEST);
   const [turns, setTurns] = useState<AskTurn[]>([]);
@@ -162,6 +165,7 @@ export function SmartSelectionPanel({
       promptVersion: STUDY_TOOLS_PROMPT_VERSION,
       selection: text,
       action: act,
+      ...(image ? { image: image.reference } : {}),
       ...(Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== undefined)) as Extra),
     };
     session(request).then(
@@ -235,7 +239,11 @@ export function SmartSelectionPanel({
 
   return (
     <div className="stack smart-selection">
-      {action ? (
+      {image ? (
+        /* Signed private thumbnails bypass public optimization. */
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={image.thumbnail} alt={image.label} style={{width:"100%",maxHeight:160,objectFit:"contain"}} />
+      ) : action ? (
         <div className="selected-quote">
           <div className="row between">
             <span className="kicker">Selected</span>
@@ -268,7 +276,7 @@ export function SmartSelectionPanel({
           ) : null}
         </div>
       )}
-      {selecting && (
+      {selecting && !image && (
         <div className="study-actions" role="tablist" aria-label="Learning tools">
           {STUDY_ACTIONS.map((item) => (
             <button
@@ -424,7 +432,7 @@ export function SmartSelectionPanel({
             <>
               {turns.length === 0 && (
                 <div className="row wrap">
-                  {STUDY_ASK_SUGGESTIONS.map((s) => (
+                  {(image ? STUDY_IMAGE_SUGGESTIONS : STUDY_ASK_SUGGESTIONS).map((s) => (
                     <button key={s} className="chip" onClick={() => ask(s)}>
                       {s}
                     </button>
@@ -432,7 +440,7 @@ export function SmartSelectionPanel({
                 </div>
               )}
               <textarea
-                aria-label={turns.length ? "Ask a follow-up" : "Ask about the selected text"}
+                aria-label={turns.length ? "Ask a follow-up" : image ? "Ask about this image" : "Ask about the selected text"}
                 placeholder={turns.length ? "Ask a follow-up…" : "Ask something about the selected text…"}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}

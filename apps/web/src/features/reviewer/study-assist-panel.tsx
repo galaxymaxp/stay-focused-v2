@@ -6,7 +6,7 @@ import {
   ASSIST_RESULT_LABELS,
   ASSIST_TYPES,
   studyAskSubject,
-  type AssistType,
+  type AssistType, type StudyImageTarget,
 } from "@stay-focused/shared";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../components/providers";
@@ -39,11 +39,13 @@ export function StudyAssistPanel(props: Parameters<typeof StudyAssistContent>[0]
 function StudyAssistContent({
   target,
   initialText,
+  image,
   initialAction,
   passageLabel,
   onClose,
 }: {
   target: AssistTarget | null;
+  image?: StudyImageTarget;
   initialText?: string;
   /** A Smart Selection action chosen in the reader, run as the panel opens. */
   initialAction?: StudyAction;
@@ -115,12 +117,13 @@ function StudyAssistContent({
           <SmartSelectionPanel
             key={`${key}|${initialText ?? ""}|${initialAction ?? ""}`}
             selection={target.selection}
+            image={image}
             initialText={initialText}
             initialAction={initialAction}
             askText={studyAskSubject(target.selection.block, target.pointIndex)}
             onActiveChange={setStudying}
           />
-          {!studying && (
+          {!studying && !image && (
             <>
               <span className="kicker assist-section-label">
                 Quick assists · whole {target.pointIndex !== undefined ? "key point" : "concept"}
