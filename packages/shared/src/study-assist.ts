@@ -1,7 +1,7 @@
 import type { ReviewerReaderModel } from './experience';
 
 /** Separate from every canonical artifact and generation DTO. */
-export const ASSIST_PROMPT_VERSION = 'study-assist-v1';
+export const ASSIST_PROMPT_VERSION = 'study-assist-v2';
 export const ASSIST_TYPES = ['summarize', 'explain_simply', 'analogy', 'example'] as const;
 export type AssistType = typeof ASSIST_TYPES[number];
 export const ASSIST_LABELS: Record<AssistType, string> = {

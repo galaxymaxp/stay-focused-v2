@@ -5,7 +5,7 @@ import type { AssistBlock } from './study-assist';
  * student can take on text selected inside a Reviewer block. Results are
  * supplementary and never change the canonical Reviewer.
  */
-export const STUDY_TOOLS_PROMPT_VERSION = 'study-tools-v1';
+export const STUDY_TOOLS_PROMPT_VERSION = 'study-tools-v2';
 /** Fixed order; the interface never reorders these. */
 export const STUDY_ACTIONS = ['define', 'explain', 'example', 'test', 'ask'] as const;
 export type StudyAction = typeof STUDY_ACTIONS[number];
@@ -39,7 +39,7 @@ export const STUDY_MODIFIER_LABELS: Record<StudyModifier, string> = {
   check: 'Check Answer', harder: 'Harder', apply: 'Apply it', explain_answer: 'Explain answer', choices: 'Need choices?',
 };
 /** Static suggestions; never generated. */
-export const STUDY_ASK_SUGGESTIONS = ['Why does this matter?', 'How does this work?', 'What could I confuse this with?'] as const;
+export const STUDY_ASK_SUGGESTIONS = ['What is this?', 'Why does this matter?', 'How does this work?', 'What could I confuse this with?'] as const;
 
 export const STUDY_LIMITS = {
   /** Characters of selected text after whitespace normalization. */
@@ -145,7 +145,7 @@ export function studyAskSubject(block: AssistBlock, pointIndex?: number): string
 /** Same-session reuse key. Inputs that change the answer are part of it. */
 export function studyCacheKey(request: StudyToolRequest): string {
   return JSON.stringify([request.reviewerId, request.blockId, request.contentHash, normalizeStudyText(request.selection), request.action,
-    request.modifier ?? '', request.question ?? '', request.answer ?? '', request.followUps ?? []]);
+    request.promptVersion, request.modifier ?? '', request.question ?? '', request.answer ?? '', request.followUps ?? []]);
 }
 /** Variants whose purpose is novelty are never reused. */
 export function studyReusable(request: StudyToolRequest): boolean {

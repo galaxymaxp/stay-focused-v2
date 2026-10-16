@@ -241,3 +241,6 @@ export * from "./course-state";
 export * from './job-status-reader';
 export * from './reviewer-share';
 export * from './course-batch';
+
+export * from './study-format';
+export * from './study-scroll';
