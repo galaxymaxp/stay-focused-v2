@@ -56,6 +56,9 @@ import { useCourseReviewerBatch } from './useCourseReviewerBatch';
 import { orderedLibrary } from './libraryOrder';
 import { useLibraryOrganizer } from './useLibraryOrganizer';
 import { LibrarySelectionToolbar } from './LibrarySelectionToolbar';
+import { LibrarySortControl } from './LibrarySortControl';
+import { LIBRARY_GRID_SORT_KEY, sortLibraryGroups, sortLibraryItems } from './librarySorting';
+import { useLibraryCourseSequence } from './useLibraryCourseSequence';
 
 const LOCAL_PAGE_SIZE = 50;
 const GRID_GAP = 12;
@@ -187,9 +190,10 @@ export function LibraryScreen() {
   const offline = library.offlineStats != null && library.errorCode === "connection";
   const offlineCaption = offlineLibraryCaption(library.offlineStats, library.refreshing && !offline);
   const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items));
-  const { prefs, pin } = useListPreferences();
+  const { prefs, pin, sortLibrary } = useListPreferences();
+  const sort = prefs.librarySort?.[LIBRARY_GRID_SORT_KEY] ?? "updated_desc";
   const { reducedMotion } = useTheme();
-  const arranged = arrangeList(groups, (group) => group.key, prefs.pinned.course, []);
+  const arranged = arrangeList(sortLibraryGroups(groups, sort), (group) => group.key, prefs.pinned.course, []);
   const contentWidth = Math.max(280, windowWidth - spacing[5] * 2);
   const columns = contentWidth >= 560 ? 3 : 2;
   const tileWidth = Math.floor((contentWidth - GRID_GAP * (columns - 1)) / columns);
@@ -221,7 +225,9 @@ export function LibraryScreen() {
   const hasLocal = library.items.length > 0;
   const loading = !library.localReady || (!hasLocal && !library.savedAt && library.refreshing);
   return (
-    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh} headerBelow={<SnapshotStatus {...library} />}>
+    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh}
+      headerAction={<LibrarySortControl value={sort} grid onChange={value => sortLibrary(LIBRARY_GRID_SORT_KEY, value)} />}
+      headerBelow={<SnapshotStatus {...library} />}>
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {offlineCaption ? <Copy muted size="caption">{offlineCaption}</Copy> : null}
       {loading ? <LibrarySkeleton /> : null}
@@ -253,7 +259,9 @@ export function LibraryCourseScreen() {
   const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
   const courseItems = useMemo(() => filterCourseLibrary(library.items, courseKey, "all"), [courseKey, library.items]);
   const filtered = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
-  const { prefs, pin, reorderLibrary } = useListPreferences();
+  const { prefs, pin, reorderLibrary, sortLibrary } = useListPreferences();
+  const sort = prefs.librarySort?.[courseKey] ?? "custom";
+  const sequence = useLibraryCourseSequence(courseKey, sort === "course" && courseKey !== PERSONAL_LIBRARY_KEY);
   const { reducedMotion, colors } = useTheme();
   const change = (update: () => void) => {
     animateNextLayout(reducedMotion);
@@ -267,10 +275,10 @@ export function LibraryCourseScreen() {
   const batch = useCourseReviewerBatch(library.refresh);
   const remaining = courseItems.filter(item => !removal.removed.has(item.id));
   const arranged = arrangeList(remaining, (item) => item.id, prefs.pinned.artifact, []);
-  const allItems = orderedLibrary([...arranged.pinned, ...arranged.rest], prefs.libraryOrder?.[courseKey]);
+  const allItems = sortLibraryItems(orderedLibrary([...arranged.pinned, ...arranged.rest], prefs.libraryOrder?.[courseKey]), sort, sequence.data);
   const filteredIds = new Set(filtered.map(item => item.id));
   const items = allItems.filter(item => filteredIds.has(item.id));
-  const organizer = useLibraryOrganizer(`${courseKey}:${filter}`, allItems.map(item => item.id), items.map(item => item.id), ids => reorderLibrary(courseKey, ids));
+  const organizer = useLibraryOrganizer(`${courseKey}:${filter}:${sort}`, allItems.map(item => item.id), items.map(item => item.id), ids => reorderLibrary(courseKey, ids));
   const selectedItems = allItems.filter(item => organizer.selectedIds.includes(item.id));
   const remakeIds = new Set(selectedItems.filter(item => item.type === 'reviewer' && item.sourceMaterialId).map(item => item.sourceMaterialId!));
   const allInCourse = remaining.length > 0 && remaining.every(item => organizer.selected.has(item.id));
@@ -294,6 +302,8 @@ export function LibraryCourseScreen() {
       scrollEnabled={!organizer.dragging}
       refreshEnabled={!organizer.editing}
       headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
+      headerAction={<LibrarySortControl value={sort} course={courseKey !== PERSONAL_LIBRARY_KEY} disabled={organizer.editing}
+        onChange={value => { sortLibrary(courseKey, value); setVisible(LOCAL_PAGE_SIZE); }} />}
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
           <SnapshotStatus {...library} />
@@ -312,6 +322,8 @@ export function LibraryCourseScreen() {
       }
     >
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
+      {sort === "course" && sequence.loading && !sequence.data ? <Copy muted size="caption">Loading course order…</Copy> : null}
+      {sort === "course" && sequence.error ? <Notice>{sequence.data ? "Using the saved course order. Connect to refresh it." : "Course order is not saved yet. Connect once to load it."}</Notice> : null}
       {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
       {batch.note ? <Notice>{batch.note}</Notice> : null}

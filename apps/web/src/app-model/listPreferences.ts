@@ -10,6 +10,7 @@
  */
 export type HideSurface = "generate" | "library" | "libraryItems" | "today" | "announcements" | "queue";
 export type PinKind = "course" | "artifact" | "today" | "announcement";
+export type LibrarySort = "custom" | "updated_desc" | "updated_asc" | "title_asc" | "title_desc" | "course";
 
 /** A Today dismissal lasts for the day it was made on. */
 export function todayHideKey(date: string, itemId: string) {
@@ -23,6 +24,7 @@ export interface ListPreferences {
   readonly read: { readonly announcements: readonly string[] };
   /** Custom saved-work order per course, on this device and account. */
   readonly libraryOrder: Readonly<Record<string, readonly string[]>>;
+  readonly librarySort?: Readonly<Record<string, LibrarySort>>;
 }
 
 export const EMPTY_LIST_PREFERENCES: ListPreferences = {
@@ -82,7 +84,7 @@ export function arrangeList<T>(
 export function parseListPreferences(raw: string | null): ListPreferences {
   if (!raw) return EMPTY_LIST_PREFERENCES;
   try {
-    const value = JSON.parse(raw) as { pinned?: Record<string, unknown>; hidden?: Record<string, unknown>; libraryOrder?: unknown };
+    const value = JSON.parse(raw) as { pinned?: Record<string, unknown>; hidden?: Record<string, unknown>; libraryOrder?: unknown; librarySort?: unknown };
     const ids = (list: unknown) =>
       Array.isArray(list) ? list.filter((id): id is string => typeof id === "string").slice(0, MAX_ENTRIES) : [];
     return {
@@ -99,10 +101,17 @@ export function parseListPreferences(raw: string | null): ListPreferences {
       libraryOrder: value.libraryOrder && typeof value.libraryOrder === "object" && !Array.isArray(value.libraryOrder)
         ? Object.fromEntries(Object.entries(value.libraryOrder).slice(0, MAX_ENTRIES).map(([course, order]) => [course, ids(order)]))
         : {},
+      ...(value.librarySort && typeof value.librarySort === "object" && !Array.isArray(value.librarySort)
+        ? { librarySort: Object.fromEntries(Object.entries(value.librarySort).slice(0, MAX_ENTRIES).filter((entry): entry is [string, LibrarySort] =>
+          ["custom", "updated_desc", "updated_asc", "title_asc", "title_desc", "course"].includes(entry[1] as string))) } : {}),
     };
   } catch {
     return EMPTY_LIST_PREFERENCES;
   }
+}
+
+export function setLibrarySort(prefs: ListPreferences, scope: string, sort: LibrarySort): ListPreferences {
+  return { ...prefs, librarySort: { ...prefs.librarySort, [scope]: sort } };
 }
 
 export function setLibraryOrder(prefs: ListPreferences, course: string, order: readonly string[]): ListPreferences {

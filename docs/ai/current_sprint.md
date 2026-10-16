@@ -1,5 +1,28 @@
 # GA1b finite unattended scope complete locally (2026-10-16)
 
+## Library sort presets (2026-10-17)
+
+Owner-approved finite scope: visible Library sorting by updated date, Canvas
+module/material order and alphabet, while preserving manual drag order. Cover
+both the course grid and saved items, store choices per owner/scope, use the
+complete existing material inventory for course sequence, retain a complete
+sequence for offline use, verify automated/native behavior, publish preview
+and reconcile this record. No backend/schema change or paid generation.
+Visible Sort controls now cover the Library course grid and saved items.
+Presets: Updated newest/oldest, Alphabetical A?Z/Z?A, Canvas Course order and
+My order. Choices are owner/scope specific; dragging switches to My order
+without erasing a previously saved order when another preset is selected.
+Canvas sequence comes from the complete paginated material inventory, with
+linked quizzes placed with their Reviewer. Unlinked work is last. Complete
+sequences are cached for offline use; failed refreshes retain the saved one.
+
+FRESH PASS: mobile 1,134 tests / 121 files, web 154 / 26, forced root TypeScript
+and lint 8/8 each, zero cached; six existing lint warnings. Root production
+build and preview/physical checks are in progress. First icon-mock and old
+bulk-toolbar assertion failures were repaired; the full rerun passes.
+See [acceptance](acceptance/realme-library-sort-20261017.md).
+
+
 ## Realme offline startup and current Autopilot integration (2026-10-17)
 
 Owner scope: restore saved-account offline startup, retain the Realme Library

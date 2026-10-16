@@ -54,8 +54,9 @@ const mocks = vi.hoisted(() => ({
   deleteReviewer: vi.fn(async () => ({ ok: true })),
   vibration: vi.fn(),
   haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
-  prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] }, libraryOrder: {} as Record<string, string[]> },
+  prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] }, libraryOrder: {} as Record<string, string[]>, librarySort: {} as Record<string, import("./listPreferences").LibrarySort> },
   reorderLibrary: vi.fn(),
+  sortLibrary: vi.fn(),
   markRead: vi.fn(),
   pin: vi.fn(),
   hide: vi.fn(),
@@ -92,8 +93,8 @@ vi.mock("../../design/theme", async () => {
 vi.mock("../../design/primitives", () => ({
   Sheet: "Sheet",
   RowLink: "RowLink",
-  Page: (props: { children?: import("react").ReactNode; headerBelow?: import("react").ReactNode }) =>
-    createElement("Page", props, props.headerBelow, props.children),
+  Page: (props: { children?: import("react").ReactNode; headerBelow?: import("react").ReactNode; headerAction?: import("react").ReactNode }) =>
+    createElement("Page", props, props.headerAction, props.headerBelow, props.children),
   Action: "Action",
   Surface: "Surface",
   Notice: "Notice",
@@ -115,8 +116,9 @@ vi.mock("../../design/CourseViews", () => ({
 vi.mock("../sync/CanvasSyncProvider", () => ({
   useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync, syncCourse: mocks.sync, unsyncCourse: mocks.unsync, selectedCourseIds: mocks.selectedCourseIds, courseStates: {} }),
 }));
+vi.mock('./useLibraryCourseSequence', () => ({ useLibraryCourseSequence: () => ({ data: null, loading: false, error: false }) }));
 vi.mock("./useListPreferences", () => ({
-  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead, reorderLibrary: mocks.reorderLibrary }),
+  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead, reorderLibrary: mocks.reorderLibrary, sortLibrary: mocks.sortLibrary }),
 }));
 vi.mock("../../design/SwipeRow", () => ({
   SwipeRow: "SwipeRow",
@@ -181,6 +183,7 @@ vi.mock("react-native-svg", () => ({
   Text: "SvgText",
 }));
 vi.mock("lucide-react-native", () => ({
+  ArrowDownWideNarrow: "ArrowDownWideNarrow",
   FileText: "FileText",
   ChevronDown: "ChevronDown",
   ChevronRight: "ChevronRight",
@@ -261,7 +264,7 @@ beforeEach(() => {
   mocks.paths = [];
   mocks.params = {};
   mocks.library = { items: [], offlineStats: null, errorCode: null, categories: null, localReady: true, refreshing: false, error: null };
-  mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] }, libraryOrder: {} };
+  mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] }, libraryOrder: {}, librarySort: {} };
   mocks.selectedCourseIds = new Set();
   mocks.reducedMotion = true;
   vi.clearAllMocks();
@@ -1289,6 +1292,30 @@ describe('O1 calm offline Library', () => {
   });
 });
 
+describe('Library sorting controls', () => {
+  it('exposes the visible Sort control and the requested preset menu', async () => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [savedQuiz];
+    const root = await render(createElement(LibraryCourseScreen));
+    const control = root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Sort Library: My order')[0]!;
+    await act(async () => control.props.onPress());
+    const options = root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityRole === 'radio');
+    expect(options.map(node => node.props.accessibilityLabel)).toEqual(['My order', 'Updated: newest first', 'Updated: oldest first', 'Alphabetical: A to Z', 'Alphabetical: Z to A']);
+    await act(async () => options.find(node => node.props.accessibilityLabel === 'Alphabetical: A to Z')!.props.onPress());
+    expect(mocks.sortLibrary).toHaveBeenCalledWith('personal', 'title_asc');
+    expect(root.findAll(node => String(node.type) === 'Sheet')).toHaveLength(0);
+  });
+  it('applies saved alphabetic sorting before filters and includes course order for Canvas courses', async () => {
+    mocks.params = { courseKey: 'course' };
+    mocks.library.items = [{ ...savedQuiz, id: 'quiz:z', title: 'Zulu', course: workspace.course }, { ...savedQuiz, id: 'quiz:a', title: 'Alpha', course: workspace.course }];
+    mocks.prefs.librarySort.course = 'title_asc';
+    const root = await render(createElement(LibraryCourseScreen));
+    expect(root.findAll(node => String(node.type) === 'RowLink').map(node => node.props.label)).toEqual(['Quiz: Alpha', 'Quiz: Zulu']);
+    await act(async () => root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel.startsWith('Sort Library:'))[0]!.props.onPress());
+    expect(root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Course order')).toHaveLength(1);
+  });
+});
+
 describe('course Library bulk actions', () => {
   it('retains the durable course batch controls alongside device Library changes', async () => {
     mocks.params = { courseId: 'course' };
@@ -1350,7 +1377,8 @@ describe('organizing saved items inside a course', () => {
   it('keeps bulk actions hidden until a hold, then shows four equal icon targets without a footer', async () => {
     setup();
     const root = await render(createElement(LibraryCourseScreen));
-    const actions = () => root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityRole === 'button');
+    const actions = () => root.findAll(node => String(node.type) === 'View' && node.props.accessibilityRole === 'toolbar')
+      .flatMap(toolbar => toolbar.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityRole === 'button'));
     expect(actions()).toHaveLength(0);
     expect(copyText(root).join(' ')).not.toMatch(/Remake all|Remove all|Move to top|Move to bottom|Organize|Done/);
     await act(async () => { list(root).props.onTouchStart(touch(60)); cards(root)[0].props.onLongPress(); });
@@ -1358,7 +1386,7 @@ describe('organizing saved items inside a course', () => {
     expect(actions().map(node => node.props.accessibilityLabel)).toEqual(['Remake selected reviewers', 'Remove selected', 'Select all', 'Cancel selection']);
     expect(actions().map(node => node.props.style({ pressed: false }))).toEqual(Array(4).fill(expect.objectContaining({ flex: 1, height: 48, minWidth: 48 })));
     expect(root.findByType('Page' as never).props.footer).toBeUndefined();
-    expect(root.findByType('Page' as never).props.headerAction).toBeUndefined();
+    expect(root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel.startsWith('Sort Library:'))[0]!.props.disabled).toBe(true);
     expect(root.findAll(node => String(node.type) === 'SegmentedControl')).toHaveLength(0);
     await act(async () => button(root, 'Cancel selection').props.onPress());
     expect(actions()).toHaveLength(0);
