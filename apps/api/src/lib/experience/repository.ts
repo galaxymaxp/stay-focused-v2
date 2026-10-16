@@ -1,3 +1,4 @@
+import { libraryPositions } from './library-positions';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ExperienceFailure } from './errors';
@@ -75,12 +76,12 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
       ]);
       if (visible.error || !visible.data) fail(visible.error);
       const rows = visible.data.filter(row => row.user_id === userId);
-      return { items: rows.slice(0, limit).map(row => row.summary as unknown as LibraryArtifactSummary), nextOffset: rows.length > limit ? offset + limit : null, supersededReviewerIds: hidden };
+      return { items: await libraryPositions(client, userId, rows.slice(0, limit).map(row => row.summary as unknown as LibraryArtifactSummary)), nextOffset: rows.length > limit ? offset + limit : null, supersededReviewerIds: hidden };
     },
     async librarySummary(userId, id) {
       const result = await client.from('experience_library_v1').select('summary,user_id').eq('user_id', userId).eq('id', id).maybeSingle();
       if (result.error) fail(result.error);
-      return result.data?.user_id === userId ? result.data.summary as unknown as LibraryArtifactSummary : null;
+      return result.data?.user_id === userId ? (await libraryPositions(client, userId, [result.data.summary as unknown as LibraryArtifactSummary]))[0]! : null;
     },
     async reviewerDetail(userId, id) {
       let query = client.from('experience_reviewer_summaries_v1').select('summary,artifact_id,version_id,user_id').eq('user_id', userId);
@@ -95,7 +96,7 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
         .eq('id', row.version_id).eq('artifact_id', row.artifact_id).eq('artifact_type', 'reviewer').maybeSingle();
       if (version.error) fail(version.error);
       if (!version.data || version.data.user_id !== userId || version.data.artifact_id !== row.artifact_id) return null;
-      return { summary: row.summary as unknown as LibraryArtifactSummary, payload: version.data.payload, artifactId: row.artifact_id };
+      return { summary: (await libraryPositions(client, userId, [row.summary as unknown as LibraryArtifactSummary]))[0]!, payload: version.data.payload, artifactId: row.artifact_id };
     },
     async materialReviewers(userId, courseId, materialIds) {
       const reviewers = new Map<string, string>();

@@ -225,13 +225,13 @@ export class ExperienceService {
       const quiz=quizView(row,attempts), course=courses.find(c=>c.id===quiz.courseId);
       const summary = { ...quiz, questions: undefined };
       const source = sources.find(value => value.id === row.source_version_id);
-      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceType:sourceType(source?.metadata),sourceTitle:source ? text(record(source.metadata).sourceTitle) : null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary,reviewMinutes:null}};
+      return {quiz,generationId:row.generation_id,summary:{id:`quiz:${quiz.id}`,type:'quiz',title:quiz.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:quiz.sourceId,sourceType:sourceType(source?.metadata),sourceTitle:source ? text(record(source.metadata).sourceTitle) : null,activityId:null,createdAt:quiz.createdAt,updatedAt:quiz.updatedAt,lastOpenedAt:null,sourcePosition:null,status:'completed',relatedArtifactIds:quiz.reviewerArtifactId?[`artifact:${quiz.reviewerArtifactId}`]:[],quiz:summary,reviewMinutes:null}};
     });
   }
   private async activityDraftRecords(userId: string): Promise<{summary:LibraryArtifactSummary;draft:ActivityDraft}[]> {
     const [drafts,courses] = await Promise.all([this.rows('activity_drafts',userId),this.getCourses(userId)]);
     return drafts.map(row => { const draft=draftView(row); const course=courses.find(c=>c.id===row.course_id);
-      return {draft,summary:{id:`activity:${row.id}`,type:'activity_output' as const,title:draft.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:draft.activityId,sourceTitle:draft.title,activityId:draft.activityId,createdAt:draft.createdAt,updatedAt:draft.updatedAt,lastOpenedAt:null,status:'completed' as const,relatedArtifactIds:[],reviewMinutes:null}};
+      return {draft,summary:{id:`activity:${row.id}`,type:'activity_output' as const,title:draft.title,course:course?{id:course.id,code:course.code,name:course.name}:null,sourceId:draft.activityId,sourceTitle:draft.title,activityId:draft.activityId,createdAt:draft.createdAt,updatedAt:draft.updatedAt,lastOpenedAt:null,sourcePosition:null,status:'completed' as const,relatedArtifactIds:[],reviewMinutes:null}};
     }).sort((a,b)=>Date.parse(b.draft.createdAt)-Date.parse(a.draft.createdAt)||a.draft.id.localeCompare(b.draft.id));
   }
   private async artifactRecords(userId: string): Promise<ArtifactRecord[]> {
@@ -250,7 +250,7 @@ export class ExperienceService {
       return { id, type: 'reviewer', title, course: snapshot ? courseMap.get(snapshot.course_id) ?? null : null,
         sourceId: snapshot?.id ?? sourceId, sourceType: kind, sourceTitle: snapshot?.source_title ?? sourceTitle, activityId: null,
         sourceMaterialId: originalItems.length === 1 && originalItems[0]!.source_row_id ? `${originalItems[0]!.source_type}:${originalItems[0]!.source_row_id}` : null,
-        createdAt, updatedAt, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
+        createdAt, updatedAt, lastOpenedAt: null, sourcePosition: null, status: 'completed', relatedArtifactIds: [] };
     }
     const versionMap = new Map(versions.filter(version => version.artifact_type === 'reviewer').map(version => [version.id, version]));
     const sourceVersionMap = new Map(sourceVersions.map(source => [source.id, source]));
