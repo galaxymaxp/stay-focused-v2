@@ -11,7 +11,13 @@ option, and selected removal uses the existing explicit confirmation.
 
 FRESH PASS: 1,052 mobile tests in 105 files; mobile TypeScript; focused ESLint;
 diff hygiene. Final test-only typing correction also passes 66 screen tests.
-Preview OTA publication and physical Realme acceptance are in progress. No native
+FRESH PASS: preview OTA group `7dc9a912-93aa-4348-8d1f-ca41911575a6`
+from `43131a5` is active on the connected Realme (2.1.0/code 5). Native
+hold-to-select and the selection controls were verified. Recent process log
+sample: zero matching fatal/JS errors. The owner is testing the phone directly;
+agent physical multi-select, drag and restart-persistence checks were not run.
+Those behaviors pass automated regression tests. See
+`docs/ai/acceptance/realme-library-organize-20261017.md`. No native
 dependency, database or backend change.
 
 ## Realme Library and generation actions (2026-10-16)
