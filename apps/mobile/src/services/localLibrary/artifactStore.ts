@@ -12,6 +12,7 @@ import type {
 import type { LocalSqlDatabase, LocalSqlExecutor } from "./sqlDatabase";
 import { createScreenSnapshotStore, type ScreenSnapshotStore } from "./screenSnapshots";
 import { createAssistCache, type AssistCache } from "./assistCache";
+import { createTopicCache, type TopicCache } from './topicCache';
 import { keyMatchesQuiz, parseQuizAnswerKey } from "./quizAnswerKeys";
 import { createPendingDraftStore, type PendingDraftStore } from './pendingDraftStore';
 
@@ -41,7 +42,7 @@ export interface OfflineStats {
 }
 export type LocalLibrarySummary = LibraryArtifactSummary & { readonly offlineReady: boolean };
 
-export interface LocalArtifactStore extends AssistCache, PendingDraftStore, ScreenSnapshotStore {
+export interface LocalArtifactStore extends AssistCache, TopicCache, PendingDraftStore, ScreenSnapshotStore {
   readQuizAnswerKey(ownerUserId: string, quizId: string, bodyUpdatedAt: string): Promise<QuizAnswerKey | null>;
   saveQuizAnswerKey(ownerUserId: string, key: QuizAnswerKey, bodyUpdatedAt: string): Promise<void>;
   offlineStats(ownerUserId: string): Promise<OfflineStats>;
@@ -97,6 +98,7 @@ export function createLocalArtifactStore(
   return {
     ...createScreenSnapshotStore(db),
     ...createAssistCache(db),
+    ...createTopicCache(db),
     ...createPendingDraftStore(db, now),
     async readQuizAnswerKey(ownerUserId, quizId, bodyUpdatedAt) {
       requireOwner(ownerUserId);

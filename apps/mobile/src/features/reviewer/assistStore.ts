@@ -4,6 +4,19 @@ import { useSyncExternalStore } from "react";
 import { haptic } from "../../design/haptics";
 import type { ExperienceClient } from "../../services/experienceApi";
 import { studyAssist, StudyAssistError } from "../../services/studyAssist";
+import { createTopicAssist } from '@stay-focused/shared';
+import { experienceRequest } from '../../services/experienceApi';
+import { getLocalArtifactStore } from '../../services/localLibrary/localArtifactDatabase';
+
+export const topicAssist = createTopicAssist<ExperienceClient>({
+  read: async (owner, selection, action) => (await getLocalArtifactStore())?.readTopic(owner, selection, action),
+  write: async (owner, selection, result) => {
+    const cache = await getLocalArtifactStore();
+    if (!cache) throw new Error('Device storage is unavailable. Reopen the app and try again.');
+    await cache.writeTopic(owner, selection, result);
+  },
+  generate: (client, body) => experienceRequest(client, '/api/experience/study-tools/topic', { method: 'POST', body }),
+});
 
 /**
  * Study Assist requests outlive the sheet that started them. This store keeps

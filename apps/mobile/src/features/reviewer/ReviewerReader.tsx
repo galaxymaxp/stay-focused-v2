@@ -1,3 +1,5 @@
+import { TopicAssist } from './TopicAssist';
+import { StudyAnswerScrollContext, useStudyAnswerScroll } from './studyAnswerScroll';
 import type { StudyImageTarget, AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
 import { suggestedQuizTitle, quizCountOptions, quizFormatMaximum, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
@@ -96,6 +98,8 @@ export function ReviewerReaderScreen({
   const scrollRef = useRef<ScrollView>(null);
   const rootRef = useRef<View>(null);
   const rootY = useRef(0);
+  const topicScroll = useStudyAnswerScroll(scrollRef, () => rootY.current);
+  const blockNodes = useRef(new Map<string, View>());
   const segmentRefs = useRef(new Map<string, Measurable>());
   const sectionY = useRef<number[]>([]);
   const blockY = useRef(new Map<string, number>());
@@ -228,7 +232,7 @@ export function ReviewerReaderScreen({
       if (!anchor) return 0;
       const section = sectionY.current[anchor.sectionIndex] ?? 0;
       const within = anchor.id === reviewer.sections[anchor.sectionIndex]?.id ? 0 : blockY.current.get(anchor.id) ?? 0;
-      return rootY.current + section + within;
+      return rootY.current + (anchor.id === reviewer.sections[anchor.sectionIndex]?.id ? section : within);
     },
     [anchors, reviewer.sections],
   );
@@ -305,7 +309,7 @@ export function ReviewerReaderScreen({
     : undefined;
 
   return (
-    <Page
+    <StudyAnswerScrollContext.Provider value={topicScroll}><Page
       back
       title="Reviewer"
       subtitle={subtitle}
@@ -314,7 +318,7 @@ export function ReviewerReaderScreen({
       scrollEnabled={scrollEnabled}
       scrollTouch={{
         onTouchStart: (event) => scrubber.current.touch?.onTouchStart(event),
-        onTouchMove: (event) => scrubber.current.touch?.onTouchMove(event),
+        onTouchMove: (event) => { topicScroll.controller.manualScroll(); scrubber.current.touch?.onTouchMove(event); },
         onTouchEnd: () => scrubber.current.touch?.onTouchEnd(),
         onTouchCancel: () => scrubber.current.touch?.onTouchCancel(),
       }}
@@ -376,7 +380,7 @@ export function ReviewerReaderScreen({
         <Copy muted size="caption">Tap a key point to select it. Hold its group to select all.</Copy>
       </View>
       <View
-        ref={rootRef}
+        ref={node => { rootRef.current = node; topicScroll.root.current = node; }}
         collapsable={false}
         onLayout={(event: LayoutChangeEvent) => {
           rootY.current = event.nativeEvent.layout.y;
@@ -409,6 +413,8 @@ export function ReviewerReaderScreen({
                   reviewerTitle={reviewer.title} sectionTitle={section.title}
                   onAsk={image => askImage(section.id, image)} onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
             </View>
+            <TopicAssist key={`${session?.user.id}|${reviewer.id}|${reviewer.generatedAt}|${section.id}|${deferredQuery}`} reviewer={reviewer} sectionId={section.id}
+              owner={session?.user.id ?? ""} client={snapshotClient} online={!deviceCopy && figureSections.online === true}>
             {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={reviewerVisuals?.[section.id]} onAsk={image => askImage(section.id, image)}
               reviewerTitle={reviewer.title} sectionTitle={section.title}
               online={!deviceCopy && figureSections.online === true && (!hasSnapshotControl || snapshotAvailability[section.id] != null)}
@@ -416,9 +422,11 @@ export function ReviewerReaderScreen({
             {section.blocks.map((block, blockIndex) => (
               <View
                 key={block.id}
+                ref={node => { if (node) blockNodes.current.set(block.id, node); else blockNodes.current.delete(block.id); }}
                 collapsable={false}
-                onLayout={(event) => {
-                  blockY.current.set(block.id, event.nativeEvent.layout.y);
+                onLayout={() => {
+                  const root = rootRef.current;
+                  if (root) blockNodes.current.get(block.id)?.measureLayout(root, (_x, y) => blockY.current.set(block.id, y), () => undefined);
                 }}
                 style={{ gap: spacing[3], paddingBottom: spacing[5], borderBottomWidth: blockIndex === section.blocks.length - 1 ? 0 : 1, borderColor: colors.separator }}
               >
@@ -484,13 +492,14 @@ export function ReviewerReaderScreen({
                 ) : null}
               </View>
             ))}
+            </TopicAssist>
           </View>
         ))}
       </View>
       {quizOpen ? <QuizFromReviewerSheet artifact={artifact} reviewer={reviewer} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
       {exportOpen ? <ExportSheet detail={{ artifact, reviewer }} onClose={() => setExportOpen(false)} /> : null}
       {assistPassage ? <StudyAssistSheet key={`${openKey ?? "missing"}|${assistPassage.image?.reference.id ?? ""}`} target={assistTarget} image={assistPassage.image} onClose={() => setAssistPassage(null)} /> : null}
-    </Page>
+    </Page></StudyAnswerScrollContext.Provider>
   );
 }
 

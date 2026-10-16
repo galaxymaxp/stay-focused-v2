@@ -3,12 +3,12 @@ import { createContext, useContext, useEffect, useRef, type ReactNode, type RefO
 import { View, type ScrollView } from 'react-native';
 import { useTheme } from '../../design/theme';
 
-export function useStudyAnswerScroll(scroll: RefObject<ScrollView | null>) {
+export function useStudyAnswerScroll(scroll: RefObject<ScrollView | null>, offset: () => number = () => 0) {
   const root = useRef<View>(null);
   const anchors = useRef(new Map<string, View>());
   const controller = useRef(createStudyAnswerScroll((target, animated, stillCurrent) => {
     const node = anchors.current.get(target), content = root.current;
-    if (node && content) node.measureLayout(content, (_x, y) => { if (stillCurrent()) scroll.current?.scrollTo({ y: Math.max(0, y), animated }); }, () => undefined);
+    if (node && content) node.measureLayout(content, (_x, y) => { if (stillCurrent()) scroll.current?.scrollTo({ y: Math.max(0, y + offset()), animated }); }, () => undefined);
   }, work => requestAnimationFrame(work))).current;
   useEffect(() => () => controller.cancel(), [controller]);
   return { root, anchors, controller };
