@@ -49,7 +49,7 @@ describe('AI generation durable call budget', () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     try {
       await expect(durableGenerationProvider(client, 'job', 'worker').generate(request)).rejects.toThrow('generation_failed');
-      expect([...checkpoints.values()]).toContainEqual({ state: 'failed', kind: 'incomplete' });
+      expect([...checkpoints.values()]).toContainEqual({ state: 'failed', kind: 'incomplete', incompleteReason: 'max_output_tokens' });
       await expect(durableGenerationProvider(client, 'job', 'worker').generate(request)).rejects.toMatchObject({ findings: ['provider_output_incomplete'] });
       expect(mocks.generate).toHaveBeenCalledTimes(1);
       expect(log).toHaveBeenCalledWith('ai_generation.request_failed', { jobId: 'job', schema: 'quiz_set', kind: 'incomplete', incompleteReason: 'max_output_tokens', durationMs: expect.any(Number) });

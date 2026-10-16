@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { GenerationContractError, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
+import { GenerationContractError, GenerationOutputLimitError, GenerationPartFailure, type GenerationProvider, type GenerationRequest } from '@stay-focused/engine';
 import type { Json } from '@stay-focused/db';
 import { createServerOpenAIProvider } from '@/providers';
 import { ProviderCallError, PROVIDER_OUTCOME_UNKNOWN, type ProviderFailureKind } from '@/providers/openai-provider';
@@ -19,26 +19,37 @@ export interface DurableProviderOptions {
  * No rejected output or provider payload is added to durable storage.
  */
 export function durableGenerationProvider(client: ProcessingJobServiceClient, jobId: string, workerId: string, options: DurableProviderOptions = {}): GenerationProvider {
-  const provider = createServerOpenAIProvider();
+  // Every HTTP transfer must have its own durable reservation. The SDK must
+  // not hide additional retries inside a single counted call.
+  const provider = createServerOpenAIProvider({ maxRetries: 0 });
   return { async generate<T>(request: GenerationRequest<T>): Promise<T> {
     const job = await readProcessingJobState(client, jobId);
     if (job.status !== 'running' || job.lease_owner !== workerId) throw new ExperienceFailure(409, 'generation_failed');
+    const reviewerIdentity = request.schema.name === 'reviewer_document' && typeof request.metadata?.reviewerCallIdentity === 'string'
+      && /^reviewer:(whole:repair|part:\d+:attempt:[01])$/.test(request.metadata.reviewerCallIdentity)
+      ? request.metadata.reviewerCallIdentity : undefined;
+    const callIdentity = reviewerIdentity ?? options.callIdentity;
+    const reviewerPart = reviewerIdentity?.startsWith('reviewer:part:') ?? false;
     // A queue redelivery can resume a validated response, but an interrupted
     // external call has an unknowable outcome. Fail safely instead of billing twice.
-    const googleKey = job.execution_backend === 'google_cloud'
-      ? `google:provider:${createHash('sha256').update(JSON.stringify(options.callIdentity ? [request.model, request.schema.name, request.prompt, options.callIdentity] : [request.model, request.schema.name, request.prompt])).digest('hex')}`
+    // Retain the existing key namespace. All durable reviewer backends need
+    // per-part receipts; a workflow step can also be replayed mid-split.
+    const googleKey = job.execution_backend === 'google_cloud' || request.schema.name === 'reviewer_document'
+      ? `google:provider:${createHash('sha256').update(JSON.stringify(callIdentity ? [request.model, request.schema.name, request.prompt, callIdentity] : [request.model, request.schema.name, request.prompt])).digest('hex')}`
       : null;
     if (googleKey) {
       const saved = await readProcessingJobCheckpoint(client, jobId, googleKey);
-      const response = saved?.payload as { state?: string; value?: Json; kind?: ProviderFailureKind } | undefined;
+      const response = saved?.payload as { state?: string; value?: Json; kind?: ProviderFailureKind; incompleteReason?: string } | undefined;
       if (response?.state === 'completed') {
         console.info('ai_generation.saved_response_reused', { jobId, schema: request.schema.name, ...(options.callIdentity ? { callIdentity: options.callIdentity } : {}) });
         return response.value as T;
       }
       if (response?.state === 'failed' && response.kind === 'incomplete') {
+        if (request.schema.name === 'reviewer_document' && response.incompleteReason === 'max_output_tokens') throw new GenerationOutputLimitError();
         throw new GenerationContractError(['provider_output_incomplete']);
       }
       if (response?.state === 'failed' && response.kind && definiteFailureKinds.has(response.kind)) {
+        if (reviewerPart) throw new GenerationPartFailure();
         console.info('ai_generation.retrying_after_definite_failure', { jobId, schema: request.schema.name, kind: response.kind });
       } else if (response) throw new GenerationContractError(['provider_outcome_uncertain']);
     }
@@ -60,8 +71,9 @@ export function durableGenerationProvider(client: ProcessingJobServiceClient, jo
       return result;
     }
     catch (error) {
-      const kind = error instanceof ProviderCallError ? error.kind : 'network';
-      const details = error instanceof ProviderCallError ? error.details : undefined;
+      const outputLimit = error instanceof GenerationOutputLimitError || (request.schema.name === 'reviewer_document' && error instanceof ProviderCallError && error.kind === 'incomplete' && error.details.incompleteReason === 'max_output_tokens');
+      const kind = outputLimit ? 'incomplete' : error instanceof ProviderCallError ? error.kind : 'network';
+      const details = outputLimit ? { incompleteReason: 'max_output_tokens', httpStatus: undefined } : error instanceof ProviderCallError ? error.details : undefined;
       console.info('ai_generation.request_failed', {
         jobId, schema: request.schema.name, kind,
         ...(details?.httpStatus ? { httpStatus: details.httpStatus } : {}),
@@ -69,8 +81,11 @@ export function durableGenerationProvider(client: ProcessingJobServiceClient, jo
         durationMs: Date.now() - started,
       });
       if (googleKey && !PROVIDER_OUTCOME_UNKNOWN.has(kind)) {
-        await writeProcessingJobCheckpoint(client, { jobId, checkpointKey: googleKey, payload: { state: 'failed', kind } });
+        await writeProcessingJobCheckpoint(client, { jobId, checkpointKey: googleKey, payload: { state: 'failed', kind,
+          ...(details?.incompleteReason ? { incompleteReason: details.incompleteReason } : {}) } });
       }
+      if (outputLimit) throw new GenerationOutputLimitError();
+      if (reviewerPart && definiteFailureKinds.has(kind)) throw new GenerationPartFailure();
       throw new ExperienceFailure(503, 'generation_failed');
     }
     finally { console.info('ai_generation.request_finished', { jobId, schema: request.schema.name, durationMs: Date.now() - started }); }

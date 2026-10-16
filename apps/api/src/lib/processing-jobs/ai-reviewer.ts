@@ -1,4 +1,4 @@
-import { runAIReviewer, GenerationContractError, type NormalizedSourceKind } from '@stay-focused/engine';
+import { runAIReviewer, reviewerProviderCallBudget, GenerationContractError, type NormalizedSourceKind, type SourceNormalizationInput } from '@stay-focused/engine';
 import type { ProcessingJobDatabaseRow, Json } from '@stay-focused/db';
 import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
@@ -17,10 +17,17 @@ export async function processAIReviewerJob(client: ProcessingJobServiceClient, j
   const blocks = readStructuredSourceBlocks(meta.reviewerSourceBlocks) ?? [];
   await updateProcessingJobProgress(client, { jobId: job.id, workerId, stage: 'generating_sections', statusMessage: 'Creating reviewer from your material' });
   try {
-    const reviewer = await runAIReviewer({ provider: durableGenerationProvider(client, job.id, workerId), input: {
+    const input: SourceNormalizationInput = {
       id: source.id, title: typeof meta.sourceTitle === 'string' ? meta.sourceTitle : undefined,
       ...(blocks.length ? { blocks, kind: meta.reviewerSourceKind as NormalizedSourceKind | undefined } : { text: source.source_text }),
-    } });
+    };
+    const generated = await runAIReviewer({ provider: durableGenerationProvider(client, job.id, workerId, { maxCalls: await reviewerProviderCallBudget(input) }), input });
+    // Reservations count actual transfers across deliveries; cache reuse is free.
+    const calls = await readProcessingJobCheckpoint(client, job.id, 'ai-first:calls:reviewer_document');
+    const count = record(calls?.payload).count;
+    const reviewer = { ...generated, metadata: { ...generated.metadata, generationMetrics: generated.metadata.generationMetrics && {
+      ...generated.metadata.generationMetrics, providerRequestCount: typeof count === 'number' ? count : generated.metadata.generationMetrics.providerRequestCount,
+    } } };
     const output = { payload: { reviewer, ...(typeof meta.reviewerSourceSnapshotId === 'string' ? { sourceSnapshotId: meta.reviewerSourceSnapshotId } : {}) }, metrics: { providerCallCount: reviewer.metadata.generationMetrics?.providerRequestCount ?? 0, finalReviewerSectionCount: reviewer.sections.length } };
     await writeProcessingJobCheckpoint(client, { jobId: job.id, checkpointKey: 'reviewer:ai-first:complete', payload: JSON.parse(JSON.stringify(output)) as Json });
     return output;

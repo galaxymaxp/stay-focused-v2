@@ -10,6 +10,16 @@ const request: GenerationRequest<unknown> = {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('provider failure classification', () => {
+  it('signals reviewer token exhaustion without interpreting or leaking truncated JSON', async () => {
+    const create = vi.fn().mockResolvedValue({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output_text: 'PRIVATE_TRUNCATED_JSON' });
+    const provider = new OpenAIProvider({ client: { responses: { create } } });
+    await expect(provider.generate({ ...request, schema: { ...request.schema, name: 'reviewer_document' } })).rejects.toMatchObject({ kind: 'incomplete', details: { incompleteReason: 'max_output_tokens' } });
+  });
+  it('keeps content-filter reviewer incompleteness on the existing failure boundary', async () => {
+    const create = vi.fn().mockResolvedValue({ status: 'incomplete', incomplete_details: { reason: 'content_filter' } });
+    const provider = new OpenAIProvider({ client: { responses: { create } } });
+    await expect(provider.generate({ ...request, schema: { ...request.schema, name: 'reviewer_document' } })).rejects.toMatchObject({ kind: 'incomplete', details: { incompleteReason: 'content_filter' } });
+  });
   it.each([
     ['timeout', new APIConnectionTimeoutError({ message: 'PRIVATE_ERROR' }), undefined],
     ['timeout', new APIUserAbortError({ message: 'PRIVATE_ERROR' }), undefined],
