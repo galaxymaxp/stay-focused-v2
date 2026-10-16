@@ -408,7 +408,7 @@ export function ReviewerReader({
                 <span className="kicker">Topic {sectionIndex + 1}</span>
                 <h2 data-segment={segmentIds.sectionTitle(section.id)}>{render(segmentIds.sectionTitle(section.id), section.title)}</h2>
               </header>
-              {visualArtifactId && <SectionVisual onAsk={image => askImage(section.id, image)} artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} external={reviewerVisuals?.[section.id]} />}
+              {visualArtifactId && <SectionVisual reviewerTitle={reviewer.title} sectionTitle={section.title} onAsk={image => askImage(section.id, image)} artifactId={visualArtifactId} sectionId={section.id} hasFigures={figureAvailability?.sections.find(item => item.sectionId === section.id)?.hasFigures} external={reviewerVisuals?.[section.id]} />}
               {section.blocks.map((block) => {
                 const pickingHere = picking?.block === block.id;
                 return (

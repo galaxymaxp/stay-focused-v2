@@ -59,7 +59,7 @@ it('page is outside the app group, noindex, and does not import private readers 
   const page = readFileSync('app/s/[token]/page.tsx', 'utf8');
   expect(page).toContain('index: false');
   const source = readFileSync('src/features/shared-reviewer.tsx', 'utf8');
-  for (const forbidden of ['useAuth', 'SectionVisual', 'assistStore', '/api/experience', 'source-page', 'source-figure']) expect(source).not.toContain(forbidden);
+  for (const forbidden of ['useAuth', 'SectionVisual', 'assistStore', '/api/experience', 'source-page', 'source-figure', 'Save image', 'downloadStudyImage']) expect(source).not.toContain(forbidden);
 });
 it.each(gradingFixtures.filter(f => f.finalized !== false && !f.assisted && !f.revealed))('public grading reuses O2 semantics: $name', fixture => {
   const quiz = { title: 'Quiz', questions: [fixture.question], keys: [fixture.key] };

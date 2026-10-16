@@ -1,7 +1,8 @@
 "use client";
 /* Signed source URLs must not pass through a public image-optimization cache. */
 /* eslint-disable @next/next/no-img-element */
-import { STUDY_OFFLINE, type StudyImageTarget } from "@stay-focused/shared";
+import { STUDY_OFFLINE, type StudyImageTarget, type StudyImageDownload } from "@stay-focused/shared";
+import { downloadStudyImage } from './download-image';
 import { Icon } from "../../components/ui";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../components/providers";
@@ -44,13 +45,15 @@ export function useReviewerVisuals(artifactId: string | null) {
   return state?.sections ?? null;
 }
 
-export function SectionVisual({ artifactId, sectionId, hasFigures, external: initialExternal, onAsk }: { artifactId: string; sectionId: string; hasFigures: boolean | undefined; external?: ExternalVisual; onAsk?: (image: StudyImageTarget) => void }) {
+export function SectionVisual({ artifactId, sectionId, hasFigures, external: initialExternal, onAsk, reviewerTitle = 'Reviewer', sectionTitle = 'Section' }: { artifactId: string; sectionId: string; hasFigures: boolean | undefined; external?: ExternalVisual; onAsk?: (image: StudyImageTarget) => void; reviewerTitle?: string; sectionTitle?: string }) {
   const { api, session } = useAuth();
   const holder = useRef<HTMLDivElement>(null), dialog = useRef<HTMLDialogElement>(null);
   const [visible, setVisible] = useState(false), [online, setOnline] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [figures, setFigures] = useState<Figure[]>([]);
   const [replacement, setReplacement] = useState<ExternalVisual | null>(null), [busy, setBusy] = useState(false);
-  const [zoomed, setZoomed] = useState<{ src: string; alt: string; image?: StudyImageTarget } | null>(null), [zoom, setZoom] = useState(1);
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string; image?: StudyImageTarget; download: StudyImageDownload } | null>(null), [zoom, setZoom] = useState(1);
+  const [saving, setSaving] = useState(false), [saveNote, setSaveNote] = useState('');
+  const savePending = useRef(false);
   const path = `/api/reviewers/${encodeURIComponent(artifactId)}/sections/${encodeURIComponent(sectionId)}`;
   const external = replacement ?? initialExternal;
   useEffect(() => {
@@ -83,7 +86,20 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     })();
     return () => controller.abort();
   }, [api, path, visible, online, session?.user.id, hasFigures]);
-  function open(src: string, alt: string, image?: StudyImageTarget) { setZoomed({ src, alt, image }); setZoom(1); dialog.current?.showModal(); }
+  function open(src: string, alt: string, image: StudyImageTarget | undefined, kind: StudyImageDownload['kind']) {
+    setZoomed({ src, alt, image, download: { uri: src, reviewerTitle, sectionTitle, kind,
+      ...(kind === 'external_visual' && external ? { sourceTitle: external.title, attribution: `${external.credit} · ${external.license}` } : {}) } });
+    setSaveNote(''); setZoom(1); dialog.current?.showModal();
+  }
+  async function save() {
+    if (!zoomed || !session?.user.id || !online || savePending.current) return;
+    savePending.current = true; setSaving(true); setSaveNote('');
+    try {
+      await downloadStudyImage(zoomed.download);
+      setSaveNote(zoomed.download.attribution ? `Image downloaded. ${zoomed.download.attribution}` : 'Image downloaded.');
+    } catch { setSaveNote('Could not download this image. Try again when connected.'); }
+    finally { savePending.current = false; setSaving(false); }
+  }
   async function another() {
     setBusy(true);
     try {
@@ -105,7 +121,7 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
         {figures.map(figure => {
           const alt = figure.slide ? `Diagram from slide ${figure.slide}` : figure.page ? `Diagram from page ${figure.page}` : "Source diagram";
           const image: StudyImageTarget = {reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label:alt};
-          return <div key={figure.id} className="stack"><button type="button" aria-label={`Enlarge ${alt}`} onClick={() => open(figure.url, alt, image)} style={frame}>
+          return <div key={figure.id} className="stack"><button type="button" aria-label={`Enlarge ${alt}`} onClick={() => open(figure.url, alt, image, 'figure')} style={frame}>
             <img src={figure.url} alt={alt} style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "contain" }} />
           </button><AskImageButton image={image} online={online} onAsk={onAsk} /></div>;
         })}
@@ -113,7 +129,7 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     </figure>}
     {online && !figures.length && snapshotUrl && <figure className="surface stack" style={{ margin: 0 }}>
       <span className="muted" style={caption}>{snapshotLabel} · your course material</span>
-      <button type="button" aria-label={`Enlarge ${snapshotLabel}`} onClick={() => open(snapshotUrl, snapshotLabel, snapshotImage)} style={frame}>
+      <button type="button" aria-label={`Enlarge ${snapshotLabel}`} onClick={() => open(snapshotUrl, snapshotLabel, snapshotImage, 'page_snapshot')} style={frame}>
         <img src={snapshotUrl} alt={snapshotLabel} style={{ display: "block", width: "100%", maxHeight: 420, objectFit: "contain" }} />
       </button>
       <AskImageButton image={snapshotImage} online={online} onAsk={onAsk} />
@@ -121,7 +137,7 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     {online && !hasSource && external && <figure className="surface stack" style={{ margin: 0 }}>
       <span className="muted" style={caption}>{external.label}</span>
       {/* Commons candidates are validated by the owner-scoped API. */}
-      <button type="button" aria-label="Enlarge visual" onClick={() => open(external.image, external.title, externalImage)} style={frame}>
+      <button type="button" aria-label="Enlarge visual" onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={frame}>
         <img src={external.image} alt={external.title} style={{ display: "block", width: "100%", maxHeight: 380, objectFit: "contain" }} />
       </button>
       <AskImageButton image={externalImage} online={online} onAsk={onAsk} />
@@ -134,6 +150,8 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     <dialog ref={dialog} aria-label={zoomed?.alt ?? "Visual"} className="surface stack" style={{ width: "min(94vw, 1000px)", maxHeight: "90vh" }}>
       <div className="row"><strong className="grow">{zoomed?.alt}</strong><button onClick={() => dialog.current?.close()}>Close</button></div>
       <AskImageButton image={zoomed?.image} online={online} onAsk={image=>{dialog.current?.close();onAsk?.(image);}} />
+      {session?.user.id && zoomed && <button className="subtle row" disabled={!online || saving} onClick={() => void save()}><Icon name="download" />{saving ? 'Saving…' : 'Save image'}</button>}
+      {saveNote && <p role="status">{saveNote}</p>}
       <label>Zoom<input type="range" min="1" max="4" step="0.25" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
       <div style={{ overflow: "auto", maxHeight: "70vh" }}>
         {zoomed && <img src={zoomed.src} alt={zoomed.alt} style={{ width: `${zoom * 100}%`, maxWidth: "none" }} />}
