@@ -1,3 +1,6 @@
+import { useLibraryOpened } from './useLibraryOpened';
+import { TOP_LEVEL_SORTS, COURSE_SORTS, sortLibraryGroups, sortCourseLibrary } from '@stay-focused/shared';
+import { LibrarySortControl } from './LibrarySortControl';
 import { SnapshotStatus } from "./SnapshotStatus";
 import { useStableSnapshotGroups } from "./useStableSnapshotGroups";
 import type {
@@ -179,8 +182,8 @@ export function LibraryScreen() {
   const library = useLocalLibrary();
   const offline = library.offlineStats != null && library.errorCode === "connection";
   const offlineCaption = offlineLibraryCaption(library.offlineStats, library.refreshing && !offline);
-  const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items));
-  const { prefs, pin } = useListPreferences();
+  const { prefs, pin, setSort } = useListPreferences();
+  const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items, prefs.opened));
   const { reducedMotion } = useTheme();
   const arranged = arrangeList(groups, (group) => group.key, prefs.pinned.course, []);
   const contentWidth = Math.max(280, windowWidth - spacing[5] * 2);
@@ -214,7 +217,7 @@ export function LibraryScreen() {
   const hasLocal = library.items.length > 0;
   const loading = !library.localReady || (!hasLocal && !library.savedAt && library.refreshing);
   return (
-    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh} headerBelow={<SnapshotStatus {...library} />}>
+    <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh} headerBelow={<View style={{ paddingHorizontal: spacing[5] }}><SnapshotStatus {...library} /><LibrarySortControl options={TOP_LEVEL_SORTS} value={prefs.sort.library} onChange={value => change(() => setSort('library', value))} /></View>}>
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {offlineCaption ? <Copy muted size="caption">{offlineCaption}</Copy> : null}
       {loading ? <LibrarySkeleton /> : null}
@@ -229,7 +232,7 @@ export function LibraryScreen() {
         </Surface>
       ) : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
-        {[...arranged.pinned, ...arranged.rest].map((group) => renderTile(group))}
+        {[...sortLibraryGroups(arranged.pinned, prefs.sort.library), ...sortLibraryGroups(arranged.rest, prefs.sort.library)].map((group) => renderTile(group))}
       </View>
     </Page>
   );
@@ -246,7 +249,7 @@ export function LibraryCourseScreen() {
   const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
   const courseItems = useMemo(() => filterCourseLibrary(library.items, courseKey, "all"), [courseKey, library.items]);
   const filtered = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
-  const { prefs, pin } = useListPreferences();
+  const { prefs, pin, setSort } = useListPreferences();
   const { reducedMotion } = useTheme();
   const change = (update: () => void) => {
     animateNextLayout(reducedMotion);
@@ -262,7 +265,7 @@ export function LibraryCourseScreen() {
     library.refresh();
   });
   const arranged = arrangeList(filtered.filter((item) => !deletion.removed.has(item.id) && !quizRemoval.removed.has(item.id)), (item) => item.id, prefs.pinned.artifact, []);
-  const items = [...arranged.pinned, ...arranged.rest];
+  const items = [...sortCourseLibrary(arranged.pinned, prefs.sort.libraryCourse), ...sortCourseLibrary(arranged.rest, prefs.sort.libraryCourse)];
   const identity = courseKey ? libraryIdentity(courseKey, courseItems[0]?.course ?? null) : null;
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
   const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
@@ -276,6 +279,7 @@ export function LibraryCourseScreen() {
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
           <SnapshotStatus {...library} />
+          <LibrarySortControl options={COURSE_SORTS} value={prefs.sort.libraryCourse} onChange={value => change(() => { setSort('libraryCourse', value); setVisible(LOCAL_PAGE_SIZE); })} />
           <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />
           {offlineCaption ? <Copy muted size="caption" style={{ marginTop: spacing[2] }}>{offlineCaption}</Copy> : null}
         </View>
@@ -364,6 +368,7 @@ export function ArtifactScreen() {
   const { id, quiz } = useLocalSearchParams<{ id: string; quiz?: string }>();
   const result = useLocalArtifact(id ?? null);
   const detail = result.data;
+  useLibraryOpened(detail && !('reviewer' in detail) ? detail.artifact.id : null);
   const [exportOpen, setExportOpen] = useState(false);
   const saveConfirmedDraft = (draft: ActivityDraft) => {
     if (detail && 'draft' in detail) result.storeConfirmed({

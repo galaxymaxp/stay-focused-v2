@@ -7,6 +7,8 @@ import { QuizScreen } from './QuizScreen';
 import { QuestionSlider } from './QuestionSlider';
 import { newOfflineAttempt } from './localQuizPractice';
 
+vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
+
 const mocks = vi.hoisted(() => ({
   quiz: null as Quiz | null, practice: null as LocalQuizPractice | null,
   remote: null as QuizAttempt | null, request: vi.fn(),

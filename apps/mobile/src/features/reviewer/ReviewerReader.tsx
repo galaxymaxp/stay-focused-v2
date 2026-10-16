@@ -1,3 +1,4 @@
+import { useLibraryOpened } from '../redesign/useLibraryOpened';
 import { TopicAssist } from './TopicAssist';
 import { StudyAnswerScrollContext, useStudyAnswerScroll } from './studyAnswerScroll';
 import type { StudyImageTarget, AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
@@ -93,6 +94,7 @@ export function ReviewerReaderScreen({
   openQuizInitially?: boolean;
   snapshotStatus?: ReactNode;
 }) {
+  useLibraryOpened(artifact.id);
   const { colors, reducedMotion } = useTheme();
   const secondaryLine = reviewerSecondaryLine(automaticReviewerLabel(artifact), reviewer.reviewMinutes);
   const scrollRef = useRef<ScrollView>(null);

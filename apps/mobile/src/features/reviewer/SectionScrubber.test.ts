@@ -3,6 +3,8 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { LibraryArtifactSummary, ReviewerReaderModel } from '@stay-focused/shared';
 
+vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
+
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 vi.mock("react-native", () => ({

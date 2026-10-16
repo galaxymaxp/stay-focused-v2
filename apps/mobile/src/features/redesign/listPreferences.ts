@@ -1,3 +1,4 @@
+import { TOP_LEVEL_SORTS, COURSE_SORTS, type TopLevelSort, type CourseSort } from '@stay-focused/shared';
 /**
  * Pin and Hide are personal browsing preferences kept on this device. They
  * never change Canvas, sync state, or saved study work.
@@ -17,6 +18,8 @@ export function todayHideKey(date: string, itemId: string) {
 }
 
 export interface ListPreferences {
+  readonly sort: { readonly library: TopLevelSort; readonly libraryCourse: CourseSort };
+  readonly opened: Readonly<Record<string, string>>;
   readonly pinned: Readonly<Record<PinKind, readonly string[]>>;
   readonly hidden: Readonly<Record<HideSurface, readonly string[]>>;
   /** Announcements the student has read on this device. */
@@ -24,6 +27,8 @@ export interface ListPreferences {
 }
 
 export const EMPTY_LIST_PREFERENCES: ListPreferences = {
+  sort: { library: 'recent', libraryCourse: 'canvas' },
+  opened: {},
   pinned: { course: [], artifact: [], today: [], announcement: [] },
   hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] },
   read: { announcements: [] },
@@ -82,7 +87,16 @@ export function parseListPreferences(raw: string | null): ListPreferences {
     const value = JSON.parse(raw) as { pinned?: Record<string, unknown>; hidden?: Record<string, unknown> };
     const ids = (list: unknown) =>
       Array.isArray(list) ? list.filter((id): id is string => typeof id === "string").slice(0, MAX_ENTRIES) : [];
+    const sort = (value as { sort?: Record<string, unknown> }).sort;
+    const opened = (value as { opened?: Record<string, unknown> }).opened;
     return {
+      sort: {
+        library: TOP_LEVEL_SORTS.find(item => item.value === sort?.library)?.value ?? 'recent',
+        libraryCourse: COURSE_SORTS.find(item => item.value === sort?.libraryCourse)?.value ?? 'canvas',
+      },
+      opened: Object.fromEntries(Object.entries(opened && typeof opened === 'object' ? opened : {})
+        .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Number.isFinite(Date.parse(entry[1])))
+        .sort((a, b) => Date.parse(b[1]) - Date.parse(a[1])).slice(0, MAX_ENTRIES)),
       pinned: { course: ids(value.pinned?.course), artifact: ids(value.pinned?.artifact), today: ids(value.pinned?.today), announcement: ids(value.pinned?.announcement) },
       hidden: {
         generate: ids(value.hidden?.generate),
@@ -97,4 +111,11 @@ export function parseListPreferences(raw: string | null): ListPreferences {
   } catch {
     return EMPTY_LIST_PREFERENCES;
   }
+}
+
+export function setLibrarySort<K extends keyof ListPreferences['sort']>(prefs: ListPreferences, surface: K, sort: ListPreferences['sort'][K]): ListPreferences {
+  return { ...prefs, sort: { ...prefs.sort, [surface]: sort } };
+}
+export function setLibraryOpened(prefs: ListPreferences, id: string, at = new Date().toISOString()): ListPreferences {
+  return { ...prefs, opened: Object.fromEntries([[id, at], ...Object.entries(prefs.opened).filter(([key]) => key !== id)].slice(0, MAX_ENTRIES)) };
 }

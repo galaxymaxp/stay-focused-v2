@@ -5,6 +5,8 @@ import { ASSIST_TYPES, assistRequest, selectAssistBlock } from '@stay-focused/sh
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 import { createGenerationIntent } from '../../services/generationRecovery';
 
+vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
+
 const visuals=vi.hoisted(()=>({sections:{} as Record<string,import('../../services/externalVisuals').ExternalReferenceVisual>}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:(_client:unknown,_id:unknown,offline:boolean)=>offline?null:visuals.sections}));
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));

@@ -50,7 +50,9 @@ const mocks = vi.hoisted(() => ({
   createIntent: vi.fn(),
   vibration: vi.fn(),
   haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
-  prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] } },
+  prefs: { sort: { library: 'recent' as import('@stay-focused/shared').TopLevelSort, libraryCourse: 'canvas' as import('@stay-focused/shared').CourseSort }, opened: {}, pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] } },
+  setSort: vi.fn(),
+  markOpened: vi.fn(),
   markRead: vi.fn(),
   pin: vi.fn(),
   hide: vi.fn(),
@@ -110,7 +112,7 @@ vi.mock("../sync/CanvasSyncProvider", () => ({
   useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync, syncCourse: mocks.sync, unsyncCourse: mocks.unsync, selectedCourseIds: mocks.selectedCourseIds, courseStates: {} }),
 }));
 vi.mock("./useListPreferences", () => ({
-  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead }),
+  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead, setSort: mocks.setSort, markOpened: mocks.markOpened }),
 }));
 vi.mock("../../design/SwipeRow", () => ({
   SwipeRow: "SwipeRow",
@@ -247,7 +249,7 @@ beforeEach(() => {
   mocks.paths = [];
   mocks.params = {};
   mocks.library = { items: [], offlineStats: null, errorCode: null, categories: null, localReady: true, refreshing: false, error: null };
-  mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] } };
+  mocks.prefs = { sort: { library: 'recent', libraryCourse: 'canvas' }, opened: {}, pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] } };
   mocks.selectedCourseIds = new Set();
   mocks.reducedMotion = true;
   vi.clearAllMocks();
@@ -1260,5 +1262,35 @@ describe('O1 calm offline Library', () => {
     await act(async () => back[0]!.props.onPress());
     expect(mocks.back).toHaveBeenCalledOnce();
     expect(root.findAll(node => String(node.type) === 'Copy').map(node => node.props.children).join(' ')).toContain("This one isn't saved on your device yet.");
+  });
+});
+
+describe('LS1 Library controls',()=>{
+  it('changes the top-level sort inside the existing sheet with selected state and no request',async()=>{
+    mocks.library.items=[{...savedQuiz,id:'one',course:{id:'z',code:'Z',name:'Alpha'},createdAt:'2026-02-01'}, {...savedQuiz,id:'two',course:{id:'a',code:'A',name:'Zulu'},createdAt:'2026-01-01'}];
+    let root=await render(createElement(LibraryScreen));
+    expect(root.findAll(node=>String(node.type)==='CourseTile').map(node=>node.props.identity.key ?? node.props.identity.title)).toHaveLength(2);
+    const sort=root.findAll(node=>String(node.type)==='Action').find(node=>node.props.label==='Sort: Recently added')!;
+    await act(async()=>sort.props.onPress());
+    const options=root.findAll(node=>node.props.accessibilityRole==='radio');
+    expect(options.map(node=>node.props.accessibilityLabel)).toEqual(['Recently added','Course','Title A\u2013Z','Recently opened']);
+    expect(options[0]!.props.accessibilityState.selected).toBe(true);
+    await act(async()=>options[1]!.props.onPress());expect(mocks.setSort).toHaveBeenCalledWith('library','course');
+    mocks.prefs.sort.library='course';await act(async()=>rendered!.update(createElement(LibraryScreen)));
+    root=rendered!.root;
+    expect(root.findAll(node=>String(node.type)==='CourseTile').map(node=>node.props.identity.title)).toEqual(['Zulu','Alpha']);
+    expect(mocks.request).not.toHaveBeenCalled();expect(mocks.createIntent).not.toHaveBeenCalled();
+  });
+  it('defaults to Canvas order and changes course sort within pin partitions without requests',async()=>{
+    mocks.params={courseKey:'personal'};
+    mocks.library.items=[{...savedQuiz,id:'z',title:'Zulu',createdAt:'2026-02-01',sourcePosition:{moduleIndex:2,itemIndex:1}}, {...savedQuiz,id:'a',title:'Alpha',createdAt:'2026-01-01',sourcePosition:{moduleIndex:1,itemIndex:2}}, {...savedQuiz,id:'p',title:'Pinned',createdAt:'2025-01-01'}];
+    mocks.prefs.pinned.artifact=['p'];const root=await render(createElement(LibraryCourseScreen));
+    const labels=()=>rendered!.root.findAll(node=>String(node.type)==='RowLink').map(node=>node.props.label);
+    expect(labels()).toEqual(['Quiz: Pinned, pinned','Quiz: Alpha','Quiz: Zulu']);
+    await act(async()=>root.findAll(node=>String(node.type)==='Action').find(node=>node.props.label==='Sort: Canvas order')!.props.onPress());
+    await act(async()=>root.findAll(node=>node.props.accessibilityRole==='radio').find(node=>node.props.accessibilityLabel==='Recently added')!.props.onPress());
+    expect(mocks.setSort).toHaveBeenCalledWith('libraryCourse','recent');
+    mocks.prefs.sort.libraryCourse='recent';await act(async()=>rendered!.update(createElement(LibraryCourseScreen)));
+    expect(labels()).toEqual(['Quiz: Pinned, pinned','Quiz: Zulu','Quiz: Alpha']);expect(mocks.request).not.toHaveBeenCalled();
   });
 });

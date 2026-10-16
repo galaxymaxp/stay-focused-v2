@@ -8,6 +8,8 @@ import {
   setHidden,
   setPinned,
   setRead,
+  setLibrarySort,
+  setLibraryOpened,
   type HideSurface,
   type ListPreferences,
   type PinKind,
@@ -45,6 +47,8 @@ function load(owner: string): Promise<void> {
 }
 
 function update(owner: string, change: (prefs: ListPreferences) => ListPreferences) {
+  // An open can be recorded on the first mount. Preserve saved pins/sorts before merging it.
+  if (!cache.has(owner)) { void load(owner).then(() => update(owner, change)); return; }
   const next = change(cache.get(owner) ?? EMPTY_LIST_PREFERENCES);
   cache.set(owner, next);
   emit();
@@ -82,5 +86,11 @@ export function useListPreferences() {
   const markRead = useCallback((id: string, read: boolean) => {
     if (owner) update(owner, (current) => setRead(current, id, read));
   }, [owner]);
-  return useMemo(() => ({ prefs, pin, hide, markRead }), [prefs, pin, hide, markRead]);
+  const setSort = useCallback(<K extends keyof ListPreferences['sort']>(surface: K, sort: ListPreferences['sort'][K]) => {
+    if (owner) update(owner, current => setLibrarySort(current, surface, sort));
+  }, [owner]);
+  const markOpened = useCallback((id: string) => {
+    if (owner) update(owner, current => setLibraryOpened(current, id));
+  }, [owner]);
+  return useMemo(() => ({ prefs, pin, hide, markRead, setSort, markOpened }), [prefs, pin, hide, markRead, setSort, markOpened]);
 }

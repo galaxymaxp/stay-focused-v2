@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STUDY_GROUNDING_DETAILS, STUDY_LIMITS, STUDY_OFFLINE, STUDY_QUESTION_TOO_LONG, STUDY_SELECTION_TOO_LARGE, selectAssistBlock, studySurface, type ReviewerReaderModel, type StudyToolRequest } from '@stay-focused/shared';
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 
+vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
+
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 vi.mock('./SourceFigures',()=>({SourceFigures:()=>null,useFigureAvailability:()=>new Set()}));

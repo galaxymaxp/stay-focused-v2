@@ -1,3 +1,4 @@
+import { useLibraryOpened } from './useLibraryOpened';
 import type { Quiz, QuizAnswerKey, QuizAttempt, QuizResult, QuizQuestion } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -53,6 +54,7 @@ export function QuizScreen() {
   const saved = useLocalArtifact(id ? `quiz:${id}` : null);
   const savedQuiz = saved.data && "quiz" in saved.data ? saved.data.quiz : null;
   const quizData = quiz.data ?? savedQuiz;
+  useLibraryOpened(quizData ? 'quiz:' + quizData.id : null);
   const client = useExperienceClient();
   const { colors } = useTheme();
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null),
