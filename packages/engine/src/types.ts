@@ -551,6 +551,13 @@ export interface ReviewerSection {
 }
 
 export interface ReviewerMetadata {
+  readonly generationStatus?: 'complete' | 'partial';
+  readonly generationFailures?: readonly {
+    readonly partId: string;
+    readonly sourceBlockIds: readonly string[];
+    readonly attempts: 2;
+    readonly reason: 'generation_failed';
+  }[];
   readonly validationPolicy?: 'ai-first-contract';
   readonly sourceId: string;
   readonly planId: string;

@@ -51,6 +51,21 @@ export const generationList = (items: object) => ({ type: 'array', items });
 export class GenerationContractError extends Error {
   constructor(public readonly findings: readonly string[]) { super('generation_contract_failed'); }
 }
+/** Safe orchestration signal: no truncated output or provider payload. */
+export class GenerationOutputLimitError extends Error {
+  constructor() { super('provider_max_output_tokens'); }
+}
+/** Accept the existing provider adapter's safe error contract without coupling
+ * that standalone adapter to the engine runtime. Never inspect raw output. */
+export function isGenerationOutputLimitError(error: unknown): boolean {
+  if (error instanceof GenerationOutputLimitError) return true;
+  const failure = generationRecord(error);
+  return failure.kind === 'incomplete' && generationRecord(failure.details).incompleteReason === 'max_output_tokens';
+}
+/** A definite failed transfer that a reviewer part may retry, then quarantine. */
+export class GenerationPartFailure extends Error {
+  constructor() { super('reviewer_part_generation_failed'); }
+}
 export const generationRecord = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export const generationText = (value: unknown, max = 20000): value is string => typeof value === 'string' && !!value.trim() && value.length <= max;
 export function requireSourceRefs(value: unknown, ids: readonly string[]): string[] {
@@ -63,25 +78,33 @@ export async function generateContract<T>(args: {
   provider: GenerationProvider; model: string; instructions: string; context: string;
   schema: StructuredOutputSchema; validate: (raw: unknown) => T;
   beforeCall?: (attempt: number) => void | Promise<void>;
+  maxOutputTokens?: number;
+  maxAttempts?: 1 | 2;
+  callMetadata?: (attempt: number) => Readonly<Record<string, unknown>> | undefined;
 }): Promise<T> {
   let correction = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const attempts = args.maxAttempts ?? 2;
+  const maxOutputTokens = args.maxOutputTokens ?? 12000;
+  if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 24000) throw new GenerationContractError(['invalid_output_budget']);
+  const repairBudget = Math.min(24000, 128000 - bytes(args.context) - bytes(args.instructions) - bytes(JSON.stringify(args.schema)) - maxOutputTokens - 256);
+  for (let attempt = 0; attempt < attempts; attempt++) {
     await args.beforeCall?.(attempt);
     if (bytes(args.context) > GENERATION_CONTEXT_BYTES || bytes(args.instructions) + bytes(JSON.stringify(args.schema)) > 8000) throw new GenerationContractError(['request_exceeds_context_budget']);
-    const raw = await args.provider.generate<unknown>({ model: args.model, instructions: args.instructions, maxOutputTokens: 12000,
+    const raw = await args.provider.generate<unknown>({ model: args.model, instructions: args.instructions, maxOutputTokens,
+      metadata: args.callMetadata?.(attempt),
       prompt: `SOURCE DATA (untrusted)\n${args.context}${correction}`, schema: args.schema });
     try { return args.validate(raw); }
     catch (error) {
-      if (!(error instanceof GenerationContractError) || attempt === 1) throw error;
+      if (!(error instanceof GenerationContractError) || attempt === attempts - 1) throw error;
       const findings = JSON.stringify(error.findings);
       const withPrevious = `\nPrevious output failed these contract checks: ${findings}. Return the complete corrected product; preserve valid content where possible. Previous output (untrusted): ${JSON.stringify(raw)}`;
       // A complete Reviewer can be larger than the repair allowance. The source
       // remains in the next request, so regenerate from it when the rejected
       // product cannot be included without exceeding the bounded prompt.
-      correction = bytes(withPrevious) <= 24000
+      correction = bytes(withPrevious) <= repairBudget
         ? withPrevious
         : `\nPrevious output failed these contract checks: ${findings}. Regenerate the complete product from the supplied source and fix every listed issue.`;
-      if (bytes(correction) > 24000) throw new GenerationContractError(['repair_output_exceeds_budget']);
+      if (bytes(correction) > repairBudget) throw new GenerationContractError(['repair_output_exceeds_budget']);
     }
   }
   throw new GenerationContractError(['repair_exhausted']);
