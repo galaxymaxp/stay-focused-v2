@@ -17,6 +17,8 @@ vi.mock("../auth/supabaseClient", () => ({
 import {
   cancelProcessingJob,
   createExtractionJob,
+  createManualReviewerJob,
+  type CreateExtractionJobInput,
   createReviewerJob,
   getExtractionJobResult,
   getProcessingJobStatus,
@@ -27,6 +29,26 @@ const BASE_INPUT = {
   accessToken: "test-access-token",
   apiBaseUrl: "http://127.0.0.1:3000",
 } as const;
+
+it("manual Office upload retains its staged intent and key after ambiguous acceptance", async () => {
+  let accepts = 0;
+  const fetchImpl = vi.fn<typeof fetch>(async (url, init) => {
+    if (String(url).endsWith("/api/job-uploads")) return jsonResponse({ ok: true, data: {
+      uploadId: "upload", bucket: "private", objectPath: "owner/upload", tusEndpoint: "https://unused.invalid", chunkSize: 6291456, expiresAt: "2099-01-01",
+    } });
+    expect(JSON.parse(String(init?.body))).toEqual({ jobType: "reviewer_generation" });
+    expect(new Headers(init?.headers).get("idempotency-key")).toBe("one-pick-key");
+    if (++accepts === 1) throw new TypeError("connection lost after acceptance");
+    return jsonResponse({ ok: true, data: jobView() }, 202);
+  });
+  const uploadSession: NonNullable<CreateExtractionJobInput["uploadSession"]> = {}, tusUploadImpl = vi.fn(async () => {});
+  const input = { ...BASE_INPUT, fetchImpl, tusUploadImpl, uploadSession, idempotencyKey: "one-pick-key",
+    source: { kind: "docx" as const, value: { uri: "file:notes", fileName: "notes.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" as const, webFile: new Blob(["fixture"]) } } };
+  expect(await createManualReviewerJob(input)).toMatchObject({ ok: false });
+  expect(await createManualReviewerJob(input)).toMatchObject({ ok: true });
+  expect(fetchImpl).toHaveBeenCalledTimes(3); expect(tusUploadImpl).toHaveBeenCalledOnce();
+});
 
 describe("processing jobs mobile API", () => {
   it.each([undefined, "automatic", "manual"])("accepts and preserves optional origin %s", async origin => {

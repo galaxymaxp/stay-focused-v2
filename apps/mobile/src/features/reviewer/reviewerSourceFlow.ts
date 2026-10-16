@@ -10,7 +10,8 @@ import type {
   SelectedPdfDocument,
 } from "./pdfDocument";
 
-export type ReviewerSourceMode = "paste" | "image" | "pdf";
+export type ReviewerSourceMode = "paste" | "image" | "pdf" | "docx" | "pptx";
+export function manualSourceNeedsEdit(mode: ReviewerSourceMode): boolean { return mode === "paste"; }
 export type OcrSourceStatus = "idle" | "selected" | "uploading" | "ready" | "failed";
 
 export interface ReviewerSourceState {

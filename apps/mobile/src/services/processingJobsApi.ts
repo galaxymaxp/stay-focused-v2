@@ -4,11 +4,15 @@ import type {
   SourceNormalizationBlockInput,
 } from "@stay-focused/engine";
 import { sanitizeStructuredBlock } from "@stay-focused/engine/structured-document";
-import type {
-  ProcessingJobListPage,
-  ProcessingJobProvenance,
-  ProcessingJobStatusView,
-  ProcessingJobType,
+import {
+  MANUAL_UPLOAD_LIMITS,
+  manualUploadMime,
+  LEGACY_OFFICE_MESSAGE,
+  type ManualUploadMime,
+  type ProcessingJobListPage,
+  type ProcessingJobProvenance,
+  type ProcessingJobStatusView,
+  type ProcessingJobType,
 } from "@stay-focused/shared";
 import { Upload } from "tus-js-client";
 
@@ -45,13 +49,24 @@ export interface CreateExtractionJobInput extends ProcessingJobApiInput {
   readonly idempotencyKey: string;
   readonly source:
     | { readonly kind: "image"; readonly value: OcrImageUpload }
-    | { readonly kind: "pdf"; readonly value: OcrPdfUpload };
+    | { readonly kind: "pdf"; readonly value: OcrPdfUpload }
+    | { readonly kind: "docx" | "pptx"; readonly value: ManualReviewerUpload };
+  readonly reviewer?: boolean;
+  readonly uploadSession?: { intent?: ProcessingUploadIntent; uploaded?: boolean };
   readonly platformOS?: OcrUploadPlatform;
   readonly onUploadProgress?: (
     completedBytes: number,
     totalBytes: number,
   ) => void;
   readonly tusUploadImpl?: typeof uploadSourceWithTus;
+}
+
+export interface ManualReviewerUpload {
+  readonly uri: string; readonly mimeType: ManualUploadMime; readonly fileName: string;
+  readonly fileSize?: number; readonly webFile?: Blob;
+}
+export function createManualReviewerJob(input: Omit<CreateExtractionJobInput, "reviewer">) {
+  return createExtractionJob({ ...input, reviewer: true });
 }
 
 export interface CreateReviewerJobInput extends ProcessingJobApiInput {
@@ -109,7 +124,7 @@ export async function createExtractionJob(
 
   const validated = input.source.kind === "pdf"
     ? validateOcrPdfUpload(input.source.value)
-    : validateOcrImageUpload(input.source.value);
+    : input.source.kind === "image" ? validateOcrImageUpload(input.source.value) : { ok: true as const, value: input.source.value };
   if (!validated.ok) {
     return failure(validated.error.code, validated.error.message, false, validated.error.status);
   }
@@ -124,7 +139,10 @@ export async function createExtractionJob(
   } catch {
     return failure("source_read_failed", "The selected source could not be read.", true);
   }
-  const intent = await requestJson({
+  const mime = manualUploadMime(validated.value.mimeType, validated.value.fileName);
+  if (!mime) return failure("unsupported_media_type", LEGACY_OFFICE_MESSAGE, false);
+  if (!blob.size || blob.size > MANUAL_UPLOAD_LIMITS[mime]) return failure("file_too_large", "Choose a non-empty file within the size limit.", false);
+  const intent = input.uploadSession?.intent ? { ok: true as const, data: input.uploadSession.intent } : await requestJson({
     ...setup.data,
     body: JSON.stringify({
       displayName: validated.value.fileName,
@@ -140,6 +158,7 @@ export async function createExtractionJob(
     parse: parseUploadIntent,
   });
   if (!intent.ok) return intent;
+  if (input.uploadSession) input.uploadSession.intent = intent.data;
   const supabaseConfig = getSupabaseMobileConfig();
   if (!supabaseConfig.ok) {
     return failure(
@@ -149,7 +168,7 @@ export async function createExtractionJob(
     );
   }
   try {
-    await (input.tusUploadImpl ?? uploadSourceWithTus)({
+    if (!input.uploadSession?.uploaded) await (input.tusUploadImpl ?? uploadSourceWithTus)({
       accessToken: setup.data.accessToken,
       anonKey: supabaseConfig.data.supabaseAnonKey,
       blob,
@@ -168,8 +187,10 @@ export async function createExtractionJob(
       true,
     );
   }
+  if (input.uploadSession) input.uploadSession.uploaded = true;
   return await requestJobStatusView({
     ...setup.data,
+    ...(input.reviewer ? { body: JSON.stringify({ jobType: "reviewer_generation" }), contentType: "application/json" } : {}),
     fetchImpl: input.fetchImpl,
     idempotencyKey: input.idempotencyKey,
     method: "POST",
@@ -371,7 +392,7 @@ interface RequestInput {
   readonly fetchImpl?: typeof fetch;
 }
 
-interface ProcessingUploadIntent {
+export interface ProcessingUploadIntent {
   readonly uploadId: string;
   readonly bucket: string;
   readonly objectPath: string;
