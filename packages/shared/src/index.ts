@@ -247,3 +247,4 @@ export * from './study-scroll';
 
 export * from "./manual-reviewer-upload";
 export * from './image-download';
+export * from './topic-assist';
