@@ -13,7 +13,16 @@ in both modes, preserving the list viewport during the hold.
 
 FRESH PASS: 1,056 mobile tests in 105 files; mobile TypeScript; focused ESLint;
 diff hygiene; EAS preview environment preflight. Final copy-only change also
-passes all 70 screen tests. Preview OTA publication and device check pending.
+passes all 70 screen tests.
+
+FRESH PASS: preview OTA group `b1537d74-77d0-4e80-ad86-24fef46abe6d`
+from `e4f0ae7` is active on Realme 2.1.0/code 5. Physical checks confirm
+three complete Reviewer cards plus part of a fourth remain visible in selection
+mode; four equal icons replace the tabs; select all, unselect all and X work.
+Native hold/drag and saved order after force-stop/relaunch pass. The original
+item order was restored; the course Library is left open in normal mode. Recent
+process sample: 0 matching fatal/JS errors. See
+`docs/ai/acceptance/realme-library-toolbar-20261017.md`.
 
 ## Realme course Library organization (2026-10-17)
 
