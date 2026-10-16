@@ -17,9 +17,27 @@ linked quizzes placed with their Reviewer. Unlinked work is last. Complete
 sequences are cached for offline use; failed refreshes retain the saved one.
 
 FRESH PASS: mobile 1,134 tests / 121 files, web 154 / 26, forced root TypeScript
-and lint 8/8 each, zero cached; six existing lint warnings. Root production
-build and preview/physical checks are in progress. First icon-mock and old
+and lint 8/8 each, zero cached; six existing lint warnings. Root production build passed 8/8, zero cached; native correction and final
+publication are recorded below. First icon-mock and old
 bulk-toolbar assertion failures were repaired; the full rerun passes.
+FRESH PASS: final Android preview group 456c1693-3c24-4104-8bd5-58f2b162d563,
+update 01a146c3-084c-7407-acf0-d3f36b97bd70, source 22b4afa, runtime
+2.1.0-sdk57, published 2026-10-17 06:09 Manila, is active on Realme
+2.1.0/code 5. Visible-title course-grid A-Z and Z-A now pass. Six choices are
+visible; item alphabet/date choices, complete course sequence and preserved
+manual order passed the preceding feature OTA. Course-order selection also
+passes an explicit fresh select/relaunch check on the final OTA. Cached course
+sequence/account/choice passed restart without an active default network;
+original network settings were restored. The Sort sheet is left open for the
+owner. Recent final process log has zero matching fatal/JS errors.
+
+FRESH final mobile suite: 1,135 tests / 121 files, mobile TypeScript, focused
+ESLint and final Android export/publication PASS. Web 154 tests and forced root
+typecheck/lint/build 8/8 each, zero cached, passed for feature base 29d48e6.
+The corrective change only adjusts the pure grid comparator to use the same
+courseIdentity title as the tiles. Initial implementation CI passed; final
+implementation CI is in progress. No APK, database, backend or paid generation.
+
 See [acceptance](acceptance/realme-library-sort-20261017.md).
 
 
