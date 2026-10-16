@@ -16,7 +16,13 @@ submission finishes; accepted work remains server-backed.
 FRESH PASS: 91 tests across screen, batch, generation-recovery, local-Library and
 Reviewer API suites; mobile TypeScript; focused ESLint; diff hygiene. Initial
 checks caught a CRLF-sensitive edit duplication; corrected before final checks.
-Preview OTA publication and connected Realme verification pending.
+FRESH PASS: preview OTA `55e1412d-c073-45d6-9bb4-651dfddddb4c` published
+from `9ef1340` and applied to the connected Realme (2.1.0/code 5). Physical
+checks confirm CC17 Generate all, generated labels, both course Library bulk
+actions and the draft Remove swipe. All confirmation dialogs were cancelled;
+NOT RUN: live generation or deletion. Recent process log sample has no matching
+fatal/JS errors. No native build, backend deployment or migration. See
+`docs/ai/acceptance/realme-library-actions-20261016.md` for evidence.
 
 ## Realme generation orb hotfix (2026-10-16)
 
