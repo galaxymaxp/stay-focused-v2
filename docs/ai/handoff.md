@@ -3629,3 +3629,63 @@ is reconciled locally; no later roadmap scope is started.
 No remote service call, remote SQL/migration application, deployment, email,
 Scheduler action, environment-file edit, push or outside-repository deletion
 occurred. The finite GA1b code endpoint is complete.
+
+
+## MR1 unattended long-source reviewer recovery (2026-10-16)
+
+**Status: PASS for STEP 0-2, fresh serial local gates, docs and scoped commits.**
+Finite MR1 only on overnight/2026-10-15_feedback, baseline ed67445; no later item
+was started. Bounded 12k-24k output budget (26,325 chars ->23,744), ordered
+whole-block recovery after known token exhaustion, two attempts per part,
+quarantined gaps with typed partial metadata and owner-reader notice, durable
+receipts/reservations on every reviewer backend, and correct saved call totals.
+Content filtering, legacy unknown reasons, uncertain outcomes, cancellation,
+source grounding, auth/RLS/isolation and SP1/CQ1/QD1/SP2/SP2b/SH1/GA1b are preserved.
+
+Commits:
+
+- 747ea4d fix(engine): recover truncated reviewers with ordered source parts
+- 7c226ed fix(api): resume reviewer parts with counted provider transfers
+- 307000e fix(reviewer): disclose partial generation on mobile and web
+
+Documentation closure: this commit, subject
+"docs: close MR1 with fresh long-source reviewer acceptance"; final hash in
+uncommitted tmp/overnight/MR1.status. All commits use the requested author.
+
+FRESH gate counts: forced typecheck/lint/root build 8/8 tasks each, zero cached;
+API 2,206 passed / 3 existing skips in 191 files; mobile 1,072/1,072 in 114;
+shared 272/272 in 28 (includes emitted copies); web 154/154 in 26; engine 606
+passed/0 failed evaluations; AI-first unit 20/20 in 3; provider contract 20/20.
+Standalone API/web/Android builds 1/1 each, 34/34 and 19/19 static pages, one
+Android bundle/35 assets. Zero lint errors/six existing warnings. Diff and staged
+checks pass with zero whitespace errors. test:workflow NOT APPLICABLE: no test
+files in the configured workflow-tests tree; common durable paths are tested
+in the API suite and Next builds 16 workflow steps/one workflow.
+
+First attempts are retained in [acceptance](acceptance/mr1-long-source-reviewer.md):
+temporary engine config launch failed before collection (bad module path), and
+the extra standalone provider-contract gate failed before assertions because a
+new engine runtime barrel import broke Node resolution. The provider keeps its
+existing safe error boundary; engine-side recognition fixed the contract gate
+to 20/20. Final serial suites/builds reran after repair. No assertion failures or
+nondeterministic flakes. Python was unavailable before an editing command wrote
+anything; Node completed the edits. [ADR-035](../architecture/ADR-035-long-source-reviewer-split.md)
+records the decision. External 2026-10-16 MR1 roadmap and all three planning files
+were reconciled; only the original unrelated untracked UI/, mobile .gitignore
+and supabase/.temp/ remain. Generated Next ambient files were restored.
+
+The supplied production checkpoint proves incomplete output but omitted its
+reason; output exhaustion is an inference, not recovered production evidence.
+The original reason/token usage, deployed revisions, applied database state,
+Scheduler state, production latency and physical behavior are **UNVERIFIED
+(owner to confirm)**. Code provenance with file:line is in acceptance.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely. Deploy
+API and Google worker; distribute website/mobile code for the safe partial
+notice. Then re-upload the SOC SCI 103 midterm reviewer PDF as manual material on
+the realme and website, inspect completeness/source order, and check Canvas,
+partial notice, Queue/cancellation and preserved features. No migration is added
+by MR1; existing prior rollout prerequisites remain owner steps. No Scheduler
+creation/change/resume. No remote service/provider call, SQL/application, email,
+environment-file edit, deployment, push or deletion outside the repo occurred.
+This MR1 run ends here.

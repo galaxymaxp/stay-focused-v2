@@ -1,3 +1,30 @@
+# MR1 finite unattended scope complete locally (2026-10-16)
+
+**PASS for STEP 0-2, fresh serial gates, reconciled docs and local commits.**
+MR1 is the first item of the 2026-10-16 roadmap, after GA1b `ed67445`.
+Source-sized bounded output budgets, ordered whole-block recovery on known token
+exhaustion, two-attempt part quarantine with typed partial results, durable
+receipts/cost counts, and safe website/mobile partial notices are implemented.
+Short sources keep one call; content filtering and unknown transfer fencing
+retain their existing failure behavior. SP1/CQ1/QD1/SP2/SP2b/SH1/GA1b are preserved.
+[Acceptance](acceptance/mr1-long-source-reviewer.md); ADR-035 records the split/assembly decision.
+No later roadmap scope is included.
+
+FRESH forced typecheck/lint/root build **8/8 each, zero cached**; API **2,206
+passed / 3 existing skips**, mobile **1,072**, shared **272**, web **154**, engine
+**606 evaluations**, AI-first unit **20**, provider contract **20** passed.
+Standalone API/web/Android builds **1/1 each** (34/34 and 19/19 pages, one Android
+bundle / 35 assets). Zero lint errors, six existing warnings. Repaired first
+provider-contract/config-launch failures are retained in acceptance. Code:
+747ea4d engine, 7c226ed API, 307000e mobile/web partial disclosure.
+
+**Owner steps remaining:** Rollout and Device checks are entirely skipped.
+Deploy API/Google worker and compatible website/mobile code, then re-upload the
+SOC SCI 103 midterm material on realme and website and inspect completeness.
+Live revisions/database/Scheduler, original incomplete reason/token usage and
+physical behavior are **UNVERIFIED (owner to confirm)**. No migration, remote
+call, environment-file edit, deployment, Scheduler change or push is part of MR1.
+
 # GA1b finite unattended scope complete locally (2026-10-16)
 
 Saved explicit batch requests, normal per-material generation under server quotas, course selection/confirmation and Queue on both platforms, tests, serial local gates, reconciled docs and scoped commits. Auto off, baseline and explicitly opened past courses are included. Confirmation omits generation minutes. All remote calls, rollout, device checks, environment-file edits and pushes are excluded. Prior GA1 audit is reused; SP1/CQ1/QD1/SP2/SP2b/SH1 are preserved.
