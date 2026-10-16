@@ -13,6 +13,16 @@ const result = { ...assistRequest(selection, 'explain_simply'), text: 'A cell ha
 const snapshot = () => buildShareSnapshot({ reviewer, citations: [['From page 4']], quizzes: [], assists: [result], visuals: [] });
 const token = 'a'.repeat(64);
 
+it('accepts retained plain v1 and formatted v2 assists with exact content binding, rejecting unknown versions', () => {
+  for (const promptVersion of ['study-assist-v1', 'study-assist-v2']) {
+    const assist = { ...result, promptVersion, text: promptVersion.endsWith('v1') ? 'Old plain answer.' : 'Lead\n- **Term**' };
+    const input = { reviewer, citations: [], quizzes: [], assists: [assist], visuals: [] };
+    expect(buildShareSnapshot(input).assists[0]?.text).toBe(assist.text);
+    expect(() => buildShareSnapshot({ ...input, assists: [{ ...assist, contentHash: 'stale' }] })).toThrow('invalid_request');
+  }
+  expect(() => buildShareSnapshot({ reviewer, citations: [], quizzes: [], assists: [{ ...result, promptVersion: 'unknown' }], visuals: [] })).toThrow('invalid_request');
+});
+
 it('explicit snapshot includes saved assistance/terms/citations and excludes private owner/source/provenance fields at every level', () => {
   const safe = snapshot();
   const dirty = { ...safe, source_text: 'PRIVATE_SOURCE_TEXT', providerMetadata: 'PRIVATE_PROVIDER', canvasUrl: 'https://canvas.test',

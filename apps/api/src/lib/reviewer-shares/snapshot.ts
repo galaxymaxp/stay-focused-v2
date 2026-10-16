@@ -1,4 +1,4 @@
-import { isAssistResult, isAssistType, selectAssistBlock, validAssistPointIndex, type ReviewerReaderModel, type ReviewerShareSnapshot, type SharedQuiz, type SharedVisual } from '@stay-focused/shared';
+import { ASSIST_PROMPT_VERSION, isAssistResult, isAssistType, selectAssistBlock, validAssistPointIndex, type ReviewerReaderModel, type ReviewerShareSnapshot, type SharedQuiz, type SharedVisual } from '@stay-focused/shared';
 import { ExperienceFailure } from '../experience/errors';
 import { record } from '../experience/mappers';
 
@@ -102,8 +102,11 @@ export function buildShareSnapshot(input: {
     const bi = section?.blocks.findIndex(b => b.id === a.blockId) ?? -1;
     const selection = si >= 0 && bi >= 0 ? selectAssistBlock(reviewer, section!.id, section!.blocks[bi]!.id) : null;
     if (!selection || !isAssistType(a.assistType) || (a.pointIndex !== undefined && !validAssistPointIndex(a.pointIndex, selection.block))) fail();
+    // Retained plain-text assistance and current formatted assistance share the
+    // same exact-content validation. Never accept arbitrary future versions.
+    if (a.promptVersion !== ASSIST_PROMPT_VERSION && a.promptVersion !== 'study-assist-v1') fail();
     const request = { reviewerId: selection.reviewerId, sectionId: selection.sectionId, blockId: selection.blockId,
-      contentHash: selection.contentHash, assistType: a.assistType, promptVersion: 'study-assist-v1',
+      contentHash: selection.contentHash, assistType: a.assistType, promptVersion: a.promptVersion,
       ...(a.pointIndex === undefined ? {} : { pointIndex: a.pointIndex as number }) };
     if (!isAssistResult(a, request)) fail();
     return { section: si, block: bi, type: a.assistType, text: a.text,

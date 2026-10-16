@@ -258,3 +258,16 @@ describe('Smart Selection refinements', () => {
     expect(call.maxOutputTokens).toBe(STUDY_OUTPUT_TOKENS.ask);
   });
 });
+
+it('organizes explanatory text while retaining plain Test Me question and choice fields', async () => {
+  const context = { reviewerTitle: 'Title', sectionTitle: 'Section', block: { title: 'Concept', explanation: 'Meaning', keyPoints: [], evidence: [] }, nearby: [], sourceExcerpts: [] };
+  for (const input of [request(), request({ action: 'ask', question: 'Why?' }), request({ action: 'test', modifier: 'check', question: 'What?', answer: 'A' }), request({ action: 'test', modifier: 'explain_answer', question: 'What?' })]) {
+    const call = studyGenerationCall(input, 'Concept', context);
+    expect(call.instructions).toContain('one short lead line'); expect(call.instructions).toContain('**bold**');
+    expect(call.instructions).toContain(input.modifier === 'check' ? '1500 characters' : '3000 characters');
+  }
+  for (const modifier of [undefined, 'choices'] as const) {
+    const call = studyGenerationCall(request({ action: 'test', modifier }), 'Concept', context);
+    expect(call.instructions).toContain('questions and choices as plain text'); expect(call.instructions).not.toContain('one short lead line');
+  }
+});

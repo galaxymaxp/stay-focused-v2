@@ -26,6 +26,8 @@ describe('Study Assist generation', () => {
     const call = p.generate.mock.calls[0] as unknown as [{ prompt: string; instructions: string; reasoningEffort?: string }];
     // A short explanation should not wait on default reasoning.
     expect(call[0].reasoningEffort).toBe('low');
+    expect(call[0].instructions).toContain('one short lead line');
+    expect(call[0].instructions).toContain('2400 characters');
     expect(call[0].prompt).toContain(sourceExcerpt);
     expect(call[0].prompt).not.toContain('UNRELATED_DO_NOT_SEND');
     expect(call[0].instructions).toContain('Original-source evidence is the factual authority');
