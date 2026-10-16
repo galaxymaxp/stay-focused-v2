@@ -1,4 +1,5 @@
 import type { LearningMaterial, LibraryArtifactSummary } from "@stay-focused/shared";
+import { courseIdentity } from "../../design/courseIdentity";
 import type { LibraryCourseGroup } from "./libraryPresentation";
 import type { LibrarySort } from "./listPreferences";
 
@@ -44,8 +45,9 @@ export function sortLibraryItems<T extends LibraryArtifactSummary>(items: readon
 }
 export function sortLibraryGroups(items: readonly LibraryCourseGroup[], sort: LibrarySort): readonly LibraryCourseGroup[] {
   if (sort === "custom") return items;
+  const names = new Map(items.map(item => [item.key, item.course ? courseIdentity(item.course).title : "Personal & other"]));
   return [...items].sort((a, b) => {
-    const name = titleOrder(a.course?.name ?? "Personal & other", b.course?.name ?? "Personal & other") || a.key.localeCompare(b.key);
+    const name = titleOrder(names.get(a.key)!, names.get(b.key)!) || a.key.localeCompare(b.key);
     return sort === "title_asc" ? name : sort === "title_desc" ? -name : dates(a.latestAt || null, b.latestAt || null, sort !== "updated_asc") || name;
   });
 }

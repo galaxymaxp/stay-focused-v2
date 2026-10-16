@@ -38,3 +38,8 @@ it("sorts course tiles by latest saved work and course name", () => {
   expect(sortLibraryGroups(groups, "title_asc").map(group => group.key)).toEqual(["Alpha", "Zulu"]);
   expect(sortLibraryGroups(groups, "updated_asc").map(group => group.key)).toEqual(["Zulu", "Alpha"]);
 });
+it("alphabetizes the visible course titles instead of hidden Canvas code/section prefixes", () => {
+  const groups = ["AA | Group A | ZULU", "ZZ | Group B | ALPHA"].map(name => ({ key: name, course: { id: name, name, code: null }, latestAt: 1, total: 1, counts: { reviewer: 1, quiz: 0, activity_output: 0 } }));
+  expect(sortLibraryGroups(groups, "title_asc").map(group => group.key)).toEqual([groups[1]!.key, groups[0]!.key]);
+  expect(sortLibraryGroups(groups, "title_desc").map(group => group.key)).toEqual([groups[0]!.key, groups[1]!.key]);
+});
