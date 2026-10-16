@@ -34,7 +34,7 @@ describe('safe flat study format', () => {
   it('changes both cache keys without invalidating old result strings or caps', () => {
     const old: AssistRequest = { reviewerId: 'artifact:a', sectionId: 's', blockId: 'b', assistType: 'summarize', contentHash: 'a', promptVersion: 'study-assist-v1' };
     expect(ASSIST_PROMPT_VERSION).toBe('study-assist-v2');
-    expect(STUDY_TOOLS_PROMPT_VERSION).toBe('study-tools-v2');
+    expect(STUDY_TOOLS_PROMPT_VERSION).toBe('study-tools-v3');
     expect(assistCacheKey(old)).not.toBe(assistCacheKey({ ...old, promptVersion: ASSIST_PROMPT_VERSION }));
     expect(isAssistResult({ ...old, text: 'An old plain answer.', createdAt: '2026-10-16T00:00:00Z' }, old)).toBe(true);
     expect(validAssistText('x'.repeat(2400))).toBe(true); expect(validAssistText('x'.repeat(2401))).toBe(false);

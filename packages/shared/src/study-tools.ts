@@ -5,7 +5,7 @@ import type { AssistBlock } from './study-assist';
  * student can take on text selected inside a Reviewer block. Results are
  * supplementary and never change the canonical Reviewer.
  */
-export const STUDY_TOOLS_PROMPT_VERSION = 'study-tools-v2';
+export const STUDY_TOOLS_PROMPT_VERSION = 'study-tools-v3';
 /** Fixed order; the interface never reorders these. */
 export const STUDY_ACTIONS = ['define', 'explain', 'example', 'test', 'ask'] as const;
 export type StudyAction = typeof STUDY_ACTIONS[number];
@@ -40,6 +40,17 @@ export const STUDY_MODIFIER_LABELS: Record<StudyModifier, string> = {
 };
 /** Static suggestions; never generated. */
 export const STUDY_ASK_SUGGESTIONS = ['What is this?', 'Why does this matter?', 'How does this work?', 'What could I confuse this with?'] as const;
+export const STUDY_IMAGE_SUGGESTIONS = ['What is this?', 'What does it mean?', 'Explain the parts', 'Why is it in this lesson?'] as const;
+export interface StudyImageReference {
+  readonly kind: 'page_snapshot' | 'figure' | 'external_visual';
+  readonly id: string;
+}
+/** Display data only. Only the reference is sent in a StudyToolRequest. */
+export interface StudyImageTarget {
+  readonly reference: StudyImageReference;
+  readonly thumbnail: string;
+  readonly label: string;
+}
 
 export const STUDY_LIMITS = {
   /** Characters of selected text after whitespace normalization. */
@@ -78,6 +89,8 @@ export interface StudyToolRequest {
   readonly promptVersion: string;
   readonly selection: string;
   readonly action: StudyAction;
+  /** Ask variant: server resolves the exact owner's image, never client bytes/URLs. */
+  readonly image?: StudyImageReference;
   readonly modifier?: StudyModifier;
   /** Ask: the student's question. Test: the question being checked, explained or converted. */
   readonly question?: string;
@@ -144,7 +157,8 @@ export function studyAskSubject(block: AssistBlock, pointIndex?: number): string
 }
 /** Same-session reuse key. Inputs that change the answer are part of it. */
 export function studyCacheKey(request: StudyToolRequest): string {
-  return JSON.stringify([request.reviewerId, request.blockId, request.contentHash, normalizeStudyText(request.selection), request.action,
+  return JSON.stringify([request.reviewerId, request.sectionId, request.blockId, request.contentHash, normalizeStudyText(request.selection), request.action,
+    request.image?.kind ?? '', request.image?.id ?? '',
     request.promptVersion, request.modifier ?? '', request.question ?? '', request.answer ?? '', request.followUps ?? []]);
 }
 /** Variants whose purpose is novelty are never reused. */
