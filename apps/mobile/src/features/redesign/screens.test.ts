@@ -52,7 +52,8 @@ const mocks = vi.hoisted(() => ({
   deleteReviewer: vi.fn(async () => ({ ok: true })),
   vibration: vi.fn(),
   haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
-  prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] } },
+  prefs: { pinned: { course: [] as string[], artifact: [] as string[], today: [] as string[], announcement: [] as string[] }, hidden: { generate: [] as string[], library: [] as string[], libraryItems: [] as string[], today: [] as string[], announcements: [] as string[], queue: [] as string[] }, read: { announcements: [] as string[] }, libraryOrder: {} as Record<string, string[]> },
+  reorderLibrary: vi.fn(),
   markRead: vi.fn(),
   pin: vi.fn(),
   hide: vi.fn(),
@@ -87,7 +88,7 @@ vi.mock("../../design/theme", async () => {
 vi.mock("../../design/primitives", () => ({
   Sheet: "Sheet",
   RowLink: "RowLink",
-  Page: "Page",
+  Page: (props: { children: ReactElement; headerAction?: ReactElement; headerBelow?: ReactElement; footer?: ReactElement }) => createElement('Page', props, props.headerAction, props.headerBelow, props.children, props.footer),
   Action: "Action",
   Surface: "Surface",
   Notice: "Notice",
@@ -110,7 +111,7 @@ vi.mock("../sync/CanvasSyncProvider", () => ({
   useCanvasSync: () => ({ snapshot: { phase: "idle", total: 0, finished: 0, lastSyncedAt: null }, dataVersion: 0, sync: mocks.sync, unsyncCourse: mocks.unsync, selectedCourseIds: mocks.selectedCourseIds, courseStates: {} }),
 }));
 vi.mock("./useListPreferences", () => ({
-  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead }),
+  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead, reorderLibrary: mocks.reorderLibrary }),
 }));
 vi.mock("../../design/SwipeRow", () => ({
   SwipeRow: "SwipeRow",
@@ -187,6 +188,7 @@ vi.mock("lucide-react-native", () => ({
   ExternalLink: "ExternalLink",
   Eye: "Eye",
   EyeOff: "EyeOff",
+  Check: "Check",
   Pin: "Pin",
   PinOff: "PinOff",
   CloudOff: "CloudOff",
@@ -250,7 +252,7 @@ beforeEach(() => {
   mocks.paths = [];
   mocks.params = {};
   mocks.library = { items: [], offlineStats: null, errorCode: null, categories: null, localReady: true, refreshing: false, error: null };
-  mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] } };
+  mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] }, libraryOrder: {} };
   mocks.selectedCourseIds = new Set();
   mocks.reducedMotion = true;
   vi.clearAllMocks();
@@ -1265,5 +1267,93 @@ describe('course Library bulk actions', () => {
     expect(mocks.removeLocal).toHaveBeenCalledExactlyOnceWith('owner', 'activity:removed');
     expect(root.findAll(node => String(node.type) === 'SwipeRow')).toHaveLength(1);
     expect(root.findAll(node => String(node.type) === 'Notice').map(node => node.props.children).join(' ')).toContain('1 could not be removed');
+  });
+});
+
+describe('organizing saved items inside a course', () => {
+  function setup() {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = ['a', 'b', 'c'].map(id => ({ ...savedQuiz, id: `quiz:${id}`, title: id }));
+  }
+  const cards = (root: ReactTestRenderer['root']) => root.findAll(node => String(node.type) === 'RowLink');
+  const list = (root: ReactTestRenderer['root']) => root.findAll(node => String(node.type) === 'View' && node.props.onPanResponderMove)[0]!;
+  const button = (root: ReactTestRenderer['root'], label: string) => root.findAll(node => String(node.type) === 'Action' && node.props.children === label)[0]!;
+  const touch = (y: number) => ({ nativeEvent: { pageY: y } });
+  it('holds to select, taps to multi-select, and Done restores ordinary opening', async () => {
+    setup();
+    const root = await render(createElement(LibraryCourseScreen));
+    await act(async () => { list(root).props.onTouchStart(touch(60)); cards(root)[0].props.onLongPress(); });
+    expect(root.findByType('Page' as never).props.scrollEnabled).toBe(false);
+    await act(async () => list(root).props.onTouchEnd());
+    expect(copyText(root)).toContain('1 selected · Hold and drag to move');
+    await act(async () => { list(root).props.onTouchStart(touch(200)); cards(root)[1].props.onPress(); });
+    expect(copyText(root)).toContain('2 selected · Hold and drag to move');
+    expect(mocks.push).not.toHaveBeenCalled();
+    await act(async () => { list(root).props.onTouchStart(touch(200)); cards(root)[1].props.onPress(); });
+    expect(copyText(root)).toContain('1 selected · Hold and drag to move');
+    await act(async () => button(root, 'Done').props.onPress());
+    await act(async () => cards(root)[1].props.onPress());
+    expect(mocks.push).toHaveBeenCalledWith({ pathname: '/artifact', params: { id: 'quiz:b' } });
+  });
+  it('drags only after a hold and saves the order on release', async () => {
+    setup();
+    const root = await render(createElement(LibraryCourseScreen));
+    expect(list(root).props.onMoveShouldSetPanResponderCapture()).toBe(false);
+    root.findAll(node => String(node.type) === 'AnimatedView' && node.props.onLayout).forEach((row, index) => row.props.onLayout({ nativeEvent: { layout: { x: 0, y: index * 134, width: 300, height: 120 } } }));
+    await act(async () => { list(root).props.onTouchStart(touch(60)); cards(root)[0].props.onLongPress(); });
+    expect(list(root).props.onMoveShouldSetPanResponderCapture()).toBe(true);
+    await act(async () => list(root).props.onPanResponderMove(touch(220)));
+    expect(mocks.reorderLibrary).not.toHaveBeenCalled();
+    await act(async () => list(root).props.onPanResponderRelease());
+    expect(mocks.reorderLibrary).toHaveBeenCalledExactlyOnceWith('personal', ['quiz:b', 'quiz:a', 'quiz:c']);
+    expect(root.findByType('Page' as never).props.scrollEnabled).toBe(true);
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('cancels interrupted dragging without changing the saved order', async () => {
+    setup();
+    const root = await render(createElement(LibraryCourseScreen));
+    await act(async () => { list(root).props.onTouchStart(touch(60)); cards(root)[0].props.onLongPress(); });
+    await act(async () => list(root).props.onPanResponderTerminate());
+    expect(mocks.reorderLibrary).not.toHaveBeenCalled();
+    expect(root.findByType('Page' as never).props.scrollEnabled).toBe(true);
+  });
+  it('scrolls near the viewport edge during dragging and stops on release', async () => {
+    vi.useFakeTimers();
+    setup();
+    const root = await render(createElement(LibraryCourseScreen));
+    const scrollTo = vi.fn();
+    root.findByType('Page' as never).props.scrollRef.current = {
+      getNativeScrollRef: () => ({ measureInWindow: (callback: (x: number, y: number, w: number, h: number) => void) => callback(0, 100, 300, 500) }),
+      scrollTo,
+    };
+    await act(async () => { list(root).props.onTouchStart(touch(200)); cards(root)[0].props.onLongPress(); });
+    await act(async () => list(root).props.onPanResponderMove(touch(580)));
+    await act(async () => { vi.advanceTimersByTime(32); });
+    expect(scrollTo).toHaveBeenCalledWith({ y: 12, animated: false });
+    await act(async () => list(root).props.onPanResponderRelease());
+    scrollTo.mockClear();
+    await act(async () => { vi.advanceTimersByTime(64); });
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+  it('uses stored order and moves the tapped selection together', async () => {
+    setup();
+    mocks.prefs.libraryOrder.personal = ['quiz:c', 'quiz:b', 'quiz:a'];
+    const root = await render(createElement(LibraryCourseScreen));
+    expect(cards(root).map(card => card.props.label)).toEqual(['Quiz: c', 'Quiz: b', 'Quiz: a']);
+    await act(async () => button(root, 'Organize').props.onPress());
+    await act(async () => cards(root)[1].props.onPress());
+    await act(async () => cards(root)[2].props.onPress());
+    await act(async () => button(root, 'Move to top').props.onPress());
+    expect(mocks.reorderLibrary).toHaveBeenCalledWith('personal', ['quiz:b', 'quiz:a', 'quiz:c']);
+  });
+  it('confirms removal of the whole selected set without deleting on tap', async () => {
+    setup();
+    const root = await render(createElement(LibraryCourseScreen));
+    await act(async () => button(root, 'Organize').props.onPress());
+    await act(async () => cards(root)[0].props.onPress());
+    await act(async () => cards(root)[1].props.onPress());
+    await act(async () => button(root, 'Remove selected').props.onPress());
+    expect(mocks.alert).toHaveBeenCalledWith('Remove saved work?', expect.stringContaining('2 selected items'), expect.any(Array));
+    expect(mocks.request).not.toHaveBeenCalled();
   });
 });

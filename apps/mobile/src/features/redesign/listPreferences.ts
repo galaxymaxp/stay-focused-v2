@@ -21,12 +21,15 @@ export interface ListPreferences {
   readonly hidden: Readonly<Record<HideSurface, readonly string[]>>;
   /** Announcements the student has read on this device. */
   readonly read: { readonly announcements: readonly string[] };
+  /** Custom saved-work order per course, on this device and account. */
+  readonly libraryOrder: Readonly<Record<string, readonly string[]>>;
 }
 
 export const EMPTY_LIST_PREFERENCES: ListPreferences = {
   pinned: { course: [], artifact: [], today: [], announcement: [] },
   hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] },
   read: { announcements: [] },
+  libraryOrder: {},
 };
 
 const MAX_ENTRIES = 300;
@@ -79,7 +82,7 @@ export function arrangeList<T>(
 export function parseListPreferences(raw: string | null): ListPreferences {
   if (!raw) return EMPTY_LIST_PREFERENCES;
   try {
-    const value = JSON.parse(raw) as { pinned?: Record<string, unknown>; hidden?: Record<string, unknown> };
+    const value = JSON.parse(raw) as { pinned?: Record<string, unknown>; hidden?: Record<string, unknown>; libraryOrder?: unknown };
     const ids = (list: unknown) =>
       Array.isArray(list) ? list.filter((id): id is string => typeof id === "string").slice(0, MAX_ENTRIES) : [];
     return {
@@ -93,8 +96,15 @@ export function parseListPreferences(raw: string | null): ListPreferences {
         queue: ids(value.hidden?.queue),
       },
       read: { announcements: ids((value as { read?: Record<string, unknown> }).read?.announcements) },
+      libraryOrder: value.libraryOrder && typeof value.libraryOrder === "object" && !Array.isArray(value.libraryOrder)
+        ? Object.fromEntries(Object.entries(value.libraryOrder).slice(0, MAX_ENTRIES).map(([course, order]) => [course, ids(order)]))
+        : {},
     };
   } catch {
     return EMPTY_LIST_PREFERENCES;
   }
+}
+
+export function setLibraryOrder(prefs: ListPreferences, course: string, order: readonly string[]): ListPreferences {
+  return { ...prefs, libraryOrder: { ...prefs.libraryOrder, [course]: [...new Set(order)].slice(0, MAX_ENTRIES) } };
 }

@@ -376,6 +376,7 @@ export function RowLink({
   accessibilityActions,
   onAccessibilityAction,
   onLongPress,
+  selected,
 }: {
   children: ReactNode;
   label: string;
@@ -388,6 +389,7 @@ export function RowLink({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
   /** Additional options, e.g. a quick-actions sheet. */
   onLongPress?: () => void;
+  selected?: boolean;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
@@ -405,7 +407,7 @@ export function RowLink({
       } : undefined}
       delayLongPress={onLongPress ? 380 : undefined}
       disabled={disabled}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, selected }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={({ pressed }) => ({

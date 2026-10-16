@@ -1,5 +1,19 @@
 # Current State
 
+## Realme course Library organization (2026-10-17)
+
+Owner scope: home-screen-style organization of saved items inside a course,
+not the course grid. Long press selects and arms drag; further taps select
+items without opening them. Drop moves the selection as a block. Order is
+account/course scoped on the device; filtered-out items retain their slots.
+Done returns to ordinary opening. Move-to-edge controls provide a gesture-free
+option, and selected removal uses the existing explicit confirmation.
+
+FRESH PASS: 1,052 mobile tests in 105 files; mobile TypeScript; focused ESLint;
+diff hygiene. Final test-only typing correction also passes 66 screen tests.
+Preview OTA publication and physical Realme acceptance are in progress. No native
+dependency, database or backend change.
+
 ## Realme Library and generation actions (2026-10-16)
 
 JS-only update adds Generate all Reviewers for ready course materials, including

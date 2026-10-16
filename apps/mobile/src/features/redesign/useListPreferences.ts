@@ -8,6 +8,7 @@ import {
   setHidden,
   setPinned,
   setRead,
+  setLibraryOrder,
   type HideSurface,
   type ListPreferences,
   type PinKind,
@@ -82,5 +83,8 @@ export function useListPreferences() {
   const markRead = useCallback((id: string, read: boolean) => {
     if (owner) update(owner, (current) => setRead(current, id, read));
   }, [owner]);
-  return useMemo(() => ({ prefs, pin, hide, markRead }), [prefs, pin, hide, markRead]);
+  const reorderLibrary = useCallback((course: string, ids: readonly string[]) => {
+    if (owner) update(owner, (current) => setLibraryOrder(current, course, ids));
+  }, [owner]);
+  return useMemo(() => ({ prefs, pin, hide, markRead, reorderLibrary }), [prefs, pin, hide, markRead, reorderLibrary]);
 }

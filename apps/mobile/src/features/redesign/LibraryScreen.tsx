@@ -6,9 +6,9 @@ import type {
 } from "@stay-focused/shared";
 import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
 import { router, useLocalSearchParams } from "expo-router";
-import { Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
+import { Check, Pin, PinOff, RotateCw, Trash2 } from "lucide-react-native";
 import { useMemo, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, View, useWindowDimensions } from "react-native";
+import { Alert, Animated, KeyboardAvoidingView, Platform, View, useWindowDimensions, type AccessibilityActionInfo } from "react-native";
 
 import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, ContentIcon, SkeletonCards, SkeletonBlock } from "../../design/primitives";
 import { useAuth } from "../../auth";
@@ -50,6 +50,8 @@ import { reviewerSecondaryLine } from '../reviewer/reviewerEstimatePresentation'
 
 import { libraryRemovalPath } from './courseReviewerActions';
 import { useCourseReviewerBatch } from './useCourseReviewerBatch';
+import { orderedLibrary } from './libraryOrder';
+import { useLibraryOrganizer } from './useLibraryOrganizer';
 
 const LOCAL_PAGE_SIZE = 50;
 const GRID_GAP = 12;
@@ -123,6 +125,7 @@ function useRemoveLibraryItems(onRemoved: (item: LibraryArtifactSummary) => void
     haptic.warning();
     Alert.alert(all ? 'Remove all saved work?' : 'Remove saved work?', all
       ? 'Remove all ' + items.length + ' items in this course Library, including Reviewers, quizzes and drafts, on every device? This cannot be undone.'
+      : items.length > 1 ? 'Remove these ' + items.length + ' selected items from your Library on every device? This cannot be undone.'
       : 'Remove ' + items[0].title + ' from your Library on every device? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: all ? 'Remove all' : 'Remove', style: 'destructive', onPress: () => void remove(items) },
@@ -240,8 +243,8 @@ export function LibraryCourseScreen() {
   const [visible, setVisible] = useState(LOCAL_PAGE_SIZE);
   const courseItems = useMemo(() => filterCourseLibrary(library.items, courseKey, "all"), [courseKey, library.items]);
   const filtered = useMemo(() => filterCourseLibrary(library.items, courseKey, filter), [courseKey, filter, library.items]);
-  const { prefs, pin } = useListPreferences();
-  const { reducedMotion } = useTheme();
+  const { prefs, pin, reorderLibrary } = useListPreferences();
+  const { reducedMotion, colors } = useTheme();
   const change = (update: () => void) => {
     animateNextLayout(reducedMotion);
     update();
@@ -254,8 +257,12 @@ export function LibraryCourseScreen() {
   const batch = useCourseReviewerBatch(library.refresh);
   const remaining = courseItems.filter(item => !removal.removed.has(item.id));
   const remakeIds = new Set(remaining.filter(item => item.type === 'reviewer' && item.sourceMaterialId).map(item => item.sourceMaterialId!));
-  const arranged = arrangeList(filtered.filter(item => !removal.removed.has(item.id)), (item) => item.id, prefs.pinned.artifact, []);
-  const items = [...arranged.pinned, ...arranged.rest];
+  const arranged = arrangeList(remaining, (item) => item.id, prefs.pinned.artifact, []);
+  const allItems = orderedLibrary([...arranged.pinned, ...arranged.rest], prefs.libraryOrder?.[courseKey]);
+  const filteredIds = new Set(filtered.map(item => item.id));
+  const items = allItems.filter(item => filteredIds.has(item.id));
+  const organizer = useLibraryOrganizer(`${courseKey}:${filter}`, allItems.map(item => item.id), items.map(item => item.id), ids => reorderLibrary(courseKey, ids));
+  const selectedItems = allItems.filter(item => organizer.selectedIds.includes(item.id));
   const identity = courseKey ? libraryIdentity(courseKey, courseItems[0]?.course ?? null) : null;
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
   const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
@@ -265,6 +272,19 @@ export function LibraryCourseScreen() {
       title={identity?.title ?? "Library"}
       subtitle={identity?.subtitle ?? undefined}
       onRefresh={library.refresh}
+      scrollRef={organizer.scrollRef}
+      onScroll={organizer.onScroll}
+      scrollEnabled={!organizer.dragging}
+      refreshEnabled={!organizer.editing}
+      headerAction={items.length ? <Action secondary onPress={organizer.editing ? organizer.done : organizer.begin}>{organizer.editing ? 'Done' : 'Organize'}</Action> : undefined}
+      footer={organizer.editing ? <View style={{ gap: spacing[2], padding: spacing[3] }}>
+        <Copy size="caption">{selectedItems.length} selected · Hold and drag to move</Copy>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+          <Action secondary disabled={!selectedItems.length || !!organizer.dragging} onPress={() => organizer.moveToEdge(false)}>Move to top</Action>
+          <Action secondary disabled={!selectedItems.length || !!organizer.dragging} onPress={() => organizer.moveToEdge(true)}>Move to bottom</Action>
+          <Action secondary disabled={!selectedItems.length || removal.busy || batch.busy || offline || !!organizer.dragging} onPress={() => removal.confirm(selectedItems)}>Remove selected</Action>
+        </View>
+      </View> : undefined}
       headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
@@ -293,6 +313,8 @@ export function LibraryCourseScreen() {
           <Copy muted>Generate from this course&apos;s materials when you are ready.</Copy>
         </Surface>
       ) : null}
+      {items.length ? <Copy muted size="caption">{organizer.editing ? 'Tap items to select. Tap Done when finished.' : 'Hold an item to rearrange or select.'}</Copy> : null}
+      <View ref={organizer.listRef} collapsable={false} style={{ gap: 14 }} {...organizer.panHandlers} onTouchStart={organizer.touchStart} onTouchEnd={organizer.touchEnd} onTouchCancel={organizer.touchCancel}>
       {items.slice(0, visible).map((item) => {
         const pinned = prefs.pinned.artifact.includes(item.id);
         const leading = pinAction(pinned, () => change(() => pin("artifact", item.id, !pinned)));
@@ -306,32 +328,51 @@ export function LibraryCourseScreen() {
             ? [{ key: "remove", label: "Remove", icon: Trash2, tone: "danger", onPress: () => removal.confirm([item]) }]
             : [];
         return (
-          <SwipeRow key={item.id} leading={leading} trailing={trailing}>
-            <LibraryCard item={item} pinned={pinned} swipeActions={[...leading, ...trailing]} />
-          </SwipeRow>
+          <Animated.View key={item.id} onLayout={event => organizer.layouts.current.set(item.id, event.nativeEvent.layout)} style={{
+            zIndex: organizer.dragging === item.id ? 10 : 0,
+            transform: [{ translateY: organizer.dragging === item.id ? organizer.translate : 0 }],
+            opacity: organizer.dragging && organizer.selected.has(item.id) && organizer.dragging !== item.id ? 0.45 : 1,
+          }}>
+            {organizer.drop?.id === item.id ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, height: 3, borderRadius: 2, backgroundColor: colors.accent, ...(organizer.drop.after ? { bottom: -8 } : { top: -8 }) }} /> : null}
+            <SwipeRow leading={organizer.editing ? [] : leading} trailing={organizer.editing ? [] : trailing}>
+              <LibraryCard item={item} pinned={pinned} swipeActions={organizer.editing ? [] : [...leading, ...trailing]}
+                organizing={organizer.editing} selected={organizer.selected.has(item.id)}
+                onPress={() => organizer.tap(item.id, () => router.push({ pathname: '/artifact', params: { id: item.id } }))}
+                onLongPress={() => organizer.hold(item.id)}
+                organize={() => { organizer.begin(); }} />
+            </SwipeRow>
+          </Animated.View>
         );
       })}
+      </View>
       {items.length > visible ? <Action secondary onPress={() => setVisible((count) => count + LOCAL_PAGE_SIZE)}>More saved work</Action> : null}
       {items.length > 0 ? <Copy muted size="caption" style={{ textAlign: "center" }}>{items.length} {items.length === 1 ? "item" : "items"}</Copy> : null}
     </Page>
   );
 }
 
-function LibraryCard({ item, pinned = false, swipeActions }: { item: LibraryArtifactSummary & { readonly offlineReady?: boolean }; pinned?: boolean; swipeActions: readonly SwipeAction[] }) {
+function LibraryCard({ item, pinned = false, swipeActions, organizing, selected, onPress, onLongPress, organize }: {
+  item: LibraryArtifactSummary & { readonly offlineReady?: boolean }; pinned?: boolean; swipeActions: readonly SwipeAction[];
+  organizing: boolean; selected: boolean; onPress: () => void; onLongPress: () => void; organize: () => void;
+}) {
   const { colors } = useTheme();
   const secondaryLine = reviewerSecondaryLine(automaticLibraryLabel(item), item.type === 'reviewer' ? item.reviewMinutes : null);
   const typeLabel = item.type === "activity_output" ? "Draft" : item.type === "quiz" ? "Quiz" : "Reviewer";
   const tone = item.type === "quiz" ? colors.violet : item.type === "activity_output" ? colors.green : colors.blue;
   const soft = item.type === "quiz" ? colors.violetSoft : item.type === "activity_output" ? colors.greenSoft : colors.blueSoft;
   return (
-    <Surface style={{ overflow: "hidden" }}>
+    <Surface style={{ overflow: "hidden", ...(selected ? { borderColor: colors.accent, borderWidth: 2 } : {}) }}>
       <RowLink
         inset
         icon={<ContentIcon kind={item.type} />}
         label={`${typeLabel}: ${item.title}${pinned ? ", pinned" : ""}${item.offlineReady ? ", Saved offline" : ""}`}
         {...swipeAccessibility(swipeActions)}
-        trailing={pinned ? <Pin size={14} color={colors.textMuted} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }] }} /> : undefined}
-        onPress={() => router.push({ pathname: "/artifact", params: { id: item.id } })}>
+        accessibilityActions={[...swipeAccessibility(swipeActions).accessibilityActions, { name: 'organize', label: 'Organize saved items' }] as AccessibilityActionInfo[]}
+        onAccessibilityAction={event => event.nativeEvent.actionName === 'organize' ? organize() : swipeAccessibility(swipeActions).onAccessibilityAction(event)}
+        selected={organizing ? selected : undefined}
+        trailing={organizing ? <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: selected ? colors.accent : colors.textMuted, backgroundColor: selected ? colors.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{selected ? <Check size={16} color={colors.onAccent} /> : null}</View> : pinned ? <Pin size={14} color={colors.textMuted} strokeWidth={1.8} style={{ transform: [{ rotate: "35deg" }] }} /> : undefined}
+        onLongPress={onLongPress}
+        onPress={onPress}>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing[2] }}>
           <View style={{ backgroundColor: soft, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}><Copy size="caption" color={tone} style={{ fontWeight: "700" }}>{typeLabel}</Copy></View>
         </View>
