@@ -1,5 +1,20 @@
 # Current State
 
+## Realme compact Library selection toolbar (2026-10-17)
+
+Owner UI correction supersedes the earlier Library controls: remove the always
+visible remake/remove card, Organize/Done, and the move-to-edge footer. Holding
+a saved item reveals four equal icon targets in place of the filter tabs:
+remake, trash, select/unselect all, and X to cancel. The header shows the selected
+count. Selection covers the current filter, including items beyond the first
+page; remake/removal use only that selection and retain confirmation. Dragging
+and stored order remain available. The toolbar occupies a fixed 48-point slot
+in both modes, preserving the list viewport during the hold.
+
+FRESH PASS: 1,056 mobile tests in 105 files; mobile TypeScript; focused ESLint;
+diff hygiene; EAS preview environment preflight. Final copy-only change also
+passes all 70 screen tests. Preview OTA publication and device check pending.
+
 ## Realme course Library organization (2026-10-17)
 
 Owner scope: home-screen-style organization of saved items inside a course,

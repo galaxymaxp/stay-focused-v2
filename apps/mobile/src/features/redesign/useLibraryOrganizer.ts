@@ -103,7 +103,7 @@ export function useLibraryOrganizer(scope: string, all: readonly string[], visib
 
   useEffect(() => {
     if (!dragging) return;
-    // The selection footer has now mounted; measure the reduced viewport.
+    // Measure the viewport when a hold arms dragging.
     scrollRef.current?.getNativeScrollRef()?.measureInWindow((_x, y, _width, height) => { viewport.current = { top: y, height }; });
     const timer = setInterval(() => {
       const current = drag.current;
@@ -141,13 +141,11 @@ export function useLibraryOrganizer(scope: string, all: readonly string[], visib
   };
   const touchStart = (event: GestureResponderEvent) => { suppressTap.current = null; touchY.current = event.nativeEvent.pageY; };
   const selectedIds = all.filter(id => selected.has(id));
-  const moveToEdge = (end: boolean) => {
-    const target = (end ? [...visible].reverse() : visible).find(id => !selected.has(id));
-    if (target) save(moveLibraryItems(all, visible, selected, target, end));
-  };
+  const allSelected = visible.length > 0 && visible.every(id => selected.has(id));
+  const toggleAll = () => { haptic.select(); setSelected(allSelected ? new Set() : new Set(visible)); };
   return {
     editing, selected, selectedIds, dragging, drop, translate, scrollRef, listRef, layouts,
-    begin: () => { setEditing(true); setSelected(new Set()); }, done, hold, tap, moveToEdge, onScroll,
+    begin: (id?: string) => { setEditing(true); setSelected(new Set(id ? [id] : [])); }, done, hold, tap, allSelected, toggleAll, onScroll,
     panHandlers: responder.panHandlers,
     touchStart,
     touchEnd: () => { if (drag.current) release(); },

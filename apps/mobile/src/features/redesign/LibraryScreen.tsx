@@ -52,6 +52,7 @@ import { libraryRemovalPath } from './courseReviewerActions';
 import { useCourseReviewerBatch } from './useCourseReviewerBatch';
 import { orderedLibrary } from './libraryOrder';
 import { useLibraryOrganizer } from './useLibraryOrganizer';
+import { LibrarySelectionToolbar } from './LibrarySelectionToolbar';
 
 const LOCAL_PAGE_SIZE = 50;
 const GRID_GAP = 12;
@@ -256,13 +257,20 @@ export function LibraryCourseScreen() {
   const remake = useRemakeReviewer();
   const batch = useCourseReviewerBatch(library.refresh);
   const remaining = courseItems.filter(item => !removal.removed.has(item.id));
-  const remakeIds = new Set(remaining.filter(item => item.type === 'reviewer' && item.sourceMaterialId).map(item => item.sourceMaterialId!));
   const arranged = arrangeList(remaining, (item) => item.id, prefs.pinned.artifact, []);
   const allItems = orderedLibrary([...arranged.pinned, ...arranged.rest], prefs.libraryOrder?.[courseKey]);
   const filteredIds = new Set(filtered.map(item => item.id));
   const items = allItems.filter(item => filteredIds.has(item.id));
   const organizer = useLibraryOrganizer(`${courseKey}:${filter}`, allItems.map(item => item.id), items.map(item => item.id), ids => reorderLibrary(courseKey, ids));
   const selectedItems = allItems.filter(item => organizer.selectedIds.includes(item.id));
+  const remakeIds = new Set(selectedItems.filter(item => item.type === 'reviewer' && item.sourceMaterialId).map(item => item.sourceMaterialId!));
+  const allInCourse = remaining.length > 0 && remaining.every(item => organizer.selected.has(item.id));
+  const confirmRemake = () => Alert.alert(allInCourse ? 'Remake all Reviewers?' : 'Remake selected Reviewers?',
+    'Create fresh versions from ' + remakeIds.size + ' selected Reviewer ' + (remakeIds.size === 1 ? 'source' : 'sources') + '? Ready original materials will be queued; current versions stay available until replacements finish.'
+    + (selectedItems.some(item => item.type === 'reviewer' && !item.sourceMaterialId) ? ' Reviewers without original course materials will be skipped.' : ''), [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remake', onPress: () => void batch.run(courseKey, remakeIds) },
+    ]);
   const identity = courseKey ? libraryIdentity(courseKey, courseItems[0]?.course ?? null) : null;
   const label = librarySegments.find((segment) => segment.value === filter)!.label.toLowerCase();
   const unavailable = filter !== "all" && library.categories ? !available(library.categories[filter]) : false;
@@ -270,25 +278,25 @@ export function LibraryCourseScreen() {
     <Page
       back
       title={identity?.title ?? "Library"}
-      subtitle={identity?.subtitle ?? undefined}
+      subtitle={organizer.editing ? `${selectedItems.length} selected` : identity?.subtitle ?? (items.length ? `${items.length} saved items` : undefined)}
       onRefresh={library.refresh}
       scrollRef={organizer.scrollRef}
       onScroll={organizer.onScroll}
       scrollEnabled={!organizer.dragging}
       refreshEnabled={!organizer.editing}
-      headerAction={items.length ? <Action secondary onPress={organizer.editing ? organizer.done : organizer.begin}>{organizer.editing ? 'Done' : 'Organize'}</Action> : undefined}
-      footer={organizer.editing ? <View style={{ gap: spacing[2], padding: spacing[3] }}>
-        <Copy size="caption">{selectedItems.length} selected · Hold and drag to move</Copy>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-          <Action secondary disabled={!selectedItems.length || !!organizer.dragging} onPress={() => organizer.moveToEdge(false)}>Move to top</Action>
-          <Action secondary disabled={!selectedItems.length || !!organizer.dragging} onPress={() => organizer.moveToEdge(true)}>Move to bottom</Action>
-          <Action secondary disabled={!selectedItems.length || removal.busy || batch.busy || offline || !!organizer.dragging} onPress={() => removal.confirm(selectedItems)}>Remove selected</Action>
-        </View>
-      </View> : undefined}
       headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
-          <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />
+          <View style={{ height: 48, justifyContent: 'center' }}>
+            {organizer.editing ? <LibrarySelectionToolbar
+              allSelected={organizer.allSelected} allInCourse={allInCourse}
+              canRemake={!batch.busy && !removal.busy && remakeIds.size > 0 && !offline}
+              canRemove={selectedItems.length > 0 && !removal.busy && !batch.busy && !offline}
+              dragging={!!organizer.dragging}
+              onRemake={confirmRemake} onRemove={() => removal.confirm(selectedItems, allInCourse)}
+              onToggleAll={organizer.toggleAll} onCancel={organizer.done}
+            /> : <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />}
+          </View>
           {offlineCaption ? <Copy muted size="caption" style={{ marginTop: spacing[2] }}>{offlineCaption}</Copy> : null}
         </View>
       }
@@ -296,14 +304,6 @@ export function LibraryCourseScreen() {
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {!library.localReady ? <LibrarySkeleton /> : null}
       {unavailable ? <Notice>This category is temporarily unavailable.</Notice> : null}
-      {remaining.length > 0 ? <Surface>
-        <Action secondary disabled={batch.busy || removal.busy || !remakeIds.size || offline} onPress={() => Alert.alert('Remake all Reviewers?', 'Create fresh versions of ' + remakeIds.size + ' saved Reviewer sources in this course? Ready original materials will be queued; current versions stay available until replacements finish.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Remake all', onPress: () => void batch.run(courseKey, remakeIds) },
-        ])}>{batch.busy ? 'Submitting Reviewers…' : 'Remake all reviewers'}</Action>
-        <Action secondary disabled={removal.busy || batch.busy || offline} onPress={() => removal.confirm(remaining, true)}>{removal.busy ? 'Removing…' : 'Remove all'}</Action>
-        {remaining.some(item => item.type === 'reviewer' && !item.sourceMaterialId) ? <Copy muted size="caption">Reviewers without an original course material cannot be remade in bulk.</Copy> : null}
-      </Surface> : null}
       {batch.note ? <Notice>{batch.note}</Notice> : null}
       {removal.note ? <Notice>{removal.note}</Notice> : null}
       {remake.note ? <Notice>{remake.note}</Notice> : null}
@@ -313,7 +313,6 @@ export function LibraryCourseScreen() {
           <Copy muted>Generate from this course&apos;s materials when you are ready.</Copy>
         </Surface>
       ) : null}
-      {items.length ? <Copy muted size="caption">{organizer.editing ? 'Tap items to select. Tap Done when finished.' : 'Hold an item to rearrange or select.'}</Copy> : null}
       <View ref={organizer.listRef} collapsable={false} style={{ gap: 14 }} {...organizer.panHandlers} onTouchStart={organizer.touchStart} onTouchEnd={organizer.touchEnd} onTouchCancel={organizer.touchCancel}>
       {items.slice(0, visible).map((item) => {
         const pinned = prefs.pinned.artifact.includes(item.id);
@@ -339,7 +338,7 @@ export function LibraryCourseScreen() {
                 organizing={organizer.editing} selected={organizer.selected.has(item.id)}
                 onPress={() => organizer.tap(item.id, () => router.push({ pathname: '/artifact', params: { id: item.id } }))}
                 onLongPress={() => organizer.hold(item.id)}
-                organize={() => { organizer.begin(); }} />
+                organize={() => organizer.begin(item.id)} />
             </SwipeRow>
           </Animated.View>
         );
