@@ -1,13 +1,14 @@
 import { StudyAnswerArea, useAnswerReveal } from './studyAnswerScroll';
 import { StudyText } from './StudyText';
 import {
+  STUDY_IMAGE_SUGGESTIONS, type StudyImageTarget, studyAskSubject,
   STUDY_ACTIONS, STUDY_ACTION_LABELS, STUDY_ACTION_TITLES, STUDY_ASK_SUGGESTIONS, STUDY_GROUNDING_DETAILS, STUDY_GROUNDING_LABELS, STUDY_LIMITS,
   STUDY_MODIFIER_LABELS, STUDY_QUESTION_TOO_LONG, STUDY_REFINEMENTS, STUDY_SELECTION_TOO_LARGE, STUDY_TOOLS_PROMPT_VERSION, checkStudySelection,
   studySurface, type AssistSelection, type StudyAction, type StudyFollowUp, type StudyGrounding, type StudyModifier,
   type StudyToolRequest, type StudyToolResult,
 } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Pressable, TextInput, View, useWindowDimensions, type GestureResponderEvent, type ScrollView } from 'react-native';
+import { Image, Pressable, TextInput, View, useWindowDimensions, type GestureResponderEvent, type ScrollView } from 'react-native';
 import { useAuth } from '../../auth';
 import { getApiBaseUrl } from '../../config/apiBaseUrl';
 import { haptic } from '../../design/haptics';
@@ -15,6 +16,7 @@ import { Action, Copy, Notice, SkeletonBlock } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
 import { radius, spacing } from '../../design/tokens';
 import { createStudyToolsSession, StudyToolsError } from '../../services/studyTools';
+import { EXTERNAL_IMAGE_HEADERS } from '../../services/externalVisuals';
 
 type Range = { start: number; end: number };
 type Run = { status: 'pending' } | { status: 'ready'; result: StudyToolResult } | { status: 'error'; message: string };
@@ -31,7 +33,7 @@ const stop = (event: GestureResponderEvent) => event.stopPropagation();
  * exact range, then Define, Explain, Example, Test Me or Ask run on it here.
  * Refinements generate only when tapped; repeats reuse this session's results.
  */
-export function SmartSelectionPanel({ selection, askText, onActiveChange, scrollRef }: { selection: AssistSelection; askText?: string; onActiveChange?: (active: boolean) => void; scrollRef?: RefObject<ScrollView | null> }) {
+export function SmartSelectionPanel({ selection, askText, image, onActiveChange, scrollRef }: { image?: StudyImageTarget; selection: AssistSelection; askText?: string; onActiveChange?: (active: boolean) => void; scrollRef?: RefObject<ScrollView | null> }) {
   const { session } = useAuth();
   const { colors, reducedMotion } = useTheme();
   const { height: windowHeight } = useWindowDimensions();
@@ -40,9 +42,9 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
   const [range, setRange] = useState<Range>({ start: 0, end: 0 });
   const picked = surface.slice(Math.min(range.start, range.end), Math.max(range.start, range.end));
   const check = checkStudySelection(selection.block, picked);
-  const [action, setAction] = useState<StudyAction | null>(null);
+  const [action, setAction] = useState<StudyAction | null>(image ? 'ask' : null);
   // The selection an action ran on stays fixed while its results are shown.
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(image ? studyAskSubject(selection.block) : '');
   const [shown, setShown] = useState<{ modifier?: StudyModifier; run: Run } | null>(null);
   const [test, setTest] = useState<TestState>(EMPTY_TEST);
   const [turns, setTurns] = useState<AskTurn[]>([]);
@@ -92,7 +94,7 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
     const revealToken = revealAnswer.begin(scrollId);
     apply({ status: 'pending' });
     const request: StudyToolRequest = { reviewerId: selection.reviewerId, sectionId: selection.sectionId, blockId: selection.blockId,
-      contentHash: selection.contentHash, promptVersion: STUDY_TOOLS_PROMPT_VERSION, selection: text, action: act,
+      contentHash: selection.contentHash, promptVersion: STUDY_TOOLS_PROMPT_VERSION, selection: text, action: act, ...(image ? { image: image.reference } : {}),
       ...Object.fromEntries(Object.entries(extra).filter(([, value]) => value !== undefined)) };
     const client = { baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' };
     studySession.run(client, request).then(result => {
@@ -152,7 +154,7 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
   }
 
   return <View ref={root} collapsable={false} style={{ gap: spacing[3] }}>
-    {action ? <View style={{ gap: spacing[2], backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4] }}>
+    {image ? <Image source={{uri:image.thumbnail, ...(image.reference.kind === 'external_visual' ? {headers:EXTERNAL_IMAGE_HEADERS} : {})}} accessibilityLabel={image.label} resizeMode="contain" style={{width:'100%',height:160}} /> : action ? <View style={{ gap: spacing[2], backgroundColor: colors.surfaceSecondary, borderRadius: radius.control, padding: spacing[4] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Copy size="caption" color={colors.textMuted} style={{ flex: 1, fontWeight: '700', letterSpacing: 0.8 }}>SELECTED</Copy>
         <Pressable accessibilityRole="button" onPress={() => { haptic.select(); revealAnswer.cancel(); setAction(null); }} hitSlop={8}>
@@ -189,7 +191,7 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
         <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700' }}>Selected  </Copy>{`“${check.text}”`}
       </Copy> : check.reason === 'too_large' ? <Notice>{STUDY_SELECTION_TOO_LARGE}</Notice> : null}
     </View>}
-    {selecting ? <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 6 }}>
+    {selecting && !image ? <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 6 }}>
       {STUDY_ACTIONS.map(item => {
         const current = action === item;
         const disabled = !action && !check.ok;
@@ -257,9 +259,9 @@ export function SmartSelectionPanel({ selection, askText, onActiveChange, scroll
       {turns.length > STUDY_LIMITS.followUps ? <Action secondary onPress={() => { haptic.select(); setTurns([]); }}>New question</Action>
         : turns.some(turn => turn.run.status === 'pending') ? null : <>
           {turns.length === 0 ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-            {STUDY_ASK_SUGGESTIONS.map(suggestion => <Chip key={suggestion} label={suggestion} onPress={() => ask(suggestion)} />)}
+            {(image ? STUDY_IMAGE_SUGGESTIONS : STUDY_ASK_SUGGESTIONS).map(suggestion => <Chip key={suggestion} label={suggestion} onPress={() => ask(suggestion)} />)}
           </View> : null}
-          <TextInput ref={askField} onFocus={() => reveal(askField)} onBlur={() => setTyping(false)} accessibilityLabel={turns.length ? 'Ask a follow-up' : 'Ask about the selected text'} placeholder={turns.length ? 'Ask a follow-up…' : 'Ask something about the selected text...'}
+          <TextInput ref={askField} onFocus={() => reveal(askField)} onBlur={() => setTyping(false)} accessibilityLabel={turns.length ? 'Ask a follow-up' : image ? 'Ask about this image' : 'Ask about the selected text'} placeholder={turns.length ? 'Ask a follow-up…' : image ? 'Ask something about this image...' : 'Ask something about the selected text...'}
             placeholderTextColor={colors.textMuted} value={draft} onChangeText={setDraft} multiline
             style={{ minHeight: 64, maxHeight: 150, padding: spacing[3], borderRadius: radius.control, borderWidth: 1, borderColor: draft.length > STUDY_LIMITS.question ? colors.danger : colors.separator, color: colors.textPrimary, backgroundColor: colors.surfaceSecondary, textAlignVertical: 'top' }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>

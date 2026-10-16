@@ -21,6 +21,14 @@ async function mount(offline = false) { await act(async () => { tree = create(cr
 const buttons = () => tree!.root.findAllByType(Pressable);
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('source-page thumbnail and viewer', () => {
+  it('asks about the exact ready snapshot from inline and zoom controls',async()=>{
+    const onAsk=vi.fn();const data={...ready,id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'};mocks.read.mockResolvedValue(data);
+    await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,onAsk}));});
+    const ask=()=>buttons().filter(n=>n.props.accessibilityLabel==='Ask about this image');
+    await act(async()=>ask()[0]!.props.onPress());expect(onAsk).toHaveBeenLastCalledWith({reference:{kind:'page_snapshot',id:data.id},thumbnail:data.url,label:'Source page 2'});
+    await act(async()=>buttons()[0]!.props.onPress());await act(async()=>ask().at(-1)!.props.onPress());
+    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findByType(Modal).props.visible).toBe(false);
+  });
   it.each([undefined, {'User-Agent':'StayFocused/2.1.0 (https://github.com/galaxymaxp/stay-focused-v2)'}])('passes optional external headers to zoom images without adding them to course images (%j)',async headers=>{
     await act(async()=>{tree=create(createElement(ZoomablePage,{url:ready.url,width:1400,height:1867,onError:vi.fn(),...(headers?{headers}:{})}));});
     expect(tree!.root.findByType(Image).props.source).toEqual({uri:ready.url,...(headers?{headers}:{})});
@@ -37,7 +45,7 @@ describe('source-page thumbnail and viewer', () => {
     mocks.read.mockResolvedValue({ available: false, reason }); await mount(); expect(buttons()).toHaveLength(0);
   });
   it('hides offline without asking the server to render', async () => {
-    await mount(true); expect(buttons()).toHaveLength(0); expect(mocks.read).not.toHaveBeenCalled();
+    await mount(true); expect(buttons().filter(n=>!n.props.disabled)).toHaveLength(0); expect(mocks.read).not.toHaveBeenCalled();
   });
   it('shows the local PDF thumbnail in the existing page viewer', async () => {
     mocks.read.mockResolvedValue({ ...ready, sourceLabel: 'My uploaded PDF' }); await mount();
@@ -53,7 +61,7 @@ describe('source-page thumbnail and viewer', () => {
     expect(tree!.root.findAllByType(Text).map(node => [node.props.children].flat().join('')).join(' '))
       .toContain('From page 2 Page preview unavailable');
     await act(async () => tree!.update(createElement(SourcePageSnapshot, { ...props, offline: true })));
-    expect(tree!.root.findAllByType(Text)).toHaveLength(0);
+    expect(tree!.root.findAllByType(Text).map(n=>n.props.children).join(' ')).toContain('Reconnect');
   });
   it('closes an open viewer and keeps the page text when deletion wins on recheck', async () => {
     mocks.read.mockResolvedValue(ready); await mount();
@@ -90,7 +98,7 @@ describe('source-page thumbnail and viewer', () => {
   it('hides a ready snapshot when the reader switches to an offline device copy', async () => {
     mocks.read.mockResolvedValue(ready); await mount();
     await act(async () => tree!.update(createElement(SourcePageSnapshot, { ...props, offline: true })));
-    expect(buttons()).toHaveLength(0);
+    expect(buttons()).toHaveLength(1);expect(buttons()[0]!.props.disabled).toBe(true);
   });
   it('does not discover before the section approaches view and automatically renders after discovery',async()=>{
     mocks.read.mockResolvedValueOnce({available:true,status:'unrendered',page:2}).mockResolvedValue(ready);

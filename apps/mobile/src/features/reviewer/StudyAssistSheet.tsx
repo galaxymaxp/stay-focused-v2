@@ -1,6 +1,6 @@
 import { StudyAnswerArea, StudyAnswerScrollContext, useAnswerReveal, useStudyAnswerScroll } from './studyAnswerScroll';
 import { StudyText } from './StudyText';
-import { ASSIST_LABELS, ASSIST_RESULT_LABELS, ASSIST_TYPES, studyAskSubject, type AssistType } from '@stay-focused/shared';
+import { ASSIST_LABELS, ASSIST_RESULT_LABELS, ASSIST_TYPES, studyAskSubject, type AssistType, type StudyImageTarget } from '@stay-focused/shared';
 import { AlignLeft, ArrowLeftRight, Check, FlaskConical, Lightbulb, RotateCcw } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { ActivityIndicator, Pressable, View, type ScrollView } from 'react-native';
@@ -25,7 +25,7 @@ const HINTS: Record<AssistType, string> = {
  * Every option can run at once; each shows its own state. Requests keep going
  * after the sheet closes, and the Reviewer marks the passage when they land.
  */
-export function StudyAssistSheet(props: { target: AssistTarget | null; onClose: () => void }) {
+export function StudyAssistSheet(props: { target: AssistTarget | null; image?: StudyImageTarget; onClose: () => void }) {
   const scroll = useRef<ScrollView>(null);
   const reveal = useStudyAnswerScroll(scroll);
   return <StudyAnswerScrollContext.Provider value={reveal}><Sheet title="Study Assist" onClose={props.onClose} scrollRef={scroll} onScrollBeginDrag={() => reveal.controller.manualScroll()}>
@@ -33,7 +33,7 @@ export function StudyAssistSheet(props: { target: AssistTarget | null; onClose: 
   </Sheet></StudyAnswerScrollContext.Provider>;
 }
 
-function StudyAssistContent({ target, scroll }: { target: AssistTarget | null; onClose: () => void; scroll: React.RefObject<ScrollView | null> }) {
+function StudyAssistContent({ target, image, scroll }: { target: AssistTarget | null; image?: StudyImageTarget; onClose: () => void; scroll: React.RefObject<ScrollView | null> }) {
   const reveal = useAnswerReveal();
   const [studying, setStudying] = useState(false);
   const revealToken = useRef(0);
@@ -91,8 +91,8 @@ function StudyAssistContent({ target, scroll }: { target: AssistTarget | null; o
   const [minHeight, setMinHeight] = useState(0);
   return <>
     {target ? <View onLayout={event => { const height = event.nativeEvent.layout.height; setMinHeight(current => Math.max(current, height)); }} style={{ gap: spacing[3], minHeight }}>
-      <SmartSelectionPanel key={key} selection={target.selection} askText={studyAskSubject(target.selection.block, target.pointIndex)} onActiveChange={setStudying} scrollRef={scroll} />
-      {studying ? null : <>
+      <SmartSelectionPanel key={key} selection={target.selection} image={image} askText={studyAskSubject(target.selection.block, target.pointIndex)} onActiveChange={setStudying} scrollRef={scroll} />
+      {studying || image ? null : <>
       <Copy size="caption" color={colors.textMuted} style={{ fontWeight: '700', letterSpacing: 0.8, paddingTop: spacing[2] }}>QUICK ASSISTS · WHOLE {target.pointIndex !== undefined ? 'KEY POINT' : 'CONCEPT'}</Copy>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
         {ASSIST_TYPES.map(type => <OptionTile key={type} type={type} entry={entries[type]} selected={shown === type} onPress={() => choose(type)} />)}

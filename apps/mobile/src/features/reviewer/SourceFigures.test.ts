@@ -23,8 +23,17 @@ const button=(label:string)=>tree!.root.findAllByType(Pressable).find(node=>node
 async function mount(overrides:Partial<typeof props>={}) {await act(async()=>{tree=create(createElement(SourceFigures,{...props,...overrides}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();vi.useRealTimers();});
 describe('in-place source figure sheet',()=>{
+  it('asks about each exact figure inline and in zoom, closing the viewer first',async()=>{
+    const onAsk=vi.fn();mocks.read.mockResolvedValue([figure]);
+    await act(async()=>{tree=create(createElement(SourceFigures,{...props,onAsk}));});
+    await act(async()=>button('Ask about this image').props.onPress());
+    expect(onAsk).toHaveBeenLastCalledWith({reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label:'Diagram from page 2'});
+    await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
+    await act(async()=>tree!.root.findAllByType(Pressable).filter(n=>n.props.accessibilityLabel==='Ask about this image').at(-1)!.props.onPress());
+    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+  });
   it.each([{hasFigures:false},{offline:true}])('hides icon without figures or offline (%j)',async override=>{
-    await mount(override);expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);expect(mocks.read).not.toHaveBeenCalled();
+    await mount(override);expect(tree!.root.findAllByType(Pressable).filter(node=>!node.props.disabled)).toHaveLength(0);expect(mocks.read).not.toHaveBeenCalled();
   });
   it('shows only the image action, opens and closes the existing sheet in the reader',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount();expect(mocks.read).toHaveBeenCalledOnce();
@@ -51,7 +60,7 @@ describe('in-place source figure sheet',()=>{
   it('closes the viewer on an offline device-copy switch',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount();await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
     await act(async()=>tree!.update(createElement(SourceFigures,{...props,offline:true})));
-    expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);
+    expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);expect(tree!.root.findAllByType(Pressable).every(node=>node.props.disabled)).toBe(true);
   });
   it('loads only near view, retains loaded inline images offscreen, and ignores an aborted late fetch',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount({visible:false});expect(mocks.read).not.toHaveBeenCalled();

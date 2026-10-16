@@ -1,3 +1,5 @@
+import type { StudyImageTarget } from '@stay-focused/shared';
+import { AskImageButton } from './AskImageButton';
 import { useEffect, useRef, useState } from 'react';
 import { Image, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Sheet } from '../../design/primitives';
@@ -35,8 +37,8 @@ export function useFigureAvailability(client:ExperienceClient,artifactId:string|
   return !offline && artifactId===state.artifactId?state.sections:EMPTY;
 }
 
-export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true}:{
-  client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;visible?:boolean;
+export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,onAsk}:{
+  client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;visible?:boolean;onAsk?:(image:StudyImageTarget)=>void;
 }) {
   const {colors}=useTheme();const {height}=useWindowDimensions();
   const [open,setOpen]=useState(false);const [figures,setFigures]=useState<readonly SourceFigure[]>([]);
@@ -59,16 +61,17 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
     finally {clearTimeout(timeout);}})();
     return ()=>{controller.abort();clearTimeout(timeout);if(request.current===controller)request.current=null;};
   },[client,artifactId,sectionId,hasFigures,offline,visible,figures.length,hidden]);
-  if(offline || !hasFigures || hidden)return null;
+  if(offline)return hasFigures ? <AskImageButton offline /> : null;
+  if(!hasFigures || hidden)return null;
   const figure=figures[index];const label=figure?.page?`From page ${figure.page}`:figure?.slide?`From slide ${figure.slide}`:'From source';
   return <>
     {figures.length?<View style={{gap:spacing[2],padding:spacing[3],borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
       <Text style={{color:colors.textMuted}}>From your course material</Text>
       {figures.map((item,i)=>{
         const caption=item.slide?`Diagram from slide ${item.slide}`:item.page?`Diagram from page ${item.page}`:'Source diagram';
-        return <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Enlarge ${caption}`} onPress={()=>{setIndex(i);setOpen(true);}}>
+        return <View key={item.id}><Pressable accessibilityRole="button" accessibilityLabel={`Enlarge ${caption}`} onPress={()=>{setIndex(i);setOpen(true);}}>
           <Image source={{uri:item.url}} accessibilityLabel={caption} resizeMode="contain" style={{width:'100%',height:Math.min(360,360*item.height/item.width)}} onError={()=>{setHidden(true);close();}}/>
-        </Pressable>;
+        </Pressable><AskImageButton offline={offline} onAsk={onAsk} image={{reference:{kind:'figure',id:item.id},thumbnail:item.url,label:caption}} /></View>;
       })}
     </View>:null}
     {open?<Sheet title="Source figures" onClose={close}>
@@ -78,6 +81,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
           <ZoomablePage key={figure.id} url={figure.url} width={figure.width} height={figure.height} label="Source figure"
             onError={()=>{setHidden(true);close();}}/>
         </View>
+        <AskImageButton offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}} />
         {figures.length>1?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing[2]}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Previous figure" accessibilityState={{disabled:index===0}} disabled={index===0}
             onPress={()=>setIndex(n=>Math.max(0,n-1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===0?colors.textMuted:colors.accent}}>Previous</Text></Pressable>

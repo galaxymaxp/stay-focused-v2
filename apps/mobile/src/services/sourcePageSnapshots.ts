@@ -3,7 +3,7 @@ import { experienceRequest, type ExperienceClient } from './experienceApi';
 export type PageSnapshot = (
   | { available: false; reason: string; page?: number }
   | { available: true; status: 'rendering' | 'unrendered'; page: number }
-  | { available: true; url: string; page: number; width: number; height: number; sourceLabel: string }) & { labelKind?: 'slide' };
+  | { available: true; id?: string; url: string; page: number; width: number; height: number; sourceLabel: string }) & { labelKind?: 'slide' };
 
 export async function readPageSnapshot(client: ExperienceClient, artifactId: string, sectionId: string,
   render: boolean, signal?: AbortSignal): Promise<PageSnapshot> {
@@ -25,7 +25,7 @@ export async function readPageSnapshot(client: ExperienceClient, artifactId: str
       data.sourceLabel.length > 500 || typeof data.width !== 'number' || typeof data.height !== 'number' ||
       !Number.isSafeInteger(data.width) || !Number.isSafeInteger(data.height) || data.width <= 0 || data.width > 1400 ||
       data.height <= 0 || data.height > 10000) throw new Error('snapshot_invalid');
-  return { available: true, url: data.url, page: data.page, width: data.width, height: data.height, sourceLabel: data.sourceLabel, ...label };
+  return { available: true, ...(typeof data.id === 'string' && /^[0-9a-f-]{36}$/i.test(data.id) ? {id:data.id} : {}), url: data.url, page: data.page, width: data.width, height: data.height, sourceLabel: data.sourceLabel, ...label };
 }
 
 export function clampPageZoom(scale: number): number { return Math.min(4, Math.max(1, scale)); }

@@ -1,3 +1,5 @@
+import type { StudyImageTarget } from '@stay-focused/shared';
+import { AskImageButton } from './AskImageButton';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Modal, Pressable, Text, View, type GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,9 +9,10 @@ import { clampPagePan, clampPageZoom, readPageSnapshot, type PageSnapshot } from
 import type { ExperienceClient } from '../../services/experienceApi';
 
 /** Discover and render the exact cited page only when its topic approaches view. */
-export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, onAvailability }: {
+export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, onAsk, onAvailability }: {
   client: ExperienceClient; artifactId: string; sectionId: string; offline: boolean;
   visible?: boolean;
+  onAsk?: (image: StudyImageTarget) => void;
   onAvailability?: (available: boolean | null) => void;
 }) {
   const availabilityRef = useRef(onAvailability); availabilityRef.current = onAvailability;
@@ -85,7 +88,8 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
     if (alive.current && result?.available) setOpen(true);
     if (alive.current) setWaiting(false);
   };
-  if (offline || !snapshot) return null;
+  if (offline) return <AskImageButton offline />;
+  if (!snapshot) return null;
   const unit = snapshot.labelKind === 'slide' ? 'slide' : 'page';
   const captionUnit = snapshot.labelKind === 'slide' ? 'Slide' : 'Page';
   if (!snapshot.available) return snapshot.reason === 'source_revision_unavailable' && snapshot.page
@@ -94,6 +98,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
       <Text style={{ color: colors.textMuted }}>Page preview unavailable</Text>
     </View> : null;
   const ready = 'url' in snapshot ? snapshot : null;
+  const image: StudyImageTarget | undefined = ready?.id ? {reference:{kind:'page_snapshot',id:ready.id},thumbnail:ready.url,label:`Source page ${ready.page}`} : undefined;
   return <>
     <View style={{gap:spacing[2],padding:spacing[3],borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
       <Text style={{color:colors.textMuted}}>From {unit} {snapshot.page} · your course material</Text>
@@ -105,6 +110,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
           {'status' in snapshot && snapshot.status === 'rendering' ? <ActivityIndicator color={colors.accent} /> : null}
         </View>}
     </Pressable>
+    {ready ? <AskImageButton image={image} offline={offline} onAsk={onAsk} /> : null}
     </View>
     <Modal visible={open} animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={() => setOpen(false)}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
@@ -115,6 +121,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
             {!exhausted ? <ActivityIndicator color={colors.accent} /> : null}
             <Text style={{ color: colors.textMuted }}>{exhausted ? 'The page is still preparing. Close and open it again in a moment.' : 'Preparing source page'}</Text>
           </View>}
+        {ready ? <AskImageButton image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}} /> : null}
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>

@@ -8,7 +8,7 @@ vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 vi.mock('./SourceFigures',()=>({SourceFigures:()=>null,useFigureAvailability:()=>new Set()}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:()=>null}));
-vi.mock('react-native', () => ({ View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+vi.mock('react-native', () => ({ Image: 'Image', View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),
   Animated: { View: 'AnimatedView', Value: class { setValue() {} stopAnimation() {} interpolate() { return 1; } },
@@ -76,6 +76,22 @@ async function press(node: ReactTestInstance | undefined) {
 const quoted = (phrase: string) => nodes('Copy').some(node => [node.props.children].flat().some((child: unknown) => typeof child === 'string' && child.includes(`“${phrase}”`)));
 
 describe('Smart Selection learning sheet', () => {
+  it('opens image Ask with thumbnail, ordered chips, typed question, bounded follow-ups and repeat cache', async () => {
+    const image={reference:{kind:'figure' as const,id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'},thumbnail:'https://private.test/thumb',label:'Cell diagram'};
+    network.mockImplementation(async (_client,_path,options)=>ok({action:(options?.body as StudyToolRequest).action}));
+    await act(async()=>{rendered=create(createElement(StudyAssistSheet,{target:{selection},image,onClose:vi.fn()}));});
+    expect(surface()).toBeUndefined();expect(nodes('Image')[0]!.props.source.uri).toBe(image.thumbnail);
+    const chips=pressables('button').map(n=>label(n)).filter(v=>['What is this?','What does it mean?','Explain the parts','Why is it in this lesson?'].includes(v));
+    expect(chips).toEqual(['What is this?','What does it mean?','Explain the parts','Why is it in this lesson?']);
+    await press(button('What is this?'));
+    expect(requests()[0]!.image).toEqual(image.reference);expect(JSON.stringify(requests()[0])).not.toContain(image.thumbnail);
+    for(const question of ['Why?', 'Which part?']) {
+      await act(async()=>nodes('TextInput').find(n=>n.props.accessibilityLabel==='Ask a follow-up')!.props.onChangeText(question));
+      await press(action('Ask'));
+    }
+    expect(requests()[2]!.followUps).toHaveLength(2);expect(nodes('TextInput')).toHaveLength(0);
+    await press(action('New question'));await press(button('What is this?'));expect(network).toHaveBeenCalledTimes(3);
+  });
   it('opens from the topic tap with nothing selected, showing whole-topic quick assists only', async () => {
     await act(async () => { rendered = create(createElement(ReviewerReaderScreen, { artifact: detail.artifact, reviewer, deviceCopy: false })); });
     const explanation = nodes('Text').find(node => node.props.children === block.explanation)!;

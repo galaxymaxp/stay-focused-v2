@@ -21,8 +21,17 @@ const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().j
 async function mount(override:Partial<typeof props>={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();});
 describe('automatic separate external card',()=>{
+  it('asks about the exact attributed image inline and in zoom',async()=>{
+    const onAsk=vi.fn();const visual={...found,id:'a'.repeat(64)};
+    await act(async()=>{tree=create(createElement(ExternalVisual,{...baseProps,visual,onAsk}));});
+    await act(async()=>button('Ask about this image').props.onPress());
+    expect(onAsk).toHaveBeenLastCalledWith({reference:{kind:'external_visual',id:visual.id},thumbnail:visual.image,label:visual.title});
+    await act(async()=>button('View external reference').props.onPress());
+    await act(async()=>tree!.root.findAllByType(Pressable).filter(n=>n.props.accessibilityLabel==='Ask about this image').at(-1)!.props.onPress());
+    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+  });
   it.each([{online:false},{hasSourceVisual:true}])('hides actions and images for %j',async override=>{
-    await mount(override);expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);expect(mocks.find).not.toHaveBeenCalled();
+    await mount(override);expect(tree!.root.findAllByType(Pressable).filter(node=>!node.props.disabled)).toHaveLength(0);expect(mocks.find).not.toHaveBeenCalled();
   });
   it('displays the batch image without a section search and labels its zoom sheet',async()=>{
     mocks.find.mockResolvedValue(found);await mount();expect(mocks.find).not.toHaveBeenCalled();

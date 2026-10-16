@@ -1,4 +1,4 @@
-import type { AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
+import type { StudyImageTarget, AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
 import { suggestedQuizTitle, quizCountOptions, quizFormatMaximum, quizSourceCapacity, selectAssistBlock } from "@stay-focused/shared";
 import { StudyAssistSheet } from "./StudyAssistSheet";
 import { router } from "expo-router";
@@ -131,12 +131,18 @@ export function ReviewerReaderScreen({
   const [snapshotAvailability, setSnapshotAvailability] = useState<Record<string, boolean | null>>({});
   useEffect(() => setSnapshotAvailability({}), [artifact.id, snapshotClient, deviceCopy]);
   const hasSnapshotControl = artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null;
-  const [assistPassage, setAssistPassage] = useState<{ section: string; block: string; point?: number } | null>(null);
+  const [assistPassage, setAssistPassage] = useState<{ section: string; block: string; point?: number; image?: StudyImageTarget } | null>(null);
   const assistTarget = useMemo<AssistTarget | null>(() => {
     if (!assistPassage) return null;
     const selection = selectAssistBlock(reviewer, assistPassage.section, assistPassage.block);
     return selection ? { selection, ...(assistPassage.point === undefined ? {} : { pointIndex: assistPassage.point }) } : null;
   }, [reviewer, assistPassage]);
+  function askImage(sectionId: string, image: StudyImageTarget) {
+    if (deviceCopy) return;
+    const section = reviewer.sections.find(item => item.id === sectionId);
+    const block = section?.blocks.find(item => selectAssistBlock(reviewer, sectionId, item.id));
+    if (block) setAssistPassage({ section: sectionId, block: block.id, image });
+  }
   const marks = useAssistMarks();
   const markFor = (blockId: string, point?: number): AssistMark => assistMark(marks[assistTargetKey(reviewer.id, blockId, point)]);
   // A tap selects one point; holding the card selects its whole group.
@@ -396,12 +402,12 @@ export function ReviewerReaderScreen({
                 {render(segmentIds.sectionTitle(section.id), section.title)}
               </Text>
               {figureArtifactId ? <SourceFigures client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
-                hasFigures={figureSections.has(section.id)} offline={deviceCopy} visible={visualIsNear(section.id)} /> : null}
+                onAsk={image => askImage(section.id, image)} hasFigures={figureSections.has(section.id)} offline={deviceCopy} visible={visualIsNear(section.id)} /> : null}
               {!figureSections.has(section.id) && (artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null) && session?.accessToken && /^artifact:/.test(artifact.id) ?
                 <SourcePageSnapshot client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy} visible={figureSections.online===true && visualIsNear(section.id)}
-                  onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
+                  onAsk={image => askImage(section.id, image)} onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
             </View>
-            {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={reviewerVisuals?.[section.id]}
+            {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={reviewerVisuals?.[section.id]} onAsk={image => askImage(section.id, image)}
               online={!deviceCopy && figureSections.online === true && (!hasSnapshotControl || snapshotAvailability[section.id] != null)}
               hasSourceVisual={figureSections.has(section.id) || snapshotAvailability[section.id] === true} /> : null}
             {section.blocks.map((block, blockIndex) => (
@@ -480,7 +486,7 @@ export function ReviewerReaderScreen({
       </View>
       {quizOpen ? <QuizFromReviewerSheet artifact={artifact} reviewer={reviewer} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
       {exportOpen ? <ExportSheet detail={{ artifact, reviewer }} onClose={() => setExportOpen(false)} /> : null}
-      {assistPassage ? <StudyAssistSheet key={openKey ?? "missing"} target={assistTarget} onClose={() => setAssistPassage(null)} /> : null}
+      {assistPassage ? <StudyAssistSheet key={`${openKey ?? "missing"}|${assistPassage.image?.reference.id ?? ""}`} target={assistTarget} image={assistPassage.image} onClose={() => setAssistPassage(null)} /> : null}
     </Page>
   );
 }

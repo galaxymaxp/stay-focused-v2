@@ -6,7 +6,7 @@ export const EXTERNAL_VISUAL_LABEL='External reference — not from your course 
 export const EXTERNAL_IMAGE_HEADERS = Object.freeze({
   'User-Agent': 'StayFocused/2.1.0 (https://github.com/galaxymaxp/stay-focused-v2)',
 });
-export type ExternalVisual = ({status:'found';image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
+export type ExternalVisual = ({status:'found';id?:string;image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
   | {status:'none';message:'No reliable visual found'}) & {attemptCount:number};
 export type ExternalReferenceVisual = Extract<ExternalVisual, { status: 'found' }>;
 export interface ReviewerVisuals {
@@ -30,7 +30,7 @@ export function parseExternalVisual(value:unknown):ExternalVisual {
     typeof v.license!=='string' || !['Public domain','CC0','CC BY','CC BY-SA'].includes(v.license) ||
     typeof v.width!=='number' || !Number.isSafeInteger(v.width) || v.width<1 || v.width>1200 ||
     typeof v.height!=='number' || !Number.isSafeInteger(v.height) || v.height<1 || v.height>10000)throw new Error('visual_invalid');
-  return {status:'found',image:v.image,title:v.title,credit:v.credit,license:v.license,licenseUrl:v.licenseUrl,sourceUrl:v.sourceUrl,label:EXTERNAL_VISUAL_LABEL,
+  return {status:'found',...(typeof v.id==='string' && /^[0-9a-f]{64}$/.test(v.id)?{id:v.id}:{}),image:v.image,title:v.title,credit:v.credit,license:v.license,licenseUrl:v.licenseUrl,sourceUrl:v.sourceUrl,label:EXTERNAL_VISUAL_LABEL,
     width:v.width,height:v.height,attemptCount:v.attemptCount};
 }
 export async function findExternalVisual(client:ExperienceClient,artifactId:string,sectionId:string,findAnother:boolean,signal?:AbortSignal):Promise<ExternalVisual> {
