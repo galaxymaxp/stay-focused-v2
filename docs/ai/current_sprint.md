@@ -30,7 +30,7 @@ FRESH mobile suite: 1,124 tests / 119 files PASS. Focused authentication/storage
 duplicate taps, account fencing and permanent rejection. FRESH forced root typecheck/lint/build pass 8/8 each, zero cached; six
 existing lint warnings. A final lifecycle concurrency adjustment has fresh
 mobile suite/typecheck/lint coverage; the preview export verifies its bundle.
-Preview/device acceptance is in progress. Earlier silent-screen assertion
+Preview/device acceptance passes as recorded below. Earlier silent-screen assertion
 failed because it inspected Copy nodes instead of the rendered Notice; fixed.
 
 Read-only live checks confirm the API production deployment uses `ed67445`
@@ -38,6 +38,29 @@ and all CQ1/SP2/SH1/GA1b migrations are present. Vercel connector inspection
 returned 403; the explicitly scoped authenticated CLI fallback succeeded.
 The installed Realme APK 2.1.0/code 5 includes expo-clipboard, so this remains
 a JavaScript-only update on runtime `2.1.0-sdk57`.
+
+FRESH PASS: Android preview group `e2aa9590-bb0b-4afe-908a-36bd52d5cc8c`,
+update `01a1465e-b73c-7d7a-be19-13d2ad63195d`, source `a4d11a8`,
+runtime `2.1.0-sdk57`, published 2026-10-17 04:19 Manila. The update is
+active on Realme 2.1.0/code 5: current cached-first status/Queue and retained
+four-icon Library controls are visible. With Android reporting no active
+default network, force-stop/relaunch retains the account, opens the course
+Library and reads a full saved Reviewer. Native hold/drag reorders two cards;
+an inverse drag restores the original order. Original Wi-Fi/data settings are
+restored. Recent app-process sample: zero matching fatal/JS errors.
+
+FRESH web suite 154/154, TypeScript and lint pass after mirroring the shared
+Library-order preference schema. PR CI initially found that mirror mismatch
+and a missing Chromium executable; the workflow now installs its required
+Playwright Chromium before browser tests. [Draft PR #12](https://github.com/galaxymaxp/stay-focused-v2/pull/12)
+retains the combined changes for mainline review. CI rerun is pending.
+
+NOT RUN: paid real-source generation/deletion and forced real-token expiry on
+the phone. Silent admission, screen exit/restart recovery and expired-token
+startup are covered by deterministic regressions. The first physical attempt
+used Android's stale global mobile-data preference as its offline check; it
+was not accepted as offline proof. The successful rerun verifies that there is
+no active default network. No native build or backend mutation was needed.
 
 See [acceptance](acceptance/realme-offline-current-20261017.md).
 

@@ -32,6 +32,7 @@ jobs:
       - run: npm test -w @stay-focused/engine
       - run: npm test -w @stay-focused/api -- --maxWorkers=4
       - run: npm test -w @stay-focused/mobile
+      - run: npx playwright install --with-deps chromium
       - run: npm test -w @stay-focused/web
       - run: npm run provider:contract -w @stay-focused/api
       - run: npm run build -- --force
