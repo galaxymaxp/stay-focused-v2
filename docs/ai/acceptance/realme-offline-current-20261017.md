@@ -71,4 +71,3 @@ startup are covered by deterministic regressions. The first physical attempt
 used Android's stale global mobile-data preference as its offline check; it
 was not accepted as offline proof. The successful rerun verifies that there is
 no active default network. No native build or backend mutation was needed.
-
