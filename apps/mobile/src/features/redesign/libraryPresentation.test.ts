@@ -17,13 +17,12 @@ const items = [
 ];
 
 describe("Library presentation", () => {
-  it("groups saved work into one tile per course, newest created first including personal", () => {
+  it("groups saved work into one tile per course, newest first, personal last", () => {
     const groups = groupLibraryByCourse(items);
     expect(groups.map((group) => [group.key, group.total, group.counts])).toEqual([
-      ["personal", 1, { reviewer: 1, quiz: 0, activity_output: 0 }],
       ["mobile", 2, { reviewer: 1, quiz: 0, activity_output: 1 }],
       ["capstone", 2, { reviewer: 1, quiz: 1, activity_output: 0 }],
-
+      ["personal", 1, { reviewer: 1, quiz: 0, activity_output: 0 }],
     ]);
   });
 
