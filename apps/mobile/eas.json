@@ -23,7 +23,7 @@
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://stay-focused-v2-prototype.vercel.app"
       },
-      "autoIncrement": true
+      "autoIncrement": false
     },
     "production": {
       "autoIncrement": true,
